@@ -1,0 +1,31 @@
+# ma 자동 결과 원장
+
+> 자동 생성 파일이다. 직접 수정하지 않는다. 원시 기준은 트랙 상태 JSON과 실행 로그의 종료 요약이다.
+> 연구적 비교와 확정 결론은 해당 `EXPERIMENTS.md`에 따로 기록한다.
+
+| 완료 시각 | 상태 | tag | 자동 요약 | 큐 질문 |
+|---|---|---|---|---|
+| 2026-08-19 17:28 | 완료 | `g1_live_s1` | MA_EVAL_SUMMARY tag=g1_live_s1 rc=0 sr=0.8989 eps=2348 fin=0.8301 t50=315 colEp=0.2751 colStep=17.96 enter=0.46 still=185.40 path=12.89 pathA=13.07,12.64 | live 시드 1. 910/3000 에서 재개 |
+| 2026-08-19 17:17 | 완료 | `g1_zero_s0` | MA_EVAL_SUMMARY tag=g1_zero_s0 rc=0 sr=0.9067 eps=2190 fin=0.8936 t50=308 colEp=0.2868 colStep=19.38 enter=0.46 still=217.41 path=13.14 pathA=13.23,13.06 | spawn gap 적용 대조군. 942/3000 에서 재개 |
+| 2026-08-19 16:38 | 완료 | `g1_c5_live` | MA_EVAL_SUMMARY tag=g1_c5_live rc=0 sr=0.8862 eps=2334 fin=0.8419 t50=304 colEp=0.3051 colStep=16.74 enter=0.49 still=199.83 path=12.38 pathA=12.52,12.22 | c=5 재확인. 1602/3000 에서 재개 |
+| 2026-08-19 16:26 | 완료 | `t6_nf_c5` | MA_EVAL_SUMMARY tag=t6_nf_c5 rc=0 sr=0.8950 eps=2266 fin=0.8698 t50=315 colEp=0.3098 colStep=15.40 enter=0.52 still=199.92 path=13.22 pathA=13.44,12.97 | 동결 해제 + c=5. 1891/3000 에서 재개 |
+| 2026-08-19 16:24 | 완료 | `g1_live_s0` | MA_EVAL_SUMMARY tag=g1_live_s0 rc=0 sr=0.8931 eps=2294 fin=0.8439 t50=321 colEp=0.2868 colStep=16.93 enter=0.47 still=187.39 path=13.35 pathA=13.49,13.11 | 토큰만 켠다. 1717/3000 에서 재개 |
+| 2026-08-19 16:13 | 완료 | `t6_nf_c0` | MA_EVAL_SUMMARY tag=t6_nf_c0 rc=0 sr=0.8643 eps=2254 fin=0.8469 t50=325 colEp=0.3035 colStep=18.62 enter=0.48 still=194.24 path=13.55 pathA=13.71,13.34 | **동결 해제 · 대조군.** 1969/3000 에서 재개. 중간 지표 `path=8.62` — 동결 런들(12.3~13.0)보다 낮고 A=1 기준선 9.07 에 가깝다 |
+| 2026-08-19 15:22 | 완료 | `g1_zero_s1` | MA_EVAL_SUMMARY tag=g1_zero_s1 rc=0 sr=0.8740 eps=2270 fin=0.8599 t50=312 colEp=0.3057 colStep=21.54 enter=0.48 still=199.58 path=13.28 pathA=13.10,13.58 | zero 시드 1. 1735/3000 에서 재개 |
+| 2026-08-19 08:53 | 완료 | `t1_live_e4096` | MA_EVAL_SUMMARY tag=t1_live_e4096 rc=0 sr=0.8687 eps=2210 fin=0.8674 t50=325 colEp=0.3855 colStep=24.64 enter=0.63 still=205.79 path=13.06 pathA=13.17,12.98 | **env 학습 안정성.** `t1_live_s0` 과 env 수만 다르다. minibatch 를 같은 배수로 올려 롤아웃당 업데이트 48 회를 유지한다 — 안 올리면 96 회가 되어 학습 자체가 달라진다(ENV_SCALING §1, steer 16k 가 걸린 지점). 성공률·근접이 크게 흔들리면 2048 확정을 재검토한다 |
+| 2026-08-19 07:46 | 완료 | `t4_c2_live` | MA_EVAL_SUMMARY tag=t4_c2_live rc=0 sr=0.8867 eps=2340 fin=0.8393 t50=316 colEp=0.3940 colStep=20.66 enter=0.64 still=199.47 path=12.74 pathA=12.78,12.61 | **c 를 실효 크기로.** c=0.2/0.5 는 벌점이 보상의 0.08~1.8 % 라 아무 일도 안 했다(실측: 에피소드 보상합 312, 벌점 총량 0.26). c=2 면 ~7 % |
+| 2026-08-19 07:42 | 완료 | `t4_c2_zero` | MA_EVAL_SUMMARY tag=t4_c2_zero rc=0 sr=0.8809 eps=2410 fin=0.8116 t50=296 colEp=0.3884 colStep=21.50 enter=0.62 still=208.52 path=12.17 pathA=12.21,12.10 | 같은 c=2 에서 토큰만 0. **c 가 실제로 물릴 때 토큰이 쓸모를 갖는가** — 1단계에서 이 질문을 못 던진 건 c 가 죽어 있었기 때문이다 |
+| 2026-08-19 06:57 | 완료 | `t3_mkspn` | MA_EVAL_SUMMARY tag=t3_mkspn rc=0 sr=0.8809 eps=2346 fin=0.8325 t50=313 colEp=0.3725 colStep=18.74 enter=0.61 still=201.23 path=12.43 pathA=12.42,12.43 | **3단계 ①.** dense 팀 항 없이 **종단 makespan 만**. `success_all·(294/T_last)`. 600 프레임에 신호 한 번이라 이중 credit assignment 에 정면으로 걸린다 — **안 되는 걸 보이는 것이 ②③를 쓰는 근거**가 된다 |
+| 2026-08-19 06:44 | 완료 | `t5_r12` | MA_EVAL_SUMMARY tag=t5_r12 rc=0 sr=0.8784 eps=2380 fin=0.8210 t50=308 colEp=0.3756 colStep=19.97 enter=0.66 still=199.53 path=12.12 pathA=12.22,11.91 | **입력축.** 상대 root·속도·heading 만(12). 반응적 회피에 그것만으로 충분한가. 양 끝(zero=0, live=21)은 t1 과 t2_c05_b00 이 겸한다 |
+| 2026-08-19 06:33 | 완료 | `t5_r18` | MA_EVAL_SUMMARY tag=t5_r18 rc=0 sr=0.8833 eps=2330 fin=0.8416 t50=315 colEp=0.3682 colStep=19.72 enter=0.59 still=202.66 path=12.64 pathA=12.86,12.39 | **입력축.** + 상대 박스(18). 상자가 독립적으로 길을 막는 게 중요한가. r18→live 에서 안 좋아지면 *끝점을 알아도 부족하다* = WM 논거 |
+| 2026-08-19 06:32 | 완료 | `t3_minp` | MA_EVAL_SUMMARY tag=t3_minp rc=0 sr=0.8848 eps=2352 fin=0.8261 t50=320 colEp=0.3639 colStep=20.71 enter=0.60 still=190.26 path=12.47 pathA=12.73,12.27 | **3단계 ②.** β 자리를 가중평균 → `min_i(progress)` 로 **교체**. c=0 이라 충돌 벌점 없이 **팀 결합 형태만** 본다. 게으름이 구조적으로 불가능한 형태 |
+| 2026-08-19 04:49 | 완료 | `t4_c5_zero` | MA_EVAL_SUMMARY tag=t4_c5_zero rc=0 sr=0.8647 eps=2414 fin=0.8227 t50=290 colEp=0.3819 colStep=20.86 enter=0.61 still=215.04 path=11.90 pathA=11.73,11.99 | 같은 c=5 에서 토큰만 0 |
+| 2026-08-19 04:38 | 완료 | `t4_c5_live` | MA_EVAL_SUMMARY tag=t4_c5_live rc=0 sr=0.8740 eps=2362 fin=0.8273 t50=310 colEp=0.3929 colStep=20.93 enter=0.63 still=201.76 path=12.23 pathA=12.59,11.90 | c=5. 벌점이 보상의 ~18 %. **여기서도 근접이 안 내려가면 벌점 형태 자체를 다시 봐야 한다** |
+| 2026-08-19 00:43 | 완료 | `t1_live_s0` | MA_EVAL_SUMMARY tag=t1_live_s0 rc=0 sr=0.8838 eps=2294 fin=0.8588 t50=312 colEp=0.4037 colStep=21.95 enter=0.68 still=209.07 path=12.83 pathA=12.88,12.75 | 보상 변경 없이 teammate 21-D 입력만으로 회피가 생기는가 |
+| 2026-08-19 00:42 | 완료 | `t2_c05_b25` | MA_EVAL_SUMMARY tag=t2_c05_b25 rc=0 sr=0.8652 eps=2294 fin=0.8461 t50=324 colEp=0.3670 colStep=22.21 enter=0.62 still=201.56 path=12.98 pathA=12.84,13.08 | 강한 벌점·보상 공유에서 lazy-agent가 생기는지 본다 |
+| 2026-08-19 00:41 | 완료 | `t1_zero_s0` | MA_EVAL_SUMMARY tag=t1_zero_s0 rc=0 sr=0.8818 eps=2348 fin=0.8360 t50=306 colEp=0.3731 colStep=21.44 enter=0.61 still=207.50 path=12.51 pathA=12.64,12.37 | **대조군.** 토큰 자리는 있고 값만 0. 관측 크기가 live 와 같아 같은 네트워크로 비교된다 |
+| 2026-08-19 00:36 | 완료 | `t2_c02_b25` | MA_EVAL_SUMMARY tag=t2_c02_b25 rc=0 sr=0.8584 eps=2372 fin=0.8162 t50=319 colEp=0.3735 colStep=21.15 enter=0.63 still=189.45 path=12.60 pathA=12.75,12.38 | 약한 벌점에 보상 공유를 더했을 때 실효 세기가 변하는가 |
+| 2026-08-19 00:35 | 완료 | `t2_c02_b00` | MA_EVAL_SUMMARY tag=t2_c02_b00 rc=0 sr=0.8760 eps=2382 fin=0.8296 t50=309 colEp=0.3896 colStep=19.93 enter=0.60 still=201.09 path=12.33 pathA=12.38,12.25 | 충돌 벌점만 약하게. `c`가 회피를 만드는 최소선인가 |
+| 2026-08-19 00:35 | 완료 | `t2_c05_b00` | MA_EVAL_SUMMARY tag=t2_c05_b00 rc=0 sr=0.8936 eps=2290 fin=0.8655 t50=316 colEp=0.4052 colStep=23.99 enter=0.68 still=201.87 path=12.90 pathA=13.14,12.68 | 강한 충돌 벌점이 회피와 makespan에 주는 영향을 본다 |
+| 2026-08-19 00:28 | 완료 | `t1_zero_s1` | MA_EVAL_SUMMARY tag=t1_zero_s1 rc=0 sr=0.8628 eps=2336 fin=0.8318 t50=307 colEp=0.3793 colStep=23.91 enter=0.61 still=207.39 path=12.38 pathA=12.50,12.27 | zero 대조군의 학습 시드 변동 |
+| 2026-08-18 21:46 | 완료 | `t1_live_s1` | MA_EVAL_SUMMARY tag=t1_live_s1 rc=0 sr=0.8696 eps=2424 fin=0.7995 t50=316 colEp=0.3680 colStep=21.45 enter=0.62 still=187.06 path=12.55 pathA=12.46,12.62 | live 의 학습 시드 변동 |

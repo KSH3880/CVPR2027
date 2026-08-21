@@ -1,0 +1,136 @@
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 0
+  episodeLength: 600 # 20s
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+
+  localRootObs: True # amp disc obs
+  localRootObsPolicy: False # policy obs
+  rootHeightObs: False # amp disc obs
+  rootHeightObsPolicy: False # policy obs
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot", "right_shin", "left_shin", "right_thigh", "left_thigh"]
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+
+  enableSelfCollisionDetection: True
+  enableTrackInitState: False
+  
+  skill: ["omomo", "loco", "loco_terrain", "pickUp", "carryWith", "putDown"]
+  skillInitProb: [0.0, 0.3, 0.3, 0.0, 0.4, 0.0]
+  skillDiscProb: [0.3, 0.2, 0.2, 0.1, 0.1, 0.1]
+
+  enableTaskObs: True
+  onlyVelReward: False
+  onlyHeightHandHeldReward: False
+  
+  box_vel_penalty: True # to avoid stiff grasping
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.5
+
+  mode: "train"
+
+  box:
+    build:
+      baseSize: [0.4, 0.4, 0.4] # unit: m
+      randomSize: True
+      randomModeEqualProportion: True
+      scaleRangeX: [0.5, 1.5] # default range if randomModeEqualProportion: True
+      scaleRangeY: [0.5, 1.5]
+      scaleRangeZ: [0.5, 1.5]
+      scaleSampleInterval: 0.125 # 0.05m
+      randomDensity: False # if True, mass will be added into policy obs
+
+      testSizes:
+       - [0.22, 0.22, 0.22]
+       - [0.27, 0.27, 0.27]
+       - [0.32, 0.32, 0.32]
+       - [0.37, 0.37, 0.37]
+       - [0.42, 0.42, 0.42]
+       - [0.47, 0.47, 0.47]
+       - [0.52, 0.52, 0.52]
+       - [0.57, 0.57, 0.57]
+       - [0.30, 0.30, 0.40]
+
+    reset:
+      randomRot: True
+      randomHeight: True
+      randomHeightProb: 1.0
+      maxTopSurfaceHeight: 1.2
+      minBottomSurfaceHeight: 0.5 # do not place the box on the irregular terrain!
+
+    obs:
+      enableBboxObs: True
+
+  debug:
+      vel: False
+
+  ##### debug
+  flagSmallTerrain: False # test & eval only
+  flagShowSensors: True # only works when headless==False & num_envs==1
+
+  ##### height map sensor
+  terrain_obs: True
+  localHeightObs: True
+  terrain_obs_type: "square"
+  terrain_obs_root: "pelvis"
+
+  terrain:
+    terrainType: trimesh # none, plane, or trimesh
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.
+    curriculum: False
+    mapLength: 20.
+    mapWidth: 20.
+    numLevels: 5
+    numTerrains: 20
+    # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping, poles, flat]
+    terrainProportions: [0.0, 0.0, 0.35, 0.35, 0.2, 0, 0, 0.1]
+    # terrainProportions: [0, 0, 0, 0, 0, 0, 0, 1.0]
+    slopeTreshold: 0.9
+
+  # power reward
+  power_reward: True
+  power_coefficient: 0.0005
+
+  eval:
+    # override env settings
+    successThreshold: 0.2
+    skill: ["loco", "loco_terrain"]
+    skillInitProb: [0.5, 0.5]
+
+  asset:
+    assetRoot: "tokenhsi/data/assets"
+    assetFileName: "mjcf/phys_humanoid_v3_box_foot.xml"
+
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

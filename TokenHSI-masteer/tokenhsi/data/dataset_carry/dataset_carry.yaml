@@ -1,0 +1,126 @@
+motions:
+  pickUp:
+    - file: motions/carry/ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/carry/ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii/phys_humanoid_v3/box_motion.npy
+      rsi_skipped_range: [30, 75]
+      weight: 1.0
+    - file: motions/carry/ACCAD+__+Female1General_c3d+__+A5_-_pick_up_box_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/carry/ACCAD+__+Female1General_c3d+__+A5_-_pick_up_box_stageii/phys_humanoid_v3/box_motion.npy
+      rsi_skipped_range: [65, 105]
+      weight: 1.0
+
+  putDown:
+    - file: motions/carry/ACCAD+__+Female1Walking_c3d+__+B21_-_put_down_box_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/carry/ACCAD+__+Female1Walking_c3d+__+B21_-_put_down_box_to_walk_stageii/phys_humanoid_v3/box_motion.npy
+      rsi_skipped_range: []
+      weight: 1.0
+
+  carryWith:
+    - file: motions/carry/ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/carry/ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii/phys_humanoid_v3/box_motion.npy
+      rsi_skipped_range: []
+      weight: 1.0
+
+  loco:
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B11_-_walk_turn_left_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B12_-_walk_turn_right_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B13_-_walk_turn_right_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B14_-_walk_turn_right_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B15_-_walk_turn_around_(same_direction)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B16_-_walk_turn_change_direction_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+
+  loco_terrain:
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+167+__+downstairs04_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+167+__+upstairs_downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+183+__+upstairs10_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+359+__+downstairs04_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+359+__+downstairs06_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+359+__+upstairs09_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+359+__+upstairs_downstairs03_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+424+__+upstairs03_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+424+__+upstairs05_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+513+__+downstairs06_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+513+__+downstairs07_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+513+__+upstairs07_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+183+__+downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+167+__+downstairs05_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+3+__+downstairs05_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+424+__+downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+513+__+upstairs_downstairs06_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+423+__+upstairs09_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+424+__+upstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco_stairs/motions/KIT/KIT+__+3+__+upstairs_downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+
+  omomo:
+    - file: motions/omomo/OMOMO+__+sub7_largebox_006/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_007/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_008/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_009/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_010/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_011/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_042/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_043/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_044/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_045/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_046/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_largebox_047/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_smallbox_046/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_smallbox_047/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_smallbox_048/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_smallbox_049/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/omomo/OMOMO+__+sub7_smallbox_051/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0

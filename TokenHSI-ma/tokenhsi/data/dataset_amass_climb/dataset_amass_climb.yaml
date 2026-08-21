@@ -1,0 +1,66 @@
+motions:
+  climb:
+    - file: motions/CMU/CMU+__+36+__+36_04_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/CMU/CMU+__+36+__+36_04_stageii/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [21, 10000]
+    - file: motions/CMU/CMU+__+36+__+36_14_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/CMU/CMU+__+36+__+36_14_stageii/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [44, 10000]
+    - file: motions/CMU/CMU+__+141+__+141_08_stageii/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/CMU/CMU+__+141+__+141_08_stageii/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [52, 10000]
+    - file: motions/CMU/CMU+__+40+__+40_08_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+      rsi_skipped_range: [10, 10000]
+      obj_file: motions/CMU/CMU+__+40+__+40_08_stageii/phys_humanoid_v3/object_state.npy
+    - file: motions/CMU/CMU+__+107+__+107_10_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+      rsi_skipped_range: [11, 10000]
+      obj_file: motions/CMU/CMU+__+107+__+107_10_stageii/phys_humanoid_v3/object_state.npy
+    - file: motions/EKUT/EKUT+__+265+__+BEAMN01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+      rsi_skipped_range: [56, 10000]
+      obj_file: motions/EKUT/EKUT+__+265+__+BEAMN01_stageii/phys_humanoid_v3/object_state.npy
+    - file: motions/Eyes_Japan_Dataset/Eyes_Japan_Dataset+__+ichige+__+jump-13-matrix-ichige_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+      rsi_skipped_range: [10, 10000]
+      obj_file: motions/Eyes_Japan_Dataset/Eyes_Japan_Dataset+__+ichige+__+jump-13-matrix-ichige_stageii/phys_humanoid_v3/object_state.npy
+  
+  climbNoRSI:
+    - file: motions/CMU/CMU+__+83+__+83_27_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/KIT/KIT+__+3+__+upstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/KIT/KIT+__+572+__+stomp_left01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: motions/KIT/KIT+__+572+__+stomp_right01_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+
+  loco:
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B11_-_walk_turn_left_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B12_-_walk_turn_right_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B13_-_walk_turn_right_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B14_-_walk_turn_right_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B15_-_walk_turn_around_(same_direction)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B16_-_walk_turn_change_direction_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0

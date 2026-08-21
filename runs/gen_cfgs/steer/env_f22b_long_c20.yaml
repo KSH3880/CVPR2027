@@ -1,0 +1,150 @@
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 0
+  episodeLength: 600 # 20s
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+
+  localRootObs: True # amp disc obs
+  localRootObsPolicy: False # policy obs
+  rootHeightObs: False # amp disc obs
+  rootHeightObsPolicy: False # policy obs
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  # terrain 판이 정강이·허벅지까지 종료 접촉부에 넣었다. 백본은 발만 쓴다.
+  contactBodies: ["right_foot", "left_foot"]
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+
+  enableSelfCollisionDetection: True
+  enableTrackInitState: False
+  
+  # 원본 carry 및 stage1 백본과 동일. loco_terrain 은 평지에 terrain 이 없는데도
+  # 초기 상태의 30 % 를 차지했고, carryWith 0.4 때문에 40 % 가 박스를 든 채 시작해서
+  # 정작 우리가 재려는 접근 구간이 잘려나갔다.
+  # 원본 carry 는 [0, .5, .1, .3, .1] 이지만 ground2terrain 부모가
+  # `assert sk_name == "carryWith"` 로 pickUp/putDown 초기화를 막는다. 그래서
+  # carryWith 0.3 만 원본에 맞추고 나머지를 loco 로 몰았다. 판별자 확률은 원본 그대로.
+  skill: ["omomo", "loco", "pickUp", "carryWith", "putDown"]
+  skillInitProb: [0.0, 0.7, 0.0, 0.3, 0.0]
+  skillDiscProb: [0.3, 0.3, 0.1, 0.1, 0.1]
+
+  enableTaskObs: True
+  # True = 원본 carry·백본과 동일 (속도 항만, 계수 0.2). False 는 ground2terrain
+  # 전용이었다 -- 경사에서 캐릭터가 1.5 m/s 를 못 내 속도 항이 0.018 로 죽으니
+  # 위치 항으로 메운 것이고, 평지인 우리에겐 그 이유가 없다.
+  onlyVelReward: True
+  onlyHeightHandHeldReward: False
+  
+  box_vel_penalty: True # to avoid stiff grasping
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.5
+
+  mode: "train"
+
+  box:
+    build:
+      baseSize: [0.4, 0.4, 0.4] # unit: m
+      randomSize: True
+      randomModeEqualProportion: True
+      scaleRangeX: [0.5, 1.5] # default range if randomModeEqualProportion: True
+      scaleRangeY: [0.5, 1.5]
+      scaleRangeZ: [0.5, 1.5]
+      scaleSampleInterval: 0.125 # 0.05m
+      randomDensity: False # if True, mass will be added into policy obs
+
+      testSizes:
+       - [0.22, 0.22, 0.22]
+       - [0.27, 0.27, 0.27]
+       - [0.32, 0.32, 0.32]
+       - [0.37, 0.37, 0.37]
+       - [0.42, 0.42, 0.42]
+       - [0.47, 0.47, 0.47]
+       - [0.52, 0.52, 0.52]
+       - [0.57, 0.57, 0.57]
+       - [0.30, 0.30, 0.40]
+
+    reset:
+      randomRot: True
+      randomHeight: True
+      randomHeightProb: 0.5
+      maxTopSurfaceHeight: 1.2
+      # 0.5 는 terrain 전용이었다 -- 울퉁불퉁한 지면에 박스를 놓지 않으려던 것이고,
+      # 평지인 우리에겐 이유가 없다. 백본(multi-task carry)도 0.0 이다. 키 자체는
+      # ground2terrain 부모가 필수로 읽으므로 지우지 말고 0.0 으로 둔다.
+      minBottomSurfaceHeight: 0.0
+
+    obs:
+      enableBboxObs: True
+
+  debug:
+      vel: False
+
+  ##### debug
+  flagSmallTerrain: False # test & eval only
+  flagShowSensors: True # only works when headless==False & num_envs==1
+
+  ##### height map sensor
+  terrain_obs: False
+  localHeightObs: True
+  terrain_obs_type: "square"
+  terrain_obs_root: "pelvis"
+
+  terrain:
+    terrainType: plane
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.
+    curriculum: False
+    mapLength: 20.
+    mapWidth: 20.
+    numLevels: 5
+    numTerrains: 20
+    # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping, poles, flat]
+    terrainProportions: [0.0, 0.0, 0.35, 0.35, 0.2, 0, 0, 0.1]
+    # terrainProportions: [0, 0, 0, 0, 0, 0, 0, 1.0]
+    slopeTreshold: 0.9
+
+  # power reward
+  power_reward: True
+  power_coefficient: 0.0005
+
+  eval:
+    # override env settings
+    successThreshold: 0.2
+    skill: ["loco"]
+    skillInitProb: [1.0]
+
+  asset:
+    assetRoot: "tokenhsi/data/assets"
+    assetFileName: "mjcf/phys_humanoid_v3_box_foot.xml"
+
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+    max_gpu_contact_pairs: 33554432
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
