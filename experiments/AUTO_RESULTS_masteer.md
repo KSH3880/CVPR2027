@@ -5,6 +5,7 @@
 
 | 완료 시각 | 상태 | tag | 자동 요약 | 큐 질문 |
 |---|---|---|---|---|
+| 2026-08-21 20:48 | 완료 | `ms12_base4_s0` | MS_EVAL_SUMMARY tag=ms12_base4_s0 rc=0 sr=0.7021 eps=2326 fin=0.6840 t50=336 colEp=0.2855 colStep=15.93 enter=0.45 still=158.24 path=11.99 pathA=12.25,11.69 lat=0.145 spd_err=0.553 v_real=0.608 off50=0.045 gait=0.940 both=0.5039 one=0.3301 indep=0.4679 vslope=0.460 vc=0.84,0.95,1.19,1.33 | **일반 베이스 후보.** 휜 v3 경로(free) + 4구간 속도 명령 + 속도항 ×5 + 끝 클램프. m4 는 lat 0.114 / vslope 0.252 로 m8 보다 좋은데 knob 을 안 얹어봤다 |
 | 2026-08-21 20:03 | 완료 | `ms12_base4_s1` | MS_EVAL_SUMMARY tag=ms12_base4_s1 rc=0 sr=0.6787 eps=2378 fin=0.6476 t50=342 colEp=0.2851 colStep=16.40 enter=0.47 still=150.99 path=11.87 pathA=11.73,12.03 lat=0.181 spd_err=0.557 v_real=0.628 off50=0.062 gait=0.951 both=0.4688 one=0.3535 indep=0.4194 vslope=0.413 vc=0.88,1.00,1.19,1.34 | 일반 베이스 시드 1 |
 | 2026-08-21 17:26 | 실패 | `ms10_we_s1` | training script rc=2 | 합침 시드 1 |
 | 2026-08-21 17:18 | 실패 | `ms10_we_s0` | training script rc=2 | **두 knob 합침.** 속도항 ×5 + 패딩꼬리 차단. 각각 vslope 0.105→0.154 / 0.158 이고 독립이라 더 갈 것 |

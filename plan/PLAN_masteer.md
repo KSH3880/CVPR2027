@@ -76,7 +76,6 @@ makespan  하한 294 / 순차 588
 | `ms11_clip_s1` | 끝 클램프 시드 1 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1 MS_SEED=1` |
 
 
-| `ms12_base4_s0` | **일반 베이스 후보.** 휜 v3 경로(free) + 4구간 속도 명령 + 속도항 ×5 + 끝 클램프. m4 는 lat 0.114 / vslope 0.252 로 m8 보다 좋은데 knob 을 안 얹어봤다 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1` |
 | `ms12_base4L_s0` | 같은 설정 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
 
 | `ms13_sep9L_s0` | sep 9 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MA_SEP=9 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
