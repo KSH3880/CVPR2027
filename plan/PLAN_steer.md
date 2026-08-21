@@ -56,8 +56,6 @@ envSpacing은 `STEER_ENVSPACING`을 사용하며 `STEER_SPACING`은 금지한다
 
 | tag | 질문·판정 기준 | 상태/GPU | 환경변수 |
 | --- | --- | --- | --- |
-| `f22b_long_c20` | **`f22_long_c20` 복구.** 15,000 iter 체크포인트에서 25,000 까지 | gpu7 · 실행 중 | `STEER_POS_C=2.0 STEER_ITERS=25000 STEER_CFG=f17_long STEER_ENVSPACING=0 STEER_CP=32 STEER_RESUME=f22_long_c20` |
-| `f22b_long_ctrl` | **`f22_long_ctrl` 복구.** 17,000 iter 에서 25,000 까지. `STEER_DUAL=0` 을 명시하는 이유: 원본이 0 이었고 base_env 는 1 이라 관측 폭이 12→24 로 달라져 체크포인트와 어긋난다 | gpu2 · 실행 중 | `STEER_VEL=native STEER_POS=off STEER_DUAL=0 STEER_ITERS=25000 STEER_CFG=f17_long STEER_ENVSPACING=0 STEER_CP=32 STEER_RESUME=f22_long_ctrl` |
 
 > **f30~f32 는 base_env 그대로 `envSpacing 5 / 4 M` 을 쓴다.** 새 계열이라 옛 런과
 > 씬을 맞출 이유가 없다. 다만 1 단계 회귀 대상 `f23_c20_b`(0.8730 / 0.1142)는

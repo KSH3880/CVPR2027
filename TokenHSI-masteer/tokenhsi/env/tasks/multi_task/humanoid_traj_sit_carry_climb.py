@@ -2115,11 +2115,15 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         h = self.agent_axis(self._humanoid_root_states)
         b_ = self.agent_axis(self._box_states)
         s_xy = env_org + start[a]
+        # **사람과 박스를 같은 벡터만큼 옮긴다.** 박스를 절대 위치로 덮어쓰면
+        # pickUp·carryWith·putDown 모션으로 시작한 경우 **손과 박스의 관계가 끊긴다** --
+        # 캐릭터는 드는 자세인데 박스만 순간이동해서 잡을 게 없어진다.
+        # 실측: 그 상태에서 출발조차 못 하는 비율이 8.6%(free) -> 39.2%(cross) 로 뛰었고,
+        # env 하나로 영상을 찍으면 63% 확률로 한 명이 굳었다.
+        # enforce_spawn_gap 과 apply_separation 은 원래 이렇게 평행이동만 한다.
+        shift = s_xy - h[e, a, 0:2]
         h[e, a, 0:2] = s_xy
-        # 박스는 사람에서 타겟 쪽으로 0.8 m -- 뒤에 두면 돌아서야 해서 난이도가 섞인다
-        dirv = tar[a] - start[a]
-        dirv = dirv / (dirv.norm(dim=-1, keepdim=True) + 1e-6)
-        b_[e, a, 0:2] = s_xy + dirv * 0.8
+        b_[e, a, 0:2] += shift
         self._box_tar_pos[rows, 0:2] = env_org + tar[a]
 
         # 받침대도 같이 옮긴다. carryResetRandomHeight 는 박스를 받침 위에 올려두고

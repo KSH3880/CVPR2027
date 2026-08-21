@@ -13,8 +13,7 @@
 
 | 트랙 | tag | 질문·판정 기준 | 상태/GPU | 환경변수 |
 |---|---|---|---|---|
-| [steer](PLAN_steer.md) | `f22b_long_c20` | **`f22_long_c20` 복구.** 15,000 iter 체크포인트에서 25,000 까지 | gpu7 · 실행 중 | `STEER_POS_C=2.0 STEER_ITERS=25000 STEER_CFG=f17_long STEER_ENVSPACING=0 STEER_CP=32 STEER_RESUME=f22_long_c20` |
-| [steer](PLAN_steer.md) | `f22b_long_ctrl` | **`f22_long_ctrl` 복구.** 17,000 iter 에서 25,000 까지. `STEER_DUAL=0` 을 명시하는 이유: 원본이 0 이었고 base_env 는 1 이라 관측 폭이 12→24 로 달라져 체크포인트와 어긋난다 | gpu2 · 실행 중 | `STEER_VEL=native STEER_POS=off STEER_DUAL=0 STEER_ITERS=25000 STEER_CFG=f17_long STEER_ENVSPACING=0 STEER_CP=32 STEER_RESUME=f22_long_ctrl` |
+| [steer](PLAN_steer.md) | — | 활성 큐 없음 | — | — |
 | [ma](PLAN_ma.md) | — | 활성 큐 없음 | — | — |
 | [lab](PLAN_lab.md) | — | 활성 큐 없음 | — | — |
 
@@ -32,18 +31,18 @@
 
 <!-- GPUMAP -->
 
-`08-21 14:39` 기준 · 실행 시작/종료 때 자동 갱신
+`08-21 20:45` 기준 · 실행 시작/종료 때 자동 갱신
 
 | GPU | 메모리 | 프로세스 | 트랙 | 올라가 있는 것 |
 |---|---|---|---|---|
-| gpu0 | 38547 M | 3 | ? steer | `ms10_we_s1` `ms9_crossw_s1` `f34_rs60`(starting) |
-| gpu1 | 37834 M | 2 | ? steer | `ms11_crosscl_s0` `ms12_base4_s1` `f31_vk125`(starting) |
-| gpu2 | 44692 M | 2 | ? steer | `ms11_crosscl_s1` `f22b_long_ctrl` |
-| gpu3 | 23939 M | 3 | ? | `ms12_base4L_s0` `ms9_crossw_s0` |
-| gpu4 | 37796 M | 2 | ? steer | `ms11_clip_s0` `ms8_solor_s0` `f34_rp60`(starting) |
+| gpu0 | 0 M | 0 | steer | `f34_rs60`(starting) |
+| gpu1 | 0 M | 0 | steer | `f31_vk125`(starting) |
+| gpu2 | 0 M | 0 | — | _(빈 카드)_ |
+| gpu3 | 18939 M | 1 | ? | `ms12_base4L_s0` |
+| gpu4 | 18937 M | 1 | ? steer | `ms11_clip_s0` `f34_rp60`(starting) |
 | gpu5 | 37908 M | 2 | ? steer | `ms11_clip_s1` `ms6_m8_long_s0` `f34_rp150`(starting) |
-| gpu6 | 37794 M | 2 | ? | `ms10_we_s0` `ms6_solo_long_s0` |
-| gpu7 | 44972 M | 2 | ? steer | `ms12_base4_s0` `f22b_long_c20` |
+| gpu6 | 37678 M | 2 | ? | `ms13_sep20L_s0` `ms13_sep9L_s0` |
+| gpu7 | 0 M | 0 | — | _(빈 카드)_ |
 
 | 트랙 | 대기 | 다음 |
 |---|---|---|
@@ -59,6 +58,7 @@
 | steer | `f30_t_c05` | training script rc=137 |
 | steer | `f31_vk060` | training script rc=137 |
 | steer | `f32_stop2` | training script rc=137 |
+| steer | `f22b_long_ctrl` | training script rc=137 |
 
 <!-- /GPUMAP -->
 

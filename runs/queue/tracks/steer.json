@@ -24,7 +24,7 @@
     6,
     7
   ],
-  "max_per_gpu": 3,
+  "max_per_gpu": 2,
   "idle_min": 5,
   "allowed_env": [
     "QUEUE_EVAL",
@@ -72,7 +72,7 @@
   ],
   "seed_env": "STEER_SEED",
   "max_seeds": 2,
-  "_why_max": "사용자가 3잡을 허가함 (2026-08-21). 평가는 512 env / ~4 GB 라 학습 잡의 1/6 이고, 8장이 ma 런으로 다 차 있어 2잡 규칙으로는 채점이 시작조차 못 한다. 밀린 40건이 빠지면 2로 되돌린다.",
+  "_why_max": "평가 백로그(40건)가 빠져서 2 로 되돌림. 학습에서 3잡은 잡당 속도만 깎는다",
   "_why_train": "f3 는 STEER_SPACING 을 envSpacing 뜻으로 써서 창 간격과 이름이 겹쳤다. f4 는 STEER_ENVSPACING",
   "_why_time_env": "시간 인덱스 steering (2026-08-19). tau[t] 를 시간축으로 재샘플 -- 속도가 상수가 아니라 점 간격이 된다",
   "_why_watch": "장기 런의 중간 체크포인트를 자동 채점한다. 25,000 iter 짜리를 끝까지 기다렸다 한 점만 보면 이터 축을 못 읽는다"

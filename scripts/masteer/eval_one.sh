@@ -138,6 +138,21 @@ if m.shape[1] >= 31:                       # 경로 추종 -- free 기준선의 
     # 그 값으로 "정책이 참조 모션보다 느리다" 고 잘못 판단했다. 이동 스텝만으로 다시 잰다.
     _mv = np.maximum(m[:, 30] - m[:, 4], 1)
     head += f" gait={_med(m[:, 5] / (_mv / 30.0)):.3f}"
+
+# **쌍 단위 성공률.** fin 은 에이전트별이라 "한 명만 배달" 을 성공으로 센다.
+# 실제 목표는 한 env 의 두 명이 **모두** 배달하는 것이고, 교차 시나리오에서
+# 둘의 격차가 크다 (실측: 개별 0.720 인데 둘 다는 0.311, 독립 예상 0.518 의 60%).
+# free 에서는 격차가 없어서(0.684 대 0.479 = 독립) 이 지표 없이는 교차의 방해를 못 본다.
+if agents == 2:
+    _env = m[:, 0].astype(int) // 2
+    _f0 = dict(zip(_env[agent == 0], finished[agent == 0]))
+    _f1 = dict(zip(_env[agent == 1], finished[agent == 1]))
+    _k = sorted(set(_f0) & set(_f1))
+    if _k:
+        _b = np.array([[_f0[k], _f1[k]] for k in _k])
+        _both = float((_b[:, 0] & _b[:, 1]).mean())
+        head += (f" both={_both:.4f} one={float((_b[:, 0] ^ _b[:, 1]).mean()):.4f}"
+                 f" indep={float(finished.mean() ** 2):.4f}")
     if m.shape[1] >= 39:
         _c = [0.375, 0.75, 1.125, 1.5]
         _xs, _ys = [], []

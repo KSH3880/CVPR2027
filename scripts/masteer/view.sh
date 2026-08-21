@@ -12,6 +12,16 @@
 # 그렇다 -- 화면은 멀쩡한데 다른 조건을 보게 되므로 반드시 같이 준다.
 #   RECORD=1 PORT=6100 bash scripts/masteer/view.sh t1_live_s0      + mp4 저장
 #
+# **MS_CLIP 기본값은 1 이다.** ms11 이후 계열은 전부 MS_CLIP=1 로 학습됐고,
+# 이 값은 창·조준점·래칫을 바꾸는 **관측** 노브라 학습과 다르면 정책이 다른 입력을
+# 본다 (MS_VEL_W·MS_ENDCLAMP 는 보상 전용이라 추론에는 무관하다).
+# MS_CLIP=0 으로 학습한 옛 태그(ms1~ms10)를 볼 때만 MS_CLIP=0 을 명시한다.
+#
+# 시나리오를 그냥 얹어보고 싶으면 MS_DBG=0 을 준다. 기본값 1 은 배치 기하가
+# 의도와 다르면 소리내어 죽는다 -- 지금 cross/parallel/solo 는 경로가 휘어서
+# 반드시 걸린다. MS_DBG=0 이면 휜 채로 그냥 돈다 (구경은 된다).
+#   PORT=6103 MS_DBG=0 MS_SCEN=cross MS_DT=2.0 bash scripts/masteer/view.sh <tag>
+#
 # 열기:
 #   ssh -L <PORT>:localhost:<PORT> <host>
 #   http://localhost:<PORT>/vnc.html
@@ -26,7 +36,14 @@ NOVNC_DIR=/home/hwanhee/opt/novnc
 
 PORT=${PORT:-6100}
 TAG=${1:?사용법: view.sh <tag 또는 ckpt경로> [env수]}
-ENVS=${2:-3}
+# **ENVS 환경변수를 우선한다.** 예전에는 위치인자 $2 만 봐서 `ENVS=1 view.sh tag 3`
+# 이 조용히 3 으로 떴다. record.sh 는 처음부터 ENVS 를 쓰므로 여기에 맞춘다.
+# 위치인자는 그대로 남겨 둔다 (ENVS 를 안 주면 $2, 그것도 없으면 3).
+ENVS=${ENVS:-${2:-3}}
+
+# MS_VIZ 를 구체 변수로 편다. record.sh 와 **같은 파일**을 쓴다.
+. "$ROOT/scripts/masteer/viz_env.sh"
+viz_expand || exit 1
 
 DISPNUM=$((PORT - 6059))
 DISP=":$DISPNUM"
@@ -89,7 +106,8 @@ echo "=============================================================="
 echo " 열기     http://localhost:$PORT/vnc.html"
 echo " 포워딩   ssh -L $PORT:localhost:$PORT $(hostname)"
 echo " 태그     $NAME   iter≈$ITER   (${AGE}초 전 저장본)"
-echo " env      $ENVS x 2명   시나리오=${MS_SCEN:-free}  지연=${MS_DT:-0}s  감속대상=${MS_DECEL:-a1}"
+echo " 시나리오 ${MS_VIZ:-(직접지정)}"
+ echo " env      $ENVS x 2명   배치=${MS_SCEN:-free}  지연=${MS_DT:-0}s  속도구간=${MS_MRAND:-0}  곡률=${MS_LAT_MAX:-2.2}  CLIP=${MS_CLIP:-1}"
 [ -n "${VIDEO:-}" ] && echo " 영상     $VIDEO"
 echo "=============================================================="
 
@@ -103,7 +121,7 @@ MS_DT_SET=${MS_DT_SET:-0,0.5,1.0,1.5,2.0} MS_DECEL=${MS_DECEL:-a1} \
 MS_L=${MS_L:-12} MS_RECOV=${MS_RECOV:-1.5} MS_W=${MS_W:-3.0} MS_GAP=${MS_GAP:-1.0} \
 MS_SEP=${MS_SEP:-9.0} MS_PLACEBO=${MS_PLACEBO:-0} \
 MS_VEL_W=${MS_VEL_W:-1} MS_VEL_K=${MS_VEL_K:-5} \
-MS_ENDCLAMP=${MS_ENDCLAMP:-0} MS_CLIP=${MS_CLIP:-0} MS_DBG=${MS_DBG:-1} \
+MS_ENDCLAMP=${MS_ENDCLAMP:-0} MS_CLIP=${MS_CLIP:-1} MS_DBG=${MS_DBG:-1} \
 CUDA_VISIBLE_DEVICES=${MA_GPU:-4} \
 python ./tokenhsi/run.py --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \

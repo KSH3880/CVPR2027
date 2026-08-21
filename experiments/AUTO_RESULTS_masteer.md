@@ -5,6 +5,9 @@
 
 | 완료 시각 | 상태 | tag | 자동 요약 | 큐 질문 |
 |---|---|---|---|---|
+| 2026-08-21 20:03 | 완료 | `ms12_base4_s1` | MS_EVAL_SUMMARY tag=ms12_base4_s1 rc=0 sr=0.6787 eps=2378 fin=0.6476 t50=342 colEp=0.2851 colStep=16.40 enter=0.47 still=150.99 path=11.87 pathA=11.73,12.03 lat=0.181 spd_err=0.557 v_real=0.628 off50=0.062 gait=0.951 both=0.4688 one=0.3535 indep=0.4194 vslope=0.413 vc=0.88,1.00,1.19,1.34 | 일반 베이스 시드 1 |
+| 2026-08-21 17:26 | 실패 | `ms10_we_s1` | training script rc=2 | 합침 시드 1 |
+| 2026-08-21 17:18 | 실패 | `ms10_we_s0` | training script rc=2 | **두 knob 합침.** 속도항 ×5 + 패딩꼬리 차단. 각각 vslope 0.105→0.154 / 0.158 이고 독립이라 더 갈 것 |
 | 2026-08-21 14:16 | 실패 | `ms9_velw10_s0` | training script rc=2 | 속도항 ×10. 5 에서 0.154 였다 — 더 키우면 계속 오르나 포화하나 |
 | 2026-08-21 14:03 | 실패 | `ms9_velw5_s1` | training script rc=2 | **속도항 확인.** velw5 의 vslope +0.049 가 시드 산포(0.019)의 2.5배라 재현 확인이 필요하다 |
 | 2026-08-21 09:08 | 완료 | `ms5_pin35_s0` | MS_EVAL_SUMMARY tag=ms5_pin35_s0 rc=0 sr=0.5518 eps=2630 fin=0.5240 t50=337 colEp=0.2753 colStep=17.16 enter=0.44 still=176.08 path=9.52 pathA=9.43,9.59 lat=0.098 spd_err=0.622 v_real=0.549 off50=0.038 gait=0.992 vslope=0.125 vc=1.03,1.06,1.12,1.17 | **pin_walk.** 0.5→0.35. 운반 중 죽어 있던 루트 속도항을 되살린다 |

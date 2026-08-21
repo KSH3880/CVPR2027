@@ -1,7 +1,7 @@
 # if given, will override the device setting in gym. 
 env: 
   numAgents: 2
-  numEnvs: 1
+  numEnvs: 64
   envSpacing: 5
   episodeLength: 600
   episodeLengthShort: 300
@@ -192,6 +192,7 @@ sim:
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 10.0
+    max_gpu_contact_pairs: 8388608
     default_buffer_size_multiplier: 10.0
 
   flex:

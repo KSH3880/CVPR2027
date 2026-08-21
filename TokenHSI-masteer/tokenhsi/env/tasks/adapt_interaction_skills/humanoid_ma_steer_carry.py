@@ -102,9 +102,9 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         self.scen_decel = os.environ.get("MS_DECEL", "a1")     # a1 | both
         self.scen_placebo = int(_f("MS_PLACEBO", 0))           # 창을 교차점 뒤로
         self.scen_dt = _f("MS_DT", 0.0)        # a1 을 몇 초 늦출까. 0 이면 sync
-        self.scen_encr = _f("MS_ENC_R", 2.5)   # 조우 반경
-        self.steer_k = int(_f("MS_K", 6))
-        self.steer_m_nom = _f("MS_M_NOM", 2.4)          # 2.4 m = 1.5 m/s
+        self.scen_encr = 2.5                # 조우 반경 (지표 임계)
+        self.steer_k = 6                    # 창의 점 개수. **관측 크기 = 2K** 라 env 로 두면 안 된다
+        self.steer_m_nom = 2.4              # 2.4 m = 1.5 m/s. 속도 눈금의 정의 그 자체
         self.steer_m_lo = _f("MS_M_LO", 0.25)           # 배수 하한
         self.steer_mrand = int(_f("MS_MRAND", 0))       # 0 이면 M 고정 = 원본과 동일
         self.steer_pos_c = _f("MS_POS_C", 2.0)          # latpen 계수
@@ -127,7 +127,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         # steer 는 "내 앞쪽" 이라 끝을 넘어 가짜 구간을 가리킨다.
         # ENDCLAMP 이 M 만 막는 우회책이라면 이쪽이 조준점·이탈거리까지 정상화한다.
         self.steer_clip = int(_f("MS_CLIP", 0))
-        self.steer_back = _f("MS_BACK", 0.5)            # 래칫 후진 허용
+        self.steer_back = 0.5               # 래칫 후진 허용
         self.steer_pin = _f("MS_PIN", 0.5)
         self.steer_zero = bool(int(os.environ.get("MS_ZERO", "0")))
         self.steer_seed = int(_f("MS_SEED", 0))
@@ -284,11 +284,11 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         seed = self.steer_seed + self._steer_tick + int(rows[0])
         path, s_box, n_end = sp.gen_full_v2(root, box, tar, seed,
                                      0.0, _f("MS_LAT_MAX", 2.2),
-                                     _f("MS_TURN_MAX", 120.0),
-                                     p_two=_f("MS_HUMP2", 0.1),
-                                     skew=_f("MS_SKEW", 0.8),
-                                     spread=(_f("MS_SPREAD_MIN", 0.85), _f("MS_SPREAD_MAX", 1.8)),
-                                     lat_frac=_f("MS_LAT_FRAC", 0.25), with_end=True)
+                                     120.0,
+                                     p_two=0.1,
+                                     skew=0.8,
+                                     spread=(0.85, 1.8),
+                                     lat_frac=0.25, with_end=True)
         self._gt_path[rows] = path
         self._s_end[rows] = (n_end.float() - 1.0) * sp.DS
         self._arc_root[rows] = 0.0
@@ -770,8 +770,8 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         draw_speed = int(_f("MS_DRAW_SPEED", 1))
         mscale_np = self._mscale.cpu().numpy()
 
-        gt_w = _f("MS_GT_WIDTH", 0.30)
-        win_w = _f("MS_WIN_WIDTH", 0.16)
+        gt_w = 0.30
+        win_w = 0.16
         # 사람마다 다른 색. 안 그러면 누구 경로인지 알 수 없다.
         GT_COL = [[1.00, 0.15, 0.65], [1.00, 0.55, 0.10], [0.70, 0.30, 1.00], [0.20, 0.80, 0.20]]
         WIN_COL = [[0.10, 0.95, 1.00], [0.35, 1.00, 0.35], [1.00, 1.00, 0.40], [0.50, 0.80, 1.00]]

@@ -17,7 +17,12 @@ ROOT=/home/hwanhee/CVPR2027
 VNC_DIR=/home/hwanhee/opt/vnc
 TAG=${1:?사용법: record.sh <tag>}
 ENVS=${ENVS:-1}
-OUT=${OUT:-$TAG}
+# MS_VIZ 를 구체 변수로 편다. view.sh 와 **같은 파일**을 쓴다 -- 매핑이 갈라지면
+# 뷰어에서 확인한 것과 영상이 달라진다.
+. "$ROOT/scripts/masteer/viz_env.sh"
+viz_expand || exit 1
+# **파일명은 MS_VIZ 값 그대로다.** 그래서 영상 이름이 곧 재현 명령이 된다.
+OUT=${OUT:-${MS_VIZ:-$TAG}}
 DUR=${DUR:-40}
 DELAY=${DELAY:-95}
 VIDEO_DIR=${VIDEO_DIR:-$ROOT/runs/results/video/0821}
@@ -44,6 +49,9 @@ import re, sys, pathlib
 s = pathlib.Path("tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml").read_text()
 s = re.sub(r"^  numAgents:.*$", "  numAgents: 2", s, flags=re.M)
 s = re.sub(r"^  numEnvs:.*$", f"  numEnvs: {sys.argv[1]}", s, flags=re.M)
+# **경로가 12 m 인데 envSpacing 이 5 면 env 들이 겹쳐 보인다.** 영상에서는 치명적이다.
+import os as _o
+s = re.sub(r"^  envSpacing:.*$", f"  envSpacing: {_o.environ.get('REC_SPACING','15')}", s, flags=re.M)
 pathlib.Path(sys.argv[2]).write_text(s)
 PY
 
@@ -58,7 +66,7 @@ Xvfb $DISP -screen 0 1600x900x24 -nolisten tcp & XVFB_PID=$!
 sleep 2
 
 DISPLAY=$DISP \
-MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1} MA_TOKEN=${MA_TOKEN:-live} MA_SEP=0 \
+MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1} MA_TOKEN=${MA_TOKEN:-live} MA_SEP=${MA_SEP:-0} \
 MA_SPAWN_GAP=${MA_SPAWN_GAP:-1.0} MS_MRAND=${MS_MRAND:-4} MS_ZERO=0 \
 MS_SCEN=${MS_SCEN:-free} MS_DT=${MS_DT:-0} MS_DT_RAND=${MS_DT_RAND:-0} \
 MS_DECEL=${MS_DECEL:-a1} MS_L=${MS_L:-12} MS_RECOV=${MS_RECOV:-1.5} \
@@ -73,7 +81,8 @@ python -u ./tokenhsi/run.py --task HumanoidMASteerCarry \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth --checkpoint "$SNAP" \
-    --test --eval_task carry --seed ${MS_SEED:-0} > /tmp/rec_${OUT}.log 2>&1 &
+    --num_envs "$ENVS" \
+    --test --eval --eval_task carry --seed ${MS_SEED:-0} > /tmp/rec_${OUT}.log 2>&1 &
 SIM_PID=$!
 
 # **고정 대기는 못 믿는다.** 모션 로딩 시간이 그때그때 다르고, 짧으면 검은 화면을 찍는다.

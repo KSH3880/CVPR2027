@@ -2,7 +2,7 @@
 env: 
   numAgents: 2
   numEnvs: 1
-  envSpacing: 5
+  envSpacing: 15
   episodeLength: 600
   episodeLengthShort: 300
   isFlagrun: False

@@ -529,8 +529,8 @@ def main():
             # eight cards held by another track a backlog of scored checkpoints
             # otherwise never starts at all. User authorised it 2026-08-21;
             # put it back to 2 once the backlog clears.
-            if not 1 <= max_per_gpu <= 3:
-                raise ValueError(f"max_per_gpu must be 1..3, got {max_per_gpu}")
+            if not 1 <= max_per_gpu <= 2:
+                raise ValueError(f"max_per_gpu must be 1 or 2, got {max_per_gpu}")
             if max_conc < 1 or idle_min < 0:
                 raise ValueError("max_concurrent must be positive and idle_min must be non-negative")
             if int(t.get("max_seeds", 2)) > 2:

@@ -69,24 +69,22 @@ makespan  하한 294 / 순차 588
 | tag | 질문·판정 기준 | 상태/GPU | 환경변수 |
 | --- | --- | --- | --- |
 
-| `ms6_solo_long_s0` | **점화.** solo 를 3배(9000 iter). β̂ 가 3000 컷오프에서 0.313 이고 **아직 가속 중**이었다. A=1 은 4배 스텝(4096×6000)으로 성공했다 |  | `MS_SCEN=solo MS_DT_RAND=1 MS_DT_SET=0,0.5,1.0,1.5,2.0 MS_L=12 MS_RECOV=1.5 MS_ITERS=9000` |
 | `ms6_m8_long_s0` | **속도 곡선 장기.** 3000 에서 기울기 0.076. A=1 은 같은 창 코드로 0.45~0.49 를 냈다 |  | `MS_MRAND=8 MS_ITERS=9000` |
 
-| `ms8_solor_s0` | 역할 랜덤 · 격리. 상대 없이도 역할 일반화가 되는지 |  | `MS_SCEN=solo MS_DT_RAND=1 MS_DT_SET=0,0.5,1.0,1.5,2.0 MS_DECEL=rand MS_L=12 MS_RECOV=1.5 MS_ITERS=9000` |
-| `ms9_crossw_s0` | **핵심 조합.** 역할 랜덤 + 속도항 ×5 + 장기. 지금까지 최선을 타이밍 시나리오에 적용 |  | `MS_SCEN=cross MS_DT_RAND=1 MS_DT_SET=0,0.5,1.0,1.5,2.0 MS_DECEL=rand MS_VEL_W=5 MS_L=12 MS_RECOV=1.5 MS_ITERS=9000` |
-| `ms9_crossw_s1` | 핵심 조합 시드 1. cross 는 2 시드 중 1 이 실패한 전례가 있다 |  | `MS_SCEN=cross MS_DT_RAND=1 MS_DT_SET=0,0.5,1.0,1.5,2.0 MS_DECEL=rand MS_VEL_W=5 MS_L=12 MS_RECOV=1.5 MS_ITERS=9000 MS_SEED=1` |
-| `ms10_we_s0` | **두 knob 합침.** 속도항 ×5 + 패딩꼬리 차단. 각각 vslope 0.105→0.154 / 0.158 이고 독립이라 더 갈 것 |  | `MS_MRAND=8 MS_VEL_W=5 MS_ENDCLAMP=1` |
-| `ms10_we_s1` | 합침 시드 1 |  | `MS_MRAND=8 MS_VEL_W=5 MS_ENDCLAMP=1 MS_SEED=1` |
 
 | `ms11_clip_s0` | **끝 클램프.** 호길이·조준점·창을 실제 경로 끝에서 포화. TokenHSI traj 의 `clip(t/dur,0,1)` 을 거리 버전으로. 지금까지 최선(속도항 ×5)과 함께 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1` |
 | `ms11_clip_s1` | 끝 클램프 시드 1 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1 MS_SEED=1` |
-| `ms11_crosscl_s0` | **최종 조합.** 역할 랜덤 + 속도항 ×5 + 끝 클램프 + 9000 iter |  | `MS_SCEN=cross MS_DT_RAND=1 MS_DT_SET=0,0.5,1.0,1.5,2.0 MS_DECEL=rand MS_VEL_W=5 MS_CLIP=1 MS_L=12 MS_RECOV=1.5 MS_ITERS=9000` |
 
-| `ms11_crosscl_s1` | 최종 조합 시드 1. cross 는 2 시드 중 1 이 실패한 전례가 있어 필수 |  | `MS_SCEN=cross MS_DT_RAND=1 MS_DT_SET=0,0.5,1.0,1.5,2.0 MS_DECEL=rand MS_VEL_W=5 MS_CLIP=1 MS_L=12 MS_RECOV=1.5 MS_ITERS=9000 MS_SEED=1` |
 
 | `ms12_base4_s0` | **일반 베이스 후보.** 휜 v3 경로(free) + 4구간 속도 명령 + 속도항 ×5 + 끝 클램프. m4 는 lat 0.114 / vslope 0.252 로 m8 보다 좋은데 knob 을 안 얹어봤다 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1` |
-| `ms12_base4_s1` | 일반 베이스 시드 1 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_SEED=1` |
 | `ms12_base4L_s0` | 같은 설정 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
+
+| `ms13_sep9L_s0` | sep 9 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MA_SEP=9 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
+| `ms13_sep20L_s0` | sep 20 + 9000 iter. `ms12_base4L_s0`(sep 0) 와 3단 비교가 된다 |  | `MA_SEP=20 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
+
+| `ms14_vw1L_s0` | **빠져 있던 대조군.** 돌고 있는 `ms12_base4L_s0` 과 `MS_VEL_W` 한 글자만 다르다(5→1). `VEL_W=5` 가 속도항 비중을 50%→83% 로 올려 `handheld`(집기)를 12.5%→4.2% 로 눌렀다는 진단을 여기서 판정한다. `ms4_m4_s0`(VEL_W=1)은 CLIP 이 없어 이 비교가 불가능했다 |  | `MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
+| `ms14_vw2L_s0` | 1 과 5 의 기하 중간(√5≈2.2). 1 이 집기를 지키고 5 가 속도를 이기면 **중간에 최적점이 있는지**. `VEL_W` = 1·2·5 세 점이 된다 (5 는 `ms12_base4L_s0` 이 이미 돈다) |  | `MS_VEL_W=2 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
+| `ms14_mloL_s0` | **M=0(완전 정지)을 배우나.** `mult.clamp(min=MS_M_LO)` 가 0.25 라 정책이 정지 명령을 한 번도 본 적이 없다(최저 0.375 m/s). 보상에는 `stopped = v_tar<0.05` 분기가 이미 있는데 이 하한 때문에 안 돈다. `VEL_W=1` 로 맞춰 **`ms14_vw1L_s0` 이 그대로 대조군**이다. 되면 월드모델이 정지를 명령할 수 있고 시각화 9·10 이 해금된다 |  | `MS_M_LO=0 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
 <!-- /QUEUE -->
 
 ## GT 시나리오
@@ -185,6 +183,108 @@ npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 �
 `cross_placebo`(`MS_PLACEBO=1`)는 창을 교차점 **뒤로** 옮겨 총 활동량·소요시간·평균
 명령속도는 같고 도착 시각차만 없앤다. 이 둘이 없으면 여유거리 사다리는 조작의
 운동학적 항등식이라 다른 값이 나올 수가 없다.
+
+## 시각화
+
+영상 12개 = 시나리오 6 x {직선, 꼬불}. 저장 `runs/results/video/0821/`.
+
+### 무엇을 부르나
+
+| 번호 | 워딩 | 펼쳐지는 변수 | 상태 |
+|---|---|---|---|
+| **1 / 2** | 경로 추종 | `MS_MRAND=0` | 됨 |
+| **3 / 4** | 속도 추종 | `MS_MRAND=4` | 됨 |
+| **5 / 6** | 교차 — 개입 없음 | `MS_SCEN=cross MS_DT=0` | 경로 휨 |
+| **7 / 8** | 교차 — 감속 양보 | `MS_SCEN=cross MS_DT=2.0` | 경로 휨 |
+| **9 / 10** | 정지·재출발 | `MS_M_LO=0 MS_MRAND=4` | 학습 범위 밖 |
+| **11 / 12** | 근접 나란히 | `MS_SCEN=parallel MS_GAP=1.0` | 경로 휨 |
+
+**홀수 = 직선, 짝수 = 꼬불.** 번호는 입력 전용이고 **파일명은 이름**이다
+(`MS_VIZ=8` -> `4_cross_yield_curve.mp4`). 없는 번호는 목록을 찍고 rc=1 로 죽는다.
+매핑은 `scripts/masteer/viz_env.sh` 한 곳이고 `view.sh`·`record.sh` 가 같이 쓴다.
+
+### 어떻게 부르나
+
+    # 뷰어
+    PORT=6100 MS_VIZ=4 ENVS=1 MS_CAM=top bash scripts/masteer/view.sh <tag>
+    ssh -L 6100:localhost:6100 <host>    #  http://localhost:6100/vnc.html
+
+    # 핵심 장면 -- 배치·경로가 같고 감속만 다르다
+    PORT=6100 MS_VIZ=5 ENVS=1 MS_CAM=top MS_DBG=0 bash ... view.sh <tag>   # 부딪힘
+    PORT=6101 MS_VIZ=7 ENVS=1 MS_CAM=top MS_DBG=0 bash ... view.sh <tag>   # 비껴감
+
+    # 영상
+    MS_VIZ=8 MS_CAM=top DUR=40 bash scripts/masteer/record.sh <tag>
+    for i in $(seq 12); do MS_VIZ=$i MS_CAM=top bash scripts/masteer/record.sh <tag>; done
+    MS_VIZ=8 bash scripts/masteer/record_pick.sh <tag>           # 움직인 시드를 골라준다
+
+    # 덮어쓰기 (호출자가 이긴다)
+    MS_VIZ=8 MS_DT=1.0 ...     MS_VIZ=4 MS_MRAND=8 ...     MS_VIZ=4 MS_CAM_H=25 ...
+
+| 층 | 인자 |
+|---|---|
+| 항상 | `PORT` · `MS_VIZ` · `<태그>` · `ENVS` |
+| 가끔 | `MS_CAM=top` · `MS_DBG=0` · `MS_CAM_H`/`MS_CAM_B`(줌) · `MS_DRAW_SPEED` |
+| 캔 밖 | `MS_MRAND` · `MS_M_LO` · `MS_DT` · `MS_GAP` · `MS_LAT_MAX` |
+
+#### MS_CLIP -- 태그에 따라 반드시 맞춘다
+
+    ms1 ~ ms10   전부 미지정 = 0 으로 학습   (52 개, 예외 없음. 영상용 ms4_m4_s0 포함)
+    ms11 ~ ms13  전부 MS_CLIP=1 로 학습      (13 개)
+
+`view.sh`·`record.sh` 기본값은 **1** 이므로 **`ms10` 이전 태그를 볼 때만
+`MS_CLIP=0` 을 붙인다.** Python 기본값은 여전히 0 이라 학습에서 미지정 = 0 이다.
+
+    MS_CLIP=0 PORT=6100 MS_VIZ=4 bash scripts/masteer/view.sh ms4_m4_s0
+    MS_CLIP=0 MS_VIZ=8 bash scripts/masteer/record.sh ms4_m4_s0
+
+**틀리면 조용히 어긋난다.** `MS_CLIP` 은 호길이 래칫·조준점·창을 **경로 끝에서
+포화**시키는 **관측** 노브다 (`_ratchet`·`_aim_pt`·`_steer_obs` 세 곳). 원본 carry 는
+명령이 절대 위치(목표)라 도착하면 저절로 "여기 있어라"가 되는데, steer 는 "내 앞쪽"
+이라 끝을 넘어 **패딩 구간(가짜 경로)을 가리킨다.** CLIP 은 TokenHSI traj 의
+`clip(t/dur, 0, 1)` 을 거리 버전으로 넣은 것이고, 끝에 다가가면 창 점들이 끝에 쌓여
+**창이 저절로 짧아진다 = 감속 명령**이 된다. 학습값과 다르면 정책이 학습 때와 다른
+입력을 받으므로 화면은 멀쩡한데 성능만 떨어진다.
+
+`MS_VEL_W`·`MS_VEL_K`·`MS_POS_C`·`MS_PIN` 은 보상 전용이라 추론에 무관하다.
+`MS_ENDCLAMP` 은 M 을 0 으로 만드는 **관측** 노브이지만 4 개 행에서만 1 이었다.
+
+### 화면 보는 법
+
+| 요소 | 위치 | a0 | a1 | 뜻 |
+|---|---|---|---|---|
+| 바닥 띠 | 바닥 | 핑크 | 주황 | GT 경로. **밝기 = 속도 명령** |
+| 허리 띠 | root 높이 | 하늘색 | 연두 | **정책 입력** (창 K=6 점) |
+| 노란 기둥 | 바닥→허리 | 노랑 | 노랑 | 보상 조준점 (`arc + M/2`) |
+
+사람 몸은 a0 연두, a1 파랑. 밝기 `0.28 + 0.72·f` (f = 속도배수 0.25~1.0)
+-- **어두우면 느리게 가라**. `MS_DRAW_SPEED=0` 단색 · `MS_DRAW_TASK=1` 원본 오버레이.
+그리는 코드는 `humanoid_ma_steer_carry.py` 의 `_draw_task`.
+
+### 배경
+
+발표 흐름:
+
+    1·2 (+9·10 정지)      두 채널이 각각 된다
+      -> 5·6              그냥 두면 부딪힌다
+      -> 7·8              속도만 바꾸면 안 부딪힌다
+      => 충돌 회피는 상위 플래너가 이 두 채널로 통제한다
+
+**5~8·11·12 가 막힌 이유.** `apply_layout` 이 박스를 사람과 같이 평행이동하도록
+고친 뒤로 손-박스 관계는 살았지만 (출발 실패 39.2% -> 8.9%) `사람->박스->목표`
+경로가 휘어 총호 12.5 m 가 24 m 가 되고 교차점을 2~3 m 빗나간다. 자기검사가
+`MS_DBG=1` 일 때만 돌아 뷰어는 **소리내어 죽고** 학습·평가는 **조용히 틀린다.**
+수정 후보 -- 아직 미정:
+
+    (1) 박스가 손 근처(<0.5 m)면 사람과 같이 옮기고, 멀면 사람 앞 0.8 m 로
+    (2) 순간이동을 안 하고 **목표만** 교차하도록 배치 (리셋을 안 건드린다)
+
+**9·10 이 막힌 이유.** 속도는 `MS_M_LO`(0.25)~1.0 의 4 단계
+**0.375 / 0.75 / 1.125 / 1.5 m/s** 이고 `clamp(min=m_lo)` 가 걸려 **M=0 이 안 나온다.**
+학습 내내 최저가 0.375 m/s 였다. 뷰어에만 `MS_M_LO=0` 을 줘도 본 적 없는 명령이라
+"아주 느리게 걷기"가 될 공산이 크다. `MS_M_LO=0` 재학습이 필요하다.
+
+인자를 왜·어떻게 정리했는지는 `TokenHSI-masteer/CHANGELOG.md` 2026-08-21 항목에 있다.
 
 ## 결과별 다음 분기
 
