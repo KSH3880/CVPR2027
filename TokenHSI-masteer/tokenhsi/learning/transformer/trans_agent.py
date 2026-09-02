@@ -194,7 +194,8 @@ class TransAgent(amp_agent.AMPAgent):
         # MS_GRADCHK=1 : 첫 backward 뒤 토크나이저별 grad 를 한 번만 찍는다.
         # extra 토큰이 학습되는지 코드를 읽는 것보다 이게 확실하다.
         import os as _og
-        if _og.environ.get("MS_GRADCHK") and not getattr(self, "_gradchk_done", False):
+        if (_og.environ.get("MS_GRADCHK", "0") == "1" and
+                not getattr(self, "_gradchk_done", False)):
             self._gradchk_done = True
             net = self.model.a2c_network
             print("\n[gradchk] ===== 토크나이저별 requires_grad / grad =====", flush=True)
@@ -211,7 +212,11 @@ class TransAgent(amp_agent.AMPAgent):
             for nm2, mod in (("self_encoder", getattr(net, "self_encoder", None)),
                              ("transformer", getattr(net, "transformer_encoder", None)),
                              ("composer", getattr(net, "composer", None)),
-                             ("adapt_mlp", getattr(net, "internal_adapt_mlp", None))):
+                             ("adapt_mlp", getattr(net, "internal_adapt_mlp", None)),
+                             ("coord_enc", getattr(net, "coord_encoder", None)),
+                             ("coord_adapt", getattr(net, "coord_adapter", None)),
+                             ("coord_res", getattr(net, "coord_residual", None)),
+                             ("hier_head", getattr(net, "hier_head", None))):
                 if mod is None: continue
                 ps = list(mod.parameters())
                 gn = [p.grad for p in ps if p.grad is not None]

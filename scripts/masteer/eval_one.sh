@@ -3,7 +3,7 @@
 # and requires both the frozen stage-1 checkpoint and the trained adapt policy.
 set -u
 
-ROOT=/home/hwanhee/CVPR2027
+ROOT=/home/hwanhee/juan/CVPR2027
 TAG=${1:?usage: eval_one.sh <tag> <gpu> [envs]}
 GPU=${2:?usage: eval_one.sh <tag> <gpu> [envs]}
 ENVS=${3:-512}
@@ -12,7 +12,7 @@ ENVS=${3:-512}
 SUF=${MS_EVAL_SUFFIX:-}
 if [ -n "$SUF" ]; then TAG_OUT="${TAG}__${SUF}"; else TAG_OUT="$TAG"; fi
 CLAIM=$ROOT/runs/queue/gpu_locks/eval_$TAG_OUT
-LOG=$ROOT/runs/queue/logs/eval_$TAG_OUT.log
+LOG=~/juan/CVPR2027/runs/queue/logs/eval_$TAG_OUT.log
 ENV_FILE=$ROOT/runs/queue/logs/$TAG.env
 
 if ! mkdir "$CLAIM" 2>/dev/null; then
@@ -70,11 +70,11 @@ text = re.sub(r"^  numEnvs:.*$", f"  numEnvs: {sys.argv[3]}", text, flags=re.M)
 open(sys.argv[2], "w").write(text)
 PY
 
-TRAIN_CFG=${MS_TRAINCFG:-tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml}
+TRAIN_CFG=${MS_TRAINCFG:-~/CVPR2027/TokenHSI-masteertokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml}
 if [ -f "$ROOT/runs/gen_cfgs/masteer/${TAG}_train.yaml" ]; then
     TRAIN_CFG=$ROOT/runs/gen_cfgs/masteer/${TAG}_train.yaml
 fi
-BASE_CKPT=${MS_CKPT:-output/tokenhsi/ckpt_stage1.pth}
+BASE_CKPT=${MS_CKPT:-~/CVPR2027/TokenHSI-masteer/output/tokenhsi/ckpt_stage1.pth}
 METRICS=$ROOT/runs/results/masteer/eval_$TAG_OUT.npy
 mkdir -p "$(dirname "$METRICS")"
 rm -f "$METRICS"
@@ -87,11 +87,11 @@ export CUDA_VISIBLE_DEVICES=$GPU
 export MS_METRICS=$METRICS
 export MA_METRICS=$METRICS
 
-python -u ./tokenhsi/run.py \
+python -u ~/CVPR2027/TokenHSI-masteer/tokenhsi/run.py \
     --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --cfg_train "$TRAIN_CFG" \
     --cfg_env "$EVAL_ENV" \
-    --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+    --motion_file ~/CVPR2027/TokenHSI-masteer/tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --num_envs "$ENVS" --headless --seed "${MS_SEED:-0}" \
     --hrl_checkpoint "$BASE_CKPT" --checkpoint "$CK" \
     --test --eval --eval_task "${MS_EVAL_TASK:-carry}" > "$LOG" 2>&1

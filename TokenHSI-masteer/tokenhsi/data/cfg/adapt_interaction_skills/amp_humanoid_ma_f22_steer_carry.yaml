@@ -192,7 +192,6 @@ sim:
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 10.0
-    max_gpu_contact_pairs: 4194304
     default_buffer_size_multiplier: 10.0
 
   flex:

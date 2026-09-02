@@ -30,7 +30,7 @@
 # 별도로 띄운다 (쓰는 중인 파일을 열면 반쯤 쓰인 상태를 읽는다). 학습에는 영향 없다.
 # 태그 대신 .pth 경로를 직접 줘도 된다.
 set -e
-ROOT=/home/hwanhee/CVPR2027
+ROOT=/home/hwanhee/juan/CVPR2027
 VNC_DIR=/home/hwanhee/opt/vnc
 NOVNC_DIR=/home/hwanhee/opt/novnc
 
@@ -51,17 +51,34 @@ VNC_PORT=$((5900 + DISPNUM))
 
 cd $ROOT/TokenHSI-masteer
 source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
-conda activate tokenhsi
+conda activate tokenhsi_juan
 
-if [ -f "$TAG" ]; then CKPT="$TAG"; NAME=$(basename $(dirname $(dirname "$TAG")))
+export LD_LIBRARY_PATH=/tmp/hwanhee-physx-lib:${LD_LIBRARY_PATH:-}
+
+if [ "${MS_BASE_ONLY:-0}" = "1" ]; then
+    # MA 학습 checkpoint를 사용하지 않고 MS_CKPT만 로드한다.
+    NAME=$(basename "$TAG" .pth)
+    SNAP=""
+    ITER="base-only"
+    AGE=0
 else
-    CKPT=$(find output/masteer/$TAG -name Humanoid.pth 2>/dev/null | head -1)
-    [ -z "$CKPT" ] && { echo "체크포인트 없음: output/masteer/$TAG"; exit 1; }
-    NAME=$TAG
+    if [ -f "$TAG" ]; then
+        CKPT="$TAG"
+        NAME=$(basename "$(dirname "$(dirname "$TAG")")")
+    else
+        CKPT=$(find "output/masteer/$TAG" -name Humanoid.pth 2>/dev/null | head -1)
+        [ -z "$CKPT" ] && {
+            echo "체크포인트 없음: output/masteer/$TAG"
+            exit 1
+        }
+        NAME=$TAG
+    fi
+
+    SNAP=/tmp/ma_view_${NAME}_$PORT.pth
+    cp "$CKPT" "$SNAP"
+    ITER=$(grep -c "fps step" "$ROOT/runs/queue/logs/$NAME.log" 2>/dev/null || echo "?")
+    AGE=$(( $(date +%s) - $(stat -c %Y "$CKPT") ))
 fi
-SNAP=/tmp/ma_view_${NAME}_$PORT.pth; cp "$CKPT" "$SNAP"
-ITER=$(grep -c "fps step" $ROOT/runs/queue/logs/$NAME.log 2>/dev/null || echo "?")
-AGE=$(( $(date +%s) - $(stat -c %Y "$CKPT") ))
 
 for p in $PORT $VNC_PORT; do
     ss -tln 2>/dev/null | grep -q ":$p " && { echo "포트 $p 사용 중 — PORT=$((PORT+1)) 로 다시"; exit 1; }
@@ -77,12 +94,42 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 CFG=$ROOT/runs/gen_cfgs/masteer/view_${NAME}_$PORT.yaml
-python3 - "$ENVS" "$CFG" <<'PY'
-import re, sys, pathlib
-s = pathlib.Path("tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml").read_text()
-s = re.sub(r"^  numAgents:.*$", "  numAgents: 2", s, flags=re.M)
-s = re.sub(r"^  numEnvs:.*$", f"  numEnvs: {sys.argv[1]}", s, flags=re.M)
-pathlib.Path(sys.argv[2]).write_text(s)
+python3 - "$ENVS" "$CFG" "${MS_AGENTS:-2}" <<'PY'
+import pathlib
+import re
+import sys
+
+envs = sys.argv[1]
+cfg_path = sys.argv[2]
+agents = sys.argv[3]
+
+src = pathlib.Path(
+    "tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml"
+)
+s = src.read_text()
+
+s = re.sub(
+    r"^  numAgents:.*$",
+    f"  numAgents: {agents}",
+    s,
+    flags=re.M,
+)
+s = re.sub(
+    r"^  numEnvs:.*$",
+    f"  numEnvs: {envs}",
+    s,
+    flags=re.M,
+)
+s = re.sub(
+    r"^(\s*)default_buffer_size_multiplier:",
+    r"\1max_gpu_contact_pairs: 4194304\n"
+    r"\1default_buffer_size_multiplier:",
+    s,
+    count=1,
+    flags=re.M,
+)
+
+pathlib.Path(cfg_path).write_text(s)
 PY
 
 Xvfb $DISP -screen 0 1600x900x24 -nolisten tcp & XVFB_PID=$!
@@ -111,9 +158,20 @@ echo " 시나리오 ${MS_VIZ:-(직접지정)}"
 [ -n "${VIDEO:-}" ] && echo " 영상     $VIDEO"
 echo "=============================================================="
 
+PLAYER_CKPT=()
+if [ "${MS_BASE_ONLY:-0}" != "1" ]; then
+    PLAYER_CKPT=(--checkpoint "$SNAP")
+fi
+
 # **시나리오 변수를 넘겨야 한다.** 안 넘기면 태그가 cross 로 학습된 것이어도
 # 뷰어는 free(랜덤 경로)로 뜬다 -- 화면은 멀쩡한데 다른 조건을 보게 된다.
-DISPLAY=$DISP \
+export DISPLAY="$DISP"
+export CUDA_VISIBLE_DEVICES="${MA_GPU:-4}"
+export LIBGL_ALWAYS_SOFTWARE=1
+export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+
+echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+
 MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1} MA_TOKEN=${MA_TOKEN:-live} MA_SEP=${MA_SEP:-0} \
 MA_SPAWN_GAP=${MA_SPAWN_GAP:-1.0} MS_MRAND=${MS_MRAND:-4} MS_ZERO=${MS_ZERO:-0} \
 MS_SCEN=${MS_SCEN:-free} MS_DT=${MS_DT:-0} MS_DT_RAND=${MS_DT_RAND:-0} \
@@ -122,11 +180,10 @@ MS_L=${MS_L:-12} MS_RECOV=${MS_RECOV:-1.5} MS_W=${MS_W:-3.0} MS_GAP=${MS_GAP:-1.
 MS_SEP=${MS_SEP:-9.0} MS_PLACEBO=${MS_PLACEBO:-0} \
 MS_VEL_W=${MS_VEL_W:-1} MS_VEL_K=${MS_VEL_K:-5} \
 MS_ENDCLAMP=${MS_ENDCLAMP:-0} MS_CLIP=${MS_CLIP:-1} MS_DBG=${MS_DBG:-1} \
-CUDA_VISIBLE_DEVICES=${MA_GPU:-4} \
 python ./tokenhsi/run.py --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
-    --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth \
-    --checkpoint "$SNAP" \
+    --hrl_checkpoint "${MS_CKPT:-output/tokenhsi/ckpt_stage1.pth}" \
+    "${PLAYER_CKPT[@]}" \
     --test --eval_task carry

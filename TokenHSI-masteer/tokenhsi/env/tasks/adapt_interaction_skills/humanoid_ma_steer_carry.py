@@ -347,7 +347,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
                     cols = torch.arange(self._win_lo, self._win_hi, device=self.device)
                     self._mscale[sel[:, None], cols[None, :]] = self._decel_mult(dt)[:, None]
                     self._ep_dtcmd[sel] = dt
-            if os.environ.get("MS_DBG") and not getattr(self, "_dbg_done", False):
+            if int(_f("MS_DBG", 0)) and not getattr(self, "_dbg_done", False):
                 self._dbg_done = True
                 self._scen_selfcheck(rows)
         return
@@ -488,6 +488,20 @@ class HumanoidMASteerCarry(HumanoidMACarry):
 
     # ---- 보상 -------------------------------------------------------------
 
+    def _handheld_score(self, root_pos, box_pos, rigid_body_pos=None):
+        """Shared unweighted hand-box proximity used by carry and stack.
+
+        This is a dense proximity score, not a grasp-state predicate.  A
+        caller that needs a discrete held event must additionally verify lift.
+        """
+        if rigid_body_pos is None:
+            rigid_body_pos = self.humanoid_rows(self._rigid_body_pos)
+        hands = rigid_body_pos[:, self._key_body_ids[[0, 1]]].mean(dim=1)
+        score = torch.exp(-5.0 * ((hands - box_pos) ** 2).sum(dim=-1))
+        return torch.where(
+            ((box_pos[:, 0:2] - root_pos[:, 0:2]) ** 2).sum(dim=-1) > 0.7 ** 2,
+            torch.zeros_like(score), score)
+
     def _compute_reward(self, actions):
         """원본 carry 보상에서 **두 줄만** 바꾼다.
 
@@ -561,12 +575,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
             carry_r = carry_r - self._carry_rwd_box_vel_pen_coeff * (
                 1.0 - torch.exp(-2.0 * (thre - spd) ** 2))
 
-        rb = self.humanoid_rows(self._rigid_body_pos)
-        hands = rb[:, self._key_body_ids[[0, 1]]].mean(dim=1)
-        handheld = torch.exp(-5.0 * ((hands - box_pos) ** 2).sum(dim=-1))
-        handheld = torch.where(
-            ((box_pos[:, 0:2] - root_pos[:, 0:2]) ** 2).sum(dim=-1) > 0.7 ** 2,
-            torch.zeros_like(handheld), handheld)
+        handheld = self._handheld_score(root_pos, box_pos)
 
         putdown = (torch.abs(box_pos[:, -1] - tar[:, -1]) <= 0.001).float()
         putdown = torch.where(err_xy > 0.1 ** 2, torch.zeros_like(putdown), putdown)

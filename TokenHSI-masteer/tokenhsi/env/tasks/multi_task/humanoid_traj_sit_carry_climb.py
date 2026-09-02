@@ -1813,16 +1813,30 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
         not_task_env_ids = env_ids[self.task_of(env_ids) != HumanoidTrajSitCarryClimb.TaskUID["carry"].value]
         if len(not_task_env_ids) > 0:
-            self._box_states[not_task_env_ids, ..., :] = 0.0
-            self._box_states[not_task_env_ids, ..., 2] = 5.0 # place above the ground
-            self._box_states[not_task_env_ids, 6] = 1.0 # quat
+            # A>=2 에서 box/platform은 (env, agent, D)다. 예전의
+            # ``states[env_ids, 6]``은 agent 축의 6번을 고르는 코드라 A=2 traj가
+            # 첫 reset에서 죽었다. 항상 row -> (env, agent)로 명시적으로 쓴다.
+            rows = self.agent_rows(not_task_env_ids)
+            A = self.num_agents
+            e = torch.div(rows, A, rounding_mode="floor")
+            a = rows % A
+            box = self.agent_axis(self._box_states)
+            box[e, a, :] = 0.0
+            box[e, a, 2] = 5.0                 # inactive object: above the scene
+            box[e, a, 6] = 1.0  
 
-            self._platform_pos[not_task_env_ids, ..., :] = 0.0
-            self._platform_pos[not_task_env_ids, -1] = 5.0 - self._box_lib._box_size[not_task_env_ids, 2] / 2 - self._platform_height / 2 - 0.05
-            self._tar_platform_pos[not_task_env_ids, ..., :] = 0.0
-            self._tar_platform_pos[not_task_env_ids, -1] = 5.0 - self._box_lib._box_size[not_task_env_ids, 2] / 2 - self._platform_height / 2 - 0.05 - 1.0
+            if self._carry_reset_random_height:
+                platform = self.agent_axis(self._platform_pos)
+                tar_platform = self.agent_axis(self._tar_platform_pos)
+                platform[e, a, :] = 0.0
+                tar_platform[e, a, :] = 0.0
+                z = (5.0 - self._box_lib._box_size[rows, 2] / 2
+                     - self._platform_height / 2 - 0.05)
+                platform[e, a, 2] = z
+                tar_platform[e, a, 2] = z - 1.0
 
-            self._box_tar_pos[self.agent_rows(not_task_env_ids), 0:3] = self._box_states[not_task_env_ids, ..., 0:3]
+
+            self._box_tar_pos[rows, 0:3] = box[e, a, 0:3]
 
         is_task_env_ids = env_ids[self.task_of(env_ids) == HumanoidTrajSitCarryClimb.TaskUID["carry"].value]
         if len(is_task_env_ids) > 0:

@@ -49,7 +49,12 @@ from env.tasks.comp_interaction_skills.humanoid_comp_traj_carry import HumanoidC
 
 # object shape variation
 from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_box2objs import HumanoidAdaptCarryBox2Objs
+from env.tasks.adapt_interaction_skills.humanoid_f22_steer_carry import HumanoidF22SteerCarry
+from env.tasks.adapt_interaction_skills.humanoid_ma_f22_steer_carry import HumanoidMAF22SteerCarry
+from env.tasks.adapt_interaction_skills.humanoid_ma_f22_stack_carry import HumanoidMAF22StackCarry
 from env.tasks.adapt_interaction_skills.humanoid_ma_carry import HumanoidMACarry
+from env.tasks.adapt_interaction_skills.humanoid_ma_stack_carry import HumanoidMAStackCarry
+from env.tasks.adapt_interaction_skills.humanoid_ma_steer import HumanoidMASteer
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
 
 # terrain shape variation

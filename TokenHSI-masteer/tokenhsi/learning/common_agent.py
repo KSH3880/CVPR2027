@@ -118,7 +118,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
         start_time = time.time()
         total_time = 0
         rep_count = 0
-        self.frame = 0
+        # Keep the frame restored by set_full_state_weights().  Resetting it
+        # here silently restarted frame-based curricula on resumed training.
+        self.frame = getattr(self, 'frame', 0)
         self.obs = self.env_reset()
         self.curr_frames = self.batch_size_envs
         

@@ -33,8 +33,23 @@ class BaseTask():
 
         self.headless = cfg["headless"]
 
-        # double check!
+        # CUDA_VISIBLE_DEVICES makes the compute id logical, while Isaac Gym's
+        # Vulkan graphics id remains a physical ordinal on the viewer server.
+        # Keep the historical same-id default, but allow viewer launchers to
+        # state the physical graphics device explicitly.
         self.graphics_device_id = self.device_id
+        graphics_override = os.environ.get("TOKENHSI_GRAPHICS_DEVICE_ID")
+        if graphics_override is not None:
+            try:
+                self.graphics_device_id = int(graphics_override)
+            except ValueError as exc:
+                raise ValueError(
+                    "TOKENHSI_GRAPHICS_DEVICE_ID must be an integer; got "
+                    + repr(graphics_override)) from exc
+            if self.graphics_device_id < -1:
+                raise ValueError(
+                    "TOKENHSI_GRAPHICS_DEVICE_ID must be >= -1; got "
+                    + str(self.graphics_device_id))
         # MA_VIDEO 로 녹화할 때는 headless 여도 그래픽 디바이스가 살아 있어야 한다.
         # 이 서버는 /dev/dri 권한이 없어 X11/OpenGL 뷰어가 안 되고 VNC 도 없다.
         # IsaacGym 카메라 센서는 X 를 안 거치고 GPU 파이프라인으로 직접 렌더하므로

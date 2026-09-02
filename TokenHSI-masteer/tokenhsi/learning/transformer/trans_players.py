@@ -49,6 +49,8 @@ class TransPlayerContinuous(common_player.CommonPlayer):
 
         self._normalize_amp_input = config.get('normalize_amp_input', True)
         self._disc_reward_scale = config['disc_reward_scale']
+        self._task_reward_w = config.get('task_reward_w', 1.0)
+        self._disc_reward_w = config.get('disc_reward_w', 0.0)
 
         super().__init__(config)
 
@@ -59,12 +61,43 @@ class TransPlayerContinuous(common_player.CommonPlayer):
             # super().restore(fn)
             self._checkpoint_fn = fn
             checkpoint = load_checkpoint(fn, self.device)
-            self.model.load_state_dict(checkpoint['model'])
+            if os.environ.get("F22_ACTOR_ONLY", "0") == "1":
+                # The A=2 parity scene keeps the f22 policy observation and
+                # actor architecture exactly, but its AMP discriminator space
+                # is row-aware and therefore has a different width.  Playback
+                # never queries the discriminator.  Load every shape-compatible
+                # tensor and fail unless all action-producing f22 tensors made it.
+                own = self.model.state_dict()
+                compatible = {k: v for k, v in checkpoint['model'].items()
+                              if k in own and own[k].shape == v.shape}
+                result = self.model.load_state_dict(compatible, strict=False)
+                actor_prefixes = (
+                    "a2c_network.self_encoder.",
+                    "a2c_network.task_encoder.",
+                    "a2c_network.transformer_encoder.",
+                    "a2c_network.composer.",
+                    "a2c_network.internal_adapt_mlp.",
+                )
+                missing_actor = [k for k in result.missing_keys
+                                 if k.startswith(actor_prefixes)]
+                if missing_actor:
+                    raise RuntimeError(
+                        "F22_ACTOR_ONLY missed actor tensors: " + str(missing_actor))
+                print(f"[f22-a2] loaded {len(compatible)}/{len(own)} compatible "
+                      f"model tensors; skipped={len(checkpoint['model']) - len(compatible)}",
+                      flush=True)
+            else:
+                self.model.load_state_dict(checkpoint['model'])
             if self.normalize_input:
                 self.running_mean_std.load_state_dict(checkpoint['running_mean_std'])
             if self._normalize_amp_input:
-                checkpoint = load_checkpoint(fn, self.device)
-                self._amp_input_mean_std.load_state_dict(checkpoint['amp_input_mean_std'])
+                amp_state = checkpoint['amp_input_mean_std']
+                if os.environ.get("F22_ACTOR_ONLY", "0") == "1" and \
+                        self._amp_input_mean_std.running_mean.shape != amp_state['running_mean'].shape:
+                    print(f"[f22-a2] skip AMP RMS {tuple(amp_state['running_mean'].shape)} -> "
+                          f"{tuple(self._amp_input_mean_std.running_mean.shape)}", flush=True)
+                else:
+                    self._amp_input_mean_std.load_state_dict(amp_state)
         return
 
     def _build_net(self, config):
@@ -115,7 +148,25 @@ class TransPlayerContinuous(common_player.CommonPlayer):
 
             disc_pred = disc_pred.detach().cpu().numpy()[:, 0]
             disc_reward = disc_reward.cpu().numpy()[:, 0]
-            print("env: {} disc_pred: {} disc_reward: {}".format(env, disc_pred, disc_reward))
+            task_reward = info.get('stack_task_reward')
+            if task_reward is not None:
+                count = len(disc_reward)
+                task_reward = task_reward[:count].detach().cpu().numpy()
+                combined_reward = (self._task_reward_w * task_reward
+                                   + self._disc_reward_w * disc_reward)
+                coord_reward = info.get('stack_coord_reward')
+                if coord_reward is not None:
+                    coord_reward = coord_reward[:count].detach().cpu().numpy()
+                stack_phase = info.get('stack_phase')
+                if stack_phase is not None:
+                    stack_phase = stack_phase[:count].detach().cpu().numpy()
+                print("env: {} disc_pred: {} disc_reward: {} task_reward: {} "
+                      "combined_reward: {} coord_reward: {} phase: {}".format(
+                          env, disc_pred, disc_reward, task_reward,
+                          combined_reward, coord_reward, stack_phase))
+            else:
+                print("env: {} disc_pred: {} disc_reward: {}".format(
+                    env, disc_pred, disc_reward))
 
         return
     

@@ -15,9 +15,11 @@
 # 이 파일을 고칠 때는 새로 쓰고 mv 로 갈아끼운다. 실행 중인 bash 는 스크립트를 증분으로
 # 읽으므로 제자리 덮어쓰기는 돌고 있는 런을 죽인다 (전례: unexpected EOF 로 6 런 사망).
 set -u
-cd /home/hwanhee/CVPR2027/TokenHSI-masteer
+cd /home/hwanhee/juan/CVPR2027/TokenHSI-masteer
 source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
-conda activate tokenhsi
+conda activate tokenhsi_juan
+
+export LD_LIBRARY_PATH=/tmp/hwanhee-physx-lib:${LD_LIBRARY_PATH:-}
 
 TAG=${MS_TAG:?MS_TAG is required}
 MODE=${MS_MODE:-sweep}
@@ -33,7 +35,7 @@ CKPT=${MS_CKPT:-output/tokenhsi/ckpt_stage1.pth}
 # 지표는 env 안에서 스텝마다 누적하고 주기적으로 여기에 쓴다 (사후 계산 금지, PITFALLS #6)
 # **env 코드가 읽는 이름은 MA_METRICS 다.** MS_METRICS 만 export 하던 탓에
 # masteer 지표가 한 번도 안 쓰였다 (runs/results/masteer/ 가 계속 비어 있었다).
-export MS_METRICS=${MS_METRICS:-/home/hwanhee/CVPR2027/runs/results/masteer/${TAG}.npy}
+export MS_METRICS=${MS_METRICS:-/home/hwanhee/juan/CVPR2027/runs/results/masteer/${TAG}.npy}
 export MA_METRICS=$MS_METRICS
 export MA_TAU MA_STILL_V MA_SEP MA_SPAWN_GAP MA_LAYOUT MA_LAYOUT_L MA_LAYOUT_D MA_LAYOUT_S
 export MA_C MA_BETA MA_K MA_TOKEN MA_TOKENIZER_ZERO MA_TEAM MA_MKSPN MA_TREF MA_NOFREEZE
@@ -48,7 +50,7 @@ export MS_VEL_W MS_VEL_K MS_ENDCLAMP MS_CLIP MS_DT_RAND MS_DT_SET MS_DECEL MS_PL
 mkdir -p "$(dirname "$MS_METRICS")"
 
 CFG_SRC=tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml
-CFG=/home/hwanhee/CVPR2027/runs/gen_cfgs/masteer/${TAG}.yaml
+CFG=/home/hwanhee/juan/CVPR2027/runs/gen_cfgs/masteer/${TAG}.yaml
 mkdir -p "$(dirname "$CFG")"
 
 # 슬롯마다 자기 cfg 사본을 만든다. 돌고 있는 파일을 고치면 다른 슬롯이 같이 바뀐다.
@@ -71,7 +73,7 @@ PY
 TRAIN_SRC=${MS_TRAINCFG:-tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task.yaml}
 TRAIN_CFG=$TRAIN_SRC
 if [ "$MB" != "0" ]; then
-    TRAIN_CFG=/home/hwanhee/CVPR2027/runs/gen_cfgs/masteer/${TAG}_train.yaml
+    TRAIN_CFG=/home/hwanhee/juan/CVPR2027/runs/gen_cfgs/masteer/${TAG}_train.yaml
     sed "s/^\( *\)minibatch_size:.*/\1minibatch_size: $MB/" "$TRAIN_SRC" > "$TRAIN_CFG"
 fi
 
@@ -129,7 +131,7 @@ rc=$?
 
 # grep -c 는 0 건일 때도 "0" 을 찍고 종료코드 1 을 낸다. `|| echo 0` 을 붙이면 "0" 이
 # 두 번 나와 값에 개행이 섞이고 뒤 필드가 통째로 밀린다. || true 여야 한다.
-LOG=/home/hwanhee/CVPR2027/runs/queue/logs/${TAG}.log
+LOG=/home/hwanhee/juan/CVPR2027/runs/queue/logs/${TAG}.log
 warn=$(grep -c foundLostAggregatePairs "$LOG" 2>/dev/null || true)
 need=$(grep -o 'Capacity to [0-9]*' "$LOG" 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)
 fps=$(grep -oE 'fps total: [0-9.]+' "$LOG" 2>/dev/null | tail -1 | grep -oE '[0-9.]+$')

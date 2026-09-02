@@ -49,6 +49,8 @@ from learning import amp_network_builder
 from learning.transformer import amp_network_builder_transformer
 from learning.transformer import amp_network_builder_transformer_comp
 from learning.transformer import amp_network_builder_transformer_adapt
+from learning.transformer import amp_network_builder_transformer_adapt_f22
+from learning.transformer import amp_network_builder_transformer_f22_stack
 from learning.transformer import amp_network_builder_transformer_longterm
 
 from learning.transformer import trans_agent
@@ -160,6 +162,13 @@ class RLGPUEnv(vecenv.IVecEnv):
     def get_number_of_agents(self):
         return self.env.get_number_of_agents()
 
+    def set_train_info(self, env_frames, *args, **kwargs):
+        """Forward rl_games training progress to tasks that own a curriculum."""
+        task = getattr(self.env, 'task', self.env)
+        if hasattr(task, 'set_train_info'):
+            task.set_train_info(env_frames, *args, **kwargs)
+
+
     def get_env_info(self):
         info = {}
         info['action_space'] = self.env.action_space
@@ -196,6 +205,8 @@ def build_alg_runner(algo_observer):
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task', lambda **kwargs : amp_network_builder_transformer.AMPTransformerMultiTaskBuilder())
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_comp', lambda **kwargs : amp_network_builder_transformer_comp.AMPTransformerMultiTaskCompBuilder())
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_adapt', lambda **kwargs : amp_network_builder_transformer_adapt.AMPTransformerMultiTaskAdaptBuilder())
+    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_adapt_f22', lambda **kwargs : amp_network_builder_transformer_adapt_f22.AMPTransformerMultiTaskAdaptBuilder())
+    runner.model_builder.network_factory.register_builder('amp_transformer_f22_stack', lambda **kwargs : amp_network_builder_transformer_f22_stack.AMPTransformerF22StackBuilder())
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_longterm', lambda **kwargs : amp_network_builder_transformer_longterm.AMPTransformerMultiTaskLongTermTaskCompletionBuilder())
 
     return runner
@@ -208,6 +219,13 @@ def main():
     set_np_formatting()
     args = get_args()
     cfg, cfg_train, logdir = load_cfg(args)
+
+    # The stack task reuses the f22 optimizer/reward recipe but has a distinct
+    # actor topology: frozen f22 plus a coordination residual.  Keeping the
+    # task-specific switch here avoids a second near-identical train YAML that
+    # could silently drift from the parity baseline.
+    if args.task == "HumanoidMAF22StackCarry":
+        cfg_train["params"]["network"]["name"] = "amp_transformer_f22_stack"
 
     cfg_train['params']['seed'] = cfg_train['params']['config']['seed'] = set_seed(cfg_train['params'].get("seed", -1), cfg_train['params'].get("torch_deterministic", False))
 

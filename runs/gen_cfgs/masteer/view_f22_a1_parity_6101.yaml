@@ -1,6 +1,6 @@
 # if given, will override the device setting in gym. 
 env: 
-  numAgents: 2
+  numAgents: 1
   numEnvs: 1
   envSpacing: 5
   episodeLength: 600

@@ -13,6 +13,8 @@ from utils.torch_utils import load_checkpoint
 
 import torch
 import torch.nn as nn
+import math
+import os
 
 class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
@@ -295,14 +297,156 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                         if getattr(m, "bias", None) is not None:
                             torch.nn.init.zeros_(m.bias)
 
+            # Optional hierarchical controller. PPO still emits the original
+            # joint-dimensional action, but the only trainable actor module is
+            # this two-output command head. It edits the local steering window
+            # (speed = radial scale, direction = planar rotation) before a
+            # previously trained masteer actor consumes it.
+            self.use_hier_steer = os.environ.get("MS_HIER", "0") == "1"
+            if self.use_hier_steer:
+                assert self.has_extra, "MS_HIER requires teammate + steering extra observations"
+                self.hier_target = os.environ.get("MS_HIER_TARGET", "steer")
+                assert self.hier_target in ("steer", "traj"), self.hier_target
+                if self.hier_target == "steer":
+                    target_ids = [i for i in self.extra_ids if self.task_obs_each_size[i] == 12]
+                    assert len(target_ids) == 1, (
+                        "MS_HIER_TARGET=steer expects exactly one 12-D extra token; got "
+                        f"{[(i, self.task_obs_each_size[i]) for i in self.extra_ids]}")
+                    self.hier_target_id = target_ids[0]
+                    context_ids = [i for i in self.extra_ids if i != self.hier_target_id]
+
+                else:
+                    assert self.major_task_name == "traj", self.major_task_name
+                    assert not self.use_pos_embed, (
+                        "MS_HIER_TARGET=traj reorders the active frozen token; "
+                        "the adapt config must set transformer.use_pos_embed=False")
+                    self.hier_target_id = self.new_major_id
+                    context_ids = list(self.extra_ids)
+
+                assert context_ids, "MS_HIER requires at least one teammate token"
+
+                self.hier_context_ids = context_ids
+                target_dim = self.task_obs_each_size[self.hier_target_id]
+
+                assert target_dim % 2 == 0, target_dim
+
+                hier_in = sum(self.task_obs_each_size[i] for i in context_ids) + target_dim
+                hidden = int(os.environ.get("MS_HIER_HIDDEN", "128"))
+                self.hier_speed_span = float(os.environ.get("MS_HIER_SPEED_SPAN", "0.5"))
+                self.hier_turn_max = math.radians(float(os.environ.get("MS_HIER_TURN_DEG", "25")))
+                self.hier_head = nn.Sequential(
+                    nn.Linear(hier_in, hidden), nn.Tanh(),
+                    nn.Linear(hidden, hidden), nn.Tanh(),
+                    nn.Linear(hidden, 2))
+                
+                # Identity command at initialization: scale=1, rotation=0.
+                nn.init.zeros_(self.hier_head[-1].weight)
+                nn.init.zeros_(self.hier_head[-1].bias)
+
+                base_path = os.environ.get("MS_HIER_BASE", "")
+                if not base_path:
+                    raise ValueError("MS_HIER=1 requires MS_HIER_BASE=<trained masteer .pth>")
+                base_ckp = load_checkpoint(base_path, device=self.device)
+                base = base_ckp["model"]
+                own = self.state_dict()
+                copied = 0
+                with torch.no_grad():
+                    for key, value in base.items():
+                        key = key[len("a2c_network."):] if key.startswith("a2c_network.") else key
+                        if key.startswith("hier_head."):
+                            continue
+                        if key in own and own[key].shape == value.shape:
+                            own[key].copy_(value)
+                            copied += 1
+                if copied == 0:
+                    raise ValueError(f"MS_HIER_BASE has no compatible actor weights: {base_path}")
+                # The frozen extra tokenizers were trained behind this exact
+                # observation normalizer. Reusing only their weights while the
+                # outer agent starts a fresh RMS silently changes their input.
+                if self.hier_target == "steer":
+                    self.hier_base_rms = RunningMeanStd(kwargs["input_shape"])
+                    self.hier_base_rms.load_state_dict(base_ckp["running_mean_std"])
+                    self.hier_base_rms.requires_grad_(False)
+                    self.hier_base_rms.eval()
+
+                # Freeze every module that turns commands into joint actions.
+                # Critic/discriminator parameters remain trainable for PPO/AMP.
+                frozen = [self.self_encoder, self.task_encoder,
+                          self.transformer_encoder, self.composer]
+                if hasattr(self, "internal_adapt_mlp"):
+                    frozen.append(self.internal_adapt_mlp)
+                if hasattr(self, "extra_act_mlp"):
+                    frozen.append(self.extra_act_mlp)
+                for module in frozen:
+                    module.requires_grad_(False)
+                    module.eval()
+                self.weight_token.requires_grad_(False)
+                self.pos_embed.requires_grad_(False)
+                self.hier_head.requires_grad_(True)
+                print(f"[hier] loaded frozen low-level actor from {base_path}; "
+                      f"copied={copied}, target={self.hier_target}, head_in={hier_in}, "
+                      f"speed_span={self.hier_speed_span}, "
+                      f"turn={math.degrees(self.hier_turn_max):.1f}deg", flush=True)
+
             return
+
+        def _hier_transform(self, raw_obs, head_obs):
+            """Apply the 2-D head to one Kx2 task-observation block."""
+            raw_task = raw_obs[..., self.self_obs_size:]
+            head_task = head_obs[..., self.self_obs_size:]
+            parts = [head_task[..., self.task_obs_each_indx[i]:self.task_obs_each_indx[i + 1]]
+                     for i in self.hier_context_ids]
+            lo = self.task_obs_each_indx[self.hier_target_id]
+            hi = self.task_obs_each_indx[self.hier_target_id + 1]
+            raw_window = raw_task[..., lo:hi]
+            head_window = head_task[..., lo:hi]
+            command = self.hier_head(torch.cat(parts + [head_window], dim=-1))
+            speed = 1.0 + self.hier_speed_span * torch.tanh(command[..., 0])
+            angle = self.hier_turn_max * torch.tanh(command[..., 1])
+            pts = raw_window.view(*raw_window.shape[:-1], -1, 2)
+            c, s = torch.cos(angle).unsqueeze(-1), torch.sin(angle).unsqueeze(-1)
+            x, y = pts[..., 0], pts[..., 1]
+            rot = torch.stack((c * x - s * y, s * x + c * y), dim=-1)
+            edited = (rot * speed[..., None, None]).reshape_as(raw_window)
+            edited_raw = raw_obs.clone()
+            edited_raw[..., self.self_obs_size + lo:self.self_obs_size + hi] = edited
+            return edited_raw
+
+        def _hier_command(self, raw_obs, normalized_obs):
+            if self.hier_target == "steer":
+                self.hier_base_rms.training = False
+                base_obs = self.hier_base_rms(raw_obs)
+                edited_raw = self._hier_transform(raw_obs, base_obs)
+
+                return self.hier_base_rms(edited_raw), raw_obs
+
+            # teammate values are already clipped in the environment; scaling
+            # them keeps the head input bounded without inventing RMS entries
+            # that do not exist in the single-agent stage1 checkpoint.  The
+            # edited raw trajectory is subsequently normalized by the frozen
+            # stage1 traj RMS in the old-task tokenizer path.
+            head_obs = normalized_obs.clone()
+            edited_raw = self._hier_transform(raw_obs, head_obs)
+            return normalized_obs, edited_raw
         
         def _eval_Transformer(self, obs, not_normalized_obs):
+
+            if getattr(self, "use_hier_steer", False):
+                obs, not_normalized_obs = self._hier_command(not_normalized_obs, obs)
 
             B = obs.shape[0]
 
             # new major task token
-            new_task_obs = self.new_task_trainable_rms(not_normalized_obs[..., self.self_obs_size:][..., self.task_obs_each_indx[self.new_major_id]:self.task_obs_each_indx[self.new_major_id + 1]])
+            _new_raw = not_normalized_obs[..., self.self_obs_size:][..., self.task_obs_each_indx[self.new_major_id]:self.task_obs_each_indx[self.new_major_id + 1]]
+            if getattr(self, "use_hier_steer", False) and self.hier_target == "traj":
+                # This token is masked below; only the frozen old-traj token is
+                # the low-level command path.  Keeping this RMS in train mode
+                # would store head-dependent tensors in its running statistics,
+                # then reuse that graph in the next PPO minibatch ("backward
+                # through the graph a second time").
+                self.new_task_trainable_rms.training = False
+                _new_raw = _new_raw.detach()
+            new_task_obs = self.new_task_trainable_rms(_new_raw)
             new_task_token = self.task_encoder[self.new_major_id](new_task_obs).unsqueeze(1)
 
             if self.has_extra:
@@ -351,6 +495,18 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
             if self.use_prior_knowledge:
                 src_key_padding_mask[:, self.how_many_new_tasks + 2:] = False
+
+            if getattr(self, "use_hier_steer", False) and self.hier_target == "traj":
+                # Exact stage1 low-level path: mask newly added teammate/new
+                # tokens and expose only weight, self and the frozen old-traj
+                # tokenizer. The head still controls that old token because the
+                # legacy adapt slice intentionally reads the duplicated new
+                # traj block from not_normalized_obs.
+                src_key_padding_mask[:] = True
+                src_key_padding_mask[:, [0, 1]] = False
+                old_pos = (2 + len(self.extra_ids) + 1
+                           + self.old_major_id - self.how_many_new_tasks)
+                src_key_padding_mask[:, old_pos] = False
             
             # src_key_padding_mask[:, 2:] = True # 只imitate style
 
