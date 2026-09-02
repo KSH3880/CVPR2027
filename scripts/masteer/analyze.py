@@ -86,6 +86,14 @@ for t in TAGS:
           f'{b.get("lat", float("nan")):>7.3f}{b.get("off50", float("nan")):>7.3f}'
           f'{b["path"]:>7.2f}{b["colEp"]:>7.3f}{b["still"]:>7.3f}')
 for t, (m, _) in rows.items():
+    if m.shape[1] >= 50:
+        steps = np.maximum(m[:, 30], 1)
+        print(f'\n[{t}] 집기/운반  graspEp {(m[:,44] >= 0).mean():.3f}  '
+              f'graspStep {med(m[:,40]/steps):.3f}  gateStep {med(m[:,41]/steps):.3f}  '
+              f'heldMove {med(m[:,42]):.2f}m  liftDz {med(m[:,43]):.2f}m')
+        print(f'        delivered {m[:,45].mean():.3f}  putdown {m[:,46].mean():.3f}  '
+              f'carry {m[:,47].mean():.3f}  place {m[:,48].mean():.3f}  '
+              f'shortcut {m[:,49].mean():.3f}')
     c = vcurve(m)
     if c:
         print(f'\n[{t}] 속도 곡선  기울기 {c["slope"]:+.3f}  ' +

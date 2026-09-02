@@ -82,8 +82,9 @@ params:
     score_to_win: 20000
     max_epochs: 1000000
     save_best_after: 50
-    save_frequency: 100
-    save_intermediate: False
+    # 최신 Humanoid.pth와 별도로 1000 epoch 단위 체크포인트를 보존한다.
+    save_frequency: 1000
+    save_intermediate: True
     print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.0

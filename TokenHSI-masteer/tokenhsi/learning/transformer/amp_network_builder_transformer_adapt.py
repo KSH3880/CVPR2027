@@ -181,6 +181,14 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 assert self.extra_ids, self.each_subtask_name
                 self.extra_id = self.extra_ids[0]
                 self.extra_task_obs_size = self.task_obs_each_size[self.extra_id]
+                # HumanoidMACarry 계열의 첫 extra 는 항상 teammate 다. 값만 0 으로
+                # 만드는 MA_TOKEN=zero 와 달리 mask 는 attention key/value 에서 정확히
+                # 제외한다. token sequence 는 [weight, self, extra...] 이므로 첫 extra
+                # 위치는 2다. 마스크는 TransformerEncoder 모든 층에 반복 적용된다.
+                self.mask_teammate_token = _osf.environ.get("MA_TOKEN", "live") == "mask"
+                self.teammate_token_pos = 2
+                if self.mask_teammate_token:
+                    print("[ma] teammate token: exact attention mask (MA_TOKEN=mask)", flush=True)
 
             ######## the first trainable task tokenizer
             s = self.task_obs_each_size[self.new_major_id]
@@ -351,6 +359,11 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
             if self.use_prior_knowledge:
                 src_key_padding_mask[:, self.how_many_new_tasks + 2:] = False
+
+            # 반드시 모든 활성화 처리 뒤에 다시 가린다. True 는 PyTorch
+            # src_key_padding_mask 에서 key/value 로 사용하지 않는다는 뜻이다.
+            if self.has_extra and self.mask_teammate_token:
+                src_key_padding_mask[:, self.teammate_token_pos] = True
             
             # src_key_padding_mask[:, 2:] = True # 只imitate style
 

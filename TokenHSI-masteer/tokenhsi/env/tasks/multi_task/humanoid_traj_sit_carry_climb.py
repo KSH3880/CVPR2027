@@ -257,7 +257,9 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._power_coefficient = cfg["env"]["power_coefficient"]
 
         self._reset_default_env_ids = []
-        self._reset_ref_env_ids = {} # to enable multi-skill reference init, use dict instead of list
+        # 참조 초기화 대상은 env가 아니라 (env, agent)를 편 row id다. 태스크는
+        # 공유 scene 때문에 env 단위지만 시작 skill/motion은 각 agent가 독립이다.
+        self._reset_ref_rows = {} # to enable multi-skill reference init, use dict instead of list
         self._reset_ref_motion_ids = {}
         self._reset_ref_motion_times = {}
 
@@ -1757,7 +1759,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
         is_task_env_ids = env_ids[self.task_of(env_ids) == HumanoidTrajSitCarryClimb.TaskUID["sit"].value]
         if len(is_task_env_ids) > 0:
-            local_reset_ref_env_ids = self._reset_ref_env_ids["sit"]
+            local_reset_ref_env_ids = self._reset_ref_rows["sit"]
             local_reset_ref_motion_ids = self._reset_ref_motion_ids["sit"]
             local_reset_ref_motion_times = self._reset_ref_motion_times["sit"]
 
@@ -1826,16 +1828,16 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
         is_task_env_ids = env_ids[self.task_of(env_ids) == HumanoidTrajSitCarryClimb.TaskUID["carry"].value]
         if len(is_task_env_ids) > 0:
-            local_reset_ref_env_ids = self._reset_ref_env_ids["carry"]
+            local_reset_ref_rows = self._reset_ref_rows["carry"]
             local_reset_ref_motion_ids = self._reset_ref_motion_ids["carry"]
             local_reset_ref_motion_times = self._reset_ref_motion_times["carry"]
 
             # for skill is pickUp, carryWith, putDown, the initial location of the box is from the reference box motion
             for sk_name in ["pickUp", "carryWith", "putDown"]:
-                if local_reset_ref_env_ids.get(sk_name) is not None:
-                    if (len(local_reset_ref_env_ids[sk_name]) > 0):
+                if local_reset_ref_rows.get(sk_name) is not None:
+                    if (len(local_reset_ref_rows[sk_name]) > 0):
 
-                        curr_env_ids = local_reset_ref_env_ids[sk_name]
+                        curr_rows = local_reset_ref_rows[sk_name]
 
                         # 박스가 에이전트당 하나이므로 각자 자기 모션의 박스 포즈를 쓴다
                         root_pos, root_rot = self._motion_lib[sk_name].get_obj_motion_state(
@@ -1843,34 +1845,31 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                             motion_times=local_reset_ref_motion_times[sk_name]
                         )
 
-                        on_ground_mask = (self._box_lib._box_size[self.agent_rows(curr_env_ids), 2] / 2 > root_pos[:, 2])
-                        root_pos[on_ground_mask, 2] = self._box_lib._box_size[self.agent_rows(curr_env_ids)[on_ground_mask], 2] / 2
+                        on_ground_mask = (self._box_lib._box_size[curr_rows, 2] / 2 > root_pos[:, 2])
+                        root_pos[on_ground_mask, 2] = self._box_lib._box_size[curr_rows[on_ground_mask], 2] / 2
 
-                        # 값은 (env, agent) 마다 한 줄로 오므로 접어서 대입한다
-                        _n, _A = len(curr_env_ids), self.num_agents
-                        self._box_states[curr_env_ids, ..., 0:3] = root_pos.view(_n, _A, 3) if _A > 1 else root_pos
-                        self._box_states[curr_env_ids, ..., 3:7] = root_rot.view(_n, _A, 4) if _A > 1 else root_rot
-                        self._box_states[curr_env_ids, ..., 7:10] = 0.0
-                        self._box_states[curr_env_ids, ..., 10:13] = 0.0
+                        _e = torch.div(curr_rows, self.num_agents, rounding_mode="floor")
+                        _a = curr_rows % self.num_agents
+                        boxes = self.agent_axis(self._box_states)
+                        boxes[_e, _a, 0:3] = root_pos
+                        boxes[_e, _a, 3:7] = root_rot
+                        boxes[_e, _a, 7:10] = 0.0
+                        boxes[_e, _a, 10:13] = 0.0
 
                         # reset platform, we needn't platforms right now.
                         if self._carry_reset_random_height:
-                            self._platform_pos[curr_env_ids] = self._platform_default_pos[curr_env_ids]
+                            platform = self.agent_axis(self._platform_pos)
+                            platform_default = self.agent_axis(self._platform_default_pos)
+                            platform[_e, _a] = platform_default[_e, _a]
 
             # for skill is loco , we random generate an inital location of the box
             random_env_ids = []
             for sk_name in ["loco_carry"]:
-                if local_reset_ref_env_ids.get(sk_name) is not None:
-                    random_env_ids.append(local_reset_ref_env_ids[sk_name])
+                if local_reset_ref_rows.get(sk_name) is not None:
+                    random_env_ids.append(local_reset_ref_rows[sk_name])
 
             if len(random_env_ids) > 0:
                 ids = torch.cat(random_env_ids, dim=0)
-                # _reset_ref_env_ids 는 **env id** 를 담는다 (스킬은 env 단위로 뽑히고,
-                # 모션만 env 당 A 개 뽑는다). 박스·받침·박스크기는 row 당 하나이므로
-                # 여기서 row 로 펴야 한다. env id 를 그대로 row 로 쓰면 엉뚱한
-                # env/agent 에 박스를 놓고 나머지 에이전트 박스는 아예 안 놓는다.
-                # A==1 이면 agent_rows 가 항등이라 원본과 같다 -- 그래서 안 보였다.
-                ids = self.agent_rows(ids)
                 _e, _a = torch.div(ids, self.num_agents, rounding_mode="floor"), ids % self.num_agents
 
                 root_pos_xy = torch.randn(len(ids), 2, device=self.device)
@@ -1912,38 +1911,36 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
             # for skill is putDown, the target location of the box is from the reference box motion
             for sk_name in ["putDown"]:
-                if local_reset_ref_env_ids.get(sk_name) is not None:
-                    if (len(local_reset_ref_env_ids[sk_name]) > 0):
+                if local_reset_ref_rows.get(sk_name) is not None:
+                    if (len(local_reset_ref_rows[sk_name]) > 0):
 
-                        curr_env_ids = local_reset_ref_env_ids[sk_name]
+                        curr_rows = local_reset_ref_rows[sk_name]
 
                         root_pos, root_rot = self._motion_lib[sk_name].get_obj_motion_state(
                             motion_ids=local_reset_ref_motion_ids[sk_name],
                             motion_times=self._motion_lib[sk_name].get_motion_length(local_reset_ref_motion_ids[sk_name]) # use last frame
                         )
 
-                        root_pos[:, 2] = self._box_lib._box_size[self.agent_rows(curr_env_ids), 2] / 2 # make tar pos 100% on the ground
-                        self._box_tar_pos[self.agent_rows(curr_env_ids)] = root_pos
+                        root_pos[:, 2] = self._box_lib._box_size[curr_rows, 2] / 2 # make tar pos 100% on the ground
+                        self._box_tar_pos[curr_rows] = root_pos
 
                         # reset tar platform
                         if self._carry_reset_random_height:
-                            self._tar_platform_pos[curr_env_ids] = self._tar_platform_default_pos[curr_env_ids]
+                            _e = torch.div(curr_rows, self.num_agents, rounding_mode="floor")
+                            _a = curr_rows % self.num_agents
+                            tar_platform = self.agent_axis(self._tar_platform_pos)
+                            tar_platform_default = self.agent_axis(self._tar_platform_default_pos)
+                            tar_platform[_e, _a] = tar_platform_default[_e, _a]
 
             # for skill is loco, pickUp, carryWith, we random generate an target location of the box
             random_env_ids = []
 
             for sk_name in ["loco_carry", "pickUp", "carryWith"]:
-                if local_reset_ref_env_ids.get(sk_name) is not None:
-                    random_env_ids.append(local_reset_ref_env_ids[sk_name])
+                if local_reset_ref_rows.get(sk_name) is not None:
+                    random_env_ids.append(local_reset_ref_rows[sk_name])
 
             if len(random_env_ids) > 0:
                 ids = torch.cat(random_env_ids, dim=0)
-                # _reset_ref_env_ids 는 **env id** 를 담는다 (스킬은 env 단위로 뽑히고,
-                # 모션만 env 당 A 개 뽑는다). 박스·받침·박스크기는 row 당 하나이므로
-                # 여기서 row 로 펴야 한다. env id 를 그대로 row 로 쓰면 엉뚱한
-                # env/agent 에 박스를 놓고 나머지 에이전트 박스는 아예 안 놓는다.
-                # A==1 이면 agent_rows 가 항등이라 원본과 같다 -- 그래서 안 보였다.
-                ids = self.agent_rows(ids)
                 _e, _a = torch.div(ids, self.num_agents, rounding_mode="floor"), ids % self.num_agents
 
                 new_target_pos = self._box_tar_pos_dist.sample((len(ids),))
@@ -1997,7 +1994,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
         is_task_env_ids = env_ids[self.task_of(env_ids) == HumanoidTrajSitCarryClimb.TaskUID["climb"].value]
         if len(is_task_env_ids) > 0:
-            local_reset_ref_env_ids = self._reset_ref_env_ids["climb"]
+            local_reset_ref_env_ids = self._reset_ref_rows["climb"]
             local_reset_ref_motion_ids = self._reset_ref_motion_ids["climb"]
             local_reset_ref_motion_times = self._reset_ref_motion_times["climb"]
 
@@ -2235,9 +2232,9 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         return self._task_indicator[env_ids * self.num_agents]
 
     def _reset_task_indicator(self, env_ids):
-        # 태스크와 스킬은 env 단위다. 한 env 의 물체는 하나뿐이라, 두 에이전트가 서로
-        # 다른 태스크를 받으면 물체를 어디 둘지가 모순된다 (한 명은 의자를 쓰겠다는데
-        # 다른 한 명이 땅속으로 치운다). 에이전트마다 다른 것은 모션 시작 프레임뿐이다.
+        # 태스크는 env 단위다. A>=2가 지원하는 carry scene에는 agent별 박스가 있으므로
+        # 그 안의 시작 skill과 reference motion은 row 단위로 독립 표본을 뽑는다.
+        # A==1에서는 row==env라 원래 동작과 완전히 같다.
         A = self.num_agents
         n = len(env_ids)
 
@@ -2253,7 +2250,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                 self._task_mask[curr_rows, :] = False
                 self._task_mask[curr_rows, curr_task_uid] = True
 
-                self._reset_ref_env_ids[task_name] = {}
+                self._reset_ref_rows[task_name] = {}
                 self._reset_ref_motion_ids[task_name] = {}
                 self._reset_ref_motion_times[task_name] = {}
 
@@ -2272,15 +2269,13 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                 else:
                     raise NotImplementedError
 
-                sk_ids = torch.multinomial(skill_init_prob, num_samples=curr_env_ids.shape[0], replacement=True)
+                sk_ids = torch.multinomial(skill_init_prob, num_samples=curr_rows.shape[0], replacement=True)
                 for uid, sk_name in enumerate(skill):
-                    skilled_curr_env_ids = curr_env_ids[(sk_ids == uid).nonzero().squeeze(-1)] # be careful!!!
-                    if len(skilled_curr_env_ids) > 0:
-                        self._reset_ref_env_ids[task_name][sk_name] = skilled_curr_env_ids
+                    skilled_curr_rows = curr_rows[(sk_ids == uid).nonzero().squeeze(-1)] # be careful!!!
+                    if len(skilled_curr_rows) > 0:
+                        self._reset_ref_rows[task_name][sk_name] = skilled_curr_rows
 
-                        # 모션은 (env, agent) 마다 하나 -- 같은 태스크라도 시작 자세는 각자
-                        num_envs = skilled_curr_env_ids.shape[0] * A
-                        motion_ids = self._motion_lib[sk_name].sample_motions(num_envs)
+                        motion_ids = self._motion_lib[sk_name].sample_motions(len(skilled_curr_rows))
                         motion_times = self._motion_lib[sk_name].sample_time_rsi(motion_ids) # avoid times with serious self-penetration
                         
                         self._reset_ref_motion_ids[task_name][sk_name] = motion_ids
@@ -2299,7 +2294,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
             if len(live) > 0:
                 self.dump_metrics(live)     # 비우기 전에 걷는다
         self._reset_default_env_ids = []
-        self._reset_ref_env_ids = {}
+        self._reset_ref_rows = {}
         self._reset_ref_motion_ids = {}
         self._reset_ref_motion_times = {}
         if (len(env_ids) > 0):
@@ -2412,11 +2407,11 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         for sk_name in self._skill:
             curr_motion_lib = self._motion_lib[sk_name]
 
-            curr_env_ids = torch.tensor([], dtype=torch.int32, device=self.device)
-            for k, v in self._reset_ref_env_ids.items():
+            curr_rows = torch.tensor([], dtype=torch.int32, device=self.device)
+            for k, v in self._reset_ref_rows.items():
                 for kk, vv in v.items():
                     if kk == sk_name:
-                        curr_env_ids = torch.hstack([curr_env_ids, vv])
+                        curr_rows = torch.hstack([curr_rows, vv])
             
             curr_motion_ids = torch.tensor([], dtype=torch.int32, device=self.device)
             for k, v in self._reset_ref_motion_ids.items():
@@ -2430,12 +2425,12 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                     if kk == sk_name:
                         curr_motion_times = torch.hstack([curr_motion_times, vv])
 
-            if len(curr_env_ids) > 0:
+            if len(curr_rows) > 0:
                 
                 root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                     = curr_motion_lib.get_motion_state(curr_motion_ids, curr_motion_times)
 
-                self._set_env_state(env_ids=curr_env_ids, 
+                self._set_row_state(rows=curr_rows,
                                     root_pos=root_pos, 
                                     root_rot=root_rot, 
                                     dof_pos=dof_pos, 
@@ -2446,9 +2441,9 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                 # update buffer for kinematic humanoid state
                 body_pos, body_rot, body_vel, body_ang_vel \
                     = curr_motion_lib.get_motion_state_max(curr_motion_ids, curr_motion_times)
-                self._kinematic_humanoid_rigid_body_states[self.agent_rows(curr_env_ids)] = torch.cat((body_pos, body_rot, body_vel, body_ang_vel), dim=-1)
+                self._kinematic_humanoid_rigid_body_states[curr_rows] = torch.cat((body_pos, body_rot, body_vel, body_ang_vel), dim=-1)
 
-                self._every_env_init_dof_pos[self.agent_rows(curr_env_ids)] = dof_pos # for "enableTrackInitState"
+                self._every_env_init_dof_pos[curr_rows] = dof_pos # for "enableTrackInitState"
 
         return
 
@@ -2475,11 +2470,11 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
         for i, sk_name in enumerate(self._skill):
 
-            curr_env_ids = torch.tensor([], dtype=torch.int32, device=self.device)
-            for k, v in self._reset_ref_env_ids.items():
+            curr_rows = torch.tensor([], dtype=torch.int32, device=self.device)
+            for k, v in self._reset_ref_rows.items():
                 for kk, vv in v.items():
                     if kk == sk_name:
-                        curr_env_ids = torch.hstack([curr_env_ids, vv])
+                        curr_rows = torch.hstack([curr_rows, vv])
             
             curr_motion_ids = torch.tensor([], dtype=torch.int32, device=self.device)
             for k, v in self._reset_ref_motion_ids.items():
@@ -2493,8 +2488,8 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                     if kk == sk_name:
                         curr_motion_times = torch.hstack([curr_motion_times, vv])
 
-            if (len(curr_env_ids) > 0):
-                self._init_amp_obs_ref(curr_env_ids, curr_motion_ids, curr_motion_times, sk_name)
+            if (len(curr_rows) > 0):
+                self._init_amp_obs_ref(curr_rows, curr_motion_ids, curr_motion_times, sk_name)
         
         return
 
@@ -2505,7 +2500,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._hist_amp_obs_buf[rows] = curr_amp_obs
         return
 
-    def _init_amp_obs_ref(self, env_ids, motion_ids, motion_times, skill_name):
+    def _init_amp_obs_ref(self, rows, motion_ids, motion_times, skill_name):
         dt = self.dt
         motion_ids = torch.tile(motion_ids.unsqueeze(-1), [1, self._num_amp_obs_steps - 1])
         motion_times = motion_times.unsqueeze(-1)
@@ -2522,9 +2517,6 @@ class HumanoidTrajSitCarryClimb(Humanoid):
                                               self._dof_obs_size, self._dof_offsets)
         
 
-        # 참조 모션도 (env, agent) 마다 하나씩 뽑았으므로 라벨도 row 수만큼 필요하다
-        rows = self.agent_rows(env_ids)
-
         if self._enable_task_specific_disc and self._enable_task_mask_obs:
             motion_labels = self._task_mask[rows]
             motion_labels = torch.broadcast_to(motion_labels.unsqueeze(-2), [motion_labels.shape[0], self._num_amp_obs_steps - 1, motion_labels.shape[1]])
@@ -2534,15 +2526,14 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._hist_amp_obs_buf[rows] = amp_obs_demo.view(self._hist_amp_obs_buf[rows].shape)
         return
 
-    def _set_env_state(self, env_ids, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel):
-        """env_ids 는 env 인덱스, 값은 (env, agent) 마다 한 줄씩 온다.
+    def _set_row_state(self, rows, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel):
+        """rows와 값은 모두 (env, agent)마다 한 줄씩 온다.
 
         쓰기 경로라 시뮬 메모리를 가리키는 창에 직접 꽂혀야 한다. (env, agent) 인덱스
         쌍으로 갈라 넣으면 창에 그대로 써진다 -- 평탄 복사본에 쓰면 크래시 없이 조용히
-        사라진다. A==1 이면 e=env_ids, a=0 이라 원래 대입과 같다.
+        사라진다. A==1 이면 e=rows, a=0 이라 원래 대입과 같다.
         """
         A = self.num_agents
-        rows = self.agent_rows(env_ids)
         e, a = torch.div(rows, A, rounding_mode="floor"), rows % A
 
         h = self.agent_axis(self._humanoid_root_states)

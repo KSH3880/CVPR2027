@@ -216,11 +216,15 @@ class TransPlayerContinuous(common_player.CommonPlayer):
     def run_eval(self):
         is_determenistic = self.is_determenistic
         num_envs = self.env.num_envs
-        num_trials = num_envs
-        assert num_envs == num_trials
+        # 원본 A=1은 env 하나가 곧 trial 하나다. A>=2에서는 관측·성공 판정이
+        # (env, agent) row마다 하나이므로, 원본 trial을 agent마다 독립 복제한다.
+        # done은 공유 scene의 env 단위로 같이 오지만 has_collected가 각 row를 한 번만
+        # 세므로 E*A개를 채우면 모든 env의 모든 agent를 정확히 한 번 평가한 것이다.
+        num_trials = num_envs * self.num_agents
         num_repeat = 3
 
-        print("evaluating policy: {} trials".format(num_envs))
+        print("evaluating policy: {} trials ({} envs x {} agents)".format(
+            num_trials, num_envs, self.num_agents))
 
         eval_res = {}
 

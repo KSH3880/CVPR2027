@@ -17,16 +17,9 @@
   ],
   "eval_summary_prefix": "MS_EVAL_SUMMARY ",
   "gpus": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7
+    0
   ],
-  "max_per_gpu": 2,
+  "max_per_gpu": 1,
   "idle_min": 5,
   "allowed_env": [
     "MS_MODE",
@@ -47,6 +40,7 @@
     "MS_M_LO",
     "MS_MRAND",
     "MS_POS_C",
+    "MS_REWARD_OUTER",
     "MS_BACK",
     "MS_PIN",
     "MS_ZERO",
@@ -102,7 +96,7 @@
   "forbidden_env": [],
   "seed_env": "MS_SEED",
   "max_seeds": 2,
-  "_why_max": "빈 카드 우선, 없으면 얹는다. 메모리 25.7GB×2=51GB 로 80GB 안에 여유",
+  "_why_max": "이 저장소는 GPU 0 하나만 사용하며 학습·평가를 동시에 하나만 실행한다",
   "job_mib": 46000,
   "_why_job_mib": "동결해제 런 실측 36GB. 80GB 카드에서 하나 올린 뒤 남는 44GB 보다 커야 둘째가 안 얹힌다"
 }

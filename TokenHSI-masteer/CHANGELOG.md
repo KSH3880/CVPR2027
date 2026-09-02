@@ -699,3 +699,85 @@ source** 한다. 매핑이 두 곳에 있으면 뷰어에서 확인한 것과 �
 
 `view.sh` 는 env 수를 위치인자 `$2` 로만 받아 `ENVS=1 view.sh tag 3` 이 조용히
 3 으로 떴다. `record.sh` 와 맞춰 `ENVS` 를 우선하게 했다 (위치인자는 뒤로 남김).
+
+## 2026-08-31
+
+### 로컬 데스크톱용 masteer 뷰어
+
+`scripts/masteer/view_local.sh` 를 추가했다. 현재 데스크톱의 `DISPLAY`에 Isaac Gym
+뷰어를 직접 띄우므로 서버용 `view.sh`의 Xvfb·x11vnc·noVNC·PORT가 필요 없다.
+태그와 `.pth` 경로를 모두 받고, 최신 `Humanoid.pth` 선택·stage1 자동 탐색·1-env cfg
+생성·체크포인트 스냅샷까지 한 스크립트에서 처리한다. 단일 GPU 로컬 기본값은 시스템의
+`cuda:0`이며 `MA_GPU`를 요구하지 않는다.
+
+Git에서 제외되는 대용량 모션·오브젝트 데이터가 masteer 복사본에 없으면, 이 PC에 이미
+있는 원본 TokenHSI의 `tokenhsi/data`를 자동 탐색해 필요한 여섯 디렉터리만 심볼릭 링크로
+공유한다. 원본 데이터는 복사하거나 수정하지 않으며, 다른 배치에서는
+`TOKENHSI_DATA_ROOT`로 명시할 수 있다.
+
+masteer와 무관한 long-horizon 태스크의 `pytorch3d` import가 `parse_task.py` 최상단에서
+실행되어 모든 태스크를 막고 있었다. `HumanoidLongTerm4BasicSkills`를 선택했을 때만
+지연 import하도록 바꿔, `pytorch3d`가 없는 환경에서도 `HumanoidMASteerCarry`를 실행할
+수 있게 했다. long-horizon 태스크 자체의 의존성 요구는 그대로다.
+
+### carry 학습 의미론 교정 — height gate·독립 시작 skill·정확한 clip 끝점
+
+- masteer의 carry 속도항에 원본 TokenHSI와 같은 height gate를 복원했다. 박스 중심이
+  `box_height/2 + 0.2m` 이하이면 속도 보상은 0이고, 원본 순서대로 목표 0.5m 안의 pin만
+  그 뒤에 1로 만든다. `MS_VEL_W`, `MS_POS_C` 등 현재 가중치는 바꾸지 않았다.
+- 태스크는 공유 scene 때문에 env 단위로 유지하되, carry 시작 skill과 reference motion은
+  `(env, agent)` row마다 독립 표본을 뽑는다. 사람 state, AMP history, 각자의 박스·platform·
+  목표 reset을 모두 같은 row 계약으로 바꿨다. A=1은 `row==env`라 동작이 같다.
+- masteer에서 실제로 지원하는 보상 형태는 `onlyVelReward=True`,
+  `onlyHeightHandHeldReward=False`로 고정했다. 상속 부모가 요구해 YAML key는 남기지만,
+  다른 값을 주면 조용히 무시하지 않고 즉시 `ValueError`를 낸다.
+- `MS_CLIP=1`의 끝점이 목표 0.1~0.2m 앞에 생기던 floor 셀 오류를 고쳤다. 마지막 waypoint를
+  ceil 셀에 보존하고 그 셀 호좌표를 반환한다. 10,000개 랜덤 경로에서 목표점 최대 오차는
+  `4.5e-6m`였다.
+- 원본 carry의 실행 모드를 다시 대조했다. 학습과 일반 `--test`는 혼합 시작 skill이고,
+  final `--test --eval`만 eval YAML의 `loco=1.0`을 쓴다. masteer는 어느 모드든 선택된
+  분포에서 row별로 독립 샘플링한다. final eval에서는 두 skill 이름이 loco로 같아도
+  reference motion/time과 각자의 박스·목표 상태는 독립이다.
+- A=2 final evaluator가 row별 성공을 세면서 종료 목표를 `num_envs`로 두어 전체 agent의
+  절반 분량만 집계하던 것을 `num_envs * num_agents`로 고쳤다. A=1 trial 수는 그대로다.
+- `view.sh`와 `view_local.sh`는 원본 viewer처럼 기본적으로 일반 test(혼합 시작)를 쓰고,
+  `MS_EVAL=1`일 때 final-eval(loco 시작)을 쓴다. `record.sh`는 final-eval 전용이며,
+  ms11 이후 정책과 맞지 않던 `MS_CLIP` 기본값 0도 1로 맞췄다.
+
+### 집기→운반→놓기 생애주기 지표 (열 40~49)
+
+`hand_near`(손 근접 proxy), 원본 height gate가 열린 스텝, 손 근접 중 박스 이동거리,
+시작 대비 최대 상승, 최초 근접 시각, delivery/엄격 putdown을 분리해 누적한다. 최종
+`carry`/`place`는 손 근접 중 0.5m 이상 실제로 옮긴 뒤 목표에 닿은 경우만 세며,
+`shortcut`은 목표에는 닿았지만 그 운반 증거가 없는 경우다. `eval_one.sh`의 한 줄 요약과
+`analyze.py` 출력에도 모두 붙였다.
+
+검증은 `py_compile`, `bash -n`, `git diff --check`, 10,000개 CPU 경로 끝점 검사와
+2-agent·혼합 시작 skill Isaac Gym 스모크로 했다. 스모크는 90초 동안 23개 에피소드를
+재시작했고 인덱스/CUDA/runtime 오류 없이 계속 실행됐다(마지막 `KeyboardInterrupt`는
+의도한 timeout 종료).
+
+## 2026-09-01
+
+### ms18 — teammate 토큰 exact attention mask
+
+`MA_TOKEN=mask`를 추가했다. teammate 21-D 관측과 네트워크 크기는 `live`와 동일하게
+유지하지만, adapt Transformer의 첫 extra 위치를 `src_key_padding_mask=True`로 두어
+모든 self-attention 층의 key/value에서 제외한다. `MA_TOKEN=zero`는 0 벡터도 attention
+softmax 분모에 남으므로 토큰 부재 대조군이 아니며, `mask`가 그 차이를 분리한다.
+따라서 ms18의 grad-check에서 teammate encoder grad=0은 의도된 정상값이고,
+steer·new-carry tokenizer와 internal adapter는 계속 nonzero gradient여야 한다.
+
+`ms18_maskteam_origscale_c06_s0`은 `ms17_origscale_c06_s0`에서 이 mask만 바꾼다.
+활성 actor 토큰은 `weight+self+steer+new_carry`이며, 현재 실행 중인 ms17은 건드리지 않고
+GPU0 다음 대기 행으로 추가했다. 기존 sidecar가 이미 `MA_TOKEN`을 저장하므로 별도 노브나
+학습/평가 스크립트 분기는 만들지 않았다. 로컬·서버 viewer와 record도 사용자가
+`MA_TOKEN`을 직접 덮지 않았을 때 태그 sidecar의 값만 복원해, mask 정책을 기본 live로
+잘못 여는 관측 불일치를 막는다.
+
+### masteer adapt 중간 체크포인트 기본 주기 1000
+
+로컬 `train_local.sh`가 기본으로 쓰는 adapt 학습 설정의 `save_frequency`를 500에서
+1000으로 바꿨다. 새 학습은 최신 `Humanoid.pth`와 별도로
+`Humanoid_00001000.pth`, `Humanoid_00002000.pth`, ...를 보존한다. 이미 설정을 읽고
+실행 중인 학습 프로세스에는 영향을 주지 않는다.

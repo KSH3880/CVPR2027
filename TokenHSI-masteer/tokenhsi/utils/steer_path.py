@@ -1,9 +1,10 @@
 """Path math for steerable carry. No isaacgym import: runnable and testable on CPU.
 
 A path is a tensor [N, V, 2] of xy vertices, resampled to a fixed arc-length
-spacing so that index j sits at arc length j * ds. Paths shorter than V vertices
-are extended along their final direction, which keeps every tensor rectangular
-and makes "past the end" mean "keep going straight" rather than "stop here".
+spacing. The final waypoint occupies the first grid cell at or beyond its true
+length (so that cell can be clipped to exactly); later cells are extended along
+the final direction. This keeps every tensor rectangular and makes "past the
+end" mean "keep going straight" rather than "stop here".
 """
 
 import torch
@@ -35,7 +36,13 @@ def _extend(pts, n_valid, total):
 
 
 def resample(waypoints, ds=DS, total=V, with_end=False):
-    """Arc-length resample a polyline [N, M, 2] to [N, total, 2] at spacing ds."""
+    """Arc-length resample a polyline [N, M, 2] to [N, total, 2] at spacing ds.
+
+    ``end_s`` is the arc coordinate of the stored vertex that is exactly the
+    final waypoint.  A fixed-spacing buffer cannot represent an arbitrary
+    length exactly, so the last real segment may be shorter than ``ds``; all
+    vertices after it are straight extrapolation.
+    """
     N, M, _ = waypoints.shape
     seg = waypoints[:, 1:] - waypoints[:, :-1]
     seg_len = seg.norm(dim=-1)
@@ -55,12 +62,14 @@ def resample(waypoints, ds=DS, total=V, with_end=False):
     p1 = waypoints[ar, j + 1]
     out = p0 + frac[..., None] * (p1 - p0)
 
-    n_valid = (total_len / ds).long().clamp(min=2, max=total)
-    # **실제 경로가 어디서 끝나는지.** 뒤쪽은 직선 외삽이라 이 값이 없으면 래칫이
-    # 그리로 미끄러져도 막을 수 없다 (실측: 경로 10.5 m 인데 호길이가 17.9 m 까지 갔다).
-    # 기본 반환은 그대로라 기존 호출부는 영향이 없다.
+    # 마지막 waypoint 를 버퍼에 실제로 보존한다. 예전 floor(total_len / ds)는
+    # 목표보다 한 셀 앞을 anchor 로 삼아 clip 끝점이 목표 0.1~0.2 m 앞에 생겼다.
+    # ceil 셀은 out 계산에서 frac=1로 포화되어 정확히 마지막 waypoint가 된다.
+    last_valid = torch.ceil(total_len / ds).long().clamp(min=1, max=total - 1)
+    n_valid = last_valid + 1
     ext = _extend(out, n_valid, total)
-    return (ext, n_valid) if with_end else ext
+    end_s = last_valid.to(waypoints.dtype) * ds
+    return (ext, end_s) if with_end else ext
 
 
 def project(root_xy, path, s_lo=None, s_hi=None):
@@ -316,8 +325,8 @@ def gen_full_v2(root_xy, box_xy, tar_xy, seed, lat_min=0.3, lat_max=1.5,
         print(f"[steer_path] WARNING: {int(over.sum())}/{len(over)} paths exceed the "
               f"{V * DS:.0f} m buffer (longest {total.max():.1f} m). Raise V.", flush=True)
     if with_end:
-        path, n_valid = resample(pts, with_end=True)
-        return path, s_box, n_valid
+        path, end_s = resample(pts, with_end=True)
+        return path, s_box, end_s
     return resample(pts), s_box
 
 

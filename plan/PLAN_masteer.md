@@ -68,23 +68,31 @@ makespan  하한 294 / 순차 588
 
 | tag | 질문·판정 기준 | 상태/GPU | 환경변수 |
 | --- | --- | --- | --- |
-
-| `ms6_m8_long_s0` | **속도 곡선 장기.** 3000 에서 기울기 0.076. A=1 은 같은 창 코드로 0.45~0.49 를 냈다 |  | `MS_MRAND=8 MS_ITERS=9000` |
-
-
-| `ms11_clip_s0` | **끝 클램프.** 호길이·조준점·창을 실제 경로 끝에서 포화. TokenHSI traj 의 `clip(t/dur,0,1)` 을 거리 버전으로. 지금까지 최선(속도항 ×5)과 함께 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1` |
-| `ms11_clip_s1` | 끝 클램프 시드 1 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1 MS_SEED=1` |
-
-
-| `ms12_base4L_s0` | 같은 설정 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
-
-| `ms13_sep9L_s0` | sep 9 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MA_SEP=9 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
-| `ms13_sep20L_s0` | sep 20 + 9000 iter. `ms12_base4L_s0`(sep 0) 와 3단 비교가 된다 |  | `MA_SEP=20 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
-
-| `ms14_vw1L_s0` | **빠져 있던 대조군.** 돌고 있는 `ms12_base4L_s0` 과 `MS_VEL_W` 한 글자만 다르다(5→1). `VEL_W=5` 가 속도항 비중을 50%→83% 로 올려 `handheld`(집기)를 12.5%→4.2% 로 눌렀다는 진단을 여기서 판정한다. `ms4_m4_s0`(VEL_W=1)은 CLIP 이 없어 이 비교가 불가능했다 |  | `MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
-| `ms14_vw2L_s0` | 1 과 5 의 기하 중간(√5≈2.2). 1 이 집기를 지키고 5 가 속도를 이기면 **중간에 최적점이 있는지**. `VEL_W` = 1·2·5 세 점이 된다 (5 는 `ms12_base4L_s0` 이 이미 돈다) |  | `MS_VEL_W=2 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
-| `ms14_mloL_s0` | **M=0(완전 정지)을 배우나.** `mult.clamp(min=MS_M_LO)` 가 0.25 라 정책이 정지 명령을 한 번도 본 적이 없다(최저 0.375 m/s). 보상에는 `stopped = v_tar<0.05` 분기가 이미 있는데 이 하한 때문에 안 돈다. `VEL_W=1` 로 맞춰 **`ms14_vw1L_s0` 이 그대로 대조군**이다. 되면 월드모델이 정지를 명령할 수 있고 시각화 9·10 이 해금된다 |  | `MS_M_LO=0 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
+| `ms16_fix_vw1L_s0` | **수정 의미론 첫 베이스.** `ms14_vw1L_s0`과 같은 가중치·명령 설정을 stage1부터 다시 학습하되 원본 height gate, agent별 독립 skill/motion/object reset, 정확한 clip 끝점을 적용한다. 핵심은 `carry/place/delivered`와 final SR, 보호 지표는 `spd_err/lat/d_min`; grad=0·warn>0·설정 불일치는 무효. 이 결과를 고정한 뒤에만 reward 가중치를 바꾼다 | 완료 (GPU0) | `MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000 MS_GRADCHK=1` |
+| `ms17_origscale_c06_s0` | **원본 보상 스케일 복원.** `ms16`의 수정 의미론과 나머지 설정은 고정하고 walk/carry 바깥 배율을 `2→1`, 경로 이탈 계수를 `2→0.6`으로 낮춘다. 집기·운반 신호가 steer 벌점에 묻히는지 검증하며 `carry/place/delivered`, `spd_err/lat/d_min`을 `ms16`과 비교한다 | 학습 중 (GPU0) | `MS_REWARD_OUTER=1 MS_POS_C=0.6 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000 MS_GRADCHK=1` |
+| `ms18_maskteam_origscale_c06_s0` | **teammate attention 간섭 대조군.** `ms17`의 환경·보상·가변속도 설정은 전부 유지하고 teammate 관측 21-D만 actor Transformer의 key/value에서 정확히 mask한다. `MA_TOKEN=zero`처럼 0 토큰을 남기지 않으므로 활성 정책 토큰은 `weight+self+steer+new_carry`다. 이 행에서는 teammate encoder grad=0이 의도된 정상값이고 steer/new-carry/adapter grad는 0이면 안 된다. `carry/place/graspEp`가 회복되면 teammate 토큰의 동시 attention이 집기를 훼손한 것이고, 그대로면 원인은 A=2 이식·steer/carry 쪽에 남는다. | 학습 중 (GPU0, ms17 병행) | `MA_TOKEN=mask MS_REWARD_OUTER=1 MS_POS_C=0.6 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000 MS_GRADCHK=1` |
 <!-- /QUEUE -->
+
+## 현재 재학습 기준 (2026-08-31)
+
+수정된 carry 의미론을 처음부터 다시 학습하는 첫 tag는 `ms16_fix_vw1L_s0`이고,
+기준 하이퍼파라미터 조합은 `ms14_vw1L_s0`이다:
+`MS_AGENTS=2 MS_ENVS=2048 MS_CP=4 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1
+MS_ITERS=9000 MS_SEED=0` (minibatch 16384). 다만 현재 같은 이름의
+체크포인트는 height gate·agent별 시작 skill·정확한 clip 끝점 수정 **전** 산출물이다.
+가중치를 이어받는다는 뜻이 아니라, stage1에서 시작해 이 하이퍼파라미터 조합을 새 코드로
+다시 학습한다는 뜻이다. 기존 종료 표식을 새 실행으로 오인하지 않도록 재학습 tag는 반드시
+새 이름을 쓴다. 큐 행과 새 tag는 사용자 소유이므로 여기서 자동으로 만들지 않는다.
+
+원본 carry의 시작 상태 의미론을 그대로 확장한다:
+
+| 실행 | 시작 skill 분포 | masteer 샘플 단위 |
+|---|---|---|
+| 학습 | `loco/pickUp/carryWith/putDown = .5/.1/.3/.1` | `(env, agent)`마다 독립 |
+| 일반 `--test` / viewer | 학습과 같은 혼합 분포 | `(env, agent)`마다 독립 |
+| final `--test --eval` | `loco=1.0` | skill은 둘 다 loco, motion/time/박스/목표는 각각 독립 |
+
+최종평가 trial도 원본의 `env당 1개`를 agent마다 복제해 `num_envs × num_agents`개를 센다.
 
 ## GT 시나리오
 
@@ -142,6 +150,15 @@ npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 �
 | 24 | `arc_end` | 종료 시점 호길이. 패딩 구간까지 갔는지 진단 |
 | 25 | `scen_id` | 0 free / 1 par / 2 cross / 3 solo, +10 both, +20 placebo |
 | 26~30 | `latr`,`latb`,`spd`,`vr`,`steps` | **경로 이탈·속도 추종. 시나리오와 무관하게 늘 쌓는다** |
+| 31~38 | `vbin_s[4]`,`vbin_n[4]` | 명령 속도 구간별 실제 속도 합·이동 스텝 수 |
+| 39 | `s_end` | clip이 포화되는 실제 목표 vertex의 호좌표 |
+| 40~44 | `hand_near`,`gate_open`,`held_move`,`lift_dz`,`grasp_first` | 집기·들기 proxy와 손 근접 중 실제 박스 이동 |
+| 45~49 | `delivered`,`putdown`,`carry`,`place`,`shortcut` | 목표 도달과 0.5m 운반 후 도달을 분리한 생애주기 판정 |
+
+`grasp`는 접촉 pair가 아니라 양손 평균과 박스 중심의 0.25m 근접 proxy다. 따라서
+`grasp` 하나를 성공으로 보지 않고, 손 근접 중 박스가 0.5m 이상 이동한 뒤 목표에 닿은
+`carry`와 엄격한 높이·0.1m 조건까지 만족한 `place`를 함께 본다. `shortcut`은 목표에는
+닿았지만 이 운반 증거가 없는 경우라 발로 차기/밀기 해를 바로 드러낸다.
 
 **기준선(free)은 성공률만으로 판정하지 않는다.** `lat_root` 가 경로 추종을, `spd_err` 이
 속도 명령 추종을 본다 — **성공률은 경로를 무시하고 목표로 직진해도 오른다.** steer 의 주장이
@@ -204,8 +221,14 @@ npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 �
 
 ### 어떻게 부르나
 
+    # 로컬 데스크톱 — 현재 DISPLAY에 Isaac Gym 창을 직접 띄움. PORT/MA_GPU 불필요
+    MS_VIZ=4 ENVS=1 MS_CAM=top bash scripts/masteer/view_local.sh <tag 또는 pth>
+    MS_EVAL=1 MS_VIZ=4 ENVS=1 bash scripts/masteer/view_local.sh <tag 또는 pth>  # final-eval 시작
+
+    # 서버 — Xvfb + VNC + 브라우저
     # 뷰어
     PORT=6100 MS_VIZ=4 ENVS=1 MS_CAM=top bash scripts/masteer/view.sh <tag>
+    MS_EVAL=1 PORT=6100 MS_VIZ=4 ENVS=1 bash scripts/masteer/view.sh <tag>          # final-eval 시작
     ssh -L 6100:localhost:6100 <host>    #  http://localhost:6100/vnc.html
 
     # 핵심 장면 -- 배치·경로가 같고 감속만 다르다
@@ -213,6 +236,7 @@ npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 �
     PORT=6101 MS_VIZ=7 ENVS=1 MS_CAM=top MS_DBG=0 bash ... view.sh <tag>   # 비껴감
 
     # 영상
+    # record.sh는 final-eval(loco 시작) 모드다.
     MS_VIZ=8 MS_CAM=top DUR=40 bash scripts/masteer/record.sh <tag>
     for i in $(seq 12); do MS_VIZ=$i MS_CAM=top bash scripts/masteer/record.sh <tag>; done
     MS_VIZ=8 bash scripts/masteer/record_pick.sh <tag>           # 움직인 시드를 골라준다
@@ -222,14 +246,15 @@ npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 �
 
 | 층 | 인자 |
 |---|---|
-| 항상 | `PORT` · `MS_VIZ` · `<태그>` · `ENVS` |
+| 로컬 항상 | `MS_VIZ` · `<태그 또는 pth>` · `ENVS` |
+| 서버 추가 | `PORT` |
 | 가끔 | `MS_CAM=top` · `MS_DBG=0` · `MS_CAM_H`/`MS_CAM_B`(줌) · `MS_DRAW_SPEED` |
 | 캔 밖 | `MS_MRAND` · `MS_M_LO` · `MS_DT` · `MS_GAP` · `MS_LAT_MAX` |
 
 #### MS_CLIP -- 태그에 따라 반드시 맞춘다
 
     ms1 ~ ms10   전부 미지정 = 0 으로 학습   (52 개, 예외 없음. 영상용 ms4_m4_s0 포함)
-    ms11 ~ ms13  전부 MS_CLIP=1 로 학습      (13 개)
+    ms11 이후    전부 MS_CLIP=1 로 학습      (현재 ms14 포함)
 
 `view.sh`·`record.sh` 기본값은 **1** 이므로 **`ms10` 이전 태그를 볼 때만
 `MS_CLIP=0` 을 붙인다.** Python 기본값은 여전히 0 이라 학습에서 미지정 = 0 이다.
@@ -244,6 +269,10 @@ npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 �
 `clip(t/dur, 0, 1)` 을 거리 버전으로 넣은 것이고, 끝에 다가가면 창 점들이 끝에 쌓여
 **창이 저절로 짧아진다 = 감속 명령**이 된다. 학습값과 다르면 정책이 학습 때와 다른
 입력을 받으므로 화면은 멀쩡한데 성능만 떨어진다.
+
+2026-08-31 수정 전에는 `floor(total_len/0.1)`을 끝 셀 수로 잘못 써 clip이 실제 목표보다
+거의 항상 0.1~0.2m 앞에서 포화됐다. 이제 `ceil` 셀에 마지막 waypoint를 보존하고 그 셀의
+호좌표를 `s_end`로 써서, 10,000개 랜덤 경로의 목표점 오차가 최대 `4.5e-6m`였다.
 
 `MS_VEL_W`·`MS_VEL_K`·`MS_POS_C`·`MS_PIN` 은 보상 전용이라 추론에 무관하다.
 `MS_ENDCLAMP` 은 M 을 0 으로 만드는 **관측** 노브이지만 4 개 행에서만 1 이었다.

@@ -92,6 +92,11 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         return sc
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
+        carry_cfg = cfg["env"]["carry"]
+        if not carry_cfg["onlyVelReward"] or carry_cfg["onlyHeightHandHeldReward"]:
+            raise ValueError(
+                "masteer 보상은 onlyVelReward=True, "
+                "onlyHeightHandHeldReward=False로 고정되어 있습니다")
         self.scen = self._scen_env()
         self.scen_L = _f("MS_L", MS_L_DEFAULT)
         self.scen_w = _f("MS_W", 3.0)          # 감속 구간 길이 (m)
@@ -108,7 +113,10 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         self.steer_m_lo = _f("MS_M_LO", 0.25)           # 배수 하한
         self.steer_mrand = int(_f("MS_MRAND", 0))       # 0 이면 M 고정 = 원본과 동일
         self.steer_pos_c = _f("MS_POS_C", 2.0)          # latpen 계수
-        # 속도 보상과 이탈 벌점의 **저울**. 기본값에서 스텝당 최대 기여가
+        # walk/carry 묶음의 바깥 배율. 기존 masteer 체크포인트는 2.0이므로 기본값을
+        # 보존하고, 원본 TokenHSI carry 스케일 실험에서만 MS_REWARD_OUTER=1을 쓴다.
+        self.reward_outer = _f("MS_REWARD_OUTER", 2.0)
+        # 속도 보상과 이탈 벌점의 **저울**. 기존 기본값(outer=2, pos_c=2)에서는
         #   속도  2*(0.2) + 2*(0.2) = 0.8
         #   이탈  2*(2.0) + 2*(2.0) = 8.0     <- 10 배
         # 라서 최적 정책이 "천천히 가고 정확히 따라가기" 가 된다. 실측이 정확히 그렇다
@@ -216,6 +224,16 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         self._VBINS = torch.tensor([0.5625, 0.9375, 1.3125], device=self.device)
         self._ep_vbin_s = torch.zeros(R, 4, device=self.device)   # 구간별 v_real 합
         self._ep_vbin_n = torch.zeros(R, 4, device=self.device)   # 구간별 스텝 수
+        # 집기/운반 생애주기 진단. contact force는 손-박스 pair를 직접 주지 않으므로
+        # 손 근접을 grasp proxy로 쓰되, 실제 박스 이동거리/목표 도착과 따로 기록한다.
+        self._metric_box_z0 = torch.zeros(R, device=self.device)
+        self._ep_hand_near = torch.zeros(R, device=self.device, dtype=torch.long)
+        self._ep_gate_open = torch.zeros(R, device=self.device, dtype=torch.long)
+        self._ep_held_move = torch.zeros(R, device=self.device)
+        self._ep_max_lift_dz = torch.zeros(R, device=self.device)
+        self._ep_grasp_first = torch.full((R,), -1, device=self.device, dtype=torch.long)
+        self._ep_delivered = torch.zeros(R, device=self.device, dtype=torch.bool)
+        self._ep_putdown = torch.zeros(R, device=self.device, dtype=torch.bool)
         # 감속 창을 **셀 인덱스로** 잡는다. _m_at 이 0.1 m 셀 단위 계단이라
         # 미터로 자르면 실효 W 가 격자만큼 어긋나 오프셋이 3% 빗나간다.
         self._x_cell = int(self.scen_L / 2.0 / sp.DS)          # 교차점이 든 셀
@@ -282,7 +300,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         tar = self._box_tar_pos[rows, 0:2]
         self._steer_tick += 1
         seed = self.steer_seed + self._steer_tick + int(rows[0])
-        path, s_box, n_end = sp.gen_full_v2(root, box, tar, seed,
+        path, s_box, s_end = sp.gen_full_v2(root, box, tar, seed,
                                      0.0, _f("MS_LAT_MAX", 2.2),
                                      120.0,
                                      p_two=0.1,
@@ -290,7 +308,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
                                      spread=(0.85, 1.8),
                                      lat_frac=0.25, with_end=True)
         self._gt_path[rows] = path
-        self._s_end[rows] = (n_end.float() - 1.0) * sp.DS
+        self._s_end[rows] = s_end
         self._arc_root[rows] = 0.0
         self._arc_box[rows] = s_box          # 박스는 두 다리가 만나는 곳에서 시작
         self._mscale[rows] = 1.0
@@ -309,6 +327,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
                 self._mscale[rows[:, None], cols[None, :]] = mult[:, j:j + 1]
 
         self._prev_arc[rows] = 0.0
+        self._metric_box_z0[rows] = b[rows, 2]
         if self.steer_endclamp:
             # 실제 경로가 끝나는 셀 이후를 정지 명령으로 만든다. 경로 버퍼 뒤쪽은
             # 직선 외삽이라 그대로 두면 목표 위에 서 있어야 할 때 전진을 명령한다.
@@ -552,7 +571,15 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         err_xy = (diff[:, 0:2] ** 2).sum(dim=-1)
         pin_carry = err_xy < 0.5 ** 2
         pos_near = torch.exp(-10.0 * (diff ** 2).sum(dim=-1))
-        carry_r = _vw * vel_term(box_vel3[:, 0:2], u_box, pin_carry, v_box) + 0.2 * pos_near
+        # 원본 TokenHSI carry와 같은 height gate: 박스 바닥이 지면에서 0.2 m를
+        # 벗어나기 전에는 속도 보상을 주지 않아 발로 차서 보내는 해를 막는다.
+        # 원본 순서대로 gate 뒤에 목표 반경 pin을 적용한다.
+        carry_vel = vel_term(box_vel3[:, 0:2], u_box,
+                             torch.zeros_like(pin_carry), v_box)
+        height_mask = box_pos[:, 2] <= self._box_lib._box_size[:, 2] / 2.0 + 0.2
+        carry_vel = torch.where(height_mask, torch.zeros_like(carry_vel), carry_vel)
+        carry_vel = torch.where(pin_carry, torch.ones_like(carry_vel), carry_vel)
+        carry_r = _vw * carry_vel + 0.2 * pos_near
         carry_r = carry_r + self.steer_pos_c * latpen(lat_box, err_xy < self.steer_pin ** 2)
         if self._carry_rwd_box_vel_penalty:
             # 원본 그대로 -- "뻣뻣하게 잡는 것을 막기 위해" 박스를 내던지는 걸 벌한다.
@@ -571,7 +598,9 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         putdown = (torch.abs(box_pos[:, -1] - tar[:, -1]) <= 0.001).float()
         putdown = torch.where(err_xy > 0.1 ** 2, torch.zeros_like(putdown), putdown)
 
-        self.rew_buf[:] = 2.0 * walk_r + 2.0 * carry_r + 0.2 * handheld + 0.2 * putdown
+        self.rew_buf[:] = (self.reward_outer * walk_r
+                           + self.reward_outer * carry_r
+                           + 0.2 * handheld + 0.2 * putdown)
         if self._power_reward:
             power = torch.abs(self.dof_force_tensor
                               * self.humanoid_rows(self._dof_vel)).sum(dim=-1)
@@ -603,6 +632,31 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         _ar = torch.arange(v_cmd0.shape[0], device=self.device)
         self._ep_vbin_s[_ar, _b] += torch.where(_mv, v_real0, torch.zeros_like(v_real0))
         self._ep_vbin_n[_ar, _b] += _mv.float()
+
+        # --- 집기 -> 들기 -> 운반 -> 놓기 생애주기 ---
+        h = self.humanoid_rows(self._humanoid_root_states)
+        box = self.humanoid_rows(self._box_states)[:, 0:3]
+        rb = self.humanoid_rows(self._rigid_body_pos)
+        hands = rb[:, self._key_body_ids[[0, 1]]].mean(dim=1)
+        hand_near = ((hands - box).norm(dim=-1) <= 0.25)
+        hand_near &= ((h[:, 0:2] - box[:, 0:2]).norm(dim=-1) <= 0.7)
+        self._ep_hand_near += hand_near.long()
+        first_grasp = hand_near & (self._ep_grasp_first < 0)
+        self._ep_grasp_first[first_grasp] = self.progress_rows()[first_grasp]
+
+        gate_open = box[:, 2] > self._box_lib._box_size[:, 2] / 2.0 + 0.2
+        self._ep_gate_open += gate_open.long()
+        box_step = (box - self._prev_box_pos).norm(dim=-1)
+        self._ep_held_move += torch.where(hand_near, box_step, torch.zeros_like(box_step))
+        self._ep_max_lift_dz = torch.maximum(
+            self._ep_max_lift_dz, (box[:, 2] - self._metric_box_z0).clamp(min=0.0))
+
+        diff = self._box_tar_pos - box
+        err_xy = diff[:, 0:2].pow(2).sum(dim=-1)
+        delivered = diff.norm(dim=-1) <= self._success_threshold
+        putdown = (err_xy <= 0.1 ** 2) & (diff[:, 2].abs() <= 0.001)
+        self._ep_delivered |= delivered
+        self._ep_putdown |= putdown
 
         if self.scen == "free":
             self._prev_arc = arc0.clone()      # free 도 다음 스텝 차분을 위해 갱신한다
@@ -677,6 +731,21 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         cols += [self._ep_vbin_s[rows, i] for i in range(4)]      # 31~34 구간별 v_real 합
         cols += [self._ep_vbin_n[rows, i] for i in range(4)]      # 35~38 구간별 스텝 수
         cols.append(self._s_end[rows])                            # 39 실제 경로 끝 (호길이)
+        carried = (self._ep_grasp_first[rows] >= 0) & (self._ep_held_move[rows] >= 0.5)
+        carry_success = self._ep_delivered[rows] & carried
+        place_success = self._ep_putdown[rows] & carried
+        cols += [
+            self._ep_hand_near[rows].float(),                     # 40 grasp proxy 스텝
+            self._ep_gate_open[rows].float(),                     # 41 height gate 열린 스텝
+            self._ep_held_move[rows],                             # 42 손 근접 중 박스 이동거리(m)
+            self._ep_max_lift_dz[rows],                           # 43 시작 대비 최대 상승(m)
+            self._ep_grasp_first[rows].float(),                   # 44 최초 손 근접 시각
+            self._ep_delivered[rows].float(),                     # 45 목표 반경 도달
+            self._ep_putdown[rows].float(),                       # 46 엄격한 putdown 도달
+            carry_success.float(),                                # 47 0.5m 운반 후 delivery
+            place_success.float(),                                # 48 0.5m 운반 후 putdown
+            (self._ep_delivered[rows] & ~carried).float(),        # 49 운반 없는 delivery
+        ]
         return cols
 
     def _metric_reset_extra(self, rows):
@@ -695,6 +764,13 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         self._ep_steps[rows] = 0
         self._ep_vbin_s[rows] = 0.0
         self._ep_vbin_n[rows] = 0.0
+        self._ep_hand_near[rows] = 0
+        self._ep_gate_open[rows] = 0
+        self._ep_held_move[rows] = 0.0
+        self._ep_max_lift_dz[rows] = 0.0
+        self._ep_grasp_first[rows] = -1
+        self._ep_delivered[rows] = False
+        self._ep_putdown[rows] = False
         return
 
     # ---- 뷰어 -------------------------------------------------------------
@@ -722,6 +798,9 @@ class HumanoidMASteerCarry(HumanoidMACarry):
     def _update_camera(self):
         # 고정 시점이면 따라가지 않는다. 따라가면 배치가 화면 안에서 흔들린다.
         if os.environ.get("MS_CAM") == "top":
+            # render()는 physics substep마다 호출된다. 최신 root state를 먼저
+            # 가져오지 않으면 뒤의 marker setter가 stale box state까지 되쓴다.
+            self.gym.refresh_actor_root_state_tensor(self.sim)
             return
         return super()._update_camera()
 

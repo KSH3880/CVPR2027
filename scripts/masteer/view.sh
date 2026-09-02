@@ -29,6 +29,8 @@
 # 학습 프로세스에 붙는 게 아니다. 100 iter 마다 덮어쓰이는 체크포인트를 **복사해서**
 # 별도로 띄운다 (쓰는 중인 파일을 열면 반쯤 쓰인 상태를 읽는다). 학습에는 영향 없다.
 # 태그 대신 .pth 경로를 직접 줘도 된다.
+# 원본 TokenHSI의 viewer/test처럼 기본은 학습 분포의 혼합 시작 skill을 쓴다.
+# final evaluation과 같은 loco 시작만 보려면 MS_EVAL=1을 준다.
 set -e
 ROOT=/home/hwanhee/CVPR2027
 VNC_DIR=/home/hwanhee/opt/vnc
@@ -59,9 +61,26 @@ else
     [ -z "$CKPT" ] && { echo "체크포인트 없음: output/masteer/$TAG"; exit 1; }
     NAME=$TAG
 fi
-SNAP=/tmp/ma_view_${NAME}_$PORT.pth; cp "$CKPT" "$SNAP"
+# 사용자가 직접 MA_TOKEN을 지정하지 않았으면 학습 sidecar의 attention 모드를
+# 복원한다. ms18의 mask 정책을 기본 live 입력으로 여는 조용한 불일치를 막는다.
+if [ -z "${MA_TOKEN+x}" ] && [ -f "$ROOT/runs/queue/logs/$NAME.env" ]; then
+    MA_TOKEN=$(bash -c 'source "$1"; printf "%s" "${MA_TOKEN:-live}"' _ \
+        "$ROOT/runs/queue/logs/$NAME.env")
+    export MA_TOKEN
+fi
+SNAP_DIR=$(mktemp -d "/tmp/ma_view_${PORT}.XXXXXX")
+mkdir -p "$SNAP_DIR/nn"
+SNAP="$SNAP_DIR/nn/Humanoid.pth"
+cp "$CKPT" "$SNAP"
 ITER=$(grep -c "fps step" $ROOT/runs/queue/logs/$NAME.log 2>/dev/null || echo "?")
 AGE=$(( $(date +%s) - $(stat -c %Y "$CKPT") ))
+
+VIEW_ARGS=(--test --eval_task carry)
+VIEW_MODE="test(mixed skill)"
+if [ "${MS_EVAL:-0}" != 0 ]; then
+    VIEW_ARGS+=(--eval)
+    VIEW_MODE="final-eval(loco)"
+fi
 
 for p in $PORT $VNC_PORT; do
     ss -tln 2>/dev/null | grep -q ":$p " && { echo "포트 $p 사용 중 — PORT=$((PORT+1)) 로 다시"; exit 1; }
@@ -73,6 +92,7 @@ done
 cleanup() {
     if [ -n "${FFMPEG_PID:-}" ]; then kill -INT $FFMPEG_PID 2>/dev/null || true; wait $FFMPEG_PID 2>/dev/null || true; fi
     kill ${XVFB_PID:-} ${VNC_PID:-} ${WEB_PID:-} 2>/dev/null || true
+    rm -rf -- "$SNAP_DIR"
 }
 trap cleanup EXIT INT TERM
 
@@ -107,6 +127,7 @@ echo " 열기     http://localhost:$PORT/vnc.html"
 echo " 포워딩   ssh -L $PORT:localhost:$PORT $(hostname)"
 echo " 태그     $NAME   iter≈$ITER   (${AGE}초 전 저장본)"
 echo " 시나리오 ${MS_VIZ:-(직접지정)}"
+echo " 시작모드 $VIEW_MODE  (agent별 독립 샘플)"
  echo " env      $ENVS x 2명   배치=${MS_SCEN:-free}  지연=${MS_DT:-0}s  속도구간=${MS_MRAND:-0}  곡률=${MS_LAT_MAX:-2.2}  CLIP=${MS_CLIP:-1}"
 [ -n "${VIDEO:-}" ] && echo " 영상     $VIDEO"
 echo "=============================================================="
@@ -129,4 +150,4 @@ python ./tokenhsi/run.py --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth \
     --checkpoint "$SNAP" \
-    --test --eval_task carry
+    "${VIEW_ARGS[@]}"

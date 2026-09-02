@@ -56,8 +56,9 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidM
 from env.tasks.adapt_interaction_skills.humanoid_adapt_traj_ground2terrain import HumanoidAdaptTrajGround2Terrain
 from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_ground2terrain import HumanoidAdaptCarryGround2Terrain
 
-# long-horizon task completion
-from tokenhsi.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills import HumanoidLongTerm4BasicSkills
+# long-horizon task completion은 parse_task()에서 지연 import한다.
+# pytorch3d는 이 태스크에만 필요한 선택 의존성인데, 여기서 미리 import하면
+# HumanoidMASteerCarry처럼 무관한 태스크도 pytorch3d 없이는 시작하지 못한다.
 
 #########
 
@@ -74,6 +75,9 @@ def warn_task_name():
         "Unrecognized task!\nTask should be one of: [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]")
 
 def parse_task(args, cfg, cfg_train, sim_params):
+
+    if args.task == "HumanoidLongTerm4BasicSkills":
+        from tokenhsi.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills import HumanoidLongTerm4BasicSkills
 
     # create native task and pass custom config
     device_id = args.device_id

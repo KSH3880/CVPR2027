@@ -15,16 +15,9 @@
     "f22b_long_ctrl"
   ],
   "gpus": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7
+    0
   ],
-  "max_per_gpu": 2,
+  "max_per_gpu": 1,
   "idle_min": 5,
   "allowed_env": [
     "QUEUE_EVAL",
@@ -72,7 +65,7 @@
   ],
   "seed_env": "STEER_SEED",
   "max_seeds": 2,
-  "_why_max": "평가 백로그(40건)가 빠져서 2 로 되돌림. 학습에서 3잡은 잡당 속도만 깎는다",
+  "_why_max": "이 저장소는 GPU 0 하나만 사용하며 학습·평가를 동시에 하나만 실행한다",
   "_why_train": "f3 는 STEER_SPACING 을 envSpacing 뜻으로 써서 창 간격과 이름이 겹쳤다. f4 는 STEER_ENVSPACING",
   "_why_time_env": "시간 인덱스 steering (2026-08-19). tau[t] 를 시간축으로 재샘플 -- 속도가 상수가 아니라 점 간격이 된다",
   "_why_watch": "장기 런의 중간 체크포인트를 자동 채점한다. 25,000 iter 짜리를 끝까지 기다렸다 한 점만 보면 이터 축을 못 읽는다"

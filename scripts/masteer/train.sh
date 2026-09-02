@@ -7,7 +7,8 @@
 #   MS_MODE=adapt   adapt 스캐폴드 (backbone 동결 + 학습 토큰). --hrl_checkpoint
 #
 #   MS_TASK  태스크 클래스. 토큰 실험은 HumanoidMACarry
-#   MA_TOKEN live|zero  teammate 토큰 값. 크기는 같고 값만 0 이 된다
+#   MA_TOKEN live|zero|r12|r18|mask
+#     mask 는 live 관측을 유지하되 teammate 토큰을 attention 에서 정확히 제외한다
 #
 # 통과 조건은 rc=0 이 아니라 warn=0 이다. 경고가 뜨는 설정이 더 빠른데, 그건 접촉을
 # 버려서 빠른 것이다 (docs/ENV_SCALING.md).
@@ -38,7 +39,7 @@ export MA_METRICS=$MS_METRICS
 export MA_TAU MA_STILL_V MA_SEP MA_SPAWN_GAP MA_LAYOUT MA_LAYOUT_L MA_LAYOUT_D MA_LAYOUT_S
 export MA_C MA_BETA MA_K MA_TOKEN MA_TOKENIZER_ZERO MA_TEAM MA_MKSPN MA_TREF MA_NOFREEZE
 export MA_TRAJ MA_TRAJ_ENVS MA_TRAJ_STEPS MA_DHIST MA_DHIST_STEPS
-export MS_K MS_M_NOM MS_M_LO MS_MRAND MS_POS_C MS_BACK MS_PIN MS_ZERO MS_SEED
+export MS_K MS_M_NOM MS_M_LO MS_MRAND MS_POS_C MS_REWARD_OUTER MS_BACK MS_PIN MS_ZERO MS_SEED
 export MS_LAT_MAX MS_TURN_MAX MS_HUMP2 MS_SKEW MS_SPREAD_MIN MS_SPREAD_MAX MS_LAT_FRAC
 # 시나리오. MS_SCEN 하나가 배치 변수들을 일관되게 정한다 (env 쪽 _scen_env)
 export MS_SCEN MS_GAP MS_DT MS_W MS_L MS_SEP MS_ENC_R
