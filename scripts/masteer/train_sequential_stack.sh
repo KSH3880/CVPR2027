@@ -103,8 +103,17 @@ export MS_GRADCHK=${MS_GRADCHK:-1}
 export MS_MRAND=${MS_MRAND:-4}
 export MS_M_LO=${MS_M_LO:-0.25}
 export MS_CLIP=${MS_CLIP:-1}
+# Exact ms18 reward contract.  Do not fall back to the older masteer defaults
+# (OUTER=2, POS_C=2), which would change the policy's reward scale at resume.
+export MS_REWARD_OUTER=${MS_REWARD_OUTER:-1}
+export MS_POS_C=${MS_POS_C:-0.6}
+export MS_VEL_W=${MS_VEL_W:-1}
 export MS_SCEN=${MS_SCEN:-free}
 export STACK_TASK_MODE=stack
+export STACK_HAND_CLEAR_START=${STACK_HAND_CLEAR_START:-0.08}
+export STACK_HAND_CLEAR_DONE=${STACK_HAND_CLEAR_DONE:-0.20}
+export STACK_RELEASE_REWARD_W=${STACK_RELEASE_REWARD_W:-0.50}
+export STACK_EARLY_RELEASE_PENALTY=${STACK_EARLY_RELEASE_PENALTY:-0.50}
 
 PHYSX_LIB_DIR=${PHYSX_LIB_DIR:-/tmp/hwanhee-physx-lib}
 if [ -d "$PHYSX_LIB_DIR" ]; then
@@ -118,6 +127,8 @@ echo " stage1     $STAGE1"
 echo " trainable  new_carry tokenizer + internal residual"
 echo " masked     teammate token"
 echo " frozen     self/teammate/steer/old-carry/transformer/composer/RMS"
+echo " ms18 rwd   OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
+echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY"
 echo " envs       $ENVS x 2 agents"
 echo " PPO batch  $BATCH_SIZE (minibatch $MINIBATCH)"
 echo " iterations +$ITERS -> final epoch $FINAL_EPOCH"

@@ -53,6 +53,17 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                          headless=headless)
         self._sequential_reset_reported = torch.zeros(
             self.num_envs, dtype=torch.bool, device=self.device)
+        self.stack_hand_clear_start = float(os.environ.get(
+            "STACK_HAND_CLEAR_START", "0.08"))
+        self.stack_hand_clear_done = float(os.environ.get(
+            "STACK_HAND_CLEAR_DONE", "0.20"))
+        self.stack_release_reward_w = float(os.environ.get(
+            "STACK_RELEASE_REWARD_W", "0.50"))
+        self.stack_early_release_penalty = float(os.environ.get(
+            "STACK_EARLY_RELEASE_PENALTY", "0.50"))
+        if self.stack_hand_clear_done <= self.stack_hand_clear_start:
+            raise ValueError(
+                "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
 
     def _set_phase(self, env_ids, phase):
         if len(env_ids) == 0:
@@ -95,6 +106,75 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         # timeout.  End this sequential episode immediately and normally once
         # the top box has remained stable for the requested number of steps.
         self.reset_buf[self._stack_phase == self.DONE] = 1
+
+    def _hand_box_clearance(self, rows):
+        """Minimum hand-center distance from the owned oriented-box surface."""
+        rigid = self.humanoid_rows(self._rigid_body_pos)[rows]
+        hands = rigid[:, self._key_body_ids[[0, 1]]]
+        boxes = self.humanoid_rows(self._box_states)[rows]
+        sizes = self._box_lib._box_size[rows]
+        return self._body_to_box_clearance(hands, boxes, sizes)
+
+    def _clearance_score(self, clearance):
+        span = self.stack_hand_clear_done - self.stack_hand_clear_start
+        return ((clearance - self.stack_hand_clear_start) / span).clamp(0.0, 1.0)
+
+    def _compute_reward(self, actions):
+        """Keep the ms18 task reward and shape only valid box release events."""
+        super()._compute_reward(actions)
+        if not hasattr(self, "_stack_phase"):
+            return
+
+        rows = self.all_rows().view(self.num_envs, 2)
+        r0, r1 = rows[:, 0], rows[:, 1]
+        boxes = self.humanoid_rows(self._box_states)
+        phase = self._stack_phase
+
+        # A1: releasing is useful only after the bottom box is accurately
+        # placed and nearly stationary.  This prevents a throw-and-step-away
+        # shortcut while supplying a dense gradient for moving both hands off.
+        bottom_delta = boxes[r0, 0:3] - self._bottom_nominal_pos
+        bottom_xy = torch.norm(bottom_delta[:, 0:2], dim=-1)
+        bottom_z = torch.abs(bottom_delta[:, 2])
+        bottom_speed2 = (boxes[r0, 7:10] ** 2).sum(dim=-1)
+        bottom_ang2 = (boxes[r0, 10:13] ** 2).sum(dim=-1)
+        bottom_quality = (torch.exp(-12.0 * bottom_xy ** 2)
+                          * torch.exp(-40.0 * bottom_z ** 2)
+                          * torch.exp(-4.0 * bottom_speed2
+                                      - 0.5 * bottom_ang2))
+        a1_clear = self._clearance_score(self._hand_box_clearance(r0))
+        placing = ((phase == self.A1_PLACE)
+                   | (phase == self.VERIFY_BOTTOM))
+        a1_valid_release = bottom_quality * a1_clear
+        a1_early_release = (1.0 - bottom_quality) * a1_clear
+        self.rew_buf[r0] += placing.float() * (
+            self.stack_release_reward_w * a1_valid_release
+            - self.stack_early_release_penalty * a1_early_release)
+
+        # A2: preserve grasp while approaching, then reverse the incentive at
+        # the committed top pose.  Exact centering, height, stillness and hand
+        # separation must all agree; proximity alone cannot earn this term.
+        top_delta = boxes[r1, 0:3] - self._committed_top_pos
+        top_xy = torch.norm(top_delta[:, 0:2], dim=-1)
+        top_z = torch.abs(top_delta[:, 2])
+        top_speed2 = (boxes[r1, 7:10] ** 2).sum(dim=-1)
+        top_ang2 = (boxes[r1, 10:13] ** 2).sum(dim=-1)
+        top_quality = (torch.exp(-50.0 * top_xy ** 2)
+                       * torch.exp(-40.0 * top_z ** 2)
+                       * torch.exp(-4.0 * top_speed2 - 0.5 * top_ang2))
+        a2_clear = self._clearance_score(self._hand_box_clearance(r1))
+        stacking = ((phase == self.A2_RESUME)
+                    | (phase == self.VERIFY_STACK))
+        a2_valid_release = top_quality * a2_clear
+        a2_early_release = (1.0 - top_quality) * a2_clear
+        # Near the target, cancel the parent's residual preference for keeping
+        # hands attached and make a clean release strictly more profitable.
+        hands_still_on = top_quality * (1.0 - a2_clear)
+        self.rew_buf[r1] += stacking.float() * (
+            0.25 * top_quality
+            + self.stack_release_reward_w * a2_valid_release
+            - self.stack_early_release_penalty * a2_early_release
+            - 0.20 * hands_still_on)
 
     def _virtual_retreat_carry_obs(self, rows, env_ids):
         """Give A1 a virtual carried box while leaving physics untouched."""
@@ -273,7 +353,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             (torch.norm(boxes[r0, 7:10], dim=-1) < self.stack_vel_tol)
             & (torch.norm(boxes[r0, 10:13], dim=-1)
                < self.stack_ang_vel_tol))
-        bottom_candidate = (bottom_err < self.stack_pos_tol) & bottom_slow
+        bottom_hands_clear = (
+            self._hand_box_clearance(r0) >= self.stack_hand_clear_done)
+        bottom_candidate = ((bottom_err < self.stack_pos_tol) & bottom_slow
+                            & bottom_hands_clear)
         self._bottom_stable_count = torch.where(
             bottom_candidate, self._bottom_stable_count + 1,
             torch.zeros_like(self._bottom_stable_count))
@@ -326,9 +409,12 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             (torch.norm(boxes[r1, 7:10], dim=-1) < self.stack_vel_tol)
             & (torch.norm(boxes[r1, 10:13], dim=-1)
                < self.stack_ang_vel_tol))
+        top_hands_clear = (
+            self._hand_box_clearance(r1) >= self.stack_hand_clear_done)
         top_candidate = (
             (top_xy_err < self.stack_top_xy_tol)
-            & (top_z_err < self.stack_top_z_tol) & top_slow)
+            & (top_z_err < self.stack_top_z_tol) & top_slow
+            & top_hands_clear & self._ever_held[r1])
         self._top_stable_count = torch.where(
             top_candidate, self._top_stable_count + 1,
             torch.zeros_like(self._top_stable_count))
@@ -336,7 +422,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         enter_verify = torch.nonzero(
             (phase == self.A2_RESUME)
             & (top_xy_err < self.stack_top_xy_tol)
-            & (top_z_err < self.stack_top_z_tol),
+            & (top_z_err < self.stack_top_z_tol)
+            & top_hands_clear & self._ever_held[r1],
             as_tuple=False).squeeze(-1)
         self._set_phase(enter_verify, self.VERIFY_STACK)
 
