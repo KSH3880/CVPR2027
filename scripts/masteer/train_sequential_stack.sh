@@ -17,16 +17,22 @@ REPO="$ROOT/TokenHSI-masteer"
 TAG=${1:?usage: train_sequential_stack.sh <tag> [ma-steer-policy.pth]}
 POLICY=${2:-"$REPO/output/ms18_maskteam_origscale_c06_s0_00009000.pth"}
 STAGE1=${MS_CKPT:-"$REPO/output/ckpt_stage1.pth"}
-ENVS=${STACK_ENVS:-256}
-ITERS=${STACK_ITERS:-500}
+ENVS=${STACK_ENVS:-2048}
+ITERS=${STACK_ITERS:-2}
 SEED=${STACK_SEED:-0}
-GPU=${MA_GPU:-0}
+# Same device contract as scripts/f22/train_stack.sh: physical GPU 7 by
+# default, remapped through CUDA_VISIBLE_DEVICES to logical cuda:0.
+GPU=${MA_GPU:-7}
 SAVE_FREQ=${STACK_SAVE_FREQ:-100}
 OUT="output/sequential_stack/$TAG"
 HORIZON=32
 
 case "$TAG" in
     ""|*[!A-Za-z0-9_.-]*) echo "invalid tag: $TAG" >&2; exit 2 ;;
+esac
+case "$GPU" in
+    0|1|2|3|4|5|6|7) ;;
+    *) echo "MA_GPU는 physical GPU index 0..7이어야 한다: $GPU" >&2; exit 2 ;;
 esac
 for file in "$POLICY" "$STAGE1"; do
     [ -f "$file" ] || { echo "checkpoint 없음: $file" >&2; exit 1; }
@@ -95,6 +101,7 @@ sed -e "s/^\( *\)save_frequency:.*/\1save_frequency: $SAVE_FREQ/" \
 
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="$GPU"
+unset TOKENHSI_GRAPHICS_DEVICE_ID
 export MA_TOKEN=mask
 export MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_FINETUNE_NEWCARRY_RESIDUAL=1
@@ -132,6 +139,7 @@ echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m rew
 echo " envs       $ENVS x 2 agents"
 echo " PPO batch  $BATCH_SIZE (minibatch $MINIBATCH)"
 echo " iterations +$ITERS -> final epoch $FINAL_EPOCH"
+echo " GPU        physical $GPU -> logical cuda:0"
 echo " output     $REPO/$OUT"
 echo "=============================================================="
 
