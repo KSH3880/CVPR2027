@@ -1,0 +1,112 @@
+# TokenHSI-MultiAgent
+
+Multi-agent extension of [**TokenHSI**](https://github.com/liangpan99/TokenHSI) (CVPR 2025 Oral) —
+Pan et al., *Unified Synthesis of Physical Human-Scene Interactions through Task Tokenization*.
+
+The original `carry` task places **one humanoid and one box** in a scene. This fork extends it to
+**M humanoids, O boxes (O ≥ M) and M goals**: each agent is randomly assigned a distinct box, and
+the remaining `O − M` boxes stay unassigned as distractors. Entities (humanoid / object / goal) are
+split into per-type tokenizers, and the assignment relation is injected as a non-learned relation
+matrix that becomes a learnable attention bias.
+
+> Everything from the upstream repo — datasets, checkpoints, single-task training paths — is left
+> untouched. Motion data is reused read-only and the multi-agent runs write to their own output paths.
+
+## What is added
+
+| Area | Files |
+|---|---|
+| Environment | `tokenhsi/env/tasks/multi_agent/` — `humanoid_ma.py`, `humanoid_ma_carry.py`, `vec_task_wrapper_ma.py` |
+| Learning | `tokenhsi/learning/multi_agent/` — `amp_network_builder_ma.py`, `ma_agent.py`, `ma_players.py` |
+| Configs | `tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml`, `tokenhsi/data/cfg/train/rlg/amp_ma_carry{,_watch}.yaml` |
+| Scripts | `tokenhsi/scripts/multi_agent/` — train / test / watch / remote-GUI helpers |
+
+Upstream files touched (registration and multi-agent plumbing only): `tokenhsi/run.py`,
+`tokenhsi/utils/config.py`, `tokenhsi/utils/parse_task.py`, `tokenhsi/learning/amp_players.py`.
+
+New algorithm keys registered in `run.py`: algo `ma`, player `ma`, network `amp_multi_agent`.
+
+## Documentation
+
+Design notes and operational docs live in [`markdowns/`](markdowns/) (written in Korean):
+
+- [`MULTI_AGENT.md`](markdowns/MULTI_AGENT.md) — architecture and implementation of the extension
+- [`PORTING_GUIDE.md`](markdowns/PORTING_GUIDE.md) — how the single-agent task was ported
+- [`USAGE.md`](markdowns/USAGE.md) — environment setup and run recipes as actually verified
+- [`CRITICAL_ISSUES.md`](markdowns/CRITICAL_ISSUES.md) — known issues and pitfalls
+- `MA_CARRY_COORDINATE_PORTING_FIX.md`, `CARRY_VIEWER_BOX_RESET_FIX.md` — specific fixes
+
+## Setup
+
+Same dependencies as upstream TokenHSI:
+
+```bash
+conda create -n tokenhsi python=3.8
+conda activate tokenhsi
+conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+pip install -r requirements.txt
+
+# IsaacGym Preview 4 (download from https://developer.nvidia.com/isaac-gym)
+cd IsaacGym_Preview_4_Package/isaacgym/python && pip install -e .
+export LD_LIBRARY_PATH="your_conda_env_path/lib:$LD_LIBRARY_PATH"
+```
+
+Assets that are **not** in this repository and must be fetched separately:
+
+- [SMPL body models](https://smpl.is.tue.mpg.de/) → `body_models/smpl/`
+- Pre-processed motion & object data → [Hugging Face](https://huggingface.co/datasets/lianganimation/TokenHSI),
+  extracted into `tokenhsi/data/dataset_*/`
+- Pre-trained checkpoints → `output/` (see the upstream README)
+
+See [`markdowns/USAGE.md`](markdowns/USAGE.md) for a verified end-to-end setup, including remote GUI
+rendering over noVNC.
+
+## Usage
+
+The helper scripts assume a conda env named in `tokenhsi/scripts/multi_agent/runtime_env.sh` — adjust
+it for your machine.
+
+```bash
+# Train: <num_agents> <num_envs> <num_objects>
+sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 1024 3
+
+# Test / evaluate a checkpoint
+sh tokenhsi/scripts/multi_agent/ma_carry_test.sh output/ma_carry/nn/xxx.pth 2 16 3
+
+# Watch a few environments in a viewer (through the noVNC helper)
+sh tokenhsi/scripts/multi_agent/run-gui.sh \
+  sh tokenhsi/scripts/multi_agent/ma_carry_watch.sh 2 4 3
+```
+
+Or invoke the runner directly:
+
+```bash
+python ./tokenhsi/run.py --task HumanoidMACarry \
+    --cfg_train tokenhsi/data/cfg/train/rlg/amp_ma_carry.yaml \
+    --cfg_env tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml \
+    --motion_file tokenhsi/data/dataset_carry/dataset_carry.yaml \
+    --num_envs 1024 --num_agents 2 --num_objects 3 \
+    --output_path output/ma_carry --headless
+```
+
+## Acknowledgements
+
+This work builds directly on [TokenHSI](https://github.com/liangpan99/TokenHSI) by Liang Pan,
+Zeshi Yang, Zhiyang Dou, Wenjia Wang, Buzhen Huang, Bo Dai, Taku Komura and Jingbo Wang, which in
+turn builds on [ASE](https://github.com/nv-tlabs/ASE), [PADL](https://github.com/nv-tlabs/PADL) and
+[InterScene](https://github.com/liangpan99/InterScene). All credit for the base method belongs to
+the original authors.
+
+```bibtex
+@inproceedings{pan2025tokenhsi,
+  title={TokenHSI: Unified Synthesis of Physical Human-Scene Interactions through Task Tokenization},
+  author={Pan, Liang and Yang, Zeshi and Dou, Zhiyang and Wang, Wenjia and Huang, Buzhen and Dai, Bo and Komura, Taku and Wang, Jingbo},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  year={2025}
+}
+```
+
+## License
+
+Released under the [MIT License](LICENSE), matching the upstream TokenHSI license. External
+libraries and datasets (AMASS, SAMP, OMOMO, SMPL, IsaacGym) remain subject to their own terms.

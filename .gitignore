@@ -1,0 +1,135 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# Virtual environments (anchored to repo root so tokenhsi/env/ is not caught)
+/.venv/
+/venv/
+/env/
+/ENV/
+/.conda/
+.python-version
+
+# Testing / typing / linting caches
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.cache/
+.hypothesis/
+
+# Notebooks
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# ---------------------------------------------------------------------------
+# OS / editor
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Agent / tooling local state
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
+.claude/memory/
+
+# ---------------------------------------------------------------------------
+# Training artifacts (checkpoints, logs, renders)
+# ---------------------------------------------------------------------------
+/output/
+runs/
+wandb/
+tensorboard/
+nn/
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.log
+*.mp4
+*.avi
+
+# ---------------------------------------------------------------------------
+# Large assets: body models & motion/object datasets
+# These must be downloaded separately (see README).
+# ---------------------------------------------------------------------------
+/body_models/smpl/
+/body_models/smplx/
+
+/tokenhsi/data/dataset_carry/motions/
+/tokenhsi/data/dataset_sit/motions/
+/tokenhsi/data/dataset_sit/objects/
+/tokenhsi/data/dataset_amass_loco/motions/
+/tokenhsi/data/dataset_amass_loco/smpl_params/
+/tokenhsi/data/dataset_amass_loco_stairs/motions/
+/tokenhsi/data/dataset_amass_loco_stairs/smpl_params/
+/tokenhsi/data/dataset_amass_climb/motions/
+/tokenhsi/data/dataset_amass_climb/smpl_params/
+/tokenhsi/data/dataset_amass_climb/objects/
+/tokenhsi/data/dataset_dynamic_objects/train/
+/tokenhsi/data/dataset_dynamic_objects/test/
+
+# Raw motion / mesh blobs anywhere in the tree
+*.npz
+*.npy
+*.pkl
+*.ply
+*.glb
+*.fbx
+*.bvh
+
+# ...except the small height maps shipped with the long-term task plans
+!/tokenhsi/data/dataset_longterm_task_completion/**/height_map/*.npy
+
+# Baseline demo GIFs from the original README (~74MB, not used here).
+# Note: tokenhsi/data/assets/ (robot meshes) is intentionally NOT ignored.
+/assets/
+
+# Loose screenshots at the repo root
+/architecture.png
+/image.png
+
+# ---------------------------------------------------------------------------
+# Misc
+# ---------------------------------------------------------------------------
+*.tar
+*.tar.gz
+*.zip
+tmp/
+scratch/

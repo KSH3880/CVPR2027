@@ -1,0 +1,67 @@
+motions:
+  loco_walkonly:
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B11_-_walk_turn_left_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B12_-_walk_turn_right_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B13_-_walk_turn_right_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B14_-_walk_turn_right_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B15_-_walk_turn_around_(same_direction)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B16_-_walk_turn_change_direction_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+
+  - file: motions/KIT/KIT+__+167+__+downstairs04_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+167+__+upstairs_downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+183+__+upstairs10_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+359+__+downstairs04_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+359+__+downstairs06_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+359+__+upstairs09_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+359+__+upstairs_downstairs03_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+424+__+upstairs03_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+424+__+upstairs05_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+513+__+downstairs06_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+513+__+downstairs07_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+513+__+upstairs07_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+183+__+downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+167+__+downstairs05_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+3+__+downstairs05_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+424+__+downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+513+__+upstairs_downstairs06_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+423+__+upstairs09_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+424+__+upstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: motions/KIT/KIT+__+3+__+upstairs_downstairs01_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0

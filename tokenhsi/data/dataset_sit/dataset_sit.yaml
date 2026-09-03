@@ -1,0 +1,129 @@
+motions:
+  sit:
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [300, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo001_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo001_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [282, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo002_stageII/phys_humanoid_v3/ref_motion.npy # left
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo002_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [181, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo003_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo003_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [295, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo004_stageII/phys_humanoid_v3/ref_motion.npy # left
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo004_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [300, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo005_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo005_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [354, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo006_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo006_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [338, 10000]
+    # - file: motions/sit/SAMP+__+Subject+__+chair_mo007_stageII/phys_humanoid_v3/ref_motion.npy # walking from left side to right side behind the chair
+    #   obj_file: motions/sit/SAMP+__+Subject+__+chair_mo007_stageII/phys_humanoid_v3/object_state.npy
+    #   weight: 1.0
+    #   rsi_skipped_range: [306, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo008_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo008_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [127, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo009_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo009_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [199, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo010_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo010_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [199, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo011_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo011_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [420, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo012_stageII/phys_humanoid_v3/ref_motion.npy # left
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo012_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [204, 10000]
+    # - file: motions/sit/SAMP+__+Subject+__+chair_mo013_stageII/phys_humanoid_v3/ref_motion.npy # walking from left side to right side behind the chair
+    #   obj_file: motions/sit/SAMP+__+Subject+__+chair_mo013_stageII/phys_humanoid_v3/object_state.npy
+    #   weight: 1.0
+    #   rsi_skipped_range: [282, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo014_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo014_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [162, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo015_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo015_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [312, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo016_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo016_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [252, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo017_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo017_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [210, 10000]
+    # - file: motions/sit/SAMP+__+Subject+__+chair_mo018_stageII/phys_humanoid_v3/ref_motion.npy # walking from left side to right side behind the chair
+    #   obj_file: motions/sit/SAMP+__+Subject+__+chair_mo018_stageII/phys_humanoid_v3/object_state.npy
+    #   weight: 1.0
+    #   rsi_skipped_range: [391, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+chair_mo019_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+chair_mo019_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [271, 10000]
+    
+    - file: motions/sit/SAMP+__+Subject+__+armchair001_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+armchair001_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [130, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+armchair003_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+armchair003_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [120, 10000]
+    - file: motions/sit/SAMP+__+Subject+__+armchair010_stageII/phys_humanoid_v3/ref_motion.npy
+      obj_file: motions/sit/SAMP+__+Subject+__+armchair010_stageII/phys_humanoid_v3/object_state.npy
+      weight: 1.0
+      rsi_skipped_range: [151, 10000]
+    # - file: motions/sit/SAMP+__+Subject+__+armchair012_stageII/phys_humanoid_v3/ref_motion.npy
+    #   obj_file: motions/sit/SAMP+__+Subject+__+armchair012_stageII/phys_humanoid_v3/object_state.npy
+    #   weight: 1.0
+    #   rsi_skipped_range: [210, 10000]
+    # - file: motions/sit/SAMP+__+Subject+__+armchair018_stageII/phys_humanoid_v3/ref_motion.npy
+    #   obj_file: motions/sit/SAMP+__+Subject+__+armchair018_stageII/phys_humanoid_v3/object_state.npy
+    #   weight: 1.0
+    #   rsi_skipped_range: [100, 10000]
+
+  loco:
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B11_-_walk_turn_left_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B12_-_walk_turn_right_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B13_-_walk_turn_right_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B14_-_walk_turn_right_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B15_-_walk_turn_around_(same_direction)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B16_-_walk_turn_change_direction_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
+    - file: ../dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+      weight: 1.0
