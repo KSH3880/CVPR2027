@@ -90,3 +90,10 @@ nohup.out
 
 # Internal execution and temporary files
 /scripts/masteer/view_sequential_stack_local.sh
+TokenHSI-masteer/tokenhsi/data/dataset_amass_climb
+TokenHSI-masteer/tokenhsi/data/dataset_amass_loco
+TokenHSI-masteer/tokenhsi/data/dataset_amass_loco_stairs
+TokenHSI-masteer/tokenhsi/data/dataset_carry
+TokenHSI-masteer/tokenhsi/data/dataset_dynamic_objects
+TokenHSI-masteer/tokenhsi/data/dataset_longterm_task_completion
+TokenHSI-masteer/tokenhsi/data/dataset_sit
