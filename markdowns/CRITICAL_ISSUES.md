@@ -177,8 +177,8 @@ multi_agent/amp_humanoid_ma_carry.yaml:30
 - humanoid: box를 들고 있는 carryWith 중간 자세
 - 실제 box: 손과 무관한 먼 위치
 
-원본은 pickup/carry/putdown RSI일 때 같은 motion ID와 time의 reference box 위치를 사용합니다. /home/user/jhh/Projects/TokenHSI/tokenhsi/env/tasks/
-basic_interaction_skills/humanoid_carry.py:723
+원본은 pickup/carry/putdown RSI일 때 같은 motion ID와 time의 reference box 위치를 사용합니다.
+`tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py:723`
 
 따라서 이 문제의 의미는:
 

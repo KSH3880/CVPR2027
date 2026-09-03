@@ -4,16 +4,23 @@
 파일과 repo 경로를 제공한다. 네트워크, 모델, 학습·테스트 파이프라인은 변경하지
 말고 경로·실행 환경·시스템 의존성만 최소 수정한다.
 
-## 이 repo의 기준 환경
+## 실행 환경 규약
 
-- repo: `/home/hwanhee/jhh/TokenHSI_assign_2`
-- conda: `tokenhsi_jhh`
-- GPU: 물리 GPU 0만 사용 (`CUDA_DEVICE_ORDER=PCI_BUS_ID`, `CUDA_VISIBLE_DEVICES=0`)
-- Isaac Gym: `tokenhsi_jhh`에서 import되는 설치본 사용
-- x11vnc: `$HOME/opt/vnc/usr/bin/x11vnc`
-- noVNC: `$HOME/opt/novnc`
-- websockify: `tokenhsi_jhh` 환경의 실행 파일
-- GUI 기본 포트: `6080`
+스크립트에는 절대 경로나 특정 머신의 환경 이름이 들어가지 않습니다. repo root는
+스크립트 자기 위치에서 계산하므로 checkout이 어디에 있든 동작하고, 나머지는 아래
+환경 변수로 조정합니다.
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `TOKENHSI_CONDA_ENV` | 이미 활성화된 env, 없으면 `tokenhsi` | 사용할 conda 환경 이름 |
+| `CONDA_BASE` | 자동 탐색 (`conda info --base`, `~/anaconda3`, `~/miniconda3`, `/opt/conda` …) | conda 설치 prefix |
+| `TOKENHSI_GPU` | `0` | `CUDA_VISIBLE_DEVICES` 값 (`CUDA_DEVICE_ORDER=PCI_BUS_ID` 고정) |
+| `X11VNC` / `VNC_DIR` | `PATH`의 `x11vnc`, 없으면 `$VNC_DIR/usr/bin/x11vnc` | x11vnc 위치 |
+| `NOVNC_DIR` | `/usr/share/novnc`, `~/opt/novnc` 등 자동 탐색 | `vnc.html`이 있는 디렉터리 |
+| `WEBSOCKIFY` | `PATH` → conda 환경 → noVNC 번들 순 탐색 | websockify 실행 파일 |
+| `PORT` | `6080` | noVNC 웹 포트 |
+
+Isaac Gym은 활성화된 conda 환경에서 import되는 설치본을 사용합니다.
 
 ## 포팅 절차
 
@@ -21,8 +28,8 @@
 2. 실행 스크립트와 직접 참조하는 YAML만 읽고, 절대 경로·conda 환경명·GPU
    설정·체크포인트 경로를 찾는다.
 3. `tokenhsi/scripts/multi_agent/runtime_env.sh`에서 repo root를 스크립트 위치로부터
-   계산하고 `tokenhsi_jhh`를 활성화한다. GPU 0 설정은 사용자 환경변수로
-   덮어쓰지 못하게 고정한다.
+   계산하고 conda 환경을 활성화한다. 환경 이름은 `TOKENHSI_CONDA_ENV`로,
+   GPU는 `TOKENHSI_GPU`로 지정한다 — 스크립트에 이름을 하드코딩하지 않는다.
 4. `ldconfig -p`에 `libcuda.so.1`만 있고 `libcuda.so`가 없으면 임시 디렉터리에
    `libcuda.so` 심볼릭 링크를 만들고 `LD_LIBRARY_PATH`에 추가한다.
 5. motion YAML의 `file`, `obj_file`을 YAML 파일 위치 기준으로 해석해 누락 파일을
@@ -37,7 +44,8 @@
 
 ```bash
 # 환경·GPU: Isaac Gym을 torch보다 먼저 import한다.
-CUDA_VISIBLE_DEVICES=0 conda run -n tokenhsi_jhh python -c \
+# ${TOKENHSI_CONDA_ENV}는 본인 환경 이름으로. 이미 activate 했다면 conda run 없이 실행해도 된다.
+CUDA_VISIBLE_DEVICES=${TOKENHSI_GPU:-0} conda run -n "${TOKENHSI_CONDA_ENV:-tokenhsi}" python -c \
   "import isaacgym, torch; print(torch.cuda.device_count(), torch.cuda.get_device_name(0))"
 
 # 학습 1 epoch: 스모크 전용 환경변수이며 기본 학습 설정은 바꾸지 않는다.

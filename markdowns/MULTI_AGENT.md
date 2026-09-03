@@ -176,7 +176,8 @@ permutation-equivariant이며 **모든 파라미터가 M과 O에 무관**합니�
 ## 3. 실행
 
 ```bash
-# 각 스크립트가 tokenhsi_jhh를 자동 활성화합니다.
+# 각 스크립트가 conda 환경을 자동 활성화합니다. 기본값은 이미 활성화된 환경,
+# 없으면 `tokenhsi`입니다. 이름이 다르면 TOKENHSI_CONDA_ENV=<본인 환경> 을 지정하세요.
 # repo 밖에서 실행해도 현재 checkout을 기준으로 동작합니다.
 
 # 학습 (M=1, 1024 envs — 16GB 기준 권장)
@@ -540,7 +541,7 @@ M=2 -> M=3 load_state_dict(strict)  : OK
 M=1 -> M=2 미학습 스칼라             : 32개 (actor+critic 합계)
 ```
 
-### 학습 (RTX 4080 16GB, 각 200 iteration, `obsFrame: owner`)
+### 학습 (검증 환경 RTX 4080 16GB 기준, 각 200 iteration, `obsFrame: owner`)
 
 | | M=1 | M=2 |
 |---|---|---|

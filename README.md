@@ -63,8 +63,21 @@ rendering over noVNC.
 
 ## Usage
 
-The helper scripts assume a conda env named in `tokenhsi/scripts/multi_agent/runtime_env.sh` — adjust
-it for your machine.
+The helper scripts contain no absolute paths: the repo root is derived from the script's own
+location, and everything else is auto-detected with an environment-variable override.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TOKENHSI_CONDA_ENV` | the env you already activated, else `tokenhsi` | conda env to activate |
+| `CONDA_BASE` | `conda info --base`, then the usual install prefixes | conda installation prefix |
+| `TOKENHSI_GPU` | `0` | value for `CUDA_VISIBLE_DEVICES` |
+| `X11VNC` / `VNC_DIR` | `x11vnc` on `PATH` | x11vnc binary, or the prefix of a user-local install |
+| `NOVNC_DIR` | `/usr/share/novnc`, `~/opt/novnc`, … | directory containing `vnc.html` |
+| `WEBSOCKIFY` | `PATH` → conda env → noVNC bundle | websockify executable |
+| `PORT` | `6080` | noVNC web port |
+
+So a machine whose env is named differently just needs, e.g.
+`TOKENHSI_CONDA_ENV=my-env sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 1024 3`.
 
 ```bash
 # Train: <num_agents> <num_envs> <num_objects>

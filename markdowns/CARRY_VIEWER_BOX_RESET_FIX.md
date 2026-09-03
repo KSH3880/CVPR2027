@@ -13,7 +13,7 @@
 
 `HumanoidMACarry.render()`와 `_capture_video_frame()`이 `_update_marker()`를 호출하고 있었다. `_update_marker()`는 마커와 플랫폼을 움직이기 위해 `set_actor_root_state_tensor_indexed()`를 물리 step 직전에 다시 호출했다.
 
-이 머신의 Isaac Gym GPU pipeline에서는 reset 직후 일부 actor만 대상으로 root-state setter를 다시 호출하면, 대상에 포함되지 않은 동적 박스가 actor 생성 pose로 되돌아갔다. 따라서 단순한 viewer 표시 문제가 아니라 실제 PhysX 상태가 변경됐다.
+Isaac Gym GPU pipeline에서는 reset 직후 일부 actor만 대상으로 root-state setter를 다시 호출하면, 대상에 포함되지 않은 동적 박스가 actor 생성 pose로 되돌아갔다. 따라서 단순한 viewer 표시 문제가 아니라 실제 PhysX 상태가 변경됐다.
 
 레퍼런스 repo는 `_update_marker()`의 setter 대상에 박스도 포함해 이 현상을 우회하고 있었다. 현재 repo에서 viewer 경로를 read-only로 만들기 위해 박스를 대상에서 제외하면서 문제가 드러났다.
 
@@ -55,7 +55,7 @@
 
 ## 검증 결과
 
-환경은 `tokenhsi_jhh`, GPU는 `CUDA_VISIBLE_DEVICES=0`만 사용했다.
+단일 conda 환경에서 GPU 한 장(`TOKENHSI_GPU=0`)만 사용해 검증했다.
 
 - Python 문법 검사 통과
 - GUI `carryWith` 전용, 2 agents, 1 env, 2 objects, seed 123, 3 episodes 통과
