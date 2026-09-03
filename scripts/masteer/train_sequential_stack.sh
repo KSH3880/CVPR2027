@@ -16,9 +16,9 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 REPO="$ROOT/TokenHSI-masteer"
 TAG=${1:?usage: train_sequential_stack.sh <tag> [ma-steer-policy.pth]}
 POLICY=${2:-"$REPO/output/stack/ms18_maskteam_origscale_c06_s0_00009000.pth"}
-STAGE1=${MS_CKPT:-"$REPO/output/ckpt_stage1.pth"}
+STAGE1=${MS_CKPT:-"$REPO/output/tokenhsi/ckpt_stage1.pth"}
 ENVS=${STACK_ENVS:-2048}
-ITERS=${STACK_ITERS:-2}
+ITERS=${STACK_ITERS:-5000}
 SEED=${STACK_SEED:-0}
 # Same device contract as scripts/f22/train_stack.sh: physical GPU 7 by
 # default, remapped through CUDA_VISIBLE_DEVICES to logical cuda:0.
@@ -58,7 +58,7 @@ fi
     exit 1
 }
 . "$CONDA_BASE/etc/profile.d/conda.sh"
-conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi118}"
+conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi_juan}"
 
 BATCH_SIZE=$((ENVS * HORIZON * 2))
 MINIBATCH=${STACK_MINIBATCH_SIZE:-16384}
@@ -118,9 +118,10 @@ export MS_VEL_W=${MS_VEL_W:-1}
 export MS_SCEN=${MS_SCEN:-free}
 export STACK_TASK_MODE=stack
 export STACK_HAND_CLEAR_START=${STACK_HAND_CLEAR_START:-0.08}
-export STACK_HAND_CLEAR_DONE=${STACK_HAND_CLEAR_DONE:-0.20}
+export STACK_HAND_CLEAR_DONE=${STACK_HAND_CLEAR_DONE:-0.15}
 export STACK_RELEASE_REWARD_W=${STACK_RELEASE_REWARD_W:-0.50}
 export STACK_EARLY_RELEASE_PENALTY=${STACK_EARLY_RELEASE_PENALTY:-0.50}
+export STACK_HANDS_ON_PENALTY=${STACK_HANDS_ON_PENALTY:-0.35}
 
 PHYSX_LIB_DIR=${PHYSX_LIB_DIR:-/tmp/hwanhee-physx-lib}
 if [ -d "$PHYSX_LIB_DIR" ]; then
@@ -135,7 +136,7 @@ echo " trainable  new_carry tokenizer + internal residual"
 echo " masked     teammate token"
 echo " frozen     self/teammate/steer/old-carry/transformer/composer/RMS"
 echo " ms18 rwd   OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
-echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY"
+echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY hands_on_pen=$STACK_HANDS_ON_PENALTY"
 echo " envs       $ENVS x 2 agents"
 echo " PPO batch  $BATCH_SIZE (minibatch $MINIBATCH)"
 echo " iterations +$ITERS -> final epoch $FINAL_EPOCH"

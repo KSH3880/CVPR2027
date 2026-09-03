@@ -56,11 +56,13 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         self.stack_hand_clear_start = float(os.environ.get(
             "STACK_HAND_CLEAR_START", "0.08"))
         self.stack_hand_clear_done = float(os.environ.get(
-            "STACK_HAND_CLEAR_DONE", "0.20"))
+            "STACK_HAND_CLEAR_DONE", "0.15"))
         self.stack_release_reward_w = float(os.environ.get(
             "STACK_RELEASE_REWARD_W", "0.50"))
         self.stack_early_release_penalty = float(os.environ.get(
             "STACK_EARLY_RELEASE_PENALTY", "0.50"))
+        self.stack_hands_on_penalty = float(os.environ.get(
+            "STACK_HANDS_ON_PENALTY", "0.35"))
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
@@ -147,9 +149,11 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                    | (phase == self.VERIFY_BOTTOM))
         a1_valid_release = bottom_quality * a1_clear
         a1_early_release = (1.0 - bottom_quality) * a1_clear
+        a1_hands_on = bottom_quality * (1.0 - a1_clear)
         self.rew_buf[r0] += placing.float() * (
             self.stack_release_reward_w * a1_valid_release
-            - self.stack_early_release_penalty * a1_early_release)
+            - self.stack_early_release_penalty * a1_early_release
+            - self.stack_hands_on_penalty * a1_hands_on)
 
         # A2: preserve grasp while approaching, then reverse the incentive at
         # the committed top pose.  Exact centering, height, stillness and hand
@@ -174,7 +178,7 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             0.25 * top_quality
             + self.stack_release_reward_w * a2_valid_release
             - self.stack_early_release_penalty * a2_early_release
-            - 0.20 * hands_still_on)
+            - self.stack_hands_on_penalty * hands_still_on)
 
     def _virtual_retreat_carry_obs(self, rows, env_ids):
         """Give A1 a virtual carried box while leaving physics untouched."""
