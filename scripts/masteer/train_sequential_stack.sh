@@ -15,7 +15,7 @@ set -eo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 REPO="$ROOT/TokenHSI-masteer"
 TAG=${1:?usage: train_sequential_stack.sh <tag> [ma-steer-policy.pth]}
-POLICY=${2:-"$REPO/output/ms18_maskteam_origscale_c06_s0_00009000.pth"}
+POLICY=${2:-"$REPO/output/stack/ms18_maskteam_origscale_c06_s0_00009000.pth"}
 STAGE1=${MS_CKPT:-"$REPO/output/ckpt_stage1.pth"}
 ENVS=${STACK_ENVS:-2048}
 ITERS=${STACK_ITERS:-2}
