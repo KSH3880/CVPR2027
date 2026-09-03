@@ -86,3 +86,6 @@ nohup.out
 /pytorch-src/
 /pytorch3d-src/
 /TokenHSI.pdf
+
+# Internal execution and temporary files
+/scripts/masteer/view_sequential_stack_local.py
