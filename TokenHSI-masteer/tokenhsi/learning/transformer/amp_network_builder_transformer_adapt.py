@@ -183,6 +183,11 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 assert self.extra_ids, self.each_subtask_name
                 self.extra_id = self.extra_ids[0]
                 self.extra_task_obs_size = self.task_obs_each_size[self.extra_id]
+                self.mask_teammate_token = os.environ.get("MA_TOKEN", "live") == "mask"
+                self.teammate_token_pos = 2
+                if self.mask_teammate_token:
+                    print("[ma] teammate token: exact attention mask (MA_TOKEN=mask)",
+                          flush=True)
 
             ######## the first trainable task tokenizer
             s = self.task_obs_each_size[self.new_major_id]
@@ -388,7 +393,73 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                       f"speed_span={self.hier_speed_span}, "
                       f"turn={math.degrees(self.hier_turn_max):.1f}deg", flush=True)
 
+            # Sequential-stack fine-tuning keeps the complete trained
+            # MA-steer actor fixed except for the carry tokenizer that was
+            # introduced during adaptation and its residual adapter.  The
+            # full MA-steer checkpoint is restored by rl_games *after* this
+            # network is constructed, so requires_grad is selected here while
+            # the actual starting weights still come from --checkpoint.
+            self.finetune_newcarry_residual = (
+                os.environ.get("MA_FINETUNE_NEWCARRY_RESIDUAL", "0") == "1")
+            if self.finetune_newcarry_residual:
+                if self.use_hier_steer:
+                    raise ValueError(
+                        "MA_FINETUNE_NEWCARRY_RESIDUAL is incompatible with MS_HIER")
+                if not self.use_internal_adaptation:
+                    raise ValueError(
+                        "new-carry residual fine-tuning requires "
+                        "use_internal_adaptation=True")
+
+                # Freeze every actor module first, then open exactly the two
+                # requested paths.  Critic and AMP discriminator are separate
+                # modules and intentionally remain trainable.
+                actor_modules = [self.self_encoder, self.task_encoder,
+                                 self.transformer_encoder, self.composer,
+                                 self.internal_adapt_mlp]
+                if hasattr(self, "extra_act_mlp"):
+                    actor_modules.append(self.extra_act_mlp)
+                for module in actor_modules:
+                    module.requires_grad_(False)
+                    module.eval()
+                self.weight_token.requires_grad_(False)
+                self.pos_embed.requires_grad_(False)
+
+                new_carry = self.task_encoder[self.new_major_id]
+                new_carry.requires_grad_(True)
+                new_carry.train()
+                self.internal_adapt_mlp.requires_grad_(True)
+                self.internal_adapt_mlp.train()
+
+                # This RMS has buffers rather than optimizer parameters.  It
+                # must nevertheless stay fixed, otherwise the tokenizer input
+                # changes even while all other actor weights are frozen.
+                self.new_task_trainable_rms.requires_grad_(False)
+                self.new_task_trainable_rms.eval()
+                print("[sequential-ft] actor trainable: new_carry tokenizer + "
+                      "internal action residual only; teammate/steer masked-or-frozen; "
+                      "base actor RMS frozen", flush=True)
+
             return
+
+        def train(self, mode=True):
+            """Keep the frozen MA-steer actor deterministic during PPO updates."""
+            super().train(mode)
+            if not getattr(self, "finetune_newcarry_residual", False):
+                return self
+
+            self.self_encoder.eval()
+            self.task_encoder.eval()
+            self.transformer_encoder.eval()
+            self.composer.eval()
+            self.new_task_trainable_rms.eval()
+            if hasattr(self, "extra_act_mlp"):
+                self.extra_act_mlp.eval()
+            if mode:
+                self.task_encoder[self.new_major_id].train()
+                self.internal_adapt_mlp.train()
+            else:
+                self.internal_adapt_mlp.eval()
+            return self
 
         def _hier_transform(self, raw_obs, head_obs):
             """Apply the 2-D head to one Kx2 task-observation block."""
@@ -495,6 +566,9 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
             if self.use_prior_knowledge:
                 src_key_padding_mask[:, self.how_many_new_tasks + 2:] = False
+
+            if self.has_extra and self.mask_teammate_token:
+                src_key_padding_mask[:, self.teammate_token_pos] = True
 
             if getattr(self, "use_hier_steer", False) and self.hier_target == "traj":
                 # Exact stage1 low-level path: mask newly added teammate/new

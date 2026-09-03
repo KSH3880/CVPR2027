@@ -54,6 +54,7 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_f22_steer_carry import Human
 from env.tasks.adapt_interaction_skills.humanoid_ma_f22_stack_carry import HumanoidMAF22StackCarry
 from env.tasks.adapt_interaction_skills.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.adapt_interaction_skills.humanoid_ma_stack_carry import HumanoidMAStackCarry
+from env.tasks.adapt_interaction_skills.humanoid_ma_sequential_stack_carry import HumanoidMASequentialStackCarry
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer import HumanoidMASteer
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
 

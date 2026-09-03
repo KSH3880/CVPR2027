@@ -88,4 +88,4 @@ nohup.out
 /TokenHSI.pdf
 
 # Internal execution and temporary files
-/scripts/masteer/view_sequential_stack_local.py
+/scripts/masteer/view_sequential_stack_local.sh

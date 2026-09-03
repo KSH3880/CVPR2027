@@ -45,7 +45,7 @@ class HumanoidMACarry(HumanoidTrajSitCarryClimb):
         #   r18   + 상대 박스 pos·vel                       (18)
         #   live  + 상대 박스 목표 = 전체                    (21)
         self._token_mode = os.environ.get("MA_TOKEN", "live")
-        assert self._token_mode in ("live", "zero", "r12", "r18"), self._token_mode
+        assert self._token_mode in ("live", "zero", "r12", "r18", "mask"), self._token_mode
         super().__init__(cfg=cfg, sim_params=sim_params, physics_engine=physics_engine,
                          device_type=device_type, device_id=device_id, headless=headless)
 
@@ -125,7 +125,10 @@ class HumanoidMACarry(HumanoidTrajSitCarryClimb):
                 local(self._box_tar_pos[other, 0:3] - my_pos),       # 3
             ], dim=-1))
         obs = torch.cat(out, dim=-1)
-        keep = {"zero": 0, "r12": 12, "r18": 18, "live": TEAMMATE_DIM}[self._token_mode]
+        keep = {
+            "zero": 0, "r12": 12, "r18": 18,
+            "live": TEAMMATE_DIM, "mask": TEAMMATE_DIM,
+        }[self._token_mode]
         if keep < TEAMMATE_DIM:
             # 상대 1명당 블록 안에서 뒤쪽을 0 으로 덮는다 (A>=3 이어도 블록마다 적용)
             v = obs.view(obs.shape[0], -1, TEAMMATE_DIM).clone()

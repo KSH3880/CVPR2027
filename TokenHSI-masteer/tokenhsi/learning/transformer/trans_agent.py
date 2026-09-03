@@ -51,6 +51,17 @@ class TransAgent(amp_agent.AMPAgent):
         super().__init__(base_name, config)
 
         return
+
+    def set_train(self):
+        super().set_train()
+        # In the narrow sequential-stack fine-tune, changing the global
+        # observation RMS would also change every frozen actor token.  Keep
+        # the checkpoint's normalization statistics bit-for-bit fixed.
+        import os
+        if (os.environ.get("MA_FINETUNE_NEWCARRY_RESIDUAL", "0") == "1"
+                and self.normalize_input):
+            self.running_mean_std.eval()
+        return
     
     def _build_net_config(self):
         config = super()._build_net_config()
