@@ -90,6 +90,7 @@ export STACK_TASK_MODE=stack
 export STACK_CARRY_REHEARSAL_PROB=0
 export STACK_END_ON_A2_RESUME=0
 export STACK_EPISODE_LENGTH=${STACK_EPISODE_LENGTH:-900}
+export STACK_BOTTOM_Z_TOL=${STACK_BOTTOM_Z_TOL:-0.05}
 
 echo "sequential-stack eval: policy=$POLICY envs=$ENVS gpu=$GPU box_grid=$STACK_EVAL_BOX_GRID size_ids=$STACK_EVAL_BOX_SIZE_IDS" | tee "$LOG"
 cd "$REPO"

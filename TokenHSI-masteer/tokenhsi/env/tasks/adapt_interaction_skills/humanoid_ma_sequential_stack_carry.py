@@ -88,6 +88,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_FOOT_BOX_CLEARANCE", "0.0"))
         self.stack_foot_box_penalty = float(os.environ.get(
             "STACK_FOOT_BOX_PENALTY", "0.0"))
+        self.stack_bottom_z_tol = float(os.environ.get(
+            "STACK_BOTTOM_Z_TOL", "0.05"))
         self.stack_release_grace_steps = int(float(os.environ.get(
             "STACK_RELEASE_GRACE_STEPS", "60")))
         self.stack_end_on_a2_resume = bool(int(os.environ.get(
@@ -95,6 +97,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
+        if self.stack_bottom_z_tol <= 0.0:
+            raise ValueError("STACK_BOTTOM_Z_TOL must be positive")
         if self.stack_release_grace_steps < self.stack_stable_steps:
             raise ValueError(
                 "STACK_RELEASE_GRACE_STEPS must be >= STACK_STABLE_STEPS")
@@ -277,15 +281,14 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                           * torch.exp(-4.0 * bottom_speed2
                                       - 0.5 * bottom_ang2))
         a1_clear = self._clearance_score(self._hand_box_clearance(r0))
-        placing = phase == self.A1_PLACE
         verifying = phase == self.VERIFY_BOTTOM
-        at_bottom = placing | verifying
-        # The native carry position term uses XYZ.  Replace only that 0.4
-        # contribution (2 * carry_r's 0.2 * pos_near) with XY distance while
-        # leaving the rest of the original carry reward untouched.
+        # Keep the native XYZ term during A1_PLACE: its Z component is the
+        # dense signal that actually lowers the box.  Only after the box has
+        # reached the strict VERIFY_BOTTOM height band replace that 0.4
+        # contribution (2 * carry_r's 0.2 * pos_near) with XY distance.
         native_pos_xyz = torch.exp(-10.0 * (bottom_delta ** 2).sum(dim=-1))
         native_pos_xy = torch.exp(-10.0 * bottom_xy ** 2)
-        self.rew_buf[r0] += at_bottom.float() * 0.4 * (
+        self.rew_buf[r0] += verifying.float() * 0.4 * (
             native_pos_xy - native_pos_xyz)
 
         # A1_PLACE keeps the native grasp incentive.  After entering
@@ -532,25 +535,33 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         boxes = self.humanoid_rows(self._box_states)
         roots = self.humanoid_rows(self._humanoid_root_states)
 
-        bottom_err = torch.norm(
-            boxes[r0, 0:3] - self._bottom_nominal_pos, dim=-1)
+        bottom_delta = boxes[r0, 0:3] - self._bottom_nominal_pos
+        bottom_xy_err = torch.norm(bottom_delta[:, 0:2], dim=-1)
+        bottom_z_err = torch.abs(bottom_delta[:, 2])
         bottom_slow = (
             (torch.norm(boxes[r0, 7:10], dim=-1) < self.stack_vel_tol)
             & (torch.norm(boxes[r0, 10:13], dim=-1)
                < self.stack_ang_vel_tol))
         foot_clear = self._foot_box_clearance(r0)
         feet_safe = foot_clear >= self.stack_foot_box_clearance
-        bottom_candidate = ((bottom_err < self.stack_pos_tol) & bottom_slow
-                            & feet_safe)
+        bottom_at_target = ((bottom_xy_err < self.stack_pos_tol)
+                            & (bottom_z_err < self.stack_bottom_z_tol))
+        bottom_candidate = bottom_at_target & bottom_slow & feet_safe
         self._bottom_stable_count = torch.where(
             bottom_candidate, self._bottom_stable_count + 1,
             torch.zeros_like(self._bottom_stable_count))
 
         phase = self._stack_phase
         verify = torch.nonzero(
-            (phase == self.A1_PLACE) & (bottom_err < self.stack_pos_tol),
+            (phase == self.A1_PLACE) & bottom_at_target,
             as_tuple=False).squeeze(-1)
         self._set_phase(verify, self.VERIFY_BOTTOM)
+
+        phase = self._stack_phase
+        lost_bottom = torch.nonzero(
+            (phase == self.VERIFY_BOTTOM) & ~bottom_at_target,
+            as_tuple=False).squeeze(-1)
+        self._set_phase(lost_bottom, self.A1_PLACE)
 
         phase = self._stack_phase
         bottom_hands_clear = (

@@ -129,6 +129,7 @@ export STACK_EARLY_RELEASE_PENALTY=${STACK_EARLY_RELEASE_PENALTY:-0.50}
 export STACK_HANDS_ON_PENALTY=${STACK_HANDS_ON_PENALTY:-1.0}
 export STACK_FOOT_BOX_CLEARANCE=${STACK_FOOT_BOX_CLEARANCE:-0.12}
 export STACK_FOOT_BOX_PENALTY=${STACK_FOOT_BOX_PENALTY:-1.0}
+export STACK_BOTTOM_Z_TOL=${STACK_BOTTOM_Z_TOL:-0.05}
 export STACK_RELEASE_GRACE_STEPS=${STACK_RELEASE_GRACE_STEPS:-60}
 # Early curriculum defaults to A1 placement/release/retreat only.  Set this to
 # 0 when continuing the same policy with A2 top placement enabled.
@@ -149,7 +150,7 @@ echo " frozen     self/teammate/steer/old-carry/transformer/composer/RMS"
 echo " steer rwd  OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
 echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY hands_on_pen=$STACK_HANDS_ON_PENALTY"
 echo " foot-box   clearance>=$STACK_FOOT_BOX_CLEARANCE penalty=$STACK_FOOT_BOX_PENALTY"
-echo " putdown    A1 reward uses XY only; Z is checked only by phase transition"
+echo " putdown    A1_PLACE uses XYZ; VERIFY uses XY; transition z_tol=$STACK_BOTTOM_Z_TOL"
 echo " release    grace<=${STACK_RELEASE_GRACE_STEPS} steps (never blocks forever)"
 echo " curriculum end_on_A2_resume=$STACK_END_ON_A2_RESUME"
 echo " rehearsal  native carry episode probability=$STACK_CARRY_REHEARSAL_PROB"
