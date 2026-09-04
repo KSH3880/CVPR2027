@@ -189,6 +189,39 @@ class BoxLib():
                 sampled_scale_id = torch.multinomial(torch.ones(num_scales) * (1.0 / num_scales), num_samples=num_envs, replacement=True)
                 self._box_scale = scale_pool[sampled_scale_id]
 
+        # Opt-in two-agent evaluation grid.  Rows are laid out as
+        # [env0/A1, env0/A2, env1/A1, env1/A2, ...], so cycling the environment
+        # id over 3x3 assigns every bottom/top size combination evenly without
+        # changing training or ordinary evaluation behavior.
+        if int(os.environ.get("STACK_EVAL_BOX_GRID", "0")):
+            if mode != "test" or num_envs % 2 != 0:
+                raise ValueError(
+                    "STACK_EVAL_BOX_GRID requires test mode and two-agent rows")
+            ids = [int(value) for value in os.environ.get(
+                "STACK_EVAL_BOX_SIZE_IDS", "0,4,7").split(",")]
+            if len(ids) != 3 or len(set(ids)) != 3:
+                raise ValueError(
+                    "STACK_EVAL_BOX_SIZE_IDS must contain 3 unique indices")
+            test_sizes = torch.tensor(
+                self._build_test_sizes, device=self.device,
+                dtype=self._box_scale.dtype)
+            if min(ids) < 0 or max(ids) >= len(test_sizes):
+                raise ValueError(
+                    "STACK_EVAL_BOX_SIZE_IDS is outside carry.box.build.testSizes")
+            chosen = test_sizes[ids]
+            env = torch.arange(num_envs // 2, device=self.device)
+            combo = env % 9
+            assigned = torch.empty(
+                (num_envs, 3), device=self.device,
+                dtype=self._box_scale.dtype)
+            assigned[0::2] = chosen[torch.div(
+                combo, 3, rounding_mode="floor")]
+            assigned[1::2] = chosen[combo % 3]
+            base = torch.tensor(
+                self._build_base_size, device=self.device,
+                dtype=self._box_scale.dtype)
+            self._box_scale = assigned / base
+
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale # (num_envs, 3)
         self._build_box_bps()
         return

@@ -267,11 +267,16 @@ class TransPlayerContinuous(common_player.CommonPlayer):
     def run_eval(self):
         is_determenistic = self.is_determenistic
         num_envs = self.env.num_envs
-        num_trials = num_envs
-        assert num_envs == num_trials
+        # Legacy evaluation stops after num_envs *agent rows*, which samples
+        # only half of the environments when A=2.  Keep legacy behavior by
+        # default; episode-direct evaluators can request every agent row.
+        if int(os.environ.get("MA_EVAL_ALL_AGENT_ROWS", "0")):
+            num_trials = num_envs * self.num_agents
+        else:
+            num_trials = num_envs
         num_repeat = 3
 
-        print("evaluating policy: {} trials".format(num_envs))
+        print("evaluating policy: {} agent-row trials".format(num_trials))
 
         eval_res = {}
 
@@ -332,6 +337,11 @@ class TransPlayerContinuous(common_player.CommonPlayer):
   
                 # self._post_step(info)
             
+            # A completed episode is normally dumped on the following reset.
+            # Explicit flushing makes the final repeat available to MA_METRICS.
+            if int(os.environ.get("MA_EVAL_FLUSH_DONE", "0")):
+                self.env_reset(normal_done_indices)
+
             success_rate = games_success / games_played
             if games_success > 0:
                 mean_success_precision = sum_success_precision / games_success

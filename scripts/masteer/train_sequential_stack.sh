@@ -102,6 +102,8 @@ sed -e "s/^\( *\)save_frequency:.*/\1save_frequency: $SAVE_FREQ/" \
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="$GPU"
 unset TOKENHSI_GRAPHICS_DEVICE_ID
+# Evaluation-only deterministic size assignment must never leak into training.
+unset STACK_EVAL_BOX_GRID STACK_EVAL_BOX_SIZE_IDS
 export MA_TOKEN=mask
 export MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_FINETUNE_NEWCARRY_RESIDUAL=1
@@ -110,18 +112,27 @@ export MS_GRADCHK=${MS_GRADCHK:-1}
 export MS_MRAND=${MS_MRAND:-4}
 export MS_M_LO=${MS_M_LO:-0.25}
 export MS_CLIP=${MS_CLIP:-1}
-# Exact ms18 reward contract.  Do not fall back to the older masteer defaults
-# (OUTER=2, POS_C=2), which would change the policy's reward scale at resume.
+# Keep the ms18 reward structure, but strengthen its existing global
+# root/box trajectory-lateral term for sequential fine-tuning.
 export MS_REWARD_OUTER=${MS_REWARD_OUTER:-1}
-export MS_POS_C=${MS_POS_C:-0.6}
+export MS_POS_C=${MS_POS_C:-1.2}
 export MS_VEL_W=${MS_VEL_W:-1}
 export MS_SCEN=${MS_SCEN:-free}
 export STACK_TASK_MODE=stack
+# Rehearse the original MA-steer carry distribution in a subset of complete
+# episodes so fine-tuning does not catastrophically forget carry/steering.
+export STACK_CARRY_REHEARSAL_PROB=${STACK_CARRY_REHEARSAL_PROB:-0.0}
 export STACK_HAND_CLEAR_START=${STACK_HAND_CLEAR_START:-0.08}
 export STACK_HAND_CLEAR_DONE=${STACK_HAND_CLEAR_DONE:-0.15}
 export STACK_RELEASE_REWARD_W=${STACK_RELEASE_REWARD_W:-0.50}
 export STACK_EARLY_RELEASE_PENALTY=${STACK_EARLY_RELEASE_PENALTY:-0.50}
-export STACK_HANDS_ON_PENALTY=${STACK_HANDS_ON_PENALTY:-0.35}
+export STACK_HANDS_ON_PENALTY=${STACK_HANDS_ON_PENALTY:-1.0}
+export STACK_FOOT_BOX_CLEARANCE=${STACK_FOOT_BOX_CLEARANCE:-0.12}
+export STACK_FOOT_BOX_PENALTY=${STACK_FOOT_BOX_PENALTY:-1.0}
+export STACK_RELEASE_GRACE_STEPS=${STACK_RELEASE_GRACE_STEPS:-60}
+# Early curriculum defaults to A1 placement/release/retreat only.  Set this to
+# 0 when continuing the same policy with A2 top placement enabled.
+export STACK_END_ON_A2_RESUME=${STACK_END_ON_A2_RESUME:-0}
 
 PHYSX_LIB_DIR=${PHYSX_LIB_DIR:-/tmp/hwanhee-physx-lib}
 if [ -d "$PHYSX_LIB_DIR" ]; then
@@ -135,8 +146,13 @@ echo " stage1     $STAGE1"
 echo " trainable  new_carry tokenizer + internal residual"
 echo " masked     teammate token"
 echo " frozen     self/teammate/steer/old-carry/transformer/composer/RMS"
-echo " ms18 rwd   OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
+echo " steer rwd  OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
 echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY hands_on_pen=$STACK_HANDS_ON_PENALTY"
+echo " foot-box   clearance>=$STACK_FOOT_BOX_CLEARANCE penalty=$STACK_FOOT_BOX_PENALTY"
+echo " putdown    A1 reward uses XY only; Z is checked only by phase transition"
+echo " release    grace<=${STACK_RELEASE_GRACE_STEPS} steps (never blocks forever)"
+echo " curriculum end_on_A2_resume=$STACK_END_ON_A2_RESUME"
+echo " rehearsal  native carry episode probability=$STACK_CARRY_REHEARSAL_PROB"
 echo " envs       $ENVS x 2 agents"
 echo " PPO batch  $BATCH_SIZE (minibatch $MINIBATCH)"
 echo " iterations +$ITERS -> final epoch $FINAL_EPOCH"

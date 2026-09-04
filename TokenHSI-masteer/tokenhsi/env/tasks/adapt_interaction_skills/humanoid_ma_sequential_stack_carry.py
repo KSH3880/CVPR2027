@@ -22,6 +22,9 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_carry import (
     CARRY_LO,
     TEAMMATE_DIM,
 )
+from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import (
+    HumanoidMASteerCarry,
+)
 from isaacgym.torch_utils import quat_mul, quat_rotate
 from isaacgym import gymtorch
 from utils import torch_utils
@@ -37,6 +40,13 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id,
                  headless):
+        self.stack_carry_rehearsal_prob = float(os.environ.get(
+            "STACK_CARRY_REHEARSAL_PROB", "0.0"))
+        if not 0.0 <= self.stack_carry_rehearsal_prob <= 1.0:
+            raise ValueError("STACK_CARRY_REHEARSAL_PROB must be in [0, 1]")
+        # The first reset runs inside super().__init__.  None keeps that
+        # construction reset on the old path; later resets sample per-env.
+        self._carry_rehearsal = None
         # The inherited 600-step horizon is sized for one carry episode.  This
         # task executes two carries plus a retreat sequentially, so that limit
         # resets otherwise healthy episodes halfway through A2's turn.
@@ -53,6 +63,17 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                          headless=headless)
         self._sequential_reset_reported = torch.zeros(
             self.num_envs, dtype=torch.bool, device=self.device)
+        self._carry_rehearsal = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device)
+        # Episode-direct evaluation metrics.  Columns are grouped as
+        # placement / retreat / A2 so a long wait in one phase cannot hide a
+        # steering regression in another phase.  Shape is (agent rows, 3).
+        self._seq_ep_lat_root = torch.zeros(
+            (self._rows, 3), device=self.device)
+        self._seq_ep_lat_box = torch.zeros(
+            (self._rows, 3), device=self.device)
+        self._seq_ep_steps = torch.zeros(
+            (self._rows, 3), device=self.device, dtype=torch.long)
         self.stack_hand_clear_start = float(os.environ.get(
             "STACK_HAND_CLEAR_START", "0.08"))
         self.stack_hand_clear_done = float(os.environ.get(
@@ -63,9 +84,20 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_EARLY_RELEASE_PENALTY", "0.50"))
         self.stack_hands_on_penalty = float(os.environ.get(
             "STACK_HANDS_ON_PENALTY", "0.35"))
+        self.stack_foot_box_clearance = float(os.environ.get(
+            "STACK_FOOT_BOX_CLEARANCE", "0.0"))
+        self.stack_foot_box_penalty = float(os.environ.get(
+            "STACK_FOOT_BOX_PENALTY", "0.0"))
+        self.stack_release_grace_steps = int(float(os.environ.get(
+            "STACK_RELEASE_GRACE_STEPS", "60")))
+        self.stack_end_on_a2_resume = bool(int(os.environ.get(
+            "STACK_END_ON_A2_RESUME", "0")))
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
+        if self.stack_release_grace_steps < self.stack_stable_steps:
+            raise ValueError(
+                "STACK_RELEASE_GRACE_STEPS must be >= STACK_STABLE_STEPS")
 
     def _set_phase(self, env_ids, phase):
         if len(env_ids) == 0:
@@ -81,6 +113,16 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                     int(self._stack_phase_age[0])), flush=True)
         return super()._set_phase(env_ids, phase)
 
+    def _reset_task_indicator(self, env_ids):
+        """Sample full native-carry rehearsal episodes at every reset."""
+        super()._reset_task_indicator(env_ids)
+        if self._carry_rehearsal is None or len(env_ids) == 0:
+            return
+        env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        self._carry_rehearsal[env_ids] = (
+            torch.rand(len(env_ids), device=self.device)
+            < self.stack_carry_rehearsal_prob)
+
     def _reset_envs(self, env_ids):
         super()._reset_envs(env_ids)
         if hasattr(self, "_sequential_reset_reported") and len(env_ids) > 0:
@@ -95,9 +137,12 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                     self.num_envs, device=self.device) == 0)).any()):
                 timeout = int(self.progress_buf[0]) >= self.max_episode_length - 1
                 fallen = bool(self._terminate_buf[0])
+                phase_name = ("CARRY_REHEARSAL"
+                              if self._carry_rehearsal[0]
+                              else self.PHASE_NAMES[int(self._stack_phase[0])])
                 print("[sequential-stack] env0 reset: phase={} step={} "
                       "timeout={} fall={}".format(
-                          self.PHASE_NAMES[int(self._stack_phase[0])],
+                          phase_name,
                           int(self.progress_buf[0]), timeout, fallen),
                       flush=True)
             self._sequential_reset_reported |= ended
@@ -108,6 +153,73 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         # timeout.  End this sequential episode immediately and normally once
         # the top box has remained stable for the requested number of steps.
         self.reset_buf[self._stack_phase == self.DONE] = 1
+        # A1-only curriculum: A2_RESUME means A1 successfully placed,
+        # released (or exhausted the bounded release grace), and retreated.
+        # End here so early training spends no rollout budget on A2.  Full
+        # sequential behavior remains the environment default.
+        if self.stack_end_on_a2_resume:
+            self.reset_buf[self._stack_phase == self.A2_RESUME] = 1
+        self.extras["stack_carry_rehearsal"] = \
+            self._carry_rehearsal.repeat_interleave(self.num_agents)
+        if self._is_eval:
+            # The inherited success buffer means ordinary carry delivery.
+            # Sequential-stack evaluation instead succeeds only after the
+            # top box has passed VERIFY_STACK and reached DONE.
+            stack_success = (self._stack_phase == self.DONE)
+            self.extras["success"] = stack_success.repeat_interleave(
+                self.num_agents)
+
+    def update_metrics(self):
+        """Accumulate path error separately for the three sequence stages."""
+        super().update_metrics()
+        # update_metrics can run during super().__init__, before these buffers
+        # are allocated.  The ordinary MA-steer columns are still collected.
+        if not hasattr(self, "_seq_ep_steps"):
+            return
+
+        rows = torch.arange(self._rows, device=self.device)
+        env = torch.div(rows, self.num_agents, rounding_mode="floor")
+        phase = self._stack_phase[env]
+        rehearsal = self._carry_rehearsal[env]
+        groups = (
+            (phase == self.A1_PLACE) | (phase == self.VERIFY_BOTTOM),
+            phase == self.A1_RETREAT,
+            (phase == self.A2_RESUME) | (phase == self.VERIFY_STACK),
+        )
+        for group, mask in enumerate(groups):
+            mask = mask & ~rehearsal
+            self._seq_ep_lat_root[mask, group] += self._lat_root[mask].abs()
+            self._seq_ep_lat_box[mask, group] += self._lat_box[mask].abs()
+            self._seq_ep_steps[mask, group] += 1
+
+    def _metric_extra_cols(self, rows):
+        """Append sequential metrics after the inherited fixed columns.
+
+        Columns 40..50 are success, final phase, then root/box cumulative
+        lateral error and step count for place, retreat and A2 respectively.
+        Columns 51..53 record the physical box XYZ size for stratified eval.
+        """
+        cols = super()._metric_extra_cols(rows)
+        env = torch.div(rows, self.num_agents, rounding_mode="floor")
+        success = (self._stack_phase[env] == self.DONE).float()
+        phase = self._stack_phase[env].float()
+        cols.extend((success, phase))
+        for group in range(3):
+            cols.extend((
+                self._seq_ep_lat_root[rows, group],
+                self._seq_ep_lat_box[rows, group],
+                self._seq_ep_steps[rows, group].float(),
+            ))
+        cols.extend((self._box_lib._box_size[rows, axis]
+                     for axis in range(3)))
+        return cols
+
+    def _metric_reset_extra(self, rows):
+        super()._metric_reset_extra(rows)
+        if hasattr(self, "_seq_ep_steps"):
+            self._seq_ep_lat_root[rows] = 0.0
+            self._seq_ep_lat_box[rows] = 0.0
+            self._seq_ep_steps[rows] = 0
 
     def _hand_box_clearance(self, rows):
         """Minimum hand-center distance from the owned oriented-box surface."""
@@ -117,18 +229,37 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         sizes = self._box_lib._box_size[rows]
         return self._body_to_box_clearance(hands, boxes, sizes)
 
+    def _foot_box_clearance(self, rows):
+        """Minimum foot-center clearance from the owned oriented box."""
+        rigid = self.humanoid_rows(self._rigid_body_pos)[rows]
+        feet = rigid[:, self._key_body_ids[[2, 3]]]
+        boxes = self.humanoid_rows(self._box_states)[rows]
+        sizes = self._box_lib._box_size[rows]
+        return self._body_to_box_clearance(feet, boxes, sizes)
+
     def _clearance_score(self, clearance):
         span = self.stack_hand_clear_done - self.stack_hand_clear_start
         return ((clearance - self.stack_hand_clear_start) / span).clamp(0.0, 1.0)
 
     def _compute_reward(self, actions):
         """Keep the ms18 task reward and shape only valid box release events."""
+        # Save the unmodified MA-steer carry reward for rehearsal envs.  The
+        # stack parent necessarily computes its coordination reward for the
+        # whole vectorized batch, so restore these rows after stack shaping.
+        rehearsal_reward = None
+        if (self._carry_rehearsal is not None
+                and bool(self._carry_rehearsal.any())):
+            HumanoidMASteerCarry._compute_reward(self, actions)
+            rehearsal_rows = self.agent_rows(torch.nonzero(
+                self._carry_rehearsal, as_tuple=False).squeeze(-1))
+            rehearsal_reward = self.rew_buf[rehearsal_rows].clone()
         super()._compute_reward(actions)
         if not hasattr(self, "_stack_phase"):
             return
 
         rows = self.all_rows().view(self.num_envs, 2)
         r0, r1 = rows[:, 0], rows[:, 1]
+        roots = self.humanoid_rows(self._humanoid_root_states)
         boxes = self.humanoid_rows(self._box_states)
         phase = self._stack_phase
 
@@ -137,23 +268,52 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         # shortcut while supplying a dense gradient for moving both hands off.
         bottom_delta = boxes[r0, 0:3] - self._bottom_nominal_pos
         bottom_xy = torch.norm(bottom_delta[:, 0:2], dim=-1)
-        bottom_z = torch.abs(bottom_delta[:, 2])
         bottom_speed2 = (boxes[r0, 7:10] ** 2).sum(dim=-1)
         bottom_ang2 = (boxes[r0, 10:13] ** 2).sum(dim=-1)
-        bottom_quality = (torch.exp(-12.0 * bottom_xy ** 2)
-                          * torch.exp(-40.0 * bottom_z ** 2)
+        # All A1 placement/release shaping is XY-only.  Height is checked by
+        # the coordinator's 3-D placement condition, not by this reward.
+        bottom_position_quality = torch.exp(-12.0 * bottom_xy ** 2)
+        bottom_quality = (bottom_position_quality
                           * torch.exp(-4.0 * bottom_speed2
                                       - 0.5 * bottom_ang2))
         a1_clear = self._clearance_score(self._hand_box_clearance(r0))
-        placing = ((phase == self.A1_PLACE)
-                   | (phase == self.VERIFY_BOTTOM))
+        placing = phase == self.A1_PLACE
+        verifying = phase == self.VERIFY_BOTTOM
+        at_bottom = placing | verifying
+        # The native carry position term uses XYZ.  Replace only that 0.4
+        # contribution (2 * carry_r's 0.2 * pos_near) with XY distance while
+        # leaving the rest of the original carry reward untouched.
+        native_pos_xyz = torch.exp(-10.0 * (bottom_delta ** 2).sum(dim=-1))
+        native_pos_xy = torch.exp(-10.0 * bottom_xy ** 2)
+        self.rew_buf[r0] += at_bottom.float() * 0.4 * (
+            native_pos_xy - native_pos_xyz)
+
+        # A1_PLACE keeps the native grasp incentive.  After entering
+        # VERIFY_BOTTOM, remove only its +0.2 handheld term; position,
+        # steering and the rest of carry reward remain intact.
+        native_handheld = self._handheld_score(
+            roots[r0, 0:3], boxes[r0, 0:3],
+            self.humanoid_rows(self._rigid_body_pos)[r0])
+        self.rew_buf[r0] -= verifying.float() * 0.2 * native_handheld
         a1_valid_release = bottom_quality * a1_clear
         a1_early_release = (1.0 - bottom_quality) * a1_clear
-        a1_hands_on = bottom_quality * (1.0 - a1_clear)
-        self.rew_buf[r0] += placing.float() * (
+        # Do not multiply hands-on by stability: lifting/moving the box must
+        # not make the penalty disappear while the hands remain attached.
+        a1_hands_on = bottom_position_quality * (1.0 - a1_clear)
+        self.rew_buf[r0] += verifying.float() * (
             self.stack_release_reward_w * a1_valid_release
             - self.stack_early_release_penalty * a1_early_release
             - self.stack_hands_on_penalty * a1_hands_on)
+        if self.stack_foot_box_penalty > 0.0:
+            foot_clear = self._foot_box_clearance(r0)
+            foot_overlap = ((self.stack_foot_box_clearance - foot_clear)
+                            / max(self.stack_foot_box_clearance, 1e-4))
+            foot_overlap = foot_overlap.clamp(0.0, 1.0)
+            # Penalize only the unsafe band.  Beyond the required clearance
+            # there is no extra reward for moving the box farther away.
+            self.rew_buf[r0] -= (verifying.float()
+                                 * self.stack_foot_box_penalty
+                                 * foot_overlap)
 
         # A2: preserve grasp while approaching, then reverse the incentive at
         # the committed top pose.  Exact centering, height, stillness and hand
@@ -179,18 +339,23 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             + self.stack_release_reward_w * a2_valid_release
             - self.stack_early_release_penalty * a2_early_release
             - self.stack_hands_on_penalty * hands_still_on)
+        if rehearsal_reward is not None:
+            self.rew_buf[rehearsal_rows] = rehearsal_reward
 
     def _virtual_retreat_carry_obs(self, rows, env_ids):
-        """Give A1 a virtual carried box while leaving physics untouched."""
+        """Place a virtual pickup box at A1's retreat endpoint."""
         roots = self.humanoid_rows(self._humanoid_root_states)[rows]
-        rigid = self.humanoid_rows(self._rigid_body_pos)[rows]
         real_box = self.humanoid_rows(self._box_states)[rows]
         heading_inv = torch_utils.calc_heading_quat_inv(roots[:, 3:7])
 
-        # Pretend the released box is still centered between A1's hands.
-        box_pos = rigid[:, self._key_body_ids[[0, 1]]].mean(dim=1)
+        # The physical box remains at the placement target.  In observation
+        # space, put a stationary duplicate on the floor at the retreat
+        # endpoint so carry asks A1 to approach/pick it up, not to keep holding
+        # the box it just released while walking away.
+        box_pos = self._a1_retreat_pos[env_ids].clone()
+        box_pos[:, 2] = real_box[:, 2]
         box_rot = real_box[:, 3:7]
-        box_vel = roots[:, 7:10]
+        box_vel = torch.zeros_like(roots[:, 7:10])
         box_ang_vel = torch.zeros_like(box_vel)
 
         local_box_vel = quat_rotate(heading_inv, box_vel)
@@ -211,10 +376,9 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             heading_exp.reshape(-1, 4),
             (world_bps - root_exp).reshape(-1, 3)).view(len(rows), -1)
 
-        # Carry the virtual box toward the retreat endpoint, at hand height,
-        # so the old carry token requests transport rather than another drop.
-        carry_goal = self._a1_retreat_pos[env_ids].clone()
-        carry_goal[:, 2] = box_pos[:, 2]
+        # Box and placement goal coincide: this is the native "walk to box"
+        # part of carry, with no request to transport an already-held object.
+        carry_goal = box_pos
         local_goal = quat_rotate(
             heading_inv, carry_goal - roots[:, 0:3])
 
@@ -252,7 +416,24 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         return out
 
     def _post_object_reset(self, env_ids):
-        super()._post_object_reset(env_ids)
+        # Native carry rehearsal must bypass every stack-specific target and
+        # object rewrite.  Both episode types still share the exact 340-D ABI.
+        if self._carry_rehearsal is None:
+            super()._post_object_reset(env_ids)
+        else:
+            env_ids = torch.as_tensor(
+                env_ids, device=self.device, dtype=torch.long)
+            carry_ids = env_ids[self._carry_rehearsal[env_ids]]
+            stack_ids = env_ids[~self._carry_rehearsal[env_ids]]
+            HumanoidMAStackCarry._post_object_reset(self, stack_ids)
+            HumanoidMASteerCarry._post_object_reset(self, carry_ids)
+            if len(carry_ids) > 0:
+                # No normal stack phase compares equal to -1, so coordinator,
+                # virtual retreat box and early curriculum termination remain
+                # inactive for native carry episodes.
+                self._stack_phase[carry_ids] = -1
+                self._stack_phase_age[carry_ids] = 0
+            env_ids = stack_ids
         if not hasattr(self, "_stack_phase") or len(env_ids) == 0:
             return
 
@@ -357,10 +538,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             (torch.norm(boxes[r0, 7:10], dim=-1) < self.stack_vel_tol)
             & (torch.norm(boxes[r0, 10:13], dim=-1)
                < self.stack_ang_vel_tol))
-        bottom_hands_clear = (
-            self._hand_box_clearance(r0) >= self.stack_hand_clear_done)
+        foot_clear = self._foot_box_clearance(r0)
+        feet_safe = foot_clear >= self.stack_foot_box_clearance
         bottom_candidate = ((bottom_err < self.stack_pos_tol) & bottom_slow
-                            & bottom_hands_clear)
+                            & feet_safe)
         self._bottom_stable_count = torch.where(
             bottom_candidate, self._bottom_stable_count + 1,
             torch.zeros_like(self._bottom_stable_count))
@@ -372,9 +553,20 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         self._set_phase(verify, self.VERIFY_BOTTOM)
 
         phase = self._stack_phase
+        bottom_hands_clear = (
+            self._hand_box_clearance(r0) >= self.stack_hand_clear_done)
+        # Give the release reward a bounded training window.  A hard hand gate
+        # trapped episodes forever, while removing it advanced to retreat as
+        # soon as the box settled and provided almost no release experience.
+        # Clear hands can advance immediately after physical stabilization;
+        # otherwise the coordinator waits only up to the grace timeout.
+        release_ready = (bottom_hands_clear
+                         | (self._stack_phase_age
+                            >= self.stack_release_grace_steps))
         placed = torch.nonzero(
             (phase == self.VERIFY_BOTTOM)
-            & (self._bottom_stable_count >= self.stack_stable_steps),
+            & (self._bottom_stable_count >= self.stack_stable_steps)
+            & release_ready,
             as_tuple=False).squeeze(-1)
         if len(placed) > 0:
             # The top target is derived from the settled physical bottom box,
@@ -413,12 +605,9 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             (torch.norm(boxes[r1, 7:10], dim=-1) < self.stack_vel_tol)
             & (torch.norm(boxes[r1, 10:13], dim=-1)
                < self.stack_ang_vel_tol))
-        top_hands_clear = (
-            self._hand_box_clearance(r1) >= self.stack_hand_clear_done)
         top_candidate = (
             (top_xy_err < self.stack_top_xy_tol)
-            & (top_z_err < self.stack_top_z_tol) & top_slow
-            & top_hands_clear & self._ever_held[r1])
+            & (top_z_err < self.stack_top_z_tol) & top_slow)
         self._top_stable_count = torch.where(
             top_candidate, self._top_stable_count + 1,
             torch.zeros_like(self._top_stable_count))
@@ -426,8 +615,7 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         enter_verify = torch.nonzero(
             (phase == self.A2_RESUME)
             & (top_xy_err < self.stack_top_xy_tol)
-            & (top_z_err < self.stack_top_z_tol)
-            & top_hands_clear & self._ever_held[r1],
+            & (top_z_err < self.stack_top_z_tol),
             as_tuple=False).squeeze(-1)
         self._set_phase(enter_verify, self.VERIFY_STACK)
 
