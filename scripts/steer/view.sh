@@ -19,7 +19,8 @@
 # post is the point the reward aims at. STEER_DRAW_TASK=1 restores TokenHSI's
 # own task lines. STEER_ZERO=1 turns steering off for comparison.
 set -e
-ROOT=/home/hwanhee/CVPR2027
+# Resolve the copied checkout instead of silently running the original workspace.
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 VNC_DIR=/home/hwanhee/opt/vnc
 NOVNC_DIR=/home/hwanhee/opt/novnc
 
@@ -27,6 +28,8 @@ PORT=${PORT:-6080}
 # default: the best F2 run (re-aim + cross-track, whole-task path)
 CKPT=${1:-output/steer/f2_3_D/Humanoid_14-14-30-06/nn/Humanoid.pth}
 ENVS=${2:-2}
+VIEW_GPU=${STEER_GPU:-6}
+VIEW_DRI=$(python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$VIEW_GPU")
 
 DISPNUM=$((PORT - 6059))          # 6080 -> :21
 DISP=":$DISPNUM"
@@ -82,11 +85,14 @@ echo " open     http://localhost:$PORT/vnc.html"
 echo " forward  ssh -L $PORT:localhost:$PORT $(hostname)"
 echo " display  $DISP    vnc  $VNC_PORT"
 echo " ckpt     $CKPT"
+echo " GPU      physical $VIEW_GPU (CUDA logical 0, Vulkan $VIEW_DRI)"
 echo " envs     $ENVS    curvature ${STEER_CURVATURE:-0.15}"
 if [ -n "$VIDEO" ]; then echo " video    $VIDEO"; fi
 echo "=============================================================="
 
 DISPLAY=$DISP \
+CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=$VIEW_GPU \
+VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select DRI_PRIME=$VIEW_DRI \
 STEER_ZERO=${STEER_ZERO:-0} \
 STEER_CELL=${STEER_CELL:-60} \
 STEER_PHASEFREE=${STEER_PHASEFREE:-0} \
@@ -95,9 +101,10 @@ STEER_REAIM=1 STEER_AIM=lookahead \
 STEER_LOOKAHEAD=${STEER_LOOKAHEAD:-1.2} \
 STEER_XTRACK=${STEER_XTRACK:-1.0} \
 python ./tokenhsi/run.py --task HumanoidSteerCarry \
-    --cfg_train /home/hwanhee/CVPR2027/runs/gen_cfgs/steer/f2_base.yaml \
+    --cfg_train "$ROOT/runs/gen_cfgs/steer/f2_base.yaml" \
     --cfg_env tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_steer_carry_cp32.yaml \
     --motion_file tokenhsi/data/dataset_carry/dataset_carry.yaml \
     --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth \
     --checkpoint "$CKPT" \
+    --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id 0 \
     --test --num_envs "$ENVS"

@@ -31,17 +31,17 @@
 
 <!-- GPUMAP -->
 
-`08-21 20:48` 기준 · 실행 시작/종료 때 자동 갱신
+`08-22 20:35` 기준 · 실행 시작/종료 때 자동 갱신
 
 | GPU | 메모리 | 프로세스 | 트랙 | 올라가 있는 것 |
 |---|---|---|---|---|
 | gpu0 | 0 M | 0 | steer | `f34_rs60`(starting) |
-| gpu1 | 18935 M | 1 | ? steer | `ms14_vw1L_s0` `f31_vk125`(starting) |
-| gpu2 | 6263 M | 1 | ? | `ms14_vw2L_s0` |
-| gpu3 | 18939 M | 1 | ? | `ms12_base4L_s0` |
-| gpu4 | 18937 M | 1 | ? steer | `ms11_clip_s0` `f34_rp60`(starting) |
-| gpu5 | 37908 M | 2 | ? steer | `ms11_clip_s1` `ms6_m8_long_s0` `f34_rp150`(starting) |
-| gpu6 | 37678 M | 2 | ? | `ms13_sep20L_s0` `ms13_sep9L_s0` |
+| gpu1 | 0 M | 0 | steer | `f31_vk125`(starting) |
+| gpu2 | 0 M | 0 | — | _(빈 카드)_ |
+| gpu3 | 0 M | 0 | — | _(빈 카드)_ |
+| gpu4 | 0 M | 0 | steer | `f34_rp60`(starting) |
+| gpu5 | 0 M | 0 | steer | `f34_rp150`(starting) |
+| gpu6 | 0 M | 0 | — | _(빈 카드)_ |
 | gpu7 | 0 M | 0 | — | _(빈 카드)_ |
 
 | 트랙 | 대기 | 다음 |

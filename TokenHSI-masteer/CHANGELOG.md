@@ -699,3 +699,30 @@ source** 한다. 매핑이 두 곳에 있으면 뷰어에서 확인한 것과 �
 
 `view.sh` 는 env 수를 위치인자 `$2` 로만 받아 `ENVS=1 view.sh tag 3` 이 조용히
 3 으로 떴다. `record.sh` 와 맞춰 `ENVS` 를 우선하게 했다 (위치인자는 뒤로 남김).
+
+## 2026-09-04
+
+### ms25 virtual-retreat adapter-only — 픽업 보존 실패로 기각
+
+`ms25_virtualretreat_adapteronly_r50_s0_e1024`는 ms18 epoch 9000에서 시작해
+기존 `internal_adapt_mlp`만 학습하고 actor 경로와 RMS를 동결했다.
+CARRY/stack-release를 50:50으로 섞고 CLEAR에는 가상 박스 관측·signed retreat·loco AMP를 사용했다.
+
+2 iteration smoke에서 adapter에만 gradient가 생기는 것은 확인했다.
+GPU 7에서 1024 env × 2 agents로 본 학습을 시작했고 epoch 9100·9200 PTH를 저장했다.
+
+epoch 9100 PTH를 viewer로 확인했을 때 기존 carry의 픽업 동작이 이미 깨지는 정성적 실패가 보였다.
+이는 rehearsal과 actor 경로 동결만으로는 adapter가 만드는 최종 action 변화에서 픽업을 보존하지 못한다는 증거다.
+사용자 판단으로 학습과 viewer를 중단했으며 별도 정량 평가는 수행하지 않았다.
+
+**판정: 실패.** 이 adapter-only + reward 중심 설정은 현재 형태로 이어서 학습하거나 후속 기준선으로 사용하지 않는다.
+완료 실험으로 해석하지 않고, 픽업 보존 장치가 없는 동일 설정의 재실행도 하지 않는다.
+
+### CLEAR AMP를 carry로 복원
+
+`origin/juan`의 구현과 대조해 CLEAR 이후 base agent의 두 carry token을 손 중심의
+가상 박스로 바꾸는 방식은 그대로 유지했다. 가상 박스는 실제 박스 회전과 BPS를 쓰고,
+목표는 retreat endpoint이며 CLEAR부터 SUCCESS까지 실제 박스를 다시 노출하지 않는다.
+
+CLEAR에서 AMP task mask를 `traj`로 바꾸던 override와 실행 설정을 제거했다.
+이제 부모 carry task의 AMP가 그대로 유지된다. reward 식과 계수는 변경하지 않았다.

@@ -16,13 +16,15 @@
 # 별도로 띄운다 (쓰는 중인 파일을 열면 반쯤 쓰인 상태를 읽는다). 학습에는 영향 없다.
 # 태그 대신 .pth 경로를 직접 줘도 된다.
 set -e
-ROOT=/home/hwanhee/CVPR2027
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 VNC_DIR=/home/hwanhee/opt/vnc
 NOVNC_DIR=/home/hwanhee/opt/novnc
 
 PORT=${PORT:-6090}
 TAG=${1:?사용법: view.sh <tag 또는 ckpt경로> [env수]}
 ENVS=${2:-3}
+VIEW_GPU=${MA_GPU:-6}
+VIEW_DRI=$(python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$VIEW_GPU")
 
 DISPNUM=$((PORT - 6059))
 DISP=":$DISPNUM"
@@ -85,17 +87,20 @@ echo "=============================================================="
 echo " 열기     http://localhost:$PORT/vnc.html"
 echo " 포워딩   ssh -L $PORT:localhost:$PORT $(hostname)"
 echo " 태그     $NAME   iter≈$ITER   (${AGE}초 전 저장본)"
+echo " GPU      physical $VIEW_GPU (CUDA logical 0, Vulkan $VIEW_DRI)"
 echo " env      $ENVS x 2명   MA_SEP=${MA_SEP:-0}   MA_TOKEN=${MA_TOKEN:-live}"
 [ -n "${VIDEO:-}" ] && echo " 영상     $VIDEO"
 echo "=============================================================="
 
 DISPLAY=$DISP \
 MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1} MA_TOKEN=${MA_TOKEN:-live} MA_SEP=${MA_SEP:-0} \
-CUDA_VISIBLE_DEVICES=${MA_GPU:-4} \
+CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=$VIEW_GPU \
+VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select DRI_PRIME=$VIEW_DRI \
 python ./tokenhsi/run.py --task HumanoidMACarry \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth \
     --checkpoint "$SNAP" \
+    --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id 0 \
     --test --eval_task carry

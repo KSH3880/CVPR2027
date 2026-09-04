@@ -1,0 +1,221 @@
+#!/bin/bash
+# Re-train pickup stage A with variable-speed steering commands.
+# Usage: pickup_a_m4_clip1_train.sh <new|old|minimal> <6|7|6,7> [iterations] [total_envs]
+# new/old preserve the historical MRAND4 comparison. minimal keeps A=2 and the
+# 340-D checkpoint shape but masks teammate/new-carry, uses MRAND=0, and saves
+# a disabled zero-init residual head for the frozen-A stop stage.
+# PICKUP_WAIT_FOR_SLOT=1 (default) then prevents exceeding the two-job cap.
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+CARRY=${1:?usage: pickup_a_m4_clip1_train.sh <new|old|minimal> <6|7|6,7> [iterations] [total_envs]}
+GPU=${2:?usage: pickup_a_m4_clip1_train.sh <new|old|minimal> <6|7|6,7> [iterations] [total_envs]}
+TARGET=${3:-15000}
+ENVS=${4:-2048}
+
+case "$CARRY" in
+    new) OLD_ONLY=0; TOKEN=live; TEAM_MASK=0; MRAND=4; RES_ARCH=0 ;;
+    old) OLD_ONLY=1; TOKEN=live; TEAM_MASK=0; MRAND=4; RES_ARCH=0 ;;
+    minimal) OLD_ONLY=1; TOKEN=zero; TEAM_MASK=1; MRAND=0; RES_ARCH=1 ;;
+    *) echo "carry must be new, old, or minimal" >&2; exit 2 ;;
+esac
+case "$GPU" in
+    6|7) NPROC=1; GPUS=("$GPU") ;;
+    6,7) NPROC=2; GPUS=(6 7) ;;
+    *) echo "GPU must be 6, 7, or 6,7" >&2; exit 2 ;;
+esac
+case "$TARGET" in
+    ''|*[!0-9]*) echo "iterations must be a positive integer" >&2; exit 2 ;;
+esac
+case "$ENVS" in
+    ''|*[!0-9]*) echo "envs must be a positive integer" >&2; exit 2 ;;
+esac
+if [ "$TARGET" -le 0 ] || [ "$ENVS" -le 0 ]; then
+    echo "iterations and envs must be positive" >&2
+    exit 2
+fi
+if [ $((ENVS % NPROC)) -ne 0 ]; then
+    echo "total envs must be divisible by GPU count" >&2
+    exit 2
+fi
+PER_GPU=$((ENVS / NPROC))
+
+SHORT=$((TARGET / 1000))k
+if [ "$CARRY" = minimal ]; then
+    TAG=pickupa_minimal_clip1_oldcarry_${SHORT}_s0
+else
+    TAG=pickupa_m4_clip1_${CARRY}carry_live_${SHORT}_s0
+fi
+TAG=${PICKUP_TAG:-$TAG}
+OUT=$ROOT/runs/output/masteer_pickup/$TAG
+CFG=$ROOT/runs/gen_cfgs/masteer_pickup/$TAG.yaml
+TRAIN_CFG=$ROOT/runs/gen_cfgs/masteer_pickup/${TAG}_train.yaml
+ENV_FILE=$ROOT/runs/logs/masteer_pickup/$TAG.env
+LOG=$ROOT/runs/logs/masteer_pickup/$TAG.log
+METRICS=$ROOT/runs/results/masteer_pickup/train_$TAG.npy
+CLAIM=$ROOT/runs/logs/masteer_pickup/.${TAG}.launching
+BASE=$ROOT/TokenHSI-masteer/output/tokenhsi/ckpt_stage1.pth
+ENV_SRC=$ROOT/TokenHSI-masteer/tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml
+TRAIN_SRC=$ROOT/TokenHSI-masteer/tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml
+
+mkdir -p "$(dirname "$OUT")" "$(dirname "$CFG")" "$(dirname "$LOG")" "$(dirname "$METRICS")"
+if ! mkdir "$CLAIM" 2>/dev/null; then
+    echo "another launcher already owns tag: $TAG" >&2
+    exit 3
+fi
+cleanup_claim() { rmdir "$CLAIM" 2>/dev/null || true; }
+trap cleanup_claim EXIT
+on_signal() { cleanup_claim; exit 143; }
+trap on_signal INT TERM
+
+if [ -e "$OUT" ] || [ -e "$LOG" ] || [ -e "$ENV_FILE" ]; then
+    echo "refusing to reuse existing tag: $TAG" >&2
+    exit 3
+fi
+if [ ! -f "$BASE" ]; then
+    echo "missing stage-1 checkpoint: $BASE" >&2
+    exit 4
+fi
+
+WAIT_PID=${PICKUP_WAIT_PID:-}
+if [ -n "$WAIT_PID" ]; then
+    case "$WAIT_PID" in
+        *[!0-9]*) echo "PICKUP_WAIT_PID must be a numeric PID" >&2; exit 2 ;;
+    esac
+    while kill -0 "$WAIT_PID" 2>/dev/null; do
+        echo "[$(date '+%F %T %Z')] waiting-for-pid: pid=$WAIT_PID gpu=$GPU tag=$TAG"
+        sleep 60
+    done
+    echo "[$(date '+%F %T %Z')] wait pid finished: pid=$WAIT_PID"
+fi
+
+# A process using both GPUs counts once on each GPU. The memory check mirrors
+# plan/PLAN.md's 26 GiB launch floor.
+if [ "${PICKUP_WAIT_FOR_SLOT:-1}" = "1" ]; then
+    while true; do
+        READY=1
+        for GPU_ID in "${GPUS[@]}"; do
+            JOBS=$(nvidia-smi -i "$GPU_ID" --query-compute-apps=pid --format=csv,noheader,nounits 2>/dev/null |
+                awk 'NF && $1 ~ /^[0-9]+$/ {seen[$1]=1} END {for (pid in seen) n++; print n+0}')
+            FREE=$(nvidia-smi -i "$GPU_ID" --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null |
+                awk 'NR==1 {print int($1)}')
+            JOBS=${JOBS:-999}
+            FREE=${FREE:-0}
+            if [ "$JOBS" -ge "${PICKUP_MAX_GPU_JOBS:-2}" ] || [ "$FREE" -lt "${PICKUP_MIN_FREE_MIB:-26000}" ]; then
+                READY=0
+                echo "[$(date '+%F %T %Z')] waiting: gpu=$GPU_ID jobs=$JOBS free=${FREE}MiB"
+            fi
+        done
+        if [ "$READY" -eq 1 ]; then
+            break
+        fi
+        sleep 60
+    done
+fi
+
+echo "[$(date '+%F %T %Z')] launch tag=$TAG gpu=$GPU carry=$CARRY total_envs=$ENVS per_gpu=$PER_GPU iterations=$TARGET"
+
+python3 - "$ENV_SRC" "$CFG" "$PER_GPU" <<'PY'
+import pathlib
+import re
+import sys
+
+src, dst, envs = sys.argv[1:]
+s = pathlib.Path(src).read_text()
+s = re.sub(r"^  numAgents:.*$", "  numAgents: 2", s, flags=re.M)
+s = re.sub(r"^  numEnvs:.*$", f"  numEnvs: {envs}", s, flags=re.M)
+s = re.sub(r"^  envSpacing:.*$", "  envSpacing: 5", s, flags=re.M)
+s = re.sub(
+    r"^(\s*)default_buffer_size_multiplier:",
+    r"\1max_gpu_contact_pairs: 4194304\n\1default_buffer_size_multiplier:",
+    s,
+    count=1,
+    flags=re.M,
+)
+pathlib.Path(dst).write_text(s)
+PY
+
+python3 - "$TRAIN_SRC" "$TRAIN_CFG" <<'PY'
+import pathlib
+import re
+import sys
+
+src, dst = sys.argv[1:]
+s = pathlib.Path(src).read_text()
+s = re.sub(r"^(\s*)save_frequency:.*$", r"\1save_frequency: 3000", s, flags=re.M)
+s = re.sub(r"^(\s*)save_intermediate:.*$", r"\1save_intermediate: True", s, flags=re.M)
+pathlib.Path(dst).write_text(s)
+PY
+
+# Free + SEP=9 keeps the pickup workspaces independent while the teammate
+# token is live for new/old and attention-masked for minimal.
+unset MA_LAYOUT MA_LAYOUT_L MA_LAYOUT_D MA_LAYOUT_S MS_DT MS_DECEL MS_PLACEBO MS_RECOV
+export MA_OLD_CARRY_ONLY=$OLD_ONLY
+export MA_TOKEN=$TOKEN MA_TOKENIZER_ZERO=1 MA_TEAMMATE_MASK=$TEAM_MASK MA_SEP=9 MA_SPAWN_GAP=1.0
+export MSTOP_RESIDUAL_ARCH=$RES_ARCH MSTOP_RESIDUAL=0 MSTOP_FROZEN_A=0
+export MA_C=0 MA_BETA=0
+export MS_SCEN=free MS_MRAND=$MRAND MS_ZERO=0 MS_POS_C=2 MS_VEL_W=1 MS_VEL_K=5
+export MS_CLIP=1 MS_ENDCLAMP=0 MS_SEED=0
+export MS_PICK_HAND=0.35 MS_PICK_LIFT=0.10 MS_PICK_FRAMES=10
+export MS_GRASP_W=${MS_GRASP_W:-0}
+export MS_GRASP_DROP_C=${MS_GRASP_DROP_C:-0}
+export MS_GRASP_SURFACE=${MS_GRASP_SURFACE:-0.12}
+export MA_METRICS=$METRICS MS_METRICS=$METRICS
+
+{
+    printf '# anti-kicking: hardcoded low-box height gate in HumanoidMASteerCarry\n'
+    printf 'export MA_OLD_CARRY_ONLY=%q\n' "$MA_OLD_CARRY_ONLY"
+    printf 'export MA_TOKEN=%q\n' "$MA_TOKEN"
+    printf 'export MA_TEAMMATE_MASK=%q\n' "$MA_TEAMMATE_MASK"
+    printf 'export MSTOP_RESIDUAL_ARCH=%q\n' "$MSTOP_RESIDUAL_ARCH"
+    printf 'export MSTOP_RESIDUAL=%q\n' "$MSTOP_RESIDUAL"
+    printf 'export MSTOP_FROZEN_A=%q\n' "$MSTOP_FROZEN_A"
+    printf 'export MA_TOKENIZER_ZERO=%q\n' "$MA_TOKENIZER_ZERO"
+    printf 'export MA_SEP=%q\n' "$MA_SEP"
+    printf 'export MA_SPAWN_GAP=%q\n' "$MA_SPAWN_GAP"
+    printf 'export MA_C=%q\n' "$MA_C"
+    printf 'export MA_BETA=%q\n' "$MA_BETA"
+    printf 'export MS_SCEN=%q\n' "$MS_SCEN"
+    printf 'export MS_MRAND=%q\n' "$MS_MRAND"
+    printf 'export MS_ZERO=%q\n' "$MS_ZERO"
+    printf 'export MS_POS_C=%q\n' "$MS_POS_C"
+    printf 'export MS_VEL_W=%q\n' "$MS_VEL_W"
+    printf 'export MS_VEL_K=%q\n' "$MS_VEL_K"
+    printf 'export MS_CLIP=%q\n' "$MS_CLIP"
+    printf 'export MS_ENDCLAMP=%q\n' "$MS_ENDCLAMP"
+    printf 'export MS_SEED=%q\n' "$MS_SEED"
+    printf 'export MS_PICK_HAND=%q\n' "$MS_PICK_HAND"
+    printf 'export MS_PICK_LIFT=%q\n' "$MS_PICK_LIFT"
+    printf 'export MS_PICK_FRAMES=%q\n' "$MS_PICK_FRAMES"
+    printf 'export MS_GRASP_W=%q\n' "$MS_GRASP_W"
+    printf 'export MS_GRASP_DROP_C=%q\n' "$MS_GRASP_DROP_C"
+    printf 'export MS_GRASP_SURFACE=%q\n' "$MS_GRASP_SURFACE"
+    printf 'export PICKUP_ENVS=%q\n' "$ENVS"
+    printf 'export PICKUP_ENVS_PER_GPU=%q\n' "$PER_GPU"
+    printf 'export PICKUP_NPROC=%q\n' "$NPROC"
+    printf 'export PICKUP_ITERATIONS=%q\n' "$TARGET"
+    printf 'export PICKUP_GPU=%q\n' "$GPU"
+    printf 'export PICKUP_WAIT_PID=%q\n' "$WAIT_PID"
+} > "$ENV_FILE"
+
+cd "$ROOT/TokenHSI-masteer"
+source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
+conda activate "${MA_CONDA_ENV:-tokenhsi_koo}"
+export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=$GPU PYTHONDONTWRITEBYTECODE=1
+if [ "$NPROC" -eq 2 ]; then
+    export PYTHONPATH="$ROOT/ddp_shim:${PYTHONPATH:-}"
+    RUN=(torchrun --standalone --nproc_per_node=2 ./tokenhsi/run.py)
+    MULTI=(--horovod)
+else
+    RUN=(python -u ./tokenhsi/run.py)
+    MULTI=()
+fi
+
+"${RUN[@]}" \
+    --task HumanoidMASteerCarry \
+    --cfg_train "$TRAIN_CFG" \
+    --cfg_env "$CFG" \
+    --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+    --num_envs "$PER_GPU" --headless --seed 0 \
+    --hrl_checkpoint "$BASE" \
+    --max_iterations "$TARGET" --output_path "$OUT" "${MULTI[@]}" 2>&1 | tee "$LOG"

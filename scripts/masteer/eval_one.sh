@@ -3,18 +3,22 @@
 # and requires both the frozen stage-1 checkpoint and the trained adapt policy.
 set -u
 
-ROOT=/home/hwanhee/CVPR2027
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 TAG=${1:?usage: eval_one.sh <tag> <gpu> [envs]}
 GPU=${2:?usage: eval_one.sh <tag> <gpu> [envs]}
 ENVS=${3:-512}
+# 중간 체크포인트 평가는 결과 tag와 원 학습 tag가 다르다.
+# QUEUE_EVAL_SOURCE가 학습 env/cfg를, QUEUE_EVAL_CKPT가 정확한 가중치를 지정한다.
+SOURCE=${QUEUE_EVAL_SOURCE:-$TAG}
 # MS_EVAL_SUFFIX 는 호출자가 준다. 잠금·로그·지표를 여기서 갈라야 정상 평가와
 # 대조군 평가가 서로 막지 않는다. 체크포인트와 cfg 는 원래 TAG 를 그대로 쓴다.
 SUF=${MS_EVAL_SUFFIX:-}
 if [ -n "$SUF" ]; then TAG_OUT="${TAG}__${SUF}"; else TAG_OUT="$TAG"; fi
 CLAIM=$ROOT/runs/queue/gpu_locks/eval_$TAG_OUT
 LOG=$ROOT/runs/queue/logs/eval_$TAG_OUT.log
-ENV_FILE=$ROOT/runs/queue/logs/$TAG.env
+ENV_FILE=$ROOT/runs/queue/logs/$SOURCE.env
 
+mkdir -p "$ROOT/runs/queue/gpu_locks" "$ROOT/runs/queue/logs"
 if ! mkdir "$CLAIM" 2>/dev/null; then
     echo "masteer eval: $TAG_OUT is already claimed" >&2
     exit 3
@@ -27,6 +31,14 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 4
 fi
 source "$ENV_FILE"
+
+# 예전 sidecar는 미지정 값도 export NAME=''로 기록했다. 숫자 설정에서
+# int('')/float('')가 되지 않도록 replay 시에는 원래 의미인 unset으로 복원한다.
+while IFS= read -r name; do
+    if [ -z "${!name}" ]; then
+        unset "$name"
+    fi
+done < <(sed -n 's/^export \([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$ENV_FILE")
 
 # 같은 정책을 다른 시나리오 설정으로 재평가하는 통로.
 #
@@ -46,7 +58,9 @@ if [ -n "${MS_EVAL_OVERRIDE:-}" ]; then
     echo "masteer eval: override $MS_EVAL_OVERRIDE"
 fi
 
-CK=$(python3 - "$ROOT/TokenHSI-masteer/output/masteer/$TAG" <<'PY'
+CK=${QUEUE_EVAL_CKPT:-}
+if [ -z "$CK" ]; then
+CK=$(python3 - "$ROOT/TokenHSI-masteer/output/masteer/$SOURCE" <<'PY'
 import sys
 from pathlib import Path
 
@@ -55,9 +69,14 @@ if paths:
     print(max(paths, key=lambda path: path.stat().st_mtime))
 PY
 )
-TRAIN_ENV=$ROOT/runs/gen_cfgs/masteer/$TAG.yaml
+fi
+if [ -n "$CK" ] && [ ! -f "$CK" ]; then
+    echo "masteer eval: checkpoint 없음: $CK" >&2
+    exit 4
+fi
+TRAIN_ENV=$ROOT/runs/gen_cfgs/masteer/$SOURCE.yaml
 if [ -z "$CK" ] || [ ! -f "$TRAIN_ENV" ]; then
-    echo "masteer eval: missing checkpoint or generated env config for $TAG" >&2
+    echo "masteer eval: missing checkpoint or generated env config for $SOURCE" >&2
     exit 4
 fi
 
@@ -71,8 +90,8 @@ open(sys.argv[2], "w").write(text)
 PY
 
 TRAIN_CFG=${MS_TRAINCFG:-tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml}
-if [ -f "$ROOT/runs/gen_cfgs/masteer/${TAG}_train.yaml" ]; then
-    TRAIN_CFG=$ROOT/runs/gen_cfgs/masteer/${TAG}_train.yaml
+if [ -f "$ROOT/runs/gen_cfgs/masteer/${SOURCE}_train.yaml" ]; then
+    TRAIN_CFG=$ROOT/runs/gen_cfgs/masteer/${SOURCE}_train.yaml
 fi
 BASE_CKPT=${MS_CKPT:-output/tokenhsi/ckpt_stage1.pth}
 METRICS=$ROOT/runs/results/masteer/eval_$TAG_OUT.npy
@@ -80,8 +99,22 @@ mkdir -p "$(dirname "$METRICS")"
 rm -f "$METRICS"
 
 cd "$ROOT/TokenHSI-masteer"
-source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
-conda activate tokenhsi
+if [ -z "${CONDA_BASE:-}" ]; then
+    if [ -n "${CONDA_EXE:-}" ]; then
+        CONDA_BASE=$("$CONDA_EXE" info --base)
+    elif command -v conda >/dev/null 2>&1; then
+        CONDA_BASE=$(conda info --base)
+    elif [ -f /home/cvlab/anaconda3/etc/profile.d/conda.sh ]; then
+        CONDA_BASE=/home/cvlab/anaconda3
+    else
+        echo "masteer eval: conda를 찾지 못함" >&2
+        exit 1
+    fi
+fi
+set +u
+. "$CONDA_BASE/etc/profile.d/conda.sh"
+conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi}"
+set -u
 export CUDA_VISIBLE_DEVICES=$GPU
 # **env 코드가 읽는 이름은 MA_METRICS 다.** MS_METRICS 만 내보내면 지표가 안 쓰인다.
 export MS_METRICS=$METRICS
@@ -138,6 +171,23 @@ if m.shape[1] >= 31:                       # 경로 추종 -- free 기준선의 
     # 그 값으로 "정책이 참조 모션보다 느리다" 고 잘못 판단했다. 이동 스텝만으로 다시 잰다.
     _mv = np.maximum(m[:, 30] - m[:, 4], 1)
     head += f" gait={_med(m[:, 5] / (_mv / 30.0)):.3f}"
+
+# 열 40~49: 집기/운반 생애주기. grasp는 손-박스 거리 proxy이고 carry/place는
+# 그 proxy 상태에서 박스를 0.5 m 이상 실제로 옮긴 뒤 목표에 닿았는지로 판정한다.
+if m.shape[1] >= 50:
+    _steps = np.maximum(m[:, 30], 1)
+    head += (
+        f" graspEp={(m[:, 44] >= 0).mean():.4f}"
+        f" graspStep={np.median(m[:, 40] / _steps):.3f}"
+        f" gateStep={np.median(m[:, 41] / _steps):.3f}"
+        f" heldMove={np.median(m[:, 42]):.2f}"
+        f" liftDz={np.median(m[:, 43]):.2f}"
+        f" delivered={m[:, 45].mean():.4f}"
+        f" putdown={m[:, 46].mean():.4f}"
+        f" carry={m[:, 47].mean():.4f}"
+        f" place={m[:, 48].mean():.4f}"
+        f" shortcut={m[:, 49].mean():.4f}"
+    )
 
 # **쌍 단위 성공률.** fin 은 에이전트별이라 "한 명만 배달" 을 성공으로 센다.
 # 실제 목표는 한 env 의 두 명이 **모두** 배달하는 것이고, 교차 시나리오에서

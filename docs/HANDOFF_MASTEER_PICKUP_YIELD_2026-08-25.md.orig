@@ -1,0 +1,1781 @@
+# MASteer pickup → steering → 교차 양보 인수인계
+
+작성일: 2026-08-25  
+최종 갱신: 2026-08-31 22:10 KST  
+작업 루트: `/home/hwanhee/koo_cvpr`
+
+## 2026-08-31 22:10 KST — Stage1 고정 joint carry/steering/STOP 구현
+
+기존 A actor 전체를 고정한 STOP-head 실험과 별도로, Stage1 core에서 새 carry,
+steering, STOP tokenizer와 adapter/head를 함께 학습하는 opt-in 모드를 구현했다.
+`self_encoder`, 기존 task tokenizer, Transformer, 기존 composer와 Stage1 checkpoint는
+고정한다. 새 steering tokenizer, 새 carry tokenizer, 공용 internal adapter, STOP 전용
+tokenizer/composer/adapter만 학습한다. A 6000 checkpoint와 optimizer를 resume하지 않고
+`TokenHSI/output/tokenhsi/ckpt_stage1.pth`에서 새 optimizer로 시작한다.
+
+학습 에피소드의 기대 혼합은 A/free no-stop 30%, B-layout no-stop 30%, B-layout STOP 40%다.
+구현값은 `MSTOP_MIX=0.3,0.7,0,0`, `MSTOP_STOP_PROB=0.5714286`이며 B로 뽑힌 환경 중
+약 4/7만 STOP을 활성화한다. 이 실험은 우선 모든 환경을 carryWith 상태에서 시작해
+운반·조향·정지·재출발을 비교하며 floor pickup 혼합은 포함하지 않는다. 기존 실행은
+`MSTOP_STOP_PROB=1` 기본값이라 바뀌지 않는다.
+
+GPU 6의 16-env, 1-iteration smoke `mastop_joint_stophead_smoke_20260831_2200`은 정상
+종료하고 checkpoint를 저장했다. Stage1 self/Transformer/composer와 old-carry는
+`requires_grad=0`; 새 steering/carry tokenizer와 공용 adapter는 nonzero gradient를
+확인했다. 짧은 rollout은 정지 지점 전에 끝나 STOP tokenizer/head gradient는 0이었으며,
+STOP branch 자체의 brake/hold/resume gradient와 파라미터 변화는 바로 앞 frozen-A
+5-iteration smoke에서 이미 확인했다. joint 본 학습은 아직 시작하지 않았다.
+
+전용 런처:
+
+```bash
+bash TokenHSI-mastop/tokenhsi/scripts/tokenhsi/stage2_ma_joint_stop_head_train.sh
+```
+
+## 2026-08-31 21:44 KST — residual 대체 STOP tokenizer/head 구현·GPU 6 시작
+
+기존 shallow `stop_residual` 실험은 멈춤 자체는 성공했지만 strict eval에서
+`contactTerminal=0.2632`, `terminal=0.5263`, `retained=0`,
+`postStopDropEp=0.5368`로 정지 후 재출발·종료 파지가 약했다. 기존 residual 경로는
+보존하고 새 opt-in `MSTOP_POLICY_MODE=stop_head`를 구현했다.
+
+새 정책은 frozen A branch와 trainable STOP branch를 분리한다. A는 STOP command token을
+항상 mask한 기존 Transformer/composer/adapter이고, STOP은 기존 21-D teammate block의
+앞 6-D `[gate, scale, brake, hold, resume, held]`를 전용 tokenizer로 읽는다. STOP branch의
+composer와 internal adapter는 warm-start 직후 A에서 복제해 학습한다. 최종 action은
+`A + gate * (STOP - A)`이고 gate 0은 clamp도 건너뛰어 A action을 그대로 반환한다.
+
+brake/hold/resume 전체에는 양손 contact 보상 `0.5`와 strict grasp 이탈 penalty `1.0`을
+추가했다. 기존 strict geometry/slip/lateral/yaw 가중치는 각각 `0.5/0.5/1.0/0.25`,
+phase reward는 켠다. 모든 새 reward와 policy flag는 기본 0 또는 residual 기본 모드라
+기존 A/B 실행 계약은 변하지 않는다.
+
+GPU 6의 16-env smoke는 1/5 iteration 모두 완주했다. 5 iteration 후 frozen A
+composer/Transformer는 checkpoint 대비 max diff 0이고, STOP tokenizer/head/adapter만
+약 `4.7e-4~5.8e-4` 변했다. 진단에서 GO의 applied action은 0이고 brake/hold/resume가
+실제 수집됐다.
+
+본 학습은 21:43 KST에 다음 조건으로 시작했다.
+
+- tag: `mastop_b_stophead_from_a6k_s0_r1`
+- GPU: physical 6, single GPU
+- start: A `Humanoid_00006000.pth`
+- env/iterations: 2048 / additional 3000 (`epoch 6000 -> 9000`)
+- service: `mastop-b-stophead-a6k-s0-r1.service`
+- log: `runs/logs/mastop_carry/mastop_b_stophead_from_a6k_s0_r1.log`
+- sidecar: `runs/logs/mastop_carry/mastop_b_stophead_from_a6k_s0_r1.env`
+
+최초 `mastop_b_stophead_from_a6k_s0`은 systemd 환경의 `LD_LIBRARY_PATH` 미정의로
+conda activate 단계에서 학습 전에 종료됐다. 해당 실패 로그/sidecar는 지우지 않았고,
+`LD_LIBRARY_PATH=`를 명시한 `_r1`이 실제 실행이다.
+
+## 2026-08-31 20:01 KST — pickup 실패 원인 확정: top-camera stale root state
+
+최종 follow-camera 대조에서 A runner와 B-repo parent가 첫 32 actor call의
+raw/normalized/self/task-head/base action까지 bit-exact했다. 이로써 B PTH,
+stop wrapper, residual/frozen sidecar, B env YAML과 repository 차이는 원인에서 제외됐다.
+
+원인은 viewer의 `MS_CAM=top` 경로였다. follow camera는 매 physics substep의 render에서
+`refresh_actor_root_state_tensor()`를 호출하지만 top camera는 즉시 반환했다.
+반면 이어지는 `_draw_task() -> _update_marker()`는 marker뿐 아니라 box/object/platform의
+physical actor ID까지 indexed root-state setter에 넣는다. top에서는 두 번째 substep 직전에
+첫 substep 이전의 stale box state가 다시 쓰여, 두 tick 중 한 tick의 낙하가 취소됐다.
+
+두 viewer 모두 sim time은 call당 `2 x 1/60 s`로 같았지만, box observation은 A
+`-0.326932 m/s`, B top `-0.163480 m/s`였다. `MS_CAM=follow`에서는 전체 trace가 같아졌다.
+
+수정은 masteer/mastop 양쪽 `HumanoidMASteerCarry._update_camera()`의 top 분기에
+`refresh_actor_root_state_tensor()` 한 줄을 추가했다. follow/headless/학습 경로는 그대로고,
+top GUI만 올바른 두 substep 상태를 유지한다. Python 구문 검증은 통과했다.
+
+20:10 기존 B wrapper + top-camera + floor-pickup formal eval을 다시 실행했고
+3회 반복의 2 agent, 총 6 trial이 모두 성공했다. `success=6/6`,
+`terminate=0/6`이므로 pickup/carry 회귀와 top-camera 수정이 최종 확인됐다.
+메트릭은 `runs/metrics/mastop_view_mastop_b_holdq_from_a6k_s0_p2_6109/carry/metrics_2026-08-31_20-10-17.json`에 저장됐다.
+
+## 2026-08-31 17:47 KST — exact B PTH의 A runner 대 B wrapper 실패 분리
+
+동일한 exact B HOLD-Q checkpoint를 floor pickup·A/free 직선·formal carry eval에서
+비교했다. 'ObjectSet_test_0/1/2'는 물체 세트가 아니라 같은 평가의 3회 반복이며,
+한 env의 두 agent를 합쳐 총 6 trial이다.
+
+| 실행 경로 | 결과 | terminate |
+|---|---:|---:|
+| 'HumanoidMASteerCarry' A runner, 'MS_EVAL=1' | 5/6 성공 | 0/6 |
+| 'HumanoidMAStopCarry' wrapper, scenario A, 'MSTOP_VIEW_EVAL=1' | 0/6 성공 | 6/6 |
+
+A runner에서는 free로 생성된 매우 긴 직선도 pickup·carry가 유지됐다. 따라서 B PTH의
+frozen base pickup/carry actor, formal eval 자체, 단순 경로 길이는 현재 실패의 충분조건이
+아니다. B의 12 m geometry 결론도 “길이 자체”로 해석하지 않는다. 실패는 같은 PTH가
+'HumanoidMAStopCarry' wrapper/B sidecar 실행 경로에 들어갈 때 재현된다.
+
+scenario A에서는 B 고정 layout과 brake/HOLD/resume activation이 없어야 하지만 wrapper는
+매 frame stop state를 갱신하고 teammate 21-D 앞부분을
+'[gate, scale, brake, hold, resume, held]'로 덮어쓴다. B sidecar는 residual 실행 경로도
+활성화한다. 의도상 scenario A의 'gate=0', 'scale=1'이므로 실제 원인을 확정하려면 actor
+입력과 'base/delta/final'을 직접 비교해야 한다.
+
+### opt-in actor parity trace
+
+기본 동작은 바꾸지 않고 'MSTOP_PARITY_PATH'가 있을 때만 첫
+'MSTOP_PARITY_STEPS' actor call을 JSONL로 저장한다. raw/normalized observation,
+task-head 21-D, policy mu/selected action을 양쪽 player에서 공통 기록하고, B residual
+network는 base action, delta, gate, final action을 추가 기록한다.
+
+18:18 첫 trace 비교는 A viewer가 `--seed`를 넘기지 않아 train config의 `seed=-1`에서
+임의 seed를 뽑고, B viewer는 `--seed 0`을 쓴 상태였다. 그 결과 step 0부터
+self observation max diff `5.6757`, base action diff `0.9652`가 나와 원인 비교로 무효다.
+B gate는 첫 32 call에서 계속 0이었고, 첫 16 call의 final-base도 0이라 residual이 초기
+실패를 만들었다는 증거는 없었다. A viewer에 기본 동작을 보존하는 opt-in
+`MA_VIEW_SEED`를 추가했다. 기존 B trace는 seed 0이므로 보존하고, A trace만
+`MA_VIEW_SEED=0`으로 다시 생성한다.
+
+18:35 seed 0으로 다시 생성한 A trace와 B trace를 비교했다. step 0에서
+self observation과 base action은 완전히 같았고, 첫 차이는 wrapper가 덮어쓴
+teammate command slot 1개(`max diff=1`)였다. B gate는 32 call 전부 0이어서
+stop residual은 적용되지 않았다.
+
+다만 step 1부터 carry observation이 갈라졌다. 해당 필드는 carry 42-D의
+local index 2, 즉 **상자의 local z 속도**다. A는 `-0.326932 m/s`, B는
+`-0.163480 m/s`이고 이후에도 A는 약 `0.3269`, B는 약 `0.1635`씩
+증가했다. `9.81/60 ≈ 0.1635`이므로 actor call 사이의 물리 시간이
+A에서 B의 2배로 진행된 것처럼 보인다. 실행 YAML은 둘 다
+`controlFrequencyInv: 2`, `substeps: 2`이고 player/base-task step 코드도 동일하다.
+따라서 현재 원인은 path length나 B residual이 아니라, **B trace 재현성 또는
+wrapper runtime의 actor-call/physics-step 대응 차이**로 좁혔다. 기존 B trace를
+새 경로로 한 번 다시 생성해 시간 비율을 재현하는 것이 다음 검증이다.
+
+18:46 B trace를 새 경로로 재생성한 결과 raw/normalized/self/task-head/base가
+32 call 전부 bit-exact였다. 따라서 stale trace나 비결정성 가능성은 제거됐고,
+A/B의 상자 낙하 속도 비율도 재현 가능한 실행 경로 차이다. B gate는 반복에서도
+계속 0이었다. step 16 이후 `final-base` 차이는 gate residual이 아니라 action clamp다.
+
+실제 시간 루프를 분리하기 위해 양쪽 `BaseTask._physics_step()`에 opt-in
+`MSTOP_PHYSICS_PATH`, `MSTOP_PHYSICS_STEPS`를 추가했다. 각 physics call의
+`control_freq_inv`와 `gym.get_sim_time()`을 simulate 전/각 호출 후 JSONL로 남긴다.
+환경변수를 주지 않으면 파일 I/O와 추가 API 호출이 전혀 없다.
+
+A runner trace:
+
+~~~bash
+cd /home/hwanhee/koo_cvpr
+source runs/logs/masteer_pickup/pickupa_minimal_clip1_oldcarry_15k_s0.env
+B_PTH=/home/hwanhee/koo_cvpr/TokenHSI-mastop/output/mastop_carry/mastop_b_holdq_from_a6k_s0_p2/Humanoid_30-19-09-49/nn/Humanoid.pth
+
+MSTOP_PARITY_PATH=/home/hwanhee/koo_cvpr/runs/tmp/mstop_parity/a_runner.jsonl \
+MSTOP_PARITY_STEPS=32 \
+MA_VIEW_SEED=0 \
+MS_TASK=HumanoidMASteerCarry \
+MS_EVAL=1 \
+MS_FLOOR_START=1 \
+MS_SNAP_DIR=/home/hwanhee/koo_cvpr/runs/tmp/masteer_pickup_view \
+MA_GPU=6 PORT=6109 ENVS=1 \
+MS_VIZ=1_follow_straight \
+bash scripts/masteer/view.sh "$B_PTH"
+~~~
+
+위 viewer가 종료된 뒤 B wrapper scenario A trace:
+
+~~~bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_PARITY_PATH=/home/hwanhee/koo_cvpr/runs/tmp/mstop_parity/b_wrapper_a.jsonl \
+MSTOP_PARITY_STEPS=32 \
+MS_FLOOR_START=1 \
+MSTOP_STAGE=A \
+MSTOP_MIX=1,0,0,0 \
+MA_SEP=9 \
+MS_LAT_MAX=0 \
+MS_MRAND=0 \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=1 \
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh \
+  mastop_b_holdq_from_a6k_s0_p2
+~~~
+
+비교:
+
+~~~bash
+python3 scripts/compare_mstop_parity.py \
+  runs/tmp/mstop_parity/a_runner.jsonl \
+  runs/tmp/mstop_parity/b_wrapper_a.jsonl
+~~~
+
+step 0의 self/task observation과 base action부터 보고, B 'gate'와
+'final-base'가 0인지 확인한다. trajectory는 첫 action divergence 뒤 자연히 갈라지므로
+후속 frame 차이를 초기 원인으로 오인하지 않는다.
+
+## 2026-08-31 15:01 KST — B PTH + A layout 재점검 순서 확정
+
+> **17:47 KST 상태 변경:** 사용자가 실제 성공시킨 것은 mastop scenario A가 아니라
+> `HumanoidMASteerCarry` A runner였다. StopCarry scenario A formal eval도 0/6 terminate로
+> 실패했으므로 아래 A-layout/stop-on 순서는 보류하고, 위 actor parity trace를 먼저 수행한다.
+
+아래 14:52 절의 **아직 미실행 — 다음 Codex가 이어서 볼 정확한 두 명령**을 그대로
+사용한다. `MS_FLOOR_START`는 넣지 않고, 다른 viewer를 닫은 뒤 다음 순서로 한 번에 하나씩
+실행한다.
+
+1. `MSTOP_SOLO_AFTER=1000000`: B stop을 끈 A-layout 대조군에서 pickup·운반이 정상인지 확인
+2. 1번이 정상일 때만 `MSTOP_SOLO_AFTER=2.5`: 나머지 조건을 고정하고 brake/hold/resume 확인
+
+1번부터 깨지면 stop residual의 증거가 아니라 `MSTOP_A_LAYOUT`의 reset/path/action parity를
+계측할 문제다. 1번은 정상이고 2번만 깨지면 B brake/HOLD 또는 resume 구간 문제로 판독한다.
+두 명령의 사용자 실행 결과는 아직 보고되지 않았다.
+
+## 2026-08-31 14:52 KST — GUI 교차 실험 실행 명령 원장
+
+다른 Codex는 아래에서 **실행 완료**, **오류**, **해석 보류**, **아직 미실행**을 구분한다.
+모든 GUI는 사용자가 GPU 6·noVNC 6109에서 직접 관찰했다. 한 env 관찰이라 정량 평가가
+아니며, 서로 다른 명령의 결과를 비교할 때 표시한 계약 차이를 보존해야 한다.
+
+공통 대상:
+
+```bash
+A_PTH=/home/hwanhee/koo_cvpr/runs/output/masteer_pickup/pickupa_minimal_clip1_oldcarry_15k_s0/Humanoid_28-16-08-25/nn/Humanoid_00006000.pth
+B_PTH=/home/hwanhee/koo_cvpr/TokenHSI-mastop/output/mastop_carry/mastop_b_holdq_from_a6k_s0_p2/Humanoid_30-19-09-49/nn/Humanoid.pth
+B_TAG=mastop_b_holdq_from_a6k_s0_p2
+```
+
+### 실행 완료 1 — B PTH + B 12 m 배치 + stop 비활성
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_SOLO_AFTER=1000000 \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=1 \
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh \
+  mastop_b_holdq_from_a6k_s0_p2
+```
+
+- B sidecar가 `MSTOP_STAGE=B`, `MSTOP_MIX=0,1,0,0`, `MA_SEP=9`, `MS_MRAND=0`을 복원한다.
+- `MSTOP_SOLO_AFTER=1000000`이라 stop residual은 발동하지 않지만 B의 고정 12 m 직선
+  배치는 그대로다.
+- 사용자 관찰: pickup 실패와 운반 중 drop이 모두 발생했다.
+
+### 실행 완료 2 — B PTH + mastop scenario A/free
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_STAGE=A \
+MSTOP_MIX=1,0,0,0 \
+MA_SEP=9 \
+MS_LAT_MAX=0 \
+MS_MRAND=0 \
+MSTOP_CARRYWITH=0 \
+bash scripts/mastop/view.sh \
+  mastop_b_holdq_from_a6k_s0_p2
+```
+
+- `MSTOP_VIEW_EVAL` 미지정이므로 viewer 기본값 1, 즉 `--eval --eval_task carry`다.
+- 이 명령에는 `MS_FLOOR_START=1`이 없다.
+- 사용자 관찰: pickup과 운반이 잘 됐다.
+
+### 실행 완료 3 — B PTH를 A runner에서 실행
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+source runs/logs/masteer_pickup/pickupa_minimal_clip1_oldcarry_15k_s0.env
+B_PTH=/home/hwanhee/koo_cvpr/TokenHSI-mastop/output/mastop_carry/mastop_b_holdq_from_a6k_s0_p2/Humanoid_30-19-09-49/nn/Humanoid.pth
+
+MS_TASK=HumanoidMASteerCarry \
+MS_EVAL=0 \
+MS_FLOOR_START=1 \
+MS_SNAP_DIR=/home/hwanhee/koo_cvpr/runs/tmp/masteer_pickup_view \
+MA_GPU=6 PORT=6109 ENVS=1 \
+MS_VIZ=1_follow_straight \
+bash scripts/masteer/view.sh "$B_PTH"
+```
+
+- A task class/config/path profile을 사용하고 A sidecar의 `MSTOP_RESIDUAL=0`을 적용한다.
+- 사용자 관찰: pickup과 운반이 잘 됐다.
+- 따라서 B checkpoint의 frozen base carry actor 자체가 망가진 것으로 보이지 않는다.
+
+### 실행 완료 4 — A Minimal 6000 PTH + B 12 m 배치 + stop 비활성
+
+`view_a6k_on_b_scenario`는 실제 학습 tag가 아니라 A PTH와 B config/sidecar를 연결한
+시각화 alias다. alias 생성 후 아래를 실행했다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_SOLO_AFTER=1000000 \
+MSTOP_STAGE=B \
+MSTOP_MIX=0,1,0,0 \
+MA_SEP=9 \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=0 \
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh \
+  view_a6k_on_b_scenario
+```
+
+- 사용자 관찰: A PTH도 B 배치에서는 pickup 실패와 운반 중 drop이 모두 발생했다.
+- B PTH와 A PTH가 같은 B stop-off 배치에서 모두 깨졌으므로 B의 12 m geometry/path가
+  주요 distribution shift라는 증거다.
+
+alias가 없는 상태에서 같은 명령을 먼저 실행했을 때 다음 오류가 났다.
+
+```text
+config 없음: output/mastop_carry/configs/view_a6k_on_b_scenario.yaml 또는
+output/mastop_carry/configs/view_a6k_on_b_scenario_train.yaml
+```
+
+당시 확인 결과 checkpoint/config/train-config/sidecar 네 alias 파일이 전부 없었다.
+이는 GPU나 PTH 오류가 아니라 준비용 링크 미생성 오류다. alias를 다시 만들 때 사용하는
+원본은 다음 세 개와 exact A PTH다.
+
+```text
+TokenHSI-mastop/output/mastop_carry/configs/mastop_b_holdq_from_a6k_s0_p2.yaml
+TokenHSI-mastop/output/mastop_carry/configs/mastop_b_holdq_from_a6k_s0_p2_train.yaml
+runs/logs/mastop_carry/mastop_b_holdq_from_a6k_s0_p2.env
+```
+
+### 해석 보류 — 새 B-stop-on-A-layout 첫 실행
+
+14:39에 추가한 `MSTOP_A_LAYOUT=1` 모드의 첫 사용자 실행은 다음 핵심 값으로 보고됐다.
+
+```bash
+MSTOP_A_LAYOUT=1 \
+MS_FLOOR_START=1 \
+MSTOP_STAGE=B \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=0 \
+...
+```
+
+사용자 관찰은 “pickup부터 다시 깨짐”이었다. 그러나 메시지에 실제 명령의 뒷부분이
+생략됐고 프로세스도 확인 시 이미 종료돼 `/proc` 환경을 복원할 수 없었다. 또한 실행 완료
+2와 비교하면 동시에 다음 축이 달라졌다.
+
+- `MSTOP_VIEW_EVAL`: 기본 1에서 0으로 변경
+- `MS_FLOOR_START`: 미사용에서 1로 변경
+- 보고된 명령에는 `MA_SEP=9`, `MS_LAT_MAX=0`, `MS_MRAND=0`이 보이지 않음
+- scenario ID A에서 B로 변경하면서 새 layout bypass를 사용
+
+따라서 이 첫 실패를 `MSTOP_A_LAYOUT` 코드가 pickup을 망가뜨렸다는 확정 증거로 쓰지 않는다.
+코드상 B stop activation은 `_ep_picked` 뒤 지정 거리 이후이고, 그 전에는
+`active=False`, `gate=0`, `stop_scale=1`이다.
+
+### 아직 미실행 — 다음 Codex가 이어서 볼 정확한 두 명령
+
+먼저 실행 완료 2의 성공 조건에 맞춰 floor override를 빼고, B scenario ID를 유지하되
+A layout을 사용하며 stop만 끈다. 이 명령은 14:52 KST 현재 아직 결과가 없다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_A_LAYOUT=1 \
+MSTOP_STAGE=B \
+MSTOP_MIX=0,1,0,0 \
+MSTOP_SOLO_AFTER=1000000 \
+MA_SEP=9 \
+MS_LAT_MAX=0 \
+MS_MRAND=0 \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=1 \
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh \
+  mastop_b_holdq_from_a6k_s0_p2
+```
+
+위 명령에서 pickup·운반이 정상이면 **다른 값은 그대로 두고** stop 거리만 2.5 m로
+바꾼다. 시각적으로 pickup/운반과 brake 실패를 분리하기 위해 기본 1.5 m보다 늦췄다.
+이 명령도 아직 미실행이다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_A_LAYOUT=1 \
+MSTOP_STAGE=B \
+MSTOP_MIX=0,1,0,0 \
+MSTOP_SOLO_AFTER=2.5 \
+MA_SEP=9 \
+MS_LAT_MAX=0 \
+MS_MRAND=0 \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=1 \
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh \
+  mastop_b_holdq_from_a6k_s0_p2
+```
+
+판독:
+
+1. 첫 명령도 pickup 전부터 깨지면 새 layout bypass에서 실제 reset/path/action parity를
+   계측해야 한다.
+2. 첫 명령은 정상이고 두 번째만 2.5 m 뒤 깨지면 pickup 문제가 아니라 B brake/HOLD
+   residual 문제다.
+3. 두 번째가 HOLD는 버티고 resume에서만 깨지면 resume residual 또는 gate-off handoff
+   문제다.
+
+14:52 KST 점검 때 GPU 6·7에는 각각 `putdown_turn3m_reinforce_s0`,
+`putdown_turn3m_s0` 학습이 약 18.3 GB씩 올라가 있어 Codex는 별도 GPU smoke를 시작하지
+않았다. 실행 중 프로세스는 종료하거나 변경하지 않았다.
+
+
+## 2026-08-31 14:39 KST — PTH와 시나리오 교차 GUI 진단 및 A-layout stop 분리
+
+### 이번 GUI 교차 비교에서 확인한 사실
+
+이번 진단은 pickup·운반 실패가 B fine-tuning으로 A actor가 손상된 것인지, B의 고정
+12 m 배치·경로 자체가 A의 학습 분포 밖인지 분리하기 위해 PTH와 시나리오를 교차했다.
+한 env 시각 관찰이므로 정량 성공률 주장은 아니지만 실패 위치를 분해하는 용도다.
+
+| PTH | 실행 태스크/배치 | stop | 화면 관찰 | 현재 해석 |
+|---|---|---:|---|---|
+| B HOLD-Q | A/free, A runner 또는 mastop scenario A | 없음 | pickup·운반 양호 | B fine-tuning이 frozen A의 기본 carry actor를 망가뜨린 증거 없음 |
+| B HOLD-Q | B 고정 12 m 직선 | 강제 비활성(`MSTOP_SOLO_AFTER=1000000`) | pickup 실패와 운반 중 drop 모두 발생 | stop residual이 아닌 B 배치·장거리 조건만으로도 실패 |
+| A Minimal 6000 | B 고정 12 m 직선 | 강제 비활성 | pickup 실패와 운반 중 drop 모두 발생 | B PTH 문제가 아니라 B 시나리오 distribution shift가 주원인 |
+| B HOLD-Q | A/free | B brake/hold/resume | 아직 미실행 | 아래 새 opt-in 모드로 stop 자체의 추가 실패를 분리할 다음 검사 |
+
+첫 세 행을 함께 보면 현재 가장 강한 결론은 **B의 12 m 고정 직선 배치가 기존 A의
+pickup·carry 분포와 맞지 않아 A와 B PTH를 모두 깨뜨린다**는 것이다. 다만 정식 B
+carryWith eval의 terminal 양손 유지 `.4514`, post-stop drop `.6412`도 이미 나왔으므로
+“시나리오만 문제이고 stop residual은 정상”이라고 결론 내릴 수는 없다. 현재는
+`장거리 B geometry 문제 + stop/resume 뒤 terminal retention 문제`가 함께 있을 가능성이
+높고, 네 번째 행이 둘을 분리한다.
+
+### 체크포인트와 viewer 계약에서 확인한 차이
+
+- exact A는
+  `pickupa_minimal_clip1_oldcarry_15k_s0/.../Humanoid_00006000.pth`, B HOLD-Q는
+  `mastop_b_holdq_from_a6k_s0_p2/.../Humanoid.pth`다.
+- 두 checkpoint의 공통 model tensor 122개 중 바뀐 21개는 residual, critic/value,
+  discriminator와 `new_task_trainable_rms`뿐이다. frozen base actor tensor와 top-level
+  input `running_mean_std`는 동일하다. test action에 쓰이는 A 본체가 B 학습으로 변한 것은
+  아니다.
+- B action은 `clamp(base_action + gate * delta, -1, 1)`이며 stop/resume 전 gate는 0이다.
+  `MSTOP_SOLO_AFTER=1000000`이면 residual은 전체 운반 동안 적용되지 않는다.
+- `scripts/mastop/view.sh`의 기본 B는 두 agent가 각각 약 12 m 직선을 운반하는 배치다.
+  `MSTOP_MIX=1,0,0,0`만으로는 A runner와 완전 동일하지 않으며 task class, sidecar,
+  seed와 초기화 경로가 남아 있다.
+- A pickup viewer의 free 분리 조건은 `MA_SEP=9`다. 중간 진단에서 사용한 `MA_SEP=0`은
+  두 scene이 가까워져 상호 간섭할 수 있으므로 A parity가 아니었다.
+- A의 `pickup_diag_view.sh`는 `MS_FLOOR_START=1`, `MS_VIZ=1_follow_straight`를 사용한다.
+  기존 mastop branch에는 floor-start override가 없었고, `MSTOP_CARRYWITH=0`은
+  carryWith 강제만 해제할 뿐 floor init을 강제하지 않았다.
+- `MS_MRAND=0`은 정지 명령이 아니라 nominal 약 1.5 m/s 고정 속도다. B가 더 빨라
+  보였던 것은 PTH가 속도를 키운 증거가 아니며, 긴 직선과 초기화·경로 차이를 함께
+  봐야 한다.
+
+`view_a6k_on_b_scenario`는 실제 학습 tag가 아니라 A PTH에 B config/sidecar를 연결하는
+시각화용 alias다. alias의 checkpoint/config/train-config/sidecar 네 링크를 만들지 않고
+호출하면 `config 없음`으로 종료되는 것이 정상이며 GPU나 checkpoint load 오류가 아니다.
+
+### 14:39 새 진단 모드 — B stop을 A/free 배치에서만 시험
+
+기존 scenario A와 B의 기본 동작을 바꾸지 않고 `HumanoidMAStopCarry`에 opt-in 두 개를
+추가했다.
+
+- `MSTOP_A_LAYOUT=1`: scenario ID는 B로 유지해 pickup 후 1.5 m의
+  brake/hold/resume trigger와 B residual을 그대로 사용하되, B의 고정 12 m layout과
+  fixed straight path override만 건너뛰어 A/free 위치·목표·경로를 사용한다.
+- `MS_FLOOR_START=1`: mastop에서도 `loco_carry` init만 선택한다.
+  `MSTOP_CARRYWITH=1`과 동시 사용은 모순이라 즉시 거부한다.
+- 두 옵션의 기본값은 0이므로 기존 A/B/C/D 학습·평가 계약은 변하지 않는다.
+- Python compile, AST parse, 기본/opt-in scenario selection 정적 검증은 통과했다.
+  GPU viewer나 새 학습은 자동으로 시작하지 않았다.
+
+B HOLD-Q PTH를 A/free 직선·floor pickup에서 실행하면서 B stop만 켜는 명령:
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MSTOP_A_LAYOUT=1 \
+MS_FLOOR_START=1 \
+MSTOP_STAGE=B \
+MSTOP_MIX=0,1,0,0 \
+MSTOP_SOLO_AFTER=1.5 \
+MA_SEP=9 \
+MS_LAT_MAX=0 \
+MS_MRAND=0 \
+MSTOP_CARRYWITH=0 \
+MSTOP_VIEW_EVAL=0 \
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh \
+  mastop_b_holdq_from_a6k_s0_p2
+```
+
+시작 로그는 다음을 포함해야 한다.
+
+```text
+[mastop-carry] stage=B mix=[0.0, 1.0, 0.0, 0.0] aLayout=1 floor=1
+```
+
+판독 기준:
+
+1. 정지 전은 안정적이고 brake/HOLD에서만 놓치면 stop residual·감속 전환 문제다.
+2. HOLD는 버티고 RESUME에서 놓치면 resume residual 또는 gate-off handoff 문제다.
+3. stop/resume까지 안정적이면 현재 GUI 실패의 주원인은 B 12 m geometry다.
+4. floor pickup부터 다시 실패하면 새 모드의 실제 reset `z0`, path와 action gate를 직접
+   기록해 A runner parity를 재검증한다.
+
+변경 파일:
+
+```text
+TokenHSI-mastop/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_stop_carry.py
+TokenHSI-mastop/CHANGELOG.md
+```
+
+
+## 2026-08-31 12:49 KST — grasp-retention 방법론 결과와 4-way 정식 평가
+
+### 방법론과 비교 관계
+
+이번 4-way는 같은 정책의 네 최종 후보가 아니라 실패 원인을 두 층으로 나눈 실험이다.
+
+1. 기존 Minimal A 6000은 floor pickup과 일반 GO/carry를 담당한다.
+2. 세 B는 그 정확한 A
+   `pickupa_minimal_clip1_oldcarry_15k_s0/.../Humanoid_00006000.pth`를 frozen base로
+   공유하고 stop residual의 단독 축만 각각 바꿨다.
+   - HOLD-Q: HOLD의 worst-hand OBB, contact-foot slip, path-frame lateral velocity,
+     yaw-rate reward
+   - ARM-MASK: residual action 6:14의 어깨·팔꿈치 보정을 0으로 만들어 A의 팔을 보존
+   - RESUME-HALF: RESUME residual 적용 크기를 0.5배로 제한
+3. A-GRASP는 기존 Minimal A와 별도로 처음부터 다시 학습한 A 후보이며 worst-hand OBB
+   reward `.5`와 pickup 뒤 strict drop penalty `1.0`을 추가했다. 세 B는 이 새 A에서
+   출발한 정책이 아니다.
+
+B residual gate는 stop/resume이 아닌 PREGRASP·GO에서 0이므로 B가 floor pickup을
+학습하거나 기존 A의 pickup을 고칠 수 없다. 또한 세 B의 학습 sidecar와 이번 정식 B
+평가는 `MSTOP_CARRYWITH=1`이라 물체를 이미 든 상태에서 stop/resume을 측정한다. 반면
+`scripts/mastop/view.sh`는 호출 전 `MSTOP_CARRYWITH` 미지정 시 0을 보존해 floor pickup을
+보여준다. 따라서 B 정식 평가의 `pick`과 `fin`을 GUI floor-pickup 성공률로 해석하지 않는다.
+
+### 정식 평가 계약과 원시 결과
+
+- A-GRASP와 기존 Minimal A 6000: `--eval carry`로 `loco_carry` init 100%,
+  512 env × 2 agents × 3 repeats = 3,072 rows, 47 columns. 단 cfg의
+  `randomHeightProb=0.5`는 유지되므로 true ground-only 평가는 아니다.
+- B 세 정책: 학습 sidecar 재생(`carryWith=1`), 각각 512 env × 2 agents × 3 repeats =
+  3,072 rows, 80 columns
+- legacy `pick`은 10-frame close+lift 뒤 영구히 1인 latch, `fin`도 terminal grasp를
+  보장하지 않는다. B 판정은 `MSTOP_STRICT_SUMMARY`를 함께 사용한다.
+
+결과에 직접 저장된 reset 높이 `z0`도 두 A 평가가 같은 분포임을 확인한다. 기존/GRASP의
+`z0<.3` 비율은 각각 `.4154/.4206`, `z0>.5`는 `.3910/.3805`다. 즉 두 eval 사이의
+시나리오 차이가 성능 역전 원인은 아니지만, 이 평가는 순수 floor-only라고 부르면 안 된다.
+
+A-GRASP 결과:
+
+| 지표 | 결과 |
+|---|---:|
+| individual pickup latch | `.9437` |
+| 두 agent 모두 pickup latch | `.8991` |
+| individual finish | `.6602` |
+| 두 agent 모두 finish | `.4414` |
+| 한 agent만 finish | `.4375` |
+| pickup latch 뒤 individual fail | `.3086` |
+| pickup한 row의 finish 조건부 비율 | `.6730` |
+| 두 agent가 pickup했지만 둘 다 finish하지 못한 scene | `.4889` |
+
+A의 `pick=.9437`은 잠깐 들어 올리는 사건이 자주 생겼다는 뜻이지 들어서 끝까지
+유지했다는 뜻이 아니다. 실제로 individual finish는 `.6602`, pair finish는 `.4414`뿐이다.
+47열 A evaluator에는 worst-hand OBB terminal/break 열이 없어 새 reward가 겨냥한 최종
+양손 유지를 직접 판정하지도 못한다. 화면에서 보인 “잡고 들지만 바로 불안정해져 유지하지
+못함”과 수치가 모순되지 않는다.
+
+같은 evaluator·배치로 완료한 기존 Minimal A 6000 exact checkpoint 대조:
+
+| 지표 | 기존 Minimal A 6000 | A-GRASP 6000 |
+|---|---:|---:|
+| individual pickup latch | `.8932` | `.9437` |
+| 두 agent 모두 pickup latch | `.8099` | `.8991` |
+| individual finish latch | `.9499` | `.6602` |
+| 두 agent 모두 finish latch | `.9225` | `.4414` |
+| pickup했지만 finish하지 못한 row, 전체 대비 | `.0241` | `.3086` |
+| pickup row의 finish 조건부 비율 | `.9730` | `.6730` |
+| both-pick이지만 both-finish가 아닌 scene, 전체 대비 | `.0326` | `.4889` |
+| held-frame fraction 중앙값 | `.2669` | `.5928` |
+
+A-GRASP는 brief pickup latch와 held-frame 비율은 올렸지만 finish latch가 크게 무너졌다.
+따라서 추가 reward가 파지 유지 시간을 일부 늘린 흔적은 있어도 전체 carry를 개선했다고
+볼 수 없으며 기존 A보다도 채택 근거가 없다. 반대로 기존 A의 높은 finish도 terminal
+양손 파지를 뜻하지 않고, held-frame 중앙값이 `.2669`뿐이므로 GUI에서 보인 놓침을
+반박하지 않는다. 두 정책 모두 아래 terminal OBB/break 계측을 추가해야 실제 유지 성공률을
+직접 비교할 수 있다.
+
+화면과 eval은 기본 계약이 다르다. 직접 `view.sh`를 실행하면 `--eval`이 없어 학습용
+carry init mix `loco_carry/pickUp/carryWith/putDown = .5/.1/.3/.1`을 사용하며, 한 env와
+무작위 seed(`seed=-1`)만 본다. eval은 seed 0에서 `loco_carry=1.0`을 3,072 row로 잰다.
+`pickup_diag_view.sh`는 `MS_FLOOR_START=1`로 init skill을 `loco_carry`에 맞추지만
+`randomHeightProb=.5`까지 끄지는 않으며, viewer seed도 eval과 고정되지 않는다.
+
+B 결과:
+
+| 정책 | root/box HOLD 속도 | resumed | foot slip | lateral/yaw | terminal 양손 | terminal contact | post-stop drop | strict retained |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| HOLD-Q | `.090/.122` | `.9954` | `.021` | `.034/.125` | `.4514` | `.1774` | `.6412` | `.0202` |
+| ARM-MASK | `.136/.189` | `.9569` | `.053` | `.060/.206` | `.4598` | `.2044` | `.6192` | `.0202` |
+| RESUME-HALF | `.121/.170` | `.9681` | `.067` | `.062/.219` | `.4465` | `.2001` | `.6317` | `.0143` |
+
+세 B 모두 stop/resume frame의 `bothHandStop/Resume`는 `.9966~.9996`으로 높지만 terminal
+양손 OBB 유지는 `.4465~.4598`, terminal contact는 `.1774~.2044`뿐이다. terminal에서
+한 손만 OBB 안에 남는 비율은 약 13~18%, 양손 모두 이탈은 약 37~42%다. `fin≈.98`과
+`heldStop≈.999`는 목표 도달 latch와 frame 평균이므로 이 terminal 실패를 가린다.
+
+### 결과 해석과 현재 결정
+
+1. **주 병목은 pickup 사건 자체보다 pickup 뒤 grasp retention과 carry finish다.**
+   A-GRASP도 brief pickup latch는 올렸지만 pair finish가 `.4414`라 채택할 수 없다.
+2. **HOLD-Q는 정지 동작 품질에는 성공했다.** 세 B 중 root/box 속도, foot slip,
+   lateral velocity, yaw rate가 모두 가장 좋다. 그러나 terminal grasp는 다른 B와 같고
+   post-stop drop도 `.6412`라 grasp 해결책은 아니다.
+3. **ARM-MASK와 RESUME-HALF는 원인 가설을 지지하지 않는다.** 팔 residual 차단이나
+   RESUME 크기 절반만으로 terminal retention이 개선되지 않았다.
+4. **세 B의 GUI floor-pickup 실패는 구조상 예상된다.** 모두 약한 기존 A를 frozen base로
+   쓰고 PREGRASP/GO에서 residual이 0이며 B 학습 자체도 carry-with start라 floor pickup을
+   본 적이 없다.
+5. 새 A를 채택하려면 true ground-only(`randomHeightProb=0`) evaluator에 per-hand terminal
+   OBB, ever/broken/regrasp, post-pick drop을 추가하고 기존 Minimal A 6000과 같은 배치에서
+   비교해야 한다. 이후에만 채택한 stop 축(HOLD-Q 우선)을 새 A 위에서 다시 학습한다.
+
+원시 산출물:
+
+```text
+runs/results/masteer_pickup/eval_pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2_debug_p2_20260831.npy
+runs/logs/masteer_pickup/eval_pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2_debug_p2_20260831.log
+runs/results/masteer_pickup/eval_pickupa_minimal_clip1_oldcarry_15k_s0_baseline6k_compare_20260831.npy
+runs/logs/masteer_pickup/eval_pickupa_minimal_clip1_oldcarry_15k_s0_baseline6k_compare_20260831.log
+runs/results/mastop_carry/eval_debug_holdq_p2_20260831.npy
+runs/results/mastop_carry/eval_debug_armmask_p2_20260831.npy
+runs/results/mastop_carry/eval_debug_resumehalf_p2_20260831.npy
+runs/logs/persistent/koo-eval-holdq-p3.log
+runs/logs/persistent/koo-eval-armmask-p3.log
+runs/logs/persistent/koo-eval-grasp-resume-p3.log
+```
+
+기존 Minimal A의 정확한 6000 checkpoint 대조 평가는 2026-08-31 12:58 KST에 완료됐다.
+대기용 `koo-eval-minimal-a6k-p4.service`는 transient `--collect` unit이라 종료 후 unit이
+자동 제거되며, 이후 `systemctl stop`의 `Unit ... not loaded`는 평가 미실행을 뜻하지 않는다.
+
+```text
+tag: pickupa_minimal_clip1_oldcarry_15k_s0
+checkpoint: Humanoid_00006000.pth
+eval suffix: baseline6k_compare_20260831
+GPU/env: 6 / 512
+rows: 3,072 / 47 columns
+result: 정상 완료, finite float32 `(3072, 47)`
+```
+
+기존 Minimal A 6000 시각화는 같은 6109 포트에서 다른 viewer를 종료한 뒤 아래 진단
+wrapper로 연다. 이 명령은 eval과 같은 `loco_carry` init으로 맞추지만, 한 env의 무작위
+seed라 정량 비교를 대신하지 않는다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+PICKUP_ITER=6000 bash scripts/masteer/pickup_diag_view.sh \
+  pickupa_minimal_clip1_oldcarry_15k_s0 6 6109
+```
+
+## 2026-08-31 11:51 KST — Codex 종료 독립 재실행·완료 상태·디버깅
+
+### 재실행 원인과 방법
+
+`_r1` 네 작업은 Codex unified exec 세션의 자식으로 실행돼 Codex 종료 때 같이 정리됐다.
+재실행은 repo나 `tokenhsi_koo` 밖의 설정 파일을 만들지 않는 사용자 transient service로
+분리했다.
+
+```bash
+source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
+conda activate tokenhsi_koo
+
+/usr/bin/systemd-run --user --unit=<고유-unit> --collect \
+  --property=WorkingDirectory=/home/hwanhee/koo_cvpr \
+  --property=StandardOutput=append:/home/hwanhee/koo_cvpr/runs/logs/persistent/<unit>.log \
+  --property=StandardError=append:/home/hwanhee/koo_cvpr/runs/logs/persistent/<unit>.log \
+  /usr/bin/env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" <실험-env> \
+  /bin/bash <launcher> <launcher-args>
+```
+
+- `systemd-run`은 실행 중인 프로세스만 사용자 systemd manager에 맡기며 persistent unit
+  파일을 설치하지 않는다. Codex 프로세스가 끝나도 작업은 유지된다.
+- 서버 전역 설정은 사용하지 않는다. 잠시 변경했던 user linger는 즉시 원복했고
+  `Linger=no`를 확인했다. 따라서 이 방법은 Codex 종료에는 독립적이지만 서버의 모든
+  로그인 세션이 종료되는 경우까지 보장하는 방식은 아니다.
+- 첫 transient 시도 `_p1`은 학습 진입 전 conda activate에서
+  `LD_LIBRARY_PATH: unbound variable`로 종료됐다. 결과는 없으며 실제 실행은 `_p2`다.
+- 재실행 때 `tokenhsi_koo`의 `LD_LIBRARY_PATH`를 명시한 이유는 launcher가
+  `set -u`를 쓰기 때문이다. 그 외 학습 조건은 `_r1`과 동일하다.
+
+| 실제 tag | unit | GPU/env | 변경축 |
+|---|---|---|---|
+| `mastop_b_holdq_from_a6k_s0_p2` | `koo-mstop-hold-p2` | GPU 6, 총/장당 2048 | HOLD OBB `.5`, slip `.5`, lateral `1.0`, yaw `.25` |
+| `mastop_b_armmask_from_a6k_s0_p2` | `koo-mstop-armmask-p2` | GPU 6, 총/장당 2048 | residual action 6:14 scale `0` |
+| `mastop_b_resumehalf_from_a6k_s0_p2` | `koo-mstop-resume-p2` | GPU 7, 총/장당 2048 | RESUME residual scale `.5` |
+| `pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2` | `koo-pickupa-grasp-p2` | GPU 6·7 DDP, 총 2048/장당 1024 | worst-hand OBB `.5`, strict drop `1.0` |
+
+세 B는 동일한 A `Humanoid_00006000.pth`에서 epoch 6000→9000으로 학습했고,
+각 phase JSONL은 3,001행이다. A-GRASP는 stage1에서 6000 iterations를 학습했다.
+
+### 2026-08-31 완료 상태
+
+- B-HOLD 정상 완료, checkpoint epoch `9001`:
+  `TokenHSI-mastop/output/mastop_carry/mastop_b_holdq_from_a6k_s0_p2/Humanoid_30-19-09-49/nn/Humanoid.pth`
+- B-ARM-MASK 정상 완료, checkpoint epoch `9001`:
+  `TokenHSI-mastop/output/mastop_carry/mastop_b_armmask_from_a6k_s0_p2/Humanoid_30-19-09-50/nn/Humanoid.pth`
+- B-RESUME-HALF 정상 완료, checkpoint epoch `9001`:
+  `TokenHSI-mastop/output/mastop_carry/mastop_b_resumehalf_from_a6k_s0_p2/Humanoid_30-19-09-42/nn/Humanoid.pth`
+- A-GRASP는 `MAX EPOCHS NUM!`까지 진행해 `Humanoid.pth`와
+  `Humanoid_00006000.pth`를 저장했다. `Humanoid.pth`는 CPU `torch.load`에 성공했고
+  epoch은 `6001`이다. 다만 저장 약 10분 뒤 rank1 ALLREDUCE가 600초 timeout되어
+  `ChildFailedError`로 끝났으므로 clean exit로 기록하지 않는다. 원인은 multi-GPU
+  `common_agent.py`의 max-epoch return이 rank 0 블록 안에 있어 rank 1만 다음 epoch의
+  collective로 진입하는 종료 동기화 버그로 확정했다. 기존 Minimal A 15k도 같은
+  ALLREDUCE 크기와 timeout으로 끝나 grasp reward나 checkpoint 손상 원인은 아니다.
+
+A 최종 checkpoint:
+`runs/output/masteer_pickup/pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2/Humanoid_30-19-09-51/nn/Humanoid.pth`
+
+### 디버깅 순서
+
+1. 저장된 sidecar로 총 env, GPU, 단독 변경축이 맞는지 먼저 확인한다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+rg 'MSTOP_ENVS|MSTOP_GPU|MSTOP_HOLD_|MSTOP_ARM_SCALE|MSTOP_RESUME_RESIDUAL_SCALE' \
+  runs/logs/mastop_carry/mastop_b_*_p2.env
+rg 'PICKUP_ENVS|PICKUP_ENVS_PER_GPU|PICKUP_GPU|MS_GRASP_' \
+  runs/logs/masteer_pickup/pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2.env
+```
+
+2. persistent log에서 정상 완료와 치명 오류를 분리한다.
+
+```bash
+rg 'MSTOP_TRAIN_DONE|MAX EPOCHS NUM|Traceback|RuntimeError|CUDA out of memory|NCCL|Killed|Terminated' \
+  runs/logs/persistent/koo-*-p2.log
+```
+
+3. B의 phase 원본은 아래 JSONL이다. 각 파일은 3,001행이며 GO/BRAKE/HOLD/RESUME별로
+`drop`, `held`, root/box speed, residual applied를 비교한다. HOLD는 strict foot-slip,
+lateral velocity, yaw-rate를 함께 보고 RESUME은 drop과 residual 크기를 함께 본다.
+
+```text
+runs/results/mastop_carry/mastop_b_holdq_from_a6k_s0_p2_diag.jsonl
+runs/results/mastop_carry/mastop_b_armmask_from_a6k_s0_p2_diag.jsonl
+runs/results/mastop_carry/mastop_b_resumehalf_from_a6k_s0_p2_diag.jsonl
+```
+
+4. 정식 수치 판정은 학습 sidecar를 명시적으로 재생하는 strict eval로 한다. 아래
+템플릿에서 `SRC_TAG`, `EVAL_TAG`, `GPU`, `CKPT`만 바꾸며, 같은 eval tag의 동시 실행은
+금지한다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+ROOT=/home/hwanhee/koo_cvpr
+SRC_TAG=mastop_b_holdq_from_a6k_s0_p2
+EVAL_TAG=debug_holdq_p2_20260831
+GPU=6
+CKPT="$ROOT/TokenHSI-mastop/output/mastop_carry/$SRC_TAG/Humanoid_30-19-09-49/nn/Humanoid.pth"
+
+MSTOP_STAGE=B MSTOP_TAG="$EVAL_TAG" \
+MSTOP_ENV_FILE="$ROOT/runs/logs/mastop_carry/$SRC_TAG.env" \
+MSTOP_GPU="$GPU" MSTOP_EVAL_ENVS=512 \
+bash TokenHSI-mastop/tokenhsi/scripts/tokenhsi/stage2_ma_stop_carry_eval.sh "$CKPT"
+```
+
+결과의 `MSTOP_EVAL_SUMMARY`와 `MSTOP_STRICT_SUMMARY`를 같이 보며 legacy `pick/fin`만으로
+판정하지 않는다. ARM-MASK는 GPU 6, RESUME-HALF는 GPU 7을 사용한다.
+
+5. 화면 디버깅은 가드가 연결된 viewer만 사용한다. B는 학습 sidecar와 checkpoint를
+tag에서 자동 복원한다. 같은 포트에서는 하나씩 실행한다.
+
+```bash
+MSTOP_GPU=6 PORT=6109 ENVS=1 bash scripts/mastop/view.sh mastop_b_holdq_from_a6k_s0_p2
+MSTOP_GPU=6 PORT=6109 ENVS=1 bash scripts/mastop/view.sh mastop_b_armmask_from_a6k_s0_p2
+MSTOP_GPU=7 PORT=6109 ENVS=1 bash scripts/mastop/view.sh mastop_b_resumehalf_from_a6k_s0_p2
+```
+
+A-GRASP는 비정상 종료 기록이 있으므로 sidecar를 먼저 불러 최종 checkpoint를 직접 연다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+set -a
+source runs/logs/masteer_pickup/pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2.env
+set +a
+MA_GPU=6 PORT=6110 ENVS=1 MS_SNAP_DIR=/home/hwanhee/koo_cvpr/runs/view_snapshots \
+bash scripts/masteer/view.sh \
+  /home/hwanhee/koo_cvpr/runs/output/masteer_pickup/pickupa_minimal_clip1_oldcarry_grasp_6k_s0_p2/Humanoid_30-19-09-51/nn/Humanoid.pth
+```
+
+GUI/Vulkan은 위 wrapper의 `scripts/vulkan_gpu_guard.py` 검증만 사용하며 서버 전역
+Vulkan·driver 설정은 변경하지 않는다.
+
+## 2026-08-30 18:57 KST — stop 실패축 4-way 병렬 pilot 시작
+
+기존 A 6k를 공유하는 B 세 ablation과 새 A grasp-retention을 분리해 실행했다.
+
+| tag | GPU | 단독 변경축 | 실행 세션 |
+|---|---:|---|---:|
+| `mastop_b_holdq_from_a6k_s0_r1` | 6 | HOLD에 양손 OBB `.5`, foot-slip `.5`, lateral `1.0`, yaw `.25` | `3531` |
+| `mastop_b_armmask_from_a6k_s0_r1` | 6 | residual의 shoulder/elbow action 6:14 scale `0` | `18718` |
+| `mastop_b_resumehalf_from_a6k_s0_r1` | 7 | RESUME residual scale `0.5` | `52922` |
+| `pickupa_minimal_clip1_oldcarry_grasp_6k_s0_r1` | 6·7 DDP | A에 worst-hand OBB `.5`, post-pick strict drop penalty `1.0` | `68626` |
+
+세 B는 모두 exact `Humanoid_00006000.pth`, 2048 env, 3000 additional iterations를 사용한다. A-GRASP는 같은 Minimal A 구조를 stage1에서 6000 iterations 학습하며 stop phase를 넣지 않았다. 기존 carry skill init `.5/.1/.3/.1`을 유지해 reward만 바꿨다. A-GRASP가 채택돼도 실행 중인 세 B의 frozen base는 바뀌지 않으므로, 마지막에는 채택된 B 축을 합쳐 새 A에서 최종 B를 다시 학습해야 한다.
+
+정적 검사는 Python compile, shell `bash -n`, tracked diff whitespace를 통과했다. 8-env A smoke와 1-iteration B smoke, HOLD/RESUME를 포함한 4-iteration B smoke가 모두 rc=0이었다. 확장 smoke에서 HOLD/RESUME count는 각각 최대 191/148이었고 residual이 nonzero인 상태에서도 NaN과 의미 있는 clamp는 없었다.
+
+처음 시도한 non-interactive `nohup` tag 네 개 중 A/HOLD 두 launcher는 실행 shell 종료와 함께 Python을 띄우기 전에 정리됐다. 원시 결과는 없고 launch/sidecar 흔적만 보존했으며, 이 시점의 기준은 `_r1`이었다. 이후 재실행·완료 기준은 위 2026-08-31 `_p2` 섹션을 따른다.
+
+## 2026-08-30 17:59 KST — B 완료 후 GUI/strict eval 및 phase별 실패 원인 확정
+
+### 대상 정책과 완료 상태
+
+- BASELINE B: `mastop_b_from_a6k_s0`
+- PHASE B: `mastop_b_phase_noamp_from_a6k_s0`
+- 두 정책 모두 epoch/iter `9001` 체크포인트까지 완료됐다.
+- 최종 체크포인트: 각 run의 `Humanoid_29-18-08-33/nn/Humanoid.pth`
+- 이번 작업에서는 정책을 재학습하거나 행동을 바꾸지 않았다. viewer를 실제 carry task와 맞추고, 실패 원인을 드러내는 진단/eval 지표를 추가했다.
+
+### 기존 학습 phase 진단 판독
+
+진단 원본:
+
+- `runs/results/mastop_carry/mastop_b_from_a6k_s0_diag.jsonl`
+- `runs/results/mastop_carry/mastop_b_phase_noamp_from_a6k_s0_diag.jsonl`
+- 각 파일 3,001행이며, 아래 값은 마지막 200 iter(epoch 8802–9001)의 count-weighted 평균이다.
+
+| 정책/phase | 관찰 결과 | 판정 |
+|---|---|---|
+| BASE GO | root/box speed `.6870/.6544`, held `.8052`, drop `.1948`, residual applied `0` | residual이 전혀 개입하지 않는 frozen A/base pickup·운반 유지 구간에서 이미 약 19.5% legacy drop이 발생한다. 집기 유지 문제의 큰 축은 B residual만의 문제가 아니다. |
+| PHASE GO | root/box speed `.6882/.6565`, held `.8028`, drop `.1972`, residual applied `0` | BASE와 같은 결론이다. |
+| BASE BRAKE | target `.7797`, root/box `1.1887/1.2220`, held `.9941`, drop `.0059` | 감속이 target보다 늦지만 grasp loss의 주 phase는 아니다. |
+| PHASE BRAKE | target `.7805`, root/box `1.2786/1.2491`, held `.9945`, drop `.0055` | PHASE도 동일하며 감속 추종은 BASE보다 다소 나쁘다. |
+| BASE HOLD | root/box `.2151/.2955`, held `.9831`, drop `.0169`, residual `.0926` | 정지 상태에서도 움직임이 남는다. |
+| PHASE HOLD | root/box `.2391/.2893`, held `.9791`, drop `.0209`, residual `.1407` | PHASE residual이 BASE보다 약 52% 커졌지만 정지가 좋아지지 않았다. 사용자가 본 제자리걸음·옆밀림의 핵심 구간이다. |
+| BASE RESUME | root/box `.7221/.7099`, held `.9691`, drop `.0309`, residual `.0459` | 재출발 때 일부 집기 손실이 있다. |
+| PHASE RESUME | root/box `.6248/.6766`, held `.9480`, drop `.0520`, residual `.0666` | PHASE의 추가 열화 지점이다. BASE보다 drop이 크고 residual도 약 45% 크다. |
+
+요약하면 문제는 하나의 phase가 아니라 세 축이다.
+
+1. `GO/pickup retention`: B residual이 0이어도 약 19.5–19.7% legacy drop이 있다.
+2. `HOLD motion quality`: 멈추면서 보행 pose가 남아 제자리걸음·측면 미끄러짐이 생긴다.
+3. `PHASE RESUME over-correction`: PHASE B는 재출발에서 BASE보다 물체 유지가 더 나쁘다.
+
+action clamp saturation은 거의 없어 residual 용량 부족으로 보이지 않는다. 현재 stop residual은 frozen walking action 위에 32 DOF 전체를 더하며 phase reset이나 hold pose replacement가 없다. 따라서 COM 속도만 상쇄하면서 stepping pose는 남고, arm residual이 집기를 흔들 수 있다. reward에도 foot slip, path-frame lateral velocity, yaw rate, arm preservation의 직접 항이 없다는 것이 코드상 원인 후보다. AMP discriminator raw reward는 run 간 절대 비교하지 않았다.
+
+### carry viewer 정합성 수정
+
+`scripts/mastop/view.sh`가 예전 object-free `HumanoidMAStopSteer`를 열던 문제를 고쳤다.
+
+- 실제 task를 `HumanoidMAStopCarry`로 변경했다.
+- `output/mastop_carry/configs/${TAG}.yaml`, `${TAG}_train.yaml`, `output/mastop_carry/${TAG}` 체크포인트를 사용한다.
+- 학습 sidecar `runs/logs/mastop_carry/${TAG}.env`를 불러 동일한 stage/mix 설정을 복원한다.
+- 기본값은 `MSTOP_CARRYWITH=0`, `MA_SEP=9`, `MSTOP_VIEW_EVAL=1`, `--eval_task carry`이다.
+- viewer snapshot을 `/tmp`가 아닌 `runs/view_snapshots`에 만들어 eval metrics의 `/metrics` PermissionError를 제거했다.
+- `x11vnc`에는 `-noshm`을 추가했다.
+- Vulkan guard와 physical GPU UUID 검증은 유지하며 GPU 6/7만 허용한다.
+
+BASELINE B GUI smoke에서 stage B/mix `[0,1,0,0]`, observation 340, residual checkpoint load를 확인했다. 실제 GUI 경로의 3회 eval은 `0/2`씩 총 `0/6` 성공으로, 사용자가 본 “대부분 놓침”이 단순 운이 아니라 현재 정책에서 재현되는 현상임을 확인했다.
+
+- GUI smoke log: `runs/queue/logs/view_smoke_carry_baseline_6109.log`
+- GUI metrics: `runs/metrics/mastop_view_mastop_b_from_a6k_s0_6109/carry/metrics_2026-08-30_17-52-57.json`
+
+### strict 실패 지표 추가
+
+`TokenHSI-mastop/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_stop_carry.py`의 기존 metric 0–60은 그대로 두고 61–79를 추가해 총 80열로 확장했다.
+
+- 양손 OBB geometry 기반: stop/resume/terminal 양손 유지, ever/broken/regrasp/post-stop drop
+- contact-backed 보조 지표: stop/resume/terminal hand net-force contact
+- terminal per-hand surface distance와 lift
+- HOLD contact-foot planar slip
+- path-frame root lateral velocity와 yaw rate
+
+net contact force는 접촉 상대를 식별하지 못하고 힘이 상쇄될 수 있으므로 단독 grasp gate로 사용하지 않고 geometry 지표와 분리했다. evaluator `TokenHSI-mastop/tokenhsi/scripts/tokenhsi/stage2_ma_stop_carry_eval.sh`는 `MSTOP_STRICT_SUMMARY`를 출력하며 과거 77열 결과와 새 80열 결과를 모두 읽는다.
+
+strict smoke는 정책별 8 env × 2 agents × 3 repeats = 48행이며 모든 값이 finite이고 shape은 `(48, 80)`이었다.
+
+| 지표 | BASELINE B | PHASE B |
+|---|---:|---:|
+| legacy pick | .8542 | .9583 |
+| legacy fin | .7500 | .7708 |
+| heldStop | .8401 | .9486 |
+| resumed | .9524 | .9048 |
+| bothHandStop | .8401 | .9486 |
+| bothHandResume | .8291 | .9087 |
+| contactStop | .5880 | .5987 |
+| contactResume | .6932 | .5913 |
+| contactTerminal | .2857 | .2857 |
+| terminal both-hand retention | .3810 | .3810 |
+| retained | .3333 | .3810 |
+| broken episode | .7619 | .6190 |
+| post-stop drop episode | .6667 | .6190 |
+| HOLD foot slip | .081 | .080 |
+| HOLD lateral velocity | .082 | .109 |
+| HOLD yaw rate | .314 | .377 |
+
+PHASE는 pickup/stop geometry는 좋아졌지만 terminal retention은 두 정책 모두 `.3810`으로 낮고, contact resume·lateral velocity·yaw rate는 오히려 나쁘다. 따라서 기존 `pick` latch와 frame-average `heldStop`만으로 시각적 성공을 판단하면 실제 drop과 미끄러짐을 과대평가한다. 이 smoke는 표본이 작아 방향 확인용이며 최종 성능 수치로 사용하지 않는다.
+
+산출물:
+
+- `runs/results/mastop_carry/eval_smoke_strict2_baseline_b.npy`
+- `runs/results/mastop_carry/eval_smoke_strict2_phase_b.npy`
+- `runs/queue/logs/smoke_strict2_baseline_b.summary.log`
+- `runs/queue/logs/smoke_strict2_phase_b.summary.log`
+
+참고로 strict metric 추가 전의 정식 512 env × 2 agents × 3 repeats 결과는 BASE B `pick=.9073, fin=.7468, heldStop=.8845, resumed=.8563`, PHASE B `pick=.9054, fin=.7826, heldStop=.9064, resumed=.8994`였다. 이 값의 `pick`은 10 frame close+lift latch이고 `heldStop`은 frame-weighted 평균이므로 terminal grasp 성공률로 해석하면 안 된다.
+
+### 6109 viewer 재현 명령
+
+같은 포트이므로 아래 두 정책은 동시에 띄우지 말고 하나씩 실행한다. 기본 모드는 3회 eval 뒤 종료한다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+MSTOP_GPU=6 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh mastop_b_from_a6k_s0
+```
+
+```bash
+cd /home/hwanhee/koo_cvpr
+MSTOP_GPU=7 PORT=6109 ENVS=1 \
+bash scripts/mastop/view.sh mastop_b_phase_noamp_from_a6k_s0
+```
+
+계속 보는 viewer가 필요하면 각 명령에 `MSTOP_VIEW_EVAL=0`을 추가한다. 원격 접속은 로컬에서 `ssh -L 6109:localhost:6109 <server>`로 포워딩한 뒤 `http://localhost:6109/vnc.html`을 연다.
+
+### 다음 학습에서 직접 바꿀 축
+
+- HOLD에 contact-foot slip, path-frame lateral velocity, yaw-rate penalty를 넣는다.
+- residual을 lower body로 제한하거나 arm residual을 mask/freeze해 집기 팔을 보호한다.
+- RESUME residual scale/ramp를 완화한다.
+- 필요하면 실제 carry-hold reference를 별도로 구성한다.
+- 위 변경 뒤에는 strict metric이 포함된 충분한 표본 eval로 BASE/PHASE를 다시 비교한다.
+
+## 2026-08-28 19:29 KST — 대화 아카이브: baseline B 보존 + phase-gated AMP ablation B
+
+### 실험 질문과 비교 계약
+
+- 목적은 held-stop reference가 부족한 AMP가 BRAKE/HOLD를 방해하는지, 아니면 stop task reward의 실질 비중이 작아서 정지가 어려운지 분리하는 것이다.
+- 기존 baseline B `mastop_b_from_a6k_s0`는 수정·중단·재실행하지 않는다. 새 ablation B는 `mastop_b_phase_noamp_from_a6k_s0`이며, 두 실험은 동일한 Minimal A 6000-iteration checkpoint, seed 0, GPU 6, 총 2048 env, Stage-B 3000 iterations를 사용하고 reward mixing만 다르게 한다.
+- `MSTOP_PHASE_REWARD` 기본값은 `0`이다. 이때 기존 `0.5 * task_reward + 0.5 * amp_reward` 결합 함수를 그대로 호출한다. `1`일 때만 GO `.5/.5`, BRAKE·HOLD `1/0`, RESUME cosine `1/0→.5/.5`의 per-env·per-step task/AMP weight가 실제 final reward 결합부에 적용된다.
+- RESUME은 `s=clamp(elapsed/duration,0,1)`, `amp_weight=.25*(1-cos(pi*s))`, `task_weight=1-amp_weight`를 사용한다. AMP freeze, optimizer, frozen-A residual 구조, 기존 carry/steer의 phase별 stop target velocity는 변경하지 않았다.
+
+### 구현과 진단
+
+- reward weight 계산과 결합부는 `TokenHSI-mastop/tokenhsi/learning/transformer/trans_agent.py`, stop 진단 원천값은 `TokenHSI-mastop/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_stop_carry.py`에 구현했다.
+- Stage-B launcher는 `MSTOP_PHASE_REWARD` 기본값 0을 sidecar에 보존한다. 새 watcher는 `scripts/mastop/auto_b_phase_noamp_from_a6k.sh`이며 자체 PID claim으로 중복 실행을 막는다.
+- JSONL에는 iteration/phase/target velocity/root·box velocity/held/dropped/base carry reward/stop bonus/total task reward/AMP reward/task·AMP weight/combined reward/AMP logit과 phase별 iteration 평균을 기록한다.
+- 경로는 baseline 진단 `runs/results/mastop_carry/mastop_b_from_a6k_s0_diag.jsonl`, ablation 진단 `runs/results/mastop_carry/mastop_b_phase_noamp_from_a6k_s0_diag.jsonl`, ablation watcher 로그 `runs/logs/mastop_carry/auto_b_phase_noamp_from_a6k_s0.watcher.log`, ablation checkpoint root `TokenHSI-mastop/output/mastop_carry/mastop_b_phase_noamp_from_a6k_s0/`이다.
+
+### 검증과 19:29 현재 운영 상태
+
+- smoke test 결과는 GO `.5/.5`, BRAKE `1/0`, HOLD `1/0`, RESUME 시작 `1/0`, 중간 `.75/.25`, 종료 `.5/.5`로 일치했다. flag off의 기존 결합식 동일성, Python compile, shell syntax, diff whitespace와 필수 diagnostic field 검증도 통과했다.
+- Minimal A는 PID `2232520`, 명령 `bash scripts/masteer/pickup_a_m4_clip1_train.sh minimal 6,7 15000 2048`로 계속 실행 중이다. 아직 `Humanoid_00006000.pth`가 생성되지 않아 concrete checkpoint 경로는 확정되지 않았다.
+- ablation watcher는 PID `2500846`, 명령 `bash scripts/mastop/auto_b_phase_noamp_from_a6k.sh`로 detached 대기 중이다. 임의의 `Humanoid_*`를 고르지 않고 baseline watcher 로그의 `valid checkpoint=<exact>; launching B` 경로를 검증한 뒤 똑같은 PTH를 사용한다.
+- 재확인 결과 기존 baseline watcher PID `2343025`는 살아 있지 않고 기존 로그에 `Terminated`가 있으며 stale claim만 남아 있다. 사용자 지시대로 baseline process·claim은 건드리지 않았다. 따라서 baseline watcher 복구를 별도로 승인받기 전에는 ablation도 단독 시작하지 않으며 두 B 동시 시작 조건은 아직 충족되지 않는다.
+- GPU 6은 97,887 MiB 중 13,526 MiB 사용, 83,725 MiB 여유다. B 하나를 약 27–32 GiB로 추정하면 A와 두 B를 합쳐 약 20–30 GiB headroom이 예상되어 동시 실행 가능성이 높지만, 실제 Isaac Gym 초기화 시 다시 확인한다. 다른 GPU 이동이나 기존 process 종료는 하지 않는다.
+
+## 2026-08-28 19:26 KST — B phase-noamp ablation 대기
+
+- baseline tag는 `mastop_b_from_a6k_s0`, ablation tag는 `mastop_b_phase_noamp_from_a6k_s0`이다. 둘 다 A의 exact `Humanoid_00006000.pth`, seed 0, GPU 6, 총 2048 env, 3000 additional iterations를 사용하고 reward mixing만 다르다.
+- `MSTOP_PHASE_REWARD=1`일 때 GO task/AMP=`.5/.5`, BRAKE·HOLD=`1/0`, RESUME는 cosine으로 `1/0→.5/.5`가 된다. 기본값 0은 기존 baseline 결합 경로를 그대로 사용한다.
+- ablation watcher PID `2500846`은 PPID 1의 detached process로 대기하며 claim의 `pid` 파일로 중복을 막는다. baseline watcher 로그의 exact checkpoint launch line이 생기기 전에는 ablation을 단독 실행하지 않는다.
+- 현재 baseline watcher process는 없고 `.mastop_b_from_a6k_s0.watcher` stale claim만 존재한다. “기존 baseline watcher를 중단·재실행하지 말라”는 지시에 따라 claim이나 baseline을 변경하지 않았다. 따라서 baseline이 별도로 복구되지 않으면 두 B 동시 시작 조건은 아직 충족되지 않는다.
+- GPU 6은 총 97,887 MiB 중 13,526 MiB 사용, 83,725 MiB 여유다. A 1024-env rank의 13.5 GiB를 기준으로 B 하나를 약 27–32 GiB로 보면 두 B+A 합계 약 67.5–77.5 GiB로 예상되어 20–30 GiB headroom이 있다.
+
+## 2026-08-28 17:06 KST — B watcher 취소와 원인 분해 진단
+
+- 사용자 요청으로 A 6k 자동 B watcher(PID `2271266`)를 종료하고 claim을 제거했다. `mastop_b_from_a6k_s0` B는 시작되지 않았다. Minimal A GPU 6·7 DDP는 그대로 실행 중이다.
+- 17:12 KST 사용자 재요청으로 watcher를 다시 시작했다. watcher PID는 `2343025`, 관리 exec session은 `15635`이며, 같은 A 6k checkpoint가 안정화되면 진단이 켜진 B를 GPU 6 단독·총 2048 env로 시작한다.
+- B 학습은 기본 `MSTOP_DIAG=1`이다. GO/BRAKE/HOLD/RESUME별 물리 속도·명령 오차·held/drop, task/AMP/combined reward, frozen A action과 residual 적용량·포화·clamp를 TensorBoard와 `${TAG}_diag.jsonl`에 남긴다.
+- 판독 기준은 다음과 같다: HOLD count 0이면 trigger/curriculum, delta가 거의 0이면 residual gradient/학습, saturation이 높고 속도가 높으면 residual 범위, clamp가 높으면 A+residual 충돌, held가 낮으면 carry/drop, HOLD AMP reward만 GO보다 낮으면 AMP demo conflict를 우선 의심한다.
+- dataset에는 전용 carry-hold motion이 없다. `carryWith`는 positive AMP demo 확률 0이며, pickup A5의 깨끗한 약 1.83초 정지 구간이 있으나 전체 AMP sampling 기여는 약 3.5%다. 따라서 AMP가 정지를 방해하는지는 추측 대신 새 phase별 수치로 판정한다.
+
+## 2026-08-28 16:34 KST 운영 — A 6k에서 B 자동 분기
+
+- 실행 중인 Minimal A는 GPU 6·7 DDP, 총 2048 env로 15k까지 계속 학습한다.
+- watcher `scripts/mastop/auto_b_from_a6k.sh`가 A PID `2232520`과 정확한 `Humanoid_00006000.pth`를 60초마다 확인한다. 파일 크기가 10초간 안정되고 `tokenhsi_koo`의 `torch.load`와 epoch 검증을 통과해야 B를 시작한다.
+- B는 A 6k snapshot을 frozen base로 사용하며 A 이후 9k/12k/15k 갱신을 따라가지 않는다. GPU 6 단독, 총 2048 env, residual 3000 additional iterations, tag `mastop_b_from_a6k_s0`이다.
+- watcher PID는 `2271266`, 관리 exec session은 `26468`, 로그는 `runs/logs/mastop_carry/auto_b_from_a6k_s0.watcher.log`다. A가 유효한 6k 전에 종료되면 B를 시작하지 않고 exit 4로 종료한다.
+
+## 2026-08-28 15:45 KST 구현 완료 — Minimal A와 frozen-A stop residual
+
+### 확정한 학습 계약
+
+- **Minimal A**는 A=2·340-D·checkpoint 구조를 유지하지만 teammate와 new-carry 토큰을 attention mask한다. `MS_MRAND=0`, `MS_CLIP=1`, 전역 `MS_VEL_K=5`를 사용한다.
+- A에서 학습되는 것은 **steer tokenizer와 기존 adapter뿐**이다. self encoder, transformer, composer, teammate tokenizer, new-carry tokenizer, positional embedding과 **old-carry tokenizer는 동결**한다.
+- 따라서 frozen old carry는 새로 학습되는 대상이 아니다. Stage1 carry 표현을 보존해서 A의 pickup/carry 기반으로 사용한다.
+- `MS_VEL_K`는 5를 유지한다. 과거 1.5는 velocity slope를 0.105에서 0.062로 낮췄으므로, stop을 위해 전역 추종력을 약화하지 않고 B에 phase별 Huber 속도 추종을 별도로 넣는다.
+
+### B stop–hold–resume 구조
+
+- B는 Minimal A 전체를 frozen base로 사용하고 작은 `stop_residual` head만 학습한다. head 입력은 frozen A latent와 6-D 명령 `[gate, target_scale, BRAKE, HOLD, RESUME, held]`이다.
+- action은 `clamp(a_base + gate * delta_stop, -1, 1)`이고, B의 `delta_stop=2*tanh(MLP(...))`로 관절별 `[-2,2]` 보정 범위를 갖는다. residual 마지막 층을 zero-init하므로 시작 시 delta가 0이고, 정상 GO에서 gate=0이라 출력은 A와 정확히 같다. A 구조·가중치·checkpoint shape는 바뀌지 않는다.
+- BRAKE는 기본 0.8초 cosine `1→0`, HOLD는 0, RESUME는 기본 0.8초 cosine `0→1` 속도 scale을 사용한다. 한 step 정지·재출발을 피하고 사람처럼 점진적으로 감속·가속하도록 유도한다.
+- BRAKE/RESUME에는 root·box 속도와 명령 속도 사이 Huber 오차를 보상에 넣고, HOLD에는 정지·creep·held/drop 보상을 유지한다.
+- resume 성공은 HOLD 중 사람과 박스가 모두 `MSTOP_STOP_SPEED=0.2 m/s` 아래로 실제 정지한 뒤, 명령과 실제 속도가 다시 올라간 경우에만 기록한다.
+- B0는 `carryWith` 초기화로 pickup 탐색과 분리해 stop residual부터 익힌다. 이후 같은 checkpoint를 바닥 pickup 전체 rollout으로 평가한다. C/D의 teammate 기반 yield 판단은 frozen executor 밖 planner 역할로 남긴다.
+
+### 실행 진입점
+
+```bash
+# Minimal A: GPU 6·7 DDP, 15k iterations, 총 2048 env
+bash scripts/masteer/pickup_a_m4_clip1_train.sh minimal 6,7 15000 2048
+
+# B: Minimal A checkpoint를 시작점으로 frozen A + residual만 학습
+MSTOP_START_CKPT=<minimal-A-Humanoid.pth> \
+  bash TokenHSI-mastop/tokenhsi/scripts/tokenhsi/stage2_ma_stop_residual_train.sh
+```
+
+A DDP에서 `2048`은 총 env 수이며 rank당 `1024`로 나뉜다. 두 GPU의 슬롯·가용 메모리를 모두 확인한 뒤 `torchrun --nproc_per_node=2 --horovod`로 시작하고, checkpoint는 3k·6k·9k·12k·15k에 보존한다. train metric은 `.rank0.npy`와 `.rank1.npy`로 분리한다.
+
+평가 스크립트는 학습 sidecar를 자동 복원한다. B의 `carryWith` 진단 뒤에는 `MSTOP_EVAL_CARRYWITH=0 MSTOP_EVAL_MIX=.5,.5,0,0 MSTOP_MA_SEP=9`로 floor-pickup A/B 회귀를 확인한다.
+
+### 구현 검증
+
+- Python compile, 세 shell의 `bash -n`, 관련 diff whitespace 검사를 통과했다.
+- GPU 6, 8-env Minimal A 1-iteration smoke에서 steer tokenizer와 adapter에만 gradient가 있었고 teammate/new-carry/old-carry 및 base backbone은 모두 frozen이었다.
+- GPU 6, 8-env B 1-iteration smoke에서 A 전체는 frozen, residual 4/4 parameter만 trainable·gradient 발생, checkpoint strict load의 missing/unexpected key는 0이었다.
+- resume latch 재평가 48 episode에서 BRAKE/RESUME가 각각 평균 6.2 step 생성됐다. 미학습 정책의 HOLD 속도는 root/box `0.644/0.828 m/s`라 실제 정지 기준을 못 넘었고 `resumed=0`으로 올바르게 집계됐다.
+
+## 2026-08-28 14:39 KST 후속 — stop 학습 구조 판단과 권장안
+
+사용자 보고와 프로세스 재확인 기준으로 new-carry Python PID `200978`과
+old-carry-only Python PID `200980`은 모두 종료되었다. 두 런 모두 번호 보존
+checkpoint는 3k·6k·9k까지 있으며, tag의 목표인 15k까지 완주한 런은 아니다.
+
+최종 목표는 두 agent가 각자 박스를 운반하다 교차 충돌이 예상되면 한 명이 박스를 든
+채 정지·대기하고, 상대가 통과한 뒤 다시 출발하는 것이다. 이를 `pickup/carry 보존`,
+`stop–hold–resume 실행`, `상대를 보고 yield agent 선택`의 세 층으로 분리한다. 현재 B는
+상대를 보고 판단하는 단계가 아니라, 두 agent를 멀리 분리한 상태에서 한 명이 명령에
+따라 박스를 들고 멈췄다가 다시 가는 저수준 실행 단계다.
+
+### 현재 증거에서의 해석
+
+- 관측 340-D는 하나의 MLP에 통째로 압축되지 않는다. `self 223`, `teammate 21`,
+  `steer 12`, `new_carry 42`, `old_carry 42`를 각각 tokenizer로 잘라 64-D 토큰으로
+  만든 뒤 transformer에 넣는다. 따라서 단순 concat 차원 증가 때문에 뒤쪽 정보가
+  사라진다는 설명은 우선순위가 낮다.
+- corrected 2×2의 최고 목표 도달 `0.9404`는 `new+old carry + teammate zero`의 6k다.
+  teammate 토큰 자리는 있었지만 실제 상대 정보는 모두 0이었다.
+- teammate live에서는 new+old와 old-only가 `0.8999` 대 `0.9038`로 사실상 같았다.
+  variable-speed·CLIP 6k에서도 목표 도달은 `0.6899` 대 `0.7002`로 old-only가 조금
+  높고, strict pickup은 `0.8958` 대 `0.8880`으로 new+old가 조금 높았다. 모두 seed 0
+  하나의 작은 차이여서 new carry의 필요성은 입증되지 않았다.
+- 과거 `mastop_ab_s0`는 stop root/box 속도를 `0.584/0.587 m/s`까지 내렸지만 운반
+  완료가 크게 회귀했다. 반대로 최신 gradual B는 pickup `0.8870`, finish `0.8369`를
+  유지했지만 stop root/box 속도가 `1.294/1.299 m/s`라 멈추지 못했다. 이는 모델 입력
+  용량 부족보다 동일한 trainable adapter가 carry와 stop을 함께 바꾸면서 생기는
+  최적화 간섭이라는 해석에 더 가깝다.
+
+### 권장 구조 — frozen A + phase-gated stop residual
+
+현재 증거만 보면 stop 단계에서 `new_carry`는 필수가 아니다. 우선 old-carry-only를
+기준으로 두고 teammate도 zero/mask한다. B에는 상대 정보가 필요 없고, 최종 yield
+결정은 상위 planner가 담당하는 것이 METHOD의 계층 분리와도 맞는다.
+
+```text
+teammate state
+      -> Planner / yield decision
+      -> speed·phase command --------------------------+
+                                                        |
+Frozen A executor(self + old_carry + steer) -> a_base   + gate * delta_a_stop
+                                                        ^
+                                  trainable stop residual
+```
+
+- 잘되는 A executor의 self/steer/carry tokenizer, transformer, composer와 기존 adapter를
+  모두 동결한다. steer tokenizer 하나만 동결하면 다른 trainable 경로가 pickup/carry
+  action을 바꿀 수 있으므로 보존 보장이 약하다.
+- 별도 full `new_carry` task를 다시 학습하지 않고, frozen A latent와 작은 명령
+  (`target_speed`, `GO/BRAKE/HOLD/RESUME` phase, held/picked flag)을 받는 stop residual
+  head만 학습한다.
+- `PREGRASP`와 정상 `GO`에서는 `gate=0`으로 두어 출력이 기존 A의 `a_base`와 정확히
+  같게 한다. `BRAKE`에서 gate를 cosine으로 `0->1`, `HOLD`에서 1, `RESUME`에서
+  `1->0`으로 내려 pickup/carry 회귀를 reward가 아니라 구조로 막는다.
+- teammate 정보는 low-level motor policy에 계속 주입하기보다 상위 planner가 읽고,
+  low-level에는 어느 agent가 어떤 속도/phase를 실행할지만 전달한다. 현재 D heuristic은
+  이 planner 자리의 proxy로 남기고, 마지막에 learned planner/WM으로 교체한다.
+
+### 권장 실험 순서
+
+1. 최종 사용 조건에서 pickup·finish·`lat`·`spd_err`를 함께 통과한 A checkpoint를
+   고른다. `0.9404`는 fixed 1.5 m/s·CLIP off·teammate zero 조건이라 stop용 최종
+   기준으로 단독 채택하지 않는다.
+2. B0는 A=2 형태를 유지하되 두 agent를 분리하고 teammate/new-carry를 mask한다.
+   이미 박스를 든 `carryWith` 초기 상태에서 stop residual만 학습해 정지·균형·hold·resume
+   탐색을 pickup과 분리한다.
+3. BRAKE 구간에도 `|v_actual-v_command|`를 직접 조밀하게 보상한다. 현재
+   `exp(-4v^2)`는 약 1.3 m/s에서 거의 포화되므로, 초기에는 Huber/선형 속도 오차처럼
+   먼 속도에서도 gradient가 남는 항을 사용하고 이후 정지 기준을 조인다.
+4. B0가 되면 바닥 pickup부터 전체 rollout을 평가한다. gate=0인 PREGRASP/GO action이
+   A와 동일한지 자동 검사하고 500 iteration마다 pickup·finish·stopV·held·drop·resume
+   gate를 확인한다.
+5. C/D에서는 low-level executor를 더 fine-tune하지 않는다. fixed 또는 ETA planner가
+   yield agent와 speed/phase command만 정하고, 같은 frozen executor+stop residual이
+   실행하게 한다. learned planner/WM은 이 계층 계약이 통과한 뒤 마지막에 붙인다.
+
+전역 pickup reward 증가는 첫 선택으로 두지 않는다. 최신 수치의 직접 실패는 pickup보다
+stop 실행이며, pickup reward를 키우면 proximity·운반 보상 우회가 다시 생길 수 있다.
+공유 가중치를 일부라도 풀어야 한다면 free/PREGRASP/GO 상태에서 A teacher action KL을
+추가하지만, 우선안은 base 완전 동결과 gate=0으로 회귀 가능성을 제거하는 것이다.
+
+## 지금 실행 중인 두 방법 — 한눈 요약 (2026-08-28 14:07 KST)
+
+현재는 **variable-speed와 실제 경로 끝 CLIP을 pickup A부터 다시 배우는 동일한 두
+학습**을 GPU 6·7에서 병렬 실행 중이다. 둘의 유일한 실험축은 **new carry token을
+attention에 포함하느냐**이며, 새로운 물리 carry 동작의 유무를 비교하는 실험은 아니다.
+
+| 방법 | tag / GPU | carry token 구성 | 확인하려는 것 |
+|---|---|---|---|
+| new + old | `pickupa_m4_clip1_newcarry_live_15k_s0` / GPU 6 | trainable new + frozen Stage1 old | 새 carry token을 함께 학습할 때 pickup·운반 기반이 유지되는가 |
+| old only | `pickupa_m4_clip1_oldcarry_live_15k_s0` / GPU 7 | new token attention mask + frozen Stage1 old | 기존 carry 표현만으로 같은 조건을 더 안정적으로 버티는가 |
+
+두 방법의 공통 계약은 A=2, 2048 env, seed 0, 15k, teammate `live`,
+`MS_MRAND=4`, `MS_VEL_W=1`, `MS_VEL_K=5`, `MS_CLIP=1`, anti-kicking on이다.
+`MA_SEP=9`라 teammate 관측은 실제 값이지만 두 agent의 물리 workspace는 분리된다.
+따라서 지금 비교하는 것은 **가변 속도·경로 끝 조건에서의 pickup A 학습 안정성**이지,
+agent 간 충돌 회피나 양보 성능이 아니다.
+
+두 런 모두 `HumanoidMASteerCarry`의 순수 pickup A이며 planner, stop state machine,
+yield oracle, B/C/D scenario는 들어 있지 않다. 2026-08-28 14:07 KST 확인 기준으로
+GPU 6의 Python PID는 `200978`, GPU 7은 `200980`이며 둘 다 rollout/metrics가
+진행 중이다. 두 런 모두 3k·6k·9k 번호 보존 checkpoint가 생성되었다. 평가 시 기존
+`pickup_diag_eval.sh`가 학습 sidecar와 생성 cfg를 source해 `MS_MRAND=4`,
+`MS_CLIP=1`, carry mask를 보존하는 tag-safe 경로로 동작하는 것을 확인했다.
+
+이 문서는 이번 대화에서 정한 연구 방향, 확인한 문제, 현재 코드 변경, 검증 결과와 다음 작업을 다른 Codex가 바로 이어받을 수 있도록 정리한 것이다.
+
+## 2026-08-28 14:07 KST 후속 — variable-speed·CLIP pickup A 6k 평가
+
+두 6k checkpoint를 먼저 `pickup_diag_view.sh`로 시각 점검했다. new-carry는 물리
+GPU 6/포트 6109, old-carry-only는 물리 GPU 7/포트 6110에서 Vulkan UUID 가드를
+통과해 실행되었다. 이 GUI는 `MS_EVAL=0`인 화면 진단일 뿐 수치 eval이 아니다.
+사용자 요청으로 두 GUI 프로세스 그룹을 종료했고 6109·6110 포트도 해제했다. 학습
+PID `200978`·`200980`은 종료하지 않았다.
+
+정식 수치 평가는 `pickup_diag_eval.sh`로 두 GPU에서 병렬 수행해 모두 정상 완료했다.
+각 평가는 `Humanoid_00006000.pth`, 512 env × A=2 × 3 repeats, seed 0,
+`--test --eval --eval_task carry`를 사용했다. 학습 sidecar를 먼저 source하므로 두 arm
+모두 `MS_MRAND=4`, `MS_CLIP=1`, `MA_TOKEN=live`, `MA_SEP=9`를 재현하고,
+new-carry는 `MA_OLD_CARRY_ONLY=0`, old-carry-only는 `1`로 차이가 보존되었다.
+NPY는 각각 3072 agent-episode × 47열로 완결되었다.
+
+초기화가 불안정한 `test_0`은 목표 도달 판정에서 버리고 `test_1+2` 평균을 쓴다.
+`fin(all)`은 참고용 전체 3 repeats의 agent별 완료율이고 strict pickup 계열은 NPY
+3072행 전체에서 계산했다.
+
+| arm | 목표 도달 `test_1+2` | `fin(all)` | strict `pick` | `bothPick` | `pickA` | `heldFrac` | `closeOnly` |
+|---|---:|---:|---:|---:|---|---:|---:|
+| new + old carry | 0.6899 | 0.7126 | **0.8958** | **0.8158** | 0.8958, 0.8958 | 0.3038 | 0.0781 |
+| old carry only | **0.7002** | **0.7230** | 0.8880 | 0.7956 | 0.8776, 0.8984 | 0.3022 | 0.0833 |
+
+new+old는 strict pickup이 +0.78%p, 두 명 동시 pickup이 +2.02%p 높았다. old-only는
+안정 반복 목표 도달이 +1.03%p, 전체 완료율이 +1.04%p 높았다. `heldFrac`은 사실상
+같다. 즉 6k에서 new carry token이 pickup 기반을 무너뜨렸다는 증거는 없지만,
+목표 도달까지 포함하면 한 arm이 전 지표에서 우세하지 않다. 학습 seed 0 하나의 작은
+차이이므로 현재 결과만으로 carry-token arm을 선택하지 않는다. 과거 `MS_MRAND=0`,
+`MS_CLIP=0` 2×2와는 평가 분포가 다르므로 절대 수치를 직접 순위 비교하지 않는다.
+
+산출물:
+
+```text
+runs/logs/masteer_pickup/eval_pickupa_m4_clip1_{new,old}carry_live_15k_s0_all4_iter6000.log
+runs/results/masteer_pickup/eval_pickupa_m4_clip1_{new,old}carry_live_15k_s0_all4_iter6000.npy
+```
+
+14:07 KST 기준 두 학습은 계속 실행 중이며 양쪽 모두 9k 번호 보존 checkpoint까지
+생성되었다. 이 평가는 6k 고정본을 명시적으로 선택했으므로 이후 최신
+`Humanoid.pth`가 갱신되어도 결과 계보는 바뀌지 않는다.
+
+## 2026-08-27 후속 — variable-speed·CLIP pickup A 재학습
+
+### 왜 A부터 다시 학습하나
+
+현재 `mastop_ab_gradual_live6k_s0_r1` B→C→D 체인의 시작점은
+`pickupdiag_live_15k_s0`의 6k checkpoint다. 이 pickup A는 strict pickup과
+anti-kicking을 복원한 뒤 학습했지만 `MS_MRAND=0`, `MS_CLIP=0`이었다. 즉 고정
+1.5 m/s 경로만 보았고 실제 경로 끝을 넘는 steering window를 포화시키지 않았다.
+
+따라서 B/C/D에 variable-speed나 CLIP을 뒤늦게 추가해 원인을 섞기 전에, pickup A
+자체가 `MS_MRAND=4`, `MS_CLIP=1`을 처음부터 배우도록 새 계보를 만든다. teammate
+입력은 두 arm 모두 `live`로 고정하고 carry token만 비교한다.
+
+### 두 arm의 정확한 계약
+
+| tag | GPU | carry token | 공통 조건 |
+|---|---:|---|---|
+| `pickupa_m4_clip1_newcarry_live_15k_s0` | 6 | trainable new + pretrained old | A=2, 2048 env, seed 0, 15k |
+| `pickupa_m4_clip1_oldcarry_live_15k_s0` | 7 | new token mask, pretrained old only | A=2, 2048 env, seed 0, 15k |
+
+공통 환경변수는 다음과 같다.
+
+```text
+MA_TOKEN=live
+MA_TOKENIZER_ZERO=1
+MA_SEP=9
+MA_SPAWN_GAP=1.0
+MA_C=0
+MA_BETA=0
+MS_SCEN=free
+MS_MRAND=4
+MS_POS_C=2
+MS_VEL_W=1
+MS_VEL_K=5
+MS_CLIP=1
+MS_ENDCLAMP=0
+MS_PICK_HAND=0.35
+MS_PICK_LIFT=0.10
+MS_PICK_FRAMES=10
+```
+
+`newcarry` arm도 새로운 물리 carry task를 뜻하지 않는다. 동일한 42-D carry 관측을
+보는 trainable new carry token과 frozen Stage1 old carry token을 함께 attention에
+넣는다. `oldcarry` arm은 `MA_OLD_CARRY_ONLY=1`로 new carry token만 mask한다.
+
+`MA_SEP=9`라 두 agent의 사람·박스·목표·경로 workspace는 분리되지만 teammate 21-D
+관측은 실제 값이다. 이 단계의 질문은 충돌 회피가 아니라 variable-speed와 실제 경로
+끝 처리 조건에서도 pickup/carry 기반이 유지되는지다. 물리 상호작용은 이후 B/C/D에서
+`MA_SEP=0`으로 학습한다.
+
+anti-kicking은 별도 환경변수가 아니라 `HumanoidMASteerCarry` reward에 항상 켜진
+높이 gate다. 박스 중심이 `box_height/2 + 0.2m` 이하이고 목표 pin 영역 밖이면 box
+velocity reward를 0으로 만들어 바닥에서 차거나 밀어 운반 보상을 얻는 우회를 막는다.
+
+### planner 포함 여부
+
+이 두 pickup A 학습에는 planner, stop state machine, yield oracle, B/C/D scenario가
+전혀 들어가지 않는다. 순수 `HumanoidMASteerCarry` A 재학습이다.
+
+별도로 진행 중인 `mastop_ab_gradual_live6k_s0_r1`의 D에는 true simulator state와
+ETA·예측 clearance를 사용하는 deterministic local planner proxy가 있다. 이것은 학습된
+world model이나 최종 planner가 아니다. 후보 경로 생성, learned dynamics, uncertainty,
+dependency optimization은 없고, 선택된 agent의 steering window scale을 내려 learned
+low-level policy가 정지·재출발을 실행하게 하는 hand-coded 의사결정기다.
+
+### 실행 상태와 산출물
+
+전용 실행기는 `scripts/masteer/pickup_a_m4_clip1_train.sh`다. 기본적으로 GPU당 2잡과
+26 GiB launch floor를 검사하고, `PICKUP_WAIT_PID=<pid>`로 특정 프로세스를 기다릴 수
+있다. 2026-08-27 18:11 KST에는 사용자 명시 승인으로 `PICKUP_WAIT_FOR_SLOT=0`을 사용해
+기존 mastop·stack과 함께 GPU당 3잡으로 즉시 시작했다.
+
+| arm | launcher PID | Python PID | 확인 상태 |
+|---|---:|---:|---|
+| new + old | `200944` | `200978` | GPU 6, `tokenhsi_koo` Python 3.8, rollout/metrics 진행 |
+| old only | `200946` | `200980` | GPU 7, `tokenhsi_koo` Python 3.8, rollout/metrics 진행 |
+
+실제 프로세스 환경에서 두 arm 모두 `CONDA_DEFAULT_ENV=tokenhsi_koo`, 각각
+`CUDA_VISIBLE_DEVICES=6|7`, `MA_TOKEN=live`, `MS_MRAND=4`, `MS_CLIP=1`을 확인했다.
+3k마다 번호 보존 checkpoint를 저장한다.
+
+```text
+runs/output/masteer_pickup/pickupa_m4_clip1_{new,old}carry_live_15k_s0/
+runs/logs/masteer_pickup/pickupa_m4_clip1_{new,old}carry_live_15k_s0.log
+runs/logs/masteer_pickup/pickupa_m4_clip1_{new,old}carry_live_15k_s0.env
+runs/results/masteer_pickup/train_pickupa_m4_clip1_{new,old}carry_live_15k_s0.npy
+```
+
+주의: 기존 `pickup_diag_eval.sh`의 non-f22 경로는 `MS_MRAND=0`, `MS_CLIP=0`을
+하드코딩한다. 이 새 두 tag를 그대로 평가하면 학습-평가 계약이 어긋난다. 최종 평가
+전에 sidecar의 `MS_MRAND=4`, `MS_CLIP=1`, carry mask, teammate 설정을 source하는
+별도 평가 경로를 만들거나 기존 evaluator를 tag-safe하게 확장해야 한다.
+
+## 2026-08-27 후속 — 기존 pickup A 2×2 corrected 결과
+
+Stage2 시작점을 정하기 위해 carry token과 teammate 입력을 분리한 2×2를 seed 0으로
+학습했다. 네 런은 A=2, 2048 env, `MS_MRAND=0`, `MS_VEL_W=1`, `MS_CLIP=0`,
+`MA_SEP=9`, anti-kicking on이었다. 15k 목표였지만 사용자 요청으로 6k 이후 종료했고,
+3k·6k 번호 보존 checkpoint만 비교한다.
+
+| 번호 | carry token | teammate | tag |
+|---:|---|---|---|
+| 1 | new + old | zero | `pickupdiag_zero_15k_s0` |
+| 2 | new + old | live | `pickupdiag_live_15k_s0` |
+| 3 | old only | zero | `pickupdiag_oldcarry_only_teammate_zero_15k_s0_r1` |
+| 4 | old only | live | `pickupdiag_oldcarry_only_teammate_live_15k_s0_r1` |
+
+strict pickup은 `손-박스 <0.35m`, reset 높이 대비 `+0.10m`, 10 policy step 연속이다.
+512 env × A=2 × 3 repeats에서 pickup 지표는 3072 agent-episode 전체로 계산한다. 목표
+도달률은 초기화 문제가 있는 `test_0`을 버리고 `test_1+2`의 2048 trial로 계산한다.
+
+| 번호 | 3k 목표 도달 | 3k pick | 3k bothPick | 6k 목표 도달 | 6k pick | 6k bothPick |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 0.9048 | 0.9163 | 0.8503 | **0.9404** | 0.9206 | 0.8600 |
+| 2 | 0.8696 | 0.9020 | 0.8288 | **0.8999** | 0.9160 | 0.8516 |
+| 3 | 0.8887 | 0.8838 | 0.7930 | **0.9165** | 0.8981 | 0.8171 |
+| 4 | 0.8691 | 0.9014 | 0.8223 | **0.9038** | 0.9089 | 0.8385 |
+
+네 조건 모두 3k→6k 목표 도달률이 2.8~3.6%p 올랐다. live에서는 new+old와 old-only가
+6k `0.8999` 대 `0.9038`로 사실상 같다. teammate live도 zero보다 높지 않다. 다만
+학습 seed 하나라 우열을 결론내리지 않으며, 순위 주장은 같은 설정 최소 n=4가 필요하다.
+
+주의: `pickup_diag_eval.sh` 머리말과 달리 non-f22 수치 평가는 `MS_FLOOR_START=1`을
+export하지 않았다. 위 수치는 학습 cfg의 초기화 분포를 따르는 corrected strict eval이고
+floor-start-only 결과가 아니다. 반면 `pickup_diag_view.sh`는 floor start를 명시한다.
+
+산출물과 재현 경로:
+
+```text
+runs/output/masteer_pickup/<tag>/Humanoid_*/nn/Humanoid_0000{3000,6000}.pth
+runs/logs/masteer_pickup/eval_<tag>_all4_iter{3000,6000}.log
+runs/results/masteer_pickup/eval_<tag>_all4_iter{3000,6000}.npy
+runs/logs/masteer_pickup/<tag>.env
+```
+
+### 과거 baseline과 최신 해석
+
+corrected strict metric으로 다시 잰 과거 MASteer 계보는 다음과 같다.
+
+| checkpoint | strict pick | bothPick | fin | both | spd_err↓ | vslope↑ |
+|---|---:|---:|---:|---:|---:|---:|
+| `ms4_reg_s0` | 0.8623 | 0.7617 | 0.8024 | 0.6465 | 1.055 | — |
+| `ms4_m4_s0` | 0.8662 | 0.7702 | 0.7288 | 0.5098 | 0.602 | 0.257 |
+| `ms14_vw1L_s0` | 0.8984 | 0.8353 | 0.6895 | 0.4609 | 0.476 | 0.520 |
+| `ms12_base4L_s0_ep3000` | 0.9183 | 0.8704 | 0.7497 | 0.6055 | 0.564 | 0.475 |
+| `ms12_base4L_s0` 9k | 0.9264 | 0.8835 | 0.6449 | 0.4297 | 0.409 | 0.720 |
+
+`ms12`는 3k→9k에서 strict pickup이 무너진 것이 아니라 `fin|pickup`이
+`0.7930→0.6806`으로 내려가면서 속도 추종이 좋아졌다. 즉 pickup 이후 강한 속도 명령과
+제한 시간 내 배달 사이 trade-off가 커졌다. 과거 floor-start 화면만 보고 “A pickup이
+전부 실패한다”고 한 잠정 판정은 corrected 2×2 수치로 대체한다.
+
+주요 조건 차이:
+
+| 항목 | `ms12_base4L_s0` | 현재 새 pickup A |
+|---|---:|---:|
+| anti-kicking | 복원 전 | 복원 후, 항상 on |
+| `MS_VEL_W` | 5 | 1 |
+| `MS_MRAND` | 4 | 4 |
+| `MS_CLIP` | 1 | 1 |
+| `MA_SEP` | 0 | 9 |
+| teammate | tokenizer zero | live |
+
+`f22b_long_c20_e25000`은 A=1, fixed 1.5m/s, teammate 없음, 당시 anti-kicking off인
+공간 steering 기준이다. fresh strict pickup은 `0.8957`, 근접은 `0.9862`였다. 따라서
+방향·경로 실행 대조로는 유효하지만 variable-speed·multi-agent pickup 대조는 아니다.
+
+## 2026-08-27 후속 — carry-aware mastop B/C/D 현재 구현
+
+과거 `HumanoidMAStopSteer`/`mastop_mixed_s0`는 object-free 진단이었지만 현재 활성
+`TokenHSI-mastop`은 `HumanoidMAStopCarry`로 박스·목표·strict pickup·anti-kicking과
+MASteer 관측을 유지하는 carry-aware 태스크다.
+
+활성 체인 `mastop_ab_gradual_live6k_s0_r1`은 `pickupdiag_live_15k_s0` 6k에서 시작해
+B→평가→C→평가→D→평가를 순차 실행한다. 공통 학습값은 `MS_MRAND=0`, `MS_VEL_W=1`,
+`MS_CLIP=0`, `MA_TOKEN=live`, `MA_C=MA_BETA=0`, anti-kicking on이다.
+
+| stage | mix | 역할 |
+|---|---|---|
+| B | A 0.50 + B 0.50 | pickup 후 solo stop–hold–resume |
+| C | A 0.35 + B 0.25 + C 0.40 | 직선 90° cross, fixed/random yield agent |
+| D | A 0.35 + B 0.20 + C 0.20 + D 0.25 | ETA·clearance 기반 동적 yield 선택 |
+
+B는 두 agent를 9m 분리하고 strict pickup과 box 1.5m 진행 뒤 한 명만 0.8초 cosine
+brake로 `M:1→0`, 0.75~1.5초 hold 후 release한다. 현재 release는 scale을 즉시 1로
+복원하므로 다음 개선 후보는 별도 cosine resume ramp다.
+
+C는 직선 직각 교차에서 두 agent가 모두 pickup한 뒤 미리 선택한 한 명을 멈추고 다른
+agent가 교차점을 지난 뒤 해제한다. D는 true simulator root/box position·velocity를
+0~3초, 9 sample로 외삽하여 HH/HB/BH/BB footprint signed clearance를 계산한다.
+예측 clearance가 음수이면 남은 arc와 box-speed EMA로 ETA를 구해 늦게 도착하는 agent를
+yield로 latch하고, non-yield 사람과 박스가 모두 교차점 +1m와 nonnegative clearance를
+만족한 뒤 release한다.
+
+이 D는 **full/learned planner가 아니다.** ground-truth state를 쓰는 deterministic local
+planner proxy다. 후보 경로 K개, learned world model/dynamics, uncertainty, route choice,
+dependency optimizer가 없다. 정확한 주장은 “heuristic planner가 stop command를 주고
+learned low-level action policy가 물리적으로 정지·재출발한다”까지다.
+
+상태 의미는 다음 계약을 유지한다.
+
+| state | 의미 | command |
+|---|---|---|
+| PREGRASP | strict pickup 미완료 | 원래 pickup/carry, yield 금지 |
+| GO | 정상 운반 | 원래 steering window |
+| YIELD_BRAKE | 충돌 예상 후 감속 | window scale cosine 1→0 |
+| HOLD | 박스를 든 채 정지 | root·box stop 유지 |
+| RESUME | 상대 통과 뒤 재출발 | 원래 window 복원 |
+| DONE | 목표 배달 | 기존 putdown/종료 규칙 |
+
+stop/yield 평가는 `pick`, `bothPick`, `fin`, `both`, `heldFrac` 외에
+`exactlyOneStop`, `bothStop`, `deadlock`, root/box stopV, `heldDuringStop`,
+`dropDuringStop`, `resumed`, `resumeLatency`, 사람+박스 `dmin`, collision episode와
+conflict 이후 both delivery를 함께 본다. free 회귀는 같은 조건 시작 checkpoint보다
+5%p 이상 나빠지지 않는 것을 초기 관문으로 둔다.
+
+## 0. 다음 Codex가 가장 먼저 할 일
+
+1. `/home/hwanhee/koo_cvpr/AGENTS.md`
+2. `docs/OPERATIONS.md`
+3. `docs/PITFALLS.md`
+4. `METHOD_V2.md` → `REPOS.md` → `plan/PLAN.md`
+5. `plan/PLAN_masteer.md` → `experiments/EXPERIMENTS_masteer.md`
+6. `TokenHSI-masteer/CHANGELOG.md`
+
+현재 작업 트리는 매우 dirty하다. 기존 수정과 `.orig` 파일은 사용자 소유이므로 임의로 reset, checkout, 삭제하지 않는다. 실행 중인 학습·평가·watcher·큐 데몬도 사용자 승인 없이 종료하지 않는다.
+
+## 1. 최종 연구 목표
+
+두 명의 humanoid가 각각 자기 박스를 든 채 서로 교차하는 경로를 걷고, 교차점에서 충돌이 예상되면 한 명이 감속하거나 멈춰 양보한 뒤 다시 출발하는 장면을 만들고 싶다.
+
+이 목표는 세 능력으로 분리해야 한다.
+
+1. **Pickup/carry**: 두 에이전트 모두 박스를 실제로 들어 안정적으로 운반한다.
+2. **Steering/stop execution**: 각 에이전트가 주어진 경로·속도·정지/재출발 명령을 실제 동작으로 수행한다.
+3. **Yield decision**: 상대 위치와 시간을 보고 누가 양보할지 결정한다.
+
+현재 방향은 3번을 한 번에 end-to-end로 학습시키지 않는 것이다. 먼저 1번을 복구하고, 이어서 2번을 독립 시나리오에서 검증한 뒤, 마지막에 3번을 붙인다.
+
+METHOD/PLAN 관점에서는 저수준 Action Policy가 carry + steering + stop/resume 명령을 실행하고, 상위 Planner/WM이 상대를 보고 어느 에이전트의 속도 명령을 낮출지 정하는 구성이 자연스럽다. 현재 `cross` 시나리오는 a1에 GT 감속 프로파일을 주어 실행 능력을 시험하는 것이지, 정책이 스스로 “상대를 보고 양보할 사람”을 결정하게 학습한 것은 아니다.
+
+## 2. 저장소 역할과 작업 경계
+
+- `/home/hwanhee/koo_cvpr/TokenHSI`
+  - 논문 원본 baseline.
+  - 읽기 전용. 수정하거나 옮기면 안 된다.
+- `/home/hwanhee/koo_cvpr/TokenHSI-steer`
+  - 싱글 에이전트 steering 계열의 개인 사본.
+  - 비교 기준은 과거 `f22b_long_c20_e25000`.
+- `/home/hwanhee/koo_cvpr/TokenHSI-masteer`
+  - 현재 핵심 작업 저장소.
+  - A=2 multi-agent carry에 steering window와 teammate token을 합친 구현.
+- `/home/hwanhee/koo_cvpr/TokenHSI-mastop`
+  - 현재 carry-aware stop–wait–resume B/C/D 체인의 활성 저장소.
+  - D의 의사결정기는 learned planner가 아니라 ground-truth 기반 local planner proxy다.
+- `/home/hwanhee/CVPR2027`
+  - 이전 작업 위치. 이번 작업의 활성 기준으로 사용하지 않는다.
+  - 앞으로는 `/home/hwanhee/koo_cvpr` 안에서만 작업한다. 외부 트리 상태는 건드리기 전에 별도 확인한다.
+
+실행 환경은 `tokenhsi_koo`, 허용 GPU는 물리 GPU 6과 7뿐이다.
+
+## 3. 왜 pickup부터 다시 보기로 했는가
+
+처음에는 “상대를 보고 멈출 수 있는가”부터 시험하려 했지만, 현재 MASteer에서 박스를 실제로 들지 않거나 바닥에서 미는 장면이 관찰됐다. 박스를 들지 않은 상태에서는 교차·양보 성공률이 높아도 최종 목표를 검증하는 수치가 아니다.
+
+따라서 순서를 다음처럼 정했다.
+
+1. 실제 pickup/carry를 수치와 화면으로 검증
+2. 박스를 든 상태에서 steering이 유지되는지 검증
+3. 상대가 없는 `solo` 조건에서 감속·정지·재출발 검증
+4. GT 스케줄의 `cross`에서 시간차가 실제로 생기는지 검증
+5. 마지막에 상대 관측을 이용한 yield decision 또는 상위 planner 연결
+
+Stage를 이어서 fine-tune하는 것은 “같은 Stage 2를 두 번 학습하는 오류”가 아니라 curriculum/warm-start가 될 수 있다. 다만 각 단계에서 이전 능력의 회귀 평가를 반드시 같이 해야 한다. 특히 stop 학습 뒤 pickup과 steering이 망가지지 않았는지 확인해야 한다.
+
+## 4. 기준 체크포인트와 기존 기록
+
+| 체크포인트 | 용도 | 기존 기록 |
+|---|---|---|
+| `ms4_m4_s0` | 전달받은 공식 MASteer 기준에 가까운 대조 | 최종 운반 `fin≈0.684` |
+| `ms5_velw5_s0` | 박스 운반 성공이 높아 화면 확인에 유리 | `fin=0.8133`, 기존 full eval `eps=2314` |
+| `f22b_long_c20_e25000` | 싱글 에이전트 steering 정상 동작 기준 | 과거 기록 pickup `0.959`, success `0.942` |
+
+주의:
+
+- 위 `ms5`와 `ms4` 결과는 새 strict pickup 정의와 anti-kicking 보상을 적용해 재학습한 결과가 아니다.
+- `f22b`의 과거 pickup 정의도 현재 strict pickup과 완전히 같다고 가정하면 안 된다.
+- `ms5_velw5_s0` 최신 체크포인트:
+  `TokenHSI-masteer/output/masteer/ms5_velw5_s0/Humanoid_20-21-33-46/nn/Humanoid.pth`
+- 성능 순위를 주장하려면 학습 seed 최소 n=4가 필요하다. 같은 정책의 평가 반복을 늘리는 것과 학습 seed를 늘리는 것은 다르다.
+
+## 5. 원본 TokenHSI reward에서 확인한 사실
+
+원본도 `handheld/pick reward` 자체는 실제 접촉이나 lift를 검사하지 않는다.
+
+- 양손 위치 평균과 박스 중심 사이 거리:
+  `0.2 * exp(-5 * ||mean(hands) - box||²)`
+- 사람과 박스의 수평 거리가 0.7m보다 멀면 0
+- 관련 코드:
+  `TokenHSI/tokenhsi/env/tasks/multi_task/humanoid_traj_sit_carry_climb.py`
+  의 `compute_handheld_reward`
+- 논문 `TokenHSI.pdf`의 carry pickup reward 식도 같은 proximity shaping이다.
+
+하지만 원본 전체 carry reward에는 anti-kicking 장치가 있다.
+
+```python
+height_mask = box_z <= box_height / 2 + 0.2
+pos_reward_far[height_mask] = 0
+vel_reward[height_mask] = 0
+```
+
+즉 박스가 바닥 가까이에 있으면 박스를 차거나 밀어서 얻는 이동 속도 보상을 막는다. 목표 0.5m 안에서는 원본 연산 순서상 도착 pin이 다시 1이 된다.
+
+## 6. 이번에 MASteer에 적용한 변경
+
+파일:
+
+`TokenHSI-masteer/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_steer_carry.py`
+
+### 6.1 Strict pickup 평가
+
+기존 “손이 박스 가까이에 한 번이라도 왔는가”를 pickup 성공으로 보던 proxy를 진단용으로 내리고, 다음 세 조건을 모두 만족해야 실제 pickup으로 latch하게 수정돼 있다.
+
+- 양손 평균 ↔ 박스 중심 거리 `< 0.35m`
+- 박스 높이 상승량 `box_z - reset_z >= 0.10m`
+- 위 두 조건을 `10 frames` 연속 유지, 30Hz 기준 약 0.33초
+
+리셋이 끝난 실제 `box_z`를 그 시점에 직접 기록한다. 사후 추론하지 않는다.
+
+metric 열:
+
+- 40: strict pickup 여부
+- 41: lifted + held 프레임 수
+- 42: 과거 proximity-only 여부
+- 43: proximity 프레임 수
+- 44: reset 직후 box z
+- 45: 최대 lift
+- 46: 최대 연속 lifted+held 프레임
+
+`eval_one.sh` 요약 필드:
+
+- `pickDef`
+- `pick`
+- `heldFrac`
+- `pickA`
+- `bothPick`
+- `close`
+- `closeOnly`
+- `maxLift50`
+- `streak50`
+
+평가 loop도 공식 success 집계에 들어간 done row를 즉시 저장하도록 바뀌었고, NPY 행 수와 로그의 `num_trials` 합이 다르면 실패하도록 flush 검사가 들어가 있다.
+
+8 env, 총 48 row의 metric 스모크 결과:
+
+- strict `pick=0.8958`
+- proximity `close=0.9375`
+- 가까이만 가고 못 든 `closeOnly=0.0417`
+
+이 수치는 metric sanity check이지 신뢰할 만한 최종 성능 평가는 아니다.
+
+### 6.2 Anti-kicking height gate
+
+2026-08-25에 원본과 같은 높이 게이트를 MASteer custom reward에 복원했다.
+
+```python
+box_vel_r = vel_term(...)
+low_box = box_z <= box_height / 2 + 0.2
+box_vel_r = where(low_box and not target_pin, 0, box_vel_r)
+```
+
+효과:
+
+- 박스가 바닥에 있을 때 carry velocity reward를 얻지 못한다.
+- 손 근접, 목표 근처 `pos_near`, 경로 이탈, putdown 보상은 유지한다.
+- 목표 0.5m 안의 pin은 원본처럼 유지한다.
+- 새 학습부터 효과가 있다. 기존 `ms5_velw5_s0` 체크포인트의 행동은 바뀌지 않는다.
+
+검증:
+
+- `tokenhsi_koo` 문법 검사 통과
+- 임계값 이하/이상/목표 pin 경계값 테스트 통과
+- GPU 7, A=2, 2 env 실제 simulator에서 세 반복 완료, rc=0
+- 스모크 로그:
+  `runs/results/masteer/smoke/height_gate_gpu7_a2_e2.log`
+- 스모크 metrics:
+  `runs/results/masteer/smoke/height_gate_gpu7_a2_e2_metrics.json`
+
+anti-kicking을 포함한 pickup 2×2는 6k까지 완료했고, 현재는 variable-speed·CLIP 조건의
+새 pickup A 두 arm이 학습 중이다.
+
+## 7. reward 비중에서 남은 주의점
+
+현재 MASteer 최종 reward는 대략 다음 구조다.
+
+```text
+2 * walk
++ 2 * carry
++ 0.2 * handheld
++ 0.2 * putdown
+- power
++ optional team reward
+```
+
+`MS_VEL_W=5`이면 carry/walk 속도항의 상대적 비중이 매우 커지고 handheld가 상대적으로 작아진다. `ms5_velw5_s0`가 운반 성공률은 높았지만 “드는 모습”이 이상할 수 있었던 이유 중 하나다.
+
+새 height gate는 “들기 전 박스 이동 보상”을 막으므로 가장 직접적인 우회를 차단한다. 그래도 새 학습에서 다음을 같이 비교해야 한다.
+
+- strict `pick`, `bothPick`, `closeOnly`
+- 최종 운반 `fin`, `both`
+- steering `lat`, `spd_err`, `vslope`
+- 화면에서 실제 파지·들기·운반 자세
+
+다음 대조 실험은 새 tag로 동일한 anti-kicking 코드 아래 `MS_VEL_W=1`과 `MS_VEL_W=5`를 비교하는 것이 해석하기 좋다. 단, 큐의 1·2·4열과 새 실험 행은 사용자 소유이므로 Codex가 임의로 큐에 추가하면 안 된다.
+
+## 8. steering과 stop에 대한 현재 판단
+
+### Steering
+
+싱글 에이전트 기준은 활성 작업 루트 안에 보존한 `f22b_long_c20_e25000` 기록이다.
+MASteer는 teammate token과 steer window를 포함하지만 성공률만으로 steering이 된다고
+말하면 안 된다. `f22b`는 고정 1.5m/s 공간 steering 검증이고 general variable-speed
+제어를 검증한 것은 아니다.
+
+필수 지표:
+
+- `lat_root`, `lat_box`: 경로 이탈
+- `spd_err`: 실제 속도와 명령 속도 차이
+- `vslope`, `vc`: 명령 속도별 실제 속도 반응
+- 성공률은 목표로 직진해도 높아질 수 있으므로 보조 지표다.
+
+### Stop/resume
+
+현재 carry-aware mastop B/C/D가 stop–hold–resume를 단계적으로 학습 중이다. B의 brake는
+0.8초 cosine ramp지만 release는 아직 즉시 `0→1`이라 자연스러운 재출발은 미검증이다.
+따라서 stop이 “해결됐다”고 판정하지 않는다. 먼저 B gate의 stopRate·held·resumed와
+root/box 속도를 보고, 다음 단일축으로 resume cosine ramp를 비교한다.
+
+### Yield
+
+현재 C는 fixed/random yield schedule이고 D는 simulator ground truth 기반 ETA·clearance
+heuristic이다. teammate token은 low-level policy에 live로 들어가지만 yield agent 선택은
+신경망이 하지 않는다. 따라서 “상대를 보고 정책이 스스로 양보한다”고 주장할 수 없다.
+최종 단계에서는 learned planner/WM 또는 명시적 상위 planner가 teammate state로 yield
+agent와 speed window를 결정해야 한다.
+
+## 9. Cross 시나리오 과거 오류
+
+이전 `/home/hwanhee/CVPR2027/TokenHSI-masteer`에서 다음 self-check 오류가 있었다.
+
+```text
+교차점까지 호길이 8.263m != MS_L/2=6.000m
+실측 곡률lat=1.732, 총호=15.099m
+MS_LAT_MAX=0인데 경로가 휘어 있음
+```
+
+교차 시나리오는 반드시 직선이어야 한다.
+
+- `MS_L=12`
+- 교차점 호길이 양쪽 모두 6.0m
+- `MS_LAT_MAX=0`
+- self-check를 끄기 전에 왜 곡선이 생성됐는지 확인
+
+현재 활성 기준은 `/home/hwanhee/koo_cvpr/TokenHSI-masteer`다. 옛 CVPR2027 트리의 오류를 우회하기 위해 `MS_DBG=0`만 주고 결과를 해석하면 안 된다. `MS_DBG=0`은 구경용일 뿐 과학적 검증용이 아니다.
+
+## 10. 평가 명령
+
+기존 정책을 새 strict pickup 기준으로 full eval하려면 같은 tag의 기존 로그를 덮지 않도록 suffix를 사용한다.
+
+```bash
+cd /home/hwanhee/koo_cvpr
+
+MA_CONDA_ENV=tokenhsi_koo \
+MS_EVAL_SUFFIX=strictpick \
+bash scripts/masteer/eval_one.sh ms5_velw5_s0 7 512
+```
+
+- GPU 인자는 두 번째 위치인자이며 6 또는 7만 사용한다.
+- 기본 full eval은 512 env와 3 repeats를 사용한다.
+- 8 env/48 row smoke는 지표 구현 확인용이고 최종 성능 주장의 근거가 아니다.
+- 실행 전 같은 tag/suffix의 claim, log, process가 없는지 확인한다.
+- 평가 config는 학습 sidecar를 재생해야 한다. 추측한 config로 평가하지 않는다.
+
+기존 pickup 2×2는 위 방식으로 평가할 수 있다. 현재 MRAND4·CLIP1 새 A 두 tag는 기존
+`pickup_diag_eval.sh`의 하드코딩과 계약이 다르므로, sidecar-safe evaluator를 만든 뒤
+평가한다.
+
+## 11. VNC 시각화와 GPU 0 문제
+
+일반 접속 방식:
+
+```bash
+ssh -L 6100:localhost:6100 <server>
+# 브라우저
+http://localhost:6100/vnc.html
+```
+
+과거 사용 예:
+
+```bash
+PORT=6100 MS_VIZ=1 ENVS=1 MS_CAM=top \
+bash scripts/masteer/view.sh ms5_velw5_s0
+```
+
+2026-08-26에 이 문제는 fail-closed 방식으로 수정됐다. GUI는 반드시
+`scripts/{masteer,mastop}/view.sh`, 해당 `record.sh`, 또는 `scripts/tokenhsi_gui.sh`만
+사용한다. 이 진입점들은 실행 전에 `scripts/vulkan_gpu_guard.py <6|7>`로 Vulkan 장치가
+정확히 한 장인지와 UUID가 요청한 물리 GPU와 같은지 검증한다. 가드가 성공한 단일 장치
+안에서만 `cuda:0`, `graphics_device_id=0`을 사용한다.
+
+`CUDA_VISIBLE_DEVICES`만으로 Vulkan이 제한된다고 가정하면 안 된다. `DRI_PRIME`은
+`6!` 또는 `7!` 숫자 selector만 허용하며 PCI selector는 금지한다. 가드를 우회한 직접
+Isaac Gym GUI 실행은 여전히 금지다.
+
+추가 주의:
+
+- `ms1`~`ms10` 체크포인트는 `MS_CLIP=0`으로 학습됐다. `ms5`를 볼 때 반드시 `MS_CLIP=0`.
+- `ms11` 이후는 보통 `MS_CLIP=1`.
+- 잘못 맞춰도 크래시 없이 관측만 달라져 성능이 조용히 망가진다.
+- 현재 올바른 viewer 형태는 가드가 연결된 wrapper를 쓰는 것이다.
+
+```bash
+MA_GPU=6 PORT=6100 MS_VIZ=1 ENVS=1 MS_CAM=top MS_CLIP=0 \
+bash scripts/masteer/view.sh ms5_velw5_s0
+```
+
+## 12. 다음 작업 권장 순서
+
+### 단계 A — 현재 두 체인 완료와 계약 일치 평가
+
+- 진행 중인 carry-aware mastop B/C/D 체인의 gate 결과를 보존한다.
+- 진행 중인 `pickupa_m4_clip1_{new,old}carry_live_15k_s0`의 3k/6k checkpoint부터 본다.
+- 새 A 평가는 sidecar의 `MS_MRAND=4`, `MS_CLIP=1`, carry mask를 반드시 재생한다.
+- strict pickup·bothPick·fin·both와 `lat`, `spd_err`, `vslope`를 함께 비교한다.
+
+### 단계 B — 새 A에서 carry token 선택
+
+같은 seed의 new+old 대 old-only는 원인 분리용일 뿐 순위 확정용이 아니다. pickup과
+variable-speed steering을 모두 통과한 arm만 다음 B/C/D의 새 시작점 후보로 둔다.
+차이가 학습 seed 산포 0.046 안이면 최소 n=4로 반복한다.
+
+### 단계 C — 자연스러운 resume와 일반화
+
+- B에 cosine resume ramp 단일축을 추가한다.
+- C/D의 고정 90° 직선 교차를 60~120°·global yaw·초기 거리 무작위화로 확장한다.
+- 임의 MRAND4 추종과 deterministic `1.5→0→1.5` stop family를 별도 평가한다.
+- curved stop은 판정 geometry가 아니라 강건성 평가로만 사용한다.
+
+### 단계 D — 독립 arm과 seed 반복
+
+현재 B→C→D 체인은 curriculum/debug에는 적합하지만 단계별 인과 비교에는 부족하다.
+최종 주장은 같은 pickup A checkpoint에서 A/AB/ABC/ABCD를 독립 시작하고 seed를 늘려
+검증한다. `MA_SEP=0` same-condition A 회귀를 반드시 함께 둔다.
+
+### 단계 E — 실제 planner/WM
+
+마지막에만 learned planner/WM 또는 명시적 상위 planner를 연결한다. 후보 경로,
+예측 dynamics, uncertainty와 dependency를 포함하지 않은 현재 D heuristic은 proxy
+대조로 남긴다.
+
+## 13. 현재 변경 파일과 산출물
+
+핵심 변경:
+
+- `TokenHSI-masteer/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_steer_carry.py`
+  - strict pickup metric
+  - anti-kicking height gate
+- `scripts/masteer/eval_one.sh`
+  - strict pickup summary
+  - metric flush 검증
+- `TokenHSI-masteer/CHANGELOG.md`
+  - 변경 이유와 스모크 기록
+- `scripts/masteer/view.sh`
+  - Vulkan UUID fail-closed guard 연결 완료
+- `scripts/masteer/pickup_a_m4_clip1_train.sh`
+  - MRAND4·CLIP1 pickup A의 new+old/old-only 두 arm 실행
+- `TokenHSI-mastop/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_stop_carry.py`
+  - carry-aware A/B/C/D와 local planner proxy
+
+관련 문서:
+
+- `plan/PLAN_masteer.md`
+- `experiments/EXPERIMENTS_masteer.md`
+- `docs/PITFALLS.md`
+- `docs/METHOD_MA_STOP_STEER_STAGE2.md`는 이 통합 문서를 가리키는 호환 안내로 유지
+
+현재 작업 트리의 관련 파일은 modified/untracked 상태다. `.orig` 파일을 포함해 임의 삭제하거나 원복하지 않는다.
+
+## 14. 다음 Codex에 전달할 한 문장
+
+“`/home/hwanhee/koo_cvpr` 안에서만 작업하고 GPU 6·7과 conda `tokenhsi_koo`만 사용하라.
+strict pickup과 anti-kicking은 구현됐고 corrected pickup 2×2는 6k까지 완료됐다. 현재
+MRAND4·CLIP1 pickup A 두 arm과 carry-aware mastop B/C/D가 실행 중이다. D는 learned
+planner가 아니라 GT 기반 heuristic proxy이며, 새 A 평가는 반드시 sidecar 계약을
+재생해야 한다. GUI는 Vulkan UUID guard가 연결된 wrapper만 사용하라.”

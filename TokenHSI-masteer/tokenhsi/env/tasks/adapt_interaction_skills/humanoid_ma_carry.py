@@ -37,6 +37,9 @@ class HumanoidMACarry(HumanoidTrajSitCarryClimb):
         # MA_TOKEN=zero 면 토큰 자리는 그대로 두고 값만 0 으로 채운다. obs 크기가 같아야
         # zero 와 live 가 **같은 네트워크**로 비교된다 -- 크기가 달라지면 그 비교는
         # "토큰 내용" 이 아니라 "네트워크 구조" 를 비교하는 게 되어 무의미해진다.
+        # MA_TOKEN=mask 는 live 21-D 관측을 그대로 계산하되 adapt 빌더가 teammate
+        # 토큰을 attention key/value 에서 제외한다. zero 토큰도 softmax 분모를 바꾸므로
+        # "토큰이 아예 없음" 을 재려면 이 모드를 써야 한다.
         # 입력축 ablation. **차원 수(21)는 항상 같고 내용만 0 으로 덮는다** --
         # 크기가 바뀌면 토크나이저가 달라져서 "입력 내용"이 아니라 "네트워크 구조"를
         # 비교하게 된다. zero/live 를 같은 크기로 둔 것과 같은 이유다.
@@ -44,8 +47,9 @@ class HumanoidMACarry(HumanoidTrajSitCarryClimb):
         #   r12   상대 root pos·vel·heading 까지            (12)
         #   r18   + 상대 박스 pos·vel                       (18)
         #   live  + 상대 박스 목표 = 전체                    (21)
+        #   mask  live 와 같은 값, actor attention 에서는 완전 제외 (21)
         self._token_mode = os.environ.get("MA_TOKEN", "live")
-        assert self._token_mode in ("live", "zero", "r12", "r18"), self._token_mode
+        assert self._token_mode in ("live", "zero", "r12", "r18", "mask"), self._token_mode
         super().__init__(cfg=cfg, sim_params=sim_params, physics_engine=physics_engine,
                          device_type=device_type, device_id=device_id, headless=headless)
 
@@ -125,7 +129,10 @@ class HumanoidMACarry(HumanoidTrajSitCarryClimb):
                 local(self._box_tar_pos[other, 0:3] - my_pos),       # 3
             ], dim=-1))
         obs = torch.cat(out, dim=-1)
-        keep = {"zero": 0, "r12": 12, "r18": 18, "live": TEAMMATE_DIM}[self._token_mode]
+        keep = {
+            "zero": 0, "r12": 12, "r18": 18,
+            "live": TEAMMATE_DIM, "mask": TEAMMATE_DIM,
+        }[self._token_mode]
         if keep < TEAMMATE_DIM:
             # 상대 1명당 블록 안에서 뒤쪽을 0 으로 덮는다 (A>=3 이어도 블록마다 적용)
             v = obs.view(obs.shape[0], -1, TEAMMATE_DIM).clone()

@@ -21,7 +21,9 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path("/home/hwanhee/CVPR2027")
+from strict_pickup import summarize_npz
+
+ROOT = Path(__file__).resolve().parents[2]
 LOGS = ROOT / "runs/queue/logs"
 DS = 0.1
 
@@ -88,7 +90,7 @@ def score_run(npz_path):
     legacy = bool(d["legacy"]) if "legacy" in d else True
 
     acc = {k: [] for k in ("app_xt", "car_xt", "app_r2", "car_r2")}
-    delivered, picked, early = [], [], []
+    delivered, early = [], []
     n_approach = n_scored = 0
     for n in range(root.shape[1]):
         sel = pick_episode(d, ep, n)
@@ -102,7 +104,6 @@ def score_run(npz_path):
         g = g_full[:max(end, 2)]
         i_box = int(np.clip(round(s_box_n / DS), 1, len(g) - 1))
 
-        picked.append(h.any())
         # 38.5 % of episodes start from the carryWith reference motion, so the
         # character is already holding the box and s_box is under a metre. Those
         # have no approach to steer; averaging them in dilutes the approach
@@ -139,6 +140,7 @@ def score_run(npz_path):
         v = np.concatenate(acc[key]) if key.endswith("_xt") else np.asarray(acc[key])
         return float(np.percentile(v, pct)) if pct else float(np.median(v))
 
+    pickup = summarize_npz(npz_path)
     return {
         "run": Path(npz_path).stem,
         "envs": int(root.shape[1]),
@@ -154,7 +156,10 @@ def score_run(npz_path):
         "car_xt_p95": agg("car_xt", 95),
         "car_r2_med": agg("car_r2"),
         "approach_frac": float(n_approach / max(n_scored, 1)),
-        "picked_frac": float(np.mean(picked)) if picked else 0.0,
+        "picked_frac": pickup["pickup_frac"],
+        "pickup_n": pickup["episodes"],
+        "pickup_definition": pickup["definition"],
+        "proximity_frac": pickup["close_frac"],
         "delivered_frac": float(np.mean(delivered)) if delivered else None,
         "delivered_n": len(delivered),
         "early_place_frac": float(np.mean(early)) if early else 0.0,

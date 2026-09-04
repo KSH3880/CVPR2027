@@ -69,21 +69,11 @@ makespan  하한 294 / 순차 588
 | tag | 질문·판정 기준 | 상태/GPU | 환경변수 |
 | --- | --- | --- | --- |
 
-| `ms6_m8_long_s0` | **속도 곡선 장기.** 3000 에서 기울기 0.076. A=1 은 같은 창 코드로 0.45~0.49 를 냈다 |  | `MS_MRAND=8 MS_ITERS=9000` |
 
 
-| `ms11_clip_s0` | **끝 클램프.** 호길이·조준점·창을 실제 경로 끝에서 포화. TokenHSI traj 의 `clip(t/dur,0,1)` 을 거리 버전으로. 지금까지 최선(속도항 ×5)과 함께 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1` |
-| `ms11_clip_s1` | 끝 클램프 시드 1 |  | `MS_MRAND=8 MS_VEL_W=5 MS_CLIP=1 MS_SEED=1` |
 
 
-| `ms12_base4L_s0` | 같은 설정 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
 
-| `ms13_sep9L_s0` | sep 9 + 9000 iter. 속도 채널이 3000 에서 아직 점화 중이었다 |  | `MA_SEP=9 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
-| `ms13_sep20L_s0` | sep 20 + 9000 iter. `ms12_base4L_s0`(sep 0) 와 3단 비교가 된다 |  | `MA_SEP=20 MS_MRAND=4 MS_VEL_W=5 MS_CLIP=1 MS_ITERS=9000` |
-
-| `ms14_vw1L_s0` | **빠져 있던 대조군.** 돌고 있는 `ms12_base4L_s0` 과 `MS_VEL_W` 한 글자만 다르다(5→1). `VEL_W=5` 가 속도항 비중을 50%→83% 로 올려 `handheld`(집기)를 12.5%→4.2% 로 눌렀다는 진단을 여기서 판정한다. `ms4_m4_s0`(VEL_W=1)은 CLIP 이 없어 이 비교가 불가능했다 |  | `MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
-| `ms14_vw2L_s0` | 1 과 5 의 기하 중간(√5≈2.2). 1 이 집기를 지키고 5 가 속도를 이기면 **중간에 최적점이 있는지**. `VEL_W` = 1·2·5 세 점이 된다 (5 는 `ms12_base4L_s0` 이 이미 돈다) |  | `MS_VEL_W=2 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
-| `ms14_mloL_s0` | **M=0(완전 정지)을 배우나.** `mult.clamp(min=MS_M_LO)` 가 0.25 라 정책이 정지 명령을 한 번도 본 적이 없다(최저 0.375 m/s). 보상에는 `stopped = v_tar<0.05` 분기가 이미 있는데 이 하한 때문에 안 돈다. `VEL_W=1` 로 맞춰 **`ms14_vw1L_s0` 이 그대로 대조군**이다. 되면 월드모델이 정지를 명령할 수 있고 시각화 9·10 이 해금된다 |  | `MS_M_LO=0 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000` |
 <!-- /QUEUE -->
 
 ## GT 시나리오

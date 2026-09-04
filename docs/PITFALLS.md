@@ -224,3 +224,52 @@ rc=0 으로 끝난다. 죽은 것은 새 토큰 하나뿐이라 나머지가 그
 
 새 입력·새 토큰을 추가하면 2 iteration 짜리로 이것부터 돌린다. 체크포인트로도 잡힌다 --
 학습 뒤에도 가중치 max 가 `1/sqrt(fan_in)` 과 정확히 일치하면 한 번도 안 움직인 것이다.
+
+## 13. `CUDA_VISIBLE_DEVICES`가 Vulkan GPU를 제한하지 않았다 (2026-08-26)
+
+Isaac Gym noVNC 뷰어를 `CUDA_VISIBLE_DEVICES=6`, `cuda:0`,
+`graphics_device_id=0`으로 실행했는데 Python PID가 물리 GPU 0에도 그래픽
+컨텍스트를 만들었다. CUDA/PhysX의 `cuda:0`은 마스킹된 물리 GPU 6을 뜻하지만,
+Vulkan 장치 열거는 `CUDA_VISIBLE_DEVICES`와 독립적이다. 터미널에는 둘 다
+`0`으로 보여서 화면과 시뮬레이션이 정상이어도 잘못된 물리 GPU 사용이 숨는다.
+
+처음 넣은 PCI selector도 이 서버에서는 실패했다.
+
+| selector | Vulkan에 노출된 장치 | 판정 |
+|---|---:|---|
+| `pci-0000_e6_00_0!` | NVIDIA 8장 + llvmpipe 1장 | 실패. `graphics_device_id=0`이 물리 GPU 0을 선택 |
+| `6!` | UUID `8d9172bc-465c-1e5b-4240-28d6a045b785`, PCI `e6:00.0` 한 장 | 물리 GPU 6 |
+| `7!` | UUID `3e1773be-ab91-d0cf-c707-a9ddeebdc342`, PCI `e7:00.0` 한 장 | 물리 GPU 7 |
+
+**방어책**
+
+- GUI·카메라·녹화는 가드가 연결된 트랙 `view.sh`·`record.sh` 또는
+  `scripts/tokenhsi_gui.sh`로만 시작한다. 새 진입점도 Isaac Gym보다 먼저
+  `scripts/vulkan_gpu_guard.py <6|7>`를 호출한다.
+- 가드는 6·7 이외 번호와 `NODEVICE_SELECT`를 거부하고, 숫자형
+  `DRI_PRIME=<GPU>!` 적용 뒤 Vulkan 장치 수가 정확히 1인지 검사한다.
+- 그 한 장의 Vulkan UUID가 `nvidia-smi -i <GPU>`의 UUID와 다르면 Xvfb와
+  Isaac Gym을 시작하지 않는다. 단순히 장치 수만 세면 잘못된 한 장도 통과하므로
+  UUID 비교를 제거하지 않는다.
+- `DRI_PRIME=pci-...!`와 `CUDA_VISIBLE_DEVICES` 단독 제한은 금지한다.
+  `--graphics_device_id 0`은 가드가 성공해 Vulkan 장치가 한 장만 보일 때만 쓴다.
+- 이 방어는 실행 프로세스의 환경변수만 설정한다. 서버 전역 Vulkan·드라이버 설정은
+  수정하지 않는다.
+
+수동 preflight는 GPU 작업을 시작하지 않고 다음처럼 확인한다.
+
+    python3 scripts/vulkan_gpu_guard.py 6
+    # stdout: 6!
+    # stderr: physical GPU 6, UUID ..., DRI_PRIME=6!
+
+## 14. pickup latch와 frame 평균이 시각적 놓침을 숨겼다 (2026-08-30)
+
+mastop의 `pick`은 손 평균 위치·10 cm lift가 10 frame 연속이면 이후 영구히 1이고,
+`heldStop`은 stop frame 전체 평균이었다. 잠깐 들었다가 놓치거나 resume 뒤 놓쳐도
+`pick≈0.9`, `heldStop≈0.9`가 나와 GUI의 반복 실패와 수치가 모순처럼 보였다.
+
+**방어책**
+- latch 성공률을 terminal retention으로 부르지 않는다.
+- 양손 각각의 box OBB 거리, terminal 상태, stop 이후 break/regrasp를 episode 단위로 함께 센다.
+- 손 net contact force는 접촉 상대를 구분할 수 없고 합력이 상쇄될 수 있어 단독 gate로 쓰지 않는다.
+- 정지 자연스러움은 접촉 발 planar speed, path-frame 횡속도, yaw-rate를 별도로 측정한다.

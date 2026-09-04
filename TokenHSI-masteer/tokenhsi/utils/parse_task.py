@@ -51,6 +51,7 @@ from env.tasks.comp_interaction_skills.humanoid_comp_traj_carry import HumanoidC
 from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_box2objs import HumanoidAdaptCarryBox2Objs
 from env.tasks.adapt_interaction_skills.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
+from env.tasks.adapt_interaction_skills.humanoid_ma_sequential_stack_release import HumanoidMASequentialStackRelease
 
 # terrain shape variation
 from env.tasks.adapt_interaction_skills.humanoid_adapt_traj_ground2terrain import HumanoidAdaptTrajGround2Terrain

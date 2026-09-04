@@ -18,7 +18,9 @@ set -u
 TAG=${1:?사용법: record.sh <tag> [초] [env수]}
 SEC=${2:-30}
 N=${3:-3}
-ROOT=/home/hwanhee/CVPR2027
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+GPU=${MA_GPU:-6}
+VIEW_DRI=$(python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GPU") || exit $?
 mkdir -p "$ROOT/runs/results/video"
 MP4=$ROOT/runs/results/video/${TAG}_$(date +%H%M%S).mp4
 
@@ -43,11 +45,13 @@ PY
 
 MA_VIDEO="$MP4" MA_VIDEO_FRAMES=$((SEC * 30)) MA_VIDEO_EVERY=${MA_VIDEO_EVERY:-2} \
 MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1} MA_TOKEN=${MA_TOKEN:-live} MA_SEP=${MA_SEP:-0} \
-CUDA_VISIBLE_DEVICES=${MA_GPU:-4} \
+CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=$GPU \
+VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select DRI_PRIME=$VIEW_DRI \
 python -u ./tokenhsi/run.py --task HumanoidMACarry \
   --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
   --cfg_env "$CFG" --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
   --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth --checkpoint "$SNAP" \
+  --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id 0 \
   --test --headless --eval_task carry 2>&1 | grep -E "^\[ma\] video|Traceback"
 
 [ -s "$MP4" ] && echo "[rec] $MP4  ($(du -h "$MP4" | cut -f1))" || echo "[rec] 실패"

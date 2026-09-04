@@ -17,6 +17,13 @@ ROOT=/home/hwanhee/CVPR2027
 VNC_DIR=/home/hwanhee/opt/vnc
 TAG=${1:?사용법: record.sh <tag>}
 ENVS=${ENVS:-1}
+# 명령행 override가 없으면 학습 때 저장한 teammate attention 모드를 재생한다.
+# 전체 sidecar는 아래의 영상 시나리오 설정을 덮을 수 있어 MA_TOKEN만 읽는다.
+if [ -z "${MA_TOKEN+x}" ] && [ -f "$ROOT/runs/queue/logs/$TAG.env" ]; then
+    MA_TOKEN=$(bash -c 'source "$1"; printf "%s" "${MA_TOKEN:-live}"' _ \
+        "$ROOT/runs/queue/logs/$TAG.env")
+    export MA_TOKEN
+fi
 # MS_VIZ 를 구체 변수로 편다. view.sh 와 **같은 파일**을 쓴다 -- 매핑이 갈라지면
 # 뷰어에서 확인한 것과 영상이 달라진다.
 . "$ROOT/scripts/masteer/viz_env.sh"
@@ -39,7 +46,10 @@ conda activate tokenhsi
 
 CKPT=$(ls -t output/masteer/$TAG/*/nn/Humanoid.pth 2>/dev/null | head -1)
 [ -z "$CKPT" ] && { echo "체크포인트 없음: $TAG"; exit 1; }
-SNAP=/tmp/rec_${OUT}.pth; cp "$CKPT" "$SNAP"
+SNAP_DIR=$(mktemp -d "/tmp/masteer_record.XXXXXX")
+mkdir -p "$SNAP_DIR/nn"
+SNAP="$SNAP_DIR/nn/Humanoid.pth"
+cp "$CKPT" "$SNAP"
 
 mkdir -p "$VIDEO_DIR"
 VIDEO=$VIDEO_DIR/${OUT}.mp4
@@ -58,7 +68,7 @@ PY
 cleanup() {
     [ -n "${FFMPEG_PID:-}" ] && { kill -INT $FFMPEG_PID 2>/dev/null; wait $FFMPEG_PID 2>/dev/null; }
     kill ${SIM_PID:-} ${XVFB_PID:-} 2>/dev/null
-    rm -f "$SNAP"
+    rm -rf -- "$SNAP_DIR"
 }
 trap cleanup EXIT INT TERM
 
@@ -72,7 +82,7 @@ MS_SCEN=${MS_SCEN:-free} MS_DT=${MS_DT:-0} MS_DT_RAND=${MS_DT_RAND:-0} \
 MS_DECEL=${MS_DECEL:-a1} MS_L=${MS_L:-12} MS_RECOV=${MS_RECOV:-1.5} \
 MS_GAP=${MS_GAP:-1.0} MS_SEP=${MS_SEP:-9.0} \
 MS_LAT_MAX=${MS_LAT_MAX:-2.2} MS_SCEN_CURVE=${MS_SCEN_CURVE:-0} \
-MS_VEL_W=${MS_VEL_W:-1} MS_CLIP=${MS_CLIP:-0} MS_DRAW_SPEED=${MS_DRAW_SPEED:-1} \
+MS_VEL_W=${MS_VEL_W:-1} MS_CLIP=${MS_CLIP:-1} MS_DRAW_SPEED=${MS_DRAW_SPEED:-1} \
 MS_DBG=1 MS_SEED=${MS_SEED:-0} \
 MS_CAM=${MS_CAM:-top} MS_CAM_H=${MS_CAM_H:-17} MS_CAM_B=${MS_CAM_B:-9} \
 MA_TRAJ=${TRAJ_OUT:-/tmp/rec_traj_${OUT}.npy} MA_TRAJ_ENVS=1 MA_TRAJ_STEPS=900 \

@@ -51,6 +51,13 @@ class TransAgent(amp_agent.AMPAgent):
         super().__init__(base_name, config)
 
         return
+    def _preproc_obs(self, obs_batch):
+        import os
+        if (os.environ.get("MA_FREEZE_INPUT_RMS", "0") == "1"
+                and self.normalize_input):
+            self.running_mean_std.eval()
+        return super()._preproc_obs(obs_batch)
+
     
     def _build_net_config(self):
         config = super()._build_net_config()

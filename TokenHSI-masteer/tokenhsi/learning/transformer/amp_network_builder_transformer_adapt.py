@@ -181,6 +181,14 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 assert self.extra_ids, self.each_subtask_name
                 self.extra_id = self.extra_ids[0]
                 self.extra_task_obs_size = self.task_obs_each_size[self.extra_id]
+                # HumanoidMACarry 계열의 첫 extra 는 항상 teammate 다. 값만 0 으로
+                # 만드는 MA_TOKEN=zero 와 달리 mask 는 attention key/value 에서 정확히
+                # 제외한다. token sequence 는 [weight, self, extra...] 이므로 첫 extra
+                # 위치는 2다. 마스크는 TransformerEncoder 모든 층에 반복 적용된다.
+                self.mask_teammate_token = _osf.environ.get("MA_TOKEN", "live") == "mask"
+                self.teammate_token_pos = 2
+                if self.mask_teammate_token:
+                    print("[ma] teammate token: exact attention mask (MA_TOKEN=mask)", flush=True)
 
             ######## the first trainable task tokenizer
             s = self.task_obs_each_size[self.new_major_id]
@@ -205,6 +213,20 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
             else:
                 raise NotImplementedError
+
+            # Stack-release continuation can protect the already learned carry
+            # representation without changing token count or tensor shapes.
+            # Steering extras and the residual adapter remain trainable.
+            self.freeze_new_carry = (
+                _osf.environ.get("MA_FREEZE_NEW_CARRY", "0") == "1"
+            )
+            if self.freeze_new_carry:
+                if self.major_task_name != "carry":
+                    raise ValueError("MA_FREEZE_NEW_CARRY requires major_task_name=carry")
+                self.task_encoder[self.new_major_id].requires_grad_(False)
+                self.task_encoder[self.new_major_id].eval()
+                self.new_task_trainable_rms.eval()
+                print("[ma] new carry tokenizer frozen", flush=True)
             
             num_features = self.weight_token.shape[-1]
             
@@ -295,13 +317,39 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                         if getattr(m, "bias", None) is not None:
                             torch.nn.init.zeros_(m.bias)
 
+            self.adapter_only = _osf.environ.get("MA_ADAPTER_ONLY", "0") == "1"
+            if self.adapter_only:
+                if not self.use_internal_adaptation:
+                    raise ValueError("MA_ADAPTER_ONLY requires use_internal_adaptation")
+                self.self_encoder.requires_grad_(False)
+                self.transformer_encoder.requires_grad_(False)
+                self.composer.requires_grad_(False)
+                self.weight_token.requires_grad_(False)
+                if hasattr(self, "pos_embed"):
+                    self.pos_embed.requires_grad_(False)
+                for encoder in self.task_encoder:
+                    encoder.requires_grad_(False)
+                self.new_task_trainable_rms.eval()
+                print("[ma] actor trainable: internal_adapt_mlp only", flush=True)
+
             return
         
         def _eval_Transformer(self, obs, not_normalized_obs):
 
             B = obs.shape[0]
+            if self.adapter_only:
+                self.self_encoder.eval()
+                self.transformer_encoder.eval()
+                self.composer.eval()
+                for encoder in self.task_encoder:
+                    encoder.eval()
+
 
             # new major task token
+            if self.freeze_new_carry:
+                # model.train() recursively flips modules back to training mode.
+                # Keep the carry normalizer fixed together with its tokenizer.
+                self.new_task_trainable_rms.training = False
             new_task_obs = self.new_task_trainable_rms(not_normalized_obs[..., self.self_obs_size:][..., self.task_obs_each_indx[self.new_major_id]:self.task_obs_each_indx[self.new_major_id + 1]])
             new_task_token = self.task_encoder[self.new_major_id](new_task_obs).unsqueeze(1)
 
@@ -351,6 +399,11 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
             if self.use_prior_knowledge:
                 src_key_padding_mask[:, self.how_many_new_tasks + 2:] = False
+
+            # 반드시 모든 활성화 처리 뒤에 다시 가린다. True 는 PyTorch
+            # src_key_padding_mask 에서 key/value 로 사용하지 않는다는 뜻이다.
+            if self.has_extra and self.mask_teammate_token:
+                src_key_padding_mask[:, self.teammate_token_pos] = True
             
             # src_key_padding_mask[:, 2:] = True # 只imitate style
 
