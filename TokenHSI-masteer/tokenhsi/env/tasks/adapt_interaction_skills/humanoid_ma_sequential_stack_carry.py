@@ -65,6 +65,11 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             self.num_envs, dtype=torch.bool, device=self.device)
         self._carry_rehearsal = torch.zeros(
             self.num_envs, dtype=torch.bool, device=self.device)
+        # Eval success is intentionally looser than task completion: once A2
+        # brings its box into the top placement tolerance, remember that event
+        # even if the box later moves before the episode is flushed.
+        self._seq_top_reached = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device)
         # Episode-direct evaluation metrics.  Columns are grouped as
         # placement / retreat / A2 so a long wait in one phase cannot hide a
         # steering regression in another phase.  Shape is (agent rows, 3).
@@ -131,6 +136,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         super()._reset_envs(env_ids)
         if hasattr(self, "_sequential_reset_reported") and len(env_ids) > 0:
             self._sequential_reset_reported[env_ids] = False
+        if hasattr(self, "_seq_top_reached") and len(env_ids) > 0:
+            self._seq_top_reached[env_ids] = False
 
     def _compute_reset(self):
         super()._compute_reset()
@@ -166,10 +173,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         self.extras["stack_carry_rehearsal"] = \
             self._carry_rehearsal.repeat_interleave(self.num_agents)
         if self._is_eval:
-            # The inherited success buffer means ordinary carry delivery.
-            # Sequential-stack evaluation instead succeeds only after the
-            # top box has passed VERIFY_STACK and reached DONE.
-            stack_success = (self._stack_phase == self.DONE)
+            # Evaluation counts an episode once A2 has put its box inside the
+            # top-pose tolerance.  Task completion remains the stricter DONE
+            # condition and is not changed by this reporting criterion.
+            stack_success = self._seq_top_reached
             self.extras["success"] = stack_success.repeat_interleave(
                 self.num_agents)
 
@@ -205,7 +212,7 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         """
         cols = super()._metric_extra_cols(rows)
         env = torch.div(rows, self.num_agents, rounding_mode="floor")
-        success = (self._stack_phase[env] == self.DONE).float()
+        success = self._seq_top_reached[env].float()
         phase = self._stack_phase[env].float()
         cols.extend((success, phase))
         for group in range(3):
@@ -628,6 +635,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             & (top_xy_err < self.stack_top_xy_tol)
             & (top_z_err < self.stack_top_z_tol),
             as_tuple=False).squeeze(-1)
+        if hasattr(self, "_seq_top_reached"):
+            self._seq_top_reached[enter_verify] = True
         self._set_phase(enter_verify, self.VERIFY_STACK)
 
         phase = self._stack_phase

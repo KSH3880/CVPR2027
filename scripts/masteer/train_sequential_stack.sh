@@ -1,7 +1,7 @@
 #!/bin/bash
-# Fine-tune only new_carry tokenizer + internal action residual from a trained
-# MA-steer checkpoint.  The teammate token is kept in the 340-D ABI but is
-# masked from transformer attention.
+# Fine-tune new_carry tokenizer + steering tokenizer + internal action residual
+# from a trained MA-steer checkpoint.  The teammate token is kept in the
+# 340-D ABI but is masked from transformer attention.
 #
 # Smoke:
 #   MA_GPU=0 STACK_ENVS=16 STACK_ITERS=2 MS_GRADCHK=1 \
@@ -107,6 +107,7 @@ unset STACK_EVAL_BOX_GRID STACK_EVAL_BOX_SIZE_IDS
 export MA_TOKEN=mask
 export MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_FINETUNE_NEWCARRY_RESIDUAL=1
+export MA_FINETUNE_STEER_TOKEN=${MA_FINETUNE_STEER_TOKEN:-1}
 export MA_NOFREEZE=0
 export MS_GRADCHK=${MS_GRADCHK:-1}
 export MS_MRAND=${MS_MRAND:-4}
@@ -144,9 +145,9 @@ echo "=============================================================="
 echo " task       HumanoidMASequentialStackCarry"
 echo " policy     $POLICY (epoch $BASE_EPOCH)"
 echo " stage1     $STAGE1"
-echo " trainable  new_carry tokenizer + internal residual"
+echo " trainable  new_carry + internal residual + steer_token=$MA_FINETUNE_STEER_TOKEN"
 echo " masked     teammate token"
-echo " frozen     self/teammate/steer/old-carry/transformer/composer/RMS"
+echo " frozen     self/teammate/old-carry/transformer/composer/RMS"
 echo " steer rwd  OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
 echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY hands_on_pen=$STACK_HANDS_ON_PENALTY"
 echo " foot-box   clearance>=$STACK_FOOT_BOX_CLEARANCE penalty=$STACK_FOOT_BOX_PENALTY"

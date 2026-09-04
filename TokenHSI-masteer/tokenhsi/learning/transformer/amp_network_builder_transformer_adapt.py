@@ -401,6 +401,13 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
             # the actual starting weights still come from --checkpoint.
             self.finetune_newcarry_residual = (
                 os.environ.get("MA_FINETUNE_NEWCARRY_RESIDUAL", "0") == "1")
+            self.finetune_steer_token = (
+                os.environ.get("MA_FINETUNE_STEER_TOKEN", "0") == "1")
+            if (self.finetune_steer_token
+                    and not self.finetune_newcarry_residual):
+                raise ValueError(
+                    "MA_FINETUNE_STEER_TOKEN requires "
+                    "MA_FINETUNE_NEWCARRY_RESIDUAL=1")
             if self.finetune_newcarry_residual:
                 if self.use_hier_steer:
                     raise ValueError(
@@ -410,9 +417,9 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                         "new-carry residual fine-tuning requires "
                         "use_internal_adaptation=True")
 
-                # Freeze every actor module first, then open exactly the two
-                # requested paths.  Critic and AMP discriminator are separate
-                # modules and intentionally remain trainable.
+                # Freeze every actor module first, then open new-carry, the
+                # residual, and optionally the steering tokenizer.  Critic
+                # and AMP discriminator are separate and remain trainable.
                 actor_modules = [self.self_encoder, self.task_encoder,
                                  self.transformer_encoder, self.composer,
                                  self.internal_adapt_mlp]
@@ -427,6 +434,21 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 new_carry = self.task_encoder[self.new_major_id]
                 new_carry.requires_grad_(True)
                 new_carry.train()
+                self.finetune_steer_id = None
+                if self.finetune_steer_token:
+                    steer_ids = [i for i in self.extra_ids
+                                 if self.task_obs_each_size[i] == 12]
+                    if len(steer_ids) != 1:
+                        raise ValueError(
+                            "MA_FINETUNE_STEER_TOKEN expects exactly one "
+                            "12-D steering tokenizer; got {}".format(
+                                [(i, self.task_obs_each_size[i])
+                                 for i in self.extra_ids]))
+                    self.finetune_steer_id = steer_ids[0]
+                    steer_tokenizer = self.task_encoder[
+                        self.finetune_steer_id]
+                    steer_tokenizer.requires_grad_(True)
+                    steer_tokenizer.train()
                 self.internal_adapt_mlp.requires_grad_(True)
                 self.internal_adapt_mlp.train()
 
@@ -435,9 +457,12 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 # changes even while all other actor weights are frozen.
                 self.new_task_trainable_rms.requires_grad_(False)
                 self.new_task_trainable_rms.eval()
+                steer_state = ("trainable" if self.finetune_steer_token
+                               else "frozen")
                 print("[sequential-ft] actor trainable: new_carry tokenizer + "
-                      "internal action residual only; teammate/steer masked-or-frozen; "
-                      "base actor RMS frozen", flush=True)
+                      "internal action residual; steer tokenizer={}; "
+                      "teammate masked/frozen; "
+                      "base actor RMS frozen".format(steer_state), flush=True)
 
             return
 
@@ -456,6 +481,8 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 self.extra_act_mlp.eval()
             if mode:
                 self.task_encoder[self.new_major_id].train()
+                if getattr(self, "finetune_steer_id", None) is not None:
+                    self.task_encoder[self.finetune_steer_id].train()
                 self.internal_adapt_mlp.train()
             else:
                 self.internal_adapt_mlp.eval()
