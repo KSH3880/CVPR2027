@@ -1,7 +1,7 @@
 #!/bin/bash
-# Fine-tune new_carry tokenizer + steering tokenizer + internal action residual
-# from a trained MA-steer checkpoint.  The teammate token is kept in the
-# 340-D ABI but is masked from transformer attention.
+# Fine-tune new_carry tokenizer + internal action residual from a trained
+# MA-steer checkpoint.  The teammate token is kept in the 340-D ABI but is
+# masked from transformer attention; the trained steering tokenizer is frozen.
 #
 # Smoke:
 #   MA_GPU=0 STACK_ENVS=16 STACK_ITERS=2 MS_GRADCHK=1 \
@@ -107,7 +107,7 @@ unset STACK_EVAL_BOX_GRID STACK_EVAL_BOX_SIZE_IDS
 export MA_TOKEN=mask
 export MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_FINETUNE_NEWCARRY_RESIDUAL=1
-export MA_FINETUNE_STEER_TOKEN=${MA_FINETUNE_STEER_TOKEN:-1}
+export MA_FINETUNE_STEER_TOKEN=${MA_FINETUNE_STEER_TOKEN:-0}
 export MA_NOFREEZE=0
 export MS_GRADCHK=${MS_GRADCHK:-1}
 export MS_MRAND=${MS_MRAND:-4}
@@ -131,6 +131,7 @@ export STACK_HANDS_ON_PENALTY=${STACK_HANDS_ON_PENALTY:-1.0}
 export STACK_FOOT_BOX_CLEARANCE=${STACK_FOOT_BOX_CLEARANCE:-0.12}
 export STACK_FOOT_BOX_PENALTY=${STACK_FOOT_BOX_PENALTY:-1.0}
 export STACK_BOTTOM_Z_TOL=${STACK_BOTTOM_Z_TOL:-0.05}
+export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.08}
 export STACK_RELEASE_GRACE_STEPS=${STACK_RELEASE_GRACE_STEPS:-60}
 # Early curriculum defaults to A1 placement/release/retreat only.  Set this to
 # 0 when continuing the same policy with A2 top placement enabled.
@@ -147,11 +148,12 @@ echo " policy     $POLICY (epoch $BASE_EPOCH)"
 echo " stage1     $STAGE1"
 echo " trainable  new_carry + internal residual + steer_token=$MA_FINETUNE_STEER_TOKEN"
 echo " masked     teammate token"
-echo " frozen     self/teammate/old-carry/transformer/composer/RMS"
+echo " frozen     self/teammate/steer/old-carry/transformer/composer/RMS"
 echo " steer rwd  OUTER=$MS_REWARD_OUTER POS_C=$MS_POS_C VEL_W=$MS_VEL_W"
 echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m reward=$STACK_RELEASE_REWARD_W early_pen=$STACK_EARLY_RELEASE_PENALTY hands_on_pen=$STACK_HANDS_ON_PENALTY"
 echo " foot-box   clearance>=$STACK_FOOT_BOX_CLEARANCE penalty=$STACK_FOOT_BOX_PENALTY"
 echo " putdown    A1_PLACE uses XYZ; VERIFY uses XY; transition z_tol=$STACK_BOTTOM_Z_TOL"
+echo " handoff    terminal if committed bottom displacement>$STACK_BOTTOM_DISPLACE_TOL m"
 echo " release    grace<=${STACK_RELEASE_GRACE_STEPS} steps (never blocks forever)"
 echo " curriculum end_on_A2_resume=$STACK_END_ON_A2_RESUME"
 echo " rehearsal  native carry episode probability=$STACK_CARRY_REHEARSAL_PROB"

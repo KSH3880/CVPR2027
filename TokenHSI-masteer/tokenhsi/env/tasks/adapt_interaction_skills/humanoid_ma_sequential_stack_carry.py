@@ -95,6 +95,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_FOOT_BOX_PENALTY", "0.0"))
         self.stack_bottom_z_tol = float(os.environ.get(
             "STACK_BOTTOM_Z_TOL", "0.05"))
+        self.stack_bottom_displace_tol = float(os.environ.get(
+            "STACK_BOTTOM_DISPLACE_TOL", "0.08"))
         self.stack_release_grace_steps = int(float(os.environ.get(
             "STACK_RELEASE_GRACE_STEPS", "60")))
         self.stack_end_on_a2_resume = bool(int(os.environ.get(
@@ -104,6 +106,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
         if self.stack_bottom_z_tol <= 0.0:
             raise ValueError("STACK_BOTTOM_Z_TOL must be positive")
+        if self.stack_bottom_displace_tol <= 0.0:
+            raise ValueError("STACK_BOTTOM_DISPLACE_TOL must be positive")
         if self.stack_release_grace_steps < self.stack_stable_steps:
             raise ValueError(
                 "STACK_RELEASE_GRACE_STEPS must be >= STACK_STABLE_STEPS")
@@ -160,6 +164,30 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
 
     def post_physics_step(self):
         super().post_physics_step()
+        # The top goal is committed from the settled bottom-box pose.  If A1
+        # kicks that support away afterwards, continuing would train A2
+        # against a target height whose physical support no longer exists.
+        # Treat it as an immediate terminal failure instead.
+        rows = self.all_rows().view(self.num_envs, self.num_agents)
+        r0 = rows[:, 0]
+        boxes = self.humanoid_rows(self._box_states)
+        bottom_disp = torch.norm(
+            boxes[r0, 0:3] - self._committed_bottom_pos, dim=-1)
+        monitor_bottom = (self._top_committed
+                          & (self._stack_phase >= self.A1_RETREAT)
+                          & (self._stack_phase < self.DONE)
+                          & ~self._carry_rehearsal)
+        bottom_lost = (monitor_bottom
+                       & (bottom_disp > self.stack_bottom_displace_tol))
+        self.reset_buf[bottom_lost] = 1
+        self._terminate_buf[bottom_lost] = 1
+        self._seq_top_reached[bottom_lost] = False
+        self.extras["stack_bottom_displaced"] = \
+            bottom_lost.repeat_interleave(self.num_agents)
+        # humanoid.post_physics_step published terminate before this
+        # sequential consistency check, so refresh it for rl_games.
+        self.extras["terminate"] = self._terminate_buf.repeat_interleave(
+            self.num_agents)
         # Full-stack mode in the parent leaves DONE alive until the global
         # timeout.  End this sequential episode immediately and normally once
         # the top box has remained stable for the requested number of steps.
