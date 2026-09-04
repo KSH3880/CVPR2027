@@ -1,0 +1,253 @@
+# Copyright (c) 2018-2022, NVIDIA Corporation
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+import os
+
+from utils.config import set_np_formatting, set_seed, get_args, parse_sim_params, load_cfg
+from utils.parse_task import parse_task
+
+from rl_games.algos_torch import players
+from rl_games.algos_torch import torch_ext
+from rl_games.common import env_configurations, experiment, vecenv
+from rl_games.common.algo_observer import AlgoObserver
+from rl_games.torch_runner import Runner
+
+import numpy as np
+import copy
+import torch
+
+from learning import amp_agent
+from learning import amp_players
+from learning import amp_models
+from learning import amp_network_builder
+
+from learning.transformer import amp_network_builder_transformer
+from learning.transformer import amp_network_builder_transformer_comp
+from learning.transformer import amp_network_builder_transformer_adapt
+from learning.transformer import amp_network_builder_transformer_longterm
+
+from learning.transformer import trans_agent
+from learning.transformer import trans_players
+
+args = None
+cfg = None
+cfg_train = None
+
+def create_rlgpu_env(**kwargs):
+    use_horovod = cfg_train['params']['config'].get('multi_gpu', False)
+    if use_horovod:
+        import horovod.torch as hvd
+
+        rank = hvd.rank()
+        print("Horovod rank: ", rank)
+
+        args.device = 'cuda'
+        args.device_id = rank
+        args.rl_device = 'cuda:' + str(rank)
+
+        cfg['rank'] = rank
+        cfg['rl_device'] = 'cuda:' + str(rank)
+
+    if args.device == 'cuda':
+        import torch
+        torch.cuda.set_device(args.device_id)
+
+    sim_params = parse_sim_params(args, cfg, cfg_train)
+    task, env = parse_task(args, cfg, cfg_train, sim_params)
+
+    print('num_envs: {:d}'.format(env.num_envs))
+    print('num_actions: {:d}'.format(env.num_actions))
+    print('num_obs: {:d}'.format(env.num_obs))
+    print('num_states: {:d}'.format(env.num_states))
+    
+    frames = kwargs.pop('frames', 1)
+    if frames > 1:
+        env = wrappers.FrameStack(env, frames, False)
+    return env
+
+
+class RLGPUAlgoObserver(AlgoObserver):
+    def __init__(self, use_successes=True):
+        self.use_successes = use_successes
+        return
+
+    def after_init(self, algo):
+        self.algo = algo
+        self.consecutive_successes = torch_ext.AverageMeter(1, self.algo.games_to_track).to(self.algo.ppo_device)
+        self.writer = self.algo.writer
+        return
+
+    def process_infos(self, infos, done_indices):
+        if isinstance(infos, dict):
+            if (self.use_successes == False) and 'consecutive_successes' in infos:
+                cons_successes = infos['consecutive_successes'].clone()
+                self.consecutive_successes.update(cons_successes.to(self.algo.ppo_device))
+            if self.use_successes and 'successes' in infos:
+                successes = infos['successes'].clone()
+                self.consecutive_successes.update(successes[done_indices].to(self.algo.ppo_device))
+        return
+
+    def after_clear_stats(self):
+        self.mean_scores.clear()
+        return
+
+    def after_print_stats(self, frame, epoch_num, total_time):
+        if self.consecutive_successes.current_size > 0:
+            mean_con_successes = self.consecutive_successes.get_mean()
+            self.writer.add_scalar('successes/consecutive_successes/mean', mean_con_successes, frame)
+            self.writer.add_scalar('successes/consecutive_successes/iter', mean_con_successes, epoch_num)
+            self.writer.add_scalar('successes/consecutive_successes/time', mean_con_successes, total_time)
+        return
+
+
+class RLGPUEnv(vecenv.IVecEnv):
+    def __init__(self, config_name, num_actors, **kwargs):
+        self.env = env_configurations.configurations[config_name]['env_creator'](**kwargs)
+        self.use_global_obs = (self.env.num_states > 0)
+
+        self.full_state = {}
+        self.full_state["obs"] = self.reset()
+        if self.use_global_obs:
+            self.full_state["states"] = self.env.get_state()
+        return
+
+    def step(self, action):
+        next_obs, reward, is_done, info = self.env.step(action)
+
+        # todo: improve, return only dictinary
+        self.full_state["obs"] = next_obs
+        if self.use_global_obs:
+            self.full_state["states"] = self.env.get_state()
+            return self.full_state, reward, is_done, info
+        else:
+            return self.full_state["obs"], reward, is_done, info
+
+    def reset(self, env_ids=None):
+        self.full_state["obs"] = self.env.reset(env_ids)
+        if self.use_global_obs:
+            self.full_state["states"] = self.env.get_state()
+            return self.full_state
+        else:
+            return self.full_state["obs"]
+
+    def get_number_of_agents(self):
+        return self.env.get_number_of_agents()
+
+    def get_env_info(self):
+        info = {}
+        info['action_space'] = self.env.action_space
+        info['observation_space'] = self.env.observation_space
+        info['amp_observation_space'] = self.env.amp_observation_space
+        # rl_games 는 batch = horizon × num_actors × num_agents 로 잡는다. 이걸 안 넘기면
+        # A=2 인데도 num_agents=1 로 계산해 batch 가 절반이 되고 minibatch 와 안 맞는다.
+        # 평가 경로는 에이전트 수를 다른 데서 읽어서 이 누락이 학습에서만 드러났다.
+        info['agents'] = self.env.get_number_of_agents()
+
+        if self.use_global_obs:
+            info['state_space'] = self.env.state_space
+            print(info['action_space'], info['observation_space'], info['state_space'])
+        else:
+            print(info['action_space'], info['observation_space'])
+
+        return info
+
+
+vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: RLGPUEnv(config_name, num_actors, **kwargs))
+env_configurations.register('rlgpu', {
+    'env_creator': lambda **kwargs: create_rlgpu_env(**kwargs),
+    'vecenv_type': 'RLGPU'})
+
+def build_alg_runner(algo_observer):
+    runner = Runner(algo_observer)
+    runner.algo_factory.register_builder('amp', lambda **kwargs : amp_agent.AMPAgent(**kwargs))
+    runner.player_factory.register_builder('amp', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
+    runner.model_builder.model_factory.register_builder('amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))  
+    runner.model_builder.network_factory.register_builder('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
+
+    runner.algo_factory.register_builder('trans', lambda **kwargs : trans_agent.TransAgent(**kwargs))
+    runner.player_factory.register_builder('trans', lambda **kwargs : trans_players.TransPlayerContinuous(**kwargs))
+    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task', lambda **kwargs : amp_network_builder_transformer.AMPTransformerMultiTaskBuilder())
+    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_comp', lambda **kwargs : amp_network_builder_transformer_comp.AMPTransformerMultiTaskCompBuilder())
+    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_adapt', lambda **kwargs : amp_network_builder_transformer_adapt.AMPTransformerMultiTaskAdaptBuilder())
+    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_longterm', lambda **kwargs : amp_network_builder_transformer_longterm.AMPTransformerMultiTaskLongTermTaskCompletionBuilder())
+
+    return runner
+
+def main():
+    global args
+    global cfg
+    global cfg_train
+
+    set_np_formatting()
+    args = get_args()
+    cfg, cfg_train, logdir = load_cfg(args)
+
+    if args.horovod:
+        cfg_train['params']['config']['multi_gpu'] = args.horovod
+
+    # torchrun의 각 rank가 서로 다른 환경을 샘플하도록 runner/env 생성 전에
+    # seed를 분리한다. 모델 파라미터는 학습 시작 직전 rank 0에서 broadcast된다.
+    base_seed = cfg_train['params'].get("seed", -1)
+    rank = int(os.environ.get("LOCAL_RANK", 0)) if args.horovod else 0
+    rank_seed = base_seed + rank if base_seed >= 0 else base_seed
+    rank_seed = set_seed(rank_seed, cfg_train['params'].get("torch_deterministic", False))
+    cfg_train['params']['seed'] = cfg_train['params']['config']['seed'] = rank_seed
+    cfg['seed'] = rank_seed
+
+    # 지표를 rank 0 파일과 같은 경로에 동시 저장하지 않는다.
+    # rank 0은 기존 파일명을 유지하고 나머지 rank는 suffix를 붙여 모두 보존한다.
+    metrics_path = os.environ.get("MA_METRICS")
+    if args.horovod and rank > 0 and metrics_path:
+        stem, ext = os.path.splitext(metrics_path)
+        os.environ["MA_METRICS"] = f"{stem}.rank{rank}{ext or '.npy'}"
+
+    if args.horizon_length != -1:
+        cfg_train['params']['config']['horizon_length'] = args.horizon_length
+
+    if args.minibatch_size != -1:
+        cfg_train['params']['config']['minibatch_size'] = args.minibatch_size
+        
+    if args.motion_file:
+        cfg['env']['motion_file'] = args.motion_file
+    
+    # Create default directories for weights and statistics
+    cfg_train['params']['config']['train_dir'] = args.output_path
+    
+    vargs = vars(args)
+
+    algo_observer = RLGPUAlgoObserver()
+
+    runner = build_alg_runner(algo_observer)
+    runner.load(cfg_train)
+    runner.reset()
+    runner.run(vargs)
+
+    return
+
+if __name__ == '__main__':
+    main()

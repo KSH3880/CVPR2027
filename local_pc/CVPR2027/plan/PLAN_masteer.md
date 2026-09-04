@@ -1,0 +1,331 @@
+# masteer 실험 계획
+
+**ma + steer 통합 레포.** 공통 운영 규칙은 [PLAN.md](PLAN.md), 함정은
+[docs/PITFALLS.md](../docs/PITFALLS.md), 이식 안내는
+[docs/MULTIAGENT_PORT.md](../docs/MULTIAGENT_PORT.md).
+
+**목표**: A=2 공유 씬에서 **속도 명령 steering** 을 실행할 수 있는 정책.
+METHOD_V2 §4.1 이 Action Policy 에 요구하는 것 — *"selected Steering Target 의 physical
+execution + local collision·interference avoidance"* — 을 만드는 층이다.
+협동·타이밍·의존성은 Planner/WM 의 일이고 여기서 학습시키지 않는다.
+
+## 구조
+
+```
+HumanoidMASteerCarry  <  HumanoidMACarry  <  HumanoidTrajSitCarryClimb
+   steer 창·보상          teammate 토큰       A=2 이식 완료 (stage1 환경)
+```
+
+관측 340 = `self 223` + `teammate 21` + `steer 12` + `new_carry 42` + `old_carry 42`
+
+토큰 5개. adapt 스캐폴드라 `old_carry`·transformer·composer·self 는 **동결**이고
+teammate·steer·new_carry 토크나이저와 `internal_adapt_mlp` 만 학습된다 (검증 완료).
+
+## 속도 명령 = 창의 길이
+
+```
+창    = path[s + (M/6)·i],  i=1..6      s = 단조 호길이 래칫 (자기교정)
+v_tar = M / 1.6 s                        원본 TokenHSI 의 1.5 상수를 대체
+```
+
+| M | 점 간격 | 목표 속도 |
+|---|---|---|
+| 2.4 m | 0.40 | 1.50 m/s |
+| 1.2 m | 0.20 | 0.75 |
+| 0 | 0 | **정지** |
+
+**공간 지평이 아니라 시간 지평(1.6 초)이 고정된다.** 창이 내 투영 기준이라
+지연이 누적되지 않고, 시계·재anchor·집기핀 같은 장치가 필요 없다.
+**월드모델 입장에서는 등간격 6점을 주는 것이 전부다.**
+
+`MS_MRAND=0` 이면 M 이 고정이라 **원본 carry 와 수학적으로 같다** — 회귀 검증용.
+
+## 기준선 (ma 트랙 실측, 지금 코드)
+
+```
+A=1 단독              0.9629
+A=2 간섭 없음 (20 m)   0.9463     ← 상한
+A=2 가까이 (sep 0)     0.8604     ← 출발점
+근접 에피소드           25.9 %
+makespan  하한 294 / 순차 588
+스폰 최소거리          1.0 m  (없으면 15 % 가 tau 안에서, 박스 16 % 가 관통 상태로 시작)
+```
+
+## 판정 기준
+
+- **신호 문턱 `Δ ≥ 0.05`.** 학습 시드 변동이 0.046 이라 그 아래는 "차이 없음".
+- **`spd_err = |실제 속도 − v_tar|` 이 주 지표다.** 경로를 완벽히 따라가면서 명령 속도를
+  무시할 수 있고 `app_xt` 는 그걸 못 본다.
+- 배달 실패의 원인이 둘이라 분리한다 — 명령을 못 들어서인지, 느린 명령 때문에 시간 안에
+  못 끝냈는지. 에피소드 평균 명령속도를 같이 본다.
+- 충돌은 **`d_min` 분포**(`<0.5 m` 시간 비율, 5·10·25 백분위)로 본다.
+  `tau=0.3` 이진 문턱은 둔해서 "0.35 → 0.6 m 로 벌린" 변화를 놓친다.
+- 인프라는 `rc=0` 과 함께 `warn=0`, 그리고 로그의 `=> loading checkpoint` 를 확인한다.
+
+## 다음 큐
+
+<!-- QUEUE -->
+
+| tag | 질문·판정 기준 | 상태/GPU | 환경변수 |
+| --- | --- | --- | --- |
+| `ms16_fix_vw1L_s0` | **수정 의미론 첫 베이스.** `ms14_vw1L_s0`과 같은 가중치·명령 설정을 stage1부터 다시 학습하되 원본 height gate, agent별 독립 skill/motion/object reset, 정확한 clip 끝점을 적용한다. 핵심은 `carry/place/delivered`와 final SR, 보호 지표는 `spd_err/lat/d_min`; grad=0·warn>0·설정 불일치는 무효. 이 결과를 고정한 뒤에만 reward 가중치를 바꾼다 | 완료 (GPU0) | `MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000 MS_GRADCHK=1` |
+| `ms17_origscale_c06_s0` | **원본 보상 스케일 복원.** `ms16`의 수정 의미론과 나머지 설정은 고정하고 walk/carry 바깥 배율을 `2→1`, 경로 이탈 계수를 `2→0.6`으로 낮춘다. 집기·운반 신호가 steer 벌점에 묻히는지 검증하며 `carry/place/delivered`, `spd_err/lat/d_min`을 `ms16`과 비교한다 | 학습 중 (GPU0) | `MS_REWARD_OUTER=1 MS_POS_C=0.6 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000 MS_GRADCHK=1` |
+| `ms18_maskteam_origscale_c06_s0` | **teammate attention 간섭 대조군.** `ms17`의 환경·보상·가변속도 설정은 전부 유지하고 teammate 관측 21-D만 actor Transformer의 key/value에서 정확히 mask한다. `MA_TOKEN=zero`처럼 0 토큰을 남기지 않으므로 활성 정책 토큰은 `weight+self+steer+new_carry`다. 이 행에서는 teammate encoder grad=0이 의도된 정상값이고 steer/new-carry/adapter grad는 0이면 안 된다. `carry/place/graspEp`가 회복되면 teammate 토큰의 동시 attention이 집기를 훼손한 것이고, 그대로면 원인은 A=2 이식·steer/carry 쪽에 남는다. | 학습 중 (GPU0, ms17 병행) | `MA_TOKEN=mask MS_REWARD_OUTER=1 MS_POS_C=0.6 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1 MS_ITERS=9000 MS_GRADCHK=1` |
+<!-- /QUEUE -->
+
+## 현재 재학습 기준 (2026-08-31)
+
+수정된 carry 의미론을 처음부터 다시 학습하는 첫 tag는 `ms16_fix_vw1L_s0`이고,
+기준 하이퍼파라미터 조합은 `ms14_vw1L_s0`이다:
+`MS_AGENTS=2 MS_ENVS=2048 MS_CP=4 MS_VEL_W=1 MS_MRAND=4 MS_CLIP=1
+MS_ITERS=9000 MS_SEED=0` (minibatch 16384). 다만 현재 같은 이름의
+체크포인트는 height gate·agent별 시작 skill·정확한 clip 끝점 수정 **전** 산출물이다.
+가중치를 이어받는다는 뜻이 아니라, stage1에서 시작해 이 하이퍼파라미터 조합을 새 코드로
+다시 학습한다는 뜻이다. 기존 종료 표식을 새 실행으로 오인하지 않도록 재학습 tag는 반드시
+새 이름을 쓴다. 큐 행과 새 tag는 사용자 소유이므로 여기서 자동으로 만들지 않는다.
+
+원본 carry의 시작 상태 의미론을 그대로 확장한다:
+
+| 실행 | 시작 skill 분포 | masteer 샘플 단위 |
+|---|---|---|
+| 학습 | `loco/pickUp/carryWith/putDown = .5/.1/.3/.1` | `(env, agent)`마다 독립 |
+| 일반 `--test` / viewer | 학습과 같은 혼합 분포 | `(env, agent)`마다 독립 |
+| final `--test --eval` | `loco=1.0` | skill은 둘 다 loco, motion/time/박스/목표는 각각 독립 |
+
+최종평가 trial도 원본의 `env당 1개`를 agent마다 복제해 `num_envs × num_agents`개를 센다.
+
+## GT 시나리오
+
+배치는 `apply_layout` 을 재사용하고 `MS_SCEN` 하나가 관련 변수를 일관되게 정한다.
+따로 주면 조합이 어긋난다 — 특히 `MA_SPAWN_GAP`(기본 1.0 m)이 `apply_layout` **뒤에**
+돌면서 `parallel 0.5` 를 통째로 망가뜨린다.
+
+| 시나리오 | 배치 | M 프로파일 | 묻는 것 |
+|---|---|---|---|
+| `free` | 랜덤 독립 | 랜덤 (`MS_MRAND`) | 현재 기준선 (ms1) |
+| `parallel` | 나란히 `MS_GAP` | 둘 다 평속 | 반응만으로 되는 한계 |
+| `cross` | 직각 교차 | a1 만 국소 감속 | **타이밍 조율** |
+| `solo` | `MS_SEP` 만큼 격리 | a1 만 국소 감속 | 감속 실행 능력 (교란 분리) |
+
+**시나리오는 직선 경로를 쓴다** (`MS_LAT_MAX=0`). 곡선이면 교차점까지 호길이가
+4.30 m 대 4.60 m 로 어긋나고 경로가 원점을 1.86 m 빗나가 통제가 안 된다 (실측).
+직선이면 양쪽 4.500 m, 빗나감 0.000 m 라 `cross` 의 `dt=0` 이 M 조작 없는 순수 대조군이 된다.
+
+국소 감속은 `MS_W`(3 m) 구간에서만 속도를 낮추고, 그 뒤 `MS_RECOV`(1.5 m) 는 평속이다.
+
+    경로 12 m,  교차점 = 호길이 6.0 m
+    창 [1.5, 4.5] m  ->  회복 [4.5, 6.0] m  ->  교차점
+
+    v_slow = W / (W/1.5 + dt)      구간 통과 시간이 정확히 dt 만큼 는다
+    dt=1 -> 1.00 m/s (M 배수 .67)   dt=2 -> 0.75 m/s (배수 .50)
+
+**회복 구간이 없으면 안 된다.** 창이 교차점에서 끝나면 감속한 쪽이 느린 채로 교차점을
+지나 체류시간이 0.67 s -> 1.33 s 로 두 배가 된다. 그러면 "늦게 왔다" 와 "느리게 지났다" 가
+같은 조작이 되어 여유거리 차이를 해석할 수 없다. 회복 구간을 두면 모든 조건이
+교차점을 1.5 m/s 로 지나고 **위상만** 달라진다. `MS_L` 이 12 인 이유도 이 자리 때문이다
+(9 면 회복 구간이 접근 다리를 통째로 삼킨다).
+
+전 구간 감속은 `MS_MRAND` 가 이미 하는 "느리게 걷기"라 새롭지 않다. 국소 감속은
+**속도를 바꿨다 되돌리는 전이**이고 총 소요시간은 전 구간 감속과 같다 (`경로/1.5 + dt`).
+
+`MS_DT_RAND=1` 로 **지연을 에피소드마다 뽑는다.** 고정 dt 로 학습하면 M 프로파일이
+매번 같아서 정책이 "호길이 1.5~4.5 에서 느려져라"를 창을 읽지 않고 외운다.
+그러면 "타이밍이 된다"는 결론이 공허하다 — 창을 0 으로 해도 같은 값이 나온다.
+
+## 시나리오 지표
+
+npy 열 13~25 가 시나리오 전용이고 전부 env 안에서 스텝마다 누적한다 (사후 계산 금지).
+**열 13~19 는 고정이다** — `train.sh` 가 위치로 읽으므로 새 열은 20 부터 붙인다.
+
+| 열 | 이름 | 정의 |
+|---|---|---|
+| 13~14 | `xtime`,`xdist` | 교차점에 가장 가까웠던 스텝과 그때 거리 |
+| 15 | `encd` | **조우 중** 상대와의 최소거리 (교차점 `MS_ENC_R` 이내일 때만) |
+| 16~18 | `wn`,`wv`,`wc` | 감속 창 체류 스텝, 실제·명령 속도 합 |
+| 19 | `dtcmd` | 그 에피소드에 명령한 지연 |
+| 20 | `wdone` | 창을 **끝까지** 지났나 |
+| 21 | `wn_box` | 박스 호길이 기준 같은 카운트 |
+| 22 | `latw` | 창 안 `\|lat_root\|` 합 |
+| 23 | `encn` | 조우 스텝 수 (`encd` 의 분모) |
+| 24 | `arc_end` | 종료 시점 호길이. 패딩 구간까지 갔는지 진단 |
+| 25 | `scen_id` | 0 free / 1 par / 2 cross / 3 solo, +10 both, +20 placebo |
+| 26~30 | `latr`,`latb`,`spd`,`vr`,`steps` | **경로 이탈·속도 추종. 시나리오와 무관하게 늘 쌓는다** |
+| 31~38 | `vbin_s[4]`,`vbin_n[4]` | 명령 속도 구간별 실제 속도 합·이동 스텝 수 |
+| 39 | `s_end` | clip이 포화되는 실제 목표 vertex의 호좌표 |
+| 40~44 | `hand_near`,`gate_open`,`held_move`,`lift_dz`,`grasp_first` | 집기·들기 proxy와 손 근접 중 실제 박스 이동 |
+| 45~49 | `delivered`,`putdown`,`carry`,`place`,`shortcut` | 목표 도달과 0.5m 운반 후 도달을 분리한 생애주기 판정 |
+
+`grasp`는 접촉 pair가 아니라 양손 평균과 박스 중심의 0.25m 근접 proxy다. 따라서
+`grasp` 하나를 성공으로 보지 않고, 손 근접 중 박스가 0.5m 이상 이동한 뒤 목표에 닿은
+`carry`와 엄격한 높이·0.1m 조건까지 만족한 `place`를 함께 본다. `shortcut`은 목표에는
+닿았지만 이 운반 증거가 없는 경우라 발로 차기/밀기 해를 바로 드러낸다.
+
+**기준선(free)은 성공률만으로 판정하지 않는다.** `lat_root` 가 경로 추종을, `spd_err` 이
+속도 명령 추종을 본다 — **성공률은 경로를 무시하고 목표로 직진해도 오른다.** steer 의 주장이
+정확히 그 구분이라 지표가 없으면 "A=2 에서 steer 가 된다" 를 말할 근거가 없다.
+미학습 귀무값: `lat_root 0.271 · spd_err 0.835 · v_real 0.357` (명령은 평균 1.0 근처).
+
+**주 지표는 `ΔT_w`** — 창 통과 시간차 `(wn[a1] − wn[a0])·dt`, **env 당 쌍으로** 잰다.
+한 env 의 두 행은 같은 시계와 같은 조우를 공유하므로 중앙값끼리 빼면 집기 시간 산포가
+잡음으로 다시 들어온다. 헤드라인은 명령 지연에 대한 회귀 기울기 `β̂` 다.
+
+**미학습 귀무값 = −0.033 s** (`v_recov2`, 명령 2.0 s). 재지 않고 가정하면 안 되는 값이라
+실측해뒀다. `wdone` 게이트를 거는 이유: 창을 못 끝낸 행에도 `wn` 이 쌓여서
+"느려서 오래 걸림" 과 "중간에 넘어짐" 이 같은 값으로 섞인다. 통과율을 같이 보고한다.
+
+속도는 **공간평균** `W/(wn·dt)` 로 읽는다. 시간평균은 느린 프레임에 가중이 실려
+아래로 편향되고, 래칫이 허용하는 0.5 m 후진을 clamp 하면 서 있는 행에도 가짜 속도가 붙는다.
+
+`latw` 는 **타이밍 대 우회의 반증 지표다.** 여유가 늘었는데 이것도 늘었으면 옆으로
+비켜서 번 것이지 늦게 와서가 아니다. `agent_min_dist` 는 env 당 대칭 스칼라 하나라
+누가 양보했는지 영영 말할 수 없어서, 방향이 있는 지표는 이것뿐이다.
+
+`encd` 를 조우 구간으로 자르는 이유: 에피소드 전체 최소거리는 경로 대부분이 서로 멀어
+**평평해진다.** ma 에서 17 조건 전부 1.62~1.93 이 나온 게 그 때문이다.
+
+### 버린 지표
+
+- `vcmd` — 창 안에서 `_mscale` 이 상수라 `wc ≡ wn × 상수`. 정보량 0
+- 짝 안 지은 `xoff` — 집기 산포가 다시 들어오고, a1 이 교차점 전에 감속하므로
+  살아남은 a1 은 빠른 a1 이라 추정치가 **0 쪽으로** 편향된다. "명령을 무시했다" 와 같은 방향
+- `encd − d_nom` — `d_nom` 이 조건별 상수(sync 0 m, off2.0 2.12 m)라 빼면
+  **동시충돌 조건이 가장 좋아 보인다.** 순위를 뒤집는다
+- 에피소드 전체 `d_min` 히스토그램 — ma 실패의 원인이 문턱이 이진이어서가 아니라
+  통계량이 에피소드 전체라 이동량의 함수였던 것이다. 구간을 나눠도 그대로다
+
+### 필요한 대조 두 개 (평가 시점)
+
+`cross_both`(`MS_DECEL=both`)는 둘 다 같은 감속을 받되 **오프셋은 0** 이다.
+`cross_placebo`(`MS_PLACEBO=1`)는 창을 교차점 **뒤로** 옮겨 총 활동량·소요시간·평균
+명령속도는 같고 도착 시각차만 없앤다. 이 둘이 없으면 여유거리 사다리는 조작의
+운동학적 항등식이라 다른 값이 나올 수가 없다.
+
+## 시각화
+
+영상 12개 = 시나리오 6 x {직선, 꼬불}. 저장 `runs/results/video/0821/`.
+
+### 무엇을 부르나
+
+| 번호 | 워딩 | 펼쳐지는 변수 | 상태 |
+|---|---|---|---|
+| **1 / 2** | 경로 추종 | `MS_MRAND=0` | 됨 |
+| **3 / 4** | 속도 추종 | `MS_MRAND=4` | 됨 |
+| **5 / 6** | 교차 — 개입 없음 | `MS_SCEN=cross MS_DT=0` | 경로 휨 |
+| **7 / 8** | 교차 — 감속 양보 | `MS_SCEN=cross MS_DT=2.0` | 경로 휨 |
+| **9 / 10** | 정지·재출발 | `MS_M_LO=0 MS_MRAND=4` | 학습 범위 밖 |
+| **11 / 12** | 근접 나란히 | `MS_SCEN=parallel MS_GAP=1.0` | 경로 휨 |
+
+**홀수 = 직선, 짝수 = 꼬불.** 번호는 입력 전용이고 **파일명은 이름**이다
+(`MS_VIZ=8` -> `4_cross_yield_curve.mp4`). 없는 번호는 목록을 찍고 rc=1 로 죽는다.
+매핑은 `scripts/masteer/viz_env.sh` 한 곳이고 `view.sh`·`record.sh` 가 같이 쓴다.
+
+### 어떻게 부르나
+
+    # 로컬 데스크톱 — 현재 DISPLAY에 Isaac Gym 창을 직접 띄움. PORT/MA_GPU 불필요
+    MS_VIZ=4 ENVS=1 MS_CAM=top bash scripts/masteer/view_local.sh <tag 또는 pth>
+    MS_EVAL=1 MS_VIZ=4 ENVS=1 bash scripts/masteer/view_local.sh <tag 또는 pth>  # final-eval 시작
+
+    # 서버 — Xvfb + VNC + 브라우저
+    # 뷰어
+    PORT=6100 MS_VIZ=4 ENVS=1 MS_CAM=top bash scripts/masteer/view.sh <tag>
+    MS_EVAL=1 PORT=6100 MS_VIZ=4 ENVS=1 bash scripts/masteer/view.sh <tag>          # final-eval 시작
+    ssh -L 6100:localhost:6100 <host>    #  http://localhost:6100/vnc.html
+
+    # 핵심 장면 -- 배치·경로가 같고 감속만 다르다
+    PORT=6100 MS_VIZ=5 ENVS=1 MS_CAM=top MS_DBG=0 bash ... view.sh <tag>   # 부딪힘
+    PORT=6101 MS_VIZ=7 ENVS=1 MS_CAM=top MS_DBG=0 bash ... view.sh <tag>   # 비껴감
+
+    # 영상
+    # record.sh는 final-eval(loco 시작) 모드다.
+    MS_VIZ=8 MS_CAM=top DUR=40 bash scripts/masteer/record.sh <tag>
+    for i in $(seq 12); do MS_VIZ=$i MS_CAM=top bash scripts/masteer/record.sh <tag>; done
+    MS_VIZ=8 bash scripts/masteer/record_pick.sh <tag>           # 움직인 시드를 골라준다
+
+    # 덮어쓰기 (호출자가 이긴다)
+    MS_VIZ=8 MS_DT=1.0 ...     MS_VIZ=4 MS_MRAND=8 ...     MS_VIZ=4 MS_CAM_H=25 ...
+
+| 층 | 인자 |
+|---|---|
+| 로컬 항상 | `MS_VIZ` · `<태그 또는 pth>` · `ENVS` |
+| 서버 추가 | `PORT` |
+| 가끔 | `MS_CAM=top` · `MS_DBG=0` · `MS_CAM_H`/`MS_CAM_B`(줌) · `MS_DRAW_SPEED` |
+| 캔 밖 | `MS_MRAND` · `MS_M_LO` · `MS_DT` · `MS_GAP` · `MS_LAT_MAX` |
+
+#### MS_CLIP -- 태그에 따라 반드시 맞춘다
+
+    ms1 ~ ms10   전부 미지정 = 0 으로 학습   (52 개, 예외 없음. 영상용 ms4_m4_s0 포함)
+    ms11 이후    전부 MS_CLIP=1 로 학습      (현재 ms14 포함)
+
+`view.sh`·`record.sh` 기본값은 **1** 이므로 **`ms10` 이전 태그를 볼 때만
+`MS_CLIP=0` 을 붙인다.** Python 기본값은 여전히 0 이라 학습에서 미지정 = 0 이다.
+
+    MS_CLIP=0 PORT=6100 MS_VIZ=4 bash scripts/masteer/view.sh ms4_m4_s0
+    MS_CLIP=0 MS_VIZ=8 bash scripts/masteer/record.sh ms4_m4_s0
+
+**틀리면 조용히 어긋난다.** `MS_CLIP` 은 호길이 래칫·조준점·창을 **경로 끝에서
+포화**시키는 **관측** 노브다 (`_ratchet`·`_aim_pt`·`_steer_obs` 세 곳). 원본 carry 는
+명령이 절대 위치(목표)라 도착하면 저절로 "여기 있어라"가 되는데, steer 는 "내 앞쪽"
+이라 끝을 넘어 **패딩 구간(가짜 경로)을 가리킨다.** CLIP 은 TokenHSI traj 의
+`clip(t/dur, 0, 1)` 을 거리 버전으로 넣은 것이고, 끝에 다가가면 창 점들이 끝에 쌓여
+**창이 저절로 짧아진다 = 감속 명령**이 된다. 학습값과 다르면 정책이 학습 때와 다른
+입력을 받으므로 화면은 멀쩡한데 성능만 떨어진다.
+
+2026-08-31 수정 전에는 `floor(total_len/0.1)`을 끝 셀 수로 잘못 써 clip이 실제 목표보다
+거의 항상 0.1~0.2m 앞에서 포화됐다. 이제 `ceil` 셀에 마지막 waypoint를 보존하고 그 셀의
+호좌표를 `s_end`로 써서, 10,000개 랜덤 경로의 목표점 오차가 최대 `4.5e-6m`였다.
+
+`MS_VEL_W`·`MS_VEL_K`·`MS_POS_C`·`MS_PIN` 은 보상 전용이라 추론에 무관하다.
+`MS_ENDCLAMP` 은 M 을 0 으로 만드는 **관측** 노브이지만 4 개 행에서만 1 이었다.
+
+### 화면 보는 법
+
+| 요소 | 위치 | a0 | a1 | 뜻 |
+|---|---|---|---|---|
+| 바닥 띠 | 바닥 | 핑크 | 주황 | GT 경로. **밝기 = 속도 명령** |
+| 허리 띠 | root 높이 | 하늘색 | 연두 | **정책 입력** (창 K=6 점) |
+| 노란 기둥 | 바닥→허리 | 노랑 | 노랑 | 보상 조준점 (`arc + M/2`) |
+
+사람 몸은 a0 연두, a1 파랑. 밝기 `0.28 + 0.72·f` (f = 속도배수 0.25~1.0)
+-- **어두우면 느리게 가라**. `MS_DRAW_SPEED=0` 단색 · `MS_DRAW_TASK=1` 원본 오버레이.
+그리는 코드는 `humanoid_ma_steer_carry.py` 의 `_draw_task`.
+
+### 배경
+
+발표 흐름:
+
+    1·2 (+9·10 정지)      두 채널이 각각 된다
+      -> 5·6              그냥 두면 부딪힌다
+      -> 7·8              속도만 바꾸면 안 부딪힌다
+      => 충돌 회피는 상위 플래너가 이 두 채널로 통제한다
+
+**5~8·11·12 가 막힌 이유.** `apply_layout` 이 박스를 사람과 같이 평행이동하도록
+고친 뒤로 손-박스 관계는 살았지만 (출발 실패 39.2% -> 8.9%) `사람->박스->목표`
+경로가 휘어 총호 12.5 m 가 24 m 가 되고 교차점을 2~3 m 빗나간다. 자기검사가
+`MS_DBG=1` 일 때만 돌아 뷰어는 **소리내어 죽고** 학습·평가는 **조용히 틀린다.**
+수정 후보 -- 아직 미정:
+
+    (1) 박스가 손 근처(<0.5 m)면 사람과 같이 옮기고, 멀면 사람 앞 0.8 m 로
+    (2) 순간이동을 안 하고 **목표만** 교차하도록 배치 (리셋을 안 건드린다)
+
+**9·10 이 막힌 이유.** 속도는 `MS_M_LO`(0.25)~1.0 의 4 단계
+**0.375 / 0.75 / 1.125 / 1.5 m/s** 이고 `clamp(min=m_lo)` 가 걸려 **M=0 이 안 나온다.**
+학습 내내 최저가 0.375 m/s 였다. 뷰어에만 `MS_M_LO=0` 을 줘도 본 적 없는 명령이라
+"아주 느리게 걷기"가 될 공산이 크다. `MS_M_LO=0` 재학습이 필요하다.
+
+인자를 왜·어떻게 정리했는지는 `TokenHSI-masteer/CHANGELOG.md` 2026-08-21 항목에 있다.
+
+## 결과별 다음 분기
+
+| 결과 | 다음 |
+|---|---|
+| `MS_MRAND=0` 회귀가 ma 기준선과 같음 | 통합이 정상. 속도 명령 축으로 진행 |
+| 회귀가 낮음 | steer 창·보상 이식에 버그. 관측·보상 순서부터 확인 |
+| 속도 명령을 무시함 (`spd_err` 안 내려감) | M 을 경로 모양과 무관하게 뽑았는지 확인. 곡률에 묶이면 정책이 간격 읽기를 안 배운다 |
+| 속도는 듣는데 배달률이 떨어짐 | 느린 명령 때문에 시간 초과인지 분리해서 본다 |
+
+## 보류
+
+- teammate 토큰 값 검증 — 경로 교차 간격 스윕으로. steer 가 붙어야 통제된 간섭이 된다
+- 팀 보상(`MA_C`·`MA_BETA`·`MA_TEAM`) — ma 트랙에서 축 A 는 효과 없음이 확인됐다.
+  물리 기반 HHI 4편이 전부 충돌 벌점을 안 쓴다
+- 리플랜 주기 `N` — WM 자리. `trk_err(N)` 이 reactive 한계가 된다
