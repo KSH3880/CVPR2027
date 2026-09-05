@@ -1,0 +1,11 @@
+diff --git a/scripts/masteer/train_handclear_footpen_local.sh b/scripts/masteer/train_handclear_footpen_local.sh
+index 6ce0f88..fe24926 100755
+--- a/scripts/masteer/train_handclear_footpen_local.sh
++++ b/scripts/masteer/train_handclear_footpen_local.sh
+@@ -17,6 +17,7 @@ export STACK_HAND_STEPS=5
+ export STACK_BODY_CLEAR=0.60
+ export STACK_CLEAR_HARD_GATE=0
++export STACK_DROP_XY=100.0
+ export STACK_FOOT_CLEAR=0.20
+ export STACK_FOOT_BOX_W="$FOOT_W"
+ export STACK_CLEAR_STEER_W=0.25

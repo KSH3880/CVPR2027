@@ -12,8 +12,8 @@ export MS_TASK=HumanoidMASequentialStackRelease
 export MA_TOKEN=mask
 export MA_TOKENIZER_ZERO=1
 export MA_NOFREEZE=0
-export MA_ADAPTER_ONLY=1
-export MA_FREEZE_INPUT_RMS=1
+export MA_ADAPTER_ONLY=${MA_ADAPTER_ONLY:-1}
+export MA_FREEZE_INPUT_RMS=${MA_FREEZE_INPUT_RMS:-1}
 export MA_FREEZE_NEW_CARRY=${MA_FREEZE_NEW_CARRY:-1}
 export MA_INIT_CKPT=${MA_INIT_CKPT:-$ROOT/TokenHSI-masteer/output/masteer/ms18_maskteam_origscale_c06_s0/imported_00009000/nn/Humanoid_00009000.pth}
 

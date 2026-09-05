@@ -722,6 +722,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
     def _update_camera(self):
         # 고정 시점이면 따라가지 않는다. 따라가면 배치가 화면 안에서 흔들린다.
         if os.environ.get("MS_CAM") == "top":
+            self.gym.refresh_actor_root_state_tensor(self.sim)
             return
         return super()._update_camera()
 

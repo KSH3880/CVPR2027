@@ -1,0 +1,157 @@
+diff --git a/TokenHSI-masteer/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_sequential_stack_release.py b/TokenHSI-masteer/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_sequential_stack_release.py
+--- a/TokenHSI-masteer/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_sequential_stack_release.py
++++ b/TokenHSI-masteer/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_ma_sequential_stack_release.py
+@@ -71,6 +71,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+         self._ss_entry_steps = _i("STACK_ENTRY_STEPS", 5)
+         self._ss_hand_clear = _f("STACK_HAND_CLEAR", 0.15)
+         self._ss_hand_steps = _i("STACK_HAND_STEPS", 5)
++        self._ss_hand_only_switch = bool(_i("STACK_HAND_ONLY_SWITCH", 0))
++        self._ss_foot_clear = _f("STACK_FOOT_CLEAR", 0.20)
++        self._ss_foot_box_w = _f("STACK_FOOT_BOX_W", 0.0)
+         self._ss_stable_lin = _f("STACK_STABLE_LIN", 0.08)
+         self._ss_stable_ang = _f("STACK_STABLE_ANG", 0.20)
+         self._ss_top_steps = _i("STACK_TOP_STEPS", 20)
+@@ -96,6 +99,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+             raise ValueError("STACK_CLEAR_PROGRESS_W/STACK_CLEAR_SPEED_W must be non-negative")
+         if self._ss_clear_steer_w < 0.0:
+             raise ValueError("STACK_CLEAR_STEER_W must be non-negative")
++        if self._ss_foot_clear <= 0.0 or self._ss_foot_box_w < 0.0:
++            raise ValueError("STACK_FOOT_CLEAR must be positive and STACK_FOOT_BOX_W non-negative")
+         clear_w = self._ss_clear_progress_w + self._ss_clear_speed_w
+         if clear_w <= 0.0:
+             raise ValueError("at least one CLEAR motion reward weight must be positive")
+@@ -221,6 +226,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+             f"clear_bonus={self._ss_clear_bonus:.2f} "
+             f"clear_steer_w={self._ss_clear_steer_w:.2f} "
+             f"retreat_scale={self._ss_retreat_scale:.2f} "
++            f"hand_only={int(self._ss_hand_only_switch)} "
++            f"foot_box_w={self._ss_foot_box_w:.2f} "
+             f"rehearsal={self._ss_rehearsal_frac:.2f} "
+             f"virtual_retreat={int(self._ss_virtual_retreat)}",
+             flush=True,
+@@ -352,6 +359,18 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+         # Minimum over hands: both hands must clear the threshold.
+         return self._hand_surface_distances(rows).amin(dim=-1)
+ 
++    def _foot_surface_distance(self, rows):
++        box = self.humanoid_rows(self._box_states)[rows]
++        rb = self.humanoid_rows(self._rigid_body_pos)[rows]
++        feet = rb[:, self._key_body_ids[[2, 3]], :]
++        rel = feet - box[:, None, 0:3]
++        inv = quat_conjugate(box[:, 3:7])[:, None, :].expand(-1, 2, -1)
++        local = quat_rotate(inv.reshape(-1, 4), rel.reshape(-1, 3)).view(-1, 2, 3)
++        half = 0.5 * self._box_lib._box_size[rows, None, :]
++        outside = torch.clamp(local.abs() - half, min=0.0)
++        return outside.norm(dim=-1).amin(dim=-1)
++
+     def _reset_stage_metrics(self, rows):
+         for value in (
+             self._ss_dbg_near_step,
+@@ -486,6 +505,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+ 
+         (base_rows, _, _, _, hand_dist, _, _, support,
+          stable, root_dist) = self._base_features()
++        foot_dist = self._foot_surface_distance(base_rows)
++        foot_penalty = torch.clamp(
++            1.0 - foot_dist / self._ss_foot_clear, 0.0, 1.0
++        )
+         h = torch.clamp(hand_dist / self._ss_hand_clear, 0.0, 1.0)
+         clear_now = hand_dist >= self._ss_hand_clear
+         clear_score = torch.clamp(
+@@ -535,6 +558,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+             replacement
+             + self._ss_clear_bonus_pending.float() * self._ss_clear_bonus
+         )
++        foot_active = (self._ss_phase >= self.RELEASE) & (self._ss_phase <= self.SUCCESS)
++        replacement = replacement - (
++            self._ss_foot_box_w * foot_penalty * foot_active.float()
++        )
+         self._ss_bonus_pending[:] = False
+         self._ss_clear_bonus_pending[:] = False
+         self.rew_buf[base_rows[post]] = replacement[post]
+@@ -543,6 +570,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+         self.extras["stack_clear_cmd_speed"] = cmd_speed
+         self.extras["stack_clear_path_quality"] = path_quality
+         self.extras["stack_clear_positive_steer"] = positive_steer
++        self.extras["stack_foot_box_distance"] = foot_dist
++        self.extras["stack_foot_box_penalty"] = foot_penalty
+ 
+         if bool(failed.any()):
+             self.rew_buf[base_rows[failed]] = -1.0
+@@ -654,6 +683,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+ 
+         stack_env = ~self._ss_rehearsal
+         carry = (self._ss_phase == self.CARRY) & stack_env
++        clear_now = hand_dist >= self._ss_hand_clear
+         placeable = (
+             (xy_err <= self._ss_xy_tol)
+             & (z_err <= self._ss_z_tol)
+@@ -666,7 +696,11 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+             self._ss_entry_count + 1,
+             torch.where(carry, torch.zeros_like(self._ss_entry_count), self._ss_entry_count),
+         )
+-        enter_release = carry & (self._ss_entry_count >= self._ss_entry_steps)
++        if self._ss_hand_only_switch:
++            picked = self._ss_dbg_pick_step[base_rows] >= 0
++            enter_release = carry & picked & clear_now
++        else:
++            enter_release = carry & (self._ss_entry_count >= self._ss_entry_steps)
+         if bool(enter_release.any()):
+             ids = torch.nonzero(enter_release, as_tuple=False).squeeze(-1)
+             rows = base_rows[ids]
+@@ -690,7 +724,6 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
+             self._compute_observations(ids)
+ 
+         release = self._ss_phase == self.RELEASE
+-        clear_now = hand_dist >= self._ss_hand_clear
+         self._ss_hand_count = torch.where(
+             release & clear_now,
+             self._ss_hand_count + 1,
+diff --git a/scripts/masteer/train_local.sh b/scripts/masteer/train_local.sh
+--- a/scripts/masteer/train_local.sh
++++ b/scripts/masteer/train_local.sh
+@@ -229,7 +229,7 @@ REPLAY_NAMES=(
+     REL_HAND_CLEAR REL_HAND_STEPS REL_STABLE_LIN REL_STABLE_ANG REL_STABLE_STEPS REL_DROP_Z
+     STACK_SEED STACK_SIZE_MARGIN STACK_GOAL_X STACK_GOAL_Y STACK_STAGE_DIST STACK_STAGE_Z STACK_STAGE_TOL
+     STACK_BODY_CLEAR STACK_RETREAT_DIST STACK_RETREAT_SCALE STACK_XY_TOL STACK_Z_TOL STACK_ENTRY_LIN STACK_ENTRY_ANG
+-    STACK_ENTRY_STEPS STACK_HAND_CLEAR STACK_HAND_STEPS STACK_STABLE_LIN STACK_STABLE_ANG STACK_TOP_STEPS
++    STACK_ENTRY_STEPS STACK_HAND_CLEAR STACK_HAND_STEPS STACK_HAND_ONLY_SWITCH STACK_FOOT_CLEAR STACK_FOOT_BOX_W STACK_STABLE_LIN STACK_STABLE_ANG STACK_TOP_STEPS
+     STACK_DROP_XY STACK_TRANSITION_BONUS STACK_CLEAR_BONUS STACK_CLEAR_PROGRESS_W STACK_CLEAR_SPEED_W STACK_CLEAR_STEER_W
+     STACK_CLEAR_VEL_K STACK_CLEAR_LAT_K STACK_CLEAR_MIN_SPEED STACK_CLEAR_HARD_GATE STACK_CLEAR_SIGNED
+     STACK_REHEARSAL_FRAC STACK_VIRTUAL_RETREAT_BOX
+@@ -259,7 +259,7 @@ export REL_HAND_CLEAR REL_HAND_STEPS REL_STABLE_LIN REL_STABLE_ANG REL_STABLE_STE
+ export REL_HAND_CLEAR REL_HAND_STEPS REL_STABLE_LIN REL_STABLE_ANG REL_STABLE_STEPS REL_DROP_Z
+ export STACK_SEED STACK_SIZE_MARGIN STACK_GOAL_X STACK_GOAL_Y STACK_STAGE_DIST STACK_STAGE_Z STACK_STAGE_TOL
+ export STACK_BODY_CLEAR STACK_RETREAT_DIST STACK_RETREAT_SCALE STACK_XY_TOL STACK_Z_TOL STACK_ENTRY_LIN STACK_ENTRY_ANG
+-export STACK_ENTRY_STEPS STACK_HAND_CLEAR STACK_HAND_STEPS STACK_STABLE_LIN STACK_STABLE_ANG STACK_TOP_STEPS
++export STACK_ENTRY_STEPS STACK_HAND_CLEAR STACK_HAND_STEPS STACK_HAND_ONLY_SWITCH STACK_FOOT_CLEAR STACK_FOOT_BOX_W STACK_STABLE_LIN STACK_STABLE_ANG STACK_TOP_STEPS
+ export STACK_DROP_XY STACK_TRANSITION_BONUS STACK_CLEAR_BONUS STACK_CLEAR_PROGRESS_W STACK_CLEAR_SPEED_W STACK_CLEAR_STEER_W
+ export STACK_CLEAR_VEL_K STACK_CLEAR_LAT_K STACK_CLEAR_MIN_SPEED STACK_CLEAR_HARD_GATE STACK_CLEAR_SIGNED
+ export STACK_REHEARSAL_FRAC STACK_VIRTUAL_RETREAT_BOX
+diff --git a/scripts/masteer/train_handclear_footpen_local.sh b/scripts/masteer/train_handclear_footpen_local.sh
+new file mode 100755
+--- /dev/null
++++ b/scripts/masteer/train_handclear_footpen_local.sh
+@@ -0,0 +1,24 @@
++#!/bin/bash
++set -eo pipefail
++
++ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
++TAG=${1:?사용법: train_handclear_footpen_local.sh <tag> <foot_box_weight>}
++FOOT_W=${2:?사용법: train_handclear_footpen_local.sh <tag> <foot_box_weight>}
++
++export MA_GPU=6
++export MA_INIT_CKPT="$ROOT/TokenHSI-masteer/output/masteer/ms18_maskteam_origscale_c06_s0/imported_00009000/nn/Humanoid_00009000.pth"
++export MA_FREEZE_NEW_CARRY=0
++export MA_TOKEN=mask
++
++export STACK_HAND_ONLY_SWITCH=1
++export STACK_HAND_CLEAR=0.10
++export STACK_HAND_STEPS=5
++export STACK_BODY_CLEAR=0.60
++export STACK_CLEAR_HARD_GATE=0
++export STACK_FOOT_CLEAR=0.20
++export STACK_FOOT_BOX_W="$FOOT_W"
++export STACK_CLEAR_STEER_W=0.25
++
++exec bash "$ROOT/scripts/masteer/train_stack_release_local.sh" "$TAG"

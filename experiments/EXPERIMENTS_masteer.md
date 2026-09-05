@@ -67,6 +67,46 @@
 
 ## 해석
 
+### 0. 순차 stacking release의 pickup 회귀 추적 (2026-09-04)
+
+목표는 모델 구조를 바꾸지 않고, 중앙 controller가 base 배치 뒤 가상 박스로 후퇴를
+지시하는 것이다. CLEAR의 base도 object-free loco AMP가 아니라 부모 carry AMP를 받는다.
+
+실험 경과:
+
+- `ms25_virtualretreat_adapteronly_r50_s0_e1024`: adapter-only, 가상 박스, 50% carry
+  rehearsal. epoch 9100 viewer에서 pickup이 깨져 기각했다.
+- 이후 CLEAR의 loco AMP override를 제거하고 carry AMP로 복원했다. 가상 박스는 유지했다.
+- `ms27_virtualbox_ms20clear_b3_tokunfreeze_s0`: ms18 epoch 9000에서 steer/new-carry
+  tokenizer와 adapter를 학습했다. CLEAR steering 추가항은 0이지만 transition bonus 3.0,
+  CLEAR 진입 bonus 1.5가 남아 있었다. epoch 9300에서도 pickup이 깨져 중단했다.
+  epoch 9200은 ms18 대비 new-carry tokenizer L2 0.358, adapter L2 1.580이 변했다.
+  따라서 head 동결만으로는 pickup action을 보존하지 못한다.
+- `ms28_virtualbox_ms20bonus0_stage_s0`: 확인된 `ms20_stackrel_gate_bonus0_s0`에 맞춰
+  transition/CLEAR 진입 bonus를 모두 0으로 내렸다. 가상 박스, carry AMP, 50% rehearsal,
+  tokenizer unfreeze, ms20 CLEAR 식은 유지한다. ms18 epoch 9000에서 GPU 7, 1024 env,
+  3000 iteration으로 실행 중이다.
+
+단계 원인을 직접 가르기 위해 episode 지표에 양손 OBB 접근, 10-frame pickup, 운반 중
+break, base 배치, 손 떼기, body clear, 물리 실패, 최대 lift와 역할을 추가했다. 학습 중
+448 iteration까지 누적된 **비정상(non-stationary) 예비치**는 base pickup 0.856,
+top pickup 0.850이었다. base의 최초 정지 위치는 접근 0.136, lift 0.009,
+carry/place 0.717, release 0.057, clear 0.039, body-clear 통과 0.044였다. 이는 고정 정책
+평가가 아니므로 최종 비교값으로 사용하지 않고 실패 후보를 고르는 용도로만 쓴다.
+
+서버 `common_agent.py`에는 `save_archive_frequency` 구현이 빠져 `Humanoid.pth`만
+덮어쓰는 것도 확인했다. 실행을 건드리지 않는 `checkpoint_watch.py`를 붙여 epoch 9450부터
+50 epoch 간격 번호 checkpoint를 보존한다. 고정 비교는 아래 두 명령의 동일 sidecar 평가로
+한다.
+
+```bash
+bash scripts/masteer/stack_stage_eval.sh ms28_virtualbox_ms20bonus0_stage_s0 7 initial 512
+bash scripts/masteer/stack_stage_eval.sh ms28_virtualbox_ms20bonus0_stage_s0 7 9450 512
+```
+
+현재 판정은 **진행 중**이다. `initial` 대비 어느 checkpoint에서 pickup 또는 carry/place가
+먼저 하락하는지 확인하기 전에는 bonus 0의 보존 성공 여부를 결론 내리지 않는다.
+
 ### 1. extra 토크나이저가 한 번도 학습된 적이 없었다 (2026-08-20)
 
 `MA_TOKENIZER_ZERO=1` 이 마지막 Linear 를 0 으로 두는데 그 뒤에 ReLU 가 하나 더 있어서

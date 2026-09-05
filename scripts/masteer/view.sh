@@ -31,8 +31,8 @@
 # 태그 대신 .pth 경로를 직접 줘도 된다.
 # 원본 TokenHSI의 viewer/test처럼 기본은 학습 분포의 혼합 시작 skill을 쓴다.
 # final evaluation과 같은 loco 시작만 보려면 MS_EVAL=1을 준다.
-set -e
-ROOT=/home/hwanhee/CVPR2027
+set -eo pipefail
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 VNC_DIR=/home/hwanhee/opt/vnc
 NOVNC_DIR=/home/hwanhee/opt/novnc
 
@@ -53,7 +53,19 @@ VNC_PORT=$((5900 + DISPNUM))
 
 cd $ROOT/TokenHSI-masteer
 source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
-conda activate tokenhsi
+conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi_koo}"
+
+GPU=${MA_GPU:-7}
+if [[ "$GPU" != 6 && "$GPU" != 7 ]]; then
+    echo "MA_GPU는 6 또는 7이어야 한다: $GPU" >&2
+    exit 2
+fi
+export MA_GPU=$GPU
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export CUDA_VISIBLE_DEVICES=$GPU
+export VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select
+export DRI_PRIME="${GPU}!"
+python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GPU" >/dev/null
 
 if [ -f "$TAG" ]; then CKPT="$TAG"; NAME=$(basename $(dirname $(dirname "$TAG")))
 else
@@ -143,7 +155,7 @@ MS_L=${MS_L:-12} MS_RECOV=${MS_RECOV:-1.5} MS_W=${MS_W:-3.0} MS_GAP=${MS_GAP:-1.
 MS_SEP=${MS_SEP:-9.0} MS_PLACEBO=${MS_PLACEBO:-0} \
 MS_VEL_W=${MS_VEL_W:-1} MS_VEL_K=${MS_VEL_K:-5} \
 MS_ENDCLAMP=${MS_ENDCLAMP:-0} MS_CLIP=${MS_CLIP:-1} MS_DBG=${MS_DBG:-1} \
-CUDA_VISIBLE_DEVICES=${MA_GPU:-4} \
+CUDA_VISIBLE_DEVICES=$GPU \
 python ./tokenhsi/run.py --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \

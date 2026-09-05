@@ -1,0 +1,21 @@
+diff --git a/TokenHSI-masteer/CHANGELOG.md b/TokenHSI-masteer/CHANGELOG.md
+--- a/TokenHSI-masteer/CHANGELOG.md
++++ b/TokenHSI-masteer/CHANGELOG.md
+@@ -793,1 +793,17 @@
+ 않고, 수정된 viewer와 학습 sidecar로 재확인한다.
++
++### ms29 손 거리 전환 + 발-박스 penalty 비교
++
++모델/head/tokenizer 구조는 바꾸지 않고 ms18 epoch 9000에서 시작한다. 실제 pickup 이력 뒤
++Agent A의 양손이 박스 표면에서 0.10m 이상인 상태를 5 step 연속 만족하면 CLEAR로 전환한다.
++box 위치·속도 안정화와 CLEAR→STACK hard gate는 끄고, Agent B 시작에는 A의 body-base-box
++거리 0.60m만 유지한다. teammate token은 mask, new-carry와 steering tokenizer 및 adapter는
++학습한다. release 후 기존 XY 이탈 실패 조건도 비활성화했다.
++
++공통 CLEAR reward는 유지하고 한 쌍만 발 원점과 base-box OBB 표면 거리 0.20m 이내에
++최대 0.25 penalty를 추가했다. 2048 env는 PhysX illegal memory access로 초기화 실패했고,
++1024 env smoke는 두 iteration·checkpoint·gradient를 통과했다.
++
++GPU 6에 1024 env, seed 0, 3000 iteration으로 두 실험을 시작했다.
++- `ms29_hand10_clear06_base_e1024_s0`: foot penalty 0
++- `ms29_hand10_clear06_foot025_e1024_s0`: foot penalty 0.25

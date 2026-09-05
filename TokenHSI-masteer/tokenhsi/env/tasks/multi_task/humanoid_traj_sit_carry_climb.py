@@ -721,10 +721,24 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._sit_marker_pos[:] = self._sit_tar_pos # 3d xyz
         self._climb_marker_pos[:] = self._climb_tar_pos # 3d xyz
 
-        actor_ids = torch.cat([self._traj_marker_actor_ids, self._sit_marker_actor_ids, self._sit_object_actor_ids, self._box_actor_ids, self._climb_marker_actor_ids, self._climb_object_actor_ids,], dim=0)
-        if self._carry_reset_random_height:
-            # env has two platforms
-            actor_ids = torch.cat([actor_ids, self._platform_actor_ids, self._tar_platform_actor_ids], dim=0)
+        actor_ids = torch.cat([
+            self._traj_marker_actor_ids,
+            self._sit_marker_actor_ids,
+            self._climb_marker_actor_ids,
+        ], dim=0)
+        if getattr(self, "_viewer_object_sync_pending", False):
+            physical_ids = [
+                self._sit_object_actor_ids,
+                self._box_actor_ids,
+                self._climb_object_actor_ids,
+            ]
+            if self._carry_reset_random_height:
+                physical_ids.extend([
+                    self._platform_actor_ids,
+                    self._tar_platform_actor_ids,
+                ])
+            actor_ids = torch.cat([actor_ids, *physical_ids], dim=0)
+            self._viewer_object_sync_pending = False
         self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states),
                                                      gymtorch.unwrap_tensor(actor_ids), len(actor_ids))
         return
@@ -2328,6 +2342,8 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         _reset_envs 가 끝난 뒤에 만들면 **첫 관측이 옛 값으로 계산되고**
         그게 _init_amp_obs 까지 흘러간다 (실측: 성공률 0.86 -> 0.43).
         """
+        if not self.headless and len(env_ids) > 0:
+            self._viewer_object_sync_pending = True
         return
 
     def _reset_progress_ref(self, env_ids):
