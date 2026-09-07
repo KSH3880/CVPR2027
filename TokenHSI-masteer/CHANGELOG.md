@@ -834,3 +834,162 @@ CLEAR→STACK gate는 CARRY/최종 적층 기준과 분리해 XY 0.15m, Z 0.10m,
 새 설정을 sidecar에서 재현했고, 첫 backward에서 active tokenizer와 adapt MLP gradient,
 약 1.1~1.4만 total FPS를 확인했다. 최초 nohup-only 태그 두 개는 session 분리 전에
 종료되어 학습하지 않았으며, 출력 보존 규칙 때문에 `try2` 새 태그로 재시작했다.
+
+
+## 2026-09-06
+
+### stack phase gate를 predicate별로 분해
+
+`HumanoidMASequentialStackRelease`의 기존 50열 episode 지표 뒤에 22열을 append했다.
+정책 입력·보상·action·phase 전환 조건은 바꾸지 않고 다음 값만 누적한다.
+
+- CARRY: XY/Z/선속도/각속도/upright/foot/placeable/결합 gate의 step 통과율과
+  결합 gate 최대 연속 프레임
+- RELEASE: hand/foot/결합 gate 통과율과 최대 연속 프레임
+- CLEAR: hand/body-distance/base-stable/결합 gate 통과율, 최대 body distance와
+  실제 retreat path arc
+
+`stack_stage_summary.py`는 기존 49·50열 결과를 계속 읽고, 새 72열 결과에서는 전체와
+agent index 0/1을 분리해 출력한다. release→clear event의 프레임 지연도 함께 출력해,
+이미 body-distance gate 밖에서 CLEAR에 진입한 즉시 통과와 실제 후퇴를 구분한다.
+
+문법 검사와 기존 50열 결과 하위 호환을 확인한 뒤 GPU 6에서 ms30 64-env smoke를 실행했다.
+72열 저장과 요약 출력을 확인했으며 reward/action 수치는 변경하지 않았다.
+
+### ms30/ms31과 ms18-init ms24 두 정책의 gate 진단
+
+동일한 최신-checkpoint, 512-env 평가를 `gate_diag_0906` suffix로 실행했다.
+
+| tag | base n | place→release→clear | CARRY joint steps | RELEASE hand/foot/joint | CLEAR body | retreat arc p50/p95/max |
+|---|---:|---:|---:|---:|---:|---:|
+| ms30 allfoot base | 1132 | 11→7→3 | 86/616866 | .457/.055/.044 | .003 | .004/.139/.173 |
+| ms31 allfoot motion | 1140 | 13→8→5 | 101/619410 | .430/.079/.041 | .017 | .032/.211/.271 |
+| ms24 possteer .25 | 1160 | 66→62→0 | 435/607084 | .311/1/.311 | .000 | .025/.150/.258 |
+| ms24 possteer .50 | 1159 | 47→44→1 | 297/613416 | .133/1/.133 | .004 | .013/.134/1.000 |
+
+ms30/31은 안정 배치만 보면 step 통과율이 .218/.231이고 all-foot도 .571/.559지만,
+둘이 같은 순간 겹친 비율은 약 0.00014/0.00016뿐이었다. 5-frame CARRY→RELEASE
+gate가 첫 병목이다. RELEASE에 들어간 뒤에는 hand보다 all-foot가 훨씬 낮아 두 번째
+병목도 foot hard gate다. 따라서 viewer에서 손을 뗐는데 phase가 바뀌지 않는 관찰과
+정량 결과가 일치한다.
+
+네 정책 모두 CLEAR의 실제 path 후퇴는 거의 없었다. ms24 possteer .50에서 한 episode만
+arc 1.0m를 진행해 viewer에서 보였을 후보가 있으나, 그 episode는 body gate 통과 step
+.080, base-stable .264, 결합 0이었고 base box가 0.256m 움직였다. 즉 실제로 물러났지만
+박스 안정성과 body-distance가 동시에 성립하지 않아 STACK으로 전환되지 않았다.
+유일한 ms24 .50 clear event도 release와 같은 frame에 발생해 학습된 후퇴 성공이 아니다.
+
+### 다음 학습 순서 제안
+
+1. CARRY→RELEASE에서 all-foot를 hard conjunction으로 쓰지 않고 안정 배치 5-frame을
+   먼저 latch한다. foot distance는 dense penalty로 유지한다.
+2. RELEASE→CLEAR도 손 떼기와 foot safety를 분리한다. 손 떼기를 phase 전환으로 쓰고,
+   foot는 penalty 또는 별도 safety 판정으로 둬 서로 다른 시점의 조건을 강제로 겹치지 않는다.
+3. CLEAR 성공은 현재 body-distance 대신 `retreat_arc >= 0.6m`를 필수로 해 이미 멀리
+   서 있던 상태의 즉시 통과를 막고, base displacement/velocity를 dense penalty로 준다.
+4. 첫 pilot은 후퇴 outlier가 실제로 나온 ms24 possteer .50에서 시작하되 CARRY 경로는
+   동결하고 CLEAR에서만 활성인 residual을 쓴다. pickup 보호지표 0.90과 base displacement를
+   함께 본다. 이 pilot이 실패할 때만 virtual-retreat 관측을 다시 검토한다.
+
+위 제안은 아직 학습이나 큐 행으로 만들지 않았다.
+
+
+### 모델 변경 없는 reward-only CLEAR pilot 구현
+
+CLEAR 전용 residual은 모델 forward와 phase 입력을 바꿔야 하므로 사용하지 않았다.
+`amp_network_builder_transformer_adapt.py`에는 변경이 없고, 기존 ms24
+`possteer050 ... try3` 체크포인트와 내부 adapter 구조를 그대로 이어 쓴다. 대신
+학습 환경의 25%를 기존 carry rehearsal로 유지해 새 CLEAR gradient에 의한 pickup/carry
+붕괴를 완화한다. 이는 CARRY action 불변을 수학적으로 보장하지 않으므로 아래
+100-iteration 단위 보호지표 평가가 필수다.
+
+환경/controller와 reward에는 다음 opt-in 노브를 추가했다. 기본값은 기존 sidecar 동작을
+보존하고, `train_clear_reward_pilot_local.sh`에서만 새 설계를 켠다.
+
+- `STACK_ENTRY_FOOT_GATE=0`: CARRY→RELEASE는 안정 배치 5프레임만 latch한다.
+- `STACK_RELEASE_FOOT_GATE=0`: RELEASE→CLEAR는 손 간격 5프레임만 사용한다.
+- `STACK_CARRY_FOOT_GATE=1`, `STACK_FOOT_BOX_W=0.10`: all-foot는 hard gate가
+  아니라 dense penalty와 73번째 episode 안전지표로 유지한다.
+- `STACK_CLEAR_ARC_DIST=0.60`: CLEAR 진행 보상과 CLEAR→STACK 전환 모두 실제
+  retreat path arc를 사용한다.
+- CLEAR에서 latched base box의 XY 변위/선속도/각속도를 각각
+  `0.10/0.05/0.05` 가중치로 정규화해 감점한다.
+- `STACK_CLEAR_HARD_GATE=0`: 안정성은 hard conjunction 대신 위 dense penalty와
+  별도 지표로 본다.
+- `STACK_REHEARSAL_FRAC=0.25`: 나머지 75%만 새 순차 phase/reward를 경험한다.
+
+파일럿은 500 iteration이며 archive를 100마다 저장한다. 평가는
+`eval_clear_reward_pilot.sh`가 초기 ms24 기준선과 100·200·300·400·500 구간을
+차례대로 평가한다. 보호 하한은 pickup 0.85, `release_given_place` 0.80,
+release 이후 base displacement p95 0.15m이며, CLEAR foot-clear step 비율은 초기보다
+최대 0.05p 하락까지 허용한다. 보호조건과 별도로 `retreat_arc >= 0.6m` episode
+비율이 초기보다 증가했는지 `learning=UP`으로 출력한다. FAIL이어도 평가를 중단하거나
+프로세스를 종료하지 않고 다섯 체크포인트를 모두 본다.
+
+구현·문법·72열 하위 호환·73열 합성 판정만 확인했다. 학습과 GPU 평가는 실행하지 않았다.
+
+## 2026-09-07
+
+### legacy delivered gate와 동적 obj 적층 목표 추가
+
+기존 안정 배치 결합 조건 대신 legacy carry 성공 이벤트인 `_ep_finish >= 0`을
+CARRY→RELEASE 기준으로 선택할 수 있도록 `STACK_ENTRY_DELIVERED`를 추가했다.
+기본값은 0이므로 기존 sidecar와 학습은 변하지 않는다. 전용 wrapper는 1 frame을 요청하지만 현재 try2의 실제 sidecar 값은 아래처럼 5 frame이다.
+
+B의 적층 carry 목표는 A가 놓은 실제 아래 박스의 현재 XY와 윗면 Z를 매 step 사용한다.
+기존에도 teammate token은 상대 박스의 현재 위치·속도를 관측했고 목표도 0.10 lerp로
+추종했지만, 이제 lerp 지연 없이 실제 obj 위치를 즉시 반영한다.
+
+`train_delivered_steer_local.sh`는 ms18 e9000에서 시작하며 가상 후퇴 박스를 끄고,
+기존 steering 경로로 CLEAR 후퇴를 학습하는 500 iteration·25% carry rehearsal
+파일럿을 실행한다. Python/Bash 문법과 diff whitespace만 확인했고 학습·GPU 평가는
+실행하지 않았다.
+
+### ms34 delivered-steer try2의 실제 RELEASE/CLEAR 조건과 reward
+
+아래는 GPU 7에서 실행한 `ms34_ms18init_delivered_steer_s0_try2`의 생성 sidecar
+기준이다. 전체 env의 25%는 carry rehearsal이고, 나머지 75%가 순차 phase를 사용한다.
+가상 후퇴 박스는 꺼져 있으며(`STACK_VIRTUAL_RETREAT_BOX=0`) 기존 steering 창을 쓴다.
+
+#### phase 전환
+
+1. CARRY→RELEASE: base agent의 원래 carry 성공 latch `_ep_finish >= 0`만 사용한다.
+   안정 배치 XY/Z/속도/upright와 foot 조건은 진단값일 뿐 hard gate가 아니다. 다만 현재
+   try2 sidecar는 `STACK_ENTRY_STEPS=5`여서 이 값이 5 frame 연속 유지돼야 한다. 전용
+   wrapper의 1 frame 설정이 기준 ms24 env source에 덮인 결과다.
+2. RELEASE→CLEAR: base box와 양손 표면 사이 최소거리 `hand_dist >= 0.15m`를 5 frame
+   연속 만족하면 전환한다. `STACK_RELEASE_FOOT_GATE=0`이므로 발 거리는 전환 조건이 아니다.
+   이때 실제 base box에서 agent 반대 방향으로 1.5m retreat steering path를 생성하고 속도
+   scale은 0.5로 둔다.
+3. CLEAR→STACK: 손 간격 0.15m를 계속 유지하면서 실제 steering path 누적 진행거리
+   `arc_root >= 0.60m`를 만족하면 전환한다. `STACK_CLEAR_HARD_GATE=0`이므로 base box의
+   위치·속도 안정성 및 foot 거리는 hard gate가 아니다. STACK 진입 후 B의 carry goal은
+   매 step 실제 A box의 현재 XY와 윗면 Z로 즉시 갱신된다.
+4. RELEASE 이후 base box가 최초 고정 goal에서 XY 0.25m 초과 이동하거나 z가 -0.05m
+   아래로 떨어지면 FAILED로 종료하고 base agent reward를 -1로 둔다.
+
+#### reward
+
+모든 phase는 먼저 ms18 carry reward를 계산한다. base agent는 RELEASE 이후 아래 reward로
+교체된다. top agent와 rehearsal env에는 post-phase reward 교체가 적용되지 않는다. target 근처에서
+박스를 집은 CARRY base와 RELEASE 이후에는 box-foot 거리 0.20m 안쪽에 최대 0.10의
+dense penalty가 추가된다. 이는 hard gate가 아니다.
+
+- 공통값: `h=clip(hand_dist/0.15,0,1)`,
+  `support=exp(-20*xy_err^2-80*z_err^2)*upright`,
+  `stable=exp(-10*||base_lin_vel||^2-0.5*||base_ang_vel||^2)`.
+- RELEASE: `0.50*h + I(hand_clear)*(0.30*support + 0.20*stable) - 0.10*clip(1-foot_dist/0.20,0,1)`.
+  즉 손을 멀리할수록 보상하고, 손을 0.15m 이상 뗀 동안에만 놓인 박스의 지지·정지를
+  추가 보상한다.
+- CLEAR: steering 진행량과 속도 일치를 `motion=0.7*signed_progress + 0.3*speed_match`로
+  계산한다. 역방향 진행은 `signed_progress` 때문에 음수이고, path 횡오차는
+  `path_quality=exp(-lat_error^2)`로 감점된다. 실제 reward는
+  `I(hand_clear)*[motion*(0.40*support+0.25*stable)+0.35*clip(arc/0.60)]`에
+  `0.50*I(hand_clear)*path_quality*motion`을 더한 뒤 base box penalty와 foot penalty를 뺀다.
+  base box penalty 최대값은 위치변위 0.10, 선속도 0.05, 각속도 0.05로 총 0.20이다.
+- CARRY→RELEASE 후 첫 CLEAR reward에는 transition bonus +3.0, CLEAR→STACK 후에는
+  clear bonus +1.5, SUCCESS phase에는 매 step +0.5가 추가된다.
+
+따라서 현재 설계의 RELEASE 핵심은 손 떼기이고, CLEAR 핵심은 손을 뗀 채 기존 steering
+경로로 0.60m 실제 이동하는 것이다. 박스 안정성은 두 phase 모두 reward/penalty로만
+유도하며 phase 전환을 막지는 않는다.

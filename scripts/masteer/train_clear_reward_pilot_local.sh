@@ -1,0 +1,50 @@
+#!/bin/bash
+# Continue ms24 possteer050 for 500 iterations with reward gates and 25% carry rehearsal.
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+BASE_TAG=ms24_ms18init_ms20clear_possteer050_s0_try3
+BASE_ENV="$ROOT/runs/queue/logs/$BASE_TAG.env"
+DEFAULT_BASE_CKPT="$ROOT/TokenHSI-masteer/output/masteer/$BASE_TAG/Humanoid_03-21-56-07/nn/Humanoid.pth"
+PILOT_INIT_CKPT=${PILOT_INIT_CKPT:-$DEFAULT_BASE_CKPT}
+TAG=${1:-ms32_ms24init_clearreward_arc060_r25_s0}
+PILOT_ENVS=${PILOT_ENVS:-1024}
+
+if [ ! -f "$BASE_ENV" ] || [ ! -f "$PILOT_INIT_CKPT" ]; then
+    echo "pilot 기준 파일 없음: $BASE_ENV 또는 $PILOT_INIT_CKPT" >&2
+    exit 1
+fi
+
+source "$BASE_ENV"
+export MS_ENVS="$PILOT_ENVS"
+export MS_TAG="$TAG"
+export MA_INIT_CKPT="$PILOT_INIT_CKPT"
+export MA_ADAPTER_ONLY=1
+export MA_FREEZE_INPUT_RMS=1
+export MA_FREEZE_NEW_CARRY=1
+
+export MS_ITERS=500
+export MS_SAVE_LATEST=100
+export MS_SAVE_ARCHIVE=100
+export MA_GPU=${MA_GPU:-6}
+unset MS_METRICS MA_METRICS
+
+export STACK_ENTRY_STEPS=${STACK_ENTRY_STEPS:-5}
+export STACK_ENTRY_DELIVERED=${STACK_ENTRY_DELIVERED:-0}
+export STACK_CARRY_FOOT_GATE=1
+export STACK_ENTRY_FOOT_GATE=0
+export STACK_RELEASE_FOOT_GATE=0
+export STACK_FOOT_CLEAR=0.20
+export STACK_FOOT_BOX_W=0.10
+
+export STACK_CLEAR_ARC_DIST=0.60
+export STACK_CLEAR_HARD_GATE=0
+export STACK_CLEAR_MOTION_GATE=1
+export STACK_CLEAR_SIGNED=1
+export STACK_CLEAR_BASE_DISP_W=0.10
+export STACK_CLEAR_BASE_LIN_W=0.05
+export STACK_CLEAR_BASE_ANG_W=0.05
+export STACK_VIRTUAL_RETREAT_BOX=${STACK_VIRTUAL_RETREAT_BOX:-0}
+export STACK_REHEARSAL_FRAC=0.25
+
+exec bash "$ROOT/scripts/masteer/train_local.sh" "$TAG"

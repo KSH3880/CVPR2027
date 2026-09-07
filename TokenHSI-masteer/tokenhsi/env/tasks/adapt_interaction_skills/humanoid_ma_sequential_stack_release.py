@@ -48,6 +48,33 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
     SUCCESS = 4
     FAILED = 5
 
+    (
+        DIAG_CARRY_STEPS,
+        DIAG_ENTRY_XY,
+        DIAG_ENTRY_Z,
+        DIAG_ENTRY_LIN,
+        DIAG_ENTRY_ANG,
+        DIAG_ENTRY_UPRIGHT,
+        DIAG_ENTRY_FOOT,
+        DIAG_ENTRY_PLACEABLE,
+        DIAG_ENTRY_JOINT,
+        DIAG_ENTRY_STREAK_MAX,
+        DIAG_RELEASE_STEPS,
+        DIAG_RELEASE_HAND,
+        DIAG_RELEASE_FOOT,
+        DIAG_RELEASE_JOINT,
+        DIAG_RELEASE_STREAK_MAX,
+        DIAG_CLEAR_STEPS,
+        DIAG_CLEAR_HAND,
+        DIAG_CLEAR_BODY,
+        DIAG_CLEAR_STABLE,
+        DIAG_CLEAR_JOINT,
+        DIAG_RETREAT_ROOT_DIST_MAX,
+        DIAG_RETREAT_ARC_MAX,
+        DIAG_CLEAR_FOOT,
+    ) = range(23)
+    DIAG_DIM = 23
+
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         if int(cfg["env"].get("numAgents", 1)) != 2:
             raise ValueError("HumanoidMASequentialStackRelease requires env.numAgents=2")
@@ -70,12 +97,19 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_entry_lin = _f("STACK_ENTRY_LIN", 0.25)
         self._ss_entry_ang = _f("STACK_ENTRY_ANG", 1.0)
         self._ss_entry_steps = _i("STACK_ENTRY_STEPS", 5)
+        self._ss_entry_delivered = bool(_i("STACK_ENTRY_DELIVERED", 0))
         self._ss_hand_clear = _f("STACK_HAND_CLEAR", 0.15)
         self._ss_hand_steps = _i("STACK_HAND_STEPS", 5)
         self._ss_hand_only_switch = bool(_i("STACK_HAND_ONLY_SWITCH", 0))
         self._ss_foot_clear = _f("STACK_FOOT_CLEAR", 0.20)
         self._ss_foot_box_w = _f("STACK_FOOT_BOX_W", 0.0)
         self._ss_carry_foot_gate = bool(_i("STACK_CARRY_FOOT_GATE", 0))
+        self._ss_entry_foot_gate = bool(_i(
+            "STACK_ENTRY_FOOT_GATE", int(self._ss_carry_foot_gate)
+        ))
+        self._ss_release_foot_gate = bool(_i(
+            "STACK_RELEASE_FOOT_GATE", int(self._ss_carry_foot_gate)
+        ))
         self._ss_carry_foot_xy = _f("STACK_CARRY_FOOT_XY", 0.30)
         self._ss_carry_foot_z = _f("STACK_CARRY_FOOT_Z", 0.20)
         self._ss_stable_lin = _f("STACK_STABLE_LIN", 0.08)
@@ -96,6 +130,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_clear_stable_lin = _f("STACK_CLEAR_STABLE_LIN", self._ss_stable_lin)
         self._ss_clear_stable_ang = _f("STACK_CLEAR_STABLE_ANG", self._ss_stable_ang)
         self._ss_clear_motion_gate = bool(_i("STACK_CLEAR_MOTION_GATE", 0))
+        self._ss_clear_arc_dist = _f("STACK_CLEAR_ARC_DIST", 0.0)
+        self._ss_clear_base_disp_w = _f("STACK_CLEAR_BASE_DISP_W", 0.0)
+        self._ss_clear_base_lin_w = _f("STACK_CLEAR_BASE_LIN_W", 0.0)
+        self._ss_clear_base_ang_w = _f("STACK_CLEAR_BASE_ANG_W", 0.0)
         self._ss_rehearsal_frac = _f("STACK_REHEARSAL_FRAC", 0.0)
         self._ss_virtual_retreat = bool(_i("STACK_VIRTUAL_RETREAT_BOX", 0))
         self._ss_clear_signed = bool(_i("STACK_CLEAR_SIGNED", 0))
@@ -107,6 +145,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             raise ValueError("STACK_CLEAR_PROGRESS_W/STACK_CLEAR_SPEED_W must be non-negative")
         if self._ss_clear_steer_w < 0.0:
             raise ValueError("STACK_CLEAR_STEER_W must be non-negative")
+        if min(self._ss_clear_arc_dist, self._ss_clear_base_disp_w,
+               self._ss_clear_base_lin_w, self._ss_clear_base_ang_w) < 0.0:
+            raise ValueError("CLEAR arc distance and base penalty weights must be non-negative")
         if self._ss_foot_clear <= 0.0 or self._ss_foot_box_w < 0.0:
             raise ValueError("STACK_FOOT_CLEAR must be positive and STACK_FOOT_BOX_W non-negative")
         if self._ss_carry_foot_xy <= 0.0 or self._ss_carry_foot_z <= 0.0:
@@ -220,6 +261,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_dbg_z0 = torch.zeros(rows, device=self.device)
         self._ss_dbg_max_lift = torch.zeros(rows, device=self.device)
         self._ss_dbg_base_disp_max = torch.zeros(num_envs, device=self.device)
+        self._ss_dbg_gate_counts = torch.zeros(
+            (num_envs, self.DIAG_DIM), device=self.device
+        )
         self._ss_dbg_near_step = torch.full(
             (rows,), -1, dtype=torch.long, device=self.device
         )
@@ -242,6 +286,12 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"hand_only={int(self._ss_hand_only_switch)} "
             f"foot_box_w={self._ss_foot_box_w:.2f} "
             f"carry_foot_gate={int(self._ss_carry_foot_gate)} "
+            f"entry_foot_gate={int(self._ss_entry_foot_gate)} "
+            f"entry_delivered={int(self._ss_entry_delivered)} "
+            f"release_foot_gate={int(self._ss_release_foot_gate)} "
+            f"clear_arc={self._ss_clear_arc_dist:.2f} "
+            f"clear_base_w={self._ss_clear_base_disp_w:.2f}/"
+            f"{self._ss_clear_base_lin_w:.2f}/{self._ss_clear_base_ang_w:.2f} "
             f"clear_motion_gate={int(self._ss_clear_motion_gate)} "
             f"rehearsal={self._ss_rehearsal_frac:.2f} "
             f"virtual_retreat={int(self._ss_virtual_retreat)}",
@@ -291,6 +341,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_latched_base[env_ids] = 0.0
         self._ss_retreat_goal[env_ids] = 0.0
         self._ss_dbg_base_disp_max[env_ids] = 0.0
+        self._ss_dbg_gate_counts[env_ids] = 0.0
 
         env_ids = env_ids[~self._ss_rehearsal[env_ids]]
         if len(env_ids) == 0:
@@ -479,6 +530,11 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_dbg_base_disp_max[env],
             torch.zeros_like(kind),
         )
+        gate_counts = torch.where(
+            (kind == 1)[:, None],
+            self._ss_dbg_gate_counts[env],
+            torch.zeros_like(self._ss_dbg_gate_counts[env]),
+        )
         return super()._metric_extra_cols(rows) + [
             self._ss_dbg_near_step[rows].float(),
             self._ss_dbg_pick_step[rows].float(),
@@ -490,13 +546,14 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_dbg_max_lift[rows],
             kind,
             base_disp,
-        ]
+        ] + [gate_counts[:, index] for index in range(self.DIAG_DIM)]
 
     def _metric_reset_extra(self, rows):
         super()._metric_reset_extra(rows)
         self._reset_stage_metrics(rows)
         env = torch.div(rows, self.num_agents, rounding_mode="floor").unique()
         self._ss_dbg_base_disp_max[env] = 0.0
+        self._ss_dbg_gate_counts[env] = 0.0
         return
 
     @staticmethod
@@ -535,7 +592,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         if not (bool(post.any()) or bool(failed.any()) or use_carry_foot):
             return
 
-        (base_rows, top_rows, _, _, hand_dist, xy_err, z_err, support,
+        (base_rows, top_rows, base, _, hand_dist, xy_err, z_err, support,
          stable, root_dist) = self._base_features()
         foot_dist = (
             self._all_foot_surface_distance(base_rows, top_rows)
@@ -564,14 +621,18 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
 
         h = torch.clamp(hand_dist / self._ss_hand_clear, 0.0, 1.0)
         clear_now = hand_dist >= self._ss_hand_clear
-        clear_score = torch.clamp(
-            (root_dist - 0.40) / max(self._ss_body_clear - 0.40, 1e-6), 0.0, 1.0
-        )
-
         # CLEAR uses the retreat path already present in the observation.  An
         # absolute distance reward pays the policy forever for standing still;
         # positive arc progress pays only forward motion in the commanded direction.
         arc = self._arc_root[base_rows]
+        clear_score = (
+            torch.clamp(arc / max(self._ss_clear_arc_dist, 1e-6), 0.0, 1.0)
+            if self._ss_clear_arc_dist > 0.0
+            else torch.clamp(
+                (root_dist - 0.40) / max(self._ss_body_clear - 0.40, 1e-6),
+                0.0, 1.0,
+            )
+        )
         prev_arc = self._prev_arc[base_rows]
         arc_speed = (arc - prev_arc) / self.dt
         cmd_speed = self._m_at(arc, base_rows) / 1.6
@@ -593,6 +654,20 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_clear_progress_w * progress
             + self._ss_clear_speed_w * speed_match
         )
+        base_disp = (base[:, 0:2] - self._ss_latched_base[:, 0:2]).norm(dim=-1)
+        base_lin = base[:, 7:10].norm(dim=-1)
+        base_ang = base[:, 10:13].norm(dim=-1)
+        clear_base_penalty = (
+            self._ss_clear_base_disp_w * torch.clamp(
+                base_disp / self._ss_clear_xy_tol, 0.0, 1.0
+            )
+            + self._ss_clear_base_lin_w * torch.clamp(
+                base_lin / self._ss_clear_stable_lin, 0.0, 1.0
+            )
+            + self._ss_clear_base_ang_w * torch.clamp(
+                base_ang / self._ss_clear_stable_ang, 0.0, 1.0
+            )
+        )
 
         # At contact this is exactly zero.  Support/stability become valuable
         # only while both hands are currently clear; the gate is not latched.
@@ -603,7 +678,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         stack_r = clear_now.float() * (0.40 * support + 0.25 * stable) + 0.35 * clear_score
         positive_steer = clear_now.float() * path_quality * clear_motion
-        clear_r = ms20_clear_r + self._ss_clear_steer_w * positive_steer
+        clear_r = ms20_clear_r + self._ss_clear_steer_w * positive_steer - clear_base_penalty
         replacement = torch.where(self._ss_phase == self.RELEASE, release_r, clear_r)
         replacement = torch.where(self._ss_phase >= self.STACK, stack_r, replacement)
         replacement = torch.where(
@@ -626,6 +701,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["stack_clear_cmd_speed"] = cmd_speed
         self.extras["stack_clear_path_quality"] = path_quality
         self.extras["stack_clear_positive_steer"] = positive_steer
+        self.extras["stack_clear_base_penalty"] = clear_base_penalty
 
         if bool(failed.any()):
             self.rew_buf[base_rows[failed]] = -1.0
@@ -744,25 +820,56 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             else self._foot_surface_distance(base_rows)
         )
         foot_clear_now = foot_dist >= self._ss_foot_clear
-        release_foot_ok = (
+        entry_foot_ok = (
             foot_clear_now
-            if self._ss_carry_foot_gate
+            if self._ss_entry_foot_gate
             else torch.ones_like(foot_clear_now)
         )
-        placeable = (
-            (xy_err <= self._ss_xy_tol)
-            & (z_err <= self._ss_z_tol)
-            & (base[:, 7:10].norm(dim=-1) <= self._ss_entry_lin)
-            & (base[:, 10:13].norm(dim=-1) <= self._ss_entry_ang)
-            & (self._upright_score(base[:, 3:7]) >= math.cos(math.radians(10.0)))
+        release_foot_ok = (
+            foot_clear_now
+            if self._ss_release_foot_gate
+            else torch.ones_like(foot_clear_now)
         )
+        entry_xy = xy_err <= self._ss_xy_tol
+        entry_z = z_err <= self._ss_z_tol
+        entry_lin = base[:, 7:10].norm(dim=-1) <= self._ss_entry_lin
+        entry_ang = base[:, 10:13].norm(dim=-1) <= self._ss_entry_ang
+        entry_upright = self._upright_score(base[:, 3:7]) >= math.cos(
+            math.radians(10.0)
+        )
+        stable_placeable = (
+            entry_xy & entry_z & entry_lin & entry_ang & entry_upright
+        )
+        delivered = self._ep_finish[base_rows] >= 0
+        placeable = delivered if self._ss_entry_delivered else stable_placeable
+        picked = self._ss_dbg_pick_step[base_rows] >= 0
+        entry_joint = (
+            picked & clear_now
+            if self._ss_hand_only_switch
+            else placeable & entry_foot_ok
+        )
+        diag = self._ss_dbg_gate_counts
+        diag[:, self.DIAG_CARRY_STEPS] += carry.float()
+        for column, condition in (
+            (self.DIAG_ENTRY_XY, entry_xy),
+            (self.DIAG_ENTRY_Z, entry_z),
+            (self.DIAG_ENTRY_LIN, entry_lin),
+            (self.DIAG_ENTRY_ANG, entry_ang),
+            (self.DIAG_ENTRY_UPRIGHT, entry_upright),
+            (self.DIAG_ENTRY_FOOT, foot_clear_now),
+            (self.DIAG_ENTRY_PLACEABLE, placeable),
+            (self.DIAG_ENTRY_JOINT, entry_joint),
+        ):
+            diag[:, column] += (carry & condition).float()
         self._ss_entry_count = torch.where(
-            carry & placeable & release_foot_ok,
+            carry & placeable & entry_foot_ok,
             self._ss_entry_count + 1,
             torch.where(carry, torch.zeros_like(self._ss_entry_count), self._ss_entry_count),
         )
+        diag[:, self.DIAG_ENTRY_STREAK_MAX] = torch.maximum(
+            diag[:, self.DIAG_ENTRY_STREAK_MAX], self._ss_entry_count.float()
+        )
         if self._ss_hand_only_switch:
-            picked = self._ss_dbg_pick_step[base_rows] >= 0
             enter_release = carry & picked & clear_now
         else:
             enter_release = carry & (self._ss_entry_count >= self._ss_entry_steps)
@@ -789,10 +896,18 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._compute_observations(ids)
 
         release = self._ss_phase == self.RELEASE
+        release_joint = clear_now & release_foot_ok
+        diag[:, self.DIAG_RELEASE_STEPS] += release.float()
+        diag[:, self.DIAG_RELEASE_HAND] += (release & clear_now).float()
+        diag[:, self.DIAG_RELEASE_FOOT] += (release & foot_clear_now).float()
+        diag[:, self.DIAG_RELEASE_JOINT] += (release & release_joint).float()
         self._ss_hand_count = torch.where(
-            release & clear_now & release_foot_ok,
+            release & release_joint,
             self._ss_hand_count + 1,
             torch.where(release, torch.zeros_like(self._ss_hand_count), self._ss_hand_count),
+        )
+        diag[:, self.DIAG_RELEASE_STREAK_MAX] = torch.maximum(
+            diag[:, self.DIAG_RELEASE_STREAK_MAX], self._ss_hand_count.float()
         )
         just_released = release & (self._ss_hand_count >= self._ss_hand_steps)
         if bool(just_released.any()):
@@ -811,9 +926,32 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             & (base[:, 7:10].norm(dim=-1) <= self._ss_clear_stable_lin)
             & (base[:, 10:13].norm(dim=-1) <= self._ss_clear_stable_ang)
         )
-        ready_to_stack = clear & clear_now & (root_dist >= self._ss_body_clear)
+        retreat_done = (
+            self._arc_root[base_rows] >= self._ss_clear_arc_dist
+            if self._ss_clear_arc_dist > 0.0
+            else root_dist >= self._ss_body_clear
+        )
+        ready_to_stack = clear & clear_now & retreat_done
         if self._ss_clear_hard_gate:
             ready_to_stack &= base_still_supported
+        diag[:, self.DIAG_CLEAR_STEPS] += clear.float()
+        diag[:, self.DIAG_CLEAR_HAND] += (clear & clear_now).float()
+        diag[:, self.DIAG_CLEAR_BODY] += (
+            clear & (root_dist >= self._ss_body_clear)
+        ).float()
+        diag[:, self.DIAG_CLEAR_STABLE] += (clear & base_still_supported).float()
+        diag[:, self.DIAG_CLEAR_JOINT] += ready_to_stack.float()
+        diag[:, self.DIAG_CLEAR_FOOT] += (clear & foot_clear_now).float()
+        diag[:, self.DIAG_RETREAT_ROOT_DIST_MAX] = torch.where(
+            clear,
+            torch.maximum(diag[:, self.DIAG_RETREAT_ROOT_DIST_MAX], root_dist),
+            diag[:, self.DIAG_RETREAT_ROOT_DIST_MAX],
+        )
+        diag[:, self.DIAG_RETREAT_ARC_MAX] = torch.where(
+            clear,
+            torch.maximum(diag[:, self.DIAG_RETREAT_ARC_MAX], self._arc_root[base_rows]),
+            diag[:, self.DIAG_RETREAT_ARC_MAX],
+        )
         if bool(ready_to_stack.any()):
             ids = torch.nonzero(ready_to_stack, as_tuple=False).squeeze(-1)
             rows = top_rows[ids]
@@ -840,7 +978,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             base_size = self._box_lib._box_size[base_rows[ids]]
             top_size = self._box_lib._box_size[rows]
             desired[:, 2] = base[ids, 2] + 0.5 * (base_size[:, 2] + top_size[:, 2])
-            self._box_tar_pos[rows] = torch.lerp(self._box_tar_pos[rows], desired, 0.10)
+            self._box_tar_pos[rows] = desired
             target = self._box_tar_pos[rows]
             top_ok = (
                 ((top[ids, 0:2] - target[:, 0:2]).norm(dim=-1) <= self._ss_xy_tol)
@@ -877,6 +1015,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["stack_hand_distance"] = hand_dist
         self.extras["stack_release_done"] = (self._ss_phase >= self.CLEAR).float()
         self.extras["stack_clear_done"] = (self._ss_phase >= self.STACK).float()
+        self.extras["stack_retreat_done"] = retreat_done.float()
         self.extras["stack_staged"] = self._ss_staged.float()
         self.extras["stack_success"] = self._ss_success.float()
         self.extras["stack_failed"] = self._ss_failed.float()
