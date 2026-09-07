@@ -222,6 +222,34 @@ class BoxLib():
                 dtype=self._box_scale.dtype)
             self._box_scale = assigned / base
 
+        # Fix every two-agent environment to one bottom/top test-size pair.
+        # This is primarily for visually inspecting a specific combination
+        # selected from carry.box.build.testSizes.
+        fixed_pair = os.environ.get("STACK_FIXED_BOX_SIZE_IDS", "").strip()
+        if fixed_pair:
+            if mode != "test" or num_envs % 2 != 0:
+                raise ValueError(
+                    "STACK_FIXED_BOX_SIZE_IDS requires test mode and two-agent rows")
+            ids = [int(value) for value in fixed_pair.split(",")]
+            if len(ids) != 2:
+                raise ValueError(
+                    "STACK_FIXED_BOX_SIZE_IDS must be bottom_id,top_id")
+            test_sizes = torch.tensor(
+                self._build_test_sizes, device=self.device,
+                dtype=self._box_scale.dtype)
+            if min(ids) < 0 or max(ids) >= len(test_sizes):
+                raise ValueError(
+                    "STACK_FIXED_BOX_SIZE_IDS is outside carry.box.build.testSizes")
+            assigned = torch.empty(
+                (num_envs, 3), device=self.device,
+                dtype=self._box_scale.dtype)
+            assigned[0::2] = test_sizes[ids[0]]
+            assigned[1::2] = test_sizes[ids[1]]
+            base = torch.tensor(
+                self._build_base_size, device=self.device,
+                dtype=self._box_scale.dtype)
+            self._box_scale = assigned / base
+
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale # (num_envs, 3)
         self._build_box_bps()
         return

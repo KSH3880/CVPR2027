@@ -5,6 +5,9 @@
 # Usage:
 #   MA_GPU=7 PORT=6100 bash scripts/masteer/view_sequential_stack.sh
 #   MA_GPU=7 PORT=6101 bash scripts/masteer/view_sequential_stack.sh /abs/policy.pth 1
+#   STACK_VIEW_BOX_IDS=0,7 bash scripts/masteer/view_sequential_stack.sh /abs/policy.pth
+# Box IDs index carry.box.build.testSizes; eval defaults use 0=0.22 m,
+# 4=0.42 m and 7=0.57 m cubes. Format is bottom_id,top_id.
 #
 # MS_CKPT, when supplied, must be the TokenHSI stage1 backbone checkpoint,
 # not the single-task carry checkpoint.
@@ -44,6 +47,7 @@ export MS_CLIP=${MS_CLIP:-1}
 export MS_SCEN=${MS_SCEN:-free}
 export MS_DBG=${MS_DBG:-0}
 export STACK_TASK_MODE=stack
+export STACK_FIXED_BOX_SIZE_IDS=${STACK_VIEW_BOX_IDS:-${STACK_FIXED_BOX_SIZE_IDS:-}}
 export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.50}
 export STACK_TOP_XY_TOL=${STACK_TOP_XY_TOL:-0.15}
 export STACK_VIRTUAL_RETREAT_BOX=${STACK_VIRTUAL_RETREAT_BOX:-1}
@@ -56,6 +60,9 @@ export ENVS
 
 echo "sequential stack: A1 place -> A1 retreat -> A2 carry-to-top"
 echo "policy: $POLICY"
+if [ -n "$STACK_FIXED_BOX_SIZE_IDS" ]; then
+    echo "box size IDs (bottom,top): $STACK_FIXED_BOX_SIZE_IDS"
+fi
 echo "viewer: http://localhost:${PORT:-6100}/vnc.html"
 
 exec bash "$ROOT/scripts/masteer/view.sh" "$POLICY" "$ENVS"

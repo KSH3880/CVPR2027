@@ -103,6 +103,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_END_ON_A2_RESUME", "0")))
         self.stack_zero_a2_reward = bool(int(os.environ.get(
             "STACK_ZERO_A2_REWARD", "0")))
+        self.stack_zero_a2_wait_reward = bool(int(os.environ.get(
+            "STACK_ZERO_A2_WAIT_REWARD", "0")))
+        self.stack_a2_tilt_penalty = float(os.environ.get(
+            "STACK_A2_TILT_PENALTY", "0.0"))
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
@@ -110,6 +114,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             raise ValueError("STACK_BOTTOM_Z_TOL must be positive")
         if self.stack_bottom_displace_tol <= 0.0:
             raise ValueError("STACK_BOTTOM_DISPLACE_TOL must be positive")
+        if self.stack_a2_tilt_penalty < 0.0:
+            raise ValueError("STACK_A2_TILT_PENALTY must be non-negative")
         if self.stack_release_grace_steps < self.stack_stable_steps:
             raise ValueError(
                 "STACK_RELEASE_GRACE_STEPS must be >= STACK_STABLE_STEPS")
@@ -374,17 +380,33 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         # Near the target, cancel the parent's residual preference for keeping
         # hands attached and make a clean release strictly more profitable.
         hands_still_on = top_quality * (1.0 - a2_clear)
+        # Keep the box horizontal throughout A2's active carry.  For Isaac
+        # Gym's xyzw quaternion, this is the world-Z component of the box's
+        # local Z axis.  A corner-first approach therefore pays a continuous
+        # cost, while yaw rotations around vertical remain unpenalized.
+        top_rot = boxes[r1, 3:7]
+        upright = (1.0 - 2.0 * (top_rot[:, 0] ** 2
+                                + top_rot[:, 1] ** 2)).clamp(0.0, 1.0)
+        tilt_cost = 1.0 - upright
         self.rew_buf[r1] += stacking.float() * (
             0.25 * top_quality
             + self.stack_release_reward_w * a2_valid_release
             - self.stack_early_release_penalty * a2_early_release
-            - self.stack_hands_on_penalty * hands_still_on)
+            - self.stack_hands_on_penalty * hands_still_on
+            - self.stack_a2_tilt_penalty * tilt_cost)
         if rehearsal_reward is not None:
             self.rew_buf[rehearsal_rows] = rehearsal_reward
         if self.stack_zero_a2_reward:
             # Keep A2 simulated, but remove all of its learning reward,
             # including rehearsal and inherited team-reward contributions.
             self.rew_buf[r1] = 0.0
+        elif self.stack_zero_a2_wait_reward:
+            # Stack A2 receives no learning signal until its dependency opens.
+            # Native carry rehearsal is a complete carry episode and must not
+            # be mistaken for a wait phase merely because its phase marker is -1.
+            waiting = (phase < self.A2_RESUME) & ~self._carry_rehearsal
+            self.rew_buf[r1] = torch.where(
+                waiting, torch.zeros_like(self.rew_buf[r1]), self.rew_buf[r1])
 
     def _virtual_retreat_carry_obs(self, rows, env_ids):
         """Place a virtual pickup box at A1's retreat endpoint."""
