@@ -95,7 +95,7 @@ PPO는 사람별로 value·advantage를 따로 계산해야 해서 `(환경, 사
 ### 그래서 결과는?
 
 - **1인 관측이 원본 TokenHSI와 수치적으로 완전히 동일**함을 확인했습니다 (오차 0.0).
-- **파라미터 수가 사람 수와 무관**합니다 (M=1,2,3,4 모두 4,100,770개).
+- **파라미터 수가 사람 수와 무관**합니다 (아래 수치는 A1 기준이며 A2도 M/O와 무관합니다).
 - M=2로 학습한 가중치가 M=3 네트워크에 **그대로 로드**됩니다.
 - 1인 학습에서 사람이 넘어지지 않고 버티는 시간이 **30 → 71 스텝**으로 늘었습니다
   (원본 TokenHSI 레퍼런스보다 빠른 속도).
@@ -131,7 +131,7 @@ PPO는 사람별로 value·advantage를 따로 계산해야 해서 `(환경, 사
 relation matrix가 전달하고, ego는 **readout 위치**가 결정합니다. 그 결과 네트워크는 완전한
 permutation-equivariant이며 **모든 파라미터가 M과 O에 무관**합니다.
 
-| M | O | obs / row | 토큰 수 | 파라미터 | state_dict 키 |
+| M | O | obs / row | 토큰 수 | 파라미터 (A1) | state_dict 키 (A1) |
 |---|---|---|---|---|---|
 | 1 | 1 | 275 | 3 | 4,100,770 | 155 |
 | 2 | 2 | 550 | 6 | 4,100,770 | 155 |
@@ -141,6 +141,10 @@ permutation-equivariant이며 **모든 파라미터가 M과 O에 무관**합니�
 
 → `M=2,O=2` 체크포인트가 `M=2,O=3` 또는 `M=3,O=3` 네트워크에
 `load_state_dict(strict=True)`로 그대로 올라갑니다.
+
+A2는 actor/critic을 합쳐 A1보다 relation 파라미터가 18,144개 많지만, 이 차이 역시 M/O와
+무관합니다. A1과 A2는 서로 다른 state-dict key를 가지므로 mode 사이의 strict load는 지원하지
+않고, 같은 mode 안에서 M/O가 달라지는 strict load만 지원합니다.
 
 ---
 
@@ -366,14 +370,31 @@ M=2 실제 출력:
   g1:    0    4    0    5    0    1
 ```
 
-학습되는 것은 `rel_embed: (num_layers, num_heads, 6)` — 총 **48개 스칼라**(인코더당)뿐이며,
+`relation_bias_mode: lookup`인 A1에서 학습되는 것은
+`rel_embed: (num_layers, num_heads, 6)` — 총 **48개 스칼라**(인코더당)뿐이며,
 attention logit에 head별로 더해집니다:
 
 ```
 S_ij = q_i·k_j / √d_h + b_h(R_ij)
 ```
 
-**0으로 초기화**했습니다. 그래서 학습 중 한 번도 등장하지 않은 relation type은 "bias 없음 =
+`relation_bias_mode: edge_mlp`인 A2는 relation taxonomy와 최종 additive-bias 위치는
+그대로 두고 bias 생성기만 확장합니다:
+
+```text
+src entity type 16-d ─┐
+relation type 32-d ───┼─ concat 64-d → MLP 64-d → e_ij
+tgt entity type 16-d ─┘
+
+b_ij^(layer,head) = w_(layer,head)^T e_ij
+```
+
+source/target embedding은 node의 `type_embed`와 공유하지 않는 edge 전용 파라미터입니다.
+`E: (L,L,64)`와 최종 bias `(num_layers,num_heads,L,L)`에는 batch 차원이 없으며 attention에서
+broadcast됩니다. 최종 projection은 0으로 초기화되어 첫 forward는 plain attention과 같습니다.
+A1 설정은 기존 `amp_ma_carry.yaml`, A2 설정은 `amp_ma_carry_edge_mlp.yaml`에 분리되어 있습니다.
+
+이어서 A1의 `rel_embed`는 **0으로 초기화**했습니다. 그래서 학습 중 한 번도 등장하지 않은 relation type은 "bias 없음 =
 평범한 attention"으로 동작합니다. M=1에서는 타입 {1,3,4,5}만 등장하므로, **M=1 → M≥2로 갈 때
 새로 학습되는 파라미터는 타입 {0, 2}에 해당하는 `4층 × 2헤드 × 2타입 = 16개 스칼라`**
 (actor+critic 합쳐 32개)뿐입니다.
@@ -528,7 +549,7 @@ root-position 자리가 정확히 0     : True   (max|·| = 0.0)
 그 3차원을 빼면 원본과 일치        : True   (max diff = 0.0)
 ```
 
-### M 무관성
+### M 무관성 (A1 측정)
 
 ```
 M=1: 4,100,770 params, 155 keys, obs=275,  tokens=3
@@ -646,7 +667,7 @@ env당 1회만 돌리고 M개 토큰 출력을 흩뿌릴 수 있습니다.
 
 ### (12) M=1 → M≥2 전이 프로토콜
 현재는 각각 처음부터 학습합니다.
-- 권장: M=1로 carry 능력 확보 → **M=2 zero-shot 성능을 먼저 측정**(미학습 파라미터가 32개뿐) →
+- 권장: M=1로 carry 능력 확보 → **M=2 zero-shot 성능을 먼저 측정**(A1은 미학습 파라미터가 32개뿐) →
   그 다음 finetune. 그 갭 자체가 논문에 쓸 수 있는 수치입니다.
 - `--checkpoint <M=1 ckpt> --resume 1`로 이어받을 수 있습니다.
 
@@ -691,7 +712,7 @@ IsaacGym에서 CUDA device-side assert는 비동기라 엉뚱한 줄을 가리�
 | 단계 | 내용 | 검증 기준 |
 |---|---|---|
 | **M1** | M=1을 수렴까지 학습 | 기존 `output/single_task/ckpt_carry.pth` eval과 성공률 비교 |
-| **M2** | M=1 가중치로 **M=2 zero-shot 측정** | 미학습 파라미터 32개뿐 — 갭 자체가 결과 |
+| **M2** | M=1 가중치로 **M=2 zero-shot 측정** | A1은 미학습 파라미터 32개뿐 — 갭 자체가 결과 |
 | **M3** | M=2 finetune, 충돌 패널티 튜닝 | 두 에이전트 모두 목표 도달, M=1 대비 하락폭 |
 | **M4** | M=3, 4 zero-shot | **핵심 결과** — cardinality 외삽 |
 | **M5** | `obsFrame` A/B (`owner` vs `global`) | heading 불변성의 실제 기여도 정량화 |

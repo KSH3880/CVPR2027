@@ -1,12 +1,4 @@
-# Watch-only variant of amp_ma_carry.yaml.
-#
-# rl_games requires  batch_size = horizon_length * num_envs * num_agents  to be a multiple
-# of minibatch_size, and amp_minibatch_size <= minibatch_size. With num_envs=4 the batch is
-# only 128 (M=1) or 256 (M=2), so the production batch sizes do not fit.
-#
-# This config exists purely to watch the characters move in a viewer. Four environments is
-# far too little signal for the policy to actually improve -- use amp_ma_carry.yaml for
-# real training.
+# A2 edge-embedding relation bias variant of amp_ma_carry.yaml.
 params:
   seed: -1
 
@@ -21,7 +13,7 @@ params:
     separate: True
 
     transformer:
-      relation_bias_mode: lookup  # A1 scalar lookup; use the edge_mlp config for A2
+      relation_bias_mode: edge_mlp
       num_features: 64
       tokenizer_units: [256, 128]
       num_layers: 4
@@ -42,7 +34,6 @@ params:
         learn_sigma: False
 
     mlp:
-      # critic only (the actor trunk is the transformer above)
       units: [1024, 512]
       activation: relu
       d2rl: False
@@ -62,12 +53,12 @@ params:
   load_checkpoint: False
 
   config:
-    name: HumanoidMAWatch
+    name: HumanoidMAEdgeMLP
     env_name: rlgpu
     multi_gpu: False
     ppo: True
     mixed_precision: False
-    normalize_input: True # entity-wise, see learning/multi_agent/ma_agent.py
+    normalize_input: True
     normalize_value: True
     reward_shaper:
       scale_value: 1
@@ -79,15 +70,15 @@ params:
     score_to_win: 20000
     max_epochs: 1000000
     save_best_after: 50
-    save_frequency: 100000  # do not spam checkpoints while just watching
-    save_intermediate: False
+    save_frequency: 500
+    save_intermediate: True
     print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.0
     truncate_grads: False
     e_clip: 0.2
     horizon_length: 32
-    minibatch_size: 128
+    minibatch_size: 8192
     mini_epochs: 6
     critic_coef: 5
     clip_value: False
@@ -97,7 +88,7 @@ params:
     amp_replay_buffer_size: 200000
     amp_replay_keep_prob: 0.01
     amp_batch_size: 512
-    amp_minibatch_size: 128
+    amp_minibatch_size: 4096
     disc_coef: 5
     disc_logit_reg: 0.01
     disc_grad_penalty: 5

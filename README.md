@@ -7,7 +7,9 @@ The original `carry` task places **one humanoid and one box** in a scene. This f
 **M humanoids, O boxes (O ≥ M) and M goals**: each agent is randomly assigned a distinct box, and
 the remaining `O − M` boxes stay unassigned as distractors. Entities (humanoid / object / goal) are
 split into per-type tokenizers, and the assignment relation is injected as a non-learned relation
-matrix that becomes a learnable attention bias.
+matrix that becomes a learnable attention bias. Two bias mechanisms are available: the original
+per-relation scalar lookup (A1) and a typed edge encoder (A2) that maps
+`[source entity type, relation type, target entity type]` to a layer/head-specific scalar bias.
 
 > Everything from the upstream repo — datasets, checkpoints, single-task training paths — is left
 > untouched. Motion data is reused read-only and the multi-agent runs write to their own output paths.
@@ -18,8 +20,8 @@ matrix that becomes a learnable attention bias.
 |---|---|
 | Environment | `tokenhsi/env/tasks/multi_agent/` — `humanoid_ma.py`, `humanoid_ma_carry.py`, `vec_task_wrapper_ma.py` |
 | Learning | `tokenhsi/learning/multi_agent/` — `amp_network_builder_ma.py`, `ma_agent.py`, `ma_players.py` |
-| Configs | `tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml`, `tokenhsi/data/cfg/train/rlg/amp_ma_carry{,_watch}.yaml` |
-| Scripts | `tokenhsi/scripts/multi_agent/` — train / test / watch / remote-GUI helpers |
+| Configs | `tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml`, `tokenhsi/data/cfg/train/rlg/amp_ma_carry*.yaml` |
+| Scripts | `tokenhsi/scripts/multi_agent/` — A1/A2 train / test / watch / remote-GUI helpers |
 
 Upstream files touched (registration and multi-agent plumbing only): `tokenhsi/run.py`,
 `tokenhsi/utils/config.py`, `tokenhsi/utils/parse_task.py`, `tokenhsi/learning/amp_players.py`.
@@ -83,8 +85,15 @@ So a machine whose env is named differently just needs, e.g.
 # Train: <num_agents> <num_envs> <num_objects>
 sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 1024 3
 
+# Train A2 with the typed edge encoder (A1 uses the script above)
+sh tokenhsi/scripts/multi_agent/ma_carry_edge_mlp_train.sh 2 1024 3
+
 # Test / evaluate a checkpoint
 sh tokenhsi/scripts/multi_agent/ma_carry_test.sh output/ma_carry/nn/xxx.pth 2 16 3
+
+# Evaluate an A2 checkpoint with its matching config
+sh tokenhsi/scripts/multi_agent/ma_carry_edge_mlp_test.sh \
+  output/ma_carry_edge_mlp/nn/xxx.pth 2 16 3
 
 # Watch a few environments in a viewer (through the noVNC helper)
 sh tokenhsi/scripts/multi_agent/run-gui.sh \

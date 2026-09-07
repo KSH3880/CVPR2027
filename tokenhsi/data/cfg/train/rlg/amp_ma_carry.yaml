@@ -12,6 +12,7 @@ params:
     separate: True
 
     transformer:
+      relation_bias_mode: lookup  # A1 scalar lookup; use the edge_mlp config for A2
       num_features: 64
       tokenizer_units: [256, 128]
       num_layers: 4
