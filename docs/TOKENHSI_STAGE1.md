@@ -191,6 +191,9 @@ traj면 `_traj_gen`이 속도 0.5~1.5 m/s, 가속 ≤2, 2% 확률로 90° 급회
 
 ## 보상과 종료
 
+Carry의 전체 구조, 행동 단계별 해석, 실제 활성 수식·게이팅과 AMP 결합은
+[원본 TokenHSI Stage 1 Carry reward](TOKENHSI_STAGE1_REWARD.md)에 별도로 정리했다.
+
 `_compute_reward`가 task_indicator로 마스크를 잘라 과제별로 다른 함수를 적용한다:
 
 | 과제 | 보상 |

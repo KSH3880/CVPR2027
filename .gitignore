@@ -54,6 +54,8 @@ nohup.out
 /runs/sweep_logs/
 /runs/verify_logs/
 /runs/compat_logs/
+/runs/trajectory_predictor/
+/runs/coord/
 /runs/queue/logs/
 /runs/queue/exits/
 /runs/queue/gpu_locks/

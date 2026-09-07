@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TokenHSI Stage 1 Carry Reward</title>
+<style>
+  :root {
+    --ink:#101828;
+    --muted:#5f6b7a;
+    --blue:#135f9f;
+    --blue-dark:#0b3f71;
+    --light-blue:#dcecf9;
+    --pale:#f6f9fc;
+    --line:#d9e2ec;
+    --red:#c93b3b;
+    --green:#178153;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:#edf2f7; color:var(--ink); }
+  body {
+    font-family:Pretendard, "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
+    overflow:hidden;
+  }
+  .deck { width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
+  .slide {
+    display:none; position:relative;
+    width:min(100vw, calc(100vh * 16 / 9));
+    height:min(100vh, calc(100vw * 9 / 16));
+    aspect-ratio:16/9; overflow:hidden;
+    background:linear-gradient(135deg, #ffffff 0%, #ffffff 76%, #f7fafc 100%);
+    box-shadow:0 12px 40px rgba(17,24,39,.15);
+  }
+  .slide.active { display:block; }
+  .title {
+    position:absolute; left:48px; top:31px;
+    font-weight:850; font-size:42px; letter-spacing:-1.2px; line-height:1; white-space:nowrap;
+  }
+  .title::after {
+    content:""; display:block; width:44px; height:4px; margin-top:13px; background:var(--blue);
+  }
+  .subtitle {
+    position:absolute; left:112px; top:89px;
+    font-size:18px; font-weight:750; letter-spacing:.3px; color:var(--blue-dark); white-space:nowrap;
+  }
+  .content { position:absolute; left:58px; top:132px; right:58px; bottom:120px; }
+  .takeaway {
+    position:absolute; left:38px; right:38px; bottom:36px; min-height:68px;
+    background:var(--light-blue); border-left:6px solid var(--blue);
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:11px 54px; font-size:23px; line-height:1.35;
+  }
+  .takeaway strong { font-weight:850; text-decoration:underline; text-underline-offset:4px; }
+  .page { position:absolute; right:23px; bottom:13px; font-size:15px; color:#4b5563; }
+  .navhint { position:absolute; left:23px; bottom:12px; font-size:13px; color:#98a2b3; }
+  .math { font-family:"Cambria Math", "STIX Two Math", "Times New Roman", serif; }
+  .center { text-align:center; }
+
+  /* Slide 1 — one equation, two responsibilities. */
+  .hero-formula {
+    text-align:center; font-size:42px; line-height:1.25; font-weight:650;
+    padding:20px 12px 12px; color:#0d2942;
+  }
+  .hero-subformula {
+    text-align:center; font-size:27px; line-height:1.3; color:var(--muted);
+    padding-bottom:18px; border-bottom:1px solid var(--line);
+  }
+  .meaning-row { display:grid; grid-template-columns:1fr 1fr; gap:64px; margin:24px 58px 0; }
+  .meaning { border-left:4px solid var(--blue); padding:2px 0 2px 18px; }
+  .meaning.amp { border-left-color:#718096; }
+  .meaning-label { font-size:17px; font-weight:800; color:var(--blue); letter-spacing:.3px; }
+  .meaning.amp .meaning-label { color:#52606d; }
+  .meaning strong { display:block; margin:5px 0 5px; font-size:29px; line-height:1.12; }
+  .meaning p { margin:0; font-size:19px; line-height:1.38; color:var(--muted); }
+  .penalty-note {
+    margin:19px auto 0; width:max-content; max-width:100%;
+    font-size:18px; color:var(--muted); letter-spacing:-.1px;
+  }
+  .penalty-note b { color:var(--ink); }
+
+  /* Slide 2 — linear decomposition, without card clutter. */
+  .reward-formula {
+    text-align:center; font-size:31px; line-height:1.25; color:#0d2942;
+    padding:7px 0 20px; border-bottom:1px solid var(--line);
+  }
+  .reward-sequence {
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:20px;
+    position:relative; margin:25px 12px 0;
+  }
+  .reward-sequence::before {
+    content:""; position:absolute; left:10%; right:10%; top:15px; height:2px; background:#b9c9d8;
+  }
+  .reward-item { position:relative; text-align:center; padding-top:38px; }
+  .reward-item::before {
+    content:""; position:absolute; z-index:1; top:8px; left:calc(50% - 8px);
+    width:16px; height:16px; border-radius:50%; background:white; border:4px solid var(--blue);
+  }
+  .reward-item .stage { font-size:14px; font-weight:800; color:var(--blue); letter-spacing:.8px; }
+  .reward-item .symbol { display:block; margin:4px 0 5px; font-size:27px; font-weight:700; }
+  .reward-item p { margin:0; font-size:17px; line-height:1.35; color:var(--muted); }
+  .penalty-row {
+    display:flex; justify-content:center; gap:42px; margin:24px 38px 0; padding-top:13px;
+    border-top:1px solid var(--line); font-size:17px; color:var(--muted);
+  }
+  .penalty-row b { color:var(--ink); }
+
+  /* Slides 3–4 — equation first, supporting image last. */
+  .pair-grid { display:grid; grid-template-columns:1fr 1fr; gap:62px; height:100%; position:relative; }
+  .pair-grid::after {
+    content:""; position:absolute; top:4px; bottom:4px; left:50%; width:1px; background:var(--line);
+  }
+  .pair-slide .col { display:flex; flex-direction:column; min-width:0; }
+  .pair-slide .col h3 { order:1; margin:0 0 7px; font-size:28px; line-height:1.12; }
+  .pair-slide .col p { order:2; margin:0; font-size:21px; line-height:1.34; }
+  .pair-slide .col p + p { margin-top:4px; }
+  .pair-slide .compact-list,
+  .pair-slide .bullets { order:3; margin:7px 0 5px; padding-left:21px; font-size:17px !important; line-height:1.38 !important; }
+  .pair-slide li { margin:2px 0; }
+  .pair-slide .visual {
+    order:4; width:100%; height:220px; object-fit:contain; display:block; margin:auto auto 0;
+    filter:drop-shadow(0 7px 9px rgba(15,23,42,.09));
+  }
+  .pair-slide .visual.smallimg { height:216px; }
+  .pair-slide .formula-line {
+    border-left:4px solid var(--blue); padding-left:13px; color:#0d2942;
+    font-size:22px !important;
+  }
+  .pair-slide .definition { color:var(--muted); font-size:18px !important; }
+  mark { background:linear-gradient(transparent 61%, rgba(190,220,246,.8) 0); padding:0 2px; }
+
+  /* Slides 3–6 — one reward per page. */
+  .single-reward { display:flex; flex-direction:column; height:100%; }
+  .single-equation {
+    text-align:center; padding:7px 24px 13px; border-bottom:1px solid var(--line);
+    font-size:30px; line-height:1.3; color:#0d2942;
+  }
+  .single-equation.long { font-size:26px; }
+  .single-explain {
+    display:flex; justify-content:center; align-items:center; gap:42px;
+    min-height:62px; padding:10px 10px 7px; font-size:18px; line-height:1.35; color:var(--muted);
+  }
+  .single-explain span { position:relative; padding-left:16px; }
+  .single-explain span::before {
+    content:""; position:absolute; left:0; top:.52em; width:6px; height:6px; border-radius:50%; background:var(--blue);
+  }
+  .single-explain b { color:var(--ink); }
+  .single-image {
+    width:100%; height:292px; object-fit:contain; display:block; margin:auto auto 0;
+    filter:drop-shadow(0 8px 10px rgba(15,23,42,.09));
+  }
+
+  /* Slide 5 — shared directional-velocity mechanism. */
+  .dot-layout { display:grid; grid-template-columns:52% 48%; gap:36px; align-items:center; height:100%; }
+  .dot-img { width:100%; height:315px; object-fit:contain; }
+  .caption { margin-top:-5px; text-align:center; font-size:17px; line-height:1.35; color:var(--muted); }
+  .calc-chain { display:flex; flex-direction:column; gap:7px; }
+  .calc-row { padding:1px 0 8px 15px; border-left:3px solid #bac9d8; }
+  .calc-row b { display:block; margin-bottom:2px; font-size:16px; color:var(--blue-dark); }
+  .calc-row .math { font-size:22px; line-height:1.25; }
+  .key-formula {
+    margin-top:2px; padding:11px 15px; background:var(--pale); border-left:5px solid var(--blue);
+    font-size:27px; line-height:1.25; color:#0d2942;
+  }
+  .case-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:4px; }
+  .case-row div { font-size:15px; line-height:1.35; color:var(--muted); }
+  .case-row b { display:block; color:var(--ink); font-size:16px; }
+
+  /* Slide 6 — exact gates stay separate from the geometric idea. */
+  .gate-grid { display:grid; grid-template-columns:1fr 1fr; gap:64px; height:100%; position:relative; }
+  .gate-grid::after { content:""; position:absolute; top:0; bottom:0; left:50%; width:1px; background:var(--line); }
+  .gate-col h3 { margin:0 0 10px; font-size:29px; }
+  .gate-col .math { font-size:22px; line-height:1.35; }
+  .gate-list { margin:15px 0 0; padding:0; list-style:none; counter-reset:gate; }
+  .gate-list li {
+    counter-increment:gate; position:relative; margin:10px 0; padding:0 0 10px 35px;
+    border-bottom:1px solid #e8edf2; font-size:18px; line-height:1.35;
+  }
+  .gate-list li::before {
+    content:counter(gate); position:absolute; left:0; top:0; color:var(--blue); font-weight:850;
+  }
+  .gate-note { margin-top:12px; font-size:16px; line-height:1.4; color:var(--muted); }
+
+  @page { size: 1280px 720px; margin: 0; }
+  @media print {
+    html, body { background:white; overflow:visible; }
+    .deck { display:block; width:auto; height:auto; }
+    .slide { display:block !important; width:1280px; height:720px; box-shadow:none; page-break-after:always; }
+    .navhint { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide active">
+  <div class="title">TokenHSI Carry Reward</div>
+  <div class="subtitle">STAGE 1 · REWARD OVERVIEW</div>
+  <div class="content">
+    <div class="hero-formula math">
+      r<sub>train</sub> = 0.5&nbsp;r<sub>env</sub> + 0.5&nbsp;r<sub>AMP</sub>
+    </div>
+    <div class="hero-subformula math">
+      r<sub>env</sub> = r<sub>walk</sub> + r<sub>transport</sub> + r<sub>handheld</sub> + r<sub>putdown</sub> + r<sub>power</sub>
+    </div>
+    <div class="meaning-row">
+      <div class="meaning">
+        <div class="meaning-label">TASK REWARD</div>
+        <strong>무엇을 해야 하는가</strong>
+        <p>box에 접근하고 → 들고 → goal까지 운반하고 → 정확히 내려놓는다.</p>
+      </div>
+      <div class="meaning amp">
+        <div class="meaning-label">AMP REWARD</div>
+        <strong>어떻게 움직일 것인가</strong>
+        <p>10-frame motion이 reference Carry처럼 보이도록 자연스러운 전신 동작을 유도한다.</p>
+      </div>
+    </div>
+    <div class="penalty-note"><b>Penalty</b>&nbsp;&nbsp; box 과속(&gt; 2.5 m/s)과 과도한 joint power만 직접 억제한다.</div>
+  </div>
+  <div class="takeaway">Task reward는 <strong>목표 성취</strong>, AMP는 <strong>사람다운 동작 스타일</strong>을 담당한다.</div>
+  <div class="navhint">← / →</div><div class="page">1 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Carry Task Reward</div>
+  <div class="subtitle">FOUR BEHAVIORAL SIGNALS</div>
+  <div class="content">
+    <div class="reward-formula math">
+      r<sub>task</sub><sup>+</sup> = r<sub>walk</sub> + r<sub>handheld</sub> + r<sub>transport</sub><sup>+</sup> + r<sub>putdown</sub>
+    </div>
+    <div class="reward-sequence">
+      <div class="reward-item">
+        <span class="stage">APPROACH</span>
+        <span class="symbol math">r<sub>walk</sub> ≤ 0.2</span>
+        <p>humanoid root가<br/>box 방향으로 이동</p>
+      </div>
+      <div class="reward-item">
+        <span class="stage">HOLD</span>
+        <span class="symbol math">r<sub>handheld</sub> ≤ 0.2</span>
+        <p>두 손 평균점을<br/>box 중심 가까이에 유지</p>
+      </div>
+      <div class="reward-item">
+        <span class="stage">TRANSPORT</span>
+        <span class="symbol math">r<sub>transport</sub><sup>+</sup> ≤ 0.4</span>
+        <p>box를 goal 방향으로<br/>이동하고 3D 위치 정렬</p>
+      </div>
+      <div class="reward-item">
+        <span class="stage">PLACE</span>
+        <span class="symbol math">r<sub>putdown</sub> ∈ {0, .2}</span>
+        <p>높이 1 mm · 수평 10 cm<br/>이내에 정확히 배치</p>
+      </div>
+    </div>
+    <div class="penalty-row">
+      <span><b>Box speed penalty</b> · ‖v<sub>b</sub>‖ &gt; 2.5 m/s</span>
+      <span class="math"><b>Joint power</b> · r<sub>power</sub> = −0.0005 Σ<sub>j</sub>|τ<sub>j</sub>q̇<sub>j</sub>|</span>
+    </div>
+  </div>
+  <div class="takeaway">네 항은 state machine으로 전환되는 것이 아니라, <strong>모든 Carry step에서 동시에 계산</strong>된다.</div>
+  <div class="navhint">← / →</div><div class="page">2 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Handheld Reward</div>
+  <div class="subtitle">KEEP BOTH HANDS CLOSE TO THE BOX</div>
+  <div class="content single-reward">
+    <div class="single-equation math">
+      p<sub>H</sub> = (p<sub>R</sub> + p<sub>L</sub>) / 2,
+      &nbsp;&nbsp;r<sub>handheld</sub> = 0.2 exp[−5‖p<sub>H</sub> − p<sub>b</sub>‖²]
+    </div>
+    <div class="single-explain">
+      <span><b>측정</b> · 두 손 평균점과 box 중심의 3D 거리</span>
+      <span><b>Gate</b> · root-box 수평 거리 &gt; 0.7 m이면 0</span>
+      <span><b>없음</b> · contact force / grasp point 판정</span>
+    </div>
+    <img class="single-image" src="assets/reward-handheld.png" alt="handheld reward illustration" />
+  </div>
+  <div class="takeaway">명시적 grasp-success 대신 <strong>두 손 평균점과 box 중심의 근접</strong>이 pickup 유지를 돕는다.</div>
+  <div class="navhint">← / →</div><div class="page">3 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Putdown Reward</div>
+  <div class="subtitle">PLACE THE BOX AT THE EXACT 3D TARGET</div>
+  <div class="content single-reward">
+    <div class="single-equation long math">
+      r<sub>putdown</sub> = 0.2 · 𝟙[
+      |p<sub>b,z</sub> − g<sub>b,z</sub>| ≤ 0.001
+      ∧ ‖p<sub>b,xy</sub> − g<sub>b,xy</sub>‖ ≤ 0.1 ]
+    </div>
+    <div class="single-explain">
+      <span><b>Vertical</b> · 높이 오차 1 mm 이하</span>
+      <span><b>Horizontal</b> · 수평 오차 10 cm 이하</span>
+      <span><b>반복</b> · 조건을 만족하는 매 step에서 0.2</span>
+    </div>
+    <img class="single-image" src="assets/reward-putdown.png" alt="putdown reward illustration" />
+  </div>
+  <div class="takeaway">Putdown은 terminal bonus가 아니라, 두 위치 조건을 동시에 만족하는 동안 <strong>매 step 반복되는 reward</strong>다.</div>
+  <div class="navhint">← / →</div><div class="page">4 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Walk Reward</div>
+  <div class="subtitle">MOVE THE HUMANOID ROOT TOWARD THE BOX</div>
+  <div class="content single-reward">
+    <div class="single-equation math">
+      r<sub>walk</sub> = 0.2 exp[−5(1.5 − v<sub>h→b</sub>)²]
+    </div>
+    <div class="single-explain">
+      <span><b>Current</b> · humanoid root</span>
+      <span><b>Target</b> · box center</span>
+      <span><b>Signal</b> · box 방향 속도 성분</span>
+      <span><b>Near</b> · 0.5 m 이내면 최대</span>
+    </div>
+    <img class="single-image" src="assets/reward-walk.png" alt="walk reward illustration" />
+  </div>
+  <div class="takeaway">Pre-grasp에서 humanoid를 최종 goal로 직접 끄는 것이 아니라, <strong>먼저 box로 접근</strong>하게 만든다.</div>
+  <div class="navhint">← / →</div><div class="page">5 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Transport Reward</div>
+  <div class="subtitle">MOVE THE BOX TOWARD THE FINAL GOAL</div>
+  <div class="content single-reward">
+    <div class="single-equation long math">
+      r<sub>transport</sub> = 0.2r<sub>box_vel</sub>
+      + 0.2 exp[−10‖g<sub>b</sub> − p<sub>b</sub>‖²]
+      + P<sub>box_vel</sub>
+    </div>
+    <div class="single-explain">
+      <span><b>Velocity</b> · goal 방향으로 1.5 m/s</span>
+      <span><b>Position</b> · 정확한 3D goal에 가까울수록 증가</span>
+      <span><b>Penalty</b> · box 속력 &gt; 2.5 m/s</span>
+    </div>
+    <img class="single-image" src="assets/reward-transport.png" alt="transport reward illustration" />
+  </div>
+  <div class="takeaway">최종 goal 신호는 humanoid가 아니라 <strong>box의 위치와 속도</strong>를 기준으로 계산한다.</div>
+  <div class="navhint">← / →</div><div class="page">6 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Directional Velocity Reward</div>
+  <div class="subtitle">TARGET DIRECTION · FINITE-DIFFERENCE VELOCITY · DOT PRODUCT</div>
+  <div class="content dot-layout">
+    <div>
+      <img class="dot-img" src="assets/reward-direction-dot.png" alt="dot product velocity reward diagram" />
+      <div class="caption">내적은 실제 속도 중에서 <strong>목표 방향으로 향하는 성분만</strong> 꺼낸다.</div>
+    </div>
+    <div class="calc-chain">
+      <div class="calc-row">
+        <b>1 · 이전 step으로부터 실제 속도 계산</b>
+        <span class="math">v<sub>t</sub> = (p<sub>t</sub> − p<sub>t−1</sub>) / dt</span>
+      </div>
+      <div class="calc-row">
+        <b>2 · 현재 위치에서 target으로 향하는 단위벡터</b>
+        <span class="math">d̂ = normalize(target<sub>xy</sub> − p<sub>t,xy</sub>)</span>
+      </div>
+      <div class="calc-row">
+        <b>3 · 내적으로 목표 방향 속도만 투영</b>
+        <span class="math">v<sub>toward</sub> = d̂<sup>T</sup>v<sub>t,xy</sub> = ‖v<sub>t,xy</sub>‖cosθ</span>
+      </div>
+      <div class="key-formula math">r<sub>vel</sub> = exp[−5(1.5 − v<sub>toward</sub>)²]</div>
+      <div class="case-row">
+        <div><b>Walk</b>p = p<sub>h</sub>, target = p<sub>b</sub></div>
+        <div><b>Transport</b>p = p<sub>b</sub>, target = g<sub>b</sub></div>
+      </div>
+    </div>
+  </div>
+  <div class="takeaway">속력 자체가 아니라 <strong>목표 방향으로 약 1.5 m/s 이동하는가</strong>를 보상한다.</div>
+  <div class="navhint">← / →</div><div class="page">7 / 8</div>
+</section>
+
+<section class="slide">
+  <div class="title">Walk vs. Transport Gates</div>
+  <div class="subtitle">SAME DOT PRODUCT · DIFFERENT OVERRIDES</div>
+  <div class="content gate-grid">
+    <div class="gate-col">
+      <h3><span class="math">r<sub>walk</sub></span> · humanoid → box</h3>
+      <div class="math">r<sub>walk</sub> = 0.2 exp[−5(1.5 − v<sub>h→b</sub>)²]</div>
+      <ol class="gate-list">
+        <li><span class="math">v<sub>h→b</sub> ≤ 0</span>이면 velocity reward = 0</li>
+        <li>root-box 수평 거리 &lt; <strong>0.5 m</strong>이면 velocity reward = 1</li>
+      </ol>
+      <div class="gate-note">두 번째 조건이 나중에 실행되므로, box 가까이에서는 현재 속도와 무관하게 <strong>r<sub>walk</sub> = 0.2</strong>.</div>
+    </div>
+    <div class="gate-col">
+      <h3><span class="math">r<sub>transport</sub></span> · box → goal</h3>
+      <div class="math">r<sub>transport</sub> = 0.2r<sub>box_vel</sub> + 0.2e<sup>−10‖g<sub>b</sub>−p<sub>b</sub>‖²</sup> + P<sub>box_vel</sub></div>
+      <ol class="gate-list">
+        <li><span class="math">v<sub>b→g</sub> ≤ 0</span>이면 velocity reward = 0</li>
+        <li><span class="math">p<sub>b,z</sub> ≤ h<sub>b</sub>/2 + 0.2</span>이면 velocity reward = 0</li>
+        <li>box-goal 수평 거리 &lt; <strong>0.5 m</strong>이면 velocity reward = 1</li>
+      </ol>
+      <div class="gate-note">마지막 proximity override가 앞의 방향·높이 gate보다 나중에 적용된다. 3D near reward와 과속 penalty는 별도로 남는다.</div>
+    </div>
+  </div>
+  <div class="takeaway">두 reward는 같은 내적 구조를 쓰지만, <strong>transport에는 pickup 높이 gate와 3D 위치 reward</strong>가 추가된다.</div>
+  <div class="navhint">← / →</div><div class="page">8 / 8</div>
+</section>
+
+</div>
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  let idx = 0;
+  function show(i) {
+    idx = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, k) => s.classList.toggle('active', k === idx));
+    history.replaceState(null, '', '#' + (idx + 1));
+  }
+  const start = parseInt(location.hash.replace('#',''), 10);
+  if (!Number.isNaN(start)) show(start - 1);
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight','PageDown',' '].includes(e.key)) show(idx + 1);
+    if (['ArrowLeft','PageUp','Backspace'].includes(e.key)) show(idx - 1);
+  });
+  document.addEventListener('click', () => show(idx + 1));
+</script>
+</body>
+</html>

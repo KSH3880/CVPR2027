@@ -1,6 +1,6 @@
 # CVPR2027 — Repo 구성
 
-TokenHSI 기반 multi-agent HOI 연구. 아래 3개는 모두 **원본 TokenHSI의 독립 복사본**이며,
+TokenHSI 기반 multi-agent HOI 연구. 아래 저장소는 모두 **원본 TokenHSI의 독립 복사본**이며,
 목적별로 분리해서 서로 간섭 없이 실험한다.
 
 | 레포 | 역할 | 과거 상태 스냅샷 (2026-08-16) |
@@ -8,6 +8,8 @@ TokenHSI 기반 multi-agent HOI 연구. 아래 3개는 모두 **원본 TokenHSI�
 | [TokenHSI/](TokenHSI/) | 원본 baseline / reference. **수정 금지** | pristine |
 | [TokenHSI-steer/](TokenHSI-steer/) | **Steerable Carry** — action policy에 steering input 추가 | 작업중. F11 최종 확정 / F13 관측 위상 제거 진행 |
 | [TokenHSI-ma/](TokenHSI-ma/) | **Multi-agent base** — 2-agent 환경/베이스 실험 | 작업중. **M0 에서 막힘** — 텐서 평탄화가 A≥2 에서 view 가 안 됨 |
+| [TokenHSI-masteer/](TokenHSI-masteer/) | **Multi-agent steer executor** — A=2 Carry + steer/speed | ms18 기준 executor |
+| [TokenHSI-coord/](TokenHSI-coord/) | **Joint coordinator** — state→joint path/speed→frozen ms18 | C1 + minimal B0/B2 two-track 완료 |
 
 현재 상태는 이 표가 아니라 [plan/PLAN.md](plan/PLAN.md)와 트랙 PLAN을 따른다. 새 세션은
 [docs/OPERATIONS.md](docs/OPERATIONS.md)에서 시작하며, `HANDOFF_ma.md`는 과거 스냅샷이다.

@@ -2,6 +2,32 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-02
+
+### ms18 호환 Joint Trajectory Predictor V1
+
+- `trajectory_predictor/`에 Isaac Gym 비의존 state schema, Free/Cross CPU
+  sampler, 9-candidate joint oracle, dataset I/O, anchored 33-point Transformer,
+  고정 loss, strict checkpoint, train/open-loop eval CLI와 단위검사를 추가했다.
+- `HumanoidMAPlannerCarry`는 기존 `HumanoidMASteerCarry`를 상속하고 경로·속도
+  버퍼 공급자만 바꾼다. ms18 policy 관측/보상/network/PTH에는 손대지 않으며 reset,
+  lift phase 전환, 매 6 action step에 refreshed state로 joint replan한다.
+- predictor 출력은 기존 `steer_path.resample()`의 `[320,2]`와 4-class 속도
+  profile로 설치되어 ms18의 6점/12-D root-local steer token 계약을 유지한다.
+- checkpoint는 schema/model/normalizer/DS/V/속도/dataset hash를 fail-closed로
+  검사한다. 첫 invalid는 analytic fallback, 이후 invalid는 직전 valid plan 유지이며
+  종료 시 invalid/fallback 비율을 출력한다.
+- `gt/oracle/analytic/learned` provider와 closed-loop state 수집 및 episode 단위
+  DAgger relabel/fine-tune 경로를 함께 추가했다.
+- predictor 학습은 기본 5 epoch마다 atomic numbered PTH를 보존한다. 별도
+  `watch_videos` 프로세스가 같은 고정 validation Free/Cross 장면의 oracle/예측
+  경로와 예측 속도 이동을 MP4로 만들므로 인코딩 중에도 GPU 학습은 다음 epoch를
+  계속한다. 이 과정은 CPU 2D 렌더라 Isaac Gym이나 별도 GPU context를 사용하지 않는다.
+- CPU 단위검사 8개와 tiny-data one-epoch end-to-end smoke를 통과했다. 실제
+  `tokenhsi` 환경에서도 GT provider와 별도 smoke predictor provider가 기존 ms18 PTH를
+  변환 없이 로드해 여러 599-step episode를 실행했다. 전체 200k/20k/20k pretrain과
+  정식 closed-loop 합격 판정은 별도 실행 단계다.
+
 ## 2026-08-13
 
 - 16:00  EXPERIMENTS.md
