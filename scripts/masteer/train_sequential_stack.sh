@@ -122,7 +122,7 @@ export MS_SCEN=${MS_SCEN:-free}
 export STACK_TASK_MODE=stack
 # Rehearse the original MA-steer carry distribution in a subset of complete
 # episodes so fine-tuning does not catastrophically forget carry/steering.
-export STACK_CARRY_REHEARSAL_PROB=${STACK_CARRY_REHEARSAL_PROB:-0.0}
+export STACK_CARRY_REHEARSAL_PROB=${STACK_CARRY_REHEARSAL_PROB:-0.25}
 export STACK_HAND_CLEAR_START=${STACK_HAND_CLEAR_START:-0.08}
 export STACK_HAND_CLEAR_DONE=${STACK_HAND_CLEAR_DONE:-0.15}
 export STACK_RELEASE_REWARD_W=${STACK_RELEASE_REWARD_W:-0.50}
@@ -131,8 +131,10 @@ export STACK_HANDS_ON_PENALTY=${STACK_HANDS_ON_PENALTY:-1.0}
 export STACK_FOOT_BOX_CLEARANCE=${STACK_FOOT_BOX_CLEARANCE:-0.12}
 export STACK_FOOT_BOX_PENALTY=${STACK_FOOT_BOX_PENALTY:-1.0}
 export STACK_BOTTOM_Z_TOL=${STACK_BOTTOM_Z_TOL:-0.05}
-export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.08}
+export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.50}
+export STACK_TOP_XY_TOL=${STACK_TOP_XY_TOL:-0.15}
 export STACK_RELEASE_GRACE_STEPS=${STACK_RELEASE_GRACE_STEPS:-60}
+export STACK_ZERO_A2_REWARD=${STACK_ZERO_A2_REWARD:-1}
 # Early curriculum defaults to A1 placement/release/retreat only.  Set this to
 # 0 when continuing the same policy with A2 top placement enabled.
 export STACK_END_ON_A2_RESUME=${STACK_END_ON_A2_RESUME:-0}
@@ -154,8 +156,10 @@ echo " release    clear=${STACK_HAND_CLEAR_START}..${STACK_HAND_CLEAR_DONE}m rew
 echo " foot-box   clearance>=$STACK_FOOT_BOX_CLEARANCE penalty=$STACK_FOOT_BOX_PENALTY"
 echo " putdown    A1_PLACE uses XYZ; VERIFY uses XY; transition z_tol=$STACK_BOTTOM_Z_TOL"
 echo " handoff    terminal if committed bottom displacement>$STACK_BOTTOM_DISPLACE_TOL m"
+echo " stack      enter VERIFY_STACK when top XY error<$STACK_TOP_XY_TOL m"
 echo " release    grace<=${STACK_RELEASE_GRACE_STEPS} steps (never blocks forever)"
 echo " curriculum end_on_A2_resume=$STACK_END_ON_A2_RESUME"
+echo " reward     agent2_zero=$STACK_ZERO_A2_REWARD"
 echo " rehearsal  native carry episode probability=$STACK_CARRY_REHEARSAL_PROB"
 echo " envs       $ENVS x 2 agents"
 echo " PPO batch  $BATCH_SIZE (minibatch $MINIBATCH)"

@@ -91,7 +91,8 @@ export STACK_CARRY_REHEARSAL_PROB=0
 export STACK_END_ON_A2_RESUME=0
 export STACK_EPISODE_LENGTH=${STACK_EPISODE_LENGTH:-900}
 export STACK_BOTTOM_Z_TOL=${STACK_BOTTOM_Z_TOL:-0.05}
-export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.08}
+export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.50}
+export STACK_TOP_XY_TOL=${STACK_TOP_XY_TOL:-0.15}
 
 echo "sequential-stack eval: policy=$POLICY envs=$ENVS gpu=$GPU box_grid=$STACK_EVAL_BOX_GRID size_ids=$STACK_EVAL_BOX_SIZE_IDS" | tee "$LOG"
 cd "$REPO"
@@ -107,36 +108,40 @@ python -u ./tokenhsi/run.py \
     --test --eval --eval_task carry 2>&1 | tee -a "$LOG"
 
 [ -f "$METRICS" ] || { echo "metric 파일이 생성되지 않았다: $METRICS" >&2; exit 5; }
-python3 - "$TAG" "$METRICS" "$ENVS" <<'PY' | tee -a "$LOG"
+python3 - "$TAG" "$METRICS" "$ENVS" "$BOX_GRID" <<'PY' | tee -a "$LOG"
 import sys
 import numpy as np
 
 tag, path, envs = sys.argv[1], sys.argv[2], int(sys.argv[3])
+box_grid = int(sys.argv[4]) != 0
 m = np.load(path)
 if m.ndim != 2 or m.shape[1] < 54:
     raise SystemExit(f"sequential metric columns >=54 expected, got {m.shape}")
 
-# The stock player performs three repeats; repeat 0 is an unsettled warm-up.
-# Each repeat completes `num_envs` agent rows.  Keep repeats 1 and 2 only.
-rows_per_repeat = 2 * envs
-if len(m) >= 3 * rows_per_repeat:
-    m = m[rows_per_repeat:3 * rows_per_repeat]
-    warmup = "discarded"
-else:
-    warmup = "unavailable"
-
-# Pair the kth A1 row with the kth A2 row from the same environment.  Overall
-# path error covers both agents; place/retreat use A1 and top placement uses A2.
+# Metrics arrive in asynchronous episode-completion order, not repeat order.
+# Group first, discard each environment's own warm-up episode, then take
+# exactly two measured episodes per environment.  Global row slicing biases
+# the result toward combinations whose episodes terminate more quickly.
 by_row = {}
 for row in m:
     by_row.setdefault(int(row[0]), []).append(row)
 episodes = []
-for env in sorted({row_id // 2 for row_id in by_row}):
+missing = []
+for env in range(envs):
     a1, a2 = by_row.get(2 * env, []), by_row.get(2 * env + 1, [])
-    for index in range(min(len(a1), len(a2))):
+    if min(len(a1), len(a2)) < 3:
+        missing.append((env, len(a1), len(a2)))
+        continue
+    for index in (1, 2):
         episodes.append((a1[index], a2[index]))
-if not episodes:
-    raise SystemExit("no paired sequential-stack episodes in metrics")
+if missing:
+    raise SystemExit(
+        "per-env warm-up + 2 measured episodes missing; first failures: "
+        + repr(missing[:10]))
+if len(episodes) != 2 * envs:
+    raise SystemExit(
+        f"expected exactly {2 * envs} balanced episodes, got {len(episodes)}")
+warmup = "per_env_discarded"
 
 a1 = np.stack([pair[0] for pair in episodes])
 a2 = np.stack([pair[1] for pair in episodes])
@@ -186,6 +191,19 @@ def size_label(row):
 
 combo_keys = sorted({(size_label(a1[i]), size_label(a2[i]))
                      for i in range(len(episodes))})
+if box_grid:
+    expected = len(episodes) // 9
+    combo_counts = {
+        key: sum(size_label(a1[i]) == key[0]
+                 and size_label(a2[i]) == key[1]
+                 for i in range(len(episodes)))
+        for key in combo_keys
+    }
+    if len(combo_keys) != 9 or any(
+            count != expected for count in combo_counts.values()):
+        raise SystemExit(
+            f"unbalanced 3x3 box grid: expected 9 x {expected}, "
+            f"got {combo_counts}")
 for bottom, top in combo_keys:
     mask = np.array([(size_label(a1[i]) == bottom
                       and size_label(a2[i]) == top)

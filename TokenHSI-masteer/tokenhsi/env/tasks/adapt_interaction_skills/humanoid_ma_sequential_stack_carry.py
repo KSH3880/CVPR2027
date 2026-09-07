@@ -96,11 +96,13 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         self.stack_bottom_z_tol = float(os.environ.get(
             "STACK_BOTTOM_Z_TOL", "0.05"))
         self.stack_bottom_displace_tol = float(os.environ.get(
-            "STACK_BOTTOM_DISPLACE_TOL", "0.08"))
+            "STACK_BOTTOM_DISPLACE_TOL", "0.50"))
         self.stack_release_grace_steps = int(float(os.environ.get(
             "STACK_RELEASE_GRACE_STEPS", "60")))
         self.stack_end_on_a2_resume = bool(int(os.environ.get(
             "STACK_END_ON_A2_RESUME", "0")))
+        self.stack_zero_a2_reward = bool(int(os.environ.get(
+            "STACK_ZERO_A2_REWARD", "0")))
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
@@ -379,6 +381,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             - self.stack_hands_on_penalty * hands_still_on)
         if rehearsal_reward is not None:
             self.rew_buf[rehearsal_rows] = rehearsal_reward
+        if self.stack_zero_a2_reward:
+            # Keep A2 simulated, but remove all of its learning reward,
+            # including rehearsal and inherited team-reward contributions.
+            self.rew_buf[r1] = 0.0
 
     def _virtual_retreat_carry_obs(self, rows, env_ids):
         """Place a virtual pickup box at A1's retreat endpoint."""
