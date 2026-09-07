@@ -621,7 +621,24 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         """Open the dependency and start A2's ordinary carry task."""
         if len(env_ids) == 0:
             return
-        r1 = self.agent_rows(env_ids).view(-1, 2)[:, 1]
+        rows = self.agent_rows(env_ids).view(-1, 2)
+        r0, r1 = rows[:, 0], rows[:, 1]
+        # A1 may move the support during retreat.  Recompute before creating
+        # A2's first path so follow mode never starts from the stale pose that
+        # was committed at VERIFY_BOTTOM.
+        if self.stack_top_follows_bottom:
+            boxes = self.humanoid_rows(self._box_states)
+            size = self._box_lib._box_size
+            bottom = boxes[r0]
+            top = bottom[:, 0:3].clone()
+            top[:, 2] += (0.5 * (size[r0, 2] + size[r1, 2])
+                          + self.stack_top_clearance)
+            self._committed_top_pos[env_ids] = top
+            self._committed_bottom_pos[env_ids] = bottom[:, 0:3]
+            q = bottom[:, 3:7]
+            self._committed_top_yaw[env_ids] = torch.atan2(
+                2.0 * (q[:, 3] * q[:, 2] + q[:, 0] * q[:, 1]),
+                1.0 - 2.0 * (q[:, 1] ** 2 + q[:, 2] ** 2))
         top = self._committed_top_pos[env_ids]
         self._box_tar_pos[r1] = top
         self._reset_steer_to(r1, top)

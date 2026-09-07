@@ -699,3 +699,10 @@ source** 한다. 매핑이 두 곳에 있으면 뷰어에서 확인한 것과 �
 
 `view.sh` 는 env 수를 위치인자 `$2` 로만 받아 `ENVS=1 view.sh tag 3` 이 조용히
 3 으로 떴다. `record.sh` 와 맞춰 `ENVS` 를 우선하게 했다 (위치인자는 뒤로 남김).
+
+### Sequential A2 follow path 초기 좌표 수정
+
+Bottom-box 추종 모드에서 A1 retreat 중 support가 움직인 경우에도 A2가 이전 commit
+좌표로 path를 시작하지 않도록 수정했다. A2 활성화 순간 현재 bottom pose로 top target과
+committed bottom/yaw를 다시 계산한 다음 최초 steering path를 생성하며, 활성화 이후에는
+기존처럼 매 step bottom 이동량을 target/path에 반영한다.
