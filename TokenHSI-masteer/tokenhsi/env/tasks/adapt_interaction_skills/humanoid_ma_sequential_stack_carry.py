@@ -107,6 +107,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_ZERO_A2_WAIT_REWARD", "0")))
         self.stack_a2_tilt_penalty = float(os.environ.get(
             "STACK_A2_TILT_PENALTY", "0.0"))
+        self.stack_top_follows_bottom = bool(int(os.environ.get(
+            "STACK_TOP_FOLLOWS_BOTTOM", "0")))
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
@@ -181,7 +183,8 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         boxes = self.humanoid_rows(self._box_states)
         bottom_disp = torch.norm(
             boxes[r0, 0:3] - self._committed_bottom_pos, dim=-1)
-        monitor_bottom = (self._top_committed
+        monitor_bottom = ((not self.stack_top_follows_bottom)
+                          & self._top_committed
                           & (self._stack_phase >= self.A1_RETREAT)
                           & (self._stack_phase < self.DONE)
                           & ~self._carry_rehearsal)
@@ -290,6 +293,7 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
 
     def _compute_reward(self, actions):
         """Keep the ms18 task reward and shape only valid box release events."""
+        self._update_following_top_goal()
         # Save the unmodified MA-steer carry reward for rehearsal envs.  The
         # stack parent necessarily computes its coordination reward for the
         # whole vectorized batch, so restore these rows after stack shaping.
@@ -407,6 +411,40 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             waiting = (phase < self.A2_RESUME) & ~self._carry_rehearsal
             self.rew_buf[r1] = torch.where(
                 waiting, torch.zeros_like(self.rew_buf[r1]), self.rew_buf[r1])
+
+    def _update_following_top_goal(self):
+        """Track the physical bottom box during A2 instead of a stale pose."""
+        if (not getattr(self, "stack_top_follows_bottom", False)
+                or not hasattr(self, "_stack_phase")
+                or self._carry_rehearsal is None):
+            return
+        active = ((self._stack_phase >= self.A2_RESUME)
+                  & (self._stack_phase < self.DONE)
+                  & ~self._carry_rehearsal)
+        env_ids = torch.nonzero(active, as_tuple=False).squeeze(-1)
+        if len(env_ids) == 0:
+            return
+
+        rows = self.agent_rows(env_ids).view(-1, 2)
+        r0, r1 = rows[:, 0], rows[:, 1]
+        boxes = self.humanoid_rows(self._box_states)
+        size = self._box_lib._box_size
+        bottom = boxes[r0]
+        top = bottom[:, 0:3].clone()
+        top[:, 2] += (0.5 * (size[r0, 2] + size[r1, 2])
+                      + self.stack_top_clearance)
+
+        # Translate the existing steering path instead of regenerating it
+        # every frame, which would reset arc progress and inject new curves.
+        delta_xy = top[:, 0:2] - self._committed_top_pos[env_ids, 0:2]
+        self._gt_path[r1] += delta_xy[:, None, :]
+        self._committed_top_pos[env_ids] = top
+        self._committed_bottom_pos[env_ids] = bottom[:, 0:3]
+        self._box_tar_pos[r1] = top
+        q = bottom[:, 3:7]
+        self._committed_top_yaw[env_ids] = torch.atan2(
+            2.0 * (q[:, 3] * q[:, 2] + q[:, 0] * q[:, 1]),
+            1.0 - 2.0 * (q[:, 1] ** 2 + q[:, 2] ** 2))
 
     def _virtual_retreat_carry_obs(self, rows, env_ids):
         """Place a virtual pickup box at A1's retreat endpoint."""

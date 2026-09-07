@@ -137,6 +137,7 @@ export STACK_RELEASE_GRACE_STEPS=${STACK_RELEASE_GRACE_STEPS:-60}
 export STACK_ZERO_A2_REWARD=${STACK_ZERO_A2_REWARD:-0}
 export STACK_ZERO_A2_WAIT_REWARD=${STACK_ZERO_A2_WAIT_REWARD:-1}
 export STACK_A2_TILT_PENALTY=${STACK_A2_TILT_PENALTY:-0.50}
+export STACK_TOP_FOLLOWS_BOTTOM=${STACK_TOP_FOLLOWS_BOTTOM:-1}
 # Early curriculum defaults to A1 placement/release/retreat only.  Set this to
 # 0 when continuing the same policy with A2 top placement enabled.
 export STACK_END_ON_A2_RESUME=${STACK_END_ON_A2_RESUME:-0}
@@ -162,6 +163,7 @@ echo " stack      enter VERIFY_STACK when top XY error<$STACK_TOP_XY_TOL m"
 echo " release    grace<=${STACK_RELEASE_GRACE_STEPS} steps (never blocks forever)"
 echo " curriculum end_on_A2_resume=$STACK_END_ON_A2_RESUME"
 echo " reward     agent2_zero=$STACK_ZERO_A2_REWARD wait_zero=$STACK_ZERO_A2_WAIT_REWARD tilt_penalty=$STACK_A2_TILT_PENALTY"
+echo " target     top_follows_bottom=$STACK_TOP_FOLLOWS_BOTTOM"
 echo " rehearsal  native carry episode probability=$STACK_CARRY_REHEARSAL_PROB"
 echo " envs       $ENVS x 2 agents"
 echo " PPO batch  $BATCH_SIZE (minibatch $MINIBATCH)"
