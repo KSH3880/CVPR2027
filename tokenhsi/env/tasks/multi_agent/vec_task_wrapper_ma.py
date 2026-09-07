@@ -1,8 +1,8 @@
 # VecTask wrapper for multi-agent tasks.
 #
-# Exposes M rows per env to rl_games, ordered env-major / agent-minor
-# (row = env * M + agent). That ordering is what rl_games assumes when it does
-# `all_done_indices[::num_agents]`, i.e. the agents of one env must be contiguous.
+# legacy_multirow exposes M observations per env. clean_scene exposes one policy
+# observation per env while actions/rewards/dones remain env-major / agent-minor.
+# MAAgent owns the one-scene-to-M-agent rollout mapping in the latter mode.
 #
 # Observations and rewards are already per-row inside the task; only the done flag is
 # per env (the episode is shared) and gets broadcast here. The per-agent `terminate`

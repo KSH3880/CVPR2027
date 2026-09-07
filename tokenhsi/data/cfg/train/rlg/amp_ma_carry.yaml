@@ -18,6 +18,16 @@ params:
       layer_num_heads: 2
       layer_dim_feedforward: 512
       extra_mlp_units: [1024, 512]
+      relation_bias: true
+      geometry:
+        enable: true
+        use_score: true
+        use_message: true
+        input_size: 15
+        embedding_dim: 64
+        position_scale: 1.0
+        velocity_scale: 0.25
+        angular_velocity_scale: 0.25
 
     space:
       continuous:
@@ -70,7 +80,7 @@ params:
     max_epochs: 1000000
     save_best_after: 50
     save_frequency: 500
-    save_intermediate: False
+    save_intermediate: True
     print_stats: True
     grad_norm: 1.0
     entropy_coef: 0.0

@@ -1,5 +1,5 @@
 # Multi-agent box carrying.
-# numAgents: 1 reproduces the single-agent scene with the new token layout.
+# numAgents: 1 exercises the same clean scene path with one H/O/T triplet.
 # numObjects: 0 means one box per agent. Values >= numAgents add unassigned distractors.
 
 env:
@@ -14,11 +14,17 @@ env:
   numObjects: 0      # 0 => numAgents; otherwise must be >= numAgents
   agentSpawnRadius: 2.5 # agents start on a circle of this radius (ignored when numAgents == 1)
 
+  # "clean_scene": one intrinsic H/O/T node set plus compact entity kinematics per env.
+  #                Pairwise geometry is constructed inside the policy; no scene rows are
+  #                replicated for individual agents.
+  # "legacy_multirow": exact ego-first A1 baseline below, retained for ablations/checkpoints.
+  policyObsMode: "clean_scene"  # "clean_scene" | "legacy_multirow"
+
   # "owner": every entity is described in the frame of the agent that owns it; a row is an
   #          ego-first permutation of the same M triplets, so M actions come out of one
   #          scene encoding and every token stays in the single-agent distribution.
   # "ego":   every entity re-expressed in the observing agent's frame (M x the transforms).
-  obsFrame: "owner"   # "owner" | "global" | "ego"
+  obsFrame: "owner"   # legacy_multirow only: "owner" | "global" | "ego"
 
   agentCollisionPenalty: True
   agentCollisionCoeff: 0.5

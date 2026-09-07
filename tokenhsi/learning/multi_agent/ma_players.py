@@ -5,7 +5,7 @@ import os
 from rl_games.algos_torch import torch_ext
 
 import learning.amp_players as amp_players
-from learning.multi_agent.ma_agent import EntityRunningMeanStd
+from learning.multi_agent.ma_agent import EntityRunningMeanStd, SceneRunningMeanStd
 
 
 class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
@@ -34,13 +34,20 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
 
         if self.normalize_input:
             task = self.env.task
-            self.running_mean_std = EntityRunningMeanStd(
-                entity_sizes=[task.get_humanoid_obs_size(),
-                              task.get_object_obs_size(),
-                              task.get_goal_obs_size()],
-                num_agents=task.num_agents,
-                num_objects=task.num_objects,
-            ).to(self.device)
+            if task.is_scene_policy():
+                self.running_mean_std = SceneRunningMeanStd(
+                    entity_sizes=task.get_scene_entity_sizes(),
+                    entity_counts=[task.num_agents, task.num_objects, task.num_agents],
+                    kinematic_size=task.get_scene_kinematic_size(),
+                ).to(self.device)
+            else:
+                self.running_mean_std = EntityRunningMeanStd(
+                    entity_sizes=[task.get_humanoid_obs_size(),
+                                  task.get_object_obs_size(),
+                                  task.get_goal_obs_size()],
+                    num_agents=task.num_agents,
+                    num_objects=task.num_objects,
+                ).to(self.device)
             self.running_mean_std.eval()
         return
 
@@ -54,8 +61,21 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             config["humanoid_obs_size"] = task.get_humanoid_obs_size()
             config["object_obs_size"] = task.get_object_obs_size()
             config["goal_obs_size"] = task.get_goal_obs_size()
+            config["observation_mode"] = task.get_policy_obs_mode()
+            if task.is_scene_policy():
+                config["scene_entity_sizes"] = task.get_scene_entity_sizes()
+                config["scene_kinematic_size"] = task.get_scene_kinematic_size()
             config["device"] = self.device
         return config
+
+    def get_batch_size(self, obses, batch_size):
+        scene_batch = super().get_batch_size(obses, batch_size)
+        if hasattr(self, 'env') and self.env.task.is_scene_policy():
+            # Observation batch is N scenes, while reward/action/done accounting stays
+            # at N*M agent slots in the stock player loop.
+            self.batch_size = scene_batch * self.env.task.num_agents
+            return self.batch_size
+        return scene_batch
 
     def env_step(self, env, actions):
         result = super().env_step(env, actions)

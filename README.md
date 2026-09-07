@@ -102,6 +102,15 @@ python ./tokenhsi/run.py --task HumanoidMACarry \
     --output_path output/ma_carry --headless
 ```
 
+The multi-agent task now defaults to `policyObsMode: clean_scene`: one intrinsic H/O/T
+token set is stored per environment, directed pair geometry is added to attention score
+and message, and all humanoid actions/values are read from one scene encoding. Set
+`policyObsMode: legacy_multirow` in the task config for the exact ego-first A1 baseline.
+Geometry ablations are controlled by `relation_bias`, `geometry.enable`,
+`geometry.use_score`, and `geometry.use_message` in `amp_ma_carry.yaml`. See
+[`markdowns/ma_clean_scene_geometry.md`](markdowns/ma_clean_scene_geometry.md) for the
+feature split and shape flow.
+
 ## Acknowledgements
 
 This work builds directly on [TokenHSI](https://github.com/liangpan99/TokenHSI) by Liang Pan,

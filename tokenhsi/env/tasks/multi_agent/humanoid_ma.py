@@ -30,7 +30,7 @@ from isaacgym.torch_utils import *
 from utils import torch_utils
 
 from env.tasks.base_task import BaseTask
-from env.tasks.humanoid import Humanoid
+from env.tasks.humanoid import Humanoid, compute_humanoid_observations_max
 
 
 class HumanoidMA(Humanoid):
@@ -54,6 +54,12 @@ class HumanoidMA(Humanoid):
 
         self.num_agents = cfg["env"].get("numAgents", 1)
         assert self.num_agents >= 1
+
+        # Keep the original row-per-agent policy available as an exact baseline.  The
+        # clean scene policy emits one observation per simulator environment and lets
+        # the network read all humanoid tokens out of one transformer pass.
+        self._policy_obs_mode = cfg["env"].get("policyObsMode", "legacy_multirow")
+        assert self._policy_obs_mode in ("legacy_multirow", "clean_scene")
 
         # How each entity token is expressed:
         #
@@ -189,8 +195,10 @@ class HumanoidMA(Humanoid):
         self._contact_forces = contact_force_tensor.view(N, bodies_per_env, 3)[:, :M * nb, :].view(N, M, nb, 3)
 
         # ---- per-slot buffers --------------------------------------------------------
-        # obs / rew / terminate are per (env, agent); reset / progress stay per env.
-        self.obs_buf = torch.zeros((N * M, self.get_obs_size()), device=self.device, dtype=torch.float)
+        # Clean policy observations are per scene. Rewards and termination remain
+        # per-agent, preserving the existing PPO semantics.
+        obs_rows = N if self.is_scene_policy() else N * M
+        self.obs_buf = torch.zeros((obs_rows, self.get_obs_size()), device=self.device, dtype=torch.float)
         self.rew_buf = torch.zeros(N * M, device=self.device, dtype=torch.float)
         self._terminate_buf = torch.ones(N * M, device=self.device, dtype=torch.long)
 
@@ -220,6 +228,28 @@ class HumanoidMA(Humanoid):
         # the arena-local pose (xy + heading cos/sin) so that agents can locate each other
         # even when each of them is described in its own frame.
         return self._num_obs + 3 + 4
+
+    def get_clean_humanoid_obs_size(self):
+        """Intrinsic humanoid state, in that humanoid's own heading frame."""
+        return self._num_obs
+
+    def is_scene_policy(self):
+        return self._policy_obs_mode == "clean_scene"
+
+    def get_policy_obs_mode(self):
+        return self._policy_obs_mode
+
+    def _compute_clean_humanoid_nodes(self, body_pos, body_rot, body_vel, body_ang_vel):
+        """Return (B, M, H) self-state nodes with no arena/observer features."""
+        B, M, nb = body_pos.shape[:3]
+        obs = compute_humanoid_observations_max(
+            body_pos.reshape(B * M, nb, 3),
+            body_rot.reshape(B * M, nb, 4),
+            body_vel.reshape(B * M, nb, 3),
+            body_ang_vel.reshape(B * M, nb, 3),
+            True,  # always heading-local: absolute yaw belongs in no clean node
+            self._root_height_obs_policy)
+        return obs.view(B, M, self.get_clean_humanoid_obs_size())
 
     def _global_frame(self, num_rows, env_ids=None):
         """Observer frame for "global" mode: the env centre, with no rotation."""
