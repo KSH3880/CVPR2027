@@ -104,6 +104,7 @@ export CUDA_VISIBLE_DEVICES="$GPU"
 unset TOKENHSI_GRAPHICS_DEVICE_ID
 # Evaluation-only deterministic size assignment must never leak into training.
 unset STACK_EVAL_BOX_GRID STACK_EVAL_BOX_SIZE_IDS
+unset STACK_FIXED_BOX_SIZE_IDS STACK_VIEW_BOX_IDS
 export MA_TOKEN=mask
 export MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_FINETUNE_NEWCARRY_RESIDUAL=1
@@ -120,6 +121,7 @@ export MS_POS_C=${MS_POS_C:-1.2}
 export MS_VEL_W=${MS_VEL_W:-1}
 export MS_SCEN=${MS_SCEN:-free}
 export STACK_TASK_MODE=stack
+export STACK_ALLOW_HAND_CONTACT=${STACK_ALLOW_HAND_CONTACT:-1}
 # Rehearse the original MA-steer carry distribution in a subset of complete
 # episodes so fine-tuning does not catastrophically forget carry/steering.
 export STACK_CARRY_REHEARSAL_PROB=${STACK_CARRY_REHEARSAL_PROB:-0.25}
@@ -149,6 +151,7 @@ fi
 
 echo "=============================================================="
 echo " task       HumanoidMASequentialStackCarry"
+echo " fall       allow_hand_contact=$STACK_ALLOW_HAND_CONTACT"
 echo " policy     $POLICY (epoch $BASE_EPOCH)"
 echo " stage1     $STAGE1"
 echo " trainable  new_carry + internal residual + steer_token=$MA_FINETUNE_STEER_TOKEN"

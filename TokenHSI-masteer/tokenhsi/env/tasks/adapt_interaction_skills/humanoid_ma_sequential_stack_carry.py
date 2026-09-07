@@ -40,6 +40,19 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id,
                  headless):
+        # The inherited fall detector treats any non-contact-body collision
+        # together with any low non-contact body as a fall, even when they are
+        # different links.  Hands necessarily contact low boxes during a
+        # valid pickup, so permit hand contact for this manipulation task.
+        # Torso, head, pelvis, knees, etc. remain fall-producing contacts.
+        self.stack_allow_hand_contact = bool(int(os.environ.get(
+            "STACK_ALLOW_HAND_CONTACT", "1")))
+        if self.stack_allow_hand_contact:
+            contact_bodies = list(cfg["env"].get("contactBodies", []))
+            for body_name in ("right_hand", "left_hand"):
+                if body_name not in contact_bodies:
+                    contact_bodies.append(body_name)
+            cfg["env"]["contactBodies"] = contact_bodies
         self.stack_carry_rehearsal_prob = float(os.environ.get(
             "STACK_CARRY_REHEARSAL_PROB", "0.0"))
         if not 0.0 <= self.stack_carry_rehearsal_prob <= 1.0:
