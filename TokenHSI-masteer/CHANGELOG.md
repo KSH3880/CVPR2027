@@ -2,6 +2,16 @@
 
 ## 2026-09-08
 
+### 별도 coordinator sequential-stack 실행 경로
+
+- `HumanoidMACoordSequentialStack`과 `run_coord_sequential_stack.py`를 추가했다.
+  기존 runtime/task registry/스크립트는 수정하지 않고 새 진입점에서만 태스크를 등록한다.
+- coord PTH의 경로·속도를 phase별 활성 Carry agent의 ms18 버퍼에 주입한다.
+  기존 후퇴·대기·XYZ 목표와 340-D ABI, 54열 평가 지표를 유지한다.
+- 새 viewer/eval 스크립트와 별도 결과 경로, checkpoint schema 검사 및 invalid fallback을 추가했다.
+- 92개 CPU 테스트 통과. 실제 C13 PTH를 이 머신에서 찾지 못했고 GPU physics rollout은
+  미검증이다. 실행 방법과 적용 범위: `../docs/COORD_SEQUENTIAL_STACK.md`.
+
 ### Sequential phase reward carryover 옵션
 
 `STACK_PHASE_REWARD_CARRYOVER=1`일 때 전환 직전 task reward의 양수 부분을

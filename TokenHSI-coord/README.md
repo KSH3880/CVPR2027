@@ -7,12 +7,17 @@
 
 ## 사용 범위
 
+추가된 opt-in 연결은 [coord → sequential-stack 안내](../docs/COORD_SEQUENTIAL_STACK.md)를 따른다.
+`coordinator/sequential_bridge.py`와 masteer의 새 실행 진입점으로 기존 정책을 사용할 수 있다.
+아래 독립 반입 범위는 최초 반입 시점의 기록이며, 원본 closed-loop runner는 여전히 별도다.
+
 - PyTorch 기반 모델, planner, loss, policy, checkpoint loader와 자체 테스트를 포함한다.
-- `TokenHSI-masteer`의 기존 학습·평가·sequential-stack 실행에는 연결하지 않았다.
-- 학습된 PTH, `trajectory_predictor/`, simulator 복사본, 실행 스크립트는 포함하지 않는다.
+- `TokenHSI-masteer`의 기존 학습·평가·sequential-stack 명령은 그대로 유지한다.
+  coord 연결은 별도의 `*_coord_sequential_stack.sh` 스크립트로만 실행한다.
+- 학습된 PTH, `trajectory_predictor/`, traj의 simulator 복사본과 실행 스크립트는 포함하지 않는다.
 - `coordinator/train_closed_loop.py`와 `measure_executor.py`는 원본 보존용이다.
   이 파일들의 실행에는 별도 Isaac Gym 및 원본 coord simulator bridge가 필요하다.
-  이 브랜치의 현재 독립 모듈만으로 closed-loop 학습이나 viewer 실행은 지원하지 않는다.
+  원본 coord 전용 closed-loop 학습/viewer는 지원하지 않으며, masteer 연결에는 위의 새 스크립트를 쓴다.
 - `coordinator/README.md`는 traj 원본 문서이므로 그 안의 `scripts/coord/` 실행 예제와
   과거 학습 결과는 이 브랜치에 해당 구성요소가 있다는 뜻이 아니다.
 
