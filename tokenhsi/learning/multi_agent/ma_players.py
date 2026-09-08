@@ -5,7 +5,8 @@ import os
 from rl_games.algos_torch import torch_ext
 
 import learning.amp_players as amp_players
-from learning.multi_agent.ma_agent import EntityRunningMeanStd, SceneRunningMeanStd
+from learning.multi_agent.ma_agent import EntityRunningMeanStd
+from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 
 
 class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
@@ -38,6 +39,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 self.running_mean_std = SceneRunningMeanStd(
                     entity_sizes=task.get_scene_entity_sizes(),
                     entity_counts=[task.num_agents, task.num_objects, task.num_agents],
+                    normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
                 ).to(self.device)
             else:
@@ -65,6 +67,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             if task.is_scene_policy():
                 config["scene_entity_sizes"] = task.get_scene_entity_sizes()
                 config["scene_kinematic_size"] = task.get_scene_kinematic_size()
+                config["scene_arena_scale"] = task.get_scene_arena_scale()
             config["device"] = self.device
         return config
 

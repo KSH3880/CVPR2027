@@ -14,9 +14,8 @@ env:
   numObjects: 0      # 0 => numAgents; otherwise must be >= numAgents
   agentSpawnRadius: 2.5 # agents start on a circle of this radius (ignored when numAgents == 1)
 
-  # "clean_scene": one intrinsic H/O/T node set plus compact entity kinematics per env.
-  #                Pairwise geometry is constructed inside the policy; no scene rows are
-  #                replicated for individual agents.
+  # "clean_scene": one H/O/T node set (223/30/1) plus one 7-D GTA pose per token.
+  #                H/O use type-wise RMS; T and env-local pose records bypass RMS.
   # "legacy_multirow": exact ego-first A1 baseline below, retained for ablations/checkpoints.
   policyObsMode: "clean_scene"  # "clean_scene" | "legacy_multirow"
 
@@ -38,9 +37,11 @@ env:
   numAMPObsSteps: 10
 
   localRootObs: True # amp disc obs
-  localRootObsPolicy: False # policy obs
+  localRootObsPolicy: False # legacy_multirow policy obs
   rootHeightObs: False # amp disc obs
-  rootHeightObsPolicy: False # policy obs
+  rootHeightObsPolicy: False # legacy_multirow policy obs
+  cleanSceneLocalRootObsPolicy: True # GTA Human223 is fully heading-local
+  cleanSceneRootHeightObsPolicy: True # GTA Human223 retains actual root height
   keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
   contactBodies: ["right_foot", "left_foot"]
   terminationHeight: 0.15

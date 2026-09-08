@@ -21,6 +21,7 @@ params:
     separate: True
 
     transformer:
+      relation_bias_mode: edge_mlp # A2 semantic edge encoder; lookup restores A1
       num_features: 64
       tokenizer_units: [256, 128]
       num_layers: 4
@@ -28,13 +29,20 @@ params:
       layer_dim_feedforward: 512
       extra_mlp_units: [1024, 512]
       relation_bias: true
-      geometry:
+      gta:
         enable: true
+        translation_scale: 1.0
+        representation: se3_direct_sum
+        diagnostics_first_forward: true # one-shot pose/QKV/logit/entropy scale check
+      geometry:
+        enable: false # historical 15-D Geo ablation; mutually exclusive with GTA
         use_score: true
         use_message: true
+        mode: full15 # position3 | pose9 | full15; encoder input always remains 15-D
         input_size: 15
         embedding_dim: 64
-        position_scale: 1.0
+        # null => [1/envSpacing, 1/envSpacing, 1], so XY matches node scene poses.
+        position_scale: null
         velocity_scale: 0.25
         angular_velocity_scale: 0.25
 

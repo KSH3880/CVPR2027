@@ -2,14 +2,15 @@
 #
 # M humanoids share one scene with O >= M boxes and M target locations.  Every humanoid
 # owns exactly one distinct box; the remaining O-M boxes are unassigned distractors.
-# The policy observation is built per (env, agent) row in
-# that agent's own heading frame, with the entities rotated so the ego always comes first:
+# legacy_multirow builds one (env, agent) row in that agent's own heading frame, with
+# entities rotated so the ego comes first:
 #
 #   row = [ humanoid_0..humanoid_{M-1} | object_0..object_{O-1} | goal_0..goal_{M-1} ]
 #           M * 230                      O * 39                   M * 6
 #
-# Entity-blocked (rather than interleaved) so the network can slice each entity type with
-# a single view and share one tokenizer / one normalizer across slots.
+# clean_scene instead stores one H/O/T node set per env: 223-D Humans, 30-D Objects,
+# and 1-D Targets, followed by one 7-D pose per token for GTA.
+# Both layouts are entity-blocked so tokenizers are shared across same-type slots.
 #
 # Actor layout per env: [humanoids, boxes, (source/target platform pairs), (markers)]
 
@@ -23,6 +24,7 @@ from isaacgym import gymapi
 from isaacgym import gymtorch
 
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
+from env.tasks.multi_agent.scene_features import build_gta_pose_records
 from env.tasks.humanoid import dof_to_obs
 from utils.motion_lib import MotionLib
 from isaacgym.torch_utils import *
@@ -181,17 +183,20 @@ class HumanoidMACarry(HumanoidMA):
         return 3 + 3
 
     def get_clean_object_obs_size(self):
-        # object-frame linear/angular velocity + object-local bbox corners
+        # Object-local linear/angular velocity and local bbox corners.
         return 3 + 3 + 24
 
     def get_clean_goal_obs_size(self):
-        # A target has no intrinsic dynamics. Its type embedding carries identity;
-        # this constant keeps the type tokenizer interface non-empty.
+        # Carry targets have no intrinsic state; position/frame lives in the GTA pose.
         return 1
 
     def get_scene_kinematic_size(self):
-        # world pose/velocity used only to construct directed edge geometry
-        return 3 + 4 + 3 + 3
+        # Env-local position plus local-to-env quaternion used only by GTA.
+        return 3 + 4
+
+    def get_scene_arena_scale(self):
+        """Retained for configuration plumbing and historical Geo ablations."""
+        return self._arena_scale
 
     def get_geometry_obs_size(self):
         # relative position + tan/normal orientation + relative lin/ang velocity
@@ -201,6 +206,10 @@ class HumanoidMACarry(HumanoidMA):
         return [self.get_clean_humanoid_obs_size(),
                 self.get_clean_object_obs_size(),
                 self.get_clean_goal_obs_size()]
+
+    def get_scene_normalized_entity_sizes(self):
+        """Normalize intrinsic H/O nodes; constant Target and GTA poses pass through."""
+        return [self.get_clean_humanoid_self_obs_size(), self.get_clean_object_obs_size(), 0]
 
     def get_scene_num_tokens(self):
         return 2 * self.num_agents + self.num_objects
@@ -602,13 +611,8 @@ class HumanoidMACarry(HumanoidMA):
     def _compute_clean_scene_obs(self, env_ids=None):
         """Build one clean, compact scene observation per environment.
 
-        Layout:
-          [M humanoid self nodes | O object self nodes | M target nodes |
-           (M+O+M) entity kinematics]
-
-        Kinematics are stored once per entity instead of materialising LxL geometry in
-        the rollout. The policy constructs the directed geometry tensor on forward.
-        Positions are env-local so clipping never depends on the simulator grid origin.
+        Layout: [M*H223 | O*O30 | M*T1 | (2M+O)*pose7].  Pose records are
+        env-local position plus local-to-env orientation and bypass node RMS.
         """
         if env_ids is None:
             body_pos = self._rigid_body_pos
@@ -632,53 +636,38 @@ class HumanoidMACarry(HumanoidMA):
 
         B, M, O = body_pos.shape[0], self.num_agents, self.num_objects
         human_nodes = self._compute_clean_humanoid_nodes(
-            body_pos, body_rot, body_vel, body_ang_vel)
+            body_pos, body_rot, body_vel, body_ang_vel, origins)
 
         box_rot = box_states[..., 3:7]
         box_rot_inv = box_rot.clone()
         box_rot_inv[..., 0:3] *= -1.0
-        object_nodes = torch.cat([
+        object_local = torch.cat([
             quat_rotate(box_rot_inv.reshape(-1, 4), box_states[..., 7:10].reshape(-1, 3)).view(B, O, 3),
             quat_rotate(box_rot_inv.reshape(-1, 4), box_states[..., 10:13].reshape(-1, 3)).view(B, O, 3),
             box_bps.reshape(B, O, 24),
         ], dim=-1)
-        goal_nodes = torch.ones(B, M, self.get_clean_goal_obs_size(),
-                                device=self.device, dtype=body_pos.dtype)
+        object_nodes = object_local
+        goal_nodes = torch.ones(B, M, 1, device=self.device, dtype=body_pos.dtype)
+        assert human_nodes.shape == (B, M, self.get_clean_humanoid_obs_size())
+        assert object_nodes.shape == (B, O, self.get_clean_object_obs_size())
+        assert goal_nodes.shape == (B, M, self.get_clean_goal_obs_size())
 
-        origin = origins.unsqueeze(1)
         # Use the same body state source as the human nodes. During reference-state
         # resets the simulator tensor has not necessarily been refreshed yet.
         root_pos = body_pos[..., 0, :]
         root_rot = body_rot[..., 0, :]
-        root_vel = body_vel[..., 0, :]
-        root_ang = body_ang_vel[..., 0, :]
         human_heading = torch_utils.calc_heading_quat(root_rot.reshape(-1, 4)).view(B, M, 4)
-
-        human_kin = torch.cat([
-            root_pos - origin,
-            human_heading,
-            root_vel,
-            root_ang,
-        ], dim=-1)
-        object_kin = torch.cat([
-            box_states[..., 0:3] - origin,
-            box_rot,
-            box_states[..., 7:10],
-            box_states[..., 10:13],
-        ], dim=-1)
-        target_kin = torch.cat([
-            tar_pos - origin,
-            human_heading,  # virtual target frame: its owner's heading
-            torch.zeros(B, M, 6, device=self.device, dtype=body_pos.dtype),
-        ], dim=-1)
 
         nodes = torch.cat([
             human_nodes.reshape(B, -1),
             object_nodes.reshape(B, -1),
             goal_nodes.reshape(B, -1),
         ], dim=-1)
-        entity_kinematics = torch.cat([human_kin, object_kin, target_kin], dim=1)
-        return torch.cat([nodes, entity_kinematics.reshape(B, -1)], dim=-1)
+        entity_poses = build_gta_pose_records(
+            root_pos, human_heading,
+            box_states[..., 0:3], box_rot,
+            tar_pos, origins)
+        return torch.cat([nodes, entity_poses.reshape(B, -1)], dim=-1)
 
     def _compute_task_obs(self, env_ids=None):
         if (env_ids is None):

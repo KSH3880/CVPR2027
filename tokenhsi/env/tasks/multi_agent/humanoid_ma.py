@@ -98,6 +98,15 @@ class HumanoidMA(Humanoid):
         self._local_root_obs_policy = self.cfg["env"]["localRootObsPolicy"]
         self._root_height_obs = self.cfg["env"].get("rootHeightObs", True)
         self._root_height_obs_policy = self.cfg["env"].get("rootHeightObsPolicy", True)
+        self._clean_local_root_obs_policy = self.cfg["env"].get(
+            "cleanSceneLocalRootObsPolicy", True)
+        self._clean_root_height_obs_policy = self.cfg["env"].get(
+            "cleanSceneRootHeightObsPolicy", True)
+        if self.is_scene_policy():
+            assert self._clean_local_root_obs_policy, \
+                "GTA clean_scene requires heading-local Human root rotation"
+            assert self._clean_root_height_obs_policy, \
+                "GTA clean_scene requires the Human root-height observation"
         self._enable_early_termination = self.cfg["env"]["enableEarlyTermination"]
 
         key_bodies = self.cfg["env"]["keyBodies"]
@@ -230,7 +239,11 @@ class HumanoidMA(Humanoid):
         return self._num_obs + 3 + 4
 
     def get_clean_humanoid_obs_size(self):
-        """Intrinsic humanoid state, in that humanoid's own heading frame."""
+        """TokenHSI self state, including root height, in the Human heading frame."""
+        return self._num_obs
+
+    def get_clean_humanoid_self_obs_size(self):
+        """Complete intrinsic Human node normalized by the Human RMS."""
         return self._num_obs
 
     def is_scene_policy(self):
@@ -239,17 +252,23 @@ class HumanoidMA(Humanoid):
     def get_policy_obs_mode(self):
         return self._policy_obs_mode
 
-    def _compute_clean_humanoid_nodes(self, body_pos, body_rot, body_vel, body_ang_vel):
-        """Return (B, M, H) self-state nodes with no arena/observer features."""
+    def _compute_clean_humanoid_nodes(self, body_pos, body_rot, body_vel, body_ang_vel,
+                                      env_origins):
+        """Return one 223-D heading-local TokenHSI self state per Human.
+
+        ``env_origins`` is accepted to keep the task call site stable; absolute position
+        belongs exclusively to the separate GTA pose record.
+        """
+        del env_origins
         B, M, nb = body_pos.shape[:3]
         obs = compute_humanoid_observations_max(
             body_pos.reshape(B * M, nb, 3),
             body_rot.reshape(B * M, nb, 4),
             body_vel.reshape(B * M, nb, 3),
             body_ang_vel.reshape(B * M, nb, 3),
-            True,  # always heading-local: absolute yaw belongs in no clean node
-            self._root_height_obs_policy)
-        return obs.view(B, M, self.get_clean_humanoid_obs_size())
+            self._clean_local_root_obs_policy,
+            self._clean_root_height_obs_policy)
+        return obs.view(B, M, self._num_obs)
 
     def _global_frame(self, num_rows, env_ids=None):
         """Observer frame for "global" mode: the env centre, with no rotation."""

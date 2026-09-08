@@ -17,6 +17,7 @@ from rl_games.algos_torch.running_mean_std import RunningMeanStd
 
 import learning.amp_agent as amp_agent
 import learning.amp_datasets as amp_datasets
+from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 
 
 class EntityRunningMeanStd(nn.Module):
@@ -54,40 +55,6 @@ class EntityRunningMeanStd(nn.Module):
         return torch.cat(out, dim=-1)
 
 
-class SceneRunningMeanStd(nn.Module):
-    """Normalize clean intrinsic nodes while leaving pose quaternions untouched.
-
-    The final L*13 kinematic block is consumed algebraically to construct geometry.
-    Normalizing it as an ordinary flat feature vector would corrupt unit quaternions.
-    """
-
-    def __init__(self, entity_sizes, entity_counts, kinematic_size=13):
-        super().__init__()
-        self.entity_sizes = list(entity_sizes)
-        self.entity_counts = list(entity_counts)
-        self.kinematic_size = kinematic_size
-        self.running_mean_std = nn.ModuleList(
-            [RunningMeanStd((sz,)) for sz in self.entity_sizes])
-
-    def forward(self, input, denorm=False, mask=None):
-        B = input.shape[0]
-        out = []
-        offset = 0
-        for rms, size, count in zip(self.running_mean_std,
-                                    self.entity_sizes, self.entity_counts):
-            width = count * size
-            block = input[:, offset:offset + width].reshape(B * count, size)
-            out.append(rms(block, denorm).reshape(B, width))
-            offset += width
-
-        num_tokens = sum(self.entity_counts)
-        expected = offset + num_tokens * self.kinematic_size
-        assert input.shape[1] == expected, \
-            "scene obs is {} wide, expected {}".format(input.shape[1], expected)
-        out.append(input[:, offset:])
-        return torch.cat(out, dim=-1)
-
-
 class MAAgent(amp_agent.AMPAgent):
 
     def __init__(self, base_name, config):
@@ -100,6 +67,7 @@ class MAAgent(amp_agent.AMPAgent):
                 self.running_mean_std = SceneRunningMeanStd(
                     entity_sizes=task.get_scene_entity_sizes(),
                     entity_counts=[task.num_agents, task.num_objects, task.num_agents],
+                    normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
                 ).to(self.ppo_device)
             else:
@@ -148,6 +116,7 @@ class MAAgent(amp_agent.AMPAgent):
         if task.is_scene_policy():
             config["scene_entity_sizes"] = task.get_scene_entity_sizes()
             config["scene_kinematic_size"] = task.get_scene_kinematic_size()
+            config["scene_arena_scale"] = task.get_scene_arena_scale()
         config["device"] = self.ppo_device
         return config
 

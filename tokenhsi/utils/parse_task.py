@@ -54,8 +54,8 @@ from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_box2objs import Hum
 from env.tasks.adapt_interaction_skills.humanoid_adapt_traj_ground2terrain import HumanoidAdaptTrajGround2Terrain
 from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_ground2terrain import HumanoidAdaptCarryGround2Terrain
 
-# long-horizon task completion
-from tokenhsi.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills import HumanoidLongTerm4BasicSkills
+# The long-horizon task imports optional PyTorch3D rendering dependencies. Import it
+# lazily in parse_task so unrelated tasks such as HumanoidMACarry do not require them.
 
 #########
 
@@ -86,17 +86,22 @@ def parse_task(args, cfg, cfg_train, sim_params):
     cfg_task = cfg["env"]
     cfg_task["seed"] = cfg["seed"]
 
-    try:
-        task = eval(args.task)(
-            cfg=cfg,
-            sim_params=sim_params,
-            physics_engine=args.physics_engine,
-            device_type=args.device,
-            device_id=device_id,
-            headless=args.headless)
-    except NameError as e:
-        print(e)
+    if args.task == "HumanoidLongTerm4BasicSkills":
+        from tokenhsi.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills \
+            import HumanoidLongTerm4BasicSkills
+        task_class = HumanoidLongTerm4BasicSkills
+    else:
+        task_class = globals().get(args.task)
+
+    if task_class is None:
         warn_task_name()
+    task = task_class(
+        cfg=cfg,
+        sim_params=sim_params,
+        physics_engine=args.physics_engine,
+        device_type=args.device,
+        device_id=device_id,
+        headless=args.headless)
     if hasattr(task, "num_agents"):
         # multi-agent tasks emit one obs/reward row per (env, agent)
         env = VecTaskPythonWrapperMA(task, rl_device, cfg_train.get("clip_observations", np.inf), cfg_train.get("clip_actions", 1.0))
