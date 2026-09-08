@@ -1,5 +1,17 @@
 # TokenHSI-ma — 변경 기록
 
+## 2026-09-08
+
+### Sequential phase reward carryover 옵션
+
+`STACK_PHASE_REWARD_CARRYOVER=1`일 때 전환 직전 task reward의 양수 부분을
+agent별·phase별로 저장하고 이후 phase reward에 더한다. AMP reward는 포함하지 않으며
+현재 penalty는 계속 적용한다. 저장값은 개별 양수 항의 합이 아니라 penalty까지 계산한
+net task reward의 `clamp(min=0)`이다. 기본값 0으로 기존 실험을 보존한다.
+A1 phase 0/1/2와 A2 phase 3/4를 분리하며 A2 대기/전체 zero override는 마지막에 적용한다.
+Rehearsal 제외, reset 초기화, rollback credit 무효화, 동일 phase 재진입 중복 누적 방지를
+포함한다. Python 구문 및 diff 검사를 수행했으며 simulator rollout은 실행하지 않았다.
+
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-08-13

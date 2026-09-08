@@ -116,6 +116,14 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_END_ON_A2_RESUME", "0")))
         self.stack_zero_a2_reward = bool(int(os.environ.get(
             "STACK_ZERO_A2_REWARD", "0")))
+        self.stack_phase_reward_carryover = bool(int(os.environ.get(
+            "STACK_PHASE_REWARD_CARRYOVER", "0")))
+        self._phase_reward_credit = torch.zeros(
+            (self.num_envs, 2, len(self.PHASE_NAMES)), device=self.device)
+        self._phase_reward_last = torch.zeros(
+            (self.num_envs, 2), device=self.device)
+        self._phase_reward_last_phase = torch.full(
+            (self.num_envs,), -1, dtype=torch.long, device=self.device)
         self.stack_zero_a2_wait_reward = bool(int(os.environ.get(
             "STACK_ZERO_A2_WAIT_REWARD", "0")))
         self.stack_a2_tilt_penalty = float(os.environ.get(
@@ -139,6 +147,22 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         if len(env_ids) == 0:
             return
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        if getattr(self, "stack_phase_reward_carryover", False):
+            old = self._stack_phase[env_ids].clone()
+            # Only credit a phase that actually produced a reward sample.
+            # Per-phase assignment (not +=) prevents repeated crossings from
+            # accumulating the same completion credit multiple times.
+            for agent, owned in ((0, (0, 1, 2)), (1, (3, 4))):
+                for previous in owned:
+                    eligible = ((old == previous) & (phase > previous)
+                                & (self._phase_reward_last_phase[env_ids] == previous)
+                                & ~self._carry_rehearsal[env_ids])
+                    ids = env_ids[eligible]
+                    self._phase_reward_credit[ids, agent, previous] = (
+                        self._phase_reward_last[ids, agent].clamp(min=0.0))
+            rollback = env_ids[old > phase]
+            if len(rollback):
+                self._phase_reward_credit[rollback, :, max(phase, 0):] = 0.0
         if (int(os.environ.get("STACK_DEBUG", "0")) != 0
                 and hasattr(self, "_stack_phase")):
             changed = env_ids[self._stack_phase[env_ids] != phase]
@@ -160,6 +184,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             < self.stack_carry_rehearsal_prob)
 
     def _reset_envs(self, env_ids):
+        if hasattr(self, "_phase_reward_credit"):
+            self._phase_reward_credit[env_ids] = 0.0
+            self._phase_reward_last[env_ids] = 0.0
+            self._phase_reward_last_phase[env_ids] = -1
         super()._reset_envs(env_ids)
         if hasattr(self, "_sequential_reset_reported") and len(env_ids) > 0:
             self._sequential_reset_reported[env_ids] = False
@@ -413,6 +441,18 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             - self.stack_a2_tilt_penalty * tilt_cost)
         if rehearsal_reward is not None:
             self.rew_buf[rehearsal_rows] = rehearsal_reward
+        if getattr(self, "stack_phase_reward_carryover", False):
+            # Snapshot before adding credit, so stored rewards never contain
+            # earlier offsets. Native rehearsal is excluded entirely.
+            self._phase_reward_last.copy_(self.rew_buf[rows].detach())
+            self._phase_reward_last_phase.copy_(phase)
+            completed = (torch.arange(len(self.PHASE_NAMES), device=self.device)
+                         [None, None, :] < phase[:, None, None])
+            credit = (self._phase_reward_credit * completed).sum(dim=-1)
+            credit *= (~self._carry_rehearsal)[:, None]
+            self.rew_buf[r0] += credit[:, 0]
+            self.rew_buf[r1] += credit[:, 1]
+            self.extras["stack_phase_reward_credit"] = credit.reshape(-1).clone()
         if self.stack_zero_a2_reward:
             # Keep A2 simulated, but remove all of its learning reward,
             # including rehearsal and inherited team-reward contributions.
