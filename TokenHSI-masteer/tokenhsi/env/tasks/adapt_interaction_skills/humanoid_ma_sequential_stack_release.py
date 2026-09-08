@@ -88,6 +88,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_stage_tol = _f("STACK_STAGE_TOL", 0.45)
         self._ss_body_clear = _f("STACK_BODY_CLEAR", 1.0)
         self._ss_retreat_dist = _f("STACK_RETREAT_DIST", 1.5)
+        self._ss_retreat_side_deg = _f("STACK_RETREAT_SIDE_DEG", 0.0)
         # Keep the old implicit value as the class default so ms20 sidecars
         # remain replayable; the ms21 wrapper explicitly selects 0.5.
         self._ss_retreat_scale = _f("STACK_RETREAT_SCALE", 1.0)
@@ -98,8 +99,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_entry_ang = _f("STACK_ENTRY_ANG", 1.0)
         self._ss_entry_steps = _i("STACK_ENTRY_STEPS", 5)
         self._ss_entry_delivered = bool(_i("STACK_ENTRY_DELIVERED", 0))
+        self._ss_entry_lowered = bool(_i("STACK_ENTRY_LOWERED", 0))
         self._ss_hand_clear = _f("STACK_HAND_CLEAR", 0.15)
         self._ss_hand_steps = _i("STACK_HAND_STEPS", 5)
+        self._ss_release_carry_bridge = bool(_i("STACK_RELEASE_CARRY_BRIDGE", 0))
         self._ss_hand_only_switch = bool(_i("STACK_HAND_ONLY_SWITCH", 0))
         self._ss_foot_clear = _f("STACK_FOOT_CLEAR", 0.20)
         self._ss_foot_box_w = _f("STACK_FOOT_BOX_W", 0.0)
@@ -136,15 +139,37 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_clear_base_ang_w = _f("STACK_CLEAR_BASE_ANG_W", 0.0)
         self._ss_rehearsal_frac = _f("STACK_REHEARSAL_FRAC", 0.0)
         self._ss_virtual_retreat = bool(_i("STACK_VIRTUAL_RETREAT_BOX", 0))
+        self._ss_dynamic_carry_mask = bool(_i("STACK_DYNAMIC_CARRY_MASK", 0))
         self._ss_clear_signed = bool(_i("STACK_CLEAR_SIGNED", 0))
+        self._ss_sequential_reward_mask = bool(_i("STACK_SEQUENTIAL_REWARD_MASK", 0))
+        self._ss_carry_done_r = _f("STACK_CARRY_DONE_REWARD", 1.6)
+        self._ss_release_done_r = _f("STACK_RELEASE_DONE_REWARD", 1.0)
+        self._ss_clear_done_r = _f(
+            "STACK_CLEAR_DONE_REWARD", 1.0 + self._ss_clear_steer_w
+        )
         if self._ss_retreat_scale <= 0.0 or self._ss_retreat_scale > 1.0:
             raise ValueError("STACK_RETREAT_SCALE must be in (0, 1]")
+        if self._ss_retreat_side_deg < 0.0 or self._ss_retreat_side_deg > 90.0:
+            raise ValueError("STACK_RETREAT_SIDE_DEG must be in [0, 90]")
         if self._ss_rehearsal_frac < 0.0 or self._ss_rehearsal_frac > 1.0:
             raise ValueError("STACK_REHEARSAL_FRAC must be in [0, 1]")
         if self._ss_clear_progress_w < 0.0 or self._ss_clear_speed_w < 0.0:
             raise ValueError("STACK_CLEAR_PROGRESS_W/STACK_CLEAR_SPEED_W must be non-negative")
         if self._ss_clear_steer_w < 0.0:
             raise ValueError("STACK_CLEAR_STEER_W must be non-negative")
+        if min(self._ss_carry_done_r, self._ss_release_done_r,
+               self._ss_clear_done_r) < 0.0:
+            raise ValueError("completed task rewards must be non-negative")
+        if self._ss_sequential_reward_mask and self._ss_release_carry_bridge:
+            raise ValueError(
+                "STACK_SEQUENTIAL_REWARD_MASK and STACK_RELEASE_CARRY_BRIDGE "
+                "cannot both be enabled"
+            )
+        if self._ss_dynamic_carry_mask and self._ss_virtual_retreat:
+            raise ValueError(
+                "STACK_DYNAMIC_CARRY_MASK and STACK_VIRTUAL_RETREAT_BOX "
+                "cannot both be enabled"
+            )
         if min(self._ss_clear_arc_dist, self._ss_clear_base_disp_w,
                self._ss_clear_base_lin_w, self._ss_clear_base_ang_w) < 0.0:
             raise ValueError("CLEAR arc distance and base penalty weights must be non-negative")
@@ -283,12 +308,18 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"clear_bonus={self._ss_clear_bonus:.2f} "
             f"clear_steer_w={self._ss_clear_steer_w:.2f} "
             f"retreat_scale={self._ss_retreat_scale:.2f} "
+            f"retreat_side_deg={self._ss_retreat_side_deg:.1f} "
             f"hand_only={int(self._ss_hand_only_switch)} "
             f"foot_box_w={self._ss_foot_box_w:.2f} "
             f"carry_foot_gate={int(self._ss_carry_foot_gate)} "
             f"entry_foot_gate={int(self._ss_entry_foot_gate)} "
             f"entry_delivered={int(self._ss_entry_delivered)} "
+            f"entry_lowered={int(self._ss_entry_lowered)} "
             f"release_foot_gate={int(self._ss_release_foot_gate)} "
+            f"release_carry_bridge={int(self._ss_release_carry_bridge)} "
+            f"sequential_reward_mask={int(self._ss_sequential_reward_mask)} "
+            f"done_r={self._ss_carry_done_r:.2f}/"
+            f"{self._ss_release_done_r:.2f}/{self._ss_clear_done_r:.2f} "
             f"clear_arc={self._ss_clear_arc_dist:.2f} "
             f"clear_base_w={self._ss_clear_base_disp_w:.2f}/"
             f"{self._ss_clear_base_lin_w:.2f}/{self._ss_clear_base_ang_w:.2f} "
@@ -594,6 +625,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
 
         (base_rows, top_rows, base, _, hand_dist, xy_err, z_err, support,
          stable, root_dist) = self._base_features()
+        carry_r = self.rew_buf[base_rows].clone()
         foot_dist = (
             self._all_foot_surface_distance(base_rows, top_rows)
             if self._ss_carry_foot_gate
@@ -672,6 +704,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         # At contact this is exactly zero.  Support/stability become valuable
         # only while both hands are currently clear; the gate is not latched.
         release_r = 0.50 * h + clear_now.float() * (0.30 * support + 0.20 * stable)
+        if self._ss_release_carry_bridge:
+            released_r = 0.50 + 0.30 * support + 0.20 * stable
+            release_r = (1.0 - h) * carry_r + h * released_r
         static_gate = clear_motion if self._ss_clear_motion_gate else 1.0
         ms20_clear_r = clear_now.float() * (
             static_gate * (0.40 * support + 0.25 * stable) + 0.35 * clear_score
@@ -679,6 +714,15 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         stack_r = clear_now.float() * (0.40 * support + 0.25 * stable) + 0.35 * clear_score
         positive_steer = clear_now.float() * path_quality * clear_motion
         clear_r = ms20_clear_r + self._ss_clear_steer_w * positive_steer - clear_base_penalty
+        if self._ss_sequential_reward_mask:
+            release_r = self._ss_carry_done_r + release_r
+            clear_r = self._ss_carry_done_r + self._ss_release_done_r + clear_r
+            stack_r = (
+                self._ss_carry_done_r
+                + self._ss_release_done_r
+                + self._ss_clear_done_r
+                + stack_r
+            )
         replacement = torch.where(self._ss_phase == self.RELEASE, release_r, clear_r)
         replacement = torch.where(self._ss_phase >= self.STACK, stack_r, replacement)
         replacement = torch.where(
@@ -716,6 +760,13 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         fallback = torch.zeros_like(away)
         fallback[:, 0] = 1.0
         away = torch.where(norm > 1e-4, away / norm.clamp(min=1e-4), fallback)
+        if self._ss_retreat_side_deg > 0.0:
+            left = torch.stack((-away[:, 1], away[:, 0]), dim=-1)
+            top_side = self._ss_stage_goal[env_ids, 0:2] - base[:, 0:2]
+            use_left = (left * top_side).sum(dim=-1, keepdim=True) <= 0.0
+            side = torch.where(use_left, left, -left)
+            angle = math.radians(self._ss_retreat_side_deg)
+            away = math.cos(angle) * away + math.sin(angle) * side
         clear = base[:, 0:2] + away * self._ss_retreat_dist
         waypoint = roots + away * 0.15
         self._ss_retreat_goal[env_ids, 0:2] = clear
@@ -783,7 +834,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
 
     def _compute_task_obs(self, env_ids=None):
         obs = super()._compute_task_obs(env_ids)
-        if not hasattr(self, "_ss_phase") or not self._ss_virtual_retreat:
+        if not hasattr(self, "_ss_phase") or not (
+            self._ss_virtual_retreat or self._ss_dynamic_carry_mask
+        ):
             return obs
 
         rows = self.all_rows() if env_ids is None else self.agent_rows(env_ids)
@@ -798,12 +851,19 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         if not bool(retreat.any()):
             return obs
 
-        virtual = self._virtual_retreat_carry_obs(rows[retreat], env[retreat])
         out = obs.clone()
         carry_start = TEAMMATE_DIM * (self.num_agents - 1) + self.steer_dim()
         carry_dim = CARRY_HI - CARRY_LO
-        out[retreat, carry_start:carry_start + carry_dim] = virtual
-        out[retreat, carry_start + carry_dim:carry_start + 2 * carry_dim] = virtual
+        if self._ss_dynamic_carry_mask:
+            # TokenHSI long-horizon의 inactive-task zero padding을 관측 shape
+            # 변경 없이 재사용한다. 네트워크는 이 두 정확한 zero window를
+            # 중앙 controller가 보낸 post-CLEAR 신호로 읽고 carry token의
+            # attention key/value를 가린다. top agent와 rehearsal은 건드리지 않는다.
+            out[retreat, carry_start:carry_start + 2 * carry_dim] = 0.0
+        else:
+            virtual = self._virtual_retreat_carry_obs(rows[retreat], env[retreat])
+            out[retreat, carry_start:carry_start + carry_dim] = virtual
+            out[retreat, carry_start + carry_dim:carry_start + 2 * carry_dim] = virtual
         return out
 
     def _update_stack_controller(self):
@@ -842,6 +902,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         delivered = self._ep_finish[base_rows] >= 0
         placeable = delivered if self._ss_entry_delivered else stable_placeable
+        if self._ss_entry_lowered:
+            placeable = placeable & entry_z
         picked = self._ss_dbg_pick_step[base_rows] >= 0
         entry_joint = (
             picked & clear_now

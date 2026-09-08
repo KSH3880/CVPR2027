@@ -993,3 +993,93 @@ dense penalty가 추가된다. 이는 hard gate가 아니다.
 따라서 현재 설계의 RELEASE 핵심은 손 떼기이고, CLEAR 핵심은 손을 뗀 채 기존 steering
 경로로 0.60m 실제 이동하는 것이다. 박스 안정성은 두 phase 모두 reward/penalty로만
 유도하며 phase 전환을 막지는 않는다.
+
+### ms35 delivered+lowered 진입과 RELEASE carry-reward bridge
+
+기존 모델 구조와 중앙 phase controller는 유지했다. 새 opt-in `STACK_ENTRY_LOWERED=1`은
+legacy carry 완료 latch `_ep_finish >= 0`에 `z_err <= STACK_Z_TOL`을 결합하며, ms35
+wrapper는 이를 2 frame 유지한 뒤 CARRY에서 RELEASE로 전환한다.
+
+`STACK_RELEASE_CARRY_BRIDGE=1`에서는 RELEASE 안에서만
+`(1-h)*carry_r + h*(0.50 + 0.30*support + 0.20*stable)`을 사용한다. CARRY reward는
+그대로이며, 손이 붙은 RELEASE 시작점은 현재 carry reward와 같고 손 거리 `h`가 증가하면
+기존 hand-clear 완료 reward로 연속 전환된다. 두 옵션의 기본값은 0이라 기존 sidecar 동작은
+변하지 않는다. pilot wrapper의 entry 설정이 기준 sidecar에 덮이지 않도록 `PILOT_*`
+override를 source 뒤에 적용했다.
+
+Python `py_compile`과 세 Bash 파일의 `bash -n`을 통과했다.
+`ms35_ms18init_deliveredz2_releasebridge_s0`를 ms18 epoch 9000에서 GPU 7, 1024 env,
+500 iteration으로 시작했다. 첫 backward에서 trainable `adapt_mlp` 4/4에 gradient가 있고
+학습 step FPS가 출력되는 것을 확인했다.
+
+#### 남아 있는 독립 병목: CLEAR 후퇴
+
+ms35는 CARRY→RELEASE 진입과 RELEASE 시작 reward 연결만 수정한다. 기존 최신-checkpoint
+512-env 진단에서 possteer025는 place→release가 58→57이었지만 실제 `retreat_arc >= 0.6m`는
+0/57, possteer050은 45→43 뒤 0/43이었다. arc p50/p95/max도 각각
+`0.020/0.082/0.453m`, `0.003/0.116/0.447m`라 RELEASE→CLEAR 전환 뒤 후퇴 실행이
+별도의 두 번째 병목이다. 기록된 clear 각 1건은 delay 0 frame이며 실제 후퇴 성공으로 보지 않는다.
+
+따라서 ms35의 판정은 (1) delivered+lowered 진입률, (2) release_given_place,
+(3) CLEAR의 `retreat_arc >= 0.6m`를 순서대로 분리한다. 앞 두 항이 개선돼도 세 번째가
+0이면 이번 reward bridge는 손 떼기까지만 해결한 것으로 판정한다. 현재 epoch 9100
+체크포인트가 생성됐고 학습 프로세스는 계속 실행 중이다.
+
+### ms36 TokenHSI식 순차 reward mask
+
+ms35 512-env eval에서 ms18 initial 대비 epoch 9400의 place는 0.730→0.696으로 비슷했지만,
+release_given_place는 0.391→0.216, RELEASE hand-clear step 비율은 0.016→0.007로 감소했다.
+retreat arc p95도 0.116m→0.059m로 줄어 live carry reward를 손 이격에 따라 보간한 bridge가
+손을 계속 붙잡는 방향으로 학습된 것으로 판정했다.
+
+모델 구조와 중앙 controller는 유지하고 opt-in STACK_SEQUENTIAL_REWARD_MASK를 추가했다.
+CARRY는 기존 reward를 그대로 사용하고, RELEASE는 carry_done+r_release, CLEAR는
+carry_done+release_done+r_clear, STACK 이후는 carry_done+release_done+clear_done+r_stack을
+사용한다. 완료 reward 기본값은 현재 reward 상한에 맞춘 1.6/1.0/(1.0+clear_steer_w)이며
+새 ms36 wrapper는 1.6/1.0/1.5를 명시한다. 완료 reward는 손 거리와 무관한 상수라 CARRY
+값을 보전하면서도 손 접촉 유인을 만들지 않는다. bridge와 reward mask의 동시 활성화는 거부한다.
+
+기존 controller의 관측 전환도 그대로다. 배치 완료 후 RELEASE에서는 steer window를 0으로
+만들고, 손 이격 5 frame이 확인된 뒤에만 CLEAR 후퇴 경로와 clear reward를 활성화한다.
+전용 RELEASE token이나 observation/model shape 변경은 없다. 새 옵션들은 train sidecar에
+저장·재생되며 scripts/masteer/train_sequential_reward_mask_local.sh는 ms18 epoch 9000,
+delivered+lowered 2-frame 진입, bridge OFF, reward mask ON 설정을 준비한다.
+Python py_compile, 관련 Bash 4개 bash -n, git diff --check를 통과했다.
+### ms37 후측방 135도 CLEAR 경로
+순수 후퇴 대신 상자 진행방향 기준 135도 후측방으로 비키도록 opt-in
+STACK_RETREAT_SIDE_DEG를 추가했다. 값은 기존 후방 벡터에서 측면으로 회전하는 각도라
+0도는 legacy 순수 후퇴, 45도는 진행방향 기준 135도, 90도는 순수 측면이다.
+좌우 후보 중 top agent staging 위치와 반대인 쪽을 중앙 controller가 env별로 선택한다.
+손 이격 5 frame 전에는 정지 steer를 유지하며, 확인 후에만 후측방 경로를 활성화한다.
+요청에 따라 ms36 학습과 전용 로그 watcher를 종료했다. 종료 시 metrics는 56 episode였고
+checkpoint 생성 전이라 비교 결과로 사용하지 않는다. 산출물은 삭제하지 않았다.
+Python py_compile, 관련 Bash bash -n, git diff --check를 통과했다.
+ms37_ms18init_seqrewardmask_side135_s0를 ms18 epoch 9000에서 GPU 7, 1024 env,
+3000 iteration(최종 epoch 12000)으로 nohup+setsid 분리 실행했다.
+첫 ms37 launch는 PhysX root-state tensor 초기화에서 CUDA global/shared-address 오류로
+종료됐다. 후측방 controller가 호출되기 전의 GPU 초기화 오류이며 OOM은 아니었다.
+같은 설정을 새 태그 ms37_ms18init_seqrewardmask_side135_s0_try2로 재시작했고,
+PhysX 초기화와 첫 backward를 통과했다. adapt_mlp 4/4 gradient 및 학습 FPS를 확인했다.
+
+### ms38 중앙 phase 기반 dynamic carry-token mask
+
+TokenHSI long-horizon의 FSM task-token masking을 현재 중앙 controller에 맞춰
+STACK_DYNAMIC_CARRY_MASK opt-in으로 구현했다. 별도 phase token이나 layer를 추가하지
+않고 observation 340-D와 checkpoint parameter shape를 그대로 유지한다. 중앙 controller가
+base agent를 CLEAR로 전환하면 CLEAR부터 SUCCESS까지 기존 두 carry observation window를
+정확히 0으로 padding하고, adapt network가 raw zero window를 확인해 대응하는
+new_carry와 old_carry attention key/value를 mask한다. top agent, carry rehearsal,
+CARRY와 RELEASE phase의 관측 및 mask는 바뀌지 않는다.
+
+현재 train cfg는 use_prior_knowledge=False여서 old_carry는 원래 비활성이므로, 실제
+정책 차이는 post-CLEAR base agent의 new_carry를 끄고 [weight, self, steer]만 남기는
+것이다. STACK_VIRTUAL_RETREAT_BOX와의 동시 사용은 서로 다른 CLEAR carry 표현이
+겹치지 않도록 거부한다. 새 knob는 train sidecar에 저장·재생된다.
+
+train_dynamic_carry_mask_from_ms18_local.sh는 ms37의 controller/reward/135도 후측방
+설정을 그대로 source하되 정책은 요청대로 ms18 epoch 9000에서 시작한다. 태그
+ms38_ms18init_seqrewardmask_side135_dynmask_s0를 GPU 7, 1024 env, 3000 iteration으로
+분리 실행했으며 최종 epoch은 12000이다. 로그에서 ms18 checkpoint 로드, dynamic mask
+활성, observation RMS (340,), 첫 backward의 adapt_mlp gradient 4/4와
+fps step 31090.4를 확인했다. Python py_compile, 관련 Bash bash -n,
+git diff --check를 통과했다.

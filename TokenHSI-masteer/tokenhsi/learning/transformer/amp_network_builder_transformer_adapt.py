@@ -171,6 +171,24 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
             self.major_task_obs_size = self.task_obs_each_size[self.each_subtask_name.index("old_{}".format(self.major_task_name))]
             self.new_major_id = self.each_subtask_name.index("new_{}".format(self.major_task_name))
             self.old_major_id = self.each_subtask_name.index("old_{}".format(self.major_task_name))
+            self.dynamic_carry_mask = (
+                _osf.environ.get("STACK_DYNAMIC_CARRY_MASK", "0") == "1"
+            )
+            if self.dynamic_carry_mask:
+                if self.major_task_name != "carry":
+                    raise ValueError(
+                        "STACK_DYNAMIC_CARRY_MASK requires major_task_name=carry"
+                    )
+                # Token sequence order is [weight, self, task ids...]. No token,
+                # layer, observation dimension, or checkpoint parameter is added.
+                self.dynamic_carry_token_pos = (
+                    self.new_major_id + 2,
+                    self.old_major_id + 2,
+                )
+                print(
+                    "[stack] dynamic carry-token mask: post-CLEAR zero window",
+                    flush=True,
+                )
             
             if self.has_extra:
                 # extra 토큰이 여럿일 수 있다 (ma+steer 는 teammate + steering 둘).
@@ -404,6 +422,20 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
             # src_key_padding_mask 에서 key/value 로 사용하지 않는다는 뜻이다.
             if self.has_extra and self.mask_teammate_token:
                 src_key_padding_mask[:, self.teammate_token_pos] = True
+
+            if self.dynamic_carry_mask:
+                task_obs_raw = not_normalized_obs[..., self.self_obs_size:]
+                new_lo = self.task_obs_each_indx[self.new_major_id]
+                new_hi = self.task_obs_each_indx[self.new_major_id + 1]
+                old_lo = self.task_obs_each_indx[self.old_major_id]
+                old_hi = self.task_obs_each_indx[self.old_major_id + 1]
+                # The sequential controller writes exact zeros only for the base
+                # agent from CLEAR through SUCCESS. Requiring both duplicate carry
+                # windows avoids interpreting an ordinary physical state as a mask.
+                carry_inactive = torch.all(task_obs_raw[..., new_lo:new_hi] == 0.0, dim=-1)
+                carry_inactive &= torch.all(task_obs_raw[..., old_lo:old_hi] == 0.0, dim=-1)
+                for token_pos in self.dynamic_carry_token_pos:
+                    src_key_padding_mask[carry_inactive, token_pos] = True
             
             # src_key_padding_mask[:, 2:] = True # 只imitate style
 
