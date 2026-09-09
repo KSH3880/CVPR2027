@@ -1,0 +1,104 @@
+# if given, will override the device setting in gym. 
+env: 
+  numEnvs: 4096
+  envSpacing: 5
+  episodeLength: 600 # 20s
+  isFlagrun: False
+  enableDebugVis: False
+  
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2 # 30 Hz
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+
+  localRootObs: True # amp disc obs
+  localRootObsPolicy: False # policy obs
+  rootHeightObs: False # amp disc obs
+  rootHeightObsPolicy: False # policy obs
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot"]
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+
+  enableSelfCollisionDetection: True
+  enableTrackInitState: False
+
+  # power reward
+  power_reward: False
+  power_coefficient: 0.0005
+
+  skill: ["omomo", "loco_more", "loco", "pickUp", "carryWith", "putDown"]
+  skillInitProb: [0.0, 0.5, 0.5, 0.0, 0.0, 0.0] # only use loco, because we already have skill prior of carrying
+  skillDiscProb: [0.0, 0.5, 0.2, 0.1, 0.1, 0.1]
+
+  # task
+  enableTaskObs: True
+  onlyVelReward: True # this term now only control carry rwd
+  onlyHeightHandHeldReward: False
+
+  upperbodyPenaltyCoeff: 1.0
+  enableStraightUpperBodyPenalty: True
+
+  box_vel_penalty: True # to avoid stiff grasping
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.0
+
+  mode: "train"
+  box:
+    build:
+      objRoot: "dataset_dynamic_objects"
+      objCategories: 
+        - "ArmChair_Normal"
+        - "Table_Circle"
+      objSpecified: "ArmChair_Normal" # in each training, we only use one object category
+
+    reset:
+      randomRot: True
+      randomHeight: True
+      randomHeightProb: 1.0
+      maxTopSurfaceHeight: 1.35 # adjust this value (1.2 >>> 1.35)
+      minBottomSurfaceHeight: 0.0
+
+    obs:
+      enableBboxObs: True
+    
+    enable_walk_rwd: True
+
+    objFallAllowDist: 0.5
+    enableObjFallTermination: True
+    enableLeaveInitPosRwd: True
+    leaveCoeff: 0.8
+
+  eval:
+    # override env settings
+    successThreshold: 0.2
+    skill: ["loco"]
+    skillInitProb: [1.0]
+
+  asset:
+    assetRoot: "tokenhsi/data/assets"
+    assetFileName: "mjcf/phys_humanoid_v3.xml"
+
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
