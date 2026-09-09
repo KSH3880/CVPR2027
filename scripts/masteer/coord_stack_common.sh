@@ -4,7 +4,8 @@
 coord_stack_setup() {
     if [ -z "${COORD_CKPT:-}" ]; then
         local candidates=() candidate
-        for candidate in "$ROOT"/runs/coord/c13*/coord_c2_latest.pth; do
+        for candidate in "$ROOT"/TokenHSI-coord/output/c13.pth \
+                         "$ROOT"/runs/coord/c13*/coord_c2_latest.pth; do
             [ ! -f "$candidate" ] || candidates+=("$candidate")
         done
         if [ "${#candidates[@]}" -ne 1 ]; then

@@ -2,6 +2,33 @@
 
 ## 2026-09-08
 
+### Coord carry viewer 기본 조건을 학습 분포에 정렬
+
+- 기본 조건을 `free`, `MS_MRAND=4`로 바꾸고 timed-cross를 opt-in으로 전환했다.
+  sequential-stack checkpoint 확인 시 교차 스트레스 장면이 초기 배치와 planner
+  동작을 동시에 바꾸지 않게 했다.
+- viewer에 `--eval`을 추가해 carry의 평가 초기화인 `loco_carry 100%`를 사용한다.
+  기존에는 학습 RSI가 적용되어 `carryWith`·`putDown` 자세에서도 시작했다. 32-env
+  짧은 GPU 진단에서 워밍업 뒤 두 반복(128 agent-row)의 terminate가 0회였다.
+- pickup 중 상자가 한 프레임 들리자마자 C13 carry phase로 재계획하던 전환에 12-step
+  debounce를 추가했다. 손이 닫히는 동안 steer window가 바뀌어 상자를 놓치는 것을 막고,
+  안정적으로 든 뒤에는 C13 경로·속도 제어를 그대로 적용한다.
+
+### C13 simultaneous carry 실행 경로 분리
+
+- `HumanoidMACoordCarry`와 전용 entry point/viewer를 추가해 sequential-stack
+  phase를 통과하지 않고 두 agent의 joint C13 경로와 속도를 동시에 실행한다.
+- masteer `Humanoid_*.pth`는 기존 340-D actor/RMS weight로만 복원하고,
+  task의 경로 공급자는 coordinator가 담당한다.
+- `Humanoid_00011300.pth`와 `c13.pth`를 사용한 GPU smoke에서 340-D policy
+  로드와 C2 planner 실행을 확인했다(`124` replans, fallback `0`).
+- 순수 coord에서도 정상적인 저상자 pickup의 손 접촉이 낙상 reset으로 처리되지
+  않도록 sequential executor와 동일하게 양손을 허용 contact body에 추가했다.
+- 두 실행의 340-D/tokenizer 구조는 동일함을 확인했다. 실제 입력 차이는 C13이 동시
+  교차에서 pickup 접근 경로까지 변형한다는 점이었다. 학습된 grasp의 박스 상대 접근
+  자세를 보존하도록 root-to-box 기하는 고정하고, 접근 속도 및 box-to-goal joint
+  경로·속도는 계속 C13이 결정하게 했다.
+
 ### 별도 coordinator sequential-stack 실행 경로
 
 - `HumanoidMACoordSequentialStack`과 `run_coord_sequential_stack.py`를 추가했다.
@@ -9,8 +36,9 @@
 - coord PTH의 경로·속도를 phase별 활성 Carry agent의 ms18 버퍼에 주입한다.
   기존 후퇴·대기·XYZ 목표와 340-D ABI, 54열 평가 지표를 유지한다.
 - 새 viewer/eval 스크립트와 별도 결과 경로, checkpoint schema 검사 및 invalid fallback을 추가했다.
-- 92개 CPU 테스트 통과. 실제 C13 PTH를 이 머신에서 찾지 못했고 GPU physics rollout은
-  미검증이다. 실행 방법과 적용 범위: `../docs/COORD_SEQUENTIAL_STACK.md`.
+- 92개 CPU 테스트와 C13 path30 step-300 checkpoint contract 검증 통과.
+  2-env/60-step GPU smoke도 rc=0, replan 75, invalid 0, fallback 0으로 통과했다.
+  실행 방법과 적용 범위: `../docs/COORD_SEQUENTIAL_STACK.md`.
 
 ### Sequential phase reward carryover 옵션
 

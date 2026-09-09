@@ -47,10 +47,10 @@ masteer와 coordinator PTH는 별도 파일이다. `MS_CKPT`는 stage1 backbone�
 활성 환경이 없으면 `CONDA_BASE` 또는 `$HOME/anaconda3`, `$HOME/miniconda3` 아래의
 `TOKENHSI_CONDA_ENV`(기본 `tokenhsi118`)를 사용한다.
 
-아래 `COORD_CKPT`는 **실제로 보유한 C13 파일 경로로 교체**한다.
+현재 확인된 C13 path30 step-300 체크포인트는
+`TokenHSI-coord/output/c13.pth`다. `COORD_CKPT`를 생략하면 이 파일을 자동 선택한다.
 
 ```bash
-COORD_CKPT=/path/to/c13_path10_s0/coord_c2_000300.pth \
 MA_GPU=0 STACK_EVAL_ENVS=270 \
 bash scripts/masteer/eval_coord_sequential_stack.sh \
   TokenHSI-masteer/output/sequential_stack/anti_feat_top_s2/Humanoid_00010000.pth \
@@ -67,7 +67,6 @@ agent 경로 수(`installed_agent_rows`), invalid/unsafe, fallback을 확인할 
 이 새 스크립트는 VNC/Xvfb 서버를 생성하거나 기존 서버를 종료하지 않는다.
 
 ```bash
-COORD_CKPT=/path/to/c13_path10_s0/coord_c2_000300.pth \
 MA_GPU=0 STACK_VIEW_BOX_IDS=0,7 \
 bash scripts/masteer/view_coord_sequential_stack.sh \
   TokenHSI-masteer/output/sequential_stack/anti_feat_top_s2/Humanoid_00010000.pth 1
@@ -81,8 +80,8 @@ bash scripts/masteer/view_coord_sequential_stack.sh \
 `traj` commit `5f39199f7ea9396532fe251c46aa634734ee9f10`에는
 `scripts/coord/c13_pathguard.sh`와 `c13_path10_s0`, `c13_path30_s0` 설정이 있다.
 두 설정은 C2 schema의 joint waypoint/speed-cap MLP이며 경로 residual loss 계수만 다르다.
-2026-09-08 현재 이 작업 머신에서 학습된 C13 PTH는 찾지 못했다.
-Git으로 옮긴 코드에 학습 가중치가 포함된 것은 아니다.
+2026-09-08에 `TokenHSI-coord/output/c13.pth`를 받아 검증했다. C2 schema,
+step 300, path residual coefficient 30, random priority 설정이다.
 
 체크포인트의 schema/config와 `extras.random_priority`를 자동으로 읽는다.
 C13의 episode-random priority agent는 원본 계약대로 직선·평속 경로를 사용하며,
@@ -103,4 +102,6 @@ OMP_NUM_THREADS=1 python -m unittest discover -s coordinator/tests -v
 공간 위치에 맞는 속도 보간, 기존 ms18 `_steer_obs`를 이용한 실제 12-D 창 변화,
 부분 env reset, phase gate, 목표 변경, invalid fallback, 우선권 보존을 포함한다.
 runtime 검사의 simulator 부모는 tensor fixture이며 physics rollout 성공을 의미하지 않는다.
-실제 학습된 C13 및 GPU simulator를 이용한 성공률 검증은 아직 수행하지 않았다.
+실제 학습된 C13의 checkpoint contract 검증을 통과했다. 2 env, 60 step의 GPU
+simulator smoke도 `rc=0`으로 끝났다. 75회 replan에서 invalid 0, unsafe 19,
+설치 75 agent-row, fallback 0이었다. 짧은 horizon이라 success 0은 성능 판정값이 아니다.

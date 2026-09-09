@@ -8,7 +8,9 @@
   이용한 후보 선택, 동일 공간 호길이상의 XY/속도 보간을 추가했다.
 - traj에서 가져온 모델·planner·checkpoint 코드는 수정하지 않았다.
 - 기존 75개 + 새 bridge/runtime 17개, 총 92개 CPU 테스트 통과.
-  C13 architecture 검사는 임시 가중치로 수행했으며 실제 학습 PTH는 이 머신에 없다.
+  `output/c13.pth`의 C2 schema, path30 설정, step 300과 random-priority 계약을 확인했다.
+- 실제 masteer sequential-stack 2-env/60-step GPU smoke에서 C13 경로를 75 agent-row에
+  설치했고 invalid/fallback 0으로 종료했다(unsafe 19; 짧은 smoke라 성능 판정 제외).
 
 ### traj coordinator 독립 반입
 
