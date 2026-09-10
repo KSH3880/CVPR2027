@@ -89,6 +89,20 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         for key in before:
             self.assertTrue(torch.equal(before[key], after[key]), key)
 
+    def test_early_v1_checkpoint_derives_redundant_retreat_contract(self):
+        model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "early_stack_v1.pth"
+            save_stack_checkpoint(path, model)
+            payload = torch.load(path, map_location="cpu", weights_only=False)
+            del payload["retreat_path_points"]
+            del payload["retreat_distance"]
+            torch.save(payload, path)
+            loaded, migrated = load_stack_checkpoint(path)
+        self.assertEqual(migrated["retreat_path_points"], PATH_POINTS)
+        self.assertEqual(migrated["retreat_distance"], model.config.retreat_distance)
+        self.assertEqual(loaded.config, model.config)
+
 
 if __name__ == "__main__":
     unittest.main()

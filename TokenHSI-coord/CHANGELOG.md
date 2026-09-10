@@ -41,6 +41,17 @@
   12 MB checkpoint를 저장했다. 이후 서버에서 본 학습하기로 해 사용자 요청에 따라 로컬
   process group만 정상 종료했으며 산출물은 보존했다.
 
+### Stack planner checkpoint viewer 분리
+
+- 학습 checkpoint를 strict schema 검사 후 로드하고 candidate 0의 mean trajectory를
+  deterministic하게 실행하는 `HumanoidMAStackPlannerView`와 전용 launcher를 추가했다.
+- 기본 6 low-level step 및 stack phase 전환마다 실제 simulator state에서 재계획하고,
+  planner의 path/speed와 learned retreat endpoint를 frozen sequential-stack agent에 적용한다.
+- 기존 coordinator/viewer와 파일을 공유하지 않는다. launcher는 noVNC 없이 로컬 Isaac Gym
+  창을 직접 띄우고 기본 GPU 0을 사용하며 `MA_GPU`로 로컬 GPU를 선택할 수 있다.
+- retreat head는 이미 있으나 중복 contract field 두 개가 없던 초기 v1 weight도 해당 값을
+  model config에서 복구한 뒤 나머지 schema와 state dict를 동일하게 strict 검사한다.
+
 ## 2026-09-09
 
 ### Sequential stack의 가상 retreat를 coordinator에 연결

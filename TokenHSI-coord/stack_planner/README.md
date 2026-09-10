@@ -69,3 +69,22 @@ STACK_PLANNER_ENVS=64 STACK_PLANNER_ITERS=200 \
 ```
 
 metric, sidecar, planner checkpoint는 `runs/stack_planner/<tag>/`에만 저장된다.
+
+## Checkpoint viewer
+
+학습된 planner의 mean action을 deterministic하게 실행하는 별도 viewer task다. frozen agent
+checkpoint도 학습 때 쓴 파일을 같이 지정해야 한다. planner는 기본 6 low-level step마다,
+그리고 stack phase가 바뀌는 즉시 다시 계획한다. 학습용 task나 기존 coordinator viewer를
+수정하지 않는다. 바닥 띠는 두 agent의 전체 planner path와 구간별 속도를, 허리 높이 띠는
+현재 frozen agent에 들어가는 steering window를 표시한다.
+
+```bash
+bash TokenHSI-coord/stack_planner/view.sh \
+  runs/stack_planner/<tag>/planner_000010.pth \
+  TokenHSI-masteer/output/sequential_stack/anti_feat_top_s2/Humanoid_00011000.pth
+```
+
+로컬 desktop에 Isaac Gym 창을 직접 띄우며 noVNC를 사용하지 않는다. 기본 물리 GPU는 0이고
+`MA_GPU=1`처럼 바꿀 수 있다. 현재 `DISPLAY`를 사용하고 값이 없으면 `:0`을 쓴다. 여러
+scene을 보고 싶으면 세 번째 인자에 env 수를 주고, 재계획 주기는
+`STACK_PLANNER_REPLAN_STEPS`로 바꿀 수 있다.

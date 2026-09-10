@@ -96,6 +96,13 @@ def load_stack_checkpoint(
     if extra:
         raise ValueError(f"unknown stack planner config keys: {extra}")
     config = StackPlannerConfig(**payload["model_config"])
+    # Early v1 checkpoints already contain the retreat heads and the
+    # retreat_distance model config, but predate these two redundant contract
+    # fields.  Reconstruct only those derivable fields; every stored value is
+    # still checked strictly below.
+    if payload.get("schema_version") == STACK_SCHEMA_VERSION:
+        payload.setdefault("retreat_path_points", PATH_POINTS)
+        payload.setdefault("retreat_distance", config.retreat_distance)
     expected = expected_contract(config)
     missing = sorted(set(expected) - set(payload))
     mismatch = {
