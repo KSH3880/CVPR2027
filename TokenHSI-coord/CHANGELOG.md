@@ -2,6 +2,45 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-10
+
+### Stack 전용 Transformer planner 패키지 분리
+
+- 기존 coordinator 입력 10개 tensor와 joint path/speed 출력 계약을 유지하는
+  `stack_planner/`를 별도 추가했다.
+- 6-entity Transformer encoder와 learned-query Transformer decoder 뒤에 path, speed,
+  dwell, value/risk head를 분리해 이후 stack event/3-D placement 출력을 확장할 경계를 만들었다.
+- 기존 C1/C2 모델, checkpoint loader, simulator runtime은 수정하지 않았고 stack checkpoint는
+  `tokenhsi-stack-planner-v1` schema로 격리했다.
+
+### Stack planner 전용 outcome reward 분리
+
+- `stack_planner/reward.py`에 frozen executor의 macro-step 실행 전후 physical state로 계산하는
+  team potential reward를 추가했다.
+- bottom placement, direction-free clearance, top placement를 곱으로 연결해 dependency를
+  표현하고 실제 collision, bottom disturbance, 시간, invalid/unsafe cost를 별도 항으로 뒀다.
+- GT path, 고정 retreat 방향, virtual box와 기존 Carry reward는 입력 계약에서 제외했다.
+- planner macro interval에서 any-agent fall을 reset 전에 latch해 한 번만 적용하는 기본 `-3.0`
+  team penalty를 추가했다.
+
+### Stack planner closed-loop PPO와 실제 simulator smoke
+
+- 동일 Transformer decoder에 물리적 A1 retreat path/speed head를 추가했다. planner는 실제
+  box만 입력받고, frozen Carry agent용 virtual box 변환은 새 `stack_planner/env_adapter.py`
+  경계 안에서만 수행한다.
+- sequential-stack agent를 완전히 freeze한 macro-step PPO trainer와 독립 launcher/sidecar/
+  checkpoint를 `stack_planner/`에 추가했다. 기존 coordinator 및 masteer 소스는 수정하지 않았다.
+- reward의 먼 거리 `exp(-distance^2)` 포화를 확인해 bounded rational quality로 바꾸고,
+  실제 root-box 접근 진행을 placement가 낮을 때만 보조하도록 추가했다. top target은 stage
+  command가 아닌 현재 bottom box의 물리 geometry에서 계산한다.
+- 누락된 비활성 sit/climb URDF actor까지 commit하던 generic reset을 stack 전용 adapter에서
+  제외했다. 8-env, horizon 8, low-step 6 smoke가 terminal reset, PPO update, checkpoint 저장까지
+  통과했고 potential delta가 `0`에서 `2.38e-4`로 살아났다. pure-PyTorch 단위검사 10개도 통과했다.
+- 본 학습 `stack_planner_v0_s0a`를 frozen `anti_feat_top_s2/Humanoid_00011000.pth`,
+  64 env, horizon 32, low-step 6, 200 iteration으로 GPU0에 시작했다. iteration 10에서 첫
+  12 MB checkpoint를 저장했다. 이후 서버에서 본 학습하기로 해 사용자 요청에 따라 로컬
+  process group만 정상 종료했으며 산출물은 보존했다.
+
 ## 2026-09-09
 
 ### Sequential stack의 가상 retreat를 coordinator에 연결
