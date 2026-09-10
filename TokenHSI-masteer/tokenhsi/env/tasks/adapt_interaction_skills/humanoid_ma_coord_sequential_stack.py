@@ -15,7 +15,7 @@ from tokenhsi.utils import steer_path as sp
 
 
 class HumanoidMACoordSequentialStack(HumanoidMASequentialStackCarry):
-    """Keep 340-D policy ABI, phase gates, native retreat and XYZ placement goals."""
+    """Attach state-only planning to stack phases without changing policy ABI."""
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._coord_ready = False
@@ -67,9 +67,11 @@ class HumanoidMACoordSequentialStack(HumanoidMASequentialStackCarry):
     def coord_state(self, env_ids):
         rows = self.agent_rows(env_ids)
         root = self.humanoid_rows(self._humanoid_root_states)[rows].reshape(-1, 2, 13)
-        box = self.humanoid_rows(self._box_states)[rows].reshape(-1, 2, 13)
+        # Clone because retreat planning rewrites A1's box only in the planner
+        # snapshot; this tensor must never alias Isaac Gym's physical state.
+        box = self.humanoid_rows(self._box_states)[rows].reshape(-1, 2, 13).clone()
         size = self._box_lib._box_size[rows].reshape(-1, 2, 3)
-        goal = self._box_tar_pos[rows, :2].reshape(-1, 2, 2)
+        goal = self._box_tar_pos[rows, :2].reshape(-1, 2, 2).clone()
         # Same measured lift/reference-floor criterion as the stack executor.
         bottom = box[..., 2] - size[..., 2] / 2
         lifted = bottom > self._initial_box_bottom_z[rows].reshape(-1, 2) + 0.08
@@ -81,6 +83,20 @@ class HumanoidMACoordSequentialStack(HumanoidMASequentialStackCarry):
         at_goal = (box[..., :2] - goal).norm(dim=-1) <= 0.15
         phase = torch.where(held, torch.full_like(bottom, 2.), near.float())
         phase = torch.where(at_goal & ~held, torch.full_like(phase, 3.), phase)
+
+        # During A1 retreat the frozen Carry executor sees a virtual stationary
+        # box at the retreat endpoint. Give the planner the exact same world
+        # state, so its root->box leg becomes the retreat path and its
+        # box->goal leg is degenerate. The placed physical box remains untouched.
+        retreat = (self._stack_phase[env_ids] == self.A1_RETREAT) & ~self._carry_rehearsal[env_ids]
+        if retreat.any():
+            virtual_xy = self._a1_retreat_pos[env_ids[retreat], :2]
+            box[retreat, 0, :2] = virtual_xy
+            box[retreat, 0, 7:9] = 0
+            goal[retreat, 0] = virtual_xy
+            held[retreat, 0] = False
+            near_virtual = ((root[retreat, 0, :2] - virtual_xy).norm(dim=-1) <= 0.7)
+            phase[retreat, 0] = near_virtual.float()
         return CoordinatorState(root[..., :2], self._coord_yaw(root), root[..., 7:9],
                                 box[..., :3], self._coord_yaw(box), box[..., 7:9],
                                 size[..., :2], goal, held.float(), phase)
@@ -110,7 +126,7 @@ class HumanoidMACoordSequentialStack(HumanoidMASequentialStackCarry):
             # The parent constructed its reset observation before our state was reset.
             self._compute_observations(env_ids)
 
-    def _coord_install(self, env_ids, path, speed, active):
+    def _coord_install(self, env_ids, path, speed, active, planner_box_xy):
         dense, dense_speed, end = resample_plan(path, speed)
         mask = active.reshape(-1)
         rows = self.agent_rows(env_ids)[mask]
@@ -122,7 +138,7 @@ class HumanoidMACoordSequentialStack(HumanoidMASequentialStackCarry):
         self._s_end[rows] = end.reshape(-1)[mask]
         self._arc_root[rows] = 0
         self._prev_arc[rows] = 0
-        boxes = self.humanoid_rows(self._box_states)[rows, :2]
+        boxes = planner_box_xy.reshape(-1, 2)[mask]
         self._arc_box[rows] = sp.project(boxes, flat)[0]
         self._coord_applied[rows] = True
         self._coord_installed += len(rows)
@@ -165,13 +181,21 @@ class HumanoidMACoordSequentialStack(HumanoidMASequentialStackCarry):
             self._coord_invalid += int((~valid).sum())
             self._coord_unsafe += int((valid & ~safe).sum())
             if valid.any():
-                self._coord_install(ids[valid], path[valid], speed[valid], use[valid])
+                self._coord_install(ids[valid], path[valid], speed[valid], use[valid],
+                                    current.box_xyz[valid, :, :2])
             # First/changed-goal invalid plans use a fresh native plan. Same-context
             # invalid replans retain the previous accepted plan.
             bad_rows = self.agent_rows(ids[~valid])[use[~valid].reshape(-1)]
             fallback = bad_rows[~self._coord_applied[bad_rows]]
             if len(fallback):
-                self._reset_steer_to(fallback, self._box_tar_pos[fallback])
+                # Fail closed to the same skill goal the planner saw. This is
+                # the virtual retreat box for A1/phase2 and the physical stack
+                # goal for ordinary Carry phases.
+                flat_goal = current.goal_xy[~valid].reshape(-1, 2)[use[~valid].reshape(-1)]
+                missing = ~self._coord_applied[bad_rows]
+                target = torch.cat((flat_goal[missing],
+                                    self._box_tar_pos[fallback, 2:3]), dim=-1)
+                self._reset_steer_to(fallback, target)
                 self._coord_fallback += len(fallback)
         self._coord_tick[env_ids] = self.progress_buf[env_ids]
         self._coord_phase[env_ids] = phase

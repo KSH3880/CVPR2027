@@ -2,6 +2,17 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-09
+
+### Sequential stack의 가상 retreat를 coordinator에 연결
+
+- `juan`에서 누락돼 import가 깨졌던 sequential execution bridge를 복원했다.
+- A1의 place/verify뿐 아니라 retreat phase도 planner 소유로 두고, 이 구간의 planner
+  snapshot에는 executor carry token과 같은 retreat endpoint의 가상 box/goal을 넣는다.
+- 가상 상태는 clone에만 기록해 Isaac Gym의 실제 배치 완료 box를 건드리지 않으며,
+  path의 box arc와 invalid fallback도 동일한 가상 goal을 사용하도록 맞췄다.
+- CPU 회귀검사에 phase ownership과 box=goal인 degenerate retreat leg를 추가했다.
+
 ## 2026-09-04
 
 ### C11 learned episode-persistent priority
