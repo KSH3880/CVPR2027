@@ -1,0 +1,118 @@
+params:
+  seed: -1
+
+  algo:
+    name: ma
+
+  model:
+    name: amp
+
+  network:
+    name: amp_multi_agent
+    separate: True
+
+    transformer:
+      relation_bias_mode: edge_mlp # A2 semantic edge encoder; lookup restores A1
+      num_features: 64
+      tokenizer_units: [256, 128]
+      num_layers: 4
+      layer_num_heads: 2
+      layer_dim_feedforward: 512
+      extra_mlp_units: [1024, 512]
+      relation_bias: true
+      gta:
+        enable: true
+        translation_scale: 1.0
+        representation: se3_direct_sum
+        diagnostics_first_forward: true # one-shot pose/QKV/logit/entropy scale check
+      geometry:
+        enable: false # historical 15-D Geo ablation; mutually exclusive with GTA
+        use_score: true
+        use_message: true
+        mode: full15 # position3 | pose9 | full15; encoder input always remains 15-D
+        input_size: 15
+        embedding_dim: 64
+        # null => [1/envSpacing, 1/envSpacing, 1], so XY matches node scene poses.
+        position_scale: null
+        velocity_scale: 0.25
+        angular_velocity_scale: 0.25
+
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: -2.9
+        fixed_sigma: True
+        learn_sigma: False
+
+    mlp:
+      # critic only (the actor trunk is the transformer above)
+      units: [1024, 512]
+      activation: relu
+      d2rl: False
+
+      initializer:
+        name: default
+      regularizer:
+        name: None
+
+    disc:
+      units: [1024, 512]
+      activation: relu
+
+      initializer:
+        name: default
+
+  load_checkpoint: False
+
+  config:
+    name: CarryRelationV0Smoke
+    env_name: rlgpu
+    multi_gpu: False
+    ppo: True
+    mixed_precision: False
+    normalize_input: True # H223/O30 RMS; T1 and GTA pose7 bypass RMS
+    normalize_value: True
+    reward_shaper:
+      scale_value: 1
+    normalize_advantage: True
+    gamma: 0.99
+    tau: 0.95
+    learning_rate: 2e-5
+    lr_schedule: constant
+    score_to_win: 20000
+    max_epochs: 1000000
+    save_best_after: 50
+    save_frequency: 500
+    save_intermediate: True
+    print_stats: True
+    grad_norm: 1.0
+    entropy_coef: 0.0
+    truncate_grads: False
+    e_clip: 0.2
+    horizon_length: 32
+    minibatch_size: 1024
+    mini_epochs: 6
+    critic_coef: 5
+    clip_value: False
+    seq_len: 4
+    bounds_loss_coef: 10
+    amp_obs_demo_buffer_size: 4096
+    amp_replay_buffer_size: 4096
+    amp_replay_keep_prob: 0.01
+    amp_batch_size: 512
+    amp_minibatch_size: 512
+    disc_coef: 5
+    disc_logit_reg: 0.01
+    disc_grad_penalty: 5
+    disc_reward_scale: 2
+    disc_weight_decay: 0.0001
+    normalize_amp_input: True
+    enable_eps_greedy: False
+
+    task_reward_w: 0.5
+    disc_reward_w: 0.5

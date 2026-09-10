@@ -6,6 +6,9 @@
 # forward. AMP observations remain per humanoid in both modes.
 
 import time
+import os
+import copy
+import yaml
 import numpy as np
 import torch
 import torch.nn as nn
@@ -18,6 +21,7 @@ from rl_games.algos_torch.running_mean_std import RunningMeanStd
 import learning.amp_agent as amp_agent
 import learning.amp_datasets as amp_datasets
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
+from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
 
 
 class EntityRunningMeanStd(nn.Module):
@@ -61,6 +65,28 @@ class MAAgent(amp_agent.AMPAgent):
         super().__init__(base_name, config)
 
         task = self.vec_env.env.task
+        if task._state_relation:
+            task._relation_output_directory = self.experiment_dir
+            with open(task.cfg['args'].cfg_train) as f:
+                resolved = yaml.safe_load(f)
+            for key in resolved['params']['config']:
+                if key in config:
+                    try:
+                        yaml.safe_dump(config[key])
+                    except yaml.YAMLError:
+                        # rl_games replaces reward_shaper with a callable; keep its YAML definition.
+                        continue
+                    resolved['params']['config'][key] = copy.deepcopy(config[key])
+            resolved['params']['seed'] = config['seed']
+            resolved['params']['load_checkpoint'] = task.cfg['args'].resume > 0
+            if task.cfg['args'].checkpoint != 'Base':
+                resolved['params']['load_path'] = task.cfg['args'].checkpoint
+            self._relation_experiment_config = {'env': copy.deepcopy(task.cfg['env']),
+                'train': resolved, 'num_envs': task.num_envs, 'num_agents': task.num_agents,
+                'num_objects': task.num_objects, 'control_dt': task.dt,
+                'observation_size': task.get_obs_size()}
+            with open(os.path.join(self.experiment_dir, 'relation_config.yaml'), 'w') as f:
+                yaml.safe_dump(self._relation_experiment_config, f, sort_keys=False)
         self._scene_policy = task.is_scene_policy()
         if self.normalize_input:
             if self._scene_policy:
@@ -69,6 +95,7 @@ class MAAgent(amp_agent.AMPAgent):
                     entity_counts=[task.num_agents, task.num_objects, task.num_agents],
                     normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
+                    extra_passthrough_size=task.get_relation_suffix_size(),
                 ).to(self.ppo_device)
             else:
                 self.running_mean_std = EntityRunningMeanStd(
@@ -103,6 +130,18 @@ class MAAgent(amp_agent.AMPAgent):
                 shape, dtype=torch.float32, device=self.ppo_device)
         return
 
+    def get_stats_weights(self):
+        weights = super().get_stats_weights()
+        task = self.vec_env.env.task
+        weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        if task._state_relation:
+            weights['relation_experiment_config'] = self._relation_experiment_config
+        return weights
+
+    def set_weights(self, weights):
+        check_checkpoint_metadata(weights, checkpoint_metadata(self.vec_env.env.task._relation_cfg))
+        return super().set_weights(weights)
+
     def _build_net_config(self):
         config = super()._build_net_config()
 
@@ -113,6 +152,7 @@ class MAAgent(amp_agent.AMPAgent):
         config["object_obs_size"] = task.get_object_obs_size()
         config["goal_obs_size"] = task.get_goal_obs_size()
         config["observation_mode"] = task.get_policy_obs_mode()
+        config['relation_reward_mode'] = task._relation_cfg.get('mode', LEGACY_MODE)
         if task.is_scene_policy():
             config["scene_entity_sizes"] = task.get_scene_entity_sizes()
             config["scene_kinematic_size"] = task.get_scene_kinematic_size()
@@ -157,6 +197,7 @@ class MAAgent(amp_agent.AMPAgent):
         self.set_eval()
         done_indices = []
         update_list = self.update_list
+        relation_near_masks = []
 
         for step_idx in range(self.horizon_length):
             self.obs = self.env_reset(done_indices)
@@ -172,6 +213,8 @@ class MAAgent(amp_agent.AMPAgent):
                 self.experience_buffer.update_data(key, step_idx, res_dict[key])
 
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
+            if 'relation_near_unplaced_slow' in infos:
+                relation_near_masks.append(infos['relation_near_unplaced_slow'].clone())
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', step_idx, shaped_rewards)
             self.experience_buffer.update_data('next_obses', step_idx, self.obs['obs'])
@@ -221,6 +264,13 @@ class MAAgent(amp_agent.AMPAgent):
         mb_returns = mb_advs + mb_values
 
         batch_dict = {}
+        if relation_near_masks:
+            mask = torch.stack(relation_near_masks).unsqueeze(-1)
+            count = mask.sum().clamp_min(1)
+            batch_dict['relation_conditional_diagnostics'] = {
+                'near_unplaced_slow/amp': (amp_rewards['disc_rewards'] * mask).sum() / count,
+                'near_unplaced_slow/combined': (mb_rewards * mask).sum() / count,
+                'near_unplaced_slow/sample_count': mask.sum().float()}
         for key in self.tensor_list:
             value = self.experience_buffer.tensor_dict.get(key)
             if value is None:
@@ -469,12 +519,21 @@ class MAAgent(amp_agent.AMPAgent):
         means = task.consume_reward_term_means()
         if means is not None:
             train_info["reward_term_means"] = means
+        train_info['relation_diagnostics'] = task.consume_relation_diagnostics()
+        train_info['relation_diagnostics'].update(batch_dict.get('relation_conditional_diagnostics', {}))
         return
 
     def _log_train_info(self, train_info, frame):
         super()._log_train_info(train_info, frame)
         disc_reward_mean = train_info["disc_rewards"].mean()
         self.writer.add_scalar("reward_terms/amp", disc_reward_mean.item(), frame)
+        for key, value in train_info.get('relation_diagnostics', {}).items():
+            self.writer.add_scalar('relation/' + key, value.item(), frame)
+        network = self.model.a2c_network
+        for name in ('actor', 'critic'):
+            encoder = getattr(network, name + '_encoder')
+            for key, value in encoder.last_diagnostics.items():
+                self.writer.add_scalar('relation_attention/{}/{}'.format(name, key), value.item(), frame)
 
         means = train_info.get("reward_term_means")
         if means is not None:

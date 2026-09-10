@@ -25,6 +25,8 @@ from isaacgym import gymtorch
 
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.scene_features import build_gta_pose_records
+from env.tasks.multi_agent.relation_task import CarryRelationMixin
+from utils.relation_task_spec import STATE_MODE, LEGACY_MODE, validate_relation_config
 from env.tasks.humanoid import dof_to_obs
 from utils.motion_lib import MotionLib
 from isaacgym.torch_utils import *
@@ -32,7 +34,7 @@ from isaacgym.torch_utils import *
 from utils import torch_utils
 
 
-class HumanoidMACarry(HumanoidMA):
+class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
     _PLATFORM_COLLISION_FILTER = 1 << 30
     REWARD_TERM_NAMES = ("walk", "carry", "handheld", "putdown", "power", "collision", "total")
 
@@ -43,7 +45,14 @@ class HumanoidMACarry(HumanoidMA):
         Hybrid = 3
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
-
+        self._relation_cfg = cfg['env'].get('relationReward', {})
+        validate_relation_config(self._relation_cfg)
+        self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) == STATE_MODE
+        if self._state_relation:
+            if cfg['env'].get('policyObsMode', 'legacy_multirow') != 'clean_scene':
+                raise ValueError('state_relation_v0 requires policyObsMode=clean_scene')
+            self.REWARD_TERM_NAMES = ('holding_delta', 'at_delta', 'holding_velocity',
+                'at_velocity', 'success_bonus', 'power', 'collision', 'box_speed', 'total')
         num_agents = int(cfg["env"].get("numAgents", 1))
         configured_objects = int(cfg["env"].get("numObjects", 0))
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects
@@ -170,9 +179,14 @@ class HumanoidMACarry(HumanoidMA):
             self._skill_init_prob = torch.tensor(cfg["env"]["eval"]["skillInitProb"],
                                                  device=self.device, dtype=torch.float)
 
+        if self._state_relation:
+            self._init_relation_runtime()
         return
 
     # ------------------------------------------------------------------ sizes
+
+    def get_relation_suffix_size(self):
+        return 9 * self.num_agents if self._state_relation else 0
 
     def get_object_obs_size(self):
         # lin vel (3) + ang vel (3) + pos (3) + rot tan-norm (6) + bbox points (8 * 3)
@@ -226,7 +240,7 @@ class HumanoidMACarry(HumanoidMA):
                           + self.num_objects * self.get_clean_object_obs_size()
                           + self.num_agents * self.get_clean_goal_obs_size())
             kinematic_width = self.get_scene_num_tokens() * self.get_scene_kinematic_size()
-            return node_width + kinematic_width
+            return node_width + kinematic_width + self.get_relation_suffix_size()
 
         obs_size = self.num_agents * self.get_humanoid_obs_size()
         if self._enable_task_obs:
@@ -667,7 +681,10 @@ class HumanoidMACarry(HumanoidMA):
             root_pos, human_heading,
             box_states[..., 0:3], box_rot,
             tar_pos, origins)
-        return torch.cat([nodes, entity_poses.reshape(B, -1)], dim=-1)
+        parts = [nodes, entity_poses.reshape(B, -1)]
+        if self._state_relation:
+            parts.append(self.relation_runtime.suffix(env_ids))
+        return torch.cat(parts, dim=-1)
 
     def _compute_task_obs(self, env_ids=None):
         if (env_ids is None):
@@ -764,6 +781,8 @@ class HumanoidMACarry(HumanoidMA):
     # ------------------------------------------------------------------ reward / reset
 
     def _compute_reward(self, actions):
+        if self._state_relation:
+            return self._compute_relation_reward(compute_agent_collision_penalty)
         N, M, nb = self.num_envs, self.num_agents, self.num_bodies
         B = N * M
 
@@ -824,8 +843,13 @@ class HumanoidMACarry(HumanoidMA):
         self.progress_buf += 1
 
         self._refresh_sim_tensors()
-        self._compute_observations()
-        self._compute_reward(self.actions)
+        if self._state_relation:
+            # Commit history once, then expose exactly that state to PPO/replay.
+            self._compute_reward(self.actions)
+            self._compute_observations()
+        else:
+            self._compute_observations()
+            self._compute_reward(self.actions)
         self._compute_reset()
 
         self.extras["terminate"] = self._terminate_buf
@@ -850,6 +874,11 @@ class HumanoidMACarry(HumanoidMA):
         return
 
     def _compute_metrics_evaluation(self):
+        if self._state_relation:
+            self._success_buf.copy_(self.relation_runtime.done.flatten().long())
+            errors = (self._assigned_box_values(self._box_states)[..., :3] - self._tar_pos).norm(dim=-1)
+            self._precision_buf.copy_(errors.flatten())
+            return
         B = self.num_envs * self.num_agents
         assigned_box_pos = self._assigned_box_values(self._box_states)[..., 0:3]
         pos_err = torch.norm(self._tar_pos.reshape(B, 3) - assigned_box_pos.reshape(B, 3), p=2, dim=-1)
@@ -869,6 +898,28 @@ class HumanoidMACarry(HumanoidMA):
     # ------------------------------------------------------------------ resets
 
     def _reset_envs(self, env_ids):
+        if self._state_relation:
+            pending = env_ids
+            for attempt in range(16):
+                if len(pending) == 0:
+                    return
+                self._reset_default_slots = None
+                self._reset_ref_slots = {}
+                self._reset_ref_motion_ids = {}
+                self._reset_ref_motion_times = {}
+                self._reset_actors(pending)
+                self._sample_box_assignments(pending)
+                self._reset_boxes(pending)
+                self._reset_task(pending)
+                self._reset_env_tensors(pending)
+                self._refresh_sim_tensors()
+                self._reset_relation_history(pending)
+                self._compute_observations(pending)
+                self._init_amp_obs(pending)
+                pending = pending[self.relation_runtime.done[pending].all(-1)]
+            if len(pending):
+                raise RuntimeError('All-subgoal-success reset persisted after 16 resamples')
+            return
         self._reset_default_slots = None
         self._reset_ref_slots = {}
         self._reset_ref_motion_ids = {}

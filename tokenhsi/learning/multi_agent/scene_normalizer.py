@@ -15,13 +15,14 @@ class SceneRunningMeanStd(nn.Module):
     """
 
     def __init__(self, entity_sizes, entity_counts, normalized_sizes=None,
-                 kinematic_size=13):
+                 kinematic_size=13, extra_passthrough_size=0):
         super().__init__()
         self.entity_sizes = list(entity_sizes)
         self.entity_counts = list(entity_counts)
         self.normalized_sizes = (list(entity_sizes) if normalized_sizes is None
                                  else list(normalized_sizes))
         self.kinematic_size = kinematic_size
+        self.extra_passthrough_size = extra_passthrough_size
         assert len(self.normalized_sizes) == len(self.entity_sizes)
         assert all(0 <= norm_size <= size
                    for norm_size, size in zip(self.normalized_sizes, self.entity_sizes))
@@ -45,7 +46,7 @@ class SceneRunningMeanStd(nn.Module):
             offset += width
 
         num_tokens = sum(self.entity_counts)
-        expected = offset + num_tokens * self.kinematic_size
+        expected = offset + num_tokens * self.kinematic_size + self.extra_passthrough_size
         assert input.shape[1] == expected, \
             "scene obs is {} wide, expected {}".format(input.shape[1], expected)
         out.append(input[:, offset:])

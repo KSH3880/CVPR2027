@@ -124,6 +124,10 @@ def build_relation_matrix(num_agents, num_objects=None):
     return R
 
 
+from utils.relation_task_spec import (
+    LEGACY_MODE, STATE_MODE, compile_carry_subgoal, build_state_relation_matrix)
+
+
 class EdgeEncoder(nn.Module):
     """A2 semantic edge encoder: typed relations -> layer/head scalar biases.
 
@@ -133,11 +137,11 @@ class EdgeEncoder(nn.Module):
     """
 
     def __init__(self, num_layers, num_heads, source_type_dim=16, relation_dim=32,
-                 target_type_dim=16, edge_dim=64, activation=nn.ReLU):
+                 target_type_dim=16, edge_dim=64, activation=nn.ReLU, num_relation_types=NUM_REL_TYPES):
         super().__init__()
         input_dim = source_type_dim + relation_dim + target_type_dim
         self.source_type_embed = nn.Embedding(NUM_ENTITY_TYPES, source_type_dim)
-        self.relation_embed = nn.Embedding(NUM_REL_TYPES, relation_dim)
+        self.relation_embed = nn.Embedding(num_relation_types, relation_dim)
         self.target_type_embed = nn.Embedding(NUM_ENTITY_TYPES, target_type_dim)
         self.edge_mlp = nn.Sequential(
             nn.Linear(input_dim, edge_dim),
@@ -194,7 +198,7 @@ class RelationTransformerLayer(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
 
     def forward(self, x, rel_bias=None, geo_score=None, geo_message=None,
-                gta_g=None, gta_ginv=None, diagnostics_label=None):
+                gta_g=None, gta_ginv=None, diagnostics_label=None, collect_diagnostics=False):
         # x: (B,L,d), rel_bias: (H,L,L), geo_score: (B,H,L,L),
         # geo_message: (B,H,L,L,head_dim), gta matrices: (B,L,4,4)
         B, L, d = x.shape
@@ -212,8 +216,17 @@ class RelationTransformerLayer(nn.Module):
             v = apply_gta_transform(gta_ginv, v)
 
         attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale            # (B, H, L, L)
+        if collect_diagnostics:
+            with torch.no_grad():
+                sampled = attn[:32].detach().float()
+                qk_rms = (sampled - sampled.mean(-1, keepdim=True)).square().mean().sqrt()
         if rel_bias is not None:
-            attn = attn + rel_bias.unsqueeze(0)
+            if rel_bias.ndim == 3:
+                assert rel_bias.shape == (self.num_heads, L, L)
+                attn = attn + rel_bias.unsqueeze(0)
+            else:
+                assert rel_bias.shape == (B, self.num_heads, L, L)
+                attn = attn + rel_bias
         if geo_score is not None:
             attn = attn + geo_score
         if diagnostics_label is not None:
@@ -225,6 +238,11 @@ class RelationTransformerLayer(nn.Module):
                 p95 = torch.quantile(flat_logits, 0.95)
                 p99 = torch.quantile(flat_logits, 0.99)
         attn = torch.softmax(attn, dim=-1)
+        if collect_diagnostics:
+            with torch.no_grad():
+                p = attn[:32].detach().float()
+                self.last_diagnostics = {'qk_row_rms': qk_rms,
+                    'entropy': -(p * p.clamp_min(1e-12).log()).sum(-1).mean()}
         if diagnostics_label is not None:
             with torch.no_grad():
                 probs = attn.detach().float()
@@ -453,8 +471,18 @@ class RelationEncoder(nn.Module):
                  num_layers, dim_feedforward, tokenizer_builder,
                  observation_mode="legacy_multirow", kinematic_size=13,
                  relation_bias=True, relation_bias_mode=RELATION_BIAS_LOOKUP,
-                 geometry_cfg=None, gta_cfg=None, diagnostics_name="encoder"):
+                 geometry_cfg=None, gta_cfg=None, diagnostics_name="encoder",
+                 relation_reward_mode=LEGACY_MODE, diagnostics_interval=100):
         super().__init__()
+        if relation_reward_mode not in (LEGACY_MODE, STATE_MODE):
+            raise ValueError('Unsupported relation reward mode')
+        self.state_relation = relation_reward_mode == STATE_MODE
+        self.suffix_width = 9 * num_agents if self.state_relation else 0
+        self.diagnostics_interval = max(1, int(diagnostics_interval))
+        self.last_diagnostics = {}
+        if self.state_relation and (observation_mode != 'clean_scene' or
+                relation_bias_mode != RELATION_BIAS_EDGE_MLP or not relation_bias):
+            raise ValueError('state_relation_v0 requires clean_scene and enabled edge_mlp relation bias')
         if relation_bias_mode not in RELATION_BIAS_MODES:
             raise ValueError("unknown relation_bias_mode {!r}; expected one of {}".format(
                 relation_bias_mode, RELATION_BIAS_MODES))
@@ -477,13 +505,23 @@ class RelationEncoder(nn.Module):
             # legacy checkpoints and clean-scene ablations.
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
         else:
-            self.edge_encoder = EdgeEncoder(num_layers, num_heads)
+            self.edge_encoder = EdgeEncoder(num_layers, num_heads,
+                                            num_relation_types=8 if self.state_relation else NUM_REL_TYPES)
 
         # non-persistent: derived from entity counts, so it must NOT end up in the
         # checkpoint -- otherwise loading M=2,O=2 into M=2,O=3 would fail on shape.
         self.register_buffer("rel_matrix", build_relation_matrix(num_agents, num_objects), persistent=False)
         self.register_buffer("entity_types", build_entity_type_ids(num_agents, num_objects),
                              persistent=False)
+        if self.state_relation:
+            self.rel_matrix = build_state_relation_matrix(num_agents, num_objects)
+            graph = compile_carry_subgoal(num_agents, num_objects)
+            self.register_buffer('state_edge_src', graph.edge_src, persistent=False)
+            self.register_buffer('state_edge_dst', graph.edge_dst, persistent=False)
+            self.register_buffer('state_edge_owner', graph.edge_owner, persistent=False)
+            self.dynamic_edge_mlp = nn.Sequential(nn.Linear(5, 32), nn.ReLU(), nn.Linear(32, 64))
+            # Parameter (not Linear): the builder's global Linear init cannot overwrite zero init.
+            self.dynamic_bias_projection = nn.Parameter(torch.zeros(num_layers, num_heads, 64))
 
         self.layers = nn.ModuleList([
             RelationTransformerLayer(d_model, num_heads, dim_feedforward) for _ in range(num_layers)
@@ -562,6 +600,12 @@ class RelationEncoder(nn.Module):
         self.rel_matrix = build_relation_matrix(num_agents, num_objects).to(device)
         self.entity_types = build_entity_type_ids(
             num_agents, num_objects, device=device)
+        if self.state_relation:
+            self.rel_matrix = build_state_relation_matrix(num_agents, num_objects, device)
+            graph = compile_carry_subgoal(num_agents, num_objects, device)
+            self.state_edge_src, self.state_edge_dst = graph.edge_src, graph.edge_dst
+            self.state_edge_owner = graph.edge_owner
+            self.suffix_width = 9 * num_agents
 
     def set_num_agents(self, num_agents):
         """Backward-compatible shorthand for the old 1:1:1 entity layout."""
@@ -583,6 +627,18 @@ class RelationEncoder(nn.Module):
         if self.relation_bias_mode == RELATION_BIAS_LOOKUP:
             return self.rel_embed[:, :, self.rel_matrix]
         return self.edge_encoder(self.entity_types, self.rel_matrix)
+
+    def build_dynamic_relation_bias(self, suffix):
+        """Stored rollout history -> (layers,batch,heads,L,L), directed edges only."""
+        B, E, L = suffix.shape[0], 2 * self.num_agents, sum(self.entity_counts)
+        assert suffix.shape[1] == self.suffix_width
+        state = suffix[:, :4 * E].reshape(B, E, 4)
+        done = suffix[:, 4 * E:][:, self.state_edge_owner].unsqueeze(-1)
+        edges = self.dynamic_edge_mlp(torch.cat([state, done], -1))
+        values = torch.einsum('bed,lhd->lbhe', edges, self.dynamic_bias_projection)
+        dense = values.new_zeros(*values.shape[:-1], L * L)
+        dense = dense.index_copy(-1, self.state_edge_src * L + self.state_edge_dst, values)
+        return dense.reshape(*values.shape[:-1], L, L)
 
     def forward(self, obs):
         self.forward_calls += 1
@@ -607,10 +663,10 @@ class RelationEncoder(nn.Module):
         if self.observation_mode == "clean_scene":
             L = sum(self.entity_counts)
             kin_width = L * self.kinematic_size
-            expected = offset + kin_width
+            expected = offset + kin_width + self.suffix_width
             assert expected == obs.shape[1], \
                 "scene obs is {} wide, nodes+kinematics cover {}".format(obs.shape[1], expected)
-            entity_kinematics = obs[:, offset:].view(B, L, self.kinematic_size)
+            entity_kinematics = obs[:, offset:offset + kin_width].view(B, L, self.kinematic_size)
             if self.gta_enabled:
                 if self.gta_diagnostics_first_forward and self.forward_calls == 1:
                     with torch.no_grad():
@@ -644,6 +700,18 @@ class RelationEncoder(nn.Module):
                 "obs row is {} wide, entity blocks cover {}".format(obs.shape[1], offset)
 
         relation_bias = self.build_relation_bias() if self.use_relation_bias else None
+        collect = self.state_relation and (self.forward_calls == 1 or
+                                           self.forward_calls % self.diagnostics_interval == 0)
+        if self.state_relation:
+            dynamic = self.build_dynamic_relation_bias(obs[:, -self.suffix_width:])
+            if collect:
+                with torch.no_grad():
+                    static = relation_bias.detach().float()
+                    sampled = dynamic[:, :32].detach().float()
+                    self.last_diagnostics = {
+                        'static_row_rms': (static - static.mean(-1, keepdim=True)).square().mean().sqrt(),
+                        'dynamic_row_rms': (sampled - sampled.mean(-1, keepdim=True)).square().mean().sqrt()}
+            relation_bias = relation_bias.unsqueeze(1) + dynamic
         for i, layer in enumerate(self.layers):
             rel_bias = None if relation_bias is None else relation_bias[i]
             diagnostics_label = None
@@ -651,7 +719,10 @@ class RelationEncoder(nn.Module):
                     and self.forward_calls == 1):
                 diagnostics_label = "{} layer{}".format(self.diagnostics_name, i)
             x = layer(x, rel_bias, geo_score, geo_message, gta_g, gta_ginv,
-                      diagnostics_label=diagnostics_label)
+                      diagnostics_label=diagnostics_label, collect_diagnostics=collect)
+            if collect:
+                self.last_diagnostics.update({'layer{}/{}'.format(i, k): v
+                                               for k, v in layer.last_diagnostics.items()})
 
         self.last_shape_flow = {
             "obs": tuple(obs.shape),
@@ -698,6 +769,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                      kwargs["object_obs_size"],
                                      kwargs["goal_obs_size"]]
             self.scene_kinematic_size = kwargs.get("scene_kinematic_size", 13)
+            self.relation_reward_mode = kwargs.get('relation_reward_mode', LEGACY_MODE)
             self.scene_arena_scale = float(kwargs.get("scene_arena_scale", 1.0))
             assert self.scene_arena_scale > 0.0
 
@@ -770,6 +842,8 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                        relation_bias_mode=relation_bias_mode,
                                        geometry_cfg=geometry_cfg,
                                        gta_cfg=gta_cfg,
+                                       relation_reward_mode=self.relation_reward_mode,
+                                       diagnostics_interval=tp.get('relation_diagnostics_interval', 100),
                                        diagnostics_name=diagnostics_name)
 
             self.actor_encoder = encoder("actor")

@@ -26,11 +26,24 @@ class VecTaskPythonWrapperMA(VecTaskPythonWrapper):
     def get_number_of_agents(self):
         return self.num_agents
 
+    def _policy_observation(self):
+        obs = self.task.obs_buf
+        if getattr(self.task, '_state_relation', False):
+            # Semantic truth/history, the constant target and algebraic GTA poses
+            # must not be corrupted by an optional flat observation clip.
+            if not np.isinf(self.clip_obs):
+                sizes = self.task.get_scene_entity_sizes()
+                width = self.num_agents * sizes[0] + self.task.num_objects * sizes[1]
+                obs = torch.cat([torch.clamp(obs[:, :width], -self.clip_obs, self.clip_obs),
+                                 obs[:, width:]], -1)
+            return obs.to(self.rl_device)
+        return torch.clamp(obs, -self.clip_obs, self.clip_obs).to(self.rl_device)
+
     def step(self, actions):
         actions_tensor = torch.clamp(actions, -self.clip_actions, self.clip_actions)
         self.task.step(actions_tensor)
 
-        obs = torch.clamp(self.task.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
+        obs = self._policy_observation()
         rew = self.task.rew_buf.to(self.rl_device)
         done = self.task.reset_buf.repeat_interleave(self.num_agents).to(self.rl_device)
 
@@ -43,4 +56,4 @@ class VecTaskPythonWrapperMA(VecTaskPythonWrapper):
             env_ids = torch.div(env_ids, self.num_agents, rounding_mode='floor').unique()
 
         self.task.reset(env_ids)
-        return torch.clamp(self.task.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
+        return self._policy_observation()
