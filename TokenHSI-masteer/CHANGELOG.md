@@ -1366,3 +1366,37 @@ MA_GPU=7 PILOT_ENVS=64 PILOT_MB=4096 PILOT_ITERS=2 PILOT_SAVE_EVERY=1 \
 MA_GPU=7 bash scripts/masteer/train_wait1_stack180_holddebug_local.sh \
   ms48_ms18init_wait1_stack180_holddebug_1000_s0
 ```
+
+### ms48 evaluation-only CLEAR→STACK transition trace
+
+학습 없이 원인을 분리하도록 기본 비활성 디버그 옵션과 전환 trace를 추가했다. `STACK_TRACE`는 전환 직전·직후와 이후 60 frame 동안 두 agent의 action, task-observation 구간별 norm, command, root 속도·upright, fall 판정, box-target 거리와 hand 거리를 NPZ로 저장한다. `STACK_DEBUG_KEEP_WAIT`, `STACK_DEBUG_CARRY_LIVE_ON_STACK`, `STACK_DEBUG_REQUIRE_TOP_BALANCED`로 top retarget 제거, STACK에서만 base carry observation 복원, top 안정 gate 강화를 각각 독립 시험할 수 있다. 기본 환경변수에서는 기존 동작이 바뀌지 않는다.
+
+`scripts/masteer/debug_stack_transition_eval.sh`와 `stack_transition_trace_summary.py`를 추가해 동일 checkpoint·seed에서 평가 전용 ablation을 반복하고 요약한다. ms48 epoch 9700, 128 env에서 baseline과 carry 복원, base hold 제거·장거리 이동, top 속도, WAIT 유지, 안정 gate, 조합, 지연 전환을 비교했지만 모두 strict stack success 0이었다. top 목표·steer·carry·command를 그대로 두고 base도 동일 장거리 경로를 유지한 대조군에서도 안정적으로 진입한 뒤 20–30 frame 사이 두 agent의 속도와 자세가 함께 붕괴했다. 따라서 view/render, 목표 순간이동, base zero-carry 또는 명시적 hold 하나가 단독 원인은 아니며, late CLEAR/WAIT 물리 상태에서 shared policy의 장기 안정성 부족이 주 병목이다.
+
+학습은 실행하지 않았다. 결과와 trace는 `runs/results/masteer/debug_stack_ms48_ms18init_wait1_stack180_holddebug_1000_s0_e9700.log` 및 같은 디렉터리의 `trace_*__debug_*_e9700.npz`에 보존했다.
+
+### ms49 model-preserving late-STACK stability curriculum
+
+ms48 trace에서 task input과 action이 유지돼도 STACK 진입 20--30 frame 뒤 두 agent가 함께
+무너졌고, 학습 마지막 100 scalar의 `stack_fraction` 평균은 0.00079, success bonus는
+전체 구간 0이었다. 모델·340-D observation·token layout을 바꾸지 않고 실제
+CLEAR→STACK 전환 물리 상태를 env별로 저장했다가 이후 reset 일부에서 재사용하는 기본
+비활성 curriculum을 추가했다. `STACK_BOOTSTRAP_FRAC`이 재사용 비율을,
+`STACK_BOOTSTRAP_KEEP_WAIT`가 bootstrap episode의 base/top hold를 제어한다. 복원 시
+humanoid root/DOF와 두 box state, role별 goal/controller 상태를 함께 되살리고 AMP history는
+복원된 현재 state로 채운다. 최종 end-to-end 평가에는 curriculum이 섞이지 않도록
+`STACK_BOOTSTRAP_EVAL=0`이 기본이며 진단 평가에서만 명시적으로 켤 수 있다.
+
+`STACK_HUMANOID_STABILITY_W`는 STACK에서 두 agent의 upright·root height·angular stability를
+dense reward로 추가한다. 기존 box support와 top native reward는 유지한다. TensorBoard에는
+`stack_phase/bootstrap_fraction`과 `stack_reward/{base_stability,top_stability}`를 추가했다.
+`train_late_stack_stability_local.sh`는 ms48 epoch 9700에서 시작해 rehearsal 0.30,
+bootstrap 0.50, WAIT hold, stability weight 1.00을 사용하며 기존 steering tokenizer/internal
+adapter만 학습한다.
+
+GPU 7 smoke에서 최초 `smoke_ms49_latehold_2it_20260910_s0`는 snapshot buffer를 simulator
+tensor 생성 전 할당한 오류를 잡아 학습 시작 전에 종료됐다. 지연 할당으로 수정한
+`smoke_ms49_latehold_2it_20260910_s0_r1`은 64 env, 2 iteration rc=0으로 완료했다.
+`smoke_ms49_latehold_branch40_20260910_s0`은 128 env, 40 iteration rc=0으로 실제 저장·복원
+분기를 통과했고 bootstrap/STACK 최대 점유율 0.012695/0.015625와 두 stability scalar를
+기록했다. full pilot은 시작하지 않았다. Python compile, Bash syntax, diff check를 통과했다.
