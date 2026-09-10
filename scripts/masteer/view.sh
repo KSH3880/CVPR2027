@@ -38,6 +38,26 @@ NOVNC_DIR=/home/hwanhee/opt/novnc
 
 PORT=${PORT:-6100}
 TAG=${1:?사용법: view.sh <tag 또는 ckpt경로> [env수]}
+MS_SINGLE=${MS_SINGLE:-0}
+if [[ "$MS_SINGLE" != 0 && "$MS_SINGLE" != 1 ]]; then
+    echo "MS_SINGLE은 0 또는 1이어야 한다: $MS_SINGLE" >&2
+    exit 2
+fi
+AGENTS=2
+if [[ "$MS_SINGLE" == 1 ]]; then
+    AGENTS=1
+    if [[ "${MA_TOKEN:-mask}" != mask ]]; then
+        echo "MS_SINGLE=1은 MS18의 MA_TOKEN=mask 체크포인트 전용이다" >&2
+        exit 2
+    fi
+    export MA_TOKEN=mask
+fi
+export MS_SINGLE
+MS_EPISODE_LENGTH=${MS_EPISODE_LENGTH:-600}
+if ! [[ "$MS_EPISODE_LENGTH" =~ ^[1-9][0-9]*$ ]]; then
+    echo "MS_EPISODE_LENGTH는 양의 정수여야 한다: $MS_EPISODE_LENGTH" >&2
+    exit 2
+fi
 # **ENVS 환경변수를 우선한다.** 예전에는 위치인자 $2 만 봐서 `ENVS=1 view.sh tag 3`
 # 이 조용히 3 으로 떴다. record.sh 는 처음부터 ENVS 를 쓰므로 여기에 맞춘다.
 # 위치인자는 그대로 남겨 둔다 (ENVS 를 안 주면 $2, 그것도 없으면 3).
@@ -109,11 +129,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 CFG=$ROOT/runs/gen_cfgs/masteer/view_${NAME}_$PORT.yaml
-python3 - "$ENVS" "$CFG" <<'PY'
+python3 - "$ENVS" "$CFG" "$AGENTS" "$MS_EPISODE_LENGTH" <<'PY'
 import re, sys, pathlib
 s = pathlib.Path("tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml").read_text()
-s = re.sub(r"^  numAgents:.*$", "  numAgents: 2", s, flags=re.M)
+s = re.sub(r"^  numAgents:.*$", f"  numAgents: {sys.argv[3]}", s, flags=re.M)
 s = re.sub(r"^  numEnvs:.*$", f"  numEnvs: {sys.argv[1]}", s, flags=re.M)
+s = re.sub(r"^  episodeLength:.*$", f"  episodeLength: {sys.argv[4]}", s, flags=re.M)
 pathlib.Path(sys.argv[2]).write_text(s)
 PY
 
@@ -140,7 +161,7 @@ echo " 포워딩   ssh -L $PORT:localhost:$PORT $(hostname)"
 echo " 태그     $NAME   iter≈$ITER   (${AGE}초 전 저장본)"
 echo " 시나리오 ${MS_VIZ:-(직접지정)}"
 echo " 시작모드 $VIEW_MODE  (agent별 독립 샘플)"
- echo " env      $ENVS x 2명   배치=${MS_SCEN:-free}  지연=${MS_DT:-0}s  속도구간=${MS_MRAND:-0}  곡률=${MS_LAT_MAX:-2.2}  CLIP=${MS_CLIP:-1}"
+ echo " env      $ENVS x ${AGENTS}명   배치=${MS_SCEN:-free}  지연=${MS_DT:-0}s  속도구간=${MS_MRAND:-0}  곡률=${MS_LAT_MAX:-2.2}  CLIP=${MS_CLIP:-1}  episode=${MS_EPISODE_LENGTH}"
 [ -n "${VIDEO:-}" ] && echo " 영상     $VIDEO"
 echo "=============================================================="
 

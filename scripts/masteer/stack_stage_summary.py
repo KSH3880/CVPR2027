@@ -12,6 +12,7 @@ if m.ndim != 2 or m.shape[1] < 49:
 near, pick, broken, place, release, clear, failed, max_lift, kind = range(40, 49)
 base_disp = 49 if m.shape[1] >= 50 else None
 diag_start = 50
+success = 73 if m.shape[1] >= 74 else None
 diag_names = (
     "carry_steps",
     "entry_xy",
@@ -158,12 +159,21 @@ if len(x):
     print("base_first_stop " + " ".join(
         f"{name}={rate(mask):.3f}" for name, mask in buckets.items()
     ))
+    success_text = (
+        f" success={rate(x[:, success] >= 0):.3f}"
+        if success is not None else ""
+    )
     print(
         f"base_events place={rate(x[:, place] >= 0):.3f} "
         f"release={rate(x[:, release] >= 0):.3f} "
-        f"clear={rate(x[:, clear] >= 0):.3f} "
-        f"failed={rate(x[:, failed] >= 0):.3f}"
+        f"clear={rate(x[:, clear] >= 0):.3f}"
+        f"{success_text} failed={rate(x[:, failed] >= 0):.3f}"
     )
+    if success is not None:
+        print(f"STACK_FINAL_SUCCESS success={rate(x[:, success] >= 0):.3f} "
+              f"count={int((x[:, success] >= 0).sum())}/{len(x)}")
+    else:
+        print("STACK_FINAL_SUCCESS unavailable=legacy_73_columns")
     placed = x[:, place] >= 0
     released = x[:, release] >= 0
     cleared = x[:, clear] >= 0
@@ -197,6 +207,46 @@ if len(x):
                 print(output)
     else:
         print("STACK_GATE_DIAG unavailable=legacy_columns")
+
+    if m.shape[1] >= 90:
+        (staged_step, settled_step, above_step, stack_steps, grasp_steps,
+         place_steps, dist_start, dist_min, native_sum, approach_sum,
+         premature_sum, release_sum, hold_sum, above_sum, success_sum,
+         end_reason) = range(74, 90)
+        entered = x[:, stack_steps] > 0
+        xe = x[entered]
+        denom = np.maximum(xe[:, stack_steps], 1)
+        print(
+            f"STACK_TOP_FUNNEL staged={rate(x[:, staged_step] >= 0):.3f} "
+            f"entered={rate(entered):.3f} "
+            f"above_given_enter={conditional_rate(x[:, above_step] >= 0, entered):.3f} "
+            f"settled_given_enter={conditional_rate(x[:, settled_step] >= 0, entered):.3f}"
+        )
+        if len(xe):
+            print(
+                f"STACK_TOP_MOTION n={len(xe)} "
+                f"steps_p50={np.median(xe[:, stack_steps]):.0f} "
+                f"grasp_frac={xe[:, grasp_steps].sum() / xe[:, stack_steps].sum():.3f} "
+                f"place_frac={xe[:, place_steps].sum() / xe[:, stack_steps].sum():.3f} "
+                f"dist_start={np.median(xe[:, dist_start]):.3f} "
+                f"dist_min={np.median(xe[:, dist_min]):.3f} "
+                f"progress={np.median(xe[:, dist_start] - xe[:, dist_min]):.3f}"
+            )
+            print(
+                f"STACK_TOP_REWARD native_per_stack_step={np.mean(xe[:, native_sum] / denom):.5f} "
+                f"approach={np.mean(xe[:, approach_sum] / denom):.5f} "
+                f"premature_per_episode={-np.mean(xe[:, premature_sum]):.5f} "
+                f"release={np.mean(xe[:, release_sum] / denom):.5f} "
+                f"hold={-np.mean(xe[:, hold_sum] / denom):.5f} "
+                f"above={np.mean(xe[:, above_sum] / denom):.5f} "
+                f"success={np.mean(xe[:, success_sum] / denom):.5f}"
+            )
+        reasons = x[:, end_reason].astype(int)
+        print("STACK_END_REASON " + " ".join(
+            f"r{reason}={int((reasons == reason).sum())}" for reason in range(1, 7)
+        ))
+    else:
+        print("STACK_TOP_DEBUG unavailable=legacy_columns")
 
 if len(sys.argv) >= 3:
     baseline_path = sys.argv[2]

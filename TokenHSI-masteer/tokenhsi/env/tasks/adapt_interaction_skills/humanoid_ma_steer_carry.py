@@ -92,6 +92,16 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         return sc
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
+        # MS18 was trained with A=2, so its checkpoint permanently expects the
+        # 21-D teammate slot even though MA_TOKEN=mask excludes that token from
+        # attention. For a true one-actor visualization, keep the checkpoint
+        # interface but fill that now-absent teammate slot with zeros.
+        self._single_agent_ms18 = bool(int(os.environ.get("MS_SINGLE", "0")))
+        if self._single_agent_ms18:
+            if int(cfg["env"].get("numAgents", 1)) != 1:
+                raise ValueError("MS_SINGLE=1 requires env.numAgents=1")
+            if os.environ.get("MA_TOKEN", "live") != "mask":
+                raise ValueError("MS_SINGLE=1 is only compatible with MA_TOKEN=mask")
         self.scen = self._scen_env()
         self.scen_L = _f("MS_L", MS_L_DEFAULT)
         self.scen_w = _f("MS_W", 3.0)          # 감속 구간 길이 (m)
@@ -140,8 +150,13 @@ class HumanoidMASteerCarry(HumanoidMACarry):
     def steer_dim(self):
         return 2 * self.steer_k
 
+    def _checkpoint_teammate_dim(self):
+        if getattr(self, "_single_agent_ms18", False):
+            return TEAMMATE_DIM
+        return TEAMMATE_DIM * (self.num_agents - 1)
+
     def get_task_obs_size(self):
-        return (TEAMMATE_DIM * (self.num_agents - 1) + self.steer_dim()
+        return (self._checkpoint_teammate_dim() + self.steer_dim()
                 + 2 * (CARRY_HI - CARRY_LO))
 
     def get_multi_task_info(self):
@@ -149,7 +164,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         # (부모가 자기 _task_mask(rows,4) 와 곱한다).
         if getattr(self, "_use_base_info", False):
             return super().get_multi_task_info()
-        each = [TEAMMATE_DIM * (self.num_agents - 1),
+        each = [self._checkpoint_teammate_dim(),
                 self.steer_dim(),
                 CARRY_HI - CARRY_LO,
                 CARRY_HI - CARRY_LO]
@@ -481,9 +496,13 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         # 그 사이에 steer 창을 끼운다.
         base = super()._compute_task_obs(env_ids)
         rows = self.all_rows() if env_ids is None else self.agent_rows(env_ids)
-        t_dim = TEAMMATE_DIM * (self.num_agents - 1)
-        teammate = base[:, :t_dim]
-        carry = base[:, t_dim:t_dim + (CARRY_HI - CARRY_LO)]
+        live_t_dim = TEAMMATE_DIM * (self.num_agents - 1)
+        if self._single_agent_ms18:
+            teammate = torch.zeros(
+                (len(rows), TEAMMATE_DIM), device=self.device, dtype=base.dtype)
+        else:
+            teammate = base[:, :live_t_dim]
+        carry = base[:, live_t_dim:live_t_dim + (CARRY_HI - CARRY_LO)]
         return torch.cat([teammate, self._steer_obs(rows), carry, carry], dim=-1)
 
     # ---- 보상 -------------------------------------------------------------
@@ -769,6 +788,7 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         root_z = h[:, 2].cpu().numpy()
         s_end_np = self._s_end.cpu().numpy()
         draw_speed = int(_f("MS_DRAW_SPEED", 1))
+        draw_speed_brown = int(_f("MS_DRAW_SPEED_BROWN", 0))
         mscale_np = self._mscale.cpu().numpy()
 
         gt_w = 0.30
@@ -820,7 +840,17 @@ class HumanoidMASteerCarry(HumanoidMACarry):
                         v = band(seg, 0.04 + 0.01 * a, gt_w)
                         f = float(ms[lo_i])
                         base = GT_COL[a % len(GT_COL)]
-                        shade = [c * (0.28 + 0.72 * f) for c in base]
+                        if draw_speed_brown:
+                            # Slow=dark brown, fast=the agent's original path color.
+                            # MS_MRAND uses {0.25, 0.50, 0.75, 1.00}, so this
+                            # produces four stable presentation colors.
+                            slow = np.array([0.36, 0.14, 0.03], dtype=np.float32)
+                            t = np.clip((f - self.steer_m_lo) /
+                                        max(1.0 - self.steer_m_lo, 1e-6), 0.0, 1.0)
+                            shade = ((1.0 - t) * slow +
+                                     t * np.asarray(base, dtype=np.float32)).tolist()
+                        else:
+                            shade = [c * (0.28 + 0.72 * f) for c in base]
                         self.gym.add_lines(self.viewer, env_ptr, len(v), v, col(shade, len(v)))
                 else:
                     v = band(g, 0.04 + 0.01 * a, gt_w)

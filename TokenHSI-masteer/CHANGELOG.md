@@ -1083,3 +1083,286 @@ ms38_ms18init_seqrewardmask_side135_dynmask_s0를 GPU 7, 1024 env, 3000 iteratio
 활성, observation RMS (340,), 첫 backward의 adapt_mlp gradient 4/4와
 fps step 31090.4를 확인했다. Python py_compile, 관련 Bash bash -n,
 git diff --check를 통과했다.
+
+### ms39 가상 박스 없는 steering-only CLEAR 500-iteration pilot
+
+ms18 epoch 9000에서 시작해 ms38과 동일한 sequential reward, 135도 후측방 controller,
+CLEAR 이후 dynamic carry-token mask를 유지하는 500-iteration wrapper를 추가했다. 가상
+박스는 사용하지 않는다. ms38은 MA_ADAPTER_ONLY=1이라 steering tokenizer까지 동결한
+채 adapter만 학습했으므로, 이번 비교에서는 pretrained backbone/composer와 new-carry
+tokenizer는 계속 동결하고 steering extra tokenizer와 기존 internal_adapt_mlp만
+학습 가능하게 한다(MA_ADAPTER_ONLY=0, MA_FREEZE_NEW_CARRY=1,
+MA_NOFREEZE=0). 25% carry rehearsal과 나머지 task/reward 설정은 ms38 sidecar를 그대로
+재생한다. 실제 base 박스를 발로 차는 행동은 기존 all-foot OBB 표면거리 penalty를
+사용하되, 0.20m 안쪽 최대 감점을 ms38의 0.10에서 0.50으로 강화한다. 첫 backward의
+tokenizer별 gradient로 실제 trainable 경로를 판정한다.
+
+### ms41 reward-only CLEAR, zero observation + no carry-token mask
+
+모델 구조와 observation 340-D shape는 바꾸지 않았다. `STACK_ZERO_CARRY_OBS=1`은
+비-rehearsal base agent가 CLEAR부터 SUCCESS일 때 new/old carry observation window 두 개를
+0으로 만들지만, `STACK_DYNAMIC_CARRY_MASK=0`이므로 두 carry token 위치는 frozen
+Transformer attention에 그대로 남는다. 이는 ms38/ms39의 post-CLEAR carry-token attention
+mask를 제거한 것이다. ms18에서 이어진 teammate token mask(`MA_TOKEN=mask`)는 별개의
+기존 설정으로 유지한다.
+
+`STACK_NEGATIVE_CLEAR_REWARD=1`은 arc ratchet 대신 실제 root XY velocity를 명령된
+후측방 retreat 방향에 투영한 `v_along`을 사용한다. CLEAR 진입 뒤 두 손이 다시 0.15m
+안쪽으로 들어오면 positive move reward를 0으로 만들고 즉시 -0.5 recontact penalty를 준다.
+5-step grace 뒤 `v_along < 0.2*v_command`이면 최대 -0.5 stall penalty, 반대 방향이면
+추가로 최대 -0.5 reverse penalty를 준다. 손이 clear이고 올바른 방향으로 이동할 때만
+`path_quality*clip(v_along/v_command,0,1)`에 최대 +1.0을 준다. 기존 base 안정성 penalty와
+0.10 foot-box penalty도 유지한다. 누적 완료 상수를 매 step 지급하던
+`STACK_SEQUENTIAL_REWARD_MASK`는 끈다.
+
+TensorBoard에는 `stack_reward/{clear_total,move_positive,hand_penalty,stall_penalty,
+reverse_penalty,base_penalty,foot_penalty,transition_bonus}`, `stack_state/{hand_factor,
+hand_clear_rate,recontact_rate,move_ratio,move_ok_rate,stall_rate,reverse_rate,v_along,
+v_command,retreat_arc}`, `stack_phase/{release_fraction,clear_fraction,stack_fraction,
+failed_fraction}`을 기록한다. phase 밖의 NaN은 observer가 제외해 해당 phase 표본만 평균낸다.
+
+`tokenhsi_koo`에서 64-env 30-iteration 스모크를 완료했다. CLEAR scalar 18개가 기록됐고
+마지막 값은 clear_fraction 0.0435, clear_total -0.3440, stall_rate 0.7978,
+reverse_rate 0.5169였다. 따라서 현재 병목이 재접촉보다 정지와 역방향임을 분리해 볼 수 있다.
+첫 backward에서 transformer 0/48, self/new-carry/old-carry/composer gradient가 모두 0이고,
+steering tokenizer와 internal adapter에만 nonzero gradient가 있음을 확인했다.
+
+`ms41_ms18init_negclear_zeroobs_nomask_steeradapt_foot010_s0`를 ms18 epoch 9000에서
+GPU 7, 1024 env, 500 iteration(최종 epoch 9500), carry rehearsal 50%로 시작했다.
+가상환경은 `tokenhsi_koo`, 분리 실행 PID는 3022738이다.
+
+#### 3000-iteration 재실행 정정
+
+최초 PID 3022738 실행은 1024 env였지만 500 iteration(`max_iterations=9500`)으로
+잘못 시작한 것을 사용자 확인으로 발견했다. 승인 후 해당 session에 TERM을 보내 정상
+종료했으며 생성된 로그·metrics 등 산출물은 삭제하지 않았다. 래퍼 기본값을 3000
+iteration으로 수정하고 새 태그
+`ms41_ms18init_negclear_zeroobs_nomask_steeradapt_foot010_3000_s0`를 ms18 epoch 9000에서
+GPU 7, 1024 env, `tokenhsi_koo`, `max_iterations=12000`으로 재실행했다. 새 PID는
+3041555이다. 첫 backward에서 Transformer 0/48과 frozen carry 경로를 재확인했고
+steering tokenizer와 adapter에만 nonzero gradient가 있으며 첫 학습 FPS도 확인했다.
+
+### ms42 completed-CARRY 0.50 reward continuity pilot
+
+`humanoid_ma_sequential_stack_release.py`에 비-rehearsal base CARRY pickup 이후만 집계하는
+TensorBoard 진단 7개를 추가했다. native carry reward, foot penalty, target distance,
+grasp 상태, latched break, near-goal 미완료, path fraction이며 reward 값은 바꾸지 않는다.
+
+`train_negative_clear_continuity_local.sh`를 추가했다. ms41의 freeze, zero carry observation,
+attention mask OFF, negative CLEAR, rehearsal 0.50, foot penalty 0.10을 유지하고
+`STACK_SEQUENTIAL_REWARD_MASK=1`, carry/release/clear 완료값 `0.50/0/0`만 적용한다.
+
+첫 64-env smoke는 minibatch 2048이 AMP minibatch 4096보다 작아 학습 전 assert로 끝났고
+산출물은 보존했다. 새 태그 smoke2는 minibatch 4096으로 2 iteration을 정상 완료했다.
+Python compile, Bash syntax, diff check와 scalar 7개 기록을 확인했다. 본 학습은 GPU 7,
+1024 env, ms18 epoch 9000에서 500 iteration을 정상 완료해 e9100~e9500을 보존했다.
+첫 backward에서 steering tokenizer와 adapter만 gradient가 있고 frozen carry/Transformer/
+composer는 0이었다.
+
+512-env stage 평가에서 initial→e9500 base delivery는 0.716→0.652, break는
+0.044→0.043으로 CARRY를 보존했다. `clear_given_release`는 0.024→0.492, 전체 CLEAR는
+0.007→0.086으로 증가했다. 반면 `release_given_place`는 0.408→0.272로 감소해 다음
+병목은 RELEASE의 5-frame hand-clear 전환으로 판정했다. TensorBoard에서도 +100→+500
+동안 move OK 0.149→0.489, reverse 0.502→0.190, retreat arc 0.067→0.275 m로
+negative CLEAR reward의 후퇴 학습 효과를 확인했다. 상세 수치는 `ANALYSIS.md`에 기록했다.
+
+### ms43 RELEASE→CLEAR reward continuity + RELEASE diagnostics
+
+`humanoid_ma_sequential_stack_release.py`에 RELEASE phase 조건부 TensorBoard scalar 12개를
+추가했다. 실제 total/local reward와 hand/support/foot 기여, hand-clear factor/rate,
+5-frame streak, support/stability/foot distance를 분리하며 reward 동작은 바꾸지 않는다.
+
+`train_release_continuity_local.sh`를 추가했다. ms42의 구조·freeze·관측·mask 설정은
+그대로 두고 carry/release/clear 완료값을 `0.50/1.00/0.00`, CLEAR stall penalty를
+`1.50`으로 설정한다. CLEAR grace의 1.50 floor를 RELEASE 경계와 맞추고 grace 뒤 정지
+상태는 -1.50 stall로 상쇄하는 설계다.
+
+Python compile, Bash syntax와 diff check를 통과했다. 64-env 2-iteration smoke는 정상
+완료했으나 RELEASE 표본이 없어, 30-iteration smoke로 scalar 12개가 각각 26회 기록되는
+것을 확인했다. 본 학습
+`ms43_ms18init_negclear_carry050_release100_stall150_zeroobs_nomask_3000_s0`를 GPU 7,
+1024 env, ms18 epoch 9000에서 3000 iteration으로 분리 실행했다(PID 3840815). sidecar
+설정, 첫 backward의 steering tokenizer/adapt_mlp gradient, frozen carry/Transformer/
+composer의 zero gradient, rollout FPS와 metrics 저장을 확인했다.
+
+## 2026-09-09
+
+### ms46 stack-first bootstrap — 곡선 CLEAR와 실제 top release 보상
+
+사용자 우선순위를 정밀 적재보다 실제 end-to-end 적재 발생으로 바꿨다. 모델·관측 shape는
+유지하고 `HumanoidMASequentialStackRelease`에 기본 비활성 옵션만 추가했다.
+
+- `STACK_CLEAR_ROUTE_AROUND=1`: base box에서 직선으로 뒷걸음치지 않고, 대기 중인 top
+  carrier 반대편의 tangent waypoint를 거쳐 박스 옆으로 도는 steering path를 만든다.
+- `STACK_CLEAR_STOP_ON_STACK=1`: 0.60 m CLEAR gate 통과 즉시 base의 남은 path를 현재
+  위치 hold로 바꿔 STACK 중 계속 후퇴하다 넘어지는 controller mismatch를 제거한다.
+- `STACK_TOP_SCALE`, `STACK_ABOVE_BONUS`: top box 접근은 느리게 하고 박스 위 영역에
+  처음 들어온 사건을 한 번만 보상한다.
+- top hand-separation progress/hold penalty와 별도 완화 tolerance를 추가했다. bootstrap
+  SUCCESS는 두 손이 모두 떨어지고 위치·속도·자세 gate를 5 frame 유지해야 하며, 성공
+  순간 두 agent에 `+20`을 한 번 지급한다.
+- `train_stack_first_curved_clear_local.sh`: ms18 epoch 9000 초기화, 1024 env, 1000
+  iteration, carry rehearsal 0.65, 작은 box 접촉은 soft penalty로 두는 ms46 pilot이다.
+
+검증: Python/Bash syntax 통과. 256 env × 30 iteration smoke가 rc=0으로 끝났고 CLEAR
+43 episode와 CLEAR→STACK 1 episode에서 새 controller 분기가 실행됐다. 첫 backward에서
+steering tokenizer와 internal adapter gradient는 nonzero, frozen carry/Transformer/
+composer gradient는 zero였다. 최종 성공 0/159는 짧은 smoke라 효과 판정에는 쓰지 않는다.
+
+### ms45 phase-isolated RELEASE shaping + strict final success bonus
+
+ms44의 고정 체크포인트 평가는 base place를 약 70--72%로 보존했지만
+`release_given_place`가 initial 0.433에서 epoch 9500의 0.234로 하락했다.
+학습 scalar도 RELEASE hand-clear가 0.0845에서 0.0026으로 감소하는 동안
+release total reward는 증가해, live native-CARRY bridge가 안정적으로 계속 잡는
+해법을 보상한 것으로 판정했다. 사용자 승인에 따라 ms44 학습만 종료했다.
+
+모델/observation/controller shape은 바꾸지 않고 기본값이 0인 다음 reward knob를
+추가했다.
+
+- `STACK_RELEASE_PROGRESS_W`: RELEASE에서 signed `h_t-h_(t-1)` 보상. 손을 더 떼면
+  양수이고 재접촉하면 음수다.
+- `STACK_RELEASE_HOLD_PEN_W`, `STACK_RELEASE_HOLD_GRACE_STEPS`: grace 이후
+  `(1-h)`에 비례해 계속 잡는 상태를 벌점 처리한다.
+- `STACK_SUCCESS_BONUS`: top box가 목표 위치/높이/속도/자세 gate를
+  `STACK_TOP_STEPS=20` frame 연속 통과해 SUCCESS로 바뀌는 순간, 두 agent 모두에게
+  한 번만 주는 최종 stacking bonus다.
+
+`STACK_RELEASE_CARRY_BRIDGE`와 RELEASE progress/hold shaping의 동시 사용은 거부한다.
+새 평가 metrics의 마지막 열에는 strict final success step을 추가했고, 기존 73열 결과도
+`stack_stage_summary.py`가 계속 읽는다.
+
+`scripts/masteer/train_release_progress_success_local.sh`는 ms18 epoch 9000에서 시작해
+live carry bridge를 끄고 progress/hold를 각각 0.50, hold grace를 5 frame,
+strict final success bonus를 +10으로 설정한다. 그 밖의 1024-env/3000-iteration,
+50% rehearsal, freeze, observation, CLEAR stall 설정은 ms44와 동일하다.
+
+### ms44 CARRY->RELEASE reward continuity bridge
+
+ms43의 3000-iteration stage 평가에서 `release_given_place`는 0.966까지
+올랐지만 base PLACE는 0.574(+500)에서 0.426(+3000)으로 감소했다. 같은 구간의
+grasp break 증가는 작고 `near_goal_not_delivered`가 0.113에서 0.265로 늘어,
+남은 병목을 pickup/carry 붕괴보다 CARRY->RELEASE 경계의 보상 불연속으로 판정했다.
+
+기존 `STACK_RELEASE_CARRY_BRIDGE`를 sequential completion reward와 함께 쓸 수
+있게 확장했다. bridge가 켜지면 RELEASE total은 손 이격도 `h`에 따라
+`h=0`에서 직전 native CARRY reward, `h=1`에서
+`carry_done + 0.50 + 0.30*support + 0.20*stable`로 보간된다. bridge가 꺼진
+기존 경로와 sequential mask 없이 쓰던 기존 bridge 동작은 그대로다. observation,
+token/layer 수, controller와 gate는 바꾸지 않았다.
+
+`train_carry_release_bridge_local.sh`는 ms43 sidecar를 기준으로 1024 env,
+3000 iteration을 실행한다. ms43과 같은 freeze/mask를 유지하며 첫 backward의
+gradient와 checkpoint별 stage 평가로 PLACE 보존 여부를 판정한다.
+
+### MS18 물리 1-agent 시각화 호환 모드
+
+`origin/local`에서 학습한 `ms18_maskteam_origscale_c06_s0` 환경을 실제 humanoid 한 명으로
+재생하도록 `MS_SINGLE=1`을 추가했다. 뷰어 생성 config만 `numAgents: 1`로 바꾸고,
+A=2 체크포인트가 기대하는 masked teammate 21-D 슬롯은 0으로 유지한다. 따라서 물리 actor와
+박스·선반은 한 벌만 생성되면서도 체크포인트 observation 340-D와 tokenizer 입력
+`[21, 12, 42, 42]`는 바뀌지 않는다. 이 모드는 `MA_TOKEN=mask` 이외의 체크포인트를 거부한다.
+기존 A=2 기본값은 그대로다.
+
+`bash -n`, Python compile, `git diff --check`를 통과했다. CPU 구조 검사에서
+`task_obs_size=117`, 전체 observation 340-D, token dims `[21, 12, 42, 42]`를 확인해
+MS18 체크포인트의 RMS 340-D와 teammate encoder 21-D에 일치시켰다.
+GPU 7·임시 포트 6111의 실제 viewer smoke에서도 `env 1 x 1명`, `agents: 1`,
+`num_obs: 340`과 MS18 PTH 복원을 확인했다. 1-env 평가 3회를 끝까지 완주했고
+`fail_trials_because_terminate=0`이었다. 검증 viewer는 종료했다.
+긴 시나리오 녹화를 위해 view 전용 `MS_EPISODE_LENGTH` 손잡이도 추가했다.
+기본값은 기존 600 step을 보존하며, 1800을 주면 30 Hz 기준 60초다. 양의 정수가 아닌 값은
+실행 전에 거부하고, GPU 없는 생성 검사에서 A=1·1 env·1800 step YAML을 확인했다.
+
+발표용 속도 경로에는 선택적 `MS_DRAW_SPEED_BROWN=1` 팔레트를 추가했다. MS_MRAND의
+속도 배수 0.25/0.50/0.75/1.00을 진한 갈색에서 기존 agent 경로색으로 선형 보간한다.
+옵션을 끄면 기존 밝기 배율 색상을 그대로 사용한다. Python compile과 diff check를 통과했다.
+
+### C5/C13 trajectory coordinator opt-in 이식
+
+`traj` 브랜치의 C2 coordinator runtime과 `HumanoidMACoordCarry`를 현재
+`TokenHSI-masteer`에 별도 모듈·별도 task로 이식했다. 기본 task
+`HumanoidMASteerCarry`와 기존 GT `_gt_path` 생성은 바꾸지 않았으며,
+`MS_TASK=HumanoidMACoordCarry`, `COORD_MODEL=c2`, `COORD_CKPT=<pth>`를 명시한
+실행에서만 learned joint path/speed가 기존 320점 steering 버퍼를 대체한다.
+
+m44의 sequential stacking 환경과 train/view/eval 스크립트는 수정하지 않았다.
+GPU를 비활성화한 Python compile과 TRAJ 원본 coordinator 단위검사 75개를 통과했다.
+전달받은 `runs/coord/imported/c5.pth`와 `c13.pth`도 strict schema/state-dict load를
+통과했다. checkpoint의 실제 step과 설정은 각각 C5-r2 2000
+(`unnecessary_slow=2`)과 C13 path-guard-30 300(`path_residual=30`)이다. 두 모델 모두
+2-batch CPU forward에서 `[2,2,33,2]` path와 `[2,2,33]` speed를 내고, 선택·resample한
+`[2,2,320,2]` 경로가 finite/valid임을 확인했다. 파일 해시와 실행법은
+`runs/coord/imported/README.md`에 기록했다. GPU bridge smoke는 별도 실행 단계다.
+
+## 2026-09-10
+
+### ms47 reward-only CLEAR balance + strict stack success 40
+
+ms46의 모델, 340-D observation, phase controller, 곡선 CLEAR 경로와 ms18 epoch-9000
+초기화를 그대로 보존한 reward-only pilot 래퍼
+`scripts/masteer/train_stack_first_clear_balance_local.sh`를 추가했다. RELEASE의 기존
+`carry_done=1.0`은 유지하되 CLEAR부터 추가되는 `release_done`만 1.0에서 0.5로 낮추고,
+stall penalty를 0.75에서 1.50으로, grace를 20에서 5 frame으로, 최소 이동 비율을
+0.20에서 0.40으로 바꾼다. 따라서 grace 뒤 정지 CLEAR의 completion floor 1.5가 stall
+1.5에 정확히 상쇄되고, ms46 command 0.375 m/s에서 stall 기준은 ms43과 같은 절대
+0.15 m/s가 된다.
+
+top 접근·release shaping과 5-frame strict success gate는 유지하고, 실제 물리 stack
+성공 때 두 agent에 한 번 지급하는 `STACK_SUCCESS_BONUS`만 20에서 40으로 높였다.
+단순 hand release에는 큰 보너스를 주지 않는다. steering tokenizer와 internal adapter는
+계속 학습하고 carry tokenizer, Transformer와 composer는 기존 freeze 계약을 유지한다.
+
+`bash -n`과 `git diff --check`를 통과했다. GPU 7에서
+`ms47_ms18init_curveclear_balance_success40_1000_s0`를 detached session으로 시작했고,
+launcher PID 2040962가 PID 1 아래 독립 session으로 유지되는 것을 확인했다. 생성된 sidecar와
+첫 실행 로그에서 ms18 epoch-9000 초기화, success bonus 40, CLEAR stall 1.50,
+move-min 0.40, grace 5, completion reward 1.00/0.50/0.00을 재확인했다. 첫 backward에서
+steering tokenizer와 internal adapter에 각각 nonzero gradient가 들어왔고, freeze 대상은
+zero/frozen 상태를 유지했다.
+
+
+### ms48 1 m WAIT + 180-frame STACK budget and hold diagnostics
+
+ms47 평가에서 strict stack success가 0인 직접 병목은 top carrier의 staging 거리 약 2 m와
+STACK 진입 뒤 생존 중앙값 약 28.5 frame의 조합이었다. `train_wait1_stack180_holddebug_local.sh`는
+모델·340-D observation·shared policy·carry/backbone freeze를 바꾸지 않고, top의 첫 목표를
+base와 1 m 떨어진 고정 WAIT point로 둔다. 두 손 grasp, box 속도 안정, WAIT tolerance를
+5 frame 연속 충족해야 stage latch가 생기며, base CLEAR가 끝나도 이 latch가 없으면 STACK으로
+넘어가지 않는다. STACK 진입 순간에만 live base top pose로 한 번 retarget하고 180 physics
+frame을 별도 보장한다. 전체 episodeLength는 600+180=780이다.
+
+WAIT/approach 동안 top이 손을 먼저 떼면 한 손이라도 box surface에서 멀어진 정도에 비례해
+`STACK_TOP_PREMATURE_RELEASE_PEN_W=0.50` 벌점을 준다. 목표까지 signed 거리 진전은 2.0
+가중치로 보상하고, stable placement 8 frame 뒤에만 기존 release-progress/hold shaping을
+활성화한다. success bonus +40과 strict 5-frame physical success gate는 유지한다.
+
+학습 TensorBoard에는 `top_native`, `top_approach_progress`, `top_premature_release_penalty`,
+`top_release_progress`, `top_hold_penalty`와 distance/grasp/settled/release-ready/stack-age를
+추가했다. 평가 metrics는 stage/above/settled step, STACK frame·grasp·place count, 시작·최소
+distance, reward 누적, 종료 사유를 더 기록하고 `stack_stage_summary.py`가 funnel/motion/reward/
+termination 통계를 출력한다. 기존 74-column ms47 eval 포맷도 계속 읽는다.
+
+GPU 학습은 사용자 요청에 따라 시작하지 않았다. Python compile, Bash syntax, diff check와
+기존 ms47 e10000 eval summary의 backward-compatible 읽기를 통과했다.
+
+GPU 7에서 64 env, 2 iteration smoke를 실행했다. 최초
+`smoke_ms48_wait1_stack180_2it_20260910_s0`는 `minibatch_size=1024`가 기존
+`amp_minibatch_size=4096`보다 작아 학습 시작 전 assertion으로 종료됐다. 출력은
+지우거나 tag를 재사용하지 않았다. 새 tag
+`smoke_ms48_wait1_stack180_2it_20260910_s0_r1`은 `PILOT_MB=4096`으로 rc=0
+완료했다. 생성 config에서 64 env, episodeLength 780, minibatch/AMP minibatch 4096을
+확인했고 sidecar에서 WAIT 1 m, 5-frame stage latch, PRE/STACK budget 600/180,
+top settle 8을 재확인했다. 첫 backward의 steering tokenizer와 internal adapter
+gradient 합은 각각 `9.276921e+02`, `1.712486e+03`이었고 frozen carry tokenizer,
+self encoder, Transformer, composer는 0이었다.
+
+```bash
+# 64-env, 2-iteration smoke. 동일 tag는 재사용하지 않는다.
+MA_GPU=7 PILOT_ENVS=64 PILOT_MB=4096 PILOT_ITERS=2 PILOT_SAVE_EVERY=1 \
+  bash scripts/masteer/train_wait1_stack180_holddebug_local.sh <new-smoke-tag>
+
+# ms18 epoch-9000에서 시작하는 1024-env, 1000-iteration ms48 pilot.
+MA_GPU=7 bash scripts/masteer/train_wait1_stack180_holddebug_local.sh \
+  ms48_ms18init_wait1_stack180_holddebug_1000_s0
+```

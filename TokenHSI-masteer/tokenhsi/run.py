@@ -96,6 +96,8 @@ def create_rlgpu_env(**kwargs):
 class RLGPUAlgoObserver(AlgoObserver):
     def __init__(self, use_successes=True):
         self.use_successes = use_successes
+        self._tb_info_sums = {}
+        self._tb_info_counts = {}
         return
 
     def after_init(self, algo):
@@ -112,10 +114,29 @@ class RLGPUAlgoObserver(AlgoObserver):
             if self.use_successes and 'successes' in infos:
                 successes = infos['successes'].clone()
                 self.consecutive_successes.update(successes[done_indices].to(self.algo.ppo_device))
+            # Tasks expose opt-in TensorBoard diagnostics with a ``tb/`` prefix.
+            # NaNs represent inactive phases and are excluded from aggregation.
+            for key, value in infos.items():
+                if not key.startswith('tb/') or not torch.is_tensor(value):
+                    continue
+                values = value.detach().float().reshape(-1)
+                finite = torch.isfinite(values)
+                value_sum = torch.where(
+                    finite, values, torch.zeros_like(values)
+                ).sum()
+                value_count = finite.sum()
+                if key in self._tb_info_sums:
+                    self._tb_info_sums[key] = self._tb_info_sums[key] + value_sum
+                    self._tb_info_counts[key] = self._tb_info_counts[key] + value_count
+                else:
+                    self._tb_info_sums[key] = value_sum
+                    self._tb_info_counts[key] = value_count
         return
 
     def after_clear_stats(self):
         self.mean_scores.clear()
+        self._tb_info_sums.clear()
+        self._tb_info_counts.clear()
         return
 
     def after_print_stats(self, frame, epoch_num, total_time):
@@ -124,6 +145,13 @@ class RLGPUAlgoObserver(AlgoObserver):
             self.writer.add_scalar('successes/consecutive_successes/mean', mean_con_successes, frame)
             self.writer.add_scalar('successes/consecutive_successes/iter', mean_con_successes, epoch_num)
             self.writer.add_scalar('successes/consecutive_successes/time', mean_con_successes, total_time)
+        for key in sorted(self._tb_info_sums):
+            count = self._tb_info_counts[key].item()
+            if count > 0:
+                mean = (self._tb_info_sums[key] / count).item()
+                self.writer.add_scalar(key[3:], mean, frame)
+        self._tb_info_sums.clear()
+        self._tb_info_counts.clear()
         return
 
 

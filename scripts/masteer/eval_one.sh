@@ -51,7 +51,7 @@ done < <(sed -n 's/^export \([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$ENV_FILE")
 if [ -n "${MS_EVAL_OVERRIDE:-}" ]; then
     for kv in $MS_EVAL_OVERRIDE; do
         case "$kv" in
-            MS_*=*|MA_*=*) export "${kv?}" ;;
+            MS_*=*|MA_*=*|STACK_*=*) export "${kv?}" ;;
             *) echo "masteer eval: 거부된 override $kv" >&2; exit 6 ;;
         esac
     done

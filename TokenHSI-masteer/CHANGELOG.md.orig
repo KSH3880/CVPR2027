@@ -2,40 +2,6 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
-
-## 2026-08-25 · 개인 사본 pickup 평가
-
-### MASteer carry anti-kicking 높이 게이트 복원
-
-- 원본 TokenHSI carry와 같이 박스 중심이 `box_height/2 + 0.2m` 이하일 때
-  carry velocity reward를 0으로 만든다. 박스를 바닥에서 밀거나 차서 경로·속도
-  보상을 받는 우회를 막는다.
-- 원본의 연산 순서를 따라 목표 0.5m 안의 pin 보상은 유지하고, 손 근접·목표 근처·
-  경로 이탈·putdown 보상은 변경하지 않았다. 이 변경의 효과는 새 학습부터 적용된다.
-
-- 실제 pickup은 `hands.mean↔box < 0.35m`와 `box_z >= reset_z+0.10m`를
-  10프레임(0.33초) 연속 유지해야 성공이다. reset이 끝난 실제 box z를 직접 기록한다.
-- metric 40·41은 실제 pickup/실제 lifted-held 프레임이다. 옛 proximity-only 값은
-  false positive 진단용 42·43열로 이동했고, reset z·최대 lift·최대 연속 프레임을 44~46열에 저장한다.
-- `eval_one.sh`가 정의와 `pick`, `heldFrac`, `pickA`, `bothPick`,
-  `closeOnly`, `maxLift50`, `streak50`을 요약한다.
-- GPU 7, 8 env 실제 pickup 스모크: 48행×47열, `pick=0.8958`,
-  옛 근접값 `close=0.9375`, 근접만 하고 못 든 `closeOnly=0.0417`.
-- 평가 loop가 공식 success 집계에 넣는 done row를 즉시 metric으로 저장하도록 했다.
-  repeat 경계의 전체 reset에서 미완료 episode가 섞이거나 마지막 batch가 누락되지 않는다.
-  `eval_one.sh`는 NPY 행 수와 로그의 `num_trials` 합이 다르면 실패한다.
-- GPU 7, 8 env 스모크: `num_trials=16+16+16=48`, NPY `(48,42)`, finite,
-  종료코드 0. 기존 38행 누락이 해소됐다.
-
-### VNC GPU 분리 진단
-
-- `CUDA_VISIBLE_DEVICES`는 Vulkan 장치 열거를 제한하지 않는다. 기존
-  `DRI_PRIME/VK_LAYER_MESA_device_select` 방식도 Isaac Gym에는 적용되지 않아
-  그래픽 ordinal 0이 물리 GPU 0을 사용했다.
-- 이 서버는 Vulkan ordinal이 NVIDIA 물리 번호보다 1 크다. 공식 Isaac Gym graphics
-  예제로 `CUDA_VISIBLE_DEVICES=7, graphics_device_id=8`을 검사했을 때 진단 Python
-  PID는 물리 GPU 7 UUID 하나만 점유했다. 현재 `view.sh`에는 아직 이 경로가 연결되지 않았다.
-
 ## 2026-08-13
 
 - 16:00  EXPERIMENTS.md
@@ -733,3 +699,531 @@ source** 한다. 매핑이 두 곳에 있으면 뷰어에서 확인한 것과 �
 
 `view.sh` 는 env 수를 위치인자 `$2` 로만 받아 `ENVS=1 view.sh tag 3` 이 조용히
 3 으로 떴다. `record.sh` 와 맞춰 `ENVS` 를 우선하게 했다 (위치인자는 뒤로 남김).
+
+## 2026-09-04
+
+### stack-stage 평가에 release/clear/displacement/pickup 회귀 분리
+
+`HumanoidMASequentialStackRelease`의 기존 49열 episode 지표 뒤에 base 박스가
+배치 시점부터 움직인 최대 XY 거리를 추가했다. 관측·보상·action·phase 전환·reset은
+바꾸지 않는다. `stack_stage_summary.py`는 release와 body-clear의 전체/조건부 성공률,
+base displacement의 mean/median/p95를 출력하고, initial 평가가 있으면 역할별 strict
+pickup 성공률 하락을 별도로 비교한다. 기존 49열 결과도 계속 읽을 수 있다.
+
+### GUI viewer의 stale 물리 actor write 복원
+
+로컬 정상본과 같은 ms18 epoch 9000 PTH를 서버에서 비교해 PTH SHA256이 동일함을 확인했다.
+현재 서버 viewer는 `_update_marker()`에서 carry box와 platform을 매 렌더 프레임 stale
+root-state로 다시 써 픽업을 방해하고 있었다. 물리 actor는 episode reset 직후 한 번만
+동기화하고 이후에는 marker actor만 쓰도록 복원했으며, top camera 갱신 전에 root-state를
+refresh하도록 맞췄다. 서버 `view.sh`도 실행 위치에서 ROOT를 계산하고 `tokenhsi_koo`를
+사용하며 GPU 6/7 Vulkan UUID 검증을 통과해야 실행되도록 고쳤다. headless 학습 경로에는
+영향이 없다.
+
+### ms25 virtual-retreat adapter-only — 픽업 보존 실패로 기각
+
+`ms25_virtualretreat_adapteronly_r50_s0_e1024`는 ms18 epoch 9000에서 시작해
+기존 `internal_adapt_mlp`만 학습하고 actor 경로와 RMS를 동결했다.
+CARRY/stack-release를 50:50으로 섞고 CLEAR에는 가상 박스 관측·signed retreat·loco AMP를 사용했다.
+
+2 iteration smoke에서 adapter에만 gradient가 생기는 것은 확인했다.
+GPU 7에서 1024 env × 2 agents로 본 학습을 시작했고 epoch 9100·9200 PTH를 저장했다.
+
+epoch 9100 PTH를 viewer로 확인했을 때 기존 carry의 픽업 동작이 이미 깨지는 정성적 실패가 보였다.
+이는 rehearsal과 actor 경로 동결만으로는 adapter가 만드는 최종 action 변화에서 픽업을 보존하지 못한다는 증거다.
+사용자 판단으로 학습과 viewer를 중단했으며 별도 정량 평가는 수행하지 않았다.
+
+**판정: 실패.** 이 adapter-only + reward 중심 설정은 현재 형태로 이어서 학습하거나 후속 기준선으로 사용하지 않는다.
+완료 실험으로 해석하지 않고, 픽업 보존 장치가 없는 동일 설정의 재실행도 하지 않는다.
+
+### CLEAR AMP를 carry로 복원
+
+`origin/juan`의 구현과 대조해 CLEAR 이후 base agent의 두 carry token을 손 중심의
+가상 박스로 바꾸는 방식은 그대로 유지했다. 가상 박스는 실제 박스 회전과 BPS를 쓰고,
+목표는 retreat endpoint이며 CLEAR부터 SUCCESS까지 실제 박스를 다시 노출하지 않는다.
+
+CLEAR에서 AMP task mask를 `traj`로 바꾸던 override와 실행 설정을 제거했다.
+이제 부모 carry task의 AMP가 그대로 유지된다. reward 식과 계수는 변경하지 않았다.
+
+### ms27 virtual-box + ms20 CLEAR reward + transition bonus 3.0
+
+픽업이 깨진 ms26 실행을 중단하고, ms18 epoch 9000에서 다시 시작했다. 가상 박스,
+carry AMP, CARRY/stack-release 50:50 rehearsal은 유지했다. 입력 RMS는 픽업 분포 보존을
+위해 동결하되 tokenizer 동결은 해제했다(`MA_ADAPTER_ONLY=0`,
+`MA_FREEZE_NEW_CARRY=0`). 기존 actor·transformer·composer와 old-carry tokenizer는
+계속 동결된다.
+
+CLEAR reward는 `STACK_CLEAR_STEER_W=0`으로 ms20 식을 그대로 사용하고,
+손 떼기 전환 보너스는 `STACK_TRANSITION_BONUS=3.0`으로 설정했다.
+
+256 env × 2 iteration smoke와 1024 env 본 실행 첫 backward 모두에서 steer/new-carry
+tokenizer와 adapter gradient를 확인했다. 본 실행 태그는
+`ms27_virtualbox_ms20clear_b3_tokunfreeze_s0`, GPU 7, 3000 iteration이다.
+
+### ms28 bonus 0 재시작 + 단계별 pickup 진단
+
+ms27 epoch 9300 viewer에서도 pickup이 깨져 실행을 중단하고 산출물은 보존했다.
+픽업이 확인됐던 `ms20_stackrel_gate_bonus0_s0`에 맞춰 transition bonus와 CLEAR 진입
+bonus를 모두 0으로 내렸다. 가상 박스, carry AMP, 50% rehearsal, tokenizer unfreeze와
+ms20 CLEAR 식은 유지한다.
+
+`HumanoidMASequentialStackRelease`의 episode 지표 뒤에 9열을 추가했다. 양손 OBB 접근,
+10-frame strict pickup, 운반 중 10-frame break, base 배치, 손 떼기, body clear, 물리 실패,
+최대 lift, rehearsal/base/top 구분을 직접 기록한다. `stack_stage_eval.sh`는 보존된 중간
+checkpoint를 동일 sidecar로 평가하고 `stack_stage_summary.py`로 최초 정지 단계를 요약한다.
+reward와 observation/model 구조는 바꾸지 않았다.
+
+256 env × 2 iteration smoke에서 forward/backward, epoch 9002 저장, 49열 metrics와 요약
+출력을 확인했다. 본 실행 `ms28_virtualbox_ms20bonus0_stage_s0`은 ms18 epoch 9000에서
+GPU 7, 1024 env, 3000 iteration으로 시작했고 진단용 checkpoint를 50 iteration마다 남긴다.
+첫 backward에서 steer/new-carry tokenizer와 adapter gradient 및 약 3.6만 step FPS를 확인했다.
+
+### ms26~28 적층 PTH의 viewer 재검증 기준
+
+학습 sidecar를 다시 대조한 결과 ms26·ms27·ms28은 모두 ms18 epoch 9000에서
+시작한 `HumanoidMASequentialStackRelease`, `MA_TOKEN=mask` 계보다. 각 배치는
+일반 CARRY rehearsal과 stack-release를 50:50으로 혼합하며, stack-release에서는
+base 박스 배치·release·body clear 후 top 박스를 base 위에 놓는 전 단계를 학습한다.
+
+PTH 경로를 `view.sh`에 직접 넘기면 학습 sidecar의 `MS_TASK`와 `STACK_*`를
+자동 복원하지 않고 기본 `HumanoidMASteerCarry`로 실행된다. 따라서 일반
+carry 동작 확인과 적층 정책 확인을 구분하고, 적층 확인 전에는 반드시
+`runs/queue/logs/<tag>.env`를 source한다. 또한 stale 물리 actor write가 수정되기
+전 viewer로 내린 ms26·ms27 pickup 정성 판정은 정책 회귀의 단독 근거로 쓰지
+않고, 수정된 viewer와 학습 sidecar로 재확인한다.
+
+### ms29 손 거리 전환 + 발-박스 penalty 비교
+
+모델/head/tokenizer 구조는 바꾸지 않고 ms18 epoch 9000에서 시작한다. 실제 pickup 이력 뒤
+Agent A의 양손이 박스 표면에서 0.10m 이상인 상태를 5 step 연속 만족하면 CLEAR로 전환한다.
+box 위치·속도 안정화와 CLEAR→STACK hard gate는 끄고, Agent B 시작에는 A의 body-base-box
+거리 0.60m만 유지한다. teammate token은 mask, new-carry와 steering tokenizer 및 adapter는
+학습한다. release 후 기존 XY 이탈 실패 조건도 비활성화했다.
+
+공통 CLEAR reward는 유지하고 한 쌍만 발 원점과 base-box OBB 표면 거리 0.20m 이내에
+최대 0.25 penalty를 추가했다. 2048 env는 PhysX illegal memory access로 초기화 실패했고,
+1024 env smoke는 두 iteration·checkpoint·gradient를 통과했다.
+
+GPU 6에 1024 env, seed 0, 3000 iteration으로 두 실험을 시작했다.
+- `ms29_hand10_clear06_base_e1024_s0`: foot penalty 0
+- `ms29_hand10_clear06_foot025_e1024_s0`: foot penalty 0.25
+
+
+## 2026-09-05
+
+### ms30/ms31 all-feet placement gate + CLEAR motion-gate 비교
+
+ms18 epoch 9000에서 동일하게 시작하는 1024-env, seed 0, +3000 iteration 두 런을
+GPU 6에 배치했다. 공통으로 ms24의 안정 배치 후 RELEASE 순서를 복원하고 손 이격 0.15m,
+body clear 0.60m, drop XY 100m를 사용한다. 목표 근처 CARRY 구간에서는 base box와 두
+에이전트의 네 발 사이 최소 OBB 표면 거리에 최대 0.25 penalty를 주고, 0.20m 이격이
+배치와 손 떼기 동안 유지되어야 다음 phase로 진행한다.
+
+CLEAR→STACK gate는 CARRY/최종 적층 기준과 분리해 XY 0.15m, Z 0.10m, 선속도 0.15m/s,
+각속도 0.40rad/s로 완화했다. 두 런의 유일한 비교축은 CLEAR의 support/stable 정적 보상을
+기존대로 유지하는지, 후퇴 motion으로 gate하는지다.
+
+- `ms30_hand15_clear06_allfoot_base_e1024_s0_try2`: 기존 CLEAR 보상
+- `ms31_hand15_clear06_allfoot_motion_e1024_s0_try2`: CLEAR 정적 항을 motion-gate
+
+`MS_SAVE_LATEST=100`은 기존 `Humanoid.pth` 갱신으로 유지하고,
+`MS_SAVE_ARCHIVE=1000`을 학습 루프에 연결했다. 각 런은 절대 epoch
+10000/11000/12000을 별도 저장하므로 종료 시 latest 1개와 archive 3개가 남는다.
+
+64-env, 2-iteration smoke에서 task forward/backward와 종료를 확인했다. 본 런 둘 다
+새 설정을 sidecar에서 재현했고, 첫 backward에서 active tokenizer와 adapt MLP gradient,
+약 1.1~1.4만 total FPS를 확인했다. 최초 nohup-only 태그 두 개는 session 분리 전에
+종료되어 학습하지 않았으며, 출력 보존 규칙 때문에 `try2` 새 태그로 재시작했다.
+
+
+## 2026-09-06
+
+### stack phase gate를 predicate별로 분해
+
+`HumanoidMASequentialStackRelease`의 기존 50열 episode 지표 뒤에 22열을 append했다.
+정책 입력·보상·action·phase 전환 조건은 바꾸지 않고 다음 값만 누적한다.
+
+- CARRY: XY/Z/선속도/각속도/upright/foot/placeable/결합 gate의 step 통과율과
+  결합 gate 최대 연속 프레임
+- RELEASE: hand/foot/결합 gate 통과율과 최대 연속 프레임
+- CLEAR: hand/body-distance/base-stable/결합 gate 통과율, 최대 body distance와
+  실제 retreat path arc
+
+`stack_stage_summary.py`는 기존 49·50열 결과를 계속 읽고, 새 72열 결과에서는 전체와
+agent index 0/1을 분리해 출력한다. release→clear event의 프레임 지연도 함께 출력해,
+이미 body-distance gate 밖에서 CLEAR에 진입한 즉시 통과와 실제 후퇴를 구분한다.
+
+문법 검사와 기존 50열 결과 하위 호환을 확인한 뒤 GPU 6에서 ms30 64-env smoke를 실행했다.
+72열 저장과 요약 출력을 확인했으며 reward/action 수치는 변경하지 않았다.
+
+### ms30/ms31과 ms18-init ms24 두 정책의 gate 진단
+
+동일한 최신-checkpoint, 512-env 평가를 `gate_diag_0906` suffix로 실행했다.
+
+| tag | base n | place→release→clear | CARRY joint steps | RELEASE hand/foot/joint | CLEAR body | retreat arc p50/p95/max |
+|---|---:|---:|---:|---:|---:|---:|
+| ms30 allfoot base | 1132 | 11→7→3 | 86/616866 | .457/.055/.044 | .003 | .004/.139/.173 |
+| ms31 allfoot motion | 1140 | 13→8→5 | 101/619410 | .430/.079/.041 | .017 | .032/.211/.271 |
+| ms24 possteer .25 | 1160 | 66→62→0 | 435/607084 | .311/1/.311 | .000 | .025/.150/.258 |
+| ms24 possteer .50 | 1159 | 47→44→1 | 297/613416 | .133/1/.133 | .004 | .013/.134/1.000 |
+
+ms30/31은 안정 배치만 보면 step 통과율이 .218/.231이고 all-foot도 .571/.559지만,
+둘이 같은 순간 겹친 비율은 약 0.00014/0.00016뿐이었다. 5-frame CARRY→RELEASE
+gate가 첫 병목이다. RELEASE에 들어간 뒤에는 hand보다 all-foot가 훨씬 낮아 두 번째
+병목도 foot hard gate다. 따라서 viewer에서 손을 뗐는데 phase가 바뀌지 않는 관찰과
+정량 결과가 일치한다.
+
+네 정책 모두 CLEAR의 실제 path 후퇴는 거의 없었다. ms24 possteer .50에서 한 episode만
+arc 1.0m를 진행해 viewer에서 보였을 후보가 있으나, 그 episode는 body gate 통과 step
+.080, base-stable .264, 결합 0이었고 base box가 0.256m 움직였다. 즉 실제로 물러났지만
+박스 안정성과 body-distance가 동시에 성립하지 않아 STACK으로 전환되지 않았다.
+유일한 ms24 .50 clear event도 release와 같은 frame에 발생해 학습된 후퇴 성공이 아니다.
+
+### 다음 학습 순서 제안
+
+1. CARRY→RELEASE에서 all-foot를 hard conjunction으로 쓰지 않고 안정 배치 5-frame을
+   먼저 latch한다. foot distance는 dense penalty로 유지한다.
+2. RELEASE→CLEAR도 손 떼기와 foot safety를 분리한다. 손 떼기를 phase 전환으로 쓰고,
+   foot는 penalty 또는 별도 safety 판정으로 둬 서로 다른 시점의 조건을 강제로 겹치지 않는다.
+3. CLEAR 성공은 현재 body-distance 대신 `retreat_arc >= 0.6m`를 필수로 해 이미 멀리
+   서 있던 상태의 즉시 통과를 막고, base displacement/velocity를 dense penalty로 준다.
+4. 첫 pilot은 후퇴 outlier가 실제로 나온 ms24 possteer .50에서 시작하되 CARRY 경로는
+   동결하고 CLEAR에서만 활성인 residual을 쓴다. pickup 보호지표 0.90과 base displacement를
+   함께 본다. 이 pilot이 실패할 때만 virtual-retreat 관측을 다시 검토한다.
+
+위 제안은 아직 학습이나 큐 행으로 만들지 않았다.
+
+
+### 모델 변경 없는 reward-only CLEAR pilot 구현
+
+CLEAR 전용 residual은 모델 forward와 phase 입력을 바꿔야 하므로 사용하지 않았다.
+`amp_network_builder_transformer_adapt.py`에는 변경이 없고, 기존 ms24
+`possteer050 ... try3` 체크포인트와 내부 adapter 구조를 그대로 이어 쓴다. 대신
+학습 환경의 25%를 기존 carry rehearsal로 유지해 새 CLEAR gradient에 의한 pickup/carry
+붕괴를 완화한다. 이는 CARRY action 불변을 수학적으로 보장하지 않으므로 아래
+100-iteration 단위 보호지표 평가가 필수다.
+
+환경/controller와 reward에는 다음 opt-in 노브를 추가했다. 기본값은 기존 sidecar 동작을
+보존하고, `train_clear_reward_pilot_local.sh`에서만 새 설계를 켠다.
+
+- `STACK_ENTRY_FOOT_GATE=0`: CARRY→RELEASE는 안정 배치 5프레임만 latch한다.
+- `STACK_RELEASE_FOOT_GATE=0`: RELEASE→CLEAR는 손 간격 5프레임만 사용한다.
+- `STACK_CARRY_FOOT_GATE=1`, `STACK_FOOT_BOX_W=0.10`: all-foot는 hard gate가
+  아니라 dense penalty와 73번째 episode 안전지표로 유지한다.
+- `STACK_CLEAR_ARC_DIST=0.60`: CLEAR 진행 보상과 CLEAR→STACK 전환 모두 실제
+  retreat path arc를 사용한다.
+- CLEAR에서 latched base box의 XY 변위/선속도/각속도를 각각
+  `0.10/0.05/0.05` 가중치로 정규화해 감점한다.
+- `STACK_CLEAR_HARD_GATE=0`: 안정성은 hard conjunction 대신 위 dense penalty와
+  별도 지표로 본다.
+- `STACK_REHEARSAL_FRAC=0.25`: 나머지 75%만 새 순차 phase/reward를 경험한다.
+
+파일럿은 500 iteration이며 archive를 100마다 저장한다. 평가는
+`eval_clear_reward_pilot.sh`가 초기 ms24 기준선과 100·200·300·400·500 구간을
+차례대로 평가한다. 보호 하한은 pickup 0.85, `release_given_place` 0.80,
+release 이후 base displacement p95 0.15m이며, CLEAR foot-clear step 비율은 초기보다
+최대 0.05p 하락까지 허용한다. 보호조건과 별도로 `retreat_arc >= 0.6m` episode
+비율이 초기보다 증가했는지 `learning=UP`으로 출력한다. FAIL이어도 평가를 중단하거나
+프로세스를 종료하지 않고 다섯 체크포인트를 모두 본다.
+
+구현·문법·72열 하위 호환·73열 합성 판정만 확인했다. 학습과 GPU 평가는 실행하지 않았다.
+
+## 2026-09-07
+
+### legacy delivered gate와 동적 obj 적층 목표 추가
+
+기존 안정 배치 결합 조건 대신 legacy carry 성공 이벤트인 `_ep_finish >= 0`을
+CARRY→RELEASE 기준으로 선택할 수 있도록 `STACK_ENTRY_DELIVERED`를 추가했다.
+기본값은 0이므로 기존 sidecar와 학습은 변하지 않는다. 전용 wrapper는 1 frame을 요청하지만 현재 try2의 실제 sidecar 값은 아래처럼 5 frame이다.
+
+B의 적층 carry 목표는 A가 놓은 실제 아래 박스의 현재 XY와 윗면 Z를 매 step 사용한다.
+기존에도 teammate token은 상대 박스의 현재 위치·속도를 관측했고 목표도 0.10 lerp로
+추종했지만, 이제 lerp 지연 없이 실제 obj 위치를 즉시 반영한다.
+
+`train_delivered_steer_local.sh`는 ms18 e9000에서 시작하며 가상 후퇴 박스를 끄고,
+기존 steering 경로로 CLEAR 후퇴를 학습하는 500 iteration·25% carry rehearsal
+파일럿을 실행한다. Python/Bash 문법과 diff whitespace만 확인했고 학습·GPU 평가는
+실행하지 않았다.
+
+### ms34 delivered-steer try2의 실제 RELEASE/CLEAR 조건과 reward
+
+아래는 GPU 7에서 실행한 `ms34_ms18init_delivered_steer_s0_try2`의 생성 sidecar
+기준이다. 전체 env의 25%는 carry rehearsal이고, 나머지 75%가 순차 phase를 사용한다.
+가상 후퇴 박스는 꺼져 있으며(`STACK_VIRTUAL_RETREAT_BOX=0`) 기존 steering 창을 쓴다.
+
+#### phase 전환
+
+1. CARRY→RELEASE: base agent의 원래 carry 성공 latch `_ep_finish >= 0`만 사용한다.
+   안정 배치 XY/Z/속도/upright와 foot 조건은 진단값일 뿐 hard gate가 아니다. 다만 현재
+   try2 sidecar는 `STACK_ENTRY_STEPS=5`여서 이 값이 5 frame 연속 유지돼야 한다. 전용
+   wrapper의 1 frame 설정이 기준 ms24 env source에 덮인 결과다.
+2. RELEASE→CLEAR: base box와 양손 표면 사이 최소거리 `hand_dist >= 0.15m`를 5 frame
+   연속 만족하면 전환한다. `STACK_RELEASE_FOOT_GATE=0`이므로 발 거리는 전환 조건이 아니다.
+   이때 실제 base box에서 agent 반대 방향으로 1.5m retreat steering path를 생성하고 속도
+   scale은 0.5로 둔다.
+3. CLEAR→STACK: 손 간격 0.15m를 계속 유지하면서 실제 steering path 누적 진행거리
+   `arc_root >= 0.60m`를 만족하면 전환한다. `STACK_CLEAR_HARD_GATE=0`이므로 base box의
+   위치·속도 안정성 및 foot 거리는 hard gate가 아니다. STACK 진입 후 B의 carry goal은
+   매 step 실제 A box의 현재 XY와 윗면 Z로 즉시 갱신된다.
+4. RELEASE 이후 base box가 최초 고정 goal에서 XY 0.25m 초과 이동하거나 z가 -0.05m
+   아래로 떨어지면 FAILED로 종료하고 base agent reward를 -1로 둔다.
+
+#### reward
+
+모든 phase는 먼저 ms18 carry reward를 계산한다. base agent는 RELEASE 이후 아래 reward로
+교체된다. top agent와 rehearsal env에는 post-phase reward 교체가 적용되지 않는다. target 근처에서
+박스를 집은 CARRY base와 RELEASE 이후에는 box-foot 거리 0.20m 안쪽에 최대 0.10의
+dense penalty가 추가된다. 이는 hard gate가 아니다.
+
+- 공통값: `h=clip(hand_dist/0.15,0,1)`,
+  `support=exp(-20*xy_err^2-80*z_err^2)*upright`,
+  `stable=exp(-10*||base_lin_vel||^2-0.5*||base_ang_vel||^2)`.
+- RELEASE: `0.50*h + I(hand_clear)*(0.30*support + 0.20*stable) - 0.10*clip(1-foot_dist/0.20,0,1)`.
+  즉 손을 멀리할수록 보상하고, 손을 0.15m 이상 뗀 동안에만 놓인 박스의 지지·정지를
+  추가 보상한다.
+- CLEAR: steering 진행량과 속도 일치를 `motion=0.7*signed_progress + 0.3*speed_match`로
+  계산한다. 역방향 진행은 `signed_progress` 때문에 음수이고, path 횡오차는
+  `path_quality=exp(-lat_error^2)`로 감점된다. 실제 reward는
+  `I(hand_clear)*[motion*(0.40*support+0.25*stable)+0.35*clip(arc/0.60)]`에
+  `0.50*I(hand_clear)*path_quality*motion`을 더한 뒤 base box penalty와 foot penalty를 뺀다.
+  base box penalty 최대값은 위치변위 0.10, 선속도 0.05, 각속도 0.05로 총 0.20이다.
+- CARRY→RELEASE 후 첫 CLEAR reward에는 transition bonus +3.0, CLEAR→STACK 후에는
+  clear bonus +1.5, SUCCESS phase에는 매 step +0.5가 추가된다.
+
+따라서 현재 설계의 RELEASE 핵심은 손 떼기이고, CLEAR 핵심은 손을 뗀 채 기존 steering
+경로로 0.60m 실제 이동하는 것이다. 박스 안정성은 두 phase 모두 reward/penalty로만
+유도하며 phase 전환을 막지는 않는다.
+
+### ms35 delivered+lowered 진입과 RELEASE carry-reward bridge
+
+기존 모델 구조와 중앙 phase controller는 유지했다. 새 opt-in `STACK_ENTRY_LOWERED=1`은
+legacy carry 완료 latch `_ep_finish >= 0`에 `z_err <= STACK_Z_TOL`을 결합하며, ms35
+wrapper는 이를 2 frame 유지한 뒤 CARRY에서 RELEASE로 전환한다.
+
+`STACK_RELEASE_CARRY_BRIDGE=1`에서는 RELEASE 안에서만
+`(1-h)*carry_r + h*(0.50 + 0.30*support + 0.20*stable)`을 사용한다. CARRY reward는
+그대로이며, 손이 붙은 RELEASE 시작점은 현재 carry reward와 같고 손 거리 `h`가 증가하면
+기존 hand-clear 완료 reward로 연속 전환된다. 두 옵션의 기본값은 0이라 기존 sidecar 동작은
+변하지 않는다. pilot wrapper의 entry 설정이 기준 sidecar에 덮이지 않도록 `PILOT_*`
+override를 source 뒤에 적용했다.
+
+Python `py_compile`과 세 Bash 파일의 `bash -n`을 통과했다.
+`ms35_ms18init_deliveredz2_releasebridge_s0`를 ms18 epoch 9000에서 GPU 7, 1024 env,
+500 iteration으로 시작했다. 첫 backward에서 trainable `adapt_mlp` 4/4에 gradient가 있고
+학습 step FPS가 출력되는 것을 확인했다.
+
+#### 남아 있는 독립 병목: CLEAR 후퇴
+
+ms35는 CARRY→RELEASE 진입과 RELEASE 시작 reward 연결만 수정한다. 기존 최신-checkpoint
+512-env 진단에서 possteer025는 place→release가 58→57이었지만 실제 `retreat_arc >= 0.6m`는
+0/57, possteer050은 45→43 뒤 0/43이었다. arc p50/p95/max도 각각
+`0.020/0.082/0.453m`, `0.003/0.116/0.447m`라 RELEASE→CLEAR 전환 뒤 후퇴 실행이
+별도의 두 번째 병목이다. 기록된 clear 각 1건은 delay 0 frame이며 실제 후퇴 성공으로 보지 않는다.
+
+따라서 ms35의 판정은 (1) delivered+lowered 진입률, (2) release_given_place,
+(3) CLEAR의 `retreat_arc >= 0.6m`를 순서대로 분리한다. 앞 두 항이 개선돼도 세 번째가
+0이면 이번 reward bridge는 손 떼기까지만 해결한 것으로 판정한다. 현재 epoch 9100
+체크포인트가 생성됐고 학습 프로세스는 계속 실행 중이다.
+
+### ms36 TokenHSI식 순차 reward mask
+
+ms35 512-env eval에서 ms18 initial 대비 epoch 9400의 place는 0.730→0.696으로 비슷했지만,
+release_given_place는 0.391→0.216, RELEASE hand-clear step 비율은 0.016→0.007로 감소했다.
+retreat arc p95도 0.116m→0.059m로 줄어 live carry reward를 손 이격에 따라 보간한 bridge가
+손을 계속 붙잡는 방향으로 학습된 것으로 판정했다.
+
+모델 구조와 중앙 controller는 유지하고 opt-in STACK_SEQUENTIAL_REWARD_MASK를 추가했다.
+CARRY는 기존 reward를 그대로 사용하고, RELEASE는 carry_done+r_release, CLEAR는
+carry_done+release_done+r_clear, STACK 이후는 carry_done+release_done+clear_done+r_stack을
+사용한다. 완료 reward 기본값은 현재 reward 상한에 맞춘 1.6/1.0/(1.0+clear_steer_w)이며
+새 ms36 wrapper는 1.6/1.0/1.5를 명시한다. 완료 reward는 손 거리와 무관한 상수라 CARRY
+값을 보전하면서도 손 접촉 유인을 만들지 않는다. bridge와 reward mask의 동시 활성화는 거부한다.
+
+기존 controller의 관측 전환도 그대로다. 배치 완료 후 RELEASE에서는 steer window를 0으로
+만들고, 손 이격 5 frame이 확인된 뒤에만 CLEAR 후퇴 경로와 clear reward를 활성화한다.
+전용 RELEASE token이나 observation/model shape 변경은 없다. 새 옵션들은 train sidecar에
+저장·재생되며 scripts/masteer/train_sequential_reward_mask_local.sh는 ms18 epoch 9000,
+delivered+lowered 2-frame 진입, bridge OFF, reward mask ON 설정을 준비한다.
+Python py_compile, 관련 Bash 4개 bash -n, git diff --check를 통과했다.
+### ms37 후측방 135도 CLEAR 경로
+순수 후퇴 대신 상자 진행방향 기준 135도 후측방으로 비키도록 opt-in
+STACK_RETREAT_SIDE_DEG를 추가했다. 값은 기존 후방 벡터에서 측면으로 회전하는 각도라
+0도는 legacy 순수 후퇴, 45도는 진행방향 기준 135도, 90도는 순수 측면이다.
+좌우 후보 중 top agent staging 위치와 반대인 쪽을 중앙 controller가 env별로 선택한다.
+손 이격 5 frame 전에는 정지 steer를 유지하며, 확인 후에만 후측방 경로를 활성화한다.
+요청에 따라 ms36 학습과 전용 로그 watcher를 종료했다. 종료 시 metrics는 56 episode였고
+checkpoint 생성 전이라 비교 결과로 사용하지 않는다. 산출물은 삭제하지 않았다.
+Python py_compile, 관련 Bash bash -n, git diff --check를 통과했다.
+ms37_ms18init_seqrewardmask_side135_s0를 ms18 epoch 9000에서 GPU 7, 1024 env,
+3000 iteration(최종 epoch 12000)으로 nohup+setsid 분리 실행했다.
+첫 ms37 launch는 PhysX root-state tensor 초기화에서 CUDA global/shared-address 오류로
+종료됐다. 후측방 controller가 호출되기 전의 GPU 초기화 오류이며 OOM은 아니었다.
+같은 설정을 새 태그 ms37_ms18init_seqrewardmask_side135_s0_try2로 재시작했고,
+PhysX 초기화와 첫 backward를 통과했다. adapt_mlp 4/4 gradient 및 학습 FPS를 확인했다.
+
+### ms38 중앙 phase 기반 dynamic carry-token mask
+
+TokenHSI long-horizon의 FSM task-token masking을 현재 중앙 controller에 맞춰
+STACK_DYNAMIC_CARRY_MASK opt-in으로 구현했다. 별도 phase token이나 layer를 추가하지
+않고 observation 340-D와 checkpoint parameter shape를 그대로 유지한다. 중앙 controller가
+base agent를 CLEAR로 전환하면 CLEAR부터 SUCCESS까지 기존 두 carry observation window를
+정확히 0으로 padding하고, adapt network가 raw zero window를 확인해 대응하는
+new_carry와 old_carry attention key/value를 mask한다. top agent, carry rehearsal,
+CARRY와 RELEASE phase의 관측 및 mask는 바뀌지 않는다.
+
+현재 train cfg는 use_prior_knowledge=False여서 old_carry는 원래 비활성이므로, 실제
+정책 차이는 post-CLEAR base agent의 new_carry를 끄고 [weight, self, steer]만 남기는
+것이다. STACK_VIRTUAL_RETREAT_BOX와의 동시 사용은 서로 다른 CLEAR carry 표현이
+겹치지 않도록 거부한다. 새 knob는 train sidecar에 저장·재생된다.
+
+train_dynamic_carry_mask_from_ms18_local.sh는 ms37의 controller/reward/135도 후측방
+설정을 그대로 source하되 정책은 요청대로 ms18 epoch 9000에서 시작한다. 태그
+ms38_ms18init_seqrewardmask_side135_dynmask_s0를 GPU 7, 1024 env, 3000 iteration으로
+분리 실행했으며 최종 epoch은 12000이다. 로그에서 ms18 checkpoint 로드, dynamic mask
+활성, observation RMS (340,), 첫 backward의 adapt_mlp gradient 4/4와
+fps step 31090.4를 확인했다. Python py_compile, 관련 Bash bash -n,
+git diff --check를 통과했다.
+
+### ms39 가상 박스 없는 steering-only CLEAR 500-iteration pilot
+
+ms18 epoch 9000에서 시작해 ms38과 동일한 sequential reward, 135도 후측방 controller,
+CLEAR 이후 dynamic carry-token mask를 유지하는 500-iteration wrapper를 추가했다. 가상
+박스는 사용하지 않는다. ms38은 MA_ADAPTER_ONLY=1이라 steering tokenizer까지 동결한
+채 adapter만 학습했으므로, 이번 비교에서는 pretrained backbone/composer와 new-carry
+tokenizer는 계속 동결하고 steering extra tokenizer와 기존 internal_adapt_mlp만
+학습 가능하게 한다(MA_ADAPTER_ONLY=0, MA_FREEZE_NEW_CARRY=1,
+MA_NOFREEZE=0). 25% carry rehearsal과 나머지 task/reward 설정은 ms38 sidecar를 그대로
+재생한다. 실제 base 박스를 발로 차는 행동은 기존 all-foot OBB 표면거리 penalty를
+사용하되, 0.20m 안쪽 최대 감점을 ms38의 0.10에서 0.50으로 강화한다. 첫 backward의
+tokenizer별 gradient로 실제 trainable 경로를 판정한다.
+
+### ms41 reward-only CLEAR, zero observation + no carry-token mask
+
+모델 구조와 observation 340-D shape는 바꾸지 않았다. `STACK_ZERO_CARRY_OBS=1`은
+비-rehearsal base agent가 CLEAR부터 SUCCESS일 때 new/old carry observation window 두 개를
+0으로 만들지만, `STACK_DYNAMIC_CARRY_MASK=0`이므로 두 carry token 위치는 frozen
+Transformer attention에 그대로 남는다. 이는 ms38/ms39의 post-CLEAR carry-token attention
+mask를 제거한 것이다. ms18에서 이어진 teammate token mask(`MA_TOKEN=mask`)는 별개의
+기존 설정으로 유지한다.
+
+`STACK_NEGATIVE_CLEAR_REWARD=1`은 arc ratchet 대신 실제 root XY velocity를 명령된
+후측방 retreat 방향에 투영한 `v_along`을 사용한다. CLEAR 진입 뒤 두 손이 다시 0.15m
+안쪽으로 들어오면 positive move reward를 0으로 만들고 즉시 -0.5 recontact penalty를 준다.
+5-step grace 뒤 `v_along < 0.2*v_command`이면 최대 -0.5 stall penalty, 반대 방향이면
+추가로 최대 -0.5 reverse penalty를 준다. 손이 clear이고 올바른 방향으로 이동할 때만
+`path_quality*clip(v_along/v_command,0,1)`에 최대 +1.0을 준다. 기존 base 안정성 penalty와
+0.10 foot-box penalty도 유지한다. 누적 완료 상수를 매 step 지급하던
+`STACK_SEQUENTIAL_REWARD_MASK`는 끈다.
+
+TensorBoard에는 `stack_reward/{clear_total,move_positive,hand_penalty,stall_penalty,
+reverse_penalty,base_penalty,foot_penalty,transition_bonus}`, `stack_state/{hand_factor,
+hand_clear_rate,recontact_rate,move_ratio,move_ok_rate,stall_rate,reverse_rate,v_along,
+v_command,retreat_arc}`, `stack_phase/{release_fraction,clear_fraction,stack_fraction,
+failed_fraction}`을 기록한다. phase 밖의 NaN은 observer가 제외해 해당 phase 표본만 평균낸다.
+
+`tokenhsi_koo`에서 64-env 30-iteration 스모크를 완료했다. CLEAR scalar 18개가 기록됐고
+마지막 값은 clear_fraction 0.0435, clear_total -0.3440, stall_rate 0.7978,
+reverse_rate 0.5169였다. 따라서 현재 병목이 재접촉보다 정지와 역방향임을 분리해 볼 수 있다.
+첫 backward에서 transformer 0/48, self/new-carry/old-carry/composer gradient가 모두 0이고,
+steering tokenizer와 internal adapter에만 nonzero gradient가 있음을 확인했다.
+
+`ms41_ms18init_negclear_zeroobs_nomask_steeradapt_foot010_s0`를 ms18 epoch 9000에서
+GPU 7, 1024 env, 500 iteration(최종 epoch 9500), carry rehearsal 50%로 시작했다.
+가상환경은 `tokenhsi_koo`, 분리 실행 PID는 3022738이다.
+
+#### 3000-iteration 재실행 정정
+
+최초 PID 3022738 실행은 1024 env였지만 500 iteration(`max_iterations=9500`)으로
+잘못 시작한 것을 사용자 확인으로 발견했다. 승인 후 해당 session에 TERM을 보내 정상
+종료했으며 생성된 로그·metrics 등 산출물은 삭제하지 않았다. 래퍼 기본값을 3000
+iteration으로 수정하고 새 태그
+`ms41_ms18init_negclear_zeroobs_nomask_steeradapt_foot010_3000_s0`를 ms18 epoch 9000에서
+GPU 7, 1024 env, `tokenhsi_koo`, `max_iterations=12000`으로 재실행했다. 새 PID는
+3041555이다. 첫 backward에서 Transformer 0/48과 frozen carry 경로를 재확인했고
+steering tokenizer와 adapter에만 nonzero gradient가 있으며 첫 학습 FPS도 확인했다.
+
+### ms42 completed-CARRY 0.50 reward continuity pilot
+
+`humanoid_ma_sequential_stack_release.py`에 비-rehearsal base CARRY pickup 이후만 집계하는
+TensorBoard 진단 7개를 추가했다. native carry reward, foot penalty, target distance,
+grasp 상태, latched break, near-goal 미완료, path fraction이며 reward 값은 바꾸지 않는다.
+
+`train_negative_clear_continuity_local.sh`를 추가했다. ms41의 freeze, zero carry observation,
+attention mask OFF, negative CLEAR, rehearsal 0.50, foot penalty 0.10을 유지하고
+`STACK_SEQUENTIAL_REWARD_MASK=1`, carry/release/clear 완료값 `0.50/0/0`만 적용한다.
+
+첫 64-env smoke는 minibatch 2048이 AMP minibatch 4096보다 작아 학습 전 assert로 끝났고
+산출물은 보존했다. 새 태그 smoke2는 minibatch 4096으로 2 iteration을 정상 완료했다.
+Python compile, Bash syntax, diff check와 scalar 7개 기록을 확인했다. 본 학습은 GPU 7,
+1024 env, ms18 epoch 9000에서 500 iteration을 정상 완료해 e9100~e9500을 보존했다.
+첫 backward에서 steering tokenizer와 adapter만 gradient가 있고 frozen carry/Transformer/
+composer는 0이었다.
+
+512-env stage 평가에서 initial→e9500 base delivery는 0.716→0.652, break는
+0.044→0.043으로 CARRY를 보존했다. `clear_given_release`는 0.024→0.492, 전체 CLEAR는
+0.007→0.086으로 증가했다. 반면 `release_given_place`는 0.408→0.272로 감소해 다음
+병목은 RELEASE의 5-frame hand-clear 전환으로 판정했다. TensorBoard에서도 +100→+500
+동안 move OK 0.149→0.489, reverse 0.502→0.190, retreat arc 0.067→0.275 m로
+negative CLEAR reward의 후퇴 학습 효과를 확인했다. 상세 수치는 `ANALYSIS.md`에 기록했다.
+
+### ms43 RELEASE→CLEAR reward continuity + RELEASE diagnostics
+
+`humanoid_ma_sequential_stack_release.py`에 RELEASE phase 조건부 TensorBoard scalar 12개를
+추가했다. 실제 total/local reward와 hand/support/foot 기여, hand-clear factor/rate,
+5-frame streak, support/stability/foot distance를 분리하며 reward 동작은 바꾸지 않는다.
+
+`train_release_continuity_local.sh`를 추가했다. ms42의 구조·freeze·관측·mask 설정은
+그대로 두고 carry/release/clear 완료값을 `0.50/1.00/0.00`, CLEAR stall penalty를
+`1.50`으로 설정한다. CLEAR grace의 1.50 floor를 RELEASE 경계와 맞추고 grace 뒤 정지
+상태는 -1.50 stall로 상쇄하는 설계다.
+
+Python compile, Bash syntax와 diff check를 통과했다. 64-env 2-iteration smoke는 정상
+완료했으나 RELEASE 표본이 없어, 30-iteration smoke로 scalar 12개가 각각 26회 기록되는
+것을 확인했다. 본 학습
+`ms43_ms18init_negclear_carry050_release100_stall150_zeroobs_nomask_3000_s0`를 GPU 7,
+1024 env, ms18 epoch 9000에서 3000 iteration으로 분리 실행했다(PID 3840815). sidecar
+설정, 첫 backward의 steering tokenizer/adapt_mlp gradient, frozen carry/Transformer/
+composer의 zero gradient, rollout FPS와 metrics 저장을 확인했다.
+
+## 2026-09-09
+
+### ms44 CARRY->RELEASE reward continuity bridge
+
+ms43의 3000-iteration stage 평가에서 `release_given_place`는 0.966까지
+올랐지만 base PLACE는 0.574(+500)에서 0.426(+3000)으로 감소했다. 같은 구간의
+grasp break 증가는 작고 `near_goal_not_delivered`가 0.113에서 0.265로 늘어,
+남은 병목을 pickup/carry 붕괴보다 CARRY->RELEASE 경계의 보상 불연속으로 판정했다.
+
+기존 `STACK_RELEASE_CARRY_BRIDGE`를 sequential completion reward와 함께 쓸 수
+있게 확장했다. bridge가 켜지면 RELEASE total은 손 이격도 `h`에 따라
+`h=0`에서 직전 native CARRY reward, `h=1`에서
+`carry_done + 0.50 + 0.30*support + 0.20*stable`로 보간된다. bridge가 꺼진
+기존 경로와 sequential mask 없이 쓰던 기존 bridge 동작은 그대로다. observation,
+token/layer 수, controller와 gate는 바꾸지 않았다.
+
+`train_carry_release_bridge_local.sh`는 ms43 sidecar를 기준으로 1024 env,
+3000 iteration을 실행한다. ms43과 같은 freeze/mask를 유지하며 첫 backward의
+gradient와 checkpoint별 stage 평가로 PLACE 보존 여부를 판정한다.
+
+### MS18 물리 1-agent 시각화 호환 모드
+
+`origin/local`에서 학습한 `ms18_maskteam_origscale_c06_s0` 환경을 실제 humanoid 한 명으로
+재생하도록 `MS_SINGLE=1`을 추가했다. 뷰어 생성 config만 `numAgents: 1`로 바꾸고,
+A=2 체크포인트가 기대하는 masked teammate 21-D 슬롯은 0으로 유지한다. 따라서 물리 actor와
+박스·선반은 한 벌만 생성되면서도 체크포인트 observation 340-D와 tokenizer 입력
+`[21, 12, 42, 42]`는 바뀌지 않는다. 이 모드는 `MA_TOKEN=mask` 이외의 체크포인트를 거부한다.
+기존 A=2 기본값은 그대로다.
+
+`bash -n`, Python compile, `git diff --check`를 통과했다. CPU 구조 검사에서
+`task_obs_size=117`, 전체 observation 340-D, token dims `[21, 12, 42, 42]`를 확인해
+MS18 체크포인트의 RMS 340-D와 teammate encoder 21-D에 일치시켰다.
+GPU 7·임시 포트 6111의 실제 viewer smoke에서도 `env 1 x 1명`, `agents: 1`,
+`num_obs: 340`과 MS18 PTH 복원을 확인했다. 1-env 평가 3회를 끝까지 완주했고
+`fail_trials_because_terminate=0`이었다. 검증 viewer는 종료했다.
+긴 시나리오 녹화를 위해 view 전용 `MS_EPISODE_LENGTH` 손잡이도 추가했다.
+기본값은 기존 600 step을 보존하며, 1800을 주면 30 Hz 기준 60초다. 양의 정수가 아닌 값은
+실행 전에 거부하고, GPU 없는 생성 검사에서 A=1·1 env·1800 step YAML을 확인했다.
+
+발표용 속도 경로에는 선택적 `MS_DRAW_SPEED_BROWN=1` 팔레트를 추가했다. MS_MRAND의
+속도 배수 0.25/0.50/0.75/1.00을 진한 갈색에서 기존 agent 경로색으로 선형 보간한다.
+옵션을 끄면 기존 밝기 배율 색상을 그대로 사용한다. Python compile과 diff check를 통과했다.
