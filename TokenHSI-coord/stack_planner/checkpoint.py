@@ -10,15 +10,12 @@ import torch
 
 from .model import StackPlannerConfig, StackTrajectoryPlanner
 from .schema import (
-    ACCEL_KNOTS,
     AGENTS,
-    MAX_ACCEL,
     MAX_SPEED,
-    MIN_SPEED,
     PATH_DS,
-    PATH_POINTS,
     PATH_VERTICES,
     STACK_SCHEMA_VERSION,
+    STACK_PATH_POINTS,
     STEER_HORIZON_SECONDS,
     STEER_POINTS,
 )
@@ -30,17 +27,13 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "model_kind": "stack_transformer",
         "agents": AGENTS,
         "candidate_k": config.candidates,
-        "path_points": PATH_POINTS,
-        "retreat_path_points": PATH_POINTS,
-        "retreat_distance": config.retreat_distance,
-        "accel_knots": ACCEL_KNOTS,
+        "path_points": STACK_PATH_POINTS,
+        "path_only": True,
         "path_ds": PATH_DS,
         "path_vertices": PATH_VERTICES,
         "steer_points": STEER_POINTS,
         "steer_horizon_seconds": STEER_HORIZON_SECONDS,
-        "min_speed": MIN_SPEED,
-        "max_speed": MAX_SPEED,
-        "max_accel": MAX_ACCEL,
+        "execution_speed": MAX_SPEED,
     }
 
 
@@ -96,13 +89,6 @@ def load_stack_checkpoint(
     if extra:
         raise ValueError(f"unknown stack planner config keys: {extra}")
     config = StackPlannerConfig(**payload["model_config"])
-    # Early v1 checkpoints already contain the retreat heads and the
-    # retreat_distance model config, but predate these two redundant contract
-    # fields.  Reconstruct only those derivable fields; every stored value is
-    # still checked strictly below.
-    if payload.get("schema_version") == STACK_SCHEMA_VERSION:
-        payload.setdefault("retreat_path_points", PATH_POINTS)
-        payload.setdefault("retreat_distance", config.retreat_distance)
     expected = expected_contract(config)
     missing = sorted(set(expected) - set(payload))
     mismatch = {

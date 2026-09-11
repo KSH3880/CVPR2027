@@ -21,7 +21,7 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
             raise FileNotFoundError(
                 "STACK_PLANNER_CKPT must point to a stack planner checkpoint"
             )
-        period = int(os.environ.get("STACK_PLANNER_REPLAN_STEPS", "6"))
+        period = int(os.environ.get("STACK_PLANNER_REPLAN_STEPS", "30"))
         if period < 1:
             raise ValueError("STACK_PLANNER_REPLAN_STEPS must be positive")
         self._stack_planner_period = period
@@ -47,6 +47,18 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
             ),
             flush=True,
         )
+
+    def _update_marker(self):
+        """Do not submit disabled multi-task actor IDs from the viewer.
+
+        The inherited debug-path renderer calls this before drawing its line
+        overlays.  Its generic implementation commits traj, sit, carry and
+        climb actors together, but this carry-only stack scene intentionally
+        has no valid sit/climb actors.  The task targets and boxes are already
+        committed by reset/physics, so no per-render root-state write is
+        required for the planner path visualization.
+        """
+        return
 
     @torch.no_grad()
     def _view_plan(self):

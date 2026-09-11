@@ -16,8 +16,9 @@ from coordinator.schema import (  # re-export the unchanged public input
 )
 
 
-STACK_SCHEMA_VERSION = "tokenhsi-stack-planner-v1"
+STACK_SCHEMA_VERSION = "tokenhsi-stack-planner-v5"
 STACK_CANDIDATES = 4
+STACK_PATH_POINTS = PATH_POINTS
 
 __all__ = [
     "ACCEL_KNOTS",
@@ -33,6 +34,6 @@ __all__ = [
     "STEER_POINTS",
     "CoordinatorState",
     "STACK_CANDIDATES",
+    "STACK_PATH_POINTS",
     "STACK_SCHEMA_VERSION",
 ]
-

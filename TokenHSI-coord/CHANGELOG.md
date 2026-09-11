@@ -2,7 +2,107 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-11
+
+### 단일 path 모델과 Carry execution slicing 분리
+
+- planner 공개 출력을 `path_local/path_world [B,K,2,33,2]`로 한정했다. 별도 retreat goal/path,
+  speed, acceleration, switch, risk 출력은 없으며 PPO value는 policy 내부 critic으로만 사용한다.
+- 모델은 Agent 1의 `root → box → carry goal → final endpoint`를 한 path로 생성한다. frozen Carry
+  실행 시에만 ordered projection으로 carry goal까지의 prefix를 33점 보간하고, placement 뒤에는
+  같은 path의 goal 이후 suffix를 현재 실제 root로 평행이동해 33점 보간한다.
+- pre-placement 실행 path의 끝은 실제 carry goal에 정확히 고정하고, post-placement 실행 path의
+  끝은 기존 low-level policy 호환용 virtual box로 사용한다. 속도는 execution adapter가 고정값으로
+  부여한다. 계약 변경을 분리하기 위해 checkpoint schema를 v5로 올렸다.
+- execution slicing을 Isaac Gym과 분리한 순수 PyTorch 모듈로 만들고 prefix endpoint, suffix translation,
+  혼합 agent 동작을 포함해 stack planner 단위검사 19개가 통과했다. 이어 8-env, horizon 8,
+  low-step 6 simulator smoke가 PPO update와 v5 path-only checkpoint 저장까지 통과했다.
+- 실제 학습 재현을 위해 launcher sidecar에 init checkpoint, seed, PPO gamma/GAE/clip/value/entropy와
+  stack episode tolerance를 모두 기록한다. resume는 v5 checkpoint와 새 tag를 요구하며 iteration 수는
+  checkpoint 이후 추가 실행량으로 명시했다.
+- 장기 학습은 서버의 physical GPU 7 할당을 사용하므로 stack planner train launcher의 기본
+  `MA_GPU`를 7로 설정했다. 프로세스 내부 CUDA/Isaac Gym device는 `CUDA_VISIBLE_DEVICES=7`에 의해
+  기존과 동일하게 logical `cuda:0`으로 유지된다.
+
+### Retreat 전환을 규칙이 아닌 reward 학습 대상으로 변경
+
+- 직전 v3의 65-point route/suffix와 physical threshold 기반 route collapse를 제거했다. planner는
+  다시 32개 segment의 단일 33-point path만 출력하며 별도 retreat goal/head/switch는 없다.
+- 초기 zero prior는 기존 Carry와 같이 endpoint가 box goal인 `root → box → goal`이다. PPO는
+  경로를 직접 바꿀 수 있고, 실제 placement quality가 낮을수록 endpoint-goal 오차와 ordered
+  visit 오차를 크게 받는다. placement quality가 연속적으로 올라가면 이 shaping이 약해지고
+  기존 direction-free clearance outcome reward가 retreat path를 선택하게 한다.
+- decoder/runtime가 `retreat_ready`를 판정해 trajectory를 교체하지 않으므로 언제 path가
+  placement형에서 retreat형으로 변할지는 state-conditioned planner가 reward로 학습한다.
+  action/trajectory 의미 변경을 분리하기 위해 checkpoint schema를 v4로 올렸다.
+- 순수 PyTorch 단위검사 18개와 8-env, horizon 3, low-step 6 simulator smoke가 PPO update와
+  v4 checkpoint 저장까지 통과했다. 보수적인 endpoint exploration std `0.08`에서 초기
+  endpoint/visit shaping reward는 각각 `-0.197/-0.227`로 유한하게 계측됐다.
+
+### Stack planner를 단일 end-to-end trajectory로 통합
+
+- 별도 interaction/retreat head와 사후 `agent1_full_*` concatenation을 제거하고, planner의
+  공개 출력을 joint 65-point `path_world/speed/trajectory` 하나로 통일했다. Agent 1은 한
+  path 안에서 `root → box → stack goal → learned endpoint`를 표현하고 Agent 2는 goal 이후
+  같은 위치를 유지한다. 사용하지 않던 pickup dwell 출력도 함께 제거했다.
+- 매 replan에서 실제 `held`, box-goal 거리, box 선·각속도로 placement 완료를 판정한다.
+  완료 뒤에는 같은 Agent 1 path의 지난 route가 current root로 접혀 learned endpoint까지의
+  남은 retreat만 실행되며, 별도 retreat path나 planner 입력 phase signal로 head를 고르지 않는다.
+- ordered projection penalty는 아직 방문이 필요한 agent에만 적용하고 temporal consistency,
+  executor resampling, validity와 PPO action contract를 65-point 단일 path에 맞췄다. incompatible
+  checkpoint가 조용히 로드되지 않도록 schema를 `tokenhsi-stack-planner-v3`로 올렸다.
+- 순수 PyTorch 단위검사 18개와 8-env, horizon 3, low-step 6 실제 simulator smoke가
+  PPO update 및 v3 checkpoint 저장까지 통과했다. smoke의 평균 box/goal projection 거리는
+  `0.0959/0.0727 m`, visit penalty reward는 `-0.00741`이었다.
+
+### Stack planner temporal plan consistency
+
+- 기본 30 action-step plan hold 뒤의 새 replan이 매번 독립적으로 흔들리지 않도록, 직전
+  mean plan의 아직 실행되지 않은 future를 elapsed time만큼 정렬해 현재 mean plan과 비교하는
+  temporal consistency loss를 추가했다.
+- 일반 root→box→goal path/speed와 실제 execution bridge가 소비하는 Agent 1 retreat
+  path/speed를 함께 학습하며, episode reset과 agent별 물리 상태 phase 변화는 mask한다.
+- `STACK_PLANNER_CONSISTENCY_COEF`를 기본 `1.0`으로 launcher·sidecar·checkpoint·metrics에
+  기록한다. time alignment, reset/phase mask, 두 path head gradient를 포함한 stack planner
+  단위검사 14개가 통과했다. 8-env, horizon 3, low-step 6 실제 simulator smoke도 PPO update와
+  checkpoint 저장까지 통과했고 consistency가 `0.00548`, valid fraction이 `0.3333`으로 기록됐다.
+
+### Agent 1 placement-to-retreat full trajectory
+
+- 33-point interaction route와 learned retreat suffix를 연결한 65-point
+  `agent1_full_path_world/speed/trajectory` 출력을 추가했다. interaction route의 실제 learned
+  endpoint에서 suffix가 연속적으로 시작한다.
+- frozen Carry용 retreat path는 기존처럼 현재 actual root에 re-anchor해 실행하되, full trajectory는
+  같은 learned displacement를 route 끝에 붙인다. 따라서 agent의 box task goal을 retreat endpoint로
+  바꾸지 않고 planner의 최종 retreat objective를 별도로 표현한다.
+
+### Hard waypoint를 ordered projection constraint로 교체
+
+- ordinary path의 `P16=box`, `P32=goal` hard anchor를 제거하고 `P0=current root`만 고정했다.
+  zero-initialized head는 기존 root→box→goal 경로를 prior로 유지하지만 junction과 endpoint를
+  포함한 나머지 경로는 모두 학습 가능하다. action/head shape가 달라 checkpoint schema를
+  `tokenhsi-stack-planner-v2`로 올려 구 weight의 의미가 조용히 바뀌지 않게 했다.
+- 각 target을 모든 유한 선분에 투영하고, 서로 다른 선분 index 또는 같은 선분의 projection
+  fraction으로 `box → stack goal` 방문 순서를 강제하는 reward penalty를 추가했다. 기본 허용
+  반경은 0.15 m, 계수는 10이며 launcher sidecar/checkpoint/metrics에 함께 기록한다.
+- stack adapter의 validity는 root anchor, finite, buffer, speed, curvature만 검사한다. box/goal
+  방문 여부는 hard invalidation이 아니라 위 연속 penalty가 담당한다.
+- 순수 PyTorch 단위검사 17개와 8-env, horizon 3, low-step 6 실제 simulator smoke가 통과했다.
+  smoke는 v2 checkpoint 저장까지 완료했고 평균 box/goal projection 거리는 각각
+  `0.0896/0.1029 m`, visit penalty reward는 `-0.0168`이었다.
+
 ## 2026-09-10
+
+### Deterministic executor path-distortion MLP
+
+- `execution_bias/`에 joint 33-point `(x,y,v)` 계획 전체를 받아 각 planned timestamp의
+  world-coordinate `(dx,dy)` 33개를 직접 출력하는 deterministic residual MLP를 분리했다.
+- shared SE(2) canonicalization으로 전역 이동·회전에 equivariant하면서 두 agent의 상대
+  geometry와 먼 goal 문맥은 보존한다. zero-init 모델은 정확히 identity execution이고,
+  `planned_xy + predicted_error`를 planner collision cost에 넣을 때 gradient가 plan까지 흐른다.
+- nominal-time simulator trace 정렬, curve-weighted supervised loss, strict checkpoint, NPZ
+  dataset/training CLI와 planner candidate adapter를 추가했다. 새 전용 검사 6개와 기존
+  stack-planner 11개, coordinator 78개 검사가 모두 통과했다.
 
 ### Stack 전용 Transformer planner 패키지 분리
 
@@ -45,12 +145,39 @@
 
 - 학습 checkpoint를 strict schema 검사 후 로드하고 candidate 0의 mean trajectory를
   deterministic하게 실행하는 `HumanoidMAStackPlannerView`와 전용 launcher를 추가했다.
-- 기본 6 low-level step 및 stack phase 전환마다 실제 simulator state에서 재계획하고,
+- 기본 30 action step 및 stack phase 전환마다 실제 simulator state에서 재계획하고,
   planner의 path/speed와 learned retreat endpoint를 frozen sequential-stack agent에 적용한다.
 - 기존 coordinator/viewer와 파일을 공유하지 않는다. launcher는 noVNC 없이 로컬 Isaac Gym
   창을 직접 띄우고 기본 GPU 0을 사용하며 `MA_GPU`로 로컬 GPU를 선택할 수 있다.
 - retreat head는 이미 있으나 중복 contract field 두 개가 없던 초기 v1 weight도 해당 값을
   model config에서 복구한 뒤 나머지 schema와 state dict를 동일하게 strict 검사한다.
+- 로컬 viewer의 첫 render에서 generic marker updater가 carry-only scene에 없는 sit/climb
+  actor ID를 함께 commit해 PhysX illegal memory access가 나던 것을 막았다. planner path
+  overlay는 유지하고 시뮬레이션 state를 쓰지 않는 viewer 전용 marker 갱신만 생략한다.
+
+### Stack planner plan hold와 replan 경계 속도 연속성
+
+- 학습 macro action과 viewer의 기본 plan hold를 6 action step(약 0.2초)에서 30 step(30 Hz에서
+  약 1초)으로 함께 늘렸다. 일반 구간은 그동안 accepted path를 유지하고 stack phase 전환은
+  즉시 replan한다.
+- 각 path 내부 가속도 제한과 별도로, accepted plan이 바뀔 때 executor에 전달되는 속도
+  command도 이전 command에서 기본 `0.75m/s²` 이하로 변화시킨다. 새 knob는
+  `STACK_PLANNER_COMMAND_ACCEL`이며 학습 sidecar에 기록한다.
+- invalid replan은 기존처럼 마지막 valid path를 덮어쓰지 않는다. 이 변경은 GT trajectory나
+  retreat 방향을 추가하지 않고 plan의 시간적 유지와 물리적 command 연속성만 보장한다.
+
+### Stack planner episode full reset
+
+- stack 전용 reset이 humanoid root와 box/platform root를 두 번의 indexed setter로 나눠
+  제출하던 것을 한 번의 actor-ID commit으로 합쳤다. Isaac Gym GPU pipeline에서 마지막
+  setter만 남아 이전 episode의 agent 또는 box pose가 물리에 유지될 수 있던 문제를 막는다.
+- reset 대상은 해당 env의 agent 2명, box 2개와 활성 platform 전부이며 DOF, root/object
+  linear·angular velocity, stack phase, planner path/speed 상태도 새 episode 값으로 초기화한다.
+- sequential 후처리가 target platform을 숨기며 추가 root setter를 호출하는 경우에도, 모든
+  후처리 뒤 agent·box·platform 전체 actor 집합을 마지막 authoritative reset으로 다시 제출한다.
+- full-stack planner의 episode reset은 기본 `STACK_PLANNER_FRESH_START=1`로 carry skill
+  분포를 `loco_carry=1.0`에 고정한다. 기존 mixed reset의 `carryWith`/`putDown` RSI 때문에
+  정상 reset도 이전 episode의 마지막 자세처럼 보이고 전체 순서를 건너뛰던 문제를 제거한다.
 
 ## 2026-09-09
 

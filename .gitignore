@@ -54,6 +54,7 @@ nohup.out
 /runs/sweep_logs/
 /runs/verify_logs/
 /runs/compat_logs/
+/runs/tools/novnc-runtime/
 /runs/queue/logs/
 /runs/queue/exits/
 /runs/queue/gpu_locks/

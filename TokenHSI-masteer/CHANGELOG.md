@@ -1,5 +1,27 @@
 # TokenHSI-ma — 변경 기록
 
+## 2026-09-11
+
+### Sequential-stack viewer를 visitor SSH용 noVNC로 이식
+
+- `view_sequential_stack.sh`가 구 `/home/hwanhee` 경로의 viewer를 호출하던 구조를
+  제거하고, 현재 프로젝트의 검증된 local viewer 앞에 Xvfb, x11vnc, websockify를
+  붙이는 loopback 전용 래퍼로 교체했다.
+- noVNC와 VNC는 모두 `127.0.0.1`에만 bind한다. `visitor`가 자신의 SSH 세션에서
+  read-only 공유 저장소의 viewer와 시뮬레이션을 직접 실행하고, 같은 연결의 `ssh -L`
+  터널을 통해 자신의 브라우저로 접속한다.
+- sudo가 필요한 전역 설치 대신 Ubuntu 패키지를 `runs/tools/novnc-runtime`에
+  추출한 프로젝트 전용 런타임을 사용한다. 포트·X display 충돌, 하위 프로세스 시작,
+  로그 경로를 검사하고 종료 시 이 스크립트가 만든 세 서비스만 정리한다.
+- `NOVNC_SMOKE_ONLY=1`로 시뮬레이션 없이 Xvfb, VNC listener, noVNC HTTP 응답과
+  종료 정리를 검증할 수 있게 했다.
+- GPU device가 other read/write이고 공유 프로젝트, checkpoint, conda env, noVNC
+  runtime이 other read/execute임을 확인했다. 동일 포트 연속 2회 smoke가 통과해
+  `visitor` 실행에 별도 저장소 쓰기 권한이나 GPU 그룹 추가가 필요 없다.
+- 전용 런타임의 Ubuntu Python 3.14용 NumPy 경로를 전역 `PYTHONPATH`로 넘겨
+  visitor의 Python 3.8 Isaac Gym import를 가리던 문제를 수정했다. 해당 경로와
+  `libvncserver` 경로는 각각 websockify와 x11vnc 자식 프로세스에만 적용한다.
+
 ## 2026-09-08
 
 ### Coord carry viewer 기본 조건을 학습 분포에 정렬

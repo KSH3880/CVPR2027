@@ -24,6 +24,10 @@ import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from coordinator.schema import AGENTS, STATE_KEYS, CoordinatorState  # noqa: E402
 from stack_planner.checkpoint import load_stack_checkpoint, save_stack_checkpoint  # noqa: E402
+from stack_planner.consistency import (  # noqa: E402
+    build_stack_consistency_target, stack_trajectory_consistency_loss,
+)
+from stack_planner.constraints import ordered_box_goal_visit  # noqa: E402
 from stack_planner.env_adapter import HumanoidMAStackPlannerTrain  # noqa: E402
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner  # noqa: E402
 from stack_planner.policy import StackPlannerActorCritic  # noqa: E402
@@ -48,6 +52,15 @@ def _flatten_states(states: List[CoordinatorState]) -> CoordinatorState:
         key: torch.cat([getattr(state, key) for state in states], dim=0)
         for key in STATE_KEYS
     })
+
+
+def _flatten_consistency_targets(targets):
+    if not targets:
+        return None
+    return {
+        key: torch.cat([target[key] for target in targets], dim=0)
+        for key in targets[0]
+    }
 
 
 def _clone_physical(state: StackPhysicalState) -> StackPhysicalState:
@@ -142,10 +155,14 @@ def _make_player(args, cfg, cfg_train):
 
 
 def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
-                advantages, epochs, minibatch, clip_ratio, value_coef,
-                entropy_coef):
+                advantages, consistency_targets, epochs, minibatch,
+                clip_ratio, value_coef, entropy_coef, consistency_coef):
     total = actions.shape[0]
-    sums = {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0}
+    sums = {
+        "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
+        "consistency": 0.0, "consistency_position": 0.0,
+        "consistency_valid_fraction": 0.0,
+    }
     updates = 0
     for _ in range(epochs):
         for index in torch.randperm(total, device=actions.device).split(minibatch):
@@ -159,7 +176,25 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
             policy_loss = -objective.mean()
             value_loss = (value - returns[index]).square().mean()
             entropy_mean = entropy.mean()
-            loss = policy_loss + value_coef * value_loss - entropy_coef * entropy_mean
+            if consistency_coef > 0.0 and consistency_targets is not None:
+                target = {
+                    key: item[index]
+                    for key, item in consistency_targets.items()
+                }
+                consistency = stack_trajectory_consistency_loss(
+                    policy.planner(state), state, target,
+                )
+            else:
+                zero = policy_loss.new_zeros(())
+                consistency = {
+                    "total": zero, "position": zero,
+                    "valid_fraction": zero,
+                }
+            loss = (
+                policy_loss + value_coef * value_loss
+                - entropy_coef * entropy_mean
+                + consistency_coef * consistency["total"]
+            )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(policy.parameters(), 1.0)
@@ -167,6 +202,11 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
             sums["policy_loss"] += float(policy_loss.detach())
             sums["value_loss"] += float(value_loss.detach())
             sums["entropy"] += float(entropy_mean.detach())
+            sums["consistency"] += float(consistency["total"].detach())
+            sums["consistency_position"] += float(consistency["position"].detach())
+            sums["consistency_valid_fraction"] += float(
+                consistency["valid_fraction"].detach()
+            )
             updates += 1
     return {key: value / max(updates, 1) for key, value in sums.items()}
 
@@ -204,9 +244,16 @@ def main():
 
     iterations = _env_int("STACK_PLANNER_ITERS", 200)
     horizon = _env_int("STACK_PLANNER_HORIZON", 32)
-    low_steps = _env_int("STACK_PLANNER_LOW_STEPS", 6)
+    low_steps = _env_int("STACK_PLANNER_LOW_STEPS", 30)
     gamma = _env_float("STACK_PLANNER_GAMMA", 0.99)
     gae_lambda = _env_float("STACK_PLANNER_GAE", 0.95)
+    consistency_coef = _env_float("STACK_PLANNER_CONSISTENCY_COEF", 1.0)
+    if consistency_coef < 0:
+        raise ValueError("STACK_PLANNER_CONSISTENCY_COEF must be non-negative")
+    visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
+    visit_tolerance = _env_float("STACK_PLANNER_VISIT_TOLERANCE", 0.15)
+    if visit_penalty_coef < 0 or visit_tolerance < 0:
+        raise ValueError("stack planner path-shaping coefficients must be non-negative")
     output_dir = Path(os.environ.get(
         "STACK_PLANNER_OUTPUT", str(WORKSPACE / "runs/stack_planner/default")
     )).expanduser().resolve()
@@ -219,11 +266,17 @@ def main():
     # triggers an Isaac Gym GPU-pipeline fault on this stack-task build.
     _refresh_obs(player)
     print(f"[stack-planner-train] envs={task.num_envs} horizon={horizon} "
-          f"low_steps={low_steps} iterations={iterations} frozen={args.checkpoint}",
+          f"low_steps={low_steps} consistency={consistency_coef:g} "
+          f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
+          f"iterations={iterations} frozen={args.checkpoint}",
           flush=True)
     first = 1 if payload is None else int(payload.get("step", 0)) + 1
+    previous_mean_output = None
+    previous_state = None
+    previous_done = torch.ones(task.num_envs, device=device, dtype=torch.bool)
     for iteration in range(first, first + iterations):
         states: List[CoordinatorState] = []
+        consistency_targets = []
         actions: List[torch.Tensor] = []
         log_probs: List[torch.Tensor] = []
         values: List[torch.Tensor] = []
@@ -234,15 +287,51 @@ def main():
             state = task.planner_state()
             before = _clone_physical(task.planner_physical_state())
             with torch.no_grad():
+                if consistency_coef > 0.0:
+                    mean_output = policy.planner(state)
+                    if previous_mean_output is None or previous_state is None:
+                        consistency_target = build_stack_consistency_target(
+                            mean_output, state, state, 0.0,
+                            torch.zeros_like(previous_done),
+                        )
+                    else:
+                        consistency_target = build_stack_consistency_target(
+                            previous_mean_output, previous_state, state,
+                            low_steps * float(task.dt), ~previous_done,
+                        )
                 output, action, log_prob, value = policy.act(state)
+                visit = ordered_box_goal_visit(
+                    output["path_world"],
+                    state.box_xyz[:, None, :, :2].expand(
+                        -1, output["path_world"].shape[1], -1, -1
+                    ),
+                    state.goal_xy[:, None].expand(
+                        -1, output["path_world"].shape[1], -1, -1
+                    ),
+                    tolerance=visit_tolerance,
+                )
                 valid, safe = task.install_external_plan(output)
             terms, done = _macro_step(player, before, valid, safe, low_steps)
+            route_penalty = visit["penalty"][:, 0].mean(dim=-1)
+            terms["route_visit_penalty"] = -visit_penalty_coef * route_penalty
+            terms["route_box_distance"] = visit["box_distance"][:, 0].mean(dim=-1)
+            terms["route_goal_distance"] = visit["goal_distance"][:, 0].mean(dim=-1)
+            terms["total"] = terms["total"] + terms["route_visit_penalty"]
             states.append(state.clone())
+            if consistency_coef > 0.0:
+                consistency_targets.append(consistency_target)
             actions.append(action)
             log_probs.append(log_prob)
             values.append(value)
             rewards.append(terms["total"])
             dones.append(done)
+            if consistency_coef > 0.0:
+                previous_mean_output = {
+                    key: mean_output[key].detach().clone()
+                    for key in ("path_world",)
+                }
+                previous_state = state.clone()
+                previous_done = done.detach().clone()
             for key, tensor in terms.items():
                 diag[key] = diag.get(key, 0.0) + float(tensor.mean())
 
@@ -266,11 +355,13 @@ def main():
         update = _ppo_update(
             policy, optimizer, _flatten_states(states), torch.cat(actions),
             torch.cat(log_probs), returns.flatten(), flat_adv,
+            _flatten_consistency_targets(consistency_targets),
             _env_int("STACK_PLANNER_PPO_EPOCHS", 3),
             _env_int("STACK_PLANNER_MINIBATCH", 512),
             _env_float("STACK_PLANNER_CLIP", 0.2),
             _env_float("STACK_PLANNER_VALUE_COEF", 0.5),
             _env_float("STACK_PLANNER_ENTROPY_COEF", 1e-4),
+            consistency_coef,
         )
         metrics = {
             "iteration": iteration,
@@ -278,20 +369,28 @@ def main():
             "done_rate": float(done_t.mean()),
             **{key: value / horizon for key, value in diag.items()},
             **update,
+            "consistency_coef": consistency_coef,
+            "visit_penalty_coef": visit_penalty_coef,
+            "visit_tolerance": visit_tolerance,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(metrics, sort_keys=True) + "\n")
         print("[stack-planner-train] " + " ".join(
             f"{key}={value:.5g}" for key, value in metrics.items()
             if key in {"iteration", "reward", "done_rate", "potential_delta",
-                       "humanoid_fall_penalty", "policy_loss", "value_loss"}
+                       "humanoid_fall_penalty", "route_visit_penalty",
+                       "policy_loss", "value_loss"}
         ), flush=True)
         if iteration % save_every == 0 or iteration == first + iterations - 1:
             save_stack_checkpoint(
                 output_dir / f"planner_{iteration:06d}.pth", policy.planner,
                 step=iteration, metrics=metrics, optimizer=optimizer,
                 extras={"action_log_std": policy.action_log_std.detach().cpu(),
-                        "frozen_executor": str(Path(args.checkpoint).resolve())},
+                        "frozen_executor": str(Path(args.checkpoint).resolve()),
+                        "consistency_coef": consistency_coef,
+                        "commit_steps": low_steps,
+                        "visit_penalty_coef": visit_penalty_coef,
+                        "visit_tolerance": visit_tolerance},
             )
 
 

@@ -1,10 +1,4 @@
-"""Transformer-based joint path and speed model for the stack task.
-
-V1 intentionally preserves the existing coordinator I/O.  Stack-specific
-event, placement-height, and dependency heads can be added to
-``StackPlannerHeads`` later without changing the scene encoder or trajectory
-decoder.
-"""
+"""Transformer planner emitting one end-to-end XY path per stack agent."""
 
 from __future__ import annotations
 
@@ -14,19 +8,10 @@ from typing import Dict, Mapping, Optional, Union
 import torch
 from torch import nn
 
-from coordinator.geometry import (
-    TOKEN_DIM,
-    build_bezier_paths,
-    integrate_speed,
-    shared_to_world,
-    state_to_tokens,
-)
+from coordinator.geometry import TOKEN_DIM, shared_to_world, state_to_tokens
 
 from .schema import (
-    ACCEL_KNOTS,
     AGENTS,
-    MAX_SPEED,
-    PATH_POINTS,
     STACK_CANDIDATES,
     CoordinatorState,
 )
@@ -43,7 +28,6 @@ class StackPlannerConfig:
     dropout: float = 0.0
     candidates: int = STACK_CANDIDATES
     residual_scale: float = 3.0
-    retreat_distance: float = 2.0
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -56,8 +40,6 @@ class StackPlannerConfig:
             raise ValueError("feedforward and candidates must be positive")
         if self.residual_scale <= 0:
             raise ValueError("residual_scale must be positive")
-        if self.retreat_distance <= 0:
-            raise ValueError("retreat_distance must be positive")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -127,7 +109,7 @@ class StackCandidateDecoder(nn.Module):
 
 
 class StackPlannerHeads(nn.Module):
-    """Current path/speed contract and the extension point for later heads."""
+    """One path head for the complete joint future."""
 
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
@@ -140,39 +122,26 @@ class StackPlannerHeads(nn.Module):
                 nn.Linear(hidden, size),
             )
 
-        self.path = head(AGENTS * 4 * 2)
-        self.acceleration = head(AGENTS * ACCEL_KNOTS)
-        self.pickup_dwell = head(AGENTS)
-        # endpoint delta + two cubic control-point residuals.  This is a
-        # physical root trajectory, not a virtual Carry-object prediction.
-        self.retreat_path = head(AGENTS * 3 * 2)
-        self.retreat_acceleration = head(AGENTS * ACCEL_KNOTS)
+        # Six vectors per agent describe root->box->goal. Three more extend
+        # Agent 1 to the final point of the same path; this is not a separate
+        # retreat output/head.
+        self.path = head((AGENTS * 6 + 3) * 2)
         self.value = head(1)
-        self.risk = head(3)
-        # A fresh planner starts from straight paths and constant speed.  PPO
-        # exploration, rather than arbitrary last-layer initialization, owns
-        # the first deviations from that executable prior.
-        for module in (
-            self.path, self.acceleration,
-            self.retreat_path, self.retreat_acceleration,
-        ):
-            nn.init.zeros_(module[-1].weight)
-            nn.init.zeros_(module[-1].bias)
+        # A fresh planner starts from straight paths. PPO exploration, rather
+        # than arbitrary last-layer initialization, owns the first deviations
+        # from that executable prior.
+        nn.init.zeros_(self.path[-1].weight)
+        nn.init.zeros_(self.path[-1].bias)
 
     def forward(self, decoded: torch.Tensor) -> Dict[str, torch.Tensor]:
         return {
             "path_raw": self.path(decoded),
-            "accel_raw": self.acceleration(decoded),
-            "dwell_raw": self.pickup_dwell(decoded),
-            "retreat_path_raw": self.retreat_path(decoded),
-            "retreat_accel_raw": self.retreat_acceleration(decoded),
             "candidate_value": self.value(decoded).squeeze(-1),
-            "risk_logits": self.risk(decoded),
         }
 
 
 class StackTrajectoryPlanner(nn.Module):
-    """Predict joint XY paths and path-local speeds for two stack agents."""
+    """Predict one joint XY path; execution concerns stay outside the model."""
 
     def __init__(self, config: Optional[StackPlannerConfig] = None):
         super().__init__()
@@ -203,100 +172,66 @@ class StackTrajectoryPlanner(nn.Module):
         """Decode network means or sampled PPO head values into trajectories."""
         _, frame = state_to_tokens(state)
 
-        residual = raw["path_raw"].reshape(
-            state.batch_size, self.config.candidates, AGENTS, 4, 2
+        path_raw = raw["path_raw"].reshape(
+            state.batch_size, self.config.candidates, AGENTS * 6 + 3, 2
         )
-        residual = self.config.residual_scale * torch.tanh(residual)
-        # A carried box makes root->box a completed leg.  Keeping that leg on
-        # the baseline matches the existing coordinator execution contract.
-        first_leg = torch.where(
-            state.held[:, None, :, None, None] >= 0.5,
-            torch.zeros_like(residual[..., :2, :]),
-            residual[..., :2, :],
+        route_residual = self.config.residual_scale * torch.tanh(
+            path_raw[..., :AGENTS * 6, :].reshape(
+                state.batch_size, self.config.candidates, AGENTS, 6, 2
+            )
         )
-        residual = torch.cat((first_leg, residual[..., 2:, :]), dim=-2)
-        path_local = build_bezier_paths(frame, residual)
+        suffix_raw = path_raw[..., AGENTS * 6:, :]
+        root = frame["root"][:, None]
+        junction = frame["box"][:, None] + route_residual[..., 0, :]
+        route_endpoint = frame["goal"][:, None] + route_residual[..., 1, :]
+        first_delta = junction - root
+        second_delta = route_endpoint - junction
+        base_control = torch.stack((
+            root + first_delta / 3.0,
+            root + 2.0 * first_delta / 3.0,
+            junction + second_delta / 3.0,
+            junction + 2.0 * second_delta / 3.0,
+        ), dim=-2)
+        control = base_control + route_residual[..., 2:, :]
+
+        def cubic(start, controls, end, samples):
+            curve_t = torch.linspace(
+                0.0, 1.0, samples, device=start.device, dtype=start.dtype,
+            ).reshape((1,) * (start.ndim - 1) + (samples, 1))
+            omt = 1.0 - curve_t
+            return (
+                omt ** 3 * start.unsqueeze(-2)
+                + 3.0 * omt ** 2 * curve_t * controls[..., 0, :].unsqueeze(-2)
+                + 3.0 * omt * curve_t ** 2 * controls[..., 1, :].unsqueeze(-2)
+                + curve_t ** 3 * end.unsqueeze(-2)
+            )
+
+        first_curve = cubic(root, control[..., :2, :], junction, 11)
+        second_curve = cubic(junction, control[..., 2:, :], route_endpoint, 12)
+        a1_start = route_endpoint[..., 0, :]
+        a1_delta = self.config.residual_scale * torch.tanh(suffix_raw[..., 0, :])
+        a1_endpoint = a1_start + a1_delta
+        a1_base = torch.stack((
+            a1_start + a1_delta / 3.0,
+            a1_start + 2.0 * a1_delta / 3.0,
+        ), dim=-2)
+        a1_control = a1_base + self.config.residual_scale * torch.tanh(
+            suffix_raw[..., 1:, :]
+        )
+        a1_suffix = cubic(a1_start, a1_control, a1_endpoint, 12)
+        a2_suffix = route_endpoint[..., 1, None, :].expand(-1, -1, 12, -1)
+        suffix = torch.stack((a1_suffix, a2_suffix), dim=2)
+        path_local = torch.cat((
+            first_curve, second_curve[..., 1:, :], suffix[..., 1:, :],
+        ), dim=-2)
+        path_local[..., 0, :] = root
         path_world = shared_to_world(
             path_local,
             frame["center"][:, None],
             frame["angle"][:, None],
         )
 
-        accel_raw = raw["accel_raw"].reshape(
-            state.batch_size, self.config.candidates, AGENTS, ACCEL_KNOTS
-        )
-        initial_speed = state.root_vel_xy.norm(dim=-1)[:, None].expand(
-            -1, self.config.candidates, -1
-        )
-        speed, acceleration = integrate_speed(path_world, accel_raw, initial_speed)
-
-        pickup_dwell = 0.5 + 2.5 * torch.sigmoid(
-            raw["dwell_raw"].reshape(
-                state.batch_size, self.config.candidates, AGENTS
-            )
-        )
-        pickup_dwell = torch.where(
-            state.held[:, None] >= 0.5,
-            torch.zeros_like(pickup_dwell),
-            pickup_dwell,
-        )
-
-        retreat_raw = raw["retreat_path_raw"].reshape(
-            state.batch_size, self.config.candidates, AGENTS, 3, 2
-        )
-        endpoint_delta = self.config.retreat_distance * torch.tanh(
-            retreat_raw[..., 0, :]
-        )
-        root = frame["root"][:, None]
-        endpoint = root + endpoint_delta
-        control_residual = self.config.residual_scale * torch.tanh(
-            retreat_raw[..., 1:, :]
-        )
-        base = torch.stack(
-            (root + endpoint_delta / 3.0, root + 2.0 * endpoint_delta / 3.0),
-            dim=-2,
-        )
-        control = base + control_residual
-        # Use two 17-sample halves of the same cubic so the public path length
-        # stays identical to the ordinary coordinator output (33 points).
-        t = torch.linspace(
-            0.0, 1.0, PATH_POINTS,
-            device=state.device, dtype=state.root_xy.dtype,
-        ).reshape(1, 1, 1, PATH_POINTS, 1)
-        omt = 1.0 - t
-        retreat_local = (
-            omt ** 3 * root.unsqueeze(-2)
-            + 3.0 * omt ** 2 * t * control[..., 0, :].unsqueeze(-2)
-            + 3.0 * omt * t ** 2 * control[..., 1, :].unsqueeze(-2)
-            + t ** 3 * endpoint.unsqueeze(-2)
-        )
-        retreat_local[..., 0, :] = root
-        retreat_local[..., -1, :] = endpoint
-        retreat_world = shared_to_world(
-            retreat_local, frame["center"][:, None], frame["angle"][:, None]
-        )
-        retreat_accel_raw = raw["retreat_accel_raw"].reshape(
-            state.batch_size, self.config.candidates, AGENTS, ACCEL_KNOTS
-        )
-        retreat_speed, retreat_acceleration = integrate_speed(
-            retreat_world, retreat_accel_raw, initial_speed
-        )
-
         return {
             "path_local": path_local,
             "path_world": path_world,
-            "speed": speed,
-            "acceleration": acceleration,
-            "pickup_dwell": pickup_dwell,
-            "candidate_value": raw["candidate_value"],
-            "risk_logits": raw["risk_logits"],
-            "control_residual": residual,
-            "accel_knots_raw": accel_raw,
-            "retreat_path_local": retreat_local,
-            "retreat_path_world": retreat_world,
-            "retreat_speed": retreat_speed,
-            "retreat_acceleration": retreat_acceleration,
-            "retreat_control_raw": retreat_raw,
-            "retreat_accel_knots_raw": retreat_accel_raw,
-            "trajectory": torch.cat((path_world, speed.unsqueeze(-1)), dim=-1),
         }

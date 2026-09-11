@@ -9,21 +9,15 @@ from torch import nn
 from torch.distributions import Normal
 
 from coordinator.geometry import state_to_tokens
-from coordinator.schema import ACCEL_KNOTS, AGENTS, CoordinatorState
+from coordinator.schema import AGENTS, CoordinatorState
 
 from .model import StackTrajectoryPlanner
 
 
-def _sizes(model: StackTrajectoryPlanner) -> Tuple[int, int, int, int, int, int]:
+def _sizes(model: StackTrajectoryPlanner) -> Tuple[int, int]:
     k = model.config.candidates
-    ordinary_path = k * AGENTS * 4 * 2
-    ordinary_accel = k * AGENTS * ACCEL_KNOTS
-    dwell = k * AGENTS
-    retreat_path = k * AGENTS * 3 * 2
-    retreat_accel = k * AGENTS * ACCEL_KNOTS
-    return (ordinary_path, ordinary_accel, dwell, retreat_path,
-            retreat_accel, ordinary_path + ordinary_accel + dwell
-            + retreat_path + retreat_accel)
+    path = k * (AGENTS * 6 + 3) * 2
+    return path, path
 
 
 def _raw_heads(model: StackTrajectoryPlanner, state: CoordinatorState) -> Dict[str, torch.Tensor]:
@@ -32,13 +26,7 @@ def _raw_heads(model: StackTrajectoryPlanner, state: CoordinatorState) -> Dict[s
 
 
 def pack_mean(model: StackTrajectoryPlanner, raw: Dict[str, torch.Tensor]) -> torch.Tensor:
-    return torch.cat((
-        raw["path_raw"].flatten(start_dim=1),
-        raw["accel_raw"].flatten(start_dim=1),
-        raw["dwell_raw"].flatten(start_dim=1),
-        raw["retreat_path_raw"].flatten(start_dim=1),
-        raw["retreat_accel_raw"].flatten(start_dim=1),
-    ), dim=-1)
+    return raw["path_raw"].flatten(start_dim=1)
 
 
 def decode_action(
@@ -47,18 +35,17 @@ def decode_action(
     action: torch.Tensor,
     template: Dict[str, torch.Tensor],
 ) -> Dict[str, torch.Tensor]:
-    path_n, accel_n, dwell_n, retreat_n, retreat_accel_n, total = _sizes(model)
+    path_n, total = _sizes(model)
     if action.shape != (state.batch_size, total):
         raise ValueError(f"expected action [B,{total}], got {tuple(action.shape)}")
-    sizes = (path_n, accel_n, dwell_n, retreat_n, retreat_accel_n)
-    names = ("path_raw", "accel_raw", "dwell_raw",
-             "retreat_path_raw", "retreat_accel_raw")
+    sizes = (path_n,)
+    names = ("path_raw",)
     raw = dict(template)
     start = 0
     for name, size in zip(names, sizes):
         raw[name] = action[:, start:start + size]
         start += size
-    # Bounding happens in the differentiable trajectory decoder.  A finite
+    # Bounding happens in the differentiable path decoder.  A finite
     # clamp only prevents extreme exploration samples from saturating it.
     for name in names:
         raw[name] = raw[name].clamp(-5.0, 5.0)
@@ -69,19 +56,16 @@ class StackPlannerActorCritic(nn.Module):
     def __init__(self, planner: StackTrajectoryPlanner, init_std: float = 0.15):
         super().__init__()
         self.planner = planner
-        path_n, accel_n, dwell_n, retreat_n, retreat_accel_n, self.action_dim = _sizes(planner)
+        path_n, self.action_dim = _sizes(planner)
         std = torch.full((self.action_dim,), float(init_std))
-        # Ordinary path perturbations should initially preserve a usable Carry
-        # plan; retreat endpoint exploration must remain large enough to move.
+        # Preserve a mostly executable route prior while letting the endpoint
+        # explore whether it should remain at the Carry goal or move away.
         std[:path_n] = 0.03
-        retreat_start = path_n + accel_n + dwell_n
-        std[retreat_start:retreat_start + retreat_n] = 0.08
-        endpoint_per_candidate = AGENTS * 3 * 2
+        path_per_candidate = (AGENTS * 6 + 3) * 2
         for candidate in range(planner.config.candidates):
-            base = retreat_start + candidate * endpoint_per_candidate
-            for agent in range(AGENTS):
-                pos = base + agent * 6
-                std[pos:pos + 2] = 0.35
+            base = candidate * path_per_candidate
+            endpoint = base + AGENTS * 6 * 2
+            std[endpoint:endpoint + 2] = 0.20
         self.action_log_std = nn.Parameter(std.log())
 
     def distribution(self, state: CoordinatorState):
