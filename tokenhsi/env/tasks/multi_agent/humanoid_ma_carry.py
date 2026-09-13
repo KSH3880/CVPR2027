@@ -51,8 +51,8 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
         if self._state_relation:
             if cfg['env'].get('policyObsMode', 'legacy_multirow') != 'clean_scene':
                 raise ValueError('state_relation_v0 requires policyObsMode=clean_scene')
-            self.REWARD_TERM_NAMES = ('holding_delta', 'at_delta', 'holding_velocity',
-                'at_velocity', 'success_bonus', 'power', 'collision', 'box_speed', 'total')
+            self.REWARD_TERM_NAMES = ('holding_state', 'at_state', 'holding_progress',
+                'at_progress', 'success_bonus', 'power', 'collision', 'box_speed', 'total')
         num_agents = int(cfg["env"].get("numAgents", 1))
         configured_objects = int(cfg["env"].get("numObjects", 0))
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects

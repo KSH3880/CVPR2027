@@ -31,8 +31,9 @@ def test_one_time_bonus_previous_achievement_and_independent_agents():
     second = r.step(phi, torch.zeros_like(phi))
     assert second['success_bonus'].tolist() == [[5., 0.]]
     third = r.step(torch.tensor([[0., 0., .5, 0.]]), torch.ones_like(phi))
-    assert third['agent_task_reward'][0, 0] == 0
+    assert third['agent_task_reward'][0, 0] > 0  # done only suppresses another bonus
     assert third['agent_task_reward'][0, 1] > 0
+    assert third['success_bonus'].sum() == 0
     assert r.done.tolist() == [[True, False]]
     fourth = r.step(phi, torch.ones_like(phi))
     assert fourth['success_bonus'].sum() == 0
@@ -65,16 +66,3 @@ def test_documented_pick_once_then_kick_and_goal_first_touch():
     assert out['success_bonus'].item() == 0
     out = r.step(torch.tensor([[0., 1.]]), torch.zeros(1, 2))
     assert out['success_bonus'].item() == 5
-
-
-def test_signed_runtime_keeps_state2_weight_and_semantic_suffix():
-    cfg = {'state_delta_weight': 2., 'progress': {'mode': 'signed_linear'},
-           'diagnostics': {'validate_tensors': True}}
-    r = RelationRuntime(1, compile_carry_subgoal(1, 1), cfg, 'cpu')
-    r.reset(torch.tensor([0]), torch.tensor([[.8, .2]]))
-    out = r.step(torch.tensor([[.9, .4]]), torch.full((1, 2), -.5))
-    torch.testing.assert_close(out['state_component'], torch.tensor([[.2, .2]]))
-    torch.testing.assert_close(out['velocity_component'], torch.tensor([[-.05, -.05]]))
-    torch.testing.assert_close(out['agent_task_reward'], torch.tensor([[.3]]))
-    assert r.suffix().shape == (1, 9)
-    assert ((r.suffix() >= 0) & (r.suffix() <= 1)).all()

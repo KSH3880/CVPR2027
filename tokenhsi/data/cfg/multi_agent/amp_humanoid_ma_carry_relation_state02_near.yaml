@@ -1,3 +1,4 @@
+# State02-based At-state correction: phi_At is the TokenHSI XYZ box-near Gaussian only.
 # Multi-agent box carrying.
 # numAgents: 1 exercises the same clean scene path with one H/O/T triplet.
 # numObjects: 0 means one box per agent. Values >= numAgents add unassigned distractors.
@@ -9,11 +10,11 @@ env:
   isFlagrun: False
   enableDebugVis: False
 
-  # Session decisions: preserve timeout/fall; no distance cutoff or new braking mask.
+  # State/progress weights match TokenHSI. At success is phi_At >= 0.9.
   relationReward:
     mode: state_relation_v0
     schema_version: 1
-    state_reward_weight: 1.0
+    state_reward_weight: 0.2
     progress_reward_weight: 0.2
     subgoal_success_bonus: 5.0
     satisfaction_threshold: 0.9
@@ -21,10 +22,8 @@ env:
     progress: {target_speed: 1.5, velocity_scale: 5.0, normalization_epsilon: 0.000001}
     holding: {hand_distance_scale: 5.0}
     at:
+      state_definition: box_near
       near_distance_scale: 10.0
-      near_fraction: 0.5
-      putdown_xy_tolerance: 0.1
-      putdown_z_tolerance: 0.001
     success:
       require_achieved_target_prerequisites: true
       once_per_subgoal: true

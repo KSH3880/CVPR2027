@@ -52,7 +52,7 @@ def validate_relation_config(config):
         raise ValueError('Unsupported relationReward mode: ' + str(mode))
     if mode == LEGACY_MODE:
         return
-    allowed = {'mode', 'schema_version', 'state_delta_weight', 'velocity_progress_weight',
+    allowed = {'mode', 'schema_version', 'state_reward_weight', 'progress_reward_weight',
                'subgoal_success_bonus', 'satisfaction_threshold', 'soft_gate', 'progress',
                'holding', 'at', 'success', 'observation', 'diagnostics'}
     unknown = set(config) - allowed
@@ -60,9 +60,10 @@ def validate_relation_config(config):
         raise ValueError('Unsupported relationReward fields/operators: ' + ', '.join(sorted(unknown)))
     nested = {
         'soft_gate': {'beta', 'center'},
-        'progress': {'mode', 'target_speed', 'velocity_scale', 'normalization_epsilon'},
+        'progress': {'kind', 'target_speed', 'velocity_scale', 'normalization_epsilon'},
         'holding': {'hand_distance_scale'},
-        'at': {'near_distance_scale', 'near_fraction', 'putdown_xy_tolerance', 'putdown_z_tolerance'},
+        'at': {'state_definition', 'near_distance_scale', 'near_fraction',
+               'putdown_xy_tolerance', 'putdown_z_tolerance'},
         'observation': {'include_relation_state', 'relation_state_fields', 'include_subgoal_done'},
         'success': {'require_achieved_target_prerequisites', 'once_per_subgoal',
                     'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success',
@@ -71,10 +72,14 @@ def validate_relation_config(config):
     for key, keys in nested.items():
         if not isinstance(config.get(key, {}), dict) or set(config.get(key, {})) - keys:
             raise ValueError('Unsupported relationReward.' + key + ' configuration')
-    if config.get('progress', {}).get('mode', 'gaussian') not in ('gaussian', 'signed_linear'):
-        raise ValueError('Unsupported relationReward.progress.mode')
     if config.get('schema_version', 1) != 1:
         raise ValueError('Unsupported relation schema_version')
+    progress = config.get('progress', {})
+    progress_kind = progress.get('kind', 'velocity')
+    if progress_kind not in ('velocity', 'direction'):
+        raise ValueError('Unsupported progress kind: ' + str(progress_kind))
+    if progress_kind == 'direction' and set(progress) & {'target_speed', 'velocity_scale'}:
+        raise ValueError('direction progress does not accept Gaussian speed parameters')
     success = config.get('success', {})
     for key in ('require_achieved_target_prerequisites', 'once_per_subgoal',
                 'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success'):
@@ -87,7 +92,7 @@ def validate_relation_config(config):
         raise ValueError('state_relation_v0 requires relation state and done observations')
     if tuple(obs.get('relation_state_fields', STATE_FIELDS)) != STATE_FIELDS:
         raise ValueError('relation state fields must be phi,gate,satisfied,achieved')
-    positive = [config.get('state_delta_weight', 1.), config.get('velocity_progress_weight', .2),
+    positive = [config.get('state_reward_weight', 1.), config.get('progress_reward_weight', .2),
                 config.get('subgoal_success_bonus', 5.), config.get('soft_gate', {}).get('beta', 30.),
                 config.get('progress', {}).get('target_speed', 1.5),
                 config.get('progress', {}).get('velocity_scale', 5.),
@@ -101,9 +106,16 @@ def validate_relation_config(config):
     for v in (config.get('satisfaction_threshold', .9), config.get('soft_gate', {}).get('center', .8)):
         if not math.isfinite(v) or not 0 < v < 1:
             raise ValueError('relation thresholds must be inside (0,1)')
-    alpha = config.get('at', {}).get('near_fraction', .5)
-    if not 0 < alpha < config.get('satisfaction_threshold', .9):
-        raise ValueError('near_fraction must be positive and below satisfaction_threshold')
+    at = config.get('at', {})
+    state_definition = at.get('state_definition', 'near_putdown')
+    if state_definition not in ('near_putdown', 'box_near'):
+        raise ValueError('Unsupported At state definition: ' + str(state_definition))
+    if state_definition == 'near_putdown':
+        alpha = at.get('near_fraction', .5)
+        if not 0 < alpha < config.get('satisfaction_threshold', .9):
+            raise ValueError('near_fraction must be positive and below satisfaction_threshold')
+    elif set(at) & {'near_fraction', 'putdown_xy_tolerance', 'putdown_z_tolerance'}:
+        raise ValueError('box_near At state does not accept legacy PutDown mixture fields')
 
 
 def checkpoint_metadata(config):

@@ -5,8 +5,8 @@ set -eu
 NUM_AGENTS=${1:-2}
 NUM_ENVS=${2:-2048}
 NUM_OBJECTS=${3:-3}
-RELATION_ENV_CFG=tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry_relation.yaml
-RELATION_OUTPUT_DEFAULT=output/ma_carry_relation_v0
+RELATION_ENV_CFG=tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry_relation_state02_near_dir.yaml
+RELATION_OUTPUT_DEFAULT=output/ma_carry_relation_state02_near_dir
 TRAIN_CFG=tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation.yaml
 if [ "${SMOKE:-0}" = 1 ]; then
     NUM_ENVS=${2:-32}
@@ -29,4 +29,5 @@ python ./tokenhsi/run.py --task HumanoidMACarry \
     --motion_file tokenhsi/data/dataset_carry/dataset_carry.yaml \
     --num_envs "$NUM_ENVS" --num_agents "$NUM_AGENTS" --num_objects "$NUM_OBJECTS" \
     --output_path "${OUTPUT_PATH:-$RELATION_OUTPUT_DEFAULT}" \
+    --experiment CarryRelationState02NearDir \
     --headless --no_video "$@"

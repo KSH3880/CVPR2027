@@ -1,4 +1,6 @@
-# Signed-linear progress ablation. Other settings match amp_humanoid_ma_carry_relation_state2.yaml.
+# State02-near + direction-only raw progress for both Holding and At.
+# XYZ state, soft gates/pinning, prerequisites, weights and success are unchanged.
+# No hard distance pinning or height mask is added.
 # Multi-agent box carrying.
 # numAgents: 1 exercises the same clean scene path with one H/O/T triplet.
 # numObjects: 0 means one box per agent. Values >= numAgents add unassigned distractors.
@@ -10,24 +12,20 @@ env:
   isFlagrun: False
   enableDebugVis: False
 
-  # Isolated state2_signed experiment; preserve timeout/fall and existing soft gates.
+  # State/progress weights match TokenHSI. At success is phi_At >= 0.9.
   relationReward:
     mode: state_relation_v0
     schema_version: 1
-    state_delta_weight: 2.0
-    velocity_progress_weight: 0.2
+    state_reward_weight: 0.2
+    progress_reward_weight: 0.2
     subgoal_success_bonus: 5.0
     satisfaction_threshold: 0.9
     soft_gate: {beta: 30.0, center: 0.8}
-    # Only objective change vs state2: P = clip(v_parallel / target_speed, -1, 1).
-    # velocity_scale is retained for config parity; signed_linear does not use it.
-    progress: {mode: signed_linear, target_speed: 1.5, velocity_scale: 5.0, normalization_epsilon: 0.000001}
+    progress: {kind: direction, normalization_epsilon: 0.000001}
     holding: {hand_distance_scale: 5.0}
     at:
+      state_definition: box_near
       near_distance_scale: 10.0
-      near_fraction: 0.5
-      putdown_xy_tolerance: 0.1
-      putdown_z_tolerance: 0.001
     success:
       require_achieved_target_prerequisites: true
       once_per_subgoal: true

@@ -5,7 +5,7 @@ import torch
 
 from utils.relation_task_spec import compile_carry_subgoal
 from env.tasks.multi_agent.relation_reward import (
-    RelationRuntime, evaluate_holding, evaluate_at, velocity_progress, box_speed_penalty)
+    RelationRuntime, evaluate_holding, evaluate_at, relation_progress, box_speed_penalty)
 
 
 class CarryRelationMixin:
@@ -34,7 +34,8 @@ class CarryRelationMixin:
         h, hand_error = evaluate_holding(hands, objects, h_cfg.get('hand_distance_scale', 5.))
         a, near, put, xy, z = evaluate_at(objects, goals,
             a_cfg.get('near_distance_scale', 10.), a_cfg.get('near_fraction', .5),
-            a_cfg.get('putdown_xy_tolerance', .1), a_cfg.get('putdown_z_tolerance', .001))
+            a_cfg.get('putdown_xy_tolerance', .1), a_cfg.get('putdown_z_tolerance', .001),
+            a_cfg.get('state_definition', 'near_putdown'))
         return torch.stack([h, a], -1).flatten(1), dict(
             hand_midpoint_distance=hand_error,
             right_hand_center_distance=(hands[..., 0, :] - objects).norm(dim=-1),
@@ -59,10 +60,8 @@ class CarryRelationMixin:
         objects = self._assigned_box_values(self._box_states)[..., :3]
         roots = self._humanoid_root_states[..., :3]
         cfg = self._relation_cfg.get('progress', {})
-        args = (self.dt, cfg.get('target_speed', 1.5), cfg.get('velocity_scale', 5.),
-                cfg.get('normalization_epsilon', 1e-6), cfg.get('mode', 'gaussian'))
-        ph = velocity_progress(self._prev_root_pos, roots, objects, *args)
-        pa = velocity_progress(self._prev_box_pos, objects, self._tar_pos, *args)
+        ph = relation_progress(self._prev_root_pos, roots, objects, self.dt, cfg)
+        pa = relation_progress(self._prev_box_pos, objects, self._tar_pos, self.dt, cfg)
         previous_satisfied = runtime.phi >= self._relation_cfg.get('satisfaction_threshold', .9)
         live = ~runtime.done.clone()
         result = runtime.step(phi, torch.stack([ph, pa], -1).flatten(1))
@@ -78,7 +77,7 @@ class CarryRelationMixin:
                                             self._box_vel_pen_coeff, self._box_vel_pen_thre)
         reward = result['agent_task_reward'] + power + collision + box_penalty
         terms = torch.stack([result['state_component'][:, 0::2], result['state_component'][:, 1::2],
-            result['velocity_component'][:, 0::2], result['velocity_component'][:, 1::2],
+            result['progress_component'][:, 0::2], result['progress_component'][:, 1::2],
             result['success_bonus'], power, collision, box_penalty, reward], -1).flatten(0, 1)
         self.rew_buf.copy_(reward.flatten())
         self.extras['reward_terms'] = terms
@@ -116,8 +115,8 @@ class CarryRelationMixin:
         for j, name in enumerate(('holding', 'at')):
             for field, value in (('phi', runtime.phi), ('gate', result['gate_next']),
                                  ('satisfied', result['satisfied_next']), ('achieved', runtime.achieved),
-                                 ('state_delta', result['state_component']),
-                                 ('velocity_reward', result['velocity_component'])):
+                                 ('state_reward', result['state_component']),
+                                 ('progress_reward', result['progress_component'])):
                 diag[name + '/' + field] = value[:, j::2].float()
             diag[name + '/threshold_up'] = ((~previous_satisfied[:, j::2]) &
                                            result['satisfied_next'][:, j::2]).float()
@@ -139,7 +138,7 @@ class CarryRelationMixin:
             prefix = 'near_{}m/'.format(distance)
             stats[prefix + 'fraction'] = mask.float().mean()
             stats[prefix + 'speed'] = (speed * mask).sum() / den
-            stats[prefix + 'velocity_reward'] = (diag['at/velocity_reward'] * mask).sum() / den
+            stats[prefix + 'progress_reward'] = (diag['at/progress_reward'] * mask).sum() / den
             stats[prefix + 'stationary_unplaced_fraction'] = (
                 mask & (speed < .05) & ~diag['put'].bool()).float().mean()
         for key, value in stats.items():

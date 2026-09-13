@@ -3,9 +3,9 @@
 
 ### 2026-09-10 대화에서 확정한 구현 기준 (아래 원문보다 우선)
 
-- 성공 시 scene을 종료하지 않는다. `terminate_when_all_subgoals_done: false`로 두고 기존 timeout/fall 종료를 유지한다. subgoal별 bonus는 1회, 완료 후 해당 task reward는 0이며 AMP/regularizer는 계속 적용한다.
-- 공통 velocity progress 및 sigmoid gate 수식은 원문 그대로 사용한다. 0.5m 같은 추가 reward cutoff, pinning 복원, 감속 곡선, height mask는 넣지 않는다. 목표 근처 속도·오차·gate·AMP/합산 보상과 sampled time-series를 기록하여 확인한다.
-- putdown 허용 오차는 TokenHSI와 같은 XY 0.1m / Z 0.001m. Holding은 두 손 midpoint의 `exp(-5*error²)`와 satisfaction 0.9이며, 기존 absolute reward 및 root–box 0.7m cutoff는 복사하지 않는다.
+- 성공 시 scene을 종료하지 않는다. `terminate_when_all_subgoals_done: false`로 두고 기존 timeout/fall 종료를 유지한다. subgoal별 bonus만 1회로 제한하고, dense relation reward는 성공 후에도 현재 물리 상태에 따라 계속 계산한다.
+- State reward는 변화량이 아닌 현재 absolute satisfaction을 사용한다. Progress reward는 relation gate에 따라 최대값 1로 soft-pinning하며, 여러 prerequisite의 reward gate는 product가 아닌 minimum을 사용한다.
+- putdown 허용 오차는 TokenHSI와 같은 XY 0.1m / Z 0.001m. Holding은 두 손 midpoint의 `exp(-5*error²)`와 satisfaction 0.9이며 root–box 0.7m cutoff는 복사하지 않는다.
 - H/O RMS는 유지하고 Target/GTA pose/relation suffix는 RMS 및 flat observation clipping을 우회한다. 학습 중 static/dynamic/QK attention scale과 entropy를 반복 기록한다.
 - 새 학습 기본값은 **env 2048 / PPO minibatch 16384 / mini-epochs 6**. 기본 scene은 비교에 사용한 M=2, O=3이며 positional arguments로 변경할 수 있다. 기존 legacy 설정과 스크립트는 유지한다.
 - 구현·실행 검증 결과 및 명령은 [구현 보고서](markdowns/CARRY_STATE_RELATION_V0_IMPLEMENTATION.md)에 정리했다. 원문의 success-termination 요구/체크리스트는 위 합의로 대체한다.
@@ -16,7 +16,7 @@
 > **대상 브랜치:** `edge_a2_gta`  
 > **명세 작성 시 확인한 원격 HEAD:** `9b68fca23fb65842c8a9a64cfd6fc066c8dcee76`  
 > **확인일:** 2026-09-10  
-> **이번 구현:** Carry-only, `Holding(H,O)` 및 `At(O,G)`, 상태 변화량 + 공통 velocity progress, soft prerequisite, achieved 이력, subgoal별 1회 성공 보너스.  
+> **이번 구현:** Carry-only, `Holding(H,O)` 및 `At(O,G)`, absolute state reward + soft-pinned velocity progress, minimum prerequisite gate, achieved 이력, subgoal별 1회 성공 보너스.
 > **이번에 구현하지 않음:** `OnTop`, `Beside`, `Push`, `Pull`, operator/action embedding, 계단 쌓기 시나리오, world model/planner.
 >
 > 문서에서 **확인된 기존 구현**, **이번 v0의 구현 결정**, **검증해야 할 가설/한계**를 구분한다. 여기 제시된 새 reward는 아직 학습 성능을 검증한 결과가 아니다. “곱셈이면 유지가 보장된다”, “soft gate면 exploit이 사라진다”처럼 주장하지 말 것.
@@ -35,12 +35,12 @@ Carry subgoal 전체
 Human H ── Holding ──▶ Object O ── At ──▶ Goal G
 
 Holding(H,O)
-  state component    = 손–물체 상태 점수의 변화량
-  progress component = H의 XY 속도가 O를 향하는 정도         [Walk]
+  state component    = 손–물체 상태 만족도
+  progress component = H의 XY 속도가 O를 향하는 정도를 satisfaction에 따라 1로 pinning
 
 At(O,G)
-  state component    = box_near + putdown으로 만든 상태 점수의 변화량
-  progress component = O의 XY 속도가 G를 향하는 정도         [Transport]
+  state component    = box_near + putdown으로 만든 상태 만족도
+  progress component = O의 XY 속도가 G를 향하는 정도를 satisfaction에 따라 1로 pinning
 ```
 
 `Walk`, `Transport`, `Putdown`을 추가 relation edge로 만들지 않는다. `At(H,O)` 접근 edge도 이번에는 추가하지 않는다.
@@ -48,30 +48,31 @@ At(O,G)
 각 edge의 공통 계산 문법은 다음이다.
 
 $$
-R_e^t = A_e^t\left[\lambda_s(\phi_e^{t+1}-\phi_e^t)
-+\lambda_v(1-g_e^t)P_e^{t\to t+1}\right],
+\bar P_e^t=(1-g_e^t)P_e^{t\to t+1}+g_e^t,
 \qquad
-A_e^t=\prod_{p\in Pre(e)}g_p^t.
+R_e^t = A_e^t\left[\lambda_s\phi_e^{t+1}+\lambda_p\bar P_e^t\right],
+\qquad
+A_e^t=\begin{cases}1,&Pre(e)=\varnothing\\ \min_{p\in Pre(e)}g_p^t,&\text{otherwise.}\end{cases}
 $$
 
 - $\phi_e$: relation별 상태 만족도, `[0,1]`.
 - $g_e=C(\phi_e)$: 공통 sigmoid로 만든 soft gate.
 - $P_e$: 모든 edge가 공유하는 **XY velocity-only** progress.
 - $Pre(e)$: subgoal이 지정하는 prerequisite relation 목록.
-- 빈 prerequisite 집합의 곱은 `1`.
-- `State`는 `+phi`가 아니라 **signed `delta_phi`**다.
-- `1-g_e`는 **progress 성분에만** 곱한다. state 변화량까지 일괄 끄지 않는다.
+- 빈 prerequisite 집합의 gate는 `1`.
+- `State`는 현재 transition의 post-state satisfaction `phi_next`다.
+- progress는 relation이 만족될수록 꺼지지 않고 `1`로 soft-pinning된다.
 
 Carry에서는:
 
 $$
-R_H^t=\lambda_s\Delta\phi_H^t+
-\lambda_v(1-g_H^t)P(H,O),
+R_H^t=\lambda_s\phi_H^{t+1}+
+\lambda_p\left[(1-g_H^t)P(H,O)+g_H^t\right],
 $$
 
 $$
-R_A^t=g_H^t\left[\lambda_s\Delta\phi_A^t+
-\lambda_v(1-g_A^t)P(O,G)\right].
+R_A^t=g_H^t\left[\lambda_s\phi_A^{t+1}+
+\lambda_p\left((1-g_A^t)P(O,G)+g_A^t\right)\right].
 $$
 
 최종 목표의 유효 완료와 subgoal 성공은:
@@ -564,78 +565,73 @@ Hysteresis/EMA/counter는 이번 reward gate의 기본값에 추가하지 않는
 
 ### 9.1 공통 edge reward
 
-`phi_prev = phi(s_t)`, `phi_next = phi(s_(t+1))`:
-
-$$
-\Delta\phi_e^t=\phi_e^{t+1}-\phi_e^t.
-$$
-
 **v0에서는 prerequisite gate와 자기 progress gate 모두 pre-transition 값**을 사용한다.
 
 $$
-A_e^t=\prod_{p\in Pre(e)}g_p^t.
+A_e^t=\begin{cases}
+1,&Pre(e)=\varnothing,\\
+\min_{p\in Pre(e)}g_p^t,&\text{otherwise.}
+\end{cases}
 $$
 
 $$
 \boxed{
-R_e^t=A_e^t\big[\lambda_s\Delta\phi_e^t+
-\lambda_v(1-g_e^t)P_e^{t\to t+1}\big].
+R_e^t=A_e^t\left[\lambda_s\phi_e^{t+1}+
+\lambda_p\left((1-g_e^t)P_e^{t\to t+1}+g_e^t\right)\right].
 }
 $$
 
-이 convention을 택하는 이유는, 해당 transition 중 prerequisite를 잃었을 때 post-state gate가 0이 되어 음의 변화량까지 즉시 가리는 구현을 피하기 위해서다. 이것이 모든 exploit을 없앤다는 뜻은 아니다.
+prerequisite가 여러 개이면 가장 낮은 gate가 bottleneck이 된다. 개수가 늘어날 때 product 때문에 reward scale이 추가로 작아지는 현상은 없다.
 
 ### 9.2 Carry 두 edge
 
 $$
 \boxed{
-R_H^t=\lambda_s(\phi_H^{t+1}-\phi_H^t)
-+\lambda_v(1-g_H^t)P(H,O).
+R_H^t=\lambda_s\phi_H^{t+1}
++\lambda_p\left[(1-g_H^t)P(H,O)+g_H^t\right].
 }
 $$
 
 $$
 \boxed{
 R_A^t=g_H^t\left[
-\lambda_s(\phi_A^{t+1}-\phi_A^t)
-+\lambda_v(1-g_A^t)P(O,G)
+\lambda_s\phi_A^{t+1}
++\lambda_p\left((1-g_A^t)P(O,G)+g_A^t\right)
 \right].
 }
 $$
 
-**별도 maintain reward는 추가하지 않는다.** Holding이 감소하면 `delta_phi_H < 0`이고, 앞으로의 At reward도 soft gate를 통해 약해진다. 이는 보상 유도이지 물리적 유지 보장이 아니다.
+Holding satisfaction 자체가 매 step dense reward이며, relation이 만족될수록 해당 progress reward는 최대값으로 pinning된다. At reward는 Holding prerequisite gate에 따라 추가 활성화된다.
 
-### 9.3 signed delta를 보존할 것
+### 9.3 absolute state와 progress soft-pinning
 
 ```python
-delta_phi = phi_next - phi_prev
+state_reward = phi_next
+pinned_progress = (1.0 - gate_prev) * progress + gate_prev
 ```
 
 다음을 하지 않는다.
 
 ```python
-# 금지: 나빠지는 transition을 없애 버림.
-delta_phi = (phi_next - phi_prev).clamp_min(0)
+# 금지: 이전 변화량 기반 state reward로 되돌림.
+state_reward = phi_next - phi_prev
 
-# 금지: 상태가 높으면 정지한 채 매 step reward 지급.
-state_reward = phi_next
-
-# 금지: state 항도 자기 completion과 함께 꺼짐.
-state_reward = (1.0 - gate_prev) * delta_phi
+# 금지: relation이 만족될수록 progress reward를 0으로 끔.
+pinned_progress = (1.0 - gate_prev) * progress
 ```
 
-success 후 task 종료 mask는 별도다. 그것은 **이미 끝난 subgoal을 다시 보상하지 않는 처리**이지 미완료 relation의 음수 변화량을 지우는 처리가 아니다.
+`done`은 dense reward를 차단하지 않는다. 성공 이력을 latch하고 success bonus의 재지급만 막는다.
 
 ### 9.4 초기 가중치: 실험 출발값
 
 ```yaml
-state_delta_weight: 1.0
-velocity_progress_weight: 0.2
+state_reward_weight: 1.0
+progress_reward_weight: 0.2
 subgoal_success_bonus: 5.0
 ```
 
-- `velocity_progress_weight=0.2`는 원본 velocity 항의 scale을 차용한다.
-- `state_delta_weight=1.0`은 `phi`를 delta로 바꾼 뒤의 **새 초기값**이다. 원본 `0.2*phi`와 같은 시간 누적 보상이라고 주장하지 않는다.
+- `progress_reward_weight=0.2`는 원본 velocity 항의 scale을 차용한다.
+- `state_reward_weight=1.0`은 현재 실험의 absolute state reward scale이다.
 - success bonus 5.0도 검증된 최적값이 아니다.
 - 모든 edge에 같은 기본 state/velocity weight를 적용한다. Carry/Holding별 특수 weight 분기는 만들지 않는다.
 - 학습 전후에 component별 평균/표준편차/누적합을 측정하고, 변경 시 config 및 비교 결과를 남긴다.
@@ -646,8 +642,8 @@ subgoal_success_bonus: 5.0
 아래는 구현 버그가 아니라 **제안 objective의 알려진 한계**다.
 
 - sigmoid로 부드럽게 연결해도 다음 상태의 기대 return이 충분하지 않으면 정지할 수 있다.
-- delta state는 동일 state에서 0이지만, velocity 성분·AMP·종료 처리까지 포함한 총 return의 최적 행동은 별도로 평가해야 한다.
-- `A_e(t) * delta_phi_e`는 일반적인 단일 potential의 차분과 같지 않다. 따라서 gate를 바꾸면서 같은 상태를 왕복하는 cycle에 양의 reward가 남을 수 있다.
+- absolute state는 만족 상태를 유지하는 동안 매 step 지급되므로 episode 길이와 체류 시간에 민감하다.
+- soft-pinned progress는 relation 만족 시 최대값을 계속 지급하므로 AMP·종료 처리까지 포함한 총 return의 최적 행동을 별도로 평가해야 한다.
 - 양의 velocity shaping은 되돌아가는 구간을 강하게 벌하지 않으므로 왕복/비비기 exploit 가능성이 남는다.
 
 **이번에는 합의한 식을 구현하되, 이를 이론적으로 exploit-free라고 포장하지 말 것.** §17의 counterexample와 rollout 진단으로 위험을 드러내고 후속 조정 근거를 만든다. 임의로 potential-based 방식이나 별도 maintain penalty로 바꾸지 않는다.
@@ -714,15 +710,15 @@ $$
 
 $$
 \boxed{
-r_{task,i}^t=(1-done_i^t)(R_{H,i}^t+R_{A,i}^t)
+r_{task,i}^t=R_{H,i}^t+R_{A,i}^t
 +B_{success}first_i^{t+1}.
 }
 $$
 
-- 첫 성공 transition의 dense reward와 bonus는 지급한다.
-- 이후 해당 agent/subgoal의 task reward는 0이다.
-- release 후 Holding이 낮아졌다고 해당 Carry가 재활성화되지 않는다.
-- 다른 agent의 미완료 subgoal reward는 계속 계산한다.
+- 첫 성공 transition의 dense reward와 bonus를 함께 지급한다.
+- 이후 bonus는 재지급하지 않지만 dense reward는 현재 satisfaction/progress에 따라 계속 계산한다.
+- 성공 후 상태를 유지하면 높은 dense reward가 지속되고, 상태를 잃으면 reward도 감소한다.
+- 다른 agent의 reward와 성공 이력은 독립적으로 계산한다.
 
 ### 10.5 이것이 막는 것과 막지 못하는 것
 
@@ -1152,8 +1148,8 @@ env:
     mode: state_relation_v0
     schema_version: 1
 
-    state_delta_weight: 1.0
-    velocity_progress_weight: 0.2
+    state_reward_weight: 1.0
+    progress_reward_weight: 0.2
     subgoal_success_bonus: 5.0
 
     soft_gate:
@@ -1203,8 +1199,8 @@ unsupported relation/operator는 명확한 오류를 낸다. `OnTop`을 자동�
 다음은 측정 후 조정 가능한 수치다.
 
 ```text
-state_delta_weight
-velocity_progress_weight
+state_reward_weight
+progress_reward_weight
 subgoal_success_bonus
 gate beta / center
 satisfaction threshold
@@ -1214,11 +1210,11 @@ state tolerance / distance scale
 반면 다음은 별도 설계 변경이다.
 
 ```text
-delta_phi 대신 absolute phi 지급
-state reward에 stop gate를 곱함
+absolute phi 대신 상태 변화량 지급
+progress reward에서 pin-to-one 제거
 current gate 대신 achieved로 dense reward 활성화
 height mask를 전체 At에 추가
-pin-to-one 복원
+prerequisite minimum 대신 product 사용
 Holding에 contact/lift 의미 추가
 final release 또는 continuous carry history 강제
 ```
@@ -1283,15 +1279,15 @@ def velocity_progress(source_prev: Tensor, source_next: Tensor,
     return torch.where(valid, reward, torch.zeros_like(reward))
 
 
-def prerequisite_product(values: Tensor, prereq_mask: Tensor) -> Tensor:
+def prerequisite_minimum(values: Tensor, prereq_mask: Tensor) -> Tensor:
     # values: [N,E]; prereq_mask: [E,E], [child,parent]
-    # Empty parent set -> product of ones -> 1.
+    # Empty parent set -> minimum of ones -> 1.
     factors = torch.where(
         prereq_mask.unsqueeze(0),
         values.unsqueeze(1),
         torch.ones_like(values).unsqueeze(1),
     )
-    return factors.prod(dim=-1)
+    return factors.amin(dim=-1)
 
 
 def prerequisite_all(flags: Tensor, prereq_mask: Tensor) -> Tensor:
@@ -1311,9 +1307,10 @@ def relation_step(
     done_prev: Tensor,
     prereq_mask: Tensor,
     edge_owner: Tensor,
+    edge_mask: Tensor,
     subgoal_target: Tensor,
     state_weight: float = 1.0,
-    velocity_weight: float = 0.2,
+    progress_weight: float = 0.2,
     success_bonus: float = 5.0,
     beta: float = 30.0,
     gate_center: float = 0.8,
@@ -1323,22 +1320,23 @@ def relation_step(
     # phi/progress/achieved: [N,E]
     # done: [N,M]; owner:[E]; target:[M]
     gate_prev = soft_gate(phi_prev, beta, gate_center)
-    activation = prerequisite_product(gate_prev, prereq_mask)
-    delta_phi = phi_next - phi_prev
+    activation = prerequisite_minimum(gate_prev, prereq_mask)
+    pinned_progress = (1.0 - gate_prev) * progress + gate_prev
 
-    state_component = state_weight * activation * delta_phi
-    velocity_component = (
-        velocity_weight * activation * (1.0 - gate_prev) * progress
+    state_component = state_weight * activation * phi_next
+    progress_component = (
+        progress_weight * activation * pinned_progress
     )
-    edge_live = (~done_prev[:, edge_owner]).to(phi_prev.dtype)
-    state_component = state_component * edge_live
-    velocity_component = velocity_component * edge_live
-    edge_reward = state_component + velocity_component
+    reward_mask = edge_mask.to(phi_prev.dtype)
+    state_component = state_component * reward_mask
+    progress_component = progress_component * reward_mask
+    edge_reward = state_component + progress_component
 
     satisfied_next = phi_next >= satisfaction_threshold
     valid_next = satisfied_next & prerequisite_all(achieved_prev, prereq_mask)
     # History does not keep evolving for an already completed subgoal.
-    achieved_next = achieved_prev | (valid_next & edge_live.bool())
+    history_live = ~done_prev[:, edge_owner]
+    achieved_next = achieved_prev | (valid_next & history_live)
     target_valid = valid_next[:, subgoal_target]
     first_success = target_valid & ~done_prev
     done_next = done_prev | target_valid
@@ -1355,9 +1353,9 @@ def relation_step(
         "agent_task_reward": agent_reward,
         "edge_reward": edge_reward,
         "state_component": state_component,
-        "velocity_component": velocity_component,
+        "progress_component": progress_component,
+        "pinned_progress": pinned_progress,
         "activation": activation,
-        "delta_phi": delta_phi,
         "gate_next": soft_gate(phi_next, beta, gate_center),
         "satisfied_next": satisfied_next,
         "achieved_next": achieved_next,
@@ -1374,8 +1372,8 @@ def relation_step(
 위 code block은 수식 대조용이다. 실제 모듈에서는 shape/dtype/device, finite 값, relation index 범위를 검사하라. reset/scene termination/AMP 결합/관측 생성은 이 코드 외부에서 명세대로 처리한다.
 
 - 이 함수는 `achieved_prev`와 `done_prev`를 in-place 수정하지 않는다.
-- `subgoal_done` 이후 phi는 계속 물리 상태를 관찰할 수 있지만 history/reward는 재활성화하지 않는다.
-- `edge_live.bool()`은 subgoal 활성 여부이며 relation의 current truth가 아니다.
+- `subgoal_done` 이후에도 phi와 dense reward는 현재 물리 상태를 반영한다.
+- `done`은 history와 one-time bonus만 latch하며 reward mask로 사용하지 않는다.
 - inference/training 모두 저장된 동일 state metadata를 사용한다.
 - 호출자에서 `torch.no_grad()`를 적용한다.
 
@@ -1434,21 +1432,20 @@ def relation_step(
 - sigmoid의 유한성 및 단조성.
 - `phi=0.8`에서 `g=0.5`.
 - `phi=0.9`에서 `g≈0.952574`.
-- 빈 prerequisite set의 product=1.
-- 두 prerequisite가 있는 synthetic graph에서 product가 올바른지 검사. 이 테스트가 OnTop task 구현을 뜻하지는 않는다.
+- 빈 prerequisite set의 minimum=1.
+- 두 prerequisite가 있는 synthetic graph에서 minimum이 올바른지 검사. 이 테스트가 OnTop task 구현을 뜻하지는 않는다.
 - `prereq_mask[child,parent]` 축을 거꾸로 해석하지 않았는지 검사.
 - parent state가 작은 폭으로 변하면 sigmoid input에 따라 reward가 변하고 hard 0/1 switch를 쓰지 않음.
 - sigmoid가 0/1에 정확히 도달한다는 잘못된 assert 금지.
 
-### 17.5 Reward / signed delta
+### 17.5 Reward / absolute state / progress pinning
 
-- `phi_next == phi_prev`, source velocity=0이면 **task dense reward=0**. AMP/regularizer 포함 total과 혼동하지 않는다.
-- Holding score 하락 시 Holding state 성분 음수.
-- At score 증가 시 gate 크기에 비례한 state 성분 양수.
-- reward gating은 pre-transition 값이며, next-state 값을 섞지 않음.
-- `delta_phi`를 positive clamp하지 않았는지 검사.
+- `phi_next == phi_prev`여도 satisfaction이 양수이면 state reward가 매 step 지급됨.
+- Holding/At state 성분은 음수가 되지 않고 현재 satisfaction에 비례함.
+- prerequisite와 progress pinning gate는 pre-transition 값, state reward는 `phi_next`를 사용함.
+- gate=0이면 pinned progress=P, gate=1이면 pinned progress=1임.
 - state 성분에 `(1-g_self)`가 곱해져 있지 않은지 검사.
-- state+velocity weight 이중 적용 없음.
+- state+progress weight 이중 적용 없음.
 - sum of edge reward가 scatter된 per-agent reward와 일치.
 - relation evaluator를 두 번 호출해도 history가 안 바뀜.
 
@@ -1460,7 +1457,8 @@ def relation_step(
 | Holding 달성, 다음 step At 성공 | bonus 정확히 1회 |
 | At threshold 주변 반복 왕복 | done 이후 bonus 재지급 없음 |
 | Holding 달성 후 놓음 | a_H 유지, g_H 감소 |
-| 성공 후 손을 뗌 | 이전 Carry task reward 재활성화 없음 |
+| 성공 후 상태 유지 | dense reward 지속, bonus 재지급 없음 |
+| 성공 후 손을 뗌 | 현재 phi 저하에 따라 dense reward 감소, bonus 재지급 없음 |
 | 동일 step에 처음 Holding과 At을 동시에 만족 | a_prev 기준이므로 그 step target valid는 false |
 | 다음 step도 At 유지, 이전 a_H=true | target valid 처리 |
 | RSI로 이미 Holding 상태에서 시작 | 초기 phi와 이력 seed가 일관됨 |
@@ -1574,10 +1572,10 @@ relation/at_satisfied
 relation/at_valid
 relation/subgoal_done
 
-reward/holding_state_delta
-reward/holding_walk_velocity
-reward/at_state_delta
-reward/at_transport_velocity
+reward/holding_state
+reward/holding_progress
+reward/at_state
+reward/at_progress
 reward/subgoal_success_bonus
 reward/task_relation_total
 reward/power
@@ -1815,8 +1813,8 @@ Holding proxy != verified grasp
 At geometric proxy != verified stable released placement
 achieved history != continuous Carry execution
 soft gate != guaranteed switching / maintenance
-no pinning != guaranteed safe stopping
-signed delta with gates != guaranteed cycle-free reward
+soft pinning != guaranteed safe stopping
+absolute state reward != guaranteed task completion
 ```
 
 구현 완료와 학습 성공을 구분한다. 모델이 아직 학습되지 않았다면 “구현 및 테스트 완료, 학습 성능 미검증”이라고 쓴다.
@@ -1830,13 +1828,13 @@ signed delta with gates != guaranteed cycle-free reward
 - [ ] entity/graph compiler는 실제 논리 assignment 사용.
 - [ ] Carry edge는 Holding과 At 두 개뿐.
 - [ ] progress는 공통 XY source velocity-only 함수.
-- [ ] state는 signed delta_phi.
+- [ ] state는 post-transition absolute phi.
 - [ ] Holding geometry 및 At near+putdown state 구현.
 - [ ] soft gate는 공통 sigmoid.
-- [ ] prerequisite product는 pre-transition current gate 사용.
+- [ ] prerequisite minimum은 pre-transition current gate 사용.
 - [ ] success는 target current satisfaction × prior achieved prerequisite.
 - [ ] bonus는 subgoal별 최초 1회.
-- [ ] post-success reward 재활성화 없음.
+- [ ] post-success dense reward 지속, success bonus 재활성화 없음.
 - [ ] reset/RSI/assignment 초기화가 first-step reward를 오염시키지 않음.
 - [ ] achieved/done이 actor와 critic 관측에 들어감.
 - [ ] suffix는 RMS/pose reshape를 오염시키지 않음.
@@ -1899,11 +1897,11 @@ PASS  zero-distance and XY-only fixtures
 PASS  state evaluator exact and putdown boundary fixtures
 PASS  soft-gate calibration fixtures
 PASS  no prerequisite history -> no success bonus
-PASS  one-time success, post-success release and no reactivation
+PASS  one-time success bonus and post-success dense reward
 PASS  pre-transition achieved snapshot ordering
-PASS  stationary state without completion -> zero task reward
-PASS  signed holding delta preserved
-PASS  known gated-delta cycle quantified (not claimed eliminated)
+PASS  stationary satisfied state -> positive dense reward
+PASS  absolute Holding/At state reward
+PASS  soft-pinned progress endpoints
 PASS  multi-agent owner scatter and shape
 ```
 

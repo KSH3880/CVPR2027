@@ -35,27 +35,6 @@ RESUME_CHECKPOINT=/absolute/path/to/new_relation_checkpoint.pth \
 
 ## 평가 / 뷰어
 
-### State delta ×2 비교 실험
-
-기존 v0 YAML은 그대로 두고 `amp_humanoid_ma_carry_relation_state2.yaml`을 추가했다. 두 env YAML의 유일한 설정 차이는 `relationReward.state_delta_weight: 1.0 → 2.0`이다. Holding/At delta의 양·음 성분이 함께 2배이며, 속도 .2 / bonus 5 / AMP / penalty / 물리 설정은 동일하다. PPO/network train YAML도 공유한다.
-
-```bash
-RELATION_VARIANT=state2 bash tokenhsi/scripts/multi_agent/ma_carry_relation_train.sh
-```
-
-기본 env2048 / MB16384 / ME6 / M2 / O3, seed는 현재 v0 run과 같은 **9896**이다. scratch 학습이며, 별도로 `RESUME_CHECKPOINT`를 지정하지 않는다. weight=1의 v0 checkpoint는 reward metadata가 다르므로 이 변형으로 resume할 수 없다.
-
-출력은 **`output/ma_carry_relation_state2/CarryRelationState2_<timestamp>/`**로 분리된다. 체크포인트·TensorBoard·config snapshot·sampled diagnostics가 이 run 아래에 저장된다. 기존 `output/ma_carry_relation_v0/`는 건드리지 않는다. `OUTPUT_PATH`를 명시하면 그 값이 우선한다. `RELATION_VARIANT`를 생략하면 기존 v0 동작을 유지한다. `SEED`로 seed를 명시적으로 변경할 수도 있다.
-
-state2 모델의 평가/뷰어에도 같은 variant를 지정해야 한다:
-
-```bash
-RELATION_VARIANT=state2 HEADLESS=0 \
-  bash tokenhsi/scripts/multi_agent/ma_carry_relation_test.sh /path/to/state2_checkpoint.pth 2 4 3 3
-```
-
-아래 기존 평가 명령은 variant를 생략한 **v0 checkpoint용**이다.
-
 ```bash
 # 순서: checkpoint, humans, environments, boxes, repeats
 bash tokenhsi/scripts/multi_agent/ma_carry_relation_test.sh /path/to/checkpoint.pth 2 16 3 3
@@ -82,7 +61,7 @@ TensorBoard:
 ## 구현 내용
 
 - `utils/relation_task_spec.py`: Carry-only graph compiler, directed Holding/At IDs 6/7, schema/config validation, checkpoint 계약.
-- `env/tasks/multi_agent/relation_reward.py`: pure PyTorch evaluator, 공통 progress, soft prerequisite, signed delta, 일회성 bonus 및 history runtime.
+- `env/tasks/multi_agent/relation_reward.py`: pure PyTorch evaluator, absolute state reward, soft-pinned progress, minimum prerequisite gate, 일회성 bonus 및 history runtime.
 - `relation_task.py` + `humanoid_ma_carry.py`: assignment에 따른 logical object slot, kinematic reset seed, bounded all-initial-success resampling, reward → history commit → next observation 순서. 성공만으로 scene reset/terminate하지 않는다.
 - `amp_network_builder_ma.py`: 8-type static semantic edge encoder 및 batch별 5D dynamic edge MLP `5→32→64`, layer/head별 zero-init projection. actor/critic 독립, NONE pair도 attention에 남고 dynamic bias만 해당 directed edges에 들어간다.
 - `scene_normalizer.py` / MA wrapper: H/O RMS 유지, Target/pose/history passthrough. 새 모드에서 optional flat clipping도 Target/pose/history를 바꾸지 않는다.
@@ -93,12 +72,12 @@ TensorBoard:
 
 Holding은 두 손 평균과 object center 사이 거리의 `exp(-5*d²)`. At은 XYZ near score와 기존 XY 10cm / Z 1mm putdown 판정을 결합한다. 속도는 source displacement / control dt의 XY 성분을 **post-step source→target 방향**으로 투영한다. 이동 target의 속도를 빼지 않는다. gate는 이전 phi, success prerequisite는 이전 achieved를 사용한다.
 
-완료 전 task는 Holding/At signed delta와 soft-gated velocity, 첫 valid success bonus 5의 합이다. 완료 후 해당 task 합은 0이며 power/collision/box-speed penalty와 AMP는 계속 적용된다. 성공 후 phi는 물리 상태를 따라 계속 관측되지만 achieved/done history와 bonus는 재활성화되지 않는다.
+Task reward는 Holding/At absolute satisfaction과 soft-pinned progress, 첫 valid success bonus 5의 합이다. relation이 만족될수록 progress는 0으로 꺼지지 않고 1로 수렴하며, 여러 prerequisite는 product가 아닌 minimum으로 결합한다. 성공 후에도 dense relation reward는 현재 물리 상태에 따라 계속 계산하고, achieved/done history와 bonus만 재활성화하지 않는다.
 
 ## 기록 항목
 
-- `reward_terms/*`: Holding/At delta와 velocity를 분리, bonus, power, collision, box speed, total, AMP, combined.
-- `relation/holding/*`, `relation/at/*`: phi/gate/current satisfaction/achieved, threshold 상하 crossing, 각 signed 성분.
+- `reward_terms/*`: Holding/At state와 progress를 분리, bonus, power, collision, box speed, total, AMP, combined.
+- `relation/holding/*`, `relation/at/*`: phi/gate/current satisfaction/achieved, threshold 상하 crossing, state/progress reward 성분.
 - `relation/goal_xy_error`, `goal_z_error`, 손 midpoint/좌우 hand center 거리, root–box XY, box speed, near/put, target XY crossing.
 - `relation/near_{0.1,0.25,0.5}m/*`: active agent의 근접 fraction, 속도/velocity reward, stationary-unplaced fraction. 거리 band는 **로그용이며 reward cutoff가 아니다**. 이 band 평균은 step별 조건부 평균을 rollout 동안 평균한 값이므로 fraction과 함께 해석한다.
 - `relation/near_unplaced_slow/*`: XY<0.5m, box speed<0.05m/s, 미배치/미완료 조건의 AMP·combined 및 sample count. AMP는 해당 rollout의 동일 discriminator로 계산하며 전체 sample을 합친 조건부 평균이다. count=0이면 평균 로그의 0은 관측값이 아님에 주의한다.
@@ -108,7 +87,7 @@ Holding은 두 손 평균과 object center 사이 거리의 `exp(-5*d²)`. At은
 
 ## 실제 실행 검증
 
-CPU tensor/network tests **48 passed**:
+CPU tensor/network tests **49 passed**:
 
 ```bash
 source tokenhsi/scripts/multi_agent/runtime_env.sh
@@ -120,7 +99,7 @@ PYTHONPATH=tokenhsi python -m pytest -q \
   tokenhsi/tests/test_ma_scene_features.py
 ```
 
-velocity target/stop/reverse/vertical/invariance, 1mm/10cm 경계, prerequisite 방향, signed delta, 이전 achievement 순서, bonus once, 부분 reset, history suffix, agent permutation, batch isolation, 두 optimizer step 이후 dynamic MLP gradient, entity-count-independent parameters, RMS bypass, strict schema/legacy 경로를 검증했다. 알려진 exploit fixture는 예방했다고 assert하지 않고 실제 허용 결과를 검사한다.
+velocity target/stop/reverse/vertical/invariance, 1mm/10cm 경계, prerequisite 방향/minimum, absolute state, progress pinning, 이전 achievement 순서, bonus once, 부분 reset, history suffix, agent permutation, batch isolation, 두 optimizer step 이후 dynamic MLP gradient, entity-count-independent parameters, RMS bypass, strict schema/legacy 경로를 검증했다.
 
 Isaac Gym / CUDA:
 
@@ -155,7 +134,7 @@ SMOKE=1 MAX_ITERATIONS=2 bash tokenhsi/scripts/multi_agent/ma_carry_relation_tra
 - 1mm tolerance와 Holding scale 유지에는 기존 20k 정책의 실측을 참고했다. 이전 baseline probe에서 384 agent episodes 중 264가 1mm putdown 조건을 한 번 이상 달성했고 263은 8 consecutive steps 달성했다. 이는 새 정책의 결과가 아니다. 원자료와 해석은 `output/diagnostics/carry_reference_review/REPORT.md`에 있다.
 - gate는 정확한 자동 감속 장치가 아니다. putdown 미성립 시 phi_At≤.5, gate_At≤약 .0001234이므로 속도 항이 거의 안 줄어드는 경우가 남는다. 이번에는 합의대로 식을 유지하고 로그로 확인한다.
 - midpoint-only Holding false positive, 한 번 잡은 뒤 kick/throw, goal-first-then-touch가 success 이력 조건상 허용될 수 있다. stable contact/lift/continuous carry/release 조건을 새로 강제하지 않았다.
-- gate-toggle closed cycle은 state reward 합 약 +.399011, gamma .99 discounted 합 약 +.379310이다. potential-based/cycle-free 보상이라고 주장하지 않는다.
+- absolute state와 soft-pinned progress는 성공 상태 유지에 dense reward를 계속 지급한다. `done`은 이 reward를 끄지 않고 one-time bonus만 latch한다.
 - reset 시 이미 만족한 relation을 seed하며 초기 유효 완료에 bonus를 지급하지 않는다. 모든 subgoal이 처음부터 완료인 scene은 최대 16회 재표본화 후 계속 발생하면 오류를 낸다.
 - 구 checkpoint → 새 mode의 warm-start 변환은 구현하지 않았다. legacy checkpoint는 legacy 모드에서 그대로 쓰고, 새 checkpoint는 schema/보상 설정을 확인한 뒤 strict load한다. diagnostics-only 변경은 허용한다.
 - 기존 trainer의 resume는 weight/optimizer/epoch를 복원하고 물리 episode와 relation history는 새 reset에서 시작한다. simulator state/RNG/replay까지 포함하는 bitwise mid-episode resume를 구현한 것은 아니다.

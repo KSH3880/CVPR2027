@@ -94,6 +94,4 @@ Current evidence favors an insufficiently learned connection between object
 location and task-appropriate behavior over a position-copying/indexing bug.
 The user's exact pickup-looking pose still needs visual confirmation; the
 headless proxy only establishes low postures away from all boxes.
-The separate state2_signed progress experiment remains a reasonable test of
-navigation reward shaping, not a proven fix for this symptom. No AMP or holding
-reward change was made as part of this diagnosis.
+No AMP or holding reward change was made as part of this diagnosis.

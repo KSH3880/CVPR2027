@@ -11,8 +11,8 @@ NUM_AGENTS=${2:-2}
 NUM_ENVS=${3:-16}
 NUM_OBJECTS=${4:-3}
 NUM_REPEATS=${5:-3}
-RELATION_ENV_CFG=tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry_relation.yaml
-RELATION_OUTPUT_DEFAULT=output/ma_carry_relation_v0
+RELATION_ENV_CFG=tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry_relation_state02_near_dir.yaml
+RELATION_OUTPUT_DEFAULT=output/ma_carry_relation_state02_near_dir
 set --
 if [ -n "${SEED:-}" ]; then
     set -- "$@" --seed "$SEED"
