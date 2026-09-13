@@ -1,4 +1,5 @@
 """Pure tensor state-relation rewards. No simulator imports or mutation of input history."""
+import math
 import torch
 
 
@@ -86,6 +87,13 @@ def pin_progress(progress, gate):
     return (1 - gate) * progress + gate
 
 
+def approach_satisfaction(distance_xy, radius=.5):
+    """XY approach credit: half credit at radius, full credit at zero distance."""
+    if not math.isfinite(radius) or radius <= 0:
+        raise ValueError('approach radius must be finite and positive')
+    return 1. / (1. + (distance_xy / radius).square())
+
+
 def prerequisite_all(values, mask):
     return torch.where(mask.unsqueeze(0), values.unsqueeze(1), torch.ones_like(values).unsqueeze(1)).all(-1)
 
@@ -101,7 +109,8 @@ def advance_relation_history(satisfied_next, achieved_prev, done_prev, graph):
 
 def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
                   state_weight=1., progress_weight=.2, success_bonus=5.,
-                  beta=30., gate_center=.8, satisfaction_threshold=.9, validate=True):
+                  beta=30., gate_center=.8, satisfaction_threshold=.9, validate=True,
+                  at_distance_xy=None, at_approach_radius=None):
     if phi_prev.shape != phi_next.shape or progress.shape != phi_prev.shape:
         raise ValueError('phi/progress shapes must agree')
     if phi_prev.ndim != 2 or phi_prev.shape[1] != graph.edge_src.numel():
@@ -123,7 +132,19 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
             raise ValueError('progress must be finite values in [0,1]')
     gate = relation_gate(phi_prev, beta, gate_center)
     activation = prerequisite_minimum(gate, graph.prereq_mask)
-    pinned_progress = pin_progress(progress, gate)
+    progress_blend = gate
+    if at_approach_radius is not None:
+        if at_distance_xy is None or at_distance_xy.shape != done_prev.shape:
+            raise ValueError('At approach progress requires XY distances with shape [N,M]')
+        if at_distance_xy.device != phi_prev.device or at_distance_xy.dtype != phi_prev.dtype:
+            raise ValueError('At XY distances must share phi device and dtype')
+        if validate and (not torch.isfinite(at_distance_xy).all() or (at_distance_xy < 0).any()):
+            raise ValueError('At XY distances must be finite and nonnegative')
+        # Carry target edges are At. Replace ONLY their self-pinning weight;
+        # prerequisite activation, state, success and observations still use XYZ phi/gate.
+        progress_blend = gate.clone()
+        progress_blend[:, graph.subgoal_target] = approach_satisfaction(at_distance_xy, at_approach_radius)
+    pinned_progress = pin_progress(progress, progress_blend)
     reward_mask = graph.edge_mask.to(phi_prev.dtype)
     state = state_weight * activation * phi_next * reward_mask
     progress_reward = progress_weight * activation * pinned_progress * reward_mask
@@ -133,7 +154,8 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
     agent.scatter_add_(1, graph.edge_owner.unsqueeze(0).expand(phi_prev.shape[0], -1), state + progress_reward)
     bonus = success_bonus * first.to(phi_prev.dtype)
     return dict(agent_task_reward=agent + bonus, edge_reward=state + progress_reward,
-                activation=activation, pinned_progress=pinned_progress, state_component=state,
+                activation=activation, pinned_progress=pinned_progress, progress_blend=progress_blend,
+                state_component=state,
                 progress_component=progress_reward, success_bonus=bonus, first_success=first,
                 achieved_next=achieved, done_next=done, valid_next=valid,
                 gate_next=relation_gate(phi_next, beta, gate_center), satisfied_next=satisfied)
@@ -157,13 +179,15 @@ class RelationRuntime:
             satisfied, seeded, torch.zeros_like(self.done[env_ids]), self.graph)
         self.achieved[env_ids], self.done[env_ids] = achieved, done
 
-    def step(self, phi, progress):
+    def step(self, phi, progress, at_distance_xy=None):
         c = self.config
         result = relation_step(self.phi, phi, progress, self.achieved, self.done, self.graph,
             c.get('state_reward_weight', 1.), c.get('progress_reward_weight', .2),
             c.get('subgoal_success_bonus', 5.), c.get('soft_gate', {}).get('beta', 30.),
             c.get('soft_gate', {}).get('center', .8), c.get('satisfaction_threshold', .9),
-            validate=c.get('diagnostics', {}).get('validate_tensors', False))
+            validate=c.get('diagnostics', {}).get('validate_tensors', False),
+            at_distance_xy=at_distance_xy,
+            at_approach_radius=c.get('progress', {}).get('at_approach_radius'))
         self.phi.copy_(phi)
         self.achieved.copy_(result['achieved_next'])
         self.done.copy_(result['done_next'])

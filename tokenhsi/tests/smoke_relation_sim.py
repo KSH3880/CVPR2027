@@ -72,7 +72,9 @@ def check_simulator(self):
                                  success_bonus=cfg.get('subgoal_success_bonus', 5.),
                                  beta=cfg.get('soft_gate', {}).get('beta', 30.),
                                  gate_center=cfg.get('soft_gate', {}).get('center', .8),
-                                 satisfaction_threshold=cfg.get('satisfaction_threshold', .9))
+                                 satisfaction_threshold=cfg.get('satisfaction_threshold', .9),
+                                 at_distance_xy=(task._tar_pos[..., :2] - objects[..., :2]).norm(dim=-1),
+                                 at_approach_radius=progress_cfg.get('at_approach_radius'))
         torch.testing.assert_close(runtime.phi, phi)
         torch.testing.assert_close(runtime.achieved, expected['achieved_next'])
         torch.testing.assert_close(runtime.done, expected['done_next'])

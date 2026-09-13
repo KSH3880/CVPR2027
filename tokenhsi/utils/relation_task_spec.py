@@ -60,7 +60,8 @@ def validate_relation_config(config):
         raise ValueError('Unsupported relationReward fields/operators: ' + ', '.join(sorted(unknown)))
     nested = {
         'soft_gate': {'beta', 'center'},
-        'progress': {'kind', 'target_speed', 'velocity_scale', 'normalization_epsilon'},
+        'progress': {'kind', 'target_speed', 'velocity_scale', 'normalization_epsilon',
+                     'at_approach_radius'},
         'holding': {'hand_distance_scale'},
         'at': {'state_definition', 'near_distance_scale', 'near_fraction',
                'putdown_xy_tolerance', 'putdown_z_tolerance'},
@@ -80,6 +81,12 @@ def validate_relation_config(config):
         raise ValueError('Unsupported progress kind: ' + str(progress_kind))
     if progress_kind == 'direction' and set(progress) & {'target_speed', 'velocity_scale'}:
         raise ValueError('direction progress does not accept Gaussian speed parameters')
+    if 'at_approach_radius' in progress:
+        radius = progress['at_approach_radius']
+        if progress_kind != 'direction':
+            raise ValueError('At approach blending requires direction progress')
+        if isinstance(radius, bool) or not isinstance(radius, (int, float)) or not math.isfinite(radius) or radius <= 0:
+            raise ValueError('At approach radius must be finite and positive')
     success = config.get('success', {})
     for key in ('require_achieved_target_prerequisites', 'once_per_subgoal',
                 'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success'):

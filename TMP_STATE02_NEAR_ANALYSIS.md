@@ -346,3 +346,30 @@ P_e=\operatorname{clip}\left(
 이 실험은 정지/정착 중 dense 보상 감소를 미래 성공 보너스로 보완할 수 있는지 확인하는 것이며, 보상 감소 자체를 제거하는 수식 변경은 아니다. 성공은 여전히 Holding 달성 이력 + XYZ phi_At>=0.9이며 실제 지지, 손 놓기, 1mm PutDown 조건과 동일하지 않다. 높은 목표에서의 통과 성공 증가와 낮은 목표에서의 정착 개선을 구분해야 한다.
 
 전체 설계의 미해결 쟁점: Z는 최종 배치 및 후속 OnTop prerequisite에는 필요한 정보이지만, 접근 중 보상과 정지 시 progress 보완까지 같은 완료 gate에 결합되어 있다. 따라서 Z 전체를 노이즈로 단정하거나 XY-only로 바꾸면 해결된다고 단정하지 않는다. 이후 검토에서는 접근 유도, 정착, 최종 상태 판정, 후속 edge 활성화를 함께 보되, 이번 success10 비교에는 추가 변경을 섞지 않는다.
+
+### 구현: At-only approach progress, r=0.5 m
+
+직전 `state02_near_dir_success10`을 대조군으로 삼아, At의 progress 보완만 변경한 별도 실험을 추가했다. 성공 보너스는 10으로 유지한다.
+
+\[
+a_A=\frac{1}{1+(d_{xy}/0.5)^2},\qquad
+\bar P_A=a_A+(1-a_A)P_A,\qquad
+R_A=g_H[0.2\phi_A+0.2\bar P_A].
+\]
+
+- `a_A`는 post-step 박스-목표 XY 거리로 계산한다. 0.5m에서 0.5, 0.1m에서 약 0.9615, XY 일치 시 1이다.
+- 기존 At self-pinning의 `g_A`를 `a_A`로 교체한다. `g_A`를 다시 더하거나 곱해 이중 보완하지 않는다.
+- Holding은 기존 `Pbar_H=(1-g_H)P_H+g_H`를 유지한다. 두 raw progress는 모두 XY 방향 cosine이다.
+- At 전체 prerequisite에는 이전 상태에서 계산한 `g_H`를 그대로 곱한다. XYZ state, gate 관측, 달성 이력, 성공 판정, state/progress 0.2/0.2, 벌점 및 AMP 설정은 변경하지 않는다.
+- 접근 달성도는 성공 판정 및 prerequisite에 쓰지 않는다. 목표 위에 들고 정지해 At progress가 1이어도 XYZ state가 부족하면 성공하지 않는다.
+- 구현 옵션: `relationReward.progress.at_approach_radius: 0.5`. 이 옵션이 없는 모든 기존 config는 기존 gate pinning으로 실행된다.
+- 새 config: `tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry_relation_state02_near_dir_success10_approach.yaml`
+- 학습: `bash tokenhsi/scripts/multi_agent/ma_carry_relation_state02_near_dir_success10_approach_train.sh`
+- 출력: `output/ma_carry_relation_state02_near_dir_success10_approach/`
+- 뷰어: `HEADLESS=0 bash tokenhsi/scripts/multi_agent/ma_carry_relation_state02_near_dir_success10_approach_test.sh <새 approach checkpoint.pth> 2 1 3 10`
+- TensorBoard: `relation/at/approach`가 a_A, `relation/at/progress_bar`가 가중치 전 Pbar_A, `relation/progress_at`이 raw dir P_A다. 기존 `relation/at/gate`는 XYZ 완료 gate로 유지한다. `relation/at/progress_reward`에는 0.2 및 prerequisite가 이미 적용돼 있다.
+- 새 checkpoint와 기존 reward config의 혼용은 계속 차단한다. 새 실험은 새 학습으로 시작한다.
+
+검증: 전체 CPU 테스트 80개 통과. 거리별 수치, 보상 범위/단조성, At-only 변경, Holding/상태/성공/관측 불변성, 실제 mixin의 거리 전달, 높은 기존 g_A를 추가 적용하지 않음, config/checkpoint 계약을 확인했다. 실제 simulator 학습은 실행하지 않았다.
+
+남은 검증 사항: 가까이 들고 머무르는 행동, 먼 거리의 완만한 접근 보상, 정착 중 Holding 손실. 현재 식은 감속 자체를 선호하거나 물리적 배치/손 놓기를 보장하지 않는다. 성공 10 대조군과 비교하여 목표 접근 및 낮은 목표 정착이 실제로 개선되는지 확인한다.

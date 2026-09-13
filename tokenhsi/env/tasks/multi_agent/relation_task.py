@@ -64,7 +64,8 @@ class CarryRelationMixin:
         pa = relation_progress(self._prev_box_pos, objects, self._tar_pos, self.dt, cfg)
         previous_satisfied = runtime.phi >= self._relation_cfg.get('satisfaction_threshold', .9)
         live = ~runtime.done.clone()
-        result = runtime.step(phi, torch.stack([ph, pa], -1).flatten(1))
+        result = runtime.step(phi, torch.stack([ph, pa], -1).flatten(1),
+                              at_distance_xy=diag.get('goal_xy_error'))
         power = torch.zeros_like(result['agent_task_reward'])
         collision = torch.zeros_like(power)
         box_penalty = torch.zeros_like(power)
@@ -116,12 +117,15 @@ class CarryRelationMixin:
             for field, value in (('phi', runtime.phi), ('gate', result['gate_next']),
                                  ('satisfied', result['satisfied_next']), ('achieved', runtime.achieved),
                                  ('state_reward', result['state_component']),
+                                 ('progress_bar', result['pinned_progress']),
                                  ('progress_reward', result['progress_component'])):
                 diag[name + '/' + field] = value[:, j::2].float()
             diag[name + '/threshold_up'] = ((~previous_satisfied[:, j::2]) &
                                            result['satisfied_next'][:, j::2]).float()
             diag[name + '/threshold_down'] = (previous_satisfied[:, j::2] &
                                              (~result['satisfied_next'][:, j::2])).float()
+        if 'at_approach_radius' in self._relation_cfg.get('progress', {}):
+            diag['at/approach'] = result['progress_blend'][:, 1::2]
         stats = {k: v.mean() for k, v in diag.items() if not k.startswith('first_') or k == 'first_success'}
         self.extras['relation_near_unplaced_slow'] = (
             (diag['goal_xy_error'] < .5) & (speed < .05) & ~diag['put'].bool() & live).flatten()
