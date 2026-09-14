@@ -1,0 +1,18 @@
+{
+  "natural_episodes": 256,
+  "natural_stack_entries": 15,
+  "natural_stack_fall_terminals": 1,
+  "natural_stack_successes": 0,
+  "running_body_obs_max_abs_error": 0.0,
+  "bank_version": 2,
+  "bank_count": 21,
+  "bootstrap_reset_ids": [
+    24,
+    41,
+    58
+  ],
+  "bootstrap_body_observation_check": "passed",
+  "bootstrap_amp_history_check": "passed",
+  "bank_remap_check": "passed",
+  "legacy_bank_rejected": true
+}

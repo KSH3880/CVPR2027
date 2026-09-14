@@ -1,0 +1,206 @@
+{
+  "design": {
+    "source_tag": "ms57_ms18e9000_sharedgoal_w2s_boot15_6000_s0",
+    "environments_per_condition": 256,
+    "seed": 0,
+    "bootstrap": false,
+    "rehearsal": false,
+    "transition_gates_changed": false,
+    "original_training_sources_modified": false,
+    "external_sources_modified": false,
+    "initial_roots_joints_boxes_goals_paths_observations_checked_equal": true,
+    "limitation": "One evaluation seed; sequential physics runs have differing natural entrants. These are not paired identical STACK states or training-seed success estimates."
+  },
+  "conditions": [
+    {
+      "policy": "ms57",
+      "mode": "cached",
+      "natural_stack_entries": 16,
+      "fall_terminal_count_after_stack": 16,
+      "stack_timeout_count": 0,
+      "base_lost_count": 0,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 10,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [
+        0.8666667118668556,
+        0.7666667066514492,
+        1.3000000678002834,
+        1.1333333924412727,
+        0.8333333767950535,
+        1.2333333976566792,
+        1.1666667275130749,
+        1.1333333924412727,
+        1.3666667379438877,
+        0.9333333820104599,
+        0.8666667118668556,
+        0.9333333820104599,
+        1.1000000573694706,
+        1.1666667275130749,
+        1.200000062584877,
+        1.1333333924412727
+      ],
+      "stack_end_reasons": {
+        "1": 16
+      }
+    },
+    {
+      "policy": "ms57",
+      "mode": "stack_only",
+      "natural_stack_entries": 19,
+      "fall_terminal_count_after_stack": 1,
+      "stack_timeout_count": 17,
+      "base_lost_count": 1,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 0,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        2.5000001303851604,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        3.9666668735444546,
+        6.000000312924385
+      ],
+      "stack_end_reasons": {
+        "3": 17,
+        "6": 1,
+        "1": 1
+      }
+    },
+    {
+      "policy": "ms57",
+      "mode": "all_live",
+      "natural_stack_entries": 18,
+      "fall_terminal_count_after_stack": 0,
+      "stack_timeout_count": 17,
+      "base_lost_count": 0,
+      "global_timeout_count": 1,
+      "top_tilt45_before_done": 4,
+      "stack_success_count": 1,
+      "post_stack_terminal_times_s": [
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        9.433333825320005,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385,
+        6.000000312924385
+      ],
+      "stack_end_reasons": {
+        "3": 17,
+        "4": 1
+      }
+    },
+    {
+      "policy": "ms57",
+      "mode": "live_until_stack",
+      "natural_stack_entries": 14,
+      "fall_terminal_count_after_stack": 14,
+      "stack_timeout_count": 0,
+      "base_lost_count": 0,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 11,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [
+        0.966666717082262,
+        1.0333333872258663,
+        0.966666717082262,
+        0.9333333820104599,
+        1.2333333976566792,
+        1.5666667483747005,
+        1.1666667275130749,
+        1.1333333924412727,
+        1.5000000782310963,
+        1.1666667275130749,
+        1.5666667483747005,
+        1.1333333924412727,
+        0.8000000417232513,
+        1.0666667222976685
+      ],
+      "stack_end_reasons": {
+        "1": 14
+      }
+    },
+    {
+      "policy": "ms18",
+      "mode": "cached",
+      "natural_stack_entries": 0,
+      "fall_terminal_count_after_stack": 0,
+      "stack_timeout_count": 0,
+      "base_lost_count": 0,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 0,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [],
+      "stack_end_reasons": {}
+    },
+    {
+      "policy": "ms18",
+      "mode": "stack_only",
+      "natural_stack_entries": 0,
+      "fall_terminal_count_after_stack": 0,
+      "stack_timeout_count": 0,
+      "base_lost_count": 0,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 0,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [],
+      "stack_end_reasons": {}
+    },
+    {
+      "policy": "ms18",
+      "mode": "all_live",
+      "natural_stack_entries": 1,
+      "fall_terminal_count_after_stack": 1,
+      "stack_timeout_count": 0,
+      "base_lost_count": 0,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 0,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [
+        2.200000114738941
+      ],
+      "stack_end_reasons": {
+        "1": 1
+      }
+    },
+    {
+      "policy": "ms18",
+      "mode": "live_until_stack",
+      "natural_stack_entries": 0,
+      "fall_terminal_count_after_stack": 0,
+      "stack_timeout_count": 0,
+      "base_lost_count": 0,
+      "global_timeout_count": 0,
+      "top_tilt45_before_done": 0,
+      "stack_success_count": 0,
+      "post_stack_terminal_times_s": [],
+      "stack_end_reasons": {}
+    }
+  ]
+}

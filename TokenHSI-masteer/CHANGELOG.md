@@ -2,7 +2,65 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-14
+
+### masteer 뷰어 VNC 공유 메모리 부족 우회
+
+- `scripts/masteer/view.sh`의 x11vnc 실행에 `-noshm`을 추가했다. 공유 메모리
+  할당 오류(`shmget: No space left on device`)로 VNC만 종료되어 noVNC 연결이
+  실패하는 문제를 우회한다.
+- 기존 뷰어 디스플레이에서 오류를 재현하고 `-noshm` 적용 후 VNC 정상 시작과
+  6100/5941 포트 수신을 확인했다. Bash 구문 검사를 통과했다.
+
+## 2026-09-14 — ms52 shared-goal 안전 경로와 평행 STACK gate
+
+- ms52의 340-D 관측·모델 ABI와 carry tokenizer 동결 계약을 유지한 전용 실행
+  `train_ms52_shared_goal_safe_local.sh`를 추가했다. CLEAR 안정 정지 streak만
+  15 frame에서 10 frame으로 완화하고, 학습 시작점은 ms18 epoch 9000을 유지한다.
+- shared-goal에서 Base와 Top의 실제 box-carry arc만 비교해 0.8 m 이상 떨어지는
+  safety-gate 경로쌍을 고른다. 접근 구간·경로 padding과 출발 후 0.6 m는 비교에서
+  제외하며, 기준 미달 env만 최대 4회 다시 뽑는다. Top은 Base release·후퇴·안정
+  정지 뒤에만 최종 적층 위치로 진입한다.
+- STACK terminal success에 base/top box face-frame 평행 조건을 추가했다. 기본 호환값은
+  180도이고 새 실행은 15도를 사용한다. 정육면체의 90도 quarter-turn은 허용하고
+  45도 diamond 배치는 거부하므로, 조건을 통과해야 base/top 각각 +20을 한 번 받는다.
+- 순수 tensor 검증에서 유효 carry arc/padding 분리와 0/15/45/90도 판정
+  `pass/pass/fail/pass`를 확인했다. 대표 32개 경로 생성에서는 Base·Top pair 재탐색
+  2회 안에 모두 0.8 m를 넘었다. Python/Bash 구문과 `git diff --check`를 통과했다.
+  Isaac Gym class dummy 검증은 확장 모듈 segfault로 완료하지 못했으며 실제 학습은
+  실행하지 않았다.
+
 ## 2026-09-14 — shared-goal W2S + late-STACK rehearsal 복구
+
+### ms43 실행 설정에 STACK 성공 1회 보너스 +20 적용
+
+- `scripts/masteer/train_release_continuity_local.sh`에
+  `STACK_SUCCESS_BONUS=${PILOT_SUCCESS_BONUS:-20.0}`을 추가했다. 기존 완료 이벤트
+  처리로 SUCCESS 전환 프레임에 base/top 각각 +20을 한 번 지급한다.
+- carry tokenizer 동결, phase별 보상 및 성공 판정 조건은 유지한다. 현재 ms43
+  성공 판정에는 top 손떼기가 필수가 아니며, 관측 수정과 함께 새 실행부터 적용된다.
+- Bash 구문 검사와 학습 실행을 차단한 환경변수 전달 확인에서 보너스 20.0,
+  carry 동결 1, 후퇴 측면각 45를 확인했다. 새 학습은 실행하지 않았다.
+
+
+### 진행 중 reset 관측 캐시 오용 제거와 bootstrap 신체 상태 복원
+
+- 단계 제어 중 선택 env 관측을 갱신하던 6곳을 실제 시뮬레이터 신체 상태로
+  갱신하도록 수정했다. 일반 reset 직후 관측·AMP 초기화에 필요한 자세 캐시는 유지한다.
+- bootstrap에 신체 링크 위치·회전·선속도·각속도를 함께 저장하고, 복원 시 reset
+  자세 캐시도 일치시킨다. 외부 bank는 version 2로 저장하며, 신체 정보가 없는
+  version 1 bank는 재수집을 요구한다. 학습 체크포인트 가중치는 변경하지 않는다.
+- GPU 7 headless, ms57 현재 체크포인트, 256 env/seed 0 자연 전환 검증에서
+  진행 중 신체 관측과 실제 상태의 최대 오차는 0이었다. 자연 STACK 진입은 15건,
+  STACK 낙상 종료 1건, 성공 0건으로 기존 정책의 작업 성공까지 해결된 것은 아니다.
+- 저장 bank 왕복·환경 원점 이동과 복원 3개 env의 첫 신체 관측·AMP 현재값 및
+  이력 일치를 확인했다. Python 구문 검사와 diff check도 통과했다.
+- 앞선 자연 전환 관측 소스 비교에서도 캐시 오용이 즉시 낙상의 주요 원인으로
+  확인됐다. 과거 ms48의 정책 불안정성 우선 해석과 ms43 등 구 평가의 방법론 비교는
+  수정된 관측으로 다시 검증해야 한다.
+- 검증 원장: `runs/stack_bootstrap/production_obs_fix_20260914/verification.json`.
+  기존 실행 중 프로세스에는 새 코드가 소급 적용되지 않는다.
+
 
 - `bootstrap_fraction=0`의 원인은 설정값 0.15가 아니라 snapshot bank가
   비어 있던 것이었다. shared-goal의 stage gate가 이미 grasp와 box 안정

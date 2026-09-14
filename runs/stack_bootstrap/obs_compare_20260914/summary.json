@@ -1,0 +1,71 @@
+{
+  "ms18": {
+    "cached": {
+      "trials": 6,
+      "top_tilt45_before_done": 4,
+      "top_tilt45_times_s": [
+        1.2666667327284813,
+        1.1000000573694706,
+        1.0666667222976685,
+        0.8000000417232513
+      ],
+      "episode_ended_within_5s": 6,
+      "episode_end_times_s": [
+        1.5000000782310963,
+        0.5000000260770321,
+        1.200000062584877,
+        1.2333333976566792,
+        1.0666667222976685,
+        1.0666667222976685
+      ]
+    },
+    "live_after_first_step": {
+      "trials": 6,
+      "top_tilt45_before_done": 0,
+      "top_tilt45_times_s": [],
+      "episode_ended_within_5s": 1,
+      "episode_end_times_s": [
+        2.833333481103182
+      ]
+    }
+  },
+  "juan": {
+    "cached": {
+      "trials": 6,
+      "top_tilt45_before_done": 4,
+      "top_tilt45_times_s": [
+        1.1000000573694706,
+        1.0666667222976685,
+        0.7000000365078449,
+        0.36666668578982353
+      ],
+      "episode_ended_within_5s": 6,
+      "episode_end_times_s": [
+        1.1666667275130749,
+        0.8666667118668556,
+        1.1333333924412727,
+        0.9333333820104599,
+        1.1000000573694706,
+        1.1000000573694706
+      ]
+    },
+    "live_after_first_step": {
+      "trials": 6,
+      "top_tilt45_before_done": 0,
+      "top_tilt45_times_s": [],
+      "episode_ended_within_5s": 3,
+      "episode_end_times_s": [
+        3.333333507180214,
+        3.6666668578982353,
+        3.400000177323818
+      ]
+    }
+  },
+  "design": {
+    "saved_states": 3,
+    "repeats": 2,
+    "control": "matched initial roots, joints, paths, initial observations and first policy action; only body observation source differs from step 1 onward",
+    "not_tested": "freshly restored first observation correction, natural full-sequence transition, retraining, population success rate",
+    "checkpoint_or_external_source_modified": false
+  }
+}

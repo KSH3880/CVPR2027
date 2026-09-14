@@ -116,6 +116,16 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_top_commit_goal = bool(_i("STACK_TOP_COMMIT_GOAL", 0))
         self._ss_shared_goal_carry = bool(_i("STACK_SHARED_GOAL_CARRY", 0))
         self._ss_shared_wait_dist = _f("STACK_SHARED_WAIT_DIST", 0.90)
+        self._ss_shared_path_clearance = _f(
+            "STACK_SHARED_PATH_CLEARANCE", 0.0
+        )
+        self._ss_shared_path_candidates = _i(
+            "STACK_SHARED_PATH_CANDIDATES", 8
+        )
+        self._ss_shared_path_retries = _i("STACK_SHARED_PATH_RETRIES", 1)
+        self._ss_shared_path_start_margin = _f(
+            "STACK_SHARED_PATH_START_MARGIN", 0.0
+        )
         self._ss_top_wait_reward_w = _f("STACK_TOP_WAIT_REWARD_W", 0.0)
         self._ss_base_hold_reward_w = _f("STACK_BASE_HOLD_REWARD_W", 0.0)
         self._ss_pre_steps = _i("STACK_PRE_STEPS", 0)
@@ -239,6 +249,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_top_stable_lin = _f("STACK_TOP_STABLE_LIN", self._ss_stable_lin)
         self._ss_top_stable_ang = _f("STACK_TOP_STABLE_ANG", self._ss_stable_ang)
         self._ss_top_upright_deg = _f("STACK_TOP_UPRIGHT_DEG", 10.0)
+        # Backward-compatible by default. New runs can require the top and
+        # base box faces to be parallel before the terminal success bonus is
+        # paid. Cube/square symmetry is handled modulo 90 degrees below.
+        self._ss_top_parallel_deg = _f("STACK_TOP_PARALLEL_DEG", 180.0)
         self._ss_top_steps = _i("STACK_TOP_STEPS", 20)
         self._ss_drop_xy = _f("STACK_DROP_XY", 0.25)
         self._ss_transition_bonus = _f("STACK_TRANSITION_BONUS", 3.0)
@@ -349,8 +363,18 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             raise ValueError("STACK top/above tolerances must be positive")
         if self._ss_top_upright_deg <= 0.0 or self._ss_top_upright_deg > 90.0:
             raise ValueError("STACK_TOP_UPRIGHT_DEG must be in (0, 90]")
+        if self._ss_top_parallel_deg <= 0.0 or self._ss_top_parallel_deg > 180.0:
+            raise ValueError("STACK_TOP_PARALLEL_DEG must be in (0, 180]")
         if self._ss_shared_wait_dist <= 0.0:
             raise ValueError("STACK_SHARED_WAIT_DIST must be positive")
+        if self._ss_shared_path_clearance < 0.0:
+            raise ValueError("STACK_SHARED_PATH_CLEARANCE must be non-negative")
+        if self._ss_shared_path_candidates < 2:
+            raise ValueError("STACK_SHARED_PATH_CANDIDATES must be at least 2")
+        if self._ss_shared_path_retries < 1:
+            raise ValueError("STACK_SHARED_PATH_RETRIES must be at least 1")
+        if self._ss_shared_path_start_margin < 0.0:
+            raise ValueError("STACK_SHARED_PATH_START_MARGIN must be non-negative")
         if min(self._ss_top_wait_reward_w, self._ss_base_hold_reward_w) < 0.0:
             raise ValueError("STACK TOP_WAIT/BASE_HOLD reward weights must be non-negative")
         if self._ss_shared_goal_carry and self._ss_top_wait_at_start:
@@ -577,6 +601,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_base_goal = torch.zeros((num_envs, 3), device=self.device)
         self._ss_stage_goal = torch.zeros((num_envs, 3), device=self.device)
         self._ss_top_goal = torch.zeros((num_envs, 3), device=self.device)
+        self._ss_shared_path_min = torch.full(
+            (num_envs,), float("nan"), device=self.device
+        )
         self._ss_latched_base = torch.zeros((num_envs, 3), device=self.device)
         self._ss_top_goal_committed = torch.zeros(
             num_envs, dtype=torch.bool, device=self.device
@@ -694,6 +721,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"commit{int(self._ss_top_commit_goal)} "
             f"shared_goal={int(self._ss_shared_goal_carry)}/"
             f"gate{self._ss_shared_wait_dist:.2f}m/"
+            f"path_clear{self._ss_shared_path_clearance:.2f}/"
+            f"k{self._ss_shared_path_candidates}/"
+            f"retry{self._ss_shared_path_retries}/"
+            f"start_margin{self._ss_shared_path_start_margin:.2f}/"
             f"wait_r{self._ss_top_wait_reward_w:.2f}/"
             f"base_hold_r{self._ss_base_hold_reward_w:.2f} "
             f"budget={self._ss_pre_steps}+{self._ss_phase_steps} "
@@ -719,6 +750,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"top_approach={self._ss_top_approach_progress_w:.2f} "
             f"top_premature={self._ss_top_premature_release_pen_w:.2f} "
             f"top_settle={self._ss_top_settle_steps} "
+            f"top_parallel={self._ss_top_parallel_deg:.1f}deg "
             f"release_progress_w={self._ss_release_progress_w:.2f} "
             f"release_hold={self._ss_release_hold_pen_w:.2f}/"
             f"{self._ss_release_hold_grace_steps} "
@@ -815,6 +847,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_bootstrap_roots = torch.zeros_like(self._humanoid_root_states)
         self._ss_bootstrap_dof_pos = torch.zeros_like(self._dof_pos)
         self._ss_bootstrap_dof_vel = torch.zeros_like(self._dof_vel)
+        self._ss_bootstrap_body_states = torch.zeros_like(
+            self._initial_humanoid_rigid_body_states
+        )
         self._ss_bootstrap_boxes = torch.zeros(
             (self.num_envs, self.num_agents, 13), device=self.device
         )
@@ -844,6 +879,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_bootstrap_roots[env_ids] = self._humanoid_root_states[env_ids]
         self._ss_bootstrap_dof_pos[env_ids] = self._dof_pos[env_ids]
         self._ss_bootstrap_dof_vel[env_ids] = self._dof_vel[env_ids]
+        self._ss_bootstrap_body_states[env_ids] = torch.cat((
+            self._rigid_body_pos[env_ids], self._rigid_body_rot[env_ids],
+            self._rigid_body_vel[env_ids], self._rigid_body_ang_vel[env_ids],
+        ), dim=-1)
         self._ss_bootstrap_boxes[env_ids] = self.agent_axis(self._box_states)[env_ids]
         self._ss_bootstrap_base_goal[env_ids] = self._ss_base_goal[env_ids]
         self._ss_bootstrap_stage_goal[env_ids] = self._ss_stage_goal[env_ids]
@@ -914,6 +953,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._humanoid_root_states[ids] = self._ss_bootstrap_roots[ids]
         self._dof_pos[ids] = self._ss_bootstrap_dof_pos[ids]
         self._dof_vel[ids] = self._ss_bootstrap_dof_vel[ids]
+        self._kinematic_humanoid_rigid_body_states[rows] = (
+            self._ss_bootstrap_body_states[ids].reshape(-1, self.num_bodies, 13)
+        )
         self.agent_axis(self._box_states)[ids] = self._ss_bootstrap_boxes[ids]
         self._ss_base_goal[ids] = self._ss_bootstrap_base_goal[ids]
         self._ss_stage_goal[ids] = self._ss_bootstrap_stage_goal[ids]
@@ -1161,7 +1203,11 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._sync_stack_actors(env_ids)
         rows = self.agent_rows(env_ids)
         self._ss_dbg_z0[rows] = self.humanoid_rows(self._box_states)[rows, 2]
-        self._reset_steer(self.agent_rows(env_ids))
+        self._ss_shared_path_min[env_ids] = float("nan")
+        if self._ss_shared_goal_carry and self._ss_shared_path_clearance > 0.0:
+            self._reset_shared_goal_paths(env_ids, base_rows, top_rows)
+        else:
+            self._reset_steer(self.agent_rows(env_ids))
         self._mscale[base_rows] = 1.0
         self._mscale[top_rows] = 1.0
         self._reset_progress_ref(env_ids)
@@ -1502,6 +1548,36 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         up = torch.zeros((len(quat), 3), device=quat.device)
         up[:, 2] = 1.0
         return quat_rotate(quat, up)[:, 2].clamp(0.0, 1.0)
+
+    @staticmethod
+    def _box_parallel_error_deg(base_quat, top_quat):
+        """Return face-alignment error, treating quarter turns as parallel.
+
+        A cube rotated 90 degrees still has parallel faces, while the unstable
+        45-degree diamond placement does not. The normal-axis term also rejects
+        a top box whose upper/lower face is tilted relative to the base box.
+        """
+        axes = torch.eye(3, device=base_quat.device, dtype=base_quat.dtype)
+        axes = axes.unsqueeze(0).expand(len(base_quat), -1, -1)
+        base_axes = quat_rotate(
+            base_quat[:, None, :].expand(-1, 3, -1).reshape(-1, 4),
+            axes.reshape(-1, 3),
+        ).view(-1, 3, 3)
+        top_axes = quat_rotate(
+            top_quat[:, None, :].expand(-1, 3, -1).reshape(-1, 4),
+            axes.reshape(-1, 3),
+        ).view(-1, 3, 3)
+
+        # Each horizontal top-box edge may align with either horizontal base
+        # edge. Absolute dot products make 180-degree flips equivalent.
+        horizontal = torch.abs(
+            torch.einsum("nai,nbi->nab", top_axes[:, :2], base_axes[:, :2])
+        )
+        top_x = horizontal[:, 0].amax(dim=-1)
+        top_y = horizontal[:, 1].amax(dim=-1)
+        normal = torch.abs((top_axes[:, 2] * base_axes[:, 2]).sum(dim=-1))
+        alignment = torch.minimum(normal, torch.minimum(top_x, top_y))
+        return torch.rad2deg(torch.acos(alignment.clamp(-1.0, 1.0)))
 
     def _base_stop_features(self, base_rows):
         roots = self.humanoid_rows(self._humanoid_root_states)[base_rows]
@@ -2355,6 +2431,171 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._prev_arc[rows] = 0.0
         self._mscale[rows] = 0.0
 
+    def _reset_shared_goal_paths(self, env_ids, base_rows, top_rows):
+        """Jointly choose a Top staging path that stays clear of Base's path.
+
+        The ms52 path generator and policy interface remain unchanged. Base is
+        generated once; Top candidates use the same generator and differ only
+        in their waiting point on the shared-goal safety circle. The candidate
+        with the largest sampled path-to-path clearance is installed.
+        """
+        self._reset_steer(base_rows)
+        boxes = self.humanoid_rows(self._box_states)
+        top_start = boxes[top_rows, 0:2]
+        goal = self._ss_base_goal[env_ids, 0:2]
+        near = top_start - goal
+        distance = near.norm(dim=-1, keepdim=True)
+        fallback = torch.zeros_like(near)
+        fallback[:, 0] = 1.0
+        near = torch.where(
+            distance > 1e-4, near / distance.clamp(min=1e-4), fallback
+        )
+        side = torch.stack((-near[:, 1], near[:, 0]), dim=-1)
+        radius = torch.minimum(
+            torch.full_like(distance[:, 0], self._ss_shared_wait_dist),
+            (distance[:, 0] - 0.50).clamp(min=0.0),
+        )
+
+        best_score = torch.full(
+            (len(env_ids),), -1.0, device=self.device
+        )
+        best_base_path = self._gt_path[base_rows].clone()
+        best_base_end = self._s_end[base_rows].clone()
+        best_base_box_arc = self._arc_box[base_rows].clone()
+        best_base_scale = self._mscale[base_rows].clone()
+        best_goal = self._ss_stage_goal[env_ids, 0:2].clone()
+        best_path = self._gt_path[top_rows].clone()
+        best_end = self._s_end[top_rows].clone()
+        best_box_arc = self._arc_box[top_rows].clone()
+        best_scale = self._mscale[top_rows].clone()
+
+        for retry in range(self._ss_shared_path_retries):
+            active = best_score < self._ss_shared_path_clearance
+            if not bool(active.any()):
+                break
+            active_index = torch.nonzero(active, as_tuple=False).squeeze(-1)
+            active_env_ids = env_ids[active]
+            active_base_rows = base_rows[active]
+            active_top_rows = top_rows[active]
+            active_near = near[active]
+            active_side = side[active]
+            active_goal = goal[active]
+            active_radius = radius[active]
+            if retry > 0:
+                # Some geometries cannot clear the fixed first Base curve no
+                # matter which safety-gate point Top uses. Resample only those
+                # unresolved Base/Top pairs with the same ms52 generator.
+                self._reset_steer(active_base_rows)
+
+            for index in range(self._ss_shared_path_candidates):
+                # Offset later retry rings so their gate points and freshly
+                # sampled ms52 curves are not exact repeats of the first ring.
+                phase = retry / self._ss_shared_path_retries
+                angle = (
+                    2.0 * math.pi
+                    * (index + phase)
+                    / self._ss_shared_path_candidates
+                )
+                direction = (
+                    math.cos(angle) * active_near
+                    + math.sin(angle) * active_side
+                )
+                candidate_goal = (
+                    active_goal + active_radius[:, None] * direction
+                )
+                self._ss_stage_goal[active_env_ids, 0:2] = candidate_goal
+                self._box_tar_pos[active_top_rows, 0:2] = candidate_goal
+                self._reset_steer(active_top_rows)
+
+                clearance = self._sampled_carry_path_clearance(
+                    self._gt_path[active_base_rows],
+                    self._arc_box[active_base_rows],
+                    self._s_end[active_base_rows],
+                    self._gt_path[active_top_rows],
+                    self._arc_box[active_top_rows],
+                    self._s_end[active_top_rows],
+                    self._ss_shared_path_start_margin,
+                )
+                better = clearance > best_score[active_index]
+                if bool(better.any()):
+                    chosen = active_index[better]
+                    chosen_base_rows = active_base_rows[better]
+                    chosen_rows = active_top_rows[better]
+                    best_score[chosen] = clearance[better]
+                    best_base_path[chosen] = self._gt_path[chosen_base_rows]
+                    best_base_end[chosen] = self._s_end[chosen_base_rows]
+                    best_base_box_arc[chosen] = self._arc_box[chosen_base_rows]
+                    best_base_scale[chosen] = self._mscale[chosen_base_rows]
+                    best_goal[chosen] = candidate_goal[better]
+                    best_path[chosen] = self._gt_path[chosen_rows]
+                    best_end[chosen] = self._s_end[chosen_rows]
+                    best_box_arc[chosen] = self._arc_box[chosen_rows]
+                    best_scale[chosen] = self._mscale[chosen_rows]
+
+        self._gt_path[base_rows] = best_base_path
+        self._s_end[base_rows] = best_base_end
+        self._arc_root[base_rows] = 0.0
+        self._arc_box[base_rows] = best_base_box_arc
+        self._prev_arc[base_rows] = 0.0
+        self._mscale[base_rows] = best_base_scale
+        self._ss_stage_goal[env_ids, 0:2] = best_goal
+        self._box_tar_pos[top_rows, 0:2] = best_goal
+        self._gt_path[top_rows] = best_path
+        self._s_end[top_rows] = best_end
+        self._arc_root[top_rows] = 0.0
+        self._arc_box[top_rows] = best_box_arc
+        self._prev_arc[top_rows] = 0.0
+        self._mscale[top_rows] = best_scale
+        self._ss_shared_path_min[env_ids] = best_score
+
+    @staticmethod
+    def _sampled_carry_path_clearance(
+        base_path,
+        base_box_arc,
+        base_end_arc,
+        top_path,
+        top_box_arc,
+        top_end_arc,
+        start_margin=0.0,
+        stride=4,
+    ):
+        """Minimum geometric clearance between the two active carry corridors.
+
+        gen_full_v2 stores person-to-box approach before _arc_box and
+        extrapolated padding after _s_end. Neither part is a box carry route,
+        so including them makes the score depend on unused path cells.
+        start_margin additionally excludes the unavoidable pickup/departure
+        neighborhood when the two reset boxes begin closer than the requested
+        corridor clearance.
+        """
+        base_sample = base_path[:, ::stride]
+        top_sample = top_path[:, ::stride]
+        arc = (
+            torch.arange(
+                0, base_path.shape[1], stride,
+                device=base_path.device,
+                dtype=base_path.dtype,
+            )
+            * sp.DS
+        )
+        base_valid = (
+            (arc[None, :] >= base_box_arc[:, None] + start_margin)
+            & (arc[None, :] <= base_end_arc[:, None])
+        )
+        top_valid = (
+            (arc[None, :] >= top_box_arc[:, None] + start_margin)
+            & (arc[None, :] <= top_end_arc[:, None])
+        )
+        pair_valid = base_valid[:, :, None] & top_valid[:, None, :]
+        distance = torch.cdist(base_sample, top_sample)
+        distance = distance.masked_fill(~pair_valid, float("inf"))
+        clearance = distance.amin(dim=(1, 2))
+        # A very short route can have no sampled cell after start_margin. Such
+        # a candidate is not eligible to claim a safe corridor.
+        return torch.where(
+            torch.isfinite(clearance), clearance, torch.zeros_like(clearance)
+        )
+
     def _set_retreat_path(self, env_ids, base_rows, base):
         roots = self.humanoid_rows(self._humanoid_root_states)[base_rows, 0:2]
         away_raw = roots - base[:, 0:2]
@@ -2532,6 +2773,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         env_ids = torch.arange(self.num_envs, device=self.device)
         (base_rows, top_rows, base, top, hand_dist, xy_err, z_err,
          _, _, root_dist) = self._base_features()
+        top_parallel_error_deg = torch.full(
+            (self.num_envs,), float("nan"), device=self.device
+        )
 
         stack_env = ~self._ss_rehearsal
         carry = (self._ss_phase == self.CARRY) & stack_env
@@ -2609,7 +2853,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             )
             # Existing steering token only: zero window means stop the object.
             self._mscale[rows] = 0.0
-            self._compute_observations(ids)
+            self._compute_observations()
 
         # In the legacy staging mode A2 carries its box near the base goal. In
         # Juan-style wait mode the stage is A2's reset box pose, so grasping is
@@ -2692,7 +2936,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 self._ss_staged[ids] = False
                 self._ss_stage_count[ids] = 0
                 self._mscale[top_rows[ids]] = 1.0
-                self._compute_observations(ids)
+                self._compute_observations()
         else:
             newly_staged = (
                 pre_stack & (~self._ss_staged) & (stage_dist <= self._ss_stage_tol)
@@ -2703,7 +2947,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_dbg_staged_step[ids] = self.progress_buf[ids]
             if self._ss_stage_force_zero:
                 self._mscale[top_rows[ids]] = 0.0
-            self._compute_observations(ids)
+            self._compute_observations()
 
         if self._ss_shared_goal_carry:
             top_waiting = (
@@ -2748,7 +2992,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_clear_age[ids] = 0
             self._ss_bonus_pending[ids] = True
             self._set_retreat_path(ids, rows, base[ids])
-            self._compute_observations(ids)
+            self._compute_observations()
 
         clear = self._ss_phase == self.CLEAR
         base_still_supported = (
@@ -2875,7 +3119,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             if not self._ss_debug_keep_wait:
                 self._reset_steer(rows)
                 self._mscale[rows] = self._ss_top_scale
-            self._compute_observations(ids)
+            self._compute_observations()
             self._record_stack_trace(trace_ids, 0)
 
         self._ss_clear_age = torch.where(
@@ -2914,6 +3158,15 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 (base[ids, 0:2] - self._ss_base_goal[ids, 0:2]).norm(dim=-1)
                 <= self._ss_drop_xy
             )
+            parallel_error_deg = self._box_parallel_error_deg(
+                base[ids, 3:7], top[ids, 3:7]
+            )
+            top_parallel_error_deg[ids] = parallel_error_deg
+            # Quaternion arithmetic can report 15.00003 for an exact 15-degree
+            # rotation, so keep the configured boundary inclusive.
+            parallel_ok = (
+                parallel_error_deg <= self._ss_top_parallel_deg + 1e-3
+            )
             top_place_ok = (
                 (top_xy_err <= self._ss_top_xy_tol)
                 & (top_z_err <= self._ss_top_z_tol)
@@ -2924,6 +3177,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                     >= math.cos(math.radians(self._ss_top_upright_deg))
                 )
                 & base_shift_ok
+                & parallel_ok
             )
             self._ss_stack_age[ids] += 1
             self._ss_dbg_stack_steps[ids] += 1
@@ -2985,7 +3239,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 self._ss_success[success] = True
                 self._ss_success_bonus_pending[success] = True
                 self._hold_steer(top_rows[success])
-            self._compute_observations(ids)
+            self._compute_observations()
 
         # No re-grasp controller: after release, losing the base ends the trial.
         post = (self._ss_phase >= self.RELEASE) & (self._ss_phase < self.SUCCESS)
@@ -3007,6 +3261,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["stack_clear_done"] = (self._ss_phase >= self.STACK).float()
         self.extras["stack_retreat_done"] = retreat_done.float()
         self.extras["stack_staged"] = self._ss_staged.float()
+        self.extras["stack_shared_path_min"] = self._ss_shared_path_min
+        self.extras["stack_top_parallel_error_deg"] = top_parallel_error_deg
         self.extras["stack_success"] = self._ss_success.float()
         self.extras["stack_failed"] = self._ss_failed.float()
         self.extras["tb/stack_phase/release_fraction"] = (
@@ -3021,6 +3277,13 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["tb/stack_phase/bootstrap_fraction"] = (
             self._ss_bootstrap_active.float()
         )
+        self.extras["tb/stack_state/top_parallel_error_deg"] = (
+            top_parallel_error_deg
+        )
+        self.extras["tb/stack_state/shared_path_min"] = self._ss_shared_path_min
+        self.extras["tb/stack_state/shared_path_safe"] = (
+            self._ss_shared_path_min >= self._ss_shared_path_clearance
+        ).float()
         # Separate an empty bootstrap bank from a valid bank that simply was
         # not sampled on the current reset. Occupancy is not the reset draw rate.
         self.extras["tb/stack_phase/bootstrap_valid_fraction"] = (

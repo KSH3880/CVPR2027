@@ -166,7 +166,7 @@ PY
 Xvfb $DISP -screen 0 1600x900x24 -nolisten tcp & XVFB_PID=$!
 sleep 2
 LD_LIBRARY_PATH=$VNC_DIR/usr/lib/x86_64-linux-gnu $VNC_DIR/usr/bin/x11vnc \
-    -display $DISP -rfbport $VNC_PORT -localhost -nopw -forever -shared -noxdamage -quiet & VNC_PID=$!
+    -display $DISP -rfbport $VNC_PORT -localhost -nopw -forever -shared -noxdamage -noshm -quiet & VNC_PID=$!
 sleep 1
 websockify --web=$NOVNC_DIR 127.0.0.1:$PORT 127.0.0.1:$VNC_PORT > /dev/null 2>&1 & WEB_PID=$!
 sleep 1

@@ -8,11 +8,11 @@ import torch
 FIELDS = (
     "roots", "dof_pos", "dof_vel", "boxes", "base_goal", "stage_goal",
     "top_goal", "top_goal_committed", "latched_base", "retreat_goal",
-    "retreat_dir",
+    "retreat_dir", "body_states",
 )
 POSITION_FIELDS = (
     "roots", "boxes", "base_goal", "stage_goal", "top_goal",
-    "latched_base", "retreat_goal",
+    "latched_base", "retreat_goal", "body_states",
 )
 
 
@@ -24,7 +24,7 @@ def export_bank(task):
     if len(ids) == 0:
         return None
     return {
-        "version": 1,
+        "version": 2,
         "env_ids": ids.cpu(),
         "box_sizes": task._box_lib._box_size.view(task.num_envs, 2, 3)[ids].cpu(),
         "base_agent": task._ss_base_agent[ids].cpu(),
@@ -39,7 +39,9 @@ def export_bank(task):
 def read_bank(path):
     state = torch.load(path, map_location="cpu")
     bank = state.get("stack_bootstrap", state)
-    if bank is None or bank.get("version") != 1:
+    if bank is not None and bank.get("version") == 1:
+        raise ValueError("이전 stack 시작 상태에는 신체 관측 정보가 없습니다. 수정된 코드로 시작 상태를 다시 수집하세요.")
+    if bank is None or bank.get("version") != 2:
         raise ValueError("저장된 stack 시작 상태가 없습니다. 먼저 collect_stack_bootstrap.sh를 실행하세요.")
     if len(bank["env_ids"]) == 0:
         raise ValueError("저장된 stack 시작 상태가 비어 있습니다.")
@@ -68,6 +70,8 @@ def import_bank(task, bank):
         value = bank["buffers"][name].to(task.device).clone()
         if name in POSITION_FIELDS:
             shift = offset[:, None, :] if value.ndim == 3 else offset
+            if name == "body_states":
+                shift = offset[:, None, None, :]
             value[..., :2] += shift
         target = getattr(task, "_ss_bootstrap_" + name)
         if target.shape != value.shape:

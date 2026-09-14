@@ -31,15 +31,19 @@ export STACK_STAGE_FORCE_ZERO=0
 export STACK_TOP_SCALE=1.0
 
 # Strengthen A1 retreat steering, then route the endpoint into deceleration
-# and require about 0.5 s of physical double-support stability before STACK.
+# and require about 0.33 s of physical double-support stability before STACK.
 export STACK_CLEAR_STEER_W=1.0
 export STACK_STOP_DECEL_DIST=0.30
-export STACK_STOP_HOLD_STEPS=15
+export STACK_STOP_HOLD_STEPS=${PILOT_STOP_HOLD_STEPS:-10}
 export STACK_STOP_LIN=0.10
 export STACK_STOP_ANG=0.50
 export STACK_STOP_UPRIGHT_DEG=15.0
 export STACK_STOP_CONTACT_FORCE=1.0
 export STACK_STOP_REWARD_W=1.0
+
+# Pay terminal success only when the two box face frames are parallel. Quarter
+# turns are equivalent for cube/square boxes; a 45-degree diamond is rejected.
+export STACK_TOP_PARALLEL_DEG=${PILOT_TOP_PARALLEL_DEG:-15.0}
 
 # Full sequential episodes must traverse and learn the new stopping phase.
 export STACK_BOOTSTRAP_FRAC=0.0
