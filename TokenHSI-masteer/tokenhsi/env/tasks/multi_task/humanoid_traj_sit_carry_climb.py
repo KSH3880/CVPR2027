@@ -542,6 +542,18 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._ep_d0 = torch.ones(self._rows, device=self.device)
         self._prev_min_prog = torch.zeros(self.num_envs, device=self.device)
         self._metric_rows = []               # 완료된 에피소드가 쌓이는 곳
+        self._metric_row_count = 0
+        self._metric_max_rows = int(
+            os.environ.get("MA_METRICS_MAX_ROWS", "262144")
+        )
+        self._metric_flush_batches = int(
+            os.environ.get("MA_METRICS_FLUSH_BATCHES", "25")
+        )
+        if min(self._metric_max_rows, self._metric_flush_batches) <= 0:
+            raise ValueError(
+                "MA_METRICS_MAX_ROWS/MA_METRICS_FLUSH_BATCHES must be positive"
+            )
+        self._metric_full = False
         if os.environ.get("MA_METRICS"):
             import atexit
             atexit.register(self.report_metrics)
@@ -1527,19 +1539,34 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         rows = self.agent_rows(env_ids)
         if len(rows) == 0:
             return
-        self._metric_rows.append(torch.stack([
-            rows.float(),
-            self._ep_finish[rows].float(),
-            self._ep_collide[rows].float(),
-            self._ep_enters[rows].float(),
-            self._ep_still[rows].float(),
-            self._ep_path[rows],
-            torch.clamp(self._ep_dmin[rows], max=99.0),
-            self._ep_band[rows, 0], self._ep_band[rows, 1],
-            self._ep_band[rows, 2], self._ep_band[rows, 3],
-            self._ep_task_r[rows],
-            self._ep_disc_r[rows],
-        ] + self._metric_extra_cols(rows), dim=-1).cpu())
+        appended = False
+        if os.environ.get("MA_METRICS") and not self._metric_full:
+            batch = torch.stack([
+                rows.float(),
+                self._ep_finish[rows].float(),
+                self._ep_collide[rows].float(),
+                self._ep_enters[rows].float(),
+                self._ep_still[rows].float(),
+                self._ep_path[rows],
+                torch.clamp(self._ep_dmin[rows], max=99.0),
+                self._ep_band[rows, 0], self._ep_band[rows, 1],
+                self._ep_band[rows, 2], self._ep_band[rows, 3],
+                self._ep_task_r[rows],
+                self._ep_disc_r[rows],
+            ] + self._metric_extra_cols(rows), dim=-1)
+            remaining = self._metric_max_rows - self._metric_row_count
+            if remaining > 0:
+                batch = batch[:remaining].cpu()
+                self._metric_rows.append(batch)
+                self._metric_row_count += len(batch)
+                appended = True
+            if self._metric_row_count >= self._metric_max_rows:
+                self._metric_full = True
+                print(
+                    "[ma] metrics row cap reached: "
+                    f"{self._metric_max_rows}; further episodes are not stored",
+                    flush=True,
+                )
         for b in (self._ep_collide, self._ep_enters, self._ep_still,
                   self._ep_path, self._ep_task_r, self._ep_disc_r):
             b[rows] = 0
@@ -1549,7 +1576,10 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._ep_finish[rows] = -1
         self._was_close[rows] = False
         # 주기적으로 파일에 쓴다. atexit 은 SIGTERM(timeout) 에서 안 돌아 못 믿는다.
-        if len(self._metric_rows) % 25 == 0:
+        if appended and (
+            self._metric_full
+            or len(self._metric_rows) % self._metric_flush_batches == 0
+        ):
             self.report_metrics()
         return
 

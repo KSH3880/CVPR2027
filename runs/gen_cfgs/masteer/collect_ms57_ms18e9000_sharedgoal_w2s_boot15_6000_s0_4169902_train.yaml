@@ -1,0 +1,116 @@
+params:
+  seed: -1
+  algo:
+    name: trans
+  model:
+    name: amp
+  network:
+    name: amp_transformer_multi_task_adapt
+    separate: true
+    network_structure_id: 2
+    transformer:
+      num_features: 64
+      tokenizer_units:
+      - 256
+      - 128
+      num_layers: 4
+      layer_num_heads: 2
+      layer_dim_feedforward: 512
+      use_pos_embed: false
+      extra_mlp_units:
+      - 1024
+      - 512
+    use_prior_knowledge: false
+    use_compensate_actions: false
+    use_internal_adaptation: true
+    apply_adapter_on_actions: false
+    plugin_units:
+    - 1024
+    - 512
+    new_input_tokenizer_units:
+    - 2048
+    - 1024
+    - 512
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: -2.9
+        fixed_sigma: true
+        learn_sigma: false
+    mlp:
+      units:
+      - 2048
+      - 1024
+      - 512
+      activation: relu
+      d2rl: false
+      initializer:
+        name: default
+      regularizer:
+        name: None
+    disc:
+      units:
+      - 1024
+      - 512
+      activation: relu
+      initializer:
+        name: default
+  load_checkpoint: false
+  config:
+    name: Humanoid
+    env_name: rlgpu
+    multi_gpu: false
+    ppo: true
+    mixed_precision: false
+    normalize_input: true
+    normalize_value: true
+    reward_shaper:
+      scale_value: 1
+    normalize_advantage: true
+    gamma: 0.99
+    tau: 0.95
+    learning_rate: 5e-6
+    lr_schedule: constant
+    score_to_win: 20000
+    max_epochs: 1000000
+    save_best_after: 50
+    save_frequency: 100
+    save_intermediate: false
+    save_archive_frequency: 100
+    print_stats: true
+    grad_norm: 1.0
+    entropy_coef: 0.0
+    truncate_grads: false
+    e_clip: 0.2
+    horizon_length: 32
+    minibatch_size: 16384
+    mini_epochs: 6
+    critic_coef: 5
+    clip_value: false
+    seq_len: 4
+    bounds_loss_coef: 10
+    amp_obs_demo_buffer_size: 200000
+    amp_replay_buffer_size: 200000
+    amp_replay_keep_prob: 0.01
+    amp_batch_size: 512
+    amp_minibatch_size: 4096
+    disc_coef: 5
+    disc_logit_reg: 0.01
+    disc_grad_penalty: 5
+    disc_reward_scale: 2
+    disc_weight_decay: 0.0001
+    normalize_amp_input: true
+    enable_eps_greedy: false
+    task_reward_w: 0.5
+    disc_reward_w: 0.5
+    reg_loss_coef: 0.01
+    reg_loss_enabled: false
+    player:
+      games_num: 1000000
+      determenistic: false
+      print_stats: false

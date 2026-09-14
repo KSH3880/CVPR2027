@@ -2,6 +2,21 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-14 — shared-goal W2S + late-STACK rehearsal 복구
+
+- `bootstrap_fraction=0`의 원인은 설정값 0.15가 아니라 snapshot bank가
+  비어 있던 것이었다. shared-goal의 stage gate가 이미 grasp와 box 안정
+  5 frame을 요구하는데 추가 Top balance streak 8 frame까지 요구해 capture가
+  한 번도 성립하지 않았다. 새 실행 스크립트에서는 중복 streak를 0으로 둔다.
+- native carry rehearsal 20%와 전체 late-STACK reset 15%를 함께 맞추기 위해,
+  non-carry 80% 안의 bootstrap 조건부 확률을 18.75%로 설정했다.
+- snapshot은 현재 rollout의 물리 초기상태만 저장·복원한다. 복원 이후 action과
+  reward는 현재 policy가 새로 생성하며, 과거 PPO `(s,a,r)` replay는 하지 않는다.
+- TensorBoard에 `bootstrap_valid_fraction`과 설정·실제 reset 비율인
+  `bootstrap_target_fraction`, `bootstrap_draw_probability`,
+  `bootstrap_reset_fraction`, `bootstrap_eligible_draw_fraction`을 추가해
+  snapshot bank 생성, reset sampling, 실제 phase 점유를 서로 분리했다.
+
 ## 2026-08-13
 
 - 16:00  EXPERIMENTS.md
@@ -1400,3 +1415,144 @@ tensor 생성 전 할당한 오류를 잡아 학습 시작 전에 종료됐다. 
 `smoke_ms49_latehold_branch40_20260910_s0`은 128 env, 40 iteration rc=0으로 실제 저장·복원
 분기를 통과했고 bootstrap/STACK 최대 점유율 0.012695/0.015625와 두 stability scalar를
 기록했다. full pilot은 시작하지 않았다. Python compile, Bash syntax, diff check를 통과했다.
+
+## 2026-09-11
+
+### A2 WAIT endpoint와 STACK 재출발을 Juan carrier 방식에 맞춤
+
+기존 실험의 재현성을 유지하도록 기본값은 그대로 두고 `STACK_STAGE_USE_HAND_Z`와
+`STACK_STAGE_FORCE_ZERO`를 추가했다. 전자를 켜면 A2의 staging z를 reset 시점 양손의 평균
+높이로 정하고, 후자를 끄면 stage latch에서 `mscale=0`을 강제하지 않는다.
+`train_a2_transition_local.sh`는 ms50r1 epoch 9300에서 시작해 staging 거리 1.5 m, 손 높이
+목표, 연속 endpoint steering, `STACK_TOP_SCALE=1.0`을 활성화한다. bootstrap 복원에서도
+A2가 실제로 재출발하도록 WAIT 고정을 끈다. carry zero-padding, attention mask, 모델 구조와
+freeze 설정은 ms50r1 그대로 유지한다. 학습은 실행하지 않았다.
+
+### A1 CLEAR→DECEL→정지 전환 학습
+
+모델·observation ABI를 바꾸지 않고 CLEAR endpoint 0.30 m부터 A1의 목표 속도를 선형으로
+낮추는 감속 reward를 추가했다. 이동 reward와 stall/reverse penalty는 감속 구간에서 끄고,
+root 선속도 0.10 m/s 이하, 각속도 0.50 rad/s 이하, upright 오차 15도 이하, 양발 접촉을
+15 frame(30 Hz에서 약 0.5초) 연속 만족해야 STACK으로 전환한다. 조건을 만족하기 전에는
+endpoint steering을 유지하므로 `_hold_steer()`의 급격한 정지 명령은 안정 정지 이후에만
+적용된다. 기존 A2 WAIT/STACK 전환 수정은 그대로 유지한다.
+
+`train_a1_w2s_transition_local.sh`는 ms18 epoch 9000에서 시작하며 CLEAR steering reward를
+0.50에서 1.00으로 높이고 stop reward weight 1.00을 사용한다. 새 정지 구간을 실제로
+통과해 학습하도록 stack bootstrap은 끈다. 모델 구조와 freeze 설정은 기준 ms50r1 sidecar를
+그대로 상속하며 학습은 실행하지 않았다.
+
+## 2026-09-12
+
+### A2 carry-target-only zero-padding 진단
+
+STACK_DEBUG_TOP_CARRY_TARGET_ONLY를 기본 비활성 옵션으로 추가했다. 활성화하면
+non-rehearsal STACK의 top 역할에서 steering 12-D 값만 0으로 채우고, carry 두 토큰과
+attention/token layout, A1 입력, controller와 목표점은 그대로 둔다. A1 carry
+zero-padding과 마찬가지로 토큰을 attention에서 제거하지 않는다.
+debug_stack_transition_eval.sh에는 재현 가능한 top_carry_target_only case를 추가했다.
+
+ms52 latest checkpoint의 128-env, seed-0 평가에서 top steering norm이 전환 직후
+0.768→0.000으로 바뀌어 옵션 적용을 확인했다. 그러나 baseline 대비 STACK 생존 p50은
+32→32 frame, top-first 낙상은 10→11/16, 목표 접근 중앙값은 0.139→0.019 m,
+top grasp frame 비율은 0.604→0.491로 개선되지 않았고 strict success는 둘 다 0이었다.
+따라서 새 steering window 하나가 단독 원인은 아니며, carry-target-only를 쓰려면
+STACK bootstrap으로 steer=0 + live carry 조합과 WAIT→재출발 상태를 직접 학습해야 한다.
+Python compile, Bash syntax, diff check와 GPU 7 실제 평가를 통과했다.
+
+### ms53 A2 direct carry-target reward + stable snapshot curriculum
+
+정식 옵션 `STACK_TOP_CARRY_TARGET_ONLY`를 추가해 기존 debug alias와 같은 raw steering
+zero-padding을 재현 sidecar에서 명시할 수 있게 했다. `STACK_TOP_DIRECT_CARRY_REWARD`는
+STACK의 top row만 Juan native carry reward(`walk + carry + handheld + putdown - power`)로
+치환한다. live stack target과 carry token은 유지되고 A1 row와 다른 phase reward는 그대로다.
+
+ms52의 학습 TensorBoard에서 3000 iteration 내내 STACK/bootstrap fraction이 0인 것을
+발견했다. 기존 snapshot은 실제 15-frame stop gate 통과 뒤에만 생성돼 stochastic 학습에서는
+late-phase curriculum이 비활성이었다. `STACK_BOOTSTRAP_CAPTURE_STABLE`은 정상 phase gate를
+바꾸지 않고, 나머지 CLEAR gate와 기존 A1 stop predicate를 한 frame 만족한 state만 snapshot
+seed로 저장한다. 복원 시 A1 hold, A2 direct carry로 시작한다.
+
+`train_a2_carry_target_bootstrap_local.sh`는 ms52 epoch 12000, A2 steering zero-padding,
+direct carry reward, rehearsal 0.30, bootstrap 0.50, stable capture를 묶어 추가 3000 iteration을
+GPU 7에서 실행한다. 모든 새 knob를 `train_local.sh` sidecar/export 목록에도 추가했다.
+
+Python compile, Bash syntax, diff check를 통과했다. 256-env/80-iteration smoke는 epoch
+12080까지 완료했고 bootstrap/STACK fraction 최대 0.02515, 마지막 0.00830을 기록했다.
+본 학습 `ms53_ms52e12000_a2carryonly_boot50_3000_s0`은 1024 env로 첫 backward를
+통과했으며 epoch 12000→15000을 실행 중이다.
+
+## 2026-09-13
+
+### 장기 학습 metrics 무한 누적·전체 재저장 방지
+
+ms53r1 장기 학습에서 wrapper가 `MS_METRICS`와 `MA_METRICS`를 unset했지만
+`train_local.sh`가 기본 npy 경로를 다시 만들어 metrics를 활성화했다. 완료 episode
+tensor가 계속 `_metric_rows`에 쌓였고 25 reset batch마다 지금까지의 전체 배열을
+`torch.cat`한 뒤 같은 npy를 덮어써, 파일 4.4 GiB·누적 쓰기 약 2.2 TB와 224-core
+CPU 포화를 일으켰다. 사용자가 해당 학습을 종료했으며 코드는 프로세스를 종료하지 않았다.
+
+`train_local.sh`의 metrics를 명시적 `MS_METRICS` 또는 `MA_METRICS` 경로가 있을 때만
+켜도록 바꿨다. 환경은 metrics가 꺼진 실행에서 CPU tensor 복사와 `_metric_rows` 누적을
+생략하고, 켠 실행도 `MA_METRICS_MAX_ROWS=262144` 기본 상한에서 수집·재저장을 멈춘다.
+flush 주기는 `MA_METRICS_FLUSH_BATCHES=25`로 명시하고 두 값을 sidecar에 기록한다.
+기존 4.4 GiB npy는 결과 보존 원칙에 따라 삭제하지 않았다. Python compile, Bash syntax,
+`git diff --check`를 통과했으며 새 학습·평가는 실행하지 않았다.
+
+### A1 steering-only CLEAR + A2 committed STACK 구조
+
+기존 sidecar 재현성을 위해 기본값은 유지하고, `STACK_TOP_WAIT_AT_START`와
+`STACK_TOP_COMMIT_GOAL`을 추가했다. 전자를 켜면 A2는 pre-STACK에서 자기 reset box 위치를
+목표로 기다리고, 후자를 켜면 CLEAR 종료 순간 실제 base box pose로 top pose를 한 번 계산해
+고정한다. STACK 동안 base 흔들림을 매 frame 따라가던 live 목표 갱신은 committed mode에서
+중지하고, A2의 carry target과 기존 steering 경로를 같은 고정 목표로 동시에 retarget한다.
+
+bootstrap snapshot은 `STACK_BOOTSTRAP_TOP_BALANCE_STEPS`와 humanoid root 선·각속도,
+upright, top box 선·각속도 임계값을 모두 연속 만족한 env만 저장한다. Juan식 wait에서는
+A2가 STACK 전 box를 들지 않으므로 `STACK_BOOTSTRAP_TOP_REQUIRE_GRASP=0`을 명시할 수 있다.
+
+`MA_FINETUNE_NEWCARRY_RESIDUAL=1`은 모델 구조를 추가하지 않고 기존 actor 전체를 먼저
+동결한 뒤 `new_carry` tokenizer와 기존 `internal_adapt_mlp`만 다시 연다. 별도 wrapper
+`train_a2_committed_steer_bootstrap_local.sh`는 ms52 epoch 12000에서 시작하고, A1 CLEAR의
+두 carry token을 exact attention mask해 steering-only로 만들며, A2에는 steering을 0으로
+패딩하지 않는다. A2 snapshot 안정 streak는 12 frame이고 학습 metrics는 비활성이다.
+
+Python compile, Bash syntax, `git diff --check`, checkpoint/sidecar 존재 검사를 통과했다.
+새 학습·평가는 실행하지 않았다.
+후속 점검에서 이 wrapper의 metrics/trace 저장은 실제로 비활성이고, 남은 디버그는 첫
+backward에서 한 번 실행되는 `MS_GRADCHK`뿐임을 확인했다. 다음 실행부터는 wrapper가
+`MS_GRADCHK=0`을 명시하며, agent도 문자열 `"1"`일 때만 검사를 실행하도록 바꿨다.
+이미 실행 중인 Python 프로세스에는 영향을 주지 않는다.
+
+### A2 carry tokenizer 동결 ablation 스위치
+
+`train_a2_committed_steer_bootstrap_local.sh`에 `PILOT_FREEZE_A2_CARRY=1` 모드를 추가했다.
+기본 ms54 모드는 바꾸지 않으며, 이 모드에서는 ms52 epoch 12000 시작점과 Juan식 wait,
+committed top goal, A1 steering-only CLEAR, bootstrap 설정을 그대로 유지한다. 차이는
+`new_carry` tokenizer를 동결하고 steering extra tokenizer와 기존 shared
+`internal_adapt_mlp`만 학습한다는 점이다. 최종 action residual은 계속 바뀌므로 이는 carry
+행동 전체 동결이 아니라 carry representation 동결 ablation이다.
+
+## 2026-09-14
+
+### ms18 shared-goal mixed sequence — carry 보존형 steering-only 학습
+
+기존 순차 적층 환경에 `STACK_SHARED_GOAL_CARRY`를 추가했다. 두 역할은 같은 최종 XY를
+공유하지만 Top은 시작부터 box를 들고 goal 앞 safety gate까지 이동한다. 먼저 도착하면 box를
+든 채 HOLD하고, Base의 release·후퇴·15-frame 안정 정지가 모두 끝난 뒤에만 그 시점의 실제
+base box pose로 Top 목표를 한 번 commit한다. STACK 전환 뒤에는 기존 `_hold_steer()`로 Base를
+후퇴 endpoint에 고정하며, Top 대기 품질과 Base HOLD 품질을 각각 작은 dense reward와
+TensorBoard state로 기록한다. strict success bonus는 40으로 유지하고 중간 bonus는 새 래퍼에서
+0으로 둔다.
+
+ms55의 carry 저하를 피하기 위해 `MA_FINETUNE_STEER_ONLY`를 추가했다. 새 레이어·token·head나
+관측 차원은 만들지 않으며, ms18과 동일한 actor에서 기존 steering tokenizer만 학습한다.
+carry/teammate tokenizer, Transformer backbone, composer, shared `internal_adapt_mlp`, actor RMS는
+동결·eval 상태를 유지한다. critic은 기존 PPO 방식대로 학습한다.
+
+`train_shared_goal_single_local.sh`는 ms18 epoch 9000에서 시작해 한 PPO run 안에 full sequence,
+carry rehearsal 20%, 유효 physical snapshot 기반 late-STACK reset 15%를 섞는다. 학습률은
+`MS_LR=5e-6`, 기본 추가 iteration은 6000, GPU는 허용된 7번이다. `train_local.sh`가 학습률과
+새 knob를 생성 cfg 및 재현 sidecar에 남기도록 확장했다. Python compile, Bash syntax,
+`git diff --check`, checkpoint/config 존재와 기본 tag 미사용 여부를 확인했으며 학습은 실행하지
+않았다.

@@ -1,0 +1,250 @@
+env:
+  numAgents: 2
+  numEnvs: 1024
+  envSpacing: 5
+  episodeLength: 780
+  episodeLengthShort: 300
+  isFlagrun: false
+  enableDebugVis: false
+  pdControl: true
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: Random
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  localRootObs: true
+  localRootObsPolicy: false
+  rootHeightObs: false
+  rootHeightObsPolicy: false
+  keyBodies:
+  - right_hand
+  - left_hand
+  - right_foot
+  - left_foot
+  contactBodies:
+  - right_foot
+  - left_foot
+  terminationHeight: 0.15
+  enableEarlyTermination: true
+  enableSelfCollisionDetection: true
+  enableTrackInitState: false
+  mode: train
+  skill:
+  - loco
+  - loco_sit
+  - sit
+  - loco_carry
+  - omomo
+  - pickUp
+  - carryWith
+  - putDown
+  - loco_climb
+  - climb
+  - climbNoRSI
+  skillDiscProb:
+  - 0.1
+  - 0.1
+  - 0.2
+  - 0.1
+  - 0.1
+  - 0.05
+  - 0.0
+  - 0.05
+  - 0.1
+  - 0.1
+  - 0.1
+  commonSkill: ''
+  enableTaskSpecificDisc: true
+  enableTaskObs: true
+  enableTaskMaskObs: true
+  enableApplyMaskOnTaskObs: true
+  task:
+  - traj
+  - sit
+  - carry
+  - climb
+  taskInitProb:
+  - 0.1
+  - 0.3
+  - 0.3
+  - 0.3
+  enableIET: true
+  maxIETSteps: 60
+  successThreshold: 0.2
+  traj:
+    numTrajSamples: 10
+    trajSampleTimestep: 0.5
+    speedMin: 0.5
+    speedMax: 1.5
+    accelMax: 2.0
+    sharpTurnProb: 0.02
+    sharpTurnAngle: 1.57
+    failDist: 4.0
+    skill:
+    - loco
+    skillInitProb:
+    - 1.0
+    eval:
+      successThreshold: 0.3
+      skill:
+      - loco
+      skillInitProb:
+      - 1.0
+  sit:
+    objDatasetDir: dataset_sit/objects
+    objCategories:
+    - StraightChair_Normal
+    sit_vel_penalty: true
+    sit_vel_pen_coeff: 0.5
+    sit_vel_pen_threshold: 1.3
+    sit_ang_vel_pen_coeff: 0.5
+    sit_ang_vel_pen_threshold: 3.0
+    enableIET: true
+    skill:
+    - loco_sit
+    - sit
+    skillInitProb:
+    - 0.5
+    - 0.5
+    eval:
+      skill:
+      - loco_sit
+      - sit
+      skillInitProb:
+      - 1.0
+      - 0.0
+  climb:
+    objDatasetDir: dataset_amass_climb/objects
+    objCategories:
+    - Box
+    - Cabinet
+    - Table_Square
+    climb_vel_penalty: true
+    climb_vel_pen_coeff: 1.0
+    climb_vel_pen_threshold: 1.3
+    enableIET: true
+    skill:
+    - loco_climb
+    - climb
+    - climbNoRSI
+    skillInitProb:
+    - 0.5
+    - 0.5
+    - 0.0
+    eval:
+      skill:
+      - loco_climb
+      - climb
+      - climbNoRSI
+      skillInitProb:
+      - 1.0
+      - 0.0
+      - 0.0
+  carry:
+    onlyVelReward: true
+    onlyHeightHandHeldReward: false
+    box_vel_penalty: true
+    box_vel_pen_coeff: 1.0
+    box_vel_pen_threshold: 2.5
+    box:
+      build:
+        baseSize:
+        - 0.4
+        - 0.4
+        - 0.4
+        randomSize: true
+        randomModeEqualProportion: true
+        scaleRangeX:
+        - 0.5
+        - 1.5
+        scaleRangeY:
+        - 0.5
+        - 1.5
+        scaleRangeZ:
+        - 0.5
+        - 1.5
+        scaleSampleInterval: 0.125
+        testSizes:
+        - - 0.22
+          - 0.22
+          - 0.22
+        - - 0.27
+          - 0.27
+          - 0.27
+        - - 0.32
+          - 0.32
+          - 0.32
+        - - 0.37
+          - 0.37
+          - 0.37
+        - - 0.42
+          - 0.42
+          - 0.42
+        - - 0.47
+          - 0.47
+          - 0.47
+        - - 0.52
+          - 0.52
+          - 0.52
+        - - 0.57
+          - 0.57
+          - 0.57
+        - - 0.3
+          - 0.3
+          - 0.4
+      reset:
+        randomRot: true
+        randomHeight: true
+        randomHeightProb: 0.5
+        maxTopSurfaceHeight: 1.2
+        minBottomSurfaceHeight: 0.0
+    skill:
+    - loco_carry
+    - pickUp
+    - carryWith
+    - putDown
+    - omomo
+    skillInitProb:
+    - 0.5
+    - 0.1
+    - 0.3
+    - 0.1
+    - 0.0
+    eval:
+      skill:
+      - loco_carry
+      - pickUp
+      - carryWith
+      - putDown
+      - omomo
+      skillInitProb:
+      - 1.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+  power_reward: true
+  power_coefficient: 0.0005
+  asset:
+    assetRoot: tokenhsi/data/assets
+    assetFileName: mjcf/phys_humanoid_v3.xml
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    max_gpu_contact_pairs: 4194304
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

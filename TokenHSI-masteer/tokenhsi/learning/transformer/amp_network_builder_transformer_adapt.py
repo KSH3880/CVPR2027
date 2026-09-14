@@ -350,7 +350,127 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 self.new_task_trainable_rms.eval()
                 print("[ma] actor trainable: internal_adapt_mlp only", flush=True)
 
+            # Preserve the trained MA-steer actor while adapting A2's ordinary
+            # carry representation to the committed stack target. No token,
+            # head, parameter shape, or checkpoint key is added by this mode.
+            self.finetune_newcarry_residual = (
+                _osf.environ.get("MA_FINETUNE_NEWCARRY_RESIDUAL", "0") == "1"
+            )
+            if self.finetune_newcarry_residual:
+                if self.adapter_only:
+                    raise ValueError(
+                        "MA_FINETUNE_NEWCARRY_RESIDUAL and MA_ADAPTER_ONLY "
+                        "cannot both be enabled"
+                    )
+                if self.freeze_new_carry:
+                    raise ValueError(
+                        "MA_FINETUNE_NEWCARRY_RESIDUAL requires MA_FREEZE_NEW_CARRY=0"
+                    )
+                if not self.use_internal_adaptation:
+                    raise ValueError(
+                        "new-carry residual fine-tuning requires "
+                        "use_internal_adaptation=True"
+                    )
+
+                actor_modules = [
+                    self.self_encoder,
+                    self.task_encoder,
+                    self.transformer_encoder,
+                    self.composer,
+                    self.internal_adapt_mlp,
+                ]
+                if hasattr(self, "extra_act_mlp"):
+                    actor_modules.append(self.extra_act_mlp)
+                for module in actor_modules:
+                    module.requires_grad_(False)
+                    module.eval()
+                self.weight_token.requires_grad_(False)
+                if hasattr(self, "pos_embed"):
+                    self.pos_embed.requires_grad_(False)
+
+                new_carry = self.task_encoder[self.new_major_id]
+                new_carry.requires_grad_(True)
+                new_carry.train()
+                self.internal_adapt_mlp.requires_grad_(True)
+                self.internal_adapt_mlp.train()
+                self.new_task_trainable_rms.requires_grad_(False)
+                self.new_task_trainable_rms.eval()
+                print(
+                    "[sequential-ft] actor trainable: new_carry tokenizer + "
+                    "internal action residual only; teammate/steer frozen; "
+                    "actor RMS frozen",
+                    flush=True,
+                )
+
+            # Reuse the exact ms18 actor topology while adapting only the
+            # already-existing steering tokenizer. Freezing new_carry alone is
+            # not sufficient because the shared action residual can still move
+            # every carry action.
+            self.finetune_steer_only = (
+                _osf.environ.get("MA_FINETUNE_STEER_ONLY", "0") == "1"
+            )
+            if self.finetune_steer_only:
+                if self.adapter_only or self.finetune_newcarry_residual:
+                    raise ValueError(
+                        "MA_FINETUNE_STEER_ONLY cannot be combined with "
+                        "MA_ADAPTER_ONLY or MA_FINETUNE_NEWCARRY_RESIDUAL"
+                    )
+                if "new_extra_1" not in self.each_subtask_name:
+                    raise ValueError(
+                        "MA_FINETUNE_STEER_ONLY requires a new_extra_1 "
+                        "steering tokenizer"
+                    )
+                actor_modules = [
+                    self.self_encoder,
+                    self.task_encoder,
+                    self.transformer_encoder,
+                    self.composer,
+                    self.internal_adapt_mlp,
+                ]
+                if hasattr(self, "extra_act_mlp"):
+                    actor_modules.append(self.extra_act_mlp)
+                for module in actor_modules:
+                    module.requires_grad_(False)
+                    module.eval()
+                self.weight_token.requires_grad_(False)
+                if hasattr(self, "pos_embed"):
+                    self.pos_embed.requires_grad_(False)
+
+                self.steer_task_id = self.each_subtask_name.index("new_extra_1")
+                steer = self.task_encoder[self.steer_task_id]
+                steer.requires_grad_(True)
+                steer.train()
+                self.new_task_trainable_rms.requires_grad_(False)
+                self.new_task_trainable_rms.eval()
+                print(
+                    "[sequential-ft] actor trainable: steering tokenizer only; "
+                    "carry/teammate/backbone/shared residual/RMS frozen",
+                    flush=True,
+                )
+
             return
+
+        def train(self, mode=True):
+            """Keep frozen actor paths in eval mode for restricted fine-tuning."""
+            super().train(mode)
+            newcarry_ft = getattr(self, "finetune_newcarry_residual", False)
+            steer_ft = getattr(self, "finetune_steer_only", False)
+            if not (newcarry_ft or steer_ft):
+                return self
+
+            self.self_encoder.eval()
+            self.task_encoder.eval()
+            self.transformer_encoder.eval()
+            self.composer.eval()
+            self.new_task_trainable_rms.eval()
+            if hasattr(self, "extra_act_mlp"):
+                self.extra_act_mlp.eval()
+            if mode and newcarry_ft:
+                self.task_encoder[self.new_major_id].train()
+                self.internal_adapt_mlp.train()
+            if mode and steer_ft:
+                self.task_encoder[self.steer_task_id].train()
+            return self
         
         def _eval_Transformer(self, obs, not_normalized_obs):
 

@@ -198,6 +198,13 @@ class CommonPlayer(players.PpoPlayerContinuous):
         return self.obs_to_torch(obs)
 
     def _post_step(self, info):
+        task = self.env.task
+        if getattr(task, '_ss_bootstrap_save_once', False):
+            if task._ss_bootstrap_export_done:
+                print(f"stack 시작 상태 저장 완료: {task._ss_bootstrap_save}")
+                raise SystemExit(0)
+            if task._ss_bootstrap_collect_tick >= task._ss_bootstrap_collect_steps:
+                raise RuntimeError("수집 제한 내에 stack 시작 상태를 확보하지 못했습니다.")
         return
 
     def _build_net_config(self):

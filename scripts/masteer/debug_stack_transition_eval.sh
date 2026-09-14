@@ -41,6 +41,7 @@ for name in $CASES; do
     case "$name" in
         baseline) override="" ;;
         base_carry_live) override="STACK_DEBUG_CARRY_LIVE_ON_STACK=1" ;;
+        top_carry_target_only) override="STACK_DEBUG_TOP_CARRY_TARGET_ONLY=1" ;;
         base_continue) override="STACK_CLEAR_STOP_ON_STACK=0" ;;
         top_fast) override="STACK_TOP_SCALE=1.0" ;;
         top_keep_wait) override="STACK_DEBUG_KEEP_WAIT=1" ;;

@@ -39,6 +39,11 @@ NOVNC_DIR=/home/hwanhee/opt/novnc
 PORT=${PORT:-6100}
 TAG=${1:?사용법: view.sh <tag 또는 ckpt경로> [env수]}
 MS_SINGLE=${MS_SINGLE:-0}
+MS_STACK_START=${MS_STACK_START:-0}
+if [[ "$MS_STACK_START" != 0 && "$MS_STACK_START" != 1 ]]; then
+    echo "MS_STACK_START는 0 또는 1이어야 한다: $MS_STACK_START" >&2
+    exit 2
+fi
 if [[ "$MS_SINGLE" != 0 && "$MS_SINGLE" != 1 ]]; then
     echo "MS_SINGLE은 0 또는 1이어야 한다: $MS_SINGLE" >&2
     exit 2
@@ -101,9 +106,26 @@ if [ -z "${MA_TOKEN+x}" ] && [ -f "$ROOT/runs/queue/logs/$NAME.env" ]; then
     export MA_TOKEN
 fi
 SNAP_DIR=$(mktemp -d "/tmp/ma_view_${PORT}.XXXXXX")
+trap 'rm -rf -- "$SNAP_DIR"' EXIT
 mkdir -p "$SNAP_DIR/nn"
 SNAP="$SNAP_DIR/nn/Humanoid.pth"
 cp "$CKPT" "$SNAP"
+if [[ "$MS_STACK_START" == 1 ]]; then
+    if [[ "${MS_TASK:-}" != HumanoidMASequentialStackRelease ]]; then
+        echo "MS_STACK_START=1은 HumanoidMASequentialStackRelease 전용이다. 학습 .env를 source하세요." >&2
+        exit 2
+    fi
+    export STACK_BOOTSTRAP_LOAD=${STACK_BOOTSTRAP_LOAD:-$SNAP}
+    export MS_EVAL=1
+    python3 - "$ROOT/TokenHSI-masteer" "$STACK_BOOTSTRAP_LOAD" "${STACK_BOOTSTRAP_INDEX:-0}" "$ENVS" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from tokenhsi.utils.stack_bootstrap import read_bank, select_bank
+bank = read_bank(sys.argv[2])
+selected = select_bank(bank, int(sys.argv[3]), int(sys.argv[4]))
+print(f"stack 시작 상태: {len(bank['env_ids'])}개, 원본 환경 {selected['env_ids'].tolist()}")
+PY
+fi
 ITER=$(grep -c "fps step" $ROOT/runs/queue/logs/$NAME.log 2>/dev/null || echo "?")
 AGE=$(( $(date +%s) - $(stat -c %Y "$CKPT") ))
 
@@ -112,6 +134,9 @@ VIEW_MODE="test(mixed skill)"
 if [ "${MS_EVAL:-0}" != 0 ]; then
     VIEW_ARGS+=(--eval)
     VIEW_MODE="final-eval(loco)"
+fi
+if [[ "$MS_STACK_START" == 1 ]]; then
+    VIEW_MODE="saved-stack"
 fi
 
 for p in $PORT $VNC_PORT; do

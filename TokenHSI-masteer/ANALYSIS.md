@@ -1,5 +1,95 @@
 # TokenHSI-masteer 분석 기록
 
+## 2026-09-12 — ms53 A2 direct carry-target 학습
+
+### 설계
+
+`ms53_ms52e12000_a2carryonly_boot50_3000_s0`는 ms52 epoch 12000에서 추가
+3000 iteration을 학습한다. 일반 CARRY/RELEASE/CLEAR와 A1의 phase 전환 조건 및
+zero-padding은 ms52 그대로다. non-rehearsal STACK의 A2/top에만 다음을 적용한다.
+
+- 12-D raw steering observation을 0으로 채우되 두 carry token과 attention slot은 유지
+- stack box pose를 live carry target으로 유지
+- path/steering reward 대신 Juan native `walk + carry + handheld + putdown - power`를
+  그 carry target에 대해 계산
+- 기존 top approach/release/hold/above와 humanoid stability shaping은 그 위에 유지
+
+ms52 학습 TensorBoard를 다시 확인하니 3000 iteration 전체에서
+`stack_phase/stack_fraction`과 `bootstrap_fraction`이 정확히 0이었다. deterministic
+fixed eval에서는 STACK 진입이 0.131이지만 stochastic PPO rollout은 A1의 15-frame stop
+gate를 통과하지 못해 기존 online snapshot curriculum을 seed하지 못한 것이다.
+
+정상 CLEAR→STACK gate를 완화하지 않기 위해 `STACK_BOOTSTRAP_CAPTURE_STABLE=1`을
+추가했다. hard gate, A2 staged/grasped, retreat 완료를 만족하고 A1이 기존 stop predicate를
+한 frame 만족한 late-CLEAR state를 snapshot으로 저장한다. 실제 phase 전환에는 여전히
+15-frame streak가 필요하다. snapshot reset에서만 A1을 hold하고 A2를 즉시 STACK direct
+carry로 시작하므로, 정상 평가의 A1 controller/observation 의미론은 바뀌지 않는다.
+
+### 검증과 실행
+
+- 첫 256-env/40-iteration smoke는 코드·backward·freeze 계약을 통과했지만 기존 capture
+  방식에서는 bootstrap/STACK fraction이 모두 0임을 재현했다.
+- stable-capture를 넣은 256-env/80-iteration smoke는 epoch 12080까지 완료했다.
+  bootstrap/STACK fraction은 최대 0.02515, 마지막 rollout 0.00830이며 tail 20회 평균은
+  0.00284였다. `top_native` tail 평균 0.98284, `top_total` 0.87404로 유한했고
+  direct-carry reward 경로가 실제 rollout에서 실행됐다.
+- 본 학습은 smoke checkpoint를 쓰지 않고 ms52 epoch 12000에서 공정하게 재시작했다.
+  GPU 7, 1024 env, seed 0, minibatch 16384, 추가 3000 iteration(epoch 15000 목표),
+  100-iteration 저장으로 실행 중이다. 최종 평가는 학습 종료 후 수행한다.
+
+재현 파일은 `scripts/masteer/train_a2_carry_target_bootstrap_local.sh`와
+`runs/queue/logs/ms53_ms52e12000_a2carryonly_boot50_3000_s0.env`다.
+
+## 2026-09-12 — ms52 A2 carry-target-only zero-shot 대조
+
+### 질문과 대조
+
+ms52_ms18init_a2trans_w2s_steer100_3000_s0의 CLEAR→STACK 전환에서 A2/top이
+native carry 목표와 새 steering window를 동시에 받는 것이 낙상의 원인인지 분리했다.
+기본 비활성 STACK_DEBUG_TOP_CARRY_TARGET_ONLY=1은 non-rehearsal STACK의 top row에서
+12-D steering observation 값만 0으로 채운다. carry 두 토큰, attention/token layout,
+340-D ABI, A1/base observation, 목표점과 내부 controller는 바꾸지 않는다. 고정 정책
+평가이므로 reward는 action 비교에 영향을 주지 않는다.
+
+동일 ms52 latest checkpoint, seed 0, 128 env, transition trace 16건을 baseline과 비교했다.
+
+| 지표 | baseline | A2 carry-target-only |
+|---|---:|---:|
+| 전체 STACK 진입 | 30/302 (0.099) | 31/315 (0.098) |
+| STACK 생존 p50 | 32 frame | 32 frame |
+| 최초 낙상 top/base/both/미관측 | 10/4/0/2 | 11/3/0/2 |
+| top 목표 접근 중앙값 | 0.139 m | 0.019 m |
+| top STACK grasp frame 비율 | 0.604 | 0.491 |
+| top above/settled/final success | 0/0/0 | 0/0/0 |
+
+옵션 적용은 trace에서 직접 확인했다. 전환 직후 top steering norm은
+0.768→0.000이지만 carry token norm은 2.256→2.560, box-target 거리는
+0.194→1.494 m로 바뀌어, steering만 zero-padding되고 native carry 목표는 살아 있다.
+A1은 baseline과 같이 steering/carry가 모두 0인 hold 입력을 유지했다.
+
+두 조건의 붕괴 궤적도 사실상 같다. carry-target-only에서 전환 시 top root는
+speed 0.048 m/s, upright 0.993으로 안정적이지만 20 frame에 1.068/0.787,
+30 frame에 2.027/0.511로 무너졌다. 같은 시점 A1도 20 frame에
+1.008/0.838, 30 frame에 1.022/0.635로 악화됐다. A2 row의 zero-padding이 A1
+network input을 직접 바꾸지는 않으며, A1 궤적이 baseline과 유사한 것도 이를 지지한다.
+
+### 판정
+
+**A2의 새 steering window가 단독 낙상 원인은 아니다.** 현재 shared policy에서
+steer=0 + live carry target 조합을 zero-shot으로 주는 것도 Juan native carry를
+복원하지 못했고 목표 접근은 개선되지 않았다. 이는 carry-target-only 아이디어 자체의
+기각보다, ms52가 이 토큰 조합과 WAIT→재출발 상태를 학습하지 않았다는 해석에 가깝다.
+다음 대조는 controller gate를 완화하는 것이 아니라 실제 STACK snapshot bootstrap에서
+steer=0 + live carry를 학습하고, top reward도 direct carry target과 정렬하는 것이다.
+
+원시 결과:
+
+- runs/results/masteer/eval_ms52_ms18init_a2trans_w2s_steer100_3000_s0__debug_top_carry_target_only_elatest.npy
+- runs/results/masteer/trace_ms52_ms18init_a2trans_w2s_steer100_3000_s0__debug_top_carry_target_only_elatest.npz
+- runs/results/masteer/debug_stack_ms52_ms18init_a2trans_w2s_steer100_3000_s0_elatest.log
+
+stage_einitial은 중단된 부분 평가이므로 이 대조의 판정 근거로 사용하지 않았다.
+
 ## 2026-09-10 — ms46 곡선 CLEAR + stack-first bootstrap 평가
 
 ### 목적과 판정 우선순위

@@ -85,6 +85,13 @@ class AMPAgent(common_agent.CommonAgent):
         
         return state
 
+    def get_full_state_weights(self):
+        state = super().get_full_state_weights()
+        getter = getattr(self.vec_env.env.task, 'get_stack_bootstrap_state', None)
+        if getter is not None:
+            state['stack_bootstrap'] = getter()
+        return state
+
     def set_stats_weights(self, weights):
         super().set_stats_weights(weights)
         if self._normalize_amp_input:

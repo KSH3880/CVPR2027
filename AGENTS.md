@@ -14,7 +14,6 @@
   또는 `scripts/tokenhsi_gui.sh`만 사용한다.
 
 ## 즉시 지킬 것
-
 - 코드 수정은 /home/hwanhee/koo_cvpr 레포 내에서만 해야 한다.
 - CUDA_VISIBLE_DEVICES 6,7번만 사용할것. 다른 GPU 넘버 사용을 사전에 막을것.
 - Isaac Gym GUI/Vulkan 실행에서 `CUDA_VISIBLE_DEVICES`만으로 GPU가 제한된다고
