@@ -124,7 +124,7 @@ export STACK_TASK_MODE=stack
 export STACK_ALLOW_HAND_CONTACT=${STACK_ALLOW_HAND_CONTACT:-1}
 # Rehearse the original MA-steer carry distribution in a subset of complete
 # episodes so fine-tuning does not catastrophically forget carry/steering.
-export STACK_CARRY_REHEARSAL_PROB=${STACK_CARRY_REHEARSAL_PROB:-0.25}
+export STACK_CARRY_REHEARSAL_PROB=${STACK_CARRY_REHEARSAL_PROB:-0.6}
 export STACK_HAND_CLEAR_START=${STACK_HAND_CLEAR_START:-0.08}
 export STACK_HAND_CLEAR_DONE=${STACK_HAND_CLEAR_DONE:-0.15}
 export STACK_RELEASE_REWARD_W=${STACK_RELEASE_REWARD_W:-0.50}

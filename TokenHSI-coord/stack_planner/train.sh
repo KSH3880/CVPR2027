@@ -8,7 +8,7 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 COORD="$ROOT/TokenHSI-coord"
 EXEC_REPO="$ROOT/TokenHSI-masteer"
 TAG=${1:?usage: train.sh <tag> [sequential-stack-policy.pth]}
-EXEC_CKPT=${2:-"$EXEC_REPO/output/sequential_stack/anti_feat_top_s2/Humanoid_00012000.pth"}
+EXEC_CKPT=${2:-"$EXEC_REPO/output/sequential_stack/anti_feat_top_s2/Humanoid_08-11-35-39/nn/Humanoid_00012000.pth"}
 STAGE1=${MS_CKPT:-"$EXEC_REPO/output/tokenhsi/ckpt_stage1.pth"}
 ENVS=${STACK_PLANNER_ENVS:-2048}
 # Server training allocation: physical GPU 7. CUDA_VISIBLE_DEVICES maps it to
