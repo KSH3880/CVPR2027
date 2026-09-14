@@ -20,6 +20,15 @@
 - clearance adapter가 `CoordinatorState`의 실제 yaw 필드명 `box_heading` 대신 존재하지 않는
   `box_yaw`를 참조해 첫 retreat sample에서 죽던 오류를 바로잡았다.
 
+### Stack planner PPO env scaling 수정
+
+- 2,048 env rollout에서 64-env용 고정 minibatch 512를 그대로 사용해 iteration당 optimizer
+  step이 12회에서 384회로 32배 증가하고, route visit penalty·value loss·path length가 함께
+  발산하는 설정 오류를 수정했다.
+- launcher의 기본 minibatch를 `envs × horizon / 4`로 계산해 PPO epoch당 4 minibatch를
+  유지한다. 기본 horizon 32에서 64 env는 512, 2,048 env는 16,384이며 학습 시작 로그에
+  실제 minibatch와 iteration당 optimizer step 수를 출력한다.
+
 ## 2026-09-11
 
 ### 단일 path 모델과 Carry execution slicing 분리

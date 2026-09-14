@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 from dataclasses import fields
@@ -264,6 +265,12 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = output_dir / "metrics.jsonl"
     save_every = _env_int("STACK_PLANNER_SAVE_EVERY", 10)
+    ppo_epochs = _env_int("STACK_PLANNER_PPO_EPOCHS", 3)
+    minibatch = _env_int("STACK_PLANNER_MINIBATCH", 512)
+    if ppo_epochs <= 0 or minibatch <= 0:
+        raise ValueError("PPO epochs and minibatch must be positive")
+    transitions = task.num_envs * horizon
+    optimizer_steps = ppo_epochs * math.ceil(transitions / minibatch)
 
     # Task construction already performs a complete reset and creates the
     # initial observation.  A second full-vector reset here is redundant and
@@ -273,6 +280,7 @@ def main():
           f"low_steps={low_steps} consistency={consistency_coef:g} "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
+          f"minibatch={minibatch} optimizer_steps={optimizer_steps} "
           f"iterations={iterations} frozen={args.checkpoint}",
           flush=True)
     first = 1 if payload is None else int(payload.get("step", 0)) + 1
@@ -374,8 +382,8 @@ def main():
             policy, optimizer, _flatten_states(states), torch.cat(actions),
             torch.cat(log_probs), returns.flatten(), flat_adv,
             _flatten_consistency_targets(consistency_targets),
-            _env_int("STACK_PLANNER_PPO_EPOCHS", 3),
-            _env_int("STACK_PLANNER_MINIBATCH", 512),
+            ppo_epochs,
+            minibatch,
             _env_float("STACK_PLANNER_CLIP", 0.2),
             _env_float("STACK_PLANNER_VALUE_COEF", 0.5),
             _env_float("STACK_PLANNER_ENTROPY_COEF", 1e-4),

@@ -115,7 +115,9 @@ MA_GPU=7 STACK_PLANNER_SEED=0 \
 ```
 
 기본값은 64 env, 200 iteration, planner action당 frozen executor 30 step이며 10 iteration마다
-checkpoint를 저장한다. 중간 checkpoint에서 이어갈 때도 기존 run을 덮어쓰지 않고 새 tag를 쓴다.
+checkpoint를 저장한다. PPO minibatch 기본값은 env와 horizon에 비례해 epoch당 항상 4개가
+되도록 정하므로, 64 env에서는 512이고 2,048 env에서는 16,384다. 중간 checkpoint에서
+이어갈 때도 기존 run을 덮어쓰지 않고 새 tag를 쓴다.
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
