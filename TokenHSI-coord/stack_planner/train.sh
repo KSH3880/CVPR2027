@@ -8,9 +8,9 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 COORD="$ROOT/TokenHSI-coord"
 EXEC_REPO="$ROOT/TokenHSI-masteer"
 TAG=${1:?usage: train.sh <tag> [sequential-stack-policy.pth]}
-EXEC_CKPT=${2:-"$EXEC_REPO/output/sequential_stack/anti_feat_top_s2/Humanoid_00011000.pth"}
-STAGE1=${MS_CKPT:-"$EXEC_REPO/output/ckpt_stage1.pth"}
-ENVS=${STACK_PLANNER_ENVS:-64}
+EXEC_CKPT=${2:-"$EXEC_REPO/output/sequential_stack/anti_feat_top_s2/Humanoid_00012000.pth"}
+STAGE1=${MS_CKPT:-"$EXEC_REPO/output/tokenhsi/ckpt_stage1.pth"}
+ENVS=${STACK_PLANNER_ENVS:-2048}
 # Server training allocation: physical GPU 7. CUDA_VISIBLE_DEVICES maps it to
 # logical cuda:0 inside Isaac Gym/PyTorch. Override MA_GPU only for diagnostics.
 GPU=${MA_GPU:-7}
@@ -43,7 +43,7 @@ if [ -z "${CONDA_BASE:-}" ]; then
     fi
 fi
 . "$CONDA_BASE/etc/profile.d/conda.sh"
-conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi118}"
+conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi_juan}"
 
 export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU"
 export STACK_PLANNER_OUTPUT="$OUT"
