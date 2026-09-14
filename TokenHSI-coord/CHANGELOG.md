@@ -29,6 +29,15 @@
   유지한다. 기본 horizon 32에서 64 env는 512, 2,048 env는 16,384이며 학습 시작 로그에
   실제 minibatch와 iteration당 optimizer step 수를 출력한다.
 
+### Planner execution metric 추가
+
+- iteration별 `path_mae`, `fall_ratio`, `collision_ratio/cost`를 추가했다. path MAE는 현재
+  phase에서 active인 agent root와 실제 설치된 dense path 사이의 평균 횡오차이며, collision은
+  발생 low-level step 비율과 기존 연속 proxy cost를 분리해 기록한다.
+- bottom box는 placement 이후 phase에서만 선속도, 각속도와 누적 이동량을 집계한다.
+  `bottom_postplace_exposure`를 함께 기록해 0이 안정성을 뜻하는지 placement 미도달을 뜻하는지
+  구분할 수 있게 했다.
+
 ## 2026-09-11
 
 ### 단일 path 모델과 Carry execution slicing 분리

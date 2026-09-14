@@ -24,6 +24,7 @@ sys.path.insert(0, str(COORD_ROOT))
 import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from coordinator.schema import AGENTS, STATE_KEYS, CoordinatorState  # noqa: E402
+from coordinator.sequential_bridge import carry_rows  # noqa: E402
 from stack_planner.checkpoint import load_stack_checkpoint, save_stack_checkpoint  # noqa: E402
 from stack_planner.consistency import (  # noqa: E402
     build_stack_consistency_target, stack_trajectory_consistency_loss,
@@ -100,6 +101,12 @@ def _macro_step(player, before, valid, safe, low_steps):
     obs = _refresh_obs(player)
     player.get_batch_size(obs, 1)
     elapsed_steps = torch.zeros(n, device=task.device)
+    path_error_sum = torch.zeros(n, device=task.device)
+    path_samples = torch.zeros(n, device=task.device)
+    collision_steps = torch.zeros(n, device=task.device)
+    postplace_steps = torch.zeros(n, device=task.device)
+    postplace_motion = torch.zeros(n, device=task.device)
+    postplace_angular_motion = torch.zeros(n, device=task.device)
     for _ in range(low_steps):
         action = player.get_action({"obs": obs}, is_determenistic=True)
         obs, _, done_rows, _ = player.env.step(action)
@@ -109,9 +116,30 @@ def _macro_step(player, before, valid, safe, low_steps):
             current.bottom_position_error - last_bottom_error
         ).norm(dim=-1)
         collision += torch.where(active, step_collision, torch.zeros_like(step_collision))
+        collision_steps += active.float() * (step_collision > 0.0).float()
         disturbance += torch.where(active, step_disturbance, torch.zeros_like(step_disturbance))
         fall = torch.maximum(fall, task.planner_fall().float() * active.float())
         elapsed_steps += active.float()
+        owned = carry_rows(task._stack_phase, task._carry_rehearsal)
+        owned &= active[:, None]
+        lateral = task._lat_root.reshape(n, AGENTS).abs()
+        path_error_sum += (lateral * owned.float()).sum(dim=-1)
+        path_samples += owned.sum(dim=-1)
+        postplace = (
+            (task._stack_phase >= task.A1_RETREAT)
+            & (task._stack_phase < task.DONE)
+            & ~task._carry_rehearsal
+            & active
+        )
+        postplace_steps += postplace.float()
+        postplace_motion += (
+            current.bottom_linear_velocity.norm(dim=-1)
+            * float(task.dt) * postplace.float()
+        )
+        postplace_angular_motion += (
+            current.bottom_angular_velocity.norm(dim=-1)
+            * float(task.dt) * postplace.float()
+        )
         _masked_update(after, current, active)
         last_bottom_error = torch.where(
             active[:, None], current.bottom_position_error, last_bottom_error
@@ -133,7 +161,24 @@ def _macro_step(player, before, valid, safe, low_steps):
         invalid_plan=(~valid).float(),
         unsafe_plan=(valid & ~safe).float(),
     )
-    return compute_stack_planner_reward(before, after, interval), done_env
+    diagnostics = {
+        "path_error_sum": path_error_sum,
+        "path_samples": path_samples,
+        "collision_steps": collision_steps,
+        "executed_steps": elapsed_steps,
+        "collision_cost_sum": interval.collision,
+        "fall_events": fall,
+        "macro_samples": torch.ones_like(fall),
+        "bottom_postplace_motion": postplace_motion,
+        "bottom_postplace_angular_motion": postplace_angular_motion,
+        "bottom_postplace_seconds": postplace_steps * float(task.dt),
+        "bottom_postplace_intervals": (postplace_steps > 0).float(),
+    }
+    return (
+        compute_stack_planner_reward(before, after, interval),
+        done_env,
+        diagnostics,
+    )
 
 
 def _make_player(args, cfg, cfg_train):
@@ -296,6 +341,7 @@ def main():
         rewards: List[torch.Tensor] = []
         dones: List[torch.Tensor] = []
         diag: Dict[str, float] = {}
+        planner_diag: Dict[str, float] = {}
         for _ in range(horizon):
             state = task.planner_state()
             before = _clone_physical(task.planner_physical_state())
@@ -330,7 +376,9 @@ def main():
                 retreat_box_min_clearance = (
                     task._planner_retreat_box_min_clearance.clone()
                 )
-            terms, done = _macro_step(player, before, valid, safe, low_steps)
+            terms, done, macro_diag = _macro_step(
+                player, before, valid, safe, low_steps
+            )
             route_penalty = visit["penalty"][:, 0].mean(dim=-1)
             terms["route_visit_penalty"] = -visit_penalty_coef * route_penalty
             terms["route_box_distance"] = visit["box_distance"][:, 0].mean(dim=-1)
@@ -360,6 +408,10 @@ def main():
                 previous_done = done.detach().clone()
             for key, tensor in terms.items():
                 diag[key] = diag.get(key, 0.0) + float(tensor.mean())
+            for key, tensor in macro_diag.items():
+                planner_diag[key] = (
+                    planner_diag.get(key, 0.0) + float(tensor.sum())
+                )
 
         with torch.no_grad():
             _, next_value, _ = policy.distribution(task.planner_state())
@@ -389,6 +441,29 @@ def main():
             _env_float("STACK_PLANNER_ENTROPY_COEF", 1e-4),
             consistency_coef,
         )
+        def ratio(numerator, denominator):
+            return planner_diag.get(numerator, 0.0) / max(
+                planner_diag.get(denominator, 0.0), 1e-8
+            )
+
+        planner_metrics = {
+            "path_mae": ratio("path_error_sum", "path_samples"),
+            "fall_ratio": ratio("fall_events", "macro_samples"),
+            "collision_ratio": ratio("collision_steps", "executed_steps"),
+            "collision_cost": ratio("collision_cost_sum", "macro_samples"),
+            "bottom_postplace_linear_speed": ratio(
+                "bottom_postplace_motion", "bottom_postplace_seconds"
+            ),
+            "bottom_postplace_angular_speed": ratio(
+                "bottom_postplace_angular_motion", "bottom_postplace_seconds"
+            ),
+            "bottom_postplace_motion_per_interval": ratio(
+                "bottom_postplace_motion", "bottom_postplace_intervals"
+            ),
+            "bottom_postplace_exposure": ratio(
+                "bottom_postplace_seconds", "executed_steps"
+            ) / float(task.dt),
+        }
         metrics = {
             "iteration": iteration,
             "reward": float(reward_t.mean()),
@@ -399,6 +474,7 @@ def main():
             "visit_penalty_coef": visit_penalty_coef,
             "visit_tolerance": visit_tolerance,
             "retreat_box_penalty_coef": retreat_box_penalty_coef,
+            **planner_metrics,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(metrics, sort_keys=True) + "\n")
@@ -407,6 +483,8 @@ def main():
             if key in {"iteration", "reward", "done_rate", "potential_delta",
                        "humanoid_fall_penalty", "route_visit_penalty",
                        "retreat_box_path_penalty",
+                       "path_mae", "fall_ratio", "collision_ratio",
+                       "bottom_postplace_linear_speed",
                        "policy_loss", "value_loss"}
         ), flush=True)
         if iteration % save_every == 0 or iteration == first + iterations - 1:

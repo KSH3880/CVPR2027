@@ -106,6 +106,20 @@ STACK_PLANNER_ENVS=64 STACK_PLANNER_ITERS=200 \
 ```
 
 metric, sidecar, planner checkpoint는 `runs/stack_planner/<tag>/`에만 저장된다.
+`metrics.jsonl`에는 reward 항 외에 planner/executor 품질을 직접 읽을 수 있는 다음 metric을
+iteration마다 기록한다.
+
+- `path_mae`: active agent root와 설치된 dense planner path 사이 평균 횡오차(m)
+- `fall_ratio`: planner macro transition 중 한 agent라도 넘어진 비율
+- `collision_ratio`: 실행 low-level step 중 기존 collision proxy가 양수인 비율
+- `collision_cost`: macro별 연속 collision cost 평균
+- `bottom_postplace_linear_speed`: bottom placement 이후 평균 선속도(m/s)
+- `bottom_postplace_angular_speed`: bottom placement 이후 평균 각속도(rad/s)
+- `bottom_postplace_motion_per_interval`: bottom placement가 관측된 macro당 누적 이동량(m)
+- `bottom_postplace_exposure`: 전체 실행 step 중 bottom placement 이후 상태가 차지한 비율
+
+마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
+도달하지 못한 것인지 구분할 수 있다.
 같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v5 설계의 첫 학습은 다음처럼
 실행할 수 있다.
 
