@@ -19,8 +19,8 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_sequential_stack_carry impor
     HumanoidMASequentialStackCarry,
 )
 from stack_planner.reward import StackPhysicalState
-from stack_planner.constraints import free_path_validity, retreat_box_clearance
-from stack_planner.execution import execution_view
+from stack_planner.constraints import free_path_validity
+from stack_planner.execution import execution_view, retreat_box_geometry
 from tokenhsi.utils import steer_path as sp
 
 
@@ -275,12 +275,7 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         self._planner_retreat_box_path_penalty.zero_()
         self._planner_retreat_box_min_clearance.zero_()
         if commit_retreat.any():
-            geometry = retreat_box_clearance(
-                path[commit_retreat, 0],
-                state.box_xyz[commit_retreat, 0, :2],
-                state.box_yaw[commit_retreat, 0],
-                state.box_size_xy[commit_retreat, 0],
-            )
+            geometry = retreat_box_geometry(path, state, commit_retreat)
             self._planner_retreat_box_path_penalty[commit_retreat] = geometry[
                 "penalty"
             ]

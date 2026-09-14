@@ -17,6 +17,8 @@
   포함한 oriented-footprint clearance penalty를 추가했다. phase 2 최초 latch에만 적용해 운반 중
   필요한 자기 box 접촉이나 실행되지 않는 후속 action을 벌하지 않으며, box 쪽으로 더 깊이
   들어가는 경로와 끝까지 footprint를 벗어나지 않는 경로를 각각 감점한다.
+- clearance adapter가 `CoordinatorState`의 실제 yaw 필드명 `box_heading` 대신 존재하지 않는
+  `box_yaw`를 참조해 첫 retreat sample에서 죽던 오류를 바로잡았다.
 
 ## 2026-09-11
 

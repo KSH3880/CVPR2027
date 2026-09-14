@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import torch
 
-from .constraints import ordered_box_goal_visit, project_points_to_segments
+from coordinator.schema import CoordinatorState
+
+from .constraints import (
+    ordered_box_goal_visit, project_points_to_segments, retreat_box_clearance,
+)
 
 
 def execution_view(
@@ -78,4 +82,22 @@ def execution_view(
     return sampled
 
 
-__all__ = ["execution_view"]
+def retreat_box_geometry(
+    path: torch.Tensor,
+    state: CoordinatorState,
+    env_mask: torch.Tensor,
+):
+    """Measure committed A1 retreat paths against their real bottom boxes."""
+    if path.ndim != 4 or path.shape[:2] != (state.batch_size, 2):
+        raise ValueError("path must be [B,2,P,2]")
+    if env_mask.shape != (state.batch_size,) or env_mask.dtype != torch.bool:
+        raise ValueError("env_mask must be bool [B]")
+    return retreat_box_clearance(
+        path[env_mask, 0],
+        state.box_xyz[env_mask, 0, :2],
+        state.box_heading[env_mask, 0],
+        state.box_size_xy[env_mask, 0],
+    )
+
+
+__all__ = ["execution_view", "retreat_box_geometry"]

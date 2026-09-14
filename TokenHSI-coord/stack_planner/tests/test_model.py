@@ -17,7 +17,7 @@ from stack_planner.constraints import (
     free_path_validity, ordered_box_goal_visit, project_points_to_segments,
     retreat_box_clearance,
 )
-from stack_planner.execution import execution_view
+from stack_planner.execution import execution_view, retreat_box_geometry
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner
 from stack_planner.policy import StackPlannerActorCritic
 from stack_planner.schema import STACK_PATH_POINTS, STACK_SCHEMA_VERSION
@@ -176,6 +176,16 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertLess(float(safe_cost), float(crossing_cost))
         crossing_cost.mean().backward()
         self.assertGreater(float(crossing.grad.abs().sum()), 0.0)
+
+        state = make_state(batch=1)
+        state.box_xyz[0, 0, :2] = box_xy[0]
+        state.box_heading[0, 0] = box_yaw[0]
+        state.box_size_xy[0, 0] = box_size[0]
+        joint_path = safe.detach()[:, None].repeat(1, 2, 1, 1)
+        measured = retreat_box_geometry(
+            joint_path, state, torch.tensor([True]),
+        )
+        self.assertTrue(torch.allclose(measured["penalty"], safe_cost.detach()))
 
     def test_visit_penalty_is_differentiable_and_free_validity_needs_only_root(self):
         state = make_state(batch=1)
