@@ -15,6 +15,7 @@ from stack_planner.consistency import (
 )
 from stack_planner.constraints import (
     free_path_validity, ordered_box_goal_visit, project_points_to_segments,
+    retreat_box_clearance,
 )
 from stack_planner.execution import execution_view
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner
@@ -155,6 +156,26 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(torch.equal(mixed[..., 0, :], path[..., 0, :]))
         self.assertTrue(torch.allclose(mixed[0, 0, -1], torch.tensor([1.0, 1.0])))
         self.assertTrue(torch.equal(mixed[0, 1, -1], goal[0, 1]))
+
+    def test_retreat_clearance_prefers_moving_away_over_crossing_box(self):
+        safe = torch.tensor([[
+            [0.0, -0.7], [0.0, -1.0], [0.0, -1.3], [0.0, -1.6],
+        ]], requires_grad=True)
+        crossing = torch.tensor([[
+            [0.0, -0.7], [0.0, -0.2], [0.0, 0.2], [0.0, 0.7],
+        ]], requires_grad=True)
+        box_xy = torch.zeros(1, 2)
+        box_yaw = torch.zeros(1)
+        box_size = torch.full((1, 2), 0.4)
+        safe_cost = retreat_box_clearance(
+            safe, box_xy, box_yaw, box_size,
+        )["penalty"]
+        crossing_cost = retreat_box_clearance(
+            crossing, box_xy, box_yaw, box_size,
+        )["penalty"]
+        self.assertLess(float(safe_cost), float(crossing_cost))
+        crossing_cost.mean().backward()
+        self.assertGreater(float(crossing.grad.abs().sum()), 0.0)
 
     def test_visit_penalty_is_differentiable_and_free_validity_needs_only_root(self):
         state = make_state(batch=1)

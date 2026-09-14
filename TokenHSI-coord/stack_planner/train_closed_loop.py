@@ -252,7 +252,11 @@ def main():
         raise ValueError("STACK_PLANNER_CONSISTENCY_COEF must be non-negative")
     visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
     visit_tolerance = _env_float("STACK_PLANNER_VISIT_TOLERANCE", 0.15)
-    if visit_penalty_coef < 0 or visit_tolerance < 0:
+    retreat_box_penalty_coef = _env_float(
+        "STACK_PLANNER_RETREAT_BOX_PENALTY", 10.0
+    )
+    if (visit_penalty_coef < 0 or visit_tolerance < 0
+            or retreat_box_penalty_coef < 0):
         raise ValueError("stack planner path-shaping coefficients must be non-negative")
     output_dir = Path(os.environ.get(
         "STACK_PLANNER_OUTPUT", str(WORKSPACE / "runs/stack_planner/default")
@@ -268,6 +272,7 @@ def main():
     print(f"[stack-planner-train] envs={task.num_envs} horizon={horizon} "
           f"low_steps={low_steps} consistency={consistency_coef:g} "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
+          f"retreat_box_penalty={retreat_box_penalty_coef:g} "
           f"iterations={iterations} frozen={args.checkpoint}",
           flush=True)
     first = 1 if payload is None else int(payload.get("step", 0)) + 1
@@ -311,12 +316,25 @@ def main():
                     tolerance=visit_tolerance,
                 )
                 valid, safe = task.install_external_plan(output)
+                retreat_box_path_cost = (
+                    task._planner_retreat_box_path_penalty.clone()
+                )
+                retreat_box_min_clearance = (
+                    task._planner_retreat_box_min_clearance.clone()
+                )
             terms, done = _macro_step(player, before, valid, safe, low_steps)
             route_penalty = visit["penalty"][:, 0].mean(dim=-1)
             terms["route_visit_penalty"] = -visit_penalty_coef * route_penalty
             terms["route_box_distance"] = visit["box_distance"][:, 0].mean(dim=-1)
             terms["route_goal_distance"] = visit["goal_distance"][:, 0].mean(dim=-1)
-            terms["total"] = terms["total"] + terms["route_visit_penalty"]
+            terms["retreat_box_path_penalty"] = (
+                -retreat_box_penalty_coef * retreat_box_path_cost
+            )
+            terms["retreat_box_min_clearance"] = retreat_box_min_clearance
+            terms["total"] = (
+                terms["total"] + terms["route_visit_penalty"]
+                + terms["retreat_box_path_penalty"]
+            )
             states.append(state.clone())
             if consistency_coef > 0.0:
                 consistency_targets.append(consistency_target)
@@ -372,6 +390,7 @@ def main():
             "consistency_coef": consistency_coef,
             "visit_penalty_coef": visit_penalty_coef,
             "visit_tolerance": visit_tolerance,
+            "retreat_box_penalty_coef": retreat_box_penalty_coef,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(metrics, sort_keys=True) + "\n")
@@ -379,6 +398,7 @@ def main():
             f"{key}={value:.5g}" for key, value in metrics.items()
             if key in {"iteration", "reward", "done_rate", "potential_delta",
                        "humanoid_fall_penalty", "route_visit_penalty",
+                       "retreat_box_path_penalty",
                        "policy_loss", "value_loss"}
         ), flush=True)
         if iteration % save_every == 0 or iteration == first + iterations - 1:
@@ -390,7 +410,8 @@ def main():
                         "consistency_coef": consistency_coef,
                         "commit_steps": low_steps,
                         "visit_penalty_coef": visit_penalty_coef,
-                        "visit_tolerance": visit_tolerance},
+                        "visit_tolerance": visit_tolerance,
+                        "retreat_box_penalty_coef": retreat_box_penalty_coef},
             )
 
 

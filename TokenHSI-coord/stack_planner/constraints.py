@@ -88,6 +88,66 @@ def ordered_box_goal_visit(
     }
 
 
+def retreat_box_clearance(
+    path: torch.Tensor,
+    box_xy: torch.Tensor,
+    box_yaw: torch.Tensor,
+    box_size_xy: torch.Tensor,
+    *,
+    agent_radius: float = 0.35,
+    safety_margin: float = 0.10,
+) -> Dict[str, torch.Tensor]:
+    """Penalize a retreat path that enters the placed box's safety footprint.
+
+    The oriented box is expanded by the agent root radius and a safety margin.
+    A1 may initially be inside that expanded region immediately after release,
+    so the loss grows with path progress and separately penalizes any step that
+    moves deeper toward the box.  Moving monotonically outward is permitted.
+    """
+    if path.ndim < 3 or path.shape[-1] != 2 or path.shape[-2] < 2:
+        raise ValueError("path must end in [P,2] with P >= 2")
+    leading = path.shape[:-2]
+    if box_xy.shape != leading + (2,):
+        raise ValueError("box_xy must match path leading dimensions")
+    if box_yaw.shape != leading or box_size_xy.shape != leading + (2,):
+        raise ValueError("box yaw/size must match path leading dimensions")
+    if agent_radius < 0.0 or safety_margin < 0.0:
+        raise ValueError("agent radius and safety margin must be non-negative")
+    if (box_size_xy <= 0.0).any():
+        raise ValueError("box_size_xy must be positive")
+
+    delta = path - box_xy.unsqueeze(-2)
+    cosine = torch.cos(box_yaw).unsqueeze(-1)
+    sine = torch.sin(box_yaw).unsqueeze(-1)
+    local = torch.stack((
+        cosine * delta[..., 0] + sine * delta[..., 1],
+        -sine * delta[..., 0] + cosine * delta[..., 1],
+    ), dim=-1)
+    half_extent = (
+        0.5 * box_size_xy + agent_radius + safety_margin
+    ).unsqueeze(-2)
+    q = local.abs() - half_extent
+    # Standard signed distance to an axis-aligned rectangle in box coordinates.
+    signed_distance = (
+        q.clamp(min=0.0).norm(dim=-1)
+        + q.amax(dim=-1).clamp(max=0.0)
+    )
+    progress = torch.linspace(
+        0.0, 1.0, path.shape[-2], device=path.device, dtype=path.dtype,
+    )
+    inside = (-signed_distance).clamp(min=0.0)
+    lingering = (progress * inside.square()).mean(dim=-1)
+    inward_step = (
+        signed_distance[..., :-1] - signed_distance[..., 1:]
+    ).clamp(min=0.0)
+    inward = inward_step.square().mean(dim=-1)
+    return {
+        "penalty": lingering + inward,
+        "minimum_clearance": signed_distance.amin(dim=-1),
+        "endpoint_clearance": signed_distance[..., -1],
+    }
+
+
 def free_path_validity(
     path: torch.Tensor, speed: torch.Tensor, root_xy: torch.Tensor,
     active: torch.Tensor,
@@ -122,6 +182,6 @@ def free_path_validity(
 
 
 __all__ = [
-    "free_path_validity", "ordered_box_goal_visit",
+    "free_path_validity", "ordered_box_goal_visit", "retreat_box_clearance",
     "project_points_to_segments",
 ]

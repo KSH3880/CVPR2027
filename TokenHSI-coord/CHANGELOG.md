@@ -2,6 +2,22 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-14
+
+### A1 retreat moving-target 제거
+
+- phase 2의 매 replan마다 model suffix를 현재 root에 다시 붙이며 virtual retreat endpoint가
+  함께 달아나던 오류를 수정했다. phase 2 진입 뒤 처음 설치에 성공한 A1 suffix/path/endpoint를
+  latch하고, phase가 끝날 때까지 후속 replan이 `_gt_path`, arc progress와 virtual box를
+  덮어쓰지 않는다.
+- inherited FSM의 phase 2 완료 기준도 legacy manual retreat goal/direction 대신 같은 latched
+  learned endpoint/start/direction을 보도록 맞췄다. planner는 계속 단일 full path만 출력하며
+  latch는 frozen Carry compatibility execution에만 존재한다.
+- A1 retreat execution path가 놓인 Box1을 관통하는 문제에 대해 box yaw/size와 agent 반경을
+  포함한 oriented-footprint clearance penalty를 추가했다. phase 2 최초 latch에만 적용해 운반 중
+  필요한 자기 box 접촉이나 실행되지 않는 후속 action을 벌하지 않으며, box 쪽으로 더 깊이
+  들어가는 경로와 끝까지 footprint를 벗어나지 않는 경로를 각각 감점한다.
+
 ## 2026-09-11
 
 ### 단일 path 모델과 Carry execution slicing 분리
