@@ -133,6 +133,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_body_clear = _f("STACK_BODY_CLEAR", 1.0)
         self._ss_retreat_dist = _f("STACK_RETREAT_DIST", 1.5)
         self._ss_retreat_side_deg = _f("STACK_RETREAT_SIDE_DEG", 0.0)
+        self._ss_retreat_random = bool(_i("STACK_RETREAT_RANDOM", 0))
         # Keep the old implicit value as the class default so ms20 sidecars
         # remain replayable; the ms21 wrapper explicitly selects 0.5.
         self._ss_retreat_scale = _f("STACK_RETREAT_SCALE", 1.0)
@@ -288,7 +289,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_clear_move_w = _f("STACK_CLEAR_MOVE_W", 1.0)
         self._ss_clear_hand_pen_w = _f("STACK_CLEAR_HAND_PEN_W", 0.5)
         self._ss_clear_stall_pen_w = _f("STACK_CLEAR_STALL_PEN_W", 0.5)
+        self._ss_clear_track_pen_w = _f("STACK_CLEAR_TRACK_PEN_W", 0.0)
         self._ss_clear_reverse_pen_w = _f("STACK_CLEAR_REVERSE_PEN_W", 0.5)
+        self._ss_clear_facing_w = _f("STACK_CLEAR_FACING_W", 0.0)
         self._ss_clear_move_min_frac = _f("STACK_CLEAR_MOVE_MIN_FRAC", 0.20)
         self._ss_clear_grace_steps = _i("STACK_CLEAR_GRACE_STEPS", 0)
         self._ss_stop_decel_dist = _f("STACK_STOP_DECEL_DIST", 0.30)
@@ -448,7 +451,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                self._ss_clear_base_lin_w, self._ss_clear_base_ang_w) < 0.0:
             raise ValueError("CLEAR arc distance and base penalty weights must be non-negative")
         if min(self._ss_clear_move_w, self._ss_clear_hand_pen_w,
-               self._ss_clear_stall_pen_w, self._ss_clear_reverse_pen_w) < 0.0:
+               self._ss_clear_stall_pen_w, self._ss_clear_reverse_pen_w,
+               self._ss_clear_track_pen_w, self._ss_clear_facing_w) < 0.0:
             raise ValueError("negative CLEAR reward weights must be non-negative")
         if self._ss_clear_move_min_frac <= 0.0 or self._ss_clear_move_min_frac > 1.0:
             raise ValueError("STACK_CLEAR_MOVE_MIN_FRAC must be in (0, 1]")
@@ -613,6 +617,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_clear_age = torch.zeros(
             num_envs, dtype=torch.long, device=self.device
         )
+        self._ss_retreat_arrived = torch.zeros(
+            num_envs, dtype=torch.bool, device=self.device
+        )
         self._ss_stop_count = torch.zeros(
             num_envs, dtype=torch.long, device=self.device
         )
@@ -702,6 +709,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"clear_steer_w={self._ss_clear_steer_w:.2f} "
             f"retreat_scale={self._ss_retreat_scale:.2f} "
             f"retreat_side_deg={self._ss_retreat_side_deg:.1f} "
+            f"retreat_random={int(self._ss_retreat_random)} "
             f"hand_only={int(self._ss_hand_only_switch)} "
             f"foot_box_w={self._ss_foot_box_w:.2f} "
             f"carry_foot_gate={int(self._ss_carry_foot_gate)} "
@@ -774,6 +782,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"{self._ss_clear_hand_pen_w:.2f}/"
             f"{self._ss_clear_stall_pen_w:.2f}/"
             f"{self._ss_clear_reverse_pen_w:.2f} "
+            f"track_pen_w={self._ss_clear_track_pen_w:.2f} "
+            f"facing_w={self._ss_clear_facing_w:.2f} "
             f"move_min_frac={self._ss_clear_move_min_frac:.2f} "
             f"stop={self._ss_stop_hold_steps}/{self._ss_stop_decel_dist:.2f}m/"
             f"{self._ss_stop_lin:.2f}/{self._ss_stop_ang:.2f}/"
@@ -1094,6 +1104,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_retreat_goal[env_ids] = 0.0
         self._ss_retreat_dir[env_ids] = 0.0
         self._ss_clear_age[env_ids] = 0
+        self._ss_retreat_arrived[env_ids] = False
         self._ss_stop_count[env_ids] = 0
         self._ss_release_age[env_ids] = 0
         self._ss_prev_release_h[env_ids] = 0.0
@@ -2200,6 +2211,20 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         positive_steer = clear_now.float() * path_quality * clear_motion
         clear_positive_steer = positive_steer * (~decel_phase).float()
+        classic_speed_match = torch.exp(
+            -self.steer_vel_k * (cmd_speed - arc_speed).square()
+        )
+        classic_speed_match = torch.where(
+            arc_speed > 0.0,
+            classic_speed_match,
+            torch.zeros_like(classic_speed_match),
+        )
+        classic_path_penalty = self.steer_pos_c * (
+            torch.exp(-0.5 * self._lat_root[base_rows].square()) - 1.0
+        )
+        classic_steer = (
+            0.2 * self.steer_vel_w * classic_speed_match + classic_path_penalty
+        ) * (~decel_phase).float()
         loop_active = (
             stack_phase
             & self._ss_bootstrap_active
@@ -2213,7 +2238,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         stack_r = stack_r + base_loop_tracking
         clear_r = (
             ms20_clear_r
-            + self._ss_clear_steer_w * clear_positive_steer
+            + self._ss_clear_steer_w * classic_steer
             + stop_reward
             - clear_base_penalty
         )
@@ -2222,7 +2247,15 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             # standing still from moving in the wrong direction. Use the actual
             # root velocity projected onto the commanded retreat direction.
             roots = self.humanoid_rows(self._humanoid_root_states)[base_rows]
-            v_along = (roots[:, 7:9] * self._ss_retreat_dir).sum(dim=-1)
+            direction = self._ss_retreat_dir
+            if self._ss_clear_track_pen_w > 0.0 or self._ss_clear_facing_w > 0.0:
+                index = (arc / sp.DS).long().clamp(0, sp.V - 2)
+                tangent = (
+                    self._gt_path[base_rows, index + 1]
+                    - self._gt_path[base_rows, index]
+                )
+                direction = torch.nn.functional.normalize(tangent, dim=-1)
+            v_along = (roots[:, 7:9] * direction).sum(dim=-1)
             speed_denom = cmd_speed.clamp(min=1e-4)
             move_ratio = torch.clamp(v_along / speed_denom, 0.0, 1.0)
             reverse_ratio = torch.clamp(-v_along / speed_denom, 0.0, 1.0)
@@ -2246,6 +2279,20 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 * move_ratio
                 * move_active
             )
+            heading = torch_utils.calc_heading_quat(roots[:, 3:7])
+            forward = torch.zeros_like(roots[:, 0:3])
+            forward[:, 0] = 1.0
+            facing_score = torch.clamp(
+                (quat_rotate(heading, forward)[:, 0:2] * direction).sum(dim=-1),
+                0.0,
+                1.0,
+            )
+            facing_reward = (
+                self._ss_clear_facing_w
+                * clear_now.float()
+                * facing_score
+                * move_active
+            )
             hand_penalty = (
                 self._ss_clear_hand_pen_w * (~clear_now).float()
             )
@@ -2256,12 +2303,19 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 self._ss_clear_reverse_pen_w
                 * reverse_ratio * after_grace * move_active
             )
+            track_penalty = (
+                self._ss_clear_track_pen_w
+                * torch.maximum(stall_ratio, 1.0 - path_quality)
+                * after_grace * move_active
+            )
             clear_r = (
                 move_reward
+                + facing_reward
                 + stop_reward
                 - hand_penalty
                 - stall_penalty
                 - reverse_penalty
+                - track_penalty
                 - clear_base_penalty
             )
 
@@ -2283,8 +2337,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 + transition_bonus
             )
             self.extras["tb/stack_reward/move_positive"] = tb_clear(move_reward)
+            self.extras["tb/stack_reward/facing_positive"] = tb_clear(facing_reward)
             self.extras["tb/stack_reward/hand_penalty"] = tb_clear(-hand_penalty)
             self.extras["tb/stack_reward/stall_penalty"] = tb_clear(-stall_penalty)
+            self.extras["tb/stack_reward/track_penalty"] = tb_clear(-track_penalty)
             self.extras["tb/stack_reward/reverse_penalty"] = tb_clear(-reverse_penalty)
             self.extras["tb/stack_reward/base_penalty"] = tb_clear(-clear_base_penalty)
             self.extras["tb/stack_reward/foot_penalty"] = tb_clear(
@@ -2297,6 +2353,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self.extras["tb/stack_state/hand_clear_rate"] = tb_clear(clear_now.float())
             self.extras["tb/stack_state/recontact_rate"] = tb_clear((~clear_now).float())
             self.extras["tb/stack_state/move_ratio"] = tb_clear(move_ratio)
+            self.extras["tb/stack_state/facing_score"] = tb_clear(facing_score)
             self.extras["tb/stack_state/move_ok_rate"] = tb_clear(
                 (v_along >= min_speed).float()
             )
@@ -2325,6 +2382,15 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["tb/stack_state/stop_stable"] = tb_stop(stop_stable.float())
         self.extras["tb/stack_state/stop_streak_fraction"] = tb_stop(
             self._ss_stop_count.float() / max(self._ss_stop_hold_steps, 1)
+        )
+        self.extras["tb/stack_state/retreat_arrived"] = tb_stop(
+            self._ss_retreat_arrived.float()
+        )
+        self.extras["tb/stack_state/retreat_endpoint_error"] = tb_stop(
+            base_hold_anchor_error
+        )
+        self.extras["tb/stack_reward/classic_steer"] = tb_stop(
+            self._ss_clear_steer_w * classic_steer
         )
         if self._ss_sequential_reward_mask:
             if not self._ss_release_carry_bridge:
@@ -2368,6 +2434,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["stack_clear_cmd_speed"] = cmd_speed
         self.extras["stack_clear_path_quality"] = path_quality
         self.extras["stack_clear_positive_steer"] = clear_positive_steer
+        self.extras["stack_clear_classic_steer"] = classic_steer
         self.extras["stack_clear_base_penalty"] = clear_base_penalty
 
         self.extras["tb/stack_reward/base_hold"] = torch.where(
@@ -2610,7 +2677,51 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         use_left = (left * top_side).sum(dim=-1, keepdim=True) <= 0.0
         side = torch.where(use_left, left, -left)
 
-        if self._ss_clear_route_around:
+        if self._ss_retreat_random:
+            g = torch.Generator(device="cpu").manual_seed(
+                self.steer_seed + self._steer_tick + int(env_ids[0])
+            )
+            angle = torch.rand(len(env_ids), 16, generator=g).to(roots) * (math.pi / 2)
+            angle = torch.cat((angle, roots.new_full((len(env_ids), 2), math.pi / 2)), dim=1)
+            signs = roots.new_ones(18)
+            signs[8:16] = -1
+            signs[-1] = -1
+            candidate_side = side[:, None, :] * signs[None, :, None]
+            directions = (
+                torch.cos(angle)[..., None] * away[:, None, :]
+                + torch.sin(angle)[..., None] * candidate_side
+            )
+            waypoints = roots[:, None, :] + directions * 0.15
+            # Resampling discards up to two DS cells before the clipped endpoint.
+            distance = max(self._ss_retreat_dist, 0.8) + 2 * sp.DS
+            endpoints = roots[:, None, :] + directions * distance
+            top_rows = self._role_rows(env_ids)[1]
+            top_box = self.humanoid_rows(self._box_states)[top_rows, :2]
+            starts = torch.stack((roots[:, None, :].expand_as(waypoints), waypoints), dim=2)
+            ends = torch.stack((waypoints, endpoints), dim=2)
+            segment = ends - starts
+            offset = top_box[:, None, None, :] - starts
+            projection = (
+                (offset * segment).sum(dim=-1)
+                / segment.square().sum(dim=-1).clamp(min=1e-8)
+            ).clamp(0.0, 1.0)
+            closest = starts + projection[..., None] * segment
+            clearance = (closest - top_box[:, None, None, :]).norm(dim=-1).amin(dim=-1)
+            top_radius = (
+                0.5 * self._box_lib._box_size[top_rows, :2].norm(dim=-1)
+                + self._ss_clear_route_margin
+            )
+            required = torch.minimum((roots - top_box).norm(dim=-1), top_radius)
+            safe = clearance >= required[:, None] - 1e-6
+            if not bool(safe.any(dim=-1).all()):
+                raise RuntimeError("No box-clear random retreat path for the current state")
+            choice = safe.long().argmax(dim=-1)
+            batch = torch.arange(len(env_ids), device=roots.device)
+            waypoint = waypoints[batch, choice]
+            clear = endpoints[batch, choice]
+            move_dir = directions[batch, choice]
+            lat_max = 0.0
+        elif self._ss_clear_route_around:
             # Move tangentially around the placed box, on the side opposite the
             # waiting top carrier.  Keeping the radial coordinate outside the
             # expanded footprint avoids commanding a blind backward walk.
@@ -3001,11 +3112,32 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             & (base[:, 7:10].norm(dim=-1) <= self._ss_clear_stable_lin)
             & (base[:, 10:13].norm(dim=-1) <= self._ss_clear_stable_ang)
         )
-        retreat_done = (
+        retreat_progress_done = (
             self._arc_root[base_rows] >= self._ss_clear_arc_dist
             if self._ss_clear_arc_dist > 0.0
             else root_dist >= self._ss_body_clear
         )
+        if self._ss_clear_stop_on_stack:
+            base_roots = self.humanoid_rows(
+                self._humanoid_root_states
+            )[base_rows]
+            endpoint_error = (
+                base_roots[:, 0:2] - self._ss_retreat_goal[:, 0:2]
+            ).norm(dim=-1)
+            just_arrived = (
+                clear
+                & retreat_progress_done
+                & (endpoint_error <= 0.12)
+                & (~self._ss_retreat_arrived)
+            )
+            if bool(just_arrived.any()):
+                ids = torch.nonzero(just_arrived, as_tuple=False).squeeze(-1)
+                self._ss_retreat_arrived[ids] = True
+                self._hold_steer(base_rows[ids])
+                self._compute_observations()
+            retreat_done = self._ss_retreat_arrived
+        else:
+            retreat_done = retreat_progress_done
         if self._ss_stop_hold_steps > 0:
             remaining = (
                 self._s_end[base_rows] - self._arc_root[base_rows]

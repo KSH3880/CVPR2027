@@ -2,7 +2,64 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-15
+
+### CLEAR를 기존 smooth steering + 도착 hold로 단순화
+
+- ms60 try2의 별도 이동/방향 reward는 다음 실행부터 끈다. CLEAR는 기존
+  부모 steering과 같은 속도 일치 양의항과 bounded 횡이탈 패널티를 계수 2.0으로 사용하며
+  track/stall/reverse 패널티는 모두 0으로 둔다.
+- 실제 1.2 m 후퇴 경로의 끝점 0.12 m 이내에 들어오고 arc가 0.8 m 이상이면 도착을
+  env별로 latch한다. 그 즉시 steering 경로와 속도 명령을 0으로 바꿔 정지를 명령한다.
+- 도착 뒤 CLEAR에서는 정지 reward 2.0을 매 frame 지급하고, 10-frame 정지 확인 뒤
+  STACK에서도 기존 base hold reward 0.5를 계속 지급한다.
+- 수정 시점에 실행 중이던 ms60 try2에는 로드된 이전 코드와 설정만 적용됐다. 실행 중인
+  train_local.sh는 수정하지 않았다.
+- Python py_compile, wrapper bash -n, git diff --check를 통과했다.
+
+### ms59 후속 CLEAR 양의 경로 진행·방향 정렬 보상
+
+- ms59의 frame당 최대 -40 경로 추종 패널티를 끄고, 후퇴 경로의 현재 접선 방향으로
+  이동할 때 최대 +4를 주도록 STACK_CLEAR_MOVE_W=4.0을 적용했다.
+- STACK_CLEAR_FACING_W를 추가해 humanoid 정면이 현재 경로 접선과 정렬될수록 최대
+  +1을 준다. 기본값은 0이라 기존 sidecar 재생 결과는 바뀌지 않는다.
+- 무작위 후퇴 경로 목표 길이는 0.8 m에서 1.2 m로, CLEAR 완료 arc는 0.6 m에서
+  0.8 m로 늘렸다. Top 대기와 Base 정지 유지 reward는 각각 0.5로 높였다.
+- 새 방향 보상은 train_local.sh sidecar 저장·재생 목록에 포함했다.
+- Python py_compile, 관련 Bash 구문 검사, git diff --check를 통과했다. check_docs는 외부 구 경로 /home/hwanhee/CVPR2027의 기존 AGENTS.md·CLAUDE.md 링크 오류 2건으로 실패했다.
+
+### Vulkan 숫자 selector와 물리 GPU 번호 분리
+
+- 물리 GPU 2가 Vulkan 열거에서 빠지면서 `DRI_PRIME=7!`가 더는 물리 GPU 7을
+  선택하지 못하고 8개 장치를 모두 노출해 GUI 가드가 중단되는 문제를 재현했다.
+- `vulkan_gpu_guard.py`는 허용된 숫자 selector `6!`, `7!`만 시도하고 요청한
+  `nvidia-smi` 물리 GPU UUID와 정확히 일치하는 한 장만 통과시켜 실제 selector를
+  stdout으로 반환한다. `masteer/view.sh`도 반환값을 Isaac Gym 실행에 전달한다.
+- 현재 서버에서는 GPU 7이 `6!`로 UUID 검증을 통과하고 GPU 6은 허용 selector로
+  도달할 수 없어 안전하게 거부됨을 확인했다. 뷰어는 이후 CUDA 초기화까지 진행했지만,
+  GPU 2의 `Unknown Error`로 신규 CUDA 컨텍스트 자체가 실패해 서버 복구가 필요하다.
+
 ## 2026-09-14
+
+### 다양한 CLEAR 후퇴 경로와 경로 추종 패널티
+
+- `STACK_RETREAT_RANDOM=1`에서 배치한 박스에서 멀어지는 연속 각도의 후퇴 경로를
+  현재 위치 기준으로 생성한다. 다른 박스와의 기하학적 여유를 확인하고 양옆 방향을
+  안전 후보로 포함한다. 리샘플링 후 실제 유효 경로 길이는 0.8 m 이상이다.
+- `STACK_CLEAR_TRACK_PEN_W`는 현재 경로 접선 방향의 이동 부족과 경로 이탈 중
+  큰 위반량을 음수 보상으로 차감한다. 기존 유예 및 감속·정지 구간은 제외한다.
+  몸 방향을 제한하거나 회전 보상을 추가하지 않는다. 새 노브의 기본값은 0으로
+  기존 저장된 실행 설정과 호환된다.
+- `train_ms52_shared_goal_safe_local.sh`는 무작위 후퇴, 길이 0.8 m, 경로 패널티
+  계수 40을 적용하고 기존 stall 패널티 계수는 0으로 해 중복을 피한다. 후퇴
+  완료 arc 기준 0.6 m, 정지·박스 안정·Top 대기 조건과 carry 즉시 제로패딩은 유지한다.
+  `train_local.sh`의 export와 재생 sidecar에도 새 노브를 포함한다.
+- CPU에서 실제 경로 함수로 생성한 1,024개 경로의 최소 길이 0.8 m와 두 박스의
+  기하학적 회피를 확인했다. 실제 CLEAR 보상식에서 경로 추종 성공 0, 이동 부족
+  및 완전 이탈 -40, 유예·감속 구간 0을 확인했고 Python/Bash 구문 검사를 통과했다.
+- 기존 ms58 e9500 정책으로 GPU 7·64환경 headless 검증을 실행해 종료 코드 0을
+  확인했다. 결과 suffix는 `retreat_random40_e9500_smoke_20260914_v1`이다. 이는
+  새 경로·보상 설정의 실행 검증이며 재학습이나 회전 동작 개선 검증은 아니다.
 
 ### masteer 뷰어 VNC 공유 메모리 부족 우회
 

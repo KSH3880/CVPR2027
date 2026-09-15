@@ -89,8 +89,8 @@ export MA_GPU=$GPU
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES=$GPU
 export VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select
-export DRI_PRIME="${GPU}!"
-python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GPU" >/dev/null
+VIEW_DRI=$(python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GPU")
+export DRI_PRIME="$VIEW_DRI"
 
 if [ -f "$TAG" ]; then CKPT="$TAG"; NAME=$(basename $(dirname $(dirname "$TAG")))
 else
@@ -202,6 +202,7 @@ MS_SEP=${MS_SEP:-9.0} MS_PLACEBO=${MS_PLACEBO:-0} \
 MS_VEL_W=${MS_VEL_W:-1} MS_VEL_K=${MS_VEL_K:-5} \
 MS_ENDCLAMP=${MS_ENDCLAMP:-0} MS_CLIP=${MS_CLIP:-1} MS_DBG=${MS_DBG:-1} \
 CUDA_VISIBLE_DEVICES=$GPU \
+DRI_PRIME=$VIEW_DRI \
 python ./tokenhsi/run.py --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \

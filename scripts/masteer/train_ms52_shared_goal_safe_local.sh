@@ -51,9 +51,21 @@ export STACK_TOP_CARRY_TARGET_ONLY=0
 export STACK_TOP_DIRECT_CARRY_REWARD=0
 export STACK_TOP_SCALE=1.0
 
-# Preserve ms52 W2S shaping and full-sequence learning. Only the consecutive
-# stop streak is relaxed from 15 frames (0.5 s) to 10 frames (about 0.33 s).
-export STACK_CLEAR_STEER_W=1.0
+# Follow the retreat path with the original smooth steering reward. Once the
+# endpoint is reached, switch immediately to zero steering and reward holding.
+# The stop streak remains 10 frames (about 0.33 s).
+export STACK_CLEAR_STEER_W=2.0
+export STACK_RETREAT_RANDOM=1
+export STACK_RETREAT_DIST=1.2
+export STACK_CLEAR_ARC_DIST=0.8
+export STACK_ZERO_CARRY_OBS=1
+export STACK_DYNAMIC_CARRY_MASK=0
+export STACK_NEGATIVE_CLEAR_REWARD=0
+export STACK_CLEAR_MOVE_W=0.0
+export STACK_CLEAR_FACING_W=0.0
+export STACK_CLEAR_TRACK_PEN_W=0.0
+export STACK_CLEAR_STALL_PEN_W=0.0
+export STACK_CLEAR_REVERSE_PEN_W=0.0
 export STACK_CLEAR_STOP_ON_STACK=1
 export STACK_STOP_DECEL_DIST=0.30
 export STACK_STOP_HOLD_STEPS=${PILOT_STOP_HOLD_STEPS:-10}
@@ -61,7 +73,9 @@ export STACK_STOP_LIN=0.10
 export STACK_STOP_ANG=0.50
 export STACK_STOP_UPRIGHT_DEG=15.0
 export STACK_STOP_CONTACT_FORCE=1.0
-export STACK_STOP_REWARD_W=1.0
+export STACK_STOP_REWARD_W=2.0
+export STACK_TOP_WAIT_REWARD_W=0.50
+export STACK_BASE_HOLD_REWARD_W=0.50
 export STACK_BOOTSTRAP_FRAC=0.0
 export STACK_BOOTSTRAP_KEEP_WAIT=0
 export STACK_REHEARSAL_FRAC=0.10

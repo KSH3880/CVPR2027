@@ -10,6 +10,7 @@ import sys
 
 
 ALLOWED_GPUS = {"6", "7"}
+ALLOWED_SELECTORS = ("6", "7")
 VK_SUCCESS = 0
 VK_STRUCTURE_TYPE_APPLICATION_INFO = 0
 VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1
@@ -36,11 +37,9 @@ if "NODEVICE_SELECT" in os.environ:
     fail("NODEVICE_SELECT is set and would disable the Vulkan device-select layer")
 
 gpu = sys.argv[1]
-selector = f"{gpu}!"
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu
 os.environ["VK_INSTANCE_LAYERS"] = "VK_LAYER_MESA_device_select"
-os.environ["DRI_PRIME"] = selector
 
 try:
     expected = subprocess.run(
@@ -149,43 +148,61 @@ create_info = InstanceCreateInfo(
     0,
     None,
 )
-instance = C.c_void_p()
-rc = vulkan.vkCreateInstance(C.byref(create_info), None, C.byref(instance))
-if rc != VK_SUCCESS:
-    fail(f"vkCreateInstance failed with rc={rc}; device-select layer is unavailable")
-
-try:
-    count = C.c_uint32()
-    rc = vulkan.vkEnumeratePhysicalDevices(instance, C.byref(count), None)
+def probe_selector(selector: str) -> tuple[str | None, str]:
+    os.environ["DRI_PRIME"] = selector
+    instance = C.c_void_p()
+    rc = vulkan.vkCreateInstance(C.byref(create_info), None, C.byref(instance))
     if rc != VK_SUCCESS:
-        fail(f"vkEnumeratePhysicalDevices(count) failed with rc={rc}")
-    if count.value != 1:
-        fail(
-            f"DRI_PRIME={selector} exposed {count.value} Vulkan devices, expected exactly 1"
-        )
+        return None, f"vkCreateInstance rc={rc}"
 
-    devices = (C.c_void_p * count.value)()
-    rc = vulkan.vkEnumeratePhysicalDevices(instance, C.byref(count), devices)
-    if rc != VK_SUCCESS:
-        fail(f"vkEnumeratePhysicalDevices(list) failed with rc={rc}")
+    try:
+        count = C.c_uint32()
+        rc = vulkan.vkEnumeratePhysicalDevices(instance, C.byref(count), None)
+        if rc != VK_SUCCESS:
+            return None, f"vkEnumeratePhysicalDevices(count) rc={rc}"
+        if count.value != 1:
+            return None, f"{count.value} devices"
 
-    id_props = PhysicalDeviceIDProperties(
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
-        None,
-    )
-    props = PhysicalDeviceProperties2(
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-        C.cast(C.pointer(id_props), C.c_void_p),
-    )
-    vulkan.vkGetPhysicalDeviceProperties2(devices[0], C.byref(props))
-    actual_uuid = bytes(id_props.deviceUUID).hex()
-    if actual_uuid != expected_uuid:
-        fail(
-            f"DRI_PRIME={selector} selected UUID {actual_uuid}, "
-            f"but physical GPU {gpu} is {expected_uuid}"
+        devices = (C.c_void_p * count.value)()
+        rc = vulkan.vkEnumeratePhysicalDevices(instance, C.byref(count), devices)
+        if rc != VK_SUCCESS:
+            return None, f"vkEnumeratePhysicalDevices(list) rc={rc}"
+
+        id_props = PhysicalDeviceIDProperties(
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
+            None,
         )
-finally:
-    vulkan.vkDestroyInstance(instance, None)
+        props = PhysicalDeviceProperties2(
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+            C.cast(C.pointer(id_props), C.c_void_p),
+        )
+        vulkan.vkGetPhysicalDeviceProperties2(devices[0], C.byref(props))
+        actual_uuid = bytes(id_props.deviceUUID).hex()
+        return actual_uuid, f"UUID {actual_uuid}"
+    finally:
+        vulkan.vkDestroyInstance(instance, None)
+
+
+# DRI_PRIME의 숫자는 현재 Vulkan이 열거할 수 있는 장치 순서다. 다른 보드가
+# 열거에서 빠지면 nvidia-smi 물리 번호와 달라질 수 있으므로, 프로젝트에서 허용한
+# 두 selector만 시도하고 요청한 물리 GPU의 UUID와 정확히 맞을 때만 통과시킨다.
+selector = None
+attempts = []
+for candidate in (gpu, *(value for value in ALLOWED_SELECTORS if value != gpu)):
+    candidate_selector = f"{candidate}!"
+    actual_uuid, detail = probe_selector(candidate_selector)
+    attempts.append(f"{candidate_selector}: {detail}")
+    if actual_uuid == expected_uuid:
+        selector = candidate_selector
+        break
+
+if selector is None:
+    fail(
+        f"no allowed numeric selector matched physical GPU {gpu} "
+        f"UUID {expected_uuid} ({'; '.join(attempts)})"
+    )
+
+os.environ["DRI_PRIME"] = selector
 
 print(
     f"VULKAN_GPU_GUARD: physical GPU {gpu}, UUID {expected_uuid}, "
