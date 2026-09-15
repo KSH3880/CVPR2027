@@ -19,6 +19,10 @@ STAGE1=${MS_CKPT:-"$EXEC_REPO/output/ckpt_stage1.pth"}
 
 [[ "$ENVS" =~ ^[1-9][0-9]*$ ]] || { echo "envs must be positive" >&2; exit 2; }
 [[ "$GPU" =~ ^[0-9]+$ ]] || { echo "MA_GPU must be a non-negative integer" >&2; exit 2; }
+export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU"
+# Vulkan graphics ordinals are independent of CUDA's logical device remap.
+export TOKENHSI_GRAPHICS_DEVICE_ID=${TOKENHSI_GRAPHICS_DEVICE_ID:-$GPU}
+[[ "$TOKENHSI_GRAPHICS_DEVICE_ID" =~ ^[0-9]+$ ]] || { echo "graphics device must be non-negative" >&2; exit 2; }
 for file in "$PLANNER" "$POLICY" "$STAGE1"; do
     [ -f "$file" ] || { echo "checkpoint 없음: $file" >&2; exit 2; }
 done
@@ -78,11 +82,12 @@ fi
 echo "planner: $PLANNER"
 echo "agent:   $POLICY"
 echo "GPU:     physical $GPU -> logical cuda:0"
+echo "Graphics: Vulkan device $TOKENHSI_GRAPHICS_DEVICE_ID (override if Vulkan ordering differs)"
 echo "DISPLAY: $DISPLAY"
 cd "$COORD"
 python -u -m stack_planner.run_view \
     --task HumanoidMAStackPlannerView \
-    --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id 0 --physx --pipeline gpu \
+    --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id "$TOKENHSI_GRAPHICS_DEVICE_ID" --physx --pipeline gpu \
     --cfg_train "$EXEC_REPO/tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml" \
     --cfg_env "$CFG" \
     --motion_file "$EXEC_REPO/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" \

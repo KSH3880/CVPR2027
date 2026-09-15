@@ -2,7 +2,110 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-15
+
+### Retreat goal 유지와 동적 body/held-box 회피 학습
+
+- 매 retreat action에서 직전 world endpoint 대비 soft drift cost를 PPO reward에 추가했다.
+  default tolerance 0.10m, coefficient 0.10, bounded cost max 4이며 reset/최초 진입은 mask한다.
+  endpoint latch/수동 위험 event는 없고 현재 planner endpoint가 계속 실행/virtual box에 적용된다.
+- retreat A1의 전체 path consistency는 default scale 0.10으로 약화해 같은 goal을 유지하면서
+  우회하기 쉬워지게 했다. 기존 position-valid denominator를 유지하고 error contribution만
+  줄여 scale이 정규화에서 상쇄되지 않도록 했다. 실제 설정은 metrics/checkpoint extras에 남긴다.
+- 기존 root/box 거리 proxy에 real held box의 yaw/XYZ extent와 상대 비손 rigid-body 위치로
+  계산한 3D proximity cost(max-body penetration, weight 10)를 더했다. 자신의 box는 제외한다.
+  planner 전용 reward만 변경하므로 기존 non-planner task에는 영향이 없다.
+- 검증: unit test 24개, Python compile 및 diff check 통과. 로컬 GPU 1에서
+  `smoke_20260915_retreat_adapt`(8 env, horizon 4, low steps 6, 1 iteration)의
+  rollout/PPO/checkpoint 저장이 exit 0으로 완료됐다. 짧은 smoke이므로 실제 retreat 중
+  동적 회피 성능을 검증한 결과는 아니며 변경 reward로 추가 학습이 필요하다.
+
+### Planner virtual box Z를 바닥 기준으로 고정
+
+- virtual center Z를 STACK_GROUND_Z(default 0) + box_height/2로 설정한다. planner adapter에서
+  inherited Carry observation의 center/BPS/goal Z를 모두 같은 높이로 보정하며 실제 box 상태는
+  쓰거나 변경하지 않는다. 실제 box Z를 복사하던 viewer 코드도 제거해 동일 buffer Z를 그린다.
+  planner 없는 inherited task 코드는 변경하지 않았다.
+
+### Virtual box를 최신 planner 끝점에 무조건 배치
+
+- 사용자 요청대로 valid/installed/retreat_ready 조건을 virtual box 배치에서 제거했다.
+  매 output의 candidate 0, A1 마지막 world XY를 즉시 사용하며 view에서도 숨기지 않는다.
+  대기 중 실제 Carry token으로 되돌리던 override도 제거했다. 실행 path validity와 A2 gate는
+  별도 실행 정책으로 남지만 가상 box 생성/표시에는 관여하지 않는다. 기존 non-planner task는
+  변경하지 않았다.
+
+### Virtual retreat box를 planner world endpoint에 정렬
+
+- execution_view의 suffix 전체 평행이동을 제거했다. 첫 점만 현재 root에 연결하고 남은
+  suffix 샘플은 원래 world 좌표를 유지하며 마지막 점을 원본 planner endpoint와 정확히 맞춘다.
+  따라서 짧거나 zero-length suffix를 root로 옮겨 가상 box가 agent에 생기던 변환을 제거했다.
+- 미채택 대기 중에는 root 위치의 가상 box를 만들거나 표시하지 않는다. planner 전용
+  observation bridge는 실제 Carry token을 유지하고 zero steering으로 대기하며, 채택 이후에만
+  virtual token/wireframe을 사용한다. readiness는 A2 시작 뒤에도 유지하고 reset/새 retreat에서
+  해제한다. planner 없는 기존 task는 변경하지 않았다.
+- 검증: Python compile/기존 회귀와 endpoint 보존·zero-length suffix 회귀를 포함한 21개 검사
+  통과. 실제 native view 및 물리 대기 자세는 아직 검증하지 않았다.
+
+### 사용자 요청으로 retreat execution latch 제거
+
+- 매 active planner tick의 valid retreat suffix/path/virtual endpoint를 재설치한다.
+  retreat_ready는 최초 유효 후보 이전의 대기/A2 gate에만 쓰며 replan을 막지 않는다.
+  manual fallback 제거는 유지했고 planner 없는 task는 수정하지 않았다.
+- 매 retreat tick을 PPO decision으로 처리하며 clearance shaping도 매 설치마다 계산한다.
+  inherited 진행도 origin은 phase 진입 root를 유지해 replan마다 progress를 초기화하지 않는다.
+  moving-target 방지는 제거되므로 endpoint가 이동 중 변할 수 있다.
+
+### Planner 전용 retreat에서 manual fallback 제거
+
+- stack_planner/env_adapter.py subclass에서만 inherited manual retreat goal/path 생성 hook을
+  stationary hold로 override했다. invalid 후보이면 출발하거나 fallback을 latch하지 않고,
+  hold-position virtual box와 zero steering command를 유지하며 다음 planner decision을 기다린다.
+  유효 후보가 채택된 순간 learned suffix/path/endpoint와 virtual box를 함께 latch한다.
+- 미채택 hold target의 도달 판정이 A2를 조기 활성화하지 않도록 A2 goal activation과 phase
+  전환을 모두 latch 여부로 gate했다. invalid 대기 action은 invalid penalty만 기록하며 GAE
+  경계를 끊고, 채택 이후 continuation은 기존 actor mask/GAE 동작을 유지한다.
+- TokenHSI-masteer의 기존 sequential-stack/steer/base task는 수정하지 않았다. 따라서 planner
+  없는 기존 task에는 적용되지 않는다. Python compile 및 기존 단위검사 20개 통과.
+  실제 subclass를 mock state로 호출해 stationary hold/virtual-box 좌표와 미채택 env의 A2
+  activation/phase side-effect 차단도 통과했다. 실제 물리 rollout에서 대기 자세는 미검증이다.
+
+### Planner view의 GPU 선택과 원본/실행 path 시각화 분리
+
+- 단일 add_lines가 한 픽셀 실처럼 보여 경로를 구분하기 어려운 문제를 보완했다. 원본은
+  0.10m 흰 띠, 실행 path는 0.30m 색 띠, steering은 0.16m 띠로 표시하며 가상 box edge도
+  0.05m로 보강했다. Isaac Gym의 line-width 미지원은 촘촘한 평행 선으로 처리한다.
+
+- view launcher가 모든 Python 실행 전에 CUDA_VISIBLE_DEVICES를 설정하고,
+  TOKENHSI_GRAPHICS_DEVICE_ID와 graphics CLI ID를 명시한다. 기본 Vulkan ordinal은 MA_GPU와
+  같으며 Vulkan 장치 순서가 다르면 override할 수 있다. compute GPU 1과 graphics GPU 0이
+  함께 사용될 수 있던 launcher 설정을 제거했다.
+- 최신 candidate-0 원본 path는 흰 선, 실제 _gt_path는 분홍/주황, 정책 steering window는
+  cyan/green, observation-space virtual retreat box는 파란 wireframe으로 그린다. 설치되지
+  않거나 latch 때문에 무시된 원본도 실제 실행 path와 비교 가능하다.
+- inherited speed-run/decimation renderer 대신 dense 실행 구간과 끝점을 그린다.
+  phase/valid/installed/retreat_latched 변화는 콘솔에 출력하며 물리 actor는 변경하지 않는다.
+- 검증: bash syntax/Python compile 및 기존 순수 PyTorch 단위검사 20개 통과.
+  실제 native window와 Vulkan physical-device mapping은 아직 검증하지 않았다.
+
 ## 2026-09-14
+
+### A1 retreat를 단일 PPO option으로 고정
+
+- retreat 진입 첫 decision을 validity와 무관하게 latch한다. 유효한 learned suffix는 그대로
+  설치하고, invalid이면 phase 진입 때 만들어진 inherited outward fallback과 그 endpoint의
+  virtual box를 함께 고정한다. 따라서 invalid 뒤 후속 valid replan이 path와 virtual box를
+  이동 중에 갑자기 교체하지 못한다.
+- latch된 retreat의 후속 planner tick은 PPO actor decision에서 제외했다. 그동안의 physical
+  reward는 GAE를 통해 최초 retreat action으로 전달되며, 실행되지 않은 후속 샘플에는 붙지
+  않는다. route/validity shaping과 consistency도 실제 decision tick에만 적용한다.
+- invalid action은 fallback의 물리 성과를 자기 보상으로 가져가지 않도록 analytic penalty만
+  기록하고 GAE 경계를 끊는다. `planner_decision_rate`를 추가해 option continuation 비율을
+  확인할 수 있게 했다.
+- 로컬 physical GPU 1, `tokenhsi118`, 로컬 executor/stage1 checkpoint 배치를 기본으로 쓰는
+  `stack_planner/train_local_gpu1.sh`를 추가했다. 24-GB GPU에서 1024 env와 자동 기본값과 같은
+  8192 PPO minibatch의 backward를 smoke 검증해 기본 env 수를 1024로 두었으며, 기존 서버용
+  launcher의 GPU 7 기본값은 변경하지 않았다.
 
 ### A1 retreat moving-target 제거
 

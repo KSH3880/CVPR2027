@@ -118,7 +118,7 @@ def stack_trajectory_consistency_loss(
     position_error = F.smooth_l1_loss(
         sampled["position"], target["position"], reduction="none", beta=0.25,
     ).mean(dim=-1)
-    position_sum = (weight * position_error).sum()
+    position_sum = (weight * position_error * target.get("position_scale", 1.0)).sum()
     denominator = valid_count.clamp(min=1.0)
     position = position_sum / denominator
     return {

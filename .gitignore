@@ -71,6 +71,7 @@ nohup.out
 /runs/queue/status.json
 /runs/queue/dashboard_fingerprint.json
 /runs/queue/_legacy_*
+/runs/stack_planner/
 
 # Datasets and model assets
 **/tokenhsi/data/dataset_*

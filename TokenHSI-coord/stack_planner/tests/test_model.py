@@ -137,7 +137,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         reverse = ordered_box_goal_visit(path, goal, box, tolerance=0.0)
         self.assertGreater(float(reverse["penalty"]), float(ordered["penalty"]))
 
-    def test_execution_interpolates_to_goal_then_translates_same_suffix(self):
+    def test_execution_attaches_suffix_without_moving_world_endpoint(self):
         points = torch.tensor([
             [0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 1.0],
         ])
@@ -154,8 +154,18 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         retreat_mask = torch.tensor([[True, False]])
         mixed = execution_view(path, box, goal, retreat_mask)
         self.assertTrue(torch.equal(mixed[..., 0, :], path[..., 0, :]))
-        self.assertTrue(torch.allclose(mixed[0, 0, -1], torch.tensor([1.0, 1.0])))
+        self.assertTrue(torch.equal(mixed[0, 0, -1], path[0, 0, -1]))
         self.assertTrue(torch.equal(mixed[0, 1, -1], goal[0, 1]))
+
+    def test_zero_length_retreat_suffix_keeps_goal_not_root_as_endpoint(self):
+        points = torch.tensor([[0., 0.], [1., 0.], [2., 0.], [2., 0.]])
+        path = points[None, None].repeat(1, 2, 1, 1)
+        box = torch.tensor([[[1., 0.], [1., 0.]]])
+        goal = torch.tensor([[[2., 0.], [2., 0.]]])
+        retreat = execution_view(path, box, goal, torch.tensor([[True, False]]))
+        self.assertTrue(torch.equal(retreat[0, 0, 0], path[0, 0, 0]))
+        self.assertTrue(torch.equal(retreat[0, 0, -1], path[0, 0, -1]))
+        self.assertFalse(torch.equal(retreat[0, 0, -1], retreat[0, 0, 0]))
 
     def test_retreat_clearance_prefers_moving_away_over_crossing_box(self):
         safe = torch.tensor([[

@@ -36,22 +36,34 @@ goal보다 먼저 방문되도록 제한한다. 허용 반경은 기본 0.15 m�
 
 ### Frozen Carry execution bridge
 
+retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENALTY`(default 0.10)는
+직전 retreat world endpoint에서 tolerance(default 0.10m)를 초과한 변화의 제곱에 적용되며
+최대 cost는 4로 제한한다. 최초 retreat/reset에는 적용하지 않는다. 경로 전체 consistency는
+`STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE`(default 0.10)로 약화해 우회 경로 변경을 허용한다.
+충돌 cost에는 root/box proxy 외에도 다른 agent의 held box와 비손 rigid-body의 3D proximity가
+포함된다. endpoint 유지보다 회피가 유리해질 수 있으며 위험 접근 event나 수동 switch는 없다.
+
 학습 모델과 frozen agent 사이에서만 `execution.py`가 같은 path의 실행 구간을 만든다.
 
 - placement 전: ordered `box → carry goal` projection에서 goal의 arc 위치를 찾고,
   현재 root부터 그 위치까지를 33점으로 보간한다. 마지막 점은 실제 carry goal과 정확히 맞춘다.
-- placement 후: 같은 path의 goal 이후 suffix만 33점으로 보간하고, 시작점이 실제 현재 root가
-  되도록 suffix 전체를 평행이동한다. phase 2에 처음 들어온 유효 suffix와 그 끝점을 한 번만
-  latch하고, phase 2 동안 후속 replan이 A1 path·arc·virtual box를 바꾸지 못하게 한다.
-  그 고정 끝점을 기존 Carry 호환용 virtual box로 사용한다.
+- placement 후: 같은 path의 goal 이후 suffix만 33점으로 보간하고, 첫 점만 실제 현재 root에
+  연결한다. 나머지 world 좌표와 planner 원본 endpoint는 이동시키지 않는다.
+  매 phase 2 planner tick의 유효 suffix를 다시 설치하며
+  path·arc·virtual box도 함께 갱신한다. execution latch는 없으며 endpoint가 이동 중 변할 수 있다.
+  planner 전용 task는 phase 2 진입 시 manual retreat 대신 현재 위치의 stationary hold를
+  설치한다. invalid 후보는 invalid penalty만 받고 다음 decision에서 재평가하며, 유효 path를
+  채택하기 전에는 A2 goal 활성화/phase 전환도 막는다. 가상 box는 이 실행 gate와 무관하게
+  매 최신 planner 원본 world endpoint에 배치하고 항상 표시한다. retreat observation도 그
+  위치를 사용한다. 기존 planner 없는 task는 그대로다.
 - 두 구간 모두 이후 기존 0.1 m/320-point steering ABI로 다시 resample한다. 실행 속도는
   adapter가 고정 `MAX_SPEED`로 부여하며 모델은 속도를 예측하지 않는다.
 
 즉 33점은 항상 모델의 한 path다. carry용 33점과 retreat용 33점을 모델이 따로 출력하는
 구조가 아니다. 어느 구간을 frozen agent에 설치할지는 simulator의 실제 placement phase를
 사용하는 execution 문제이며, planner action이나 학습 head에는 switch가 없다.
-phase 2 완료 판정도 legacy manual retreat goal이 아니라 이 latched learned endpoint를 사용한다.
-phase 2 최초 execution suffix에는 놓인 Box1의 yaw/XY size를 반영한 oriented footprint
+phase 2 완료 판정도 legacy manual retreat goal이 아니라 최신 learned endpoint를 사용한다.
+phase 2의 매 설치 execution suffix에는 놓인 Box1의 yaw/XY size를 반영한 oriented footprint
 clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safety margin 0.10 m만큼
 팽창하며, release 직후 가까이 서 있는 것 자체보다 이후 point가 box 안쪽으로 파고들거나
 끝까지 안전 영역을 빠져나오지 않는 경로를 감점한다. 기본 계수는
@@ -105,6 +117,22 @@ STACK_PLANNER_ENVS=64 STACK_PLANNER_ITERS=200 \
   bash TokenHSI-coord/stack_planner/train.sh stack_planner_v0_s0
 ```
 
+로컬 physical GPU 1에서는 로컬 checkpoint 배치와 `tokenhsi118` 환경을 사용하는
+전용 wrapper를 실행한다. 기본 env 수는 24-GB GPU에서 실제 PPO backward까지 검증한
+1024이다.
+
+```bash
+bash TokenHSI-coord/stack_planner/train_local_gpu1.sh local_stack_s0
+```
+
+짧은 smoke는 다음처럼 실행한다.
+
+```bash
+STACK_PLANNER_ENVS=8 STACK_PLANNER_ITERS=1 \
+STACK_PLANNER_HORIZON=8 STACK_PLANNER_LOW_STEPS=6 \
+  bash TokenHSI-coord/stack_planner/train_local_gpu1.sh local_stack_smoke
+```
+
 metric, sidecar, planner checkpoint는 `runs/stack_planner/<tag>/`에만 저장된다.
 `metrics.jsonl`에는 reward 항 외에 planner/executor 품질을 직접 읽을 수 있는 다음 metric을
 iteration마다 기록한다.
@@ -155,7 +183,12 @@ bash TokenHSI-coord/stack_planner/view.sh \
 ```
 
 로컬 desktop에 Isaac Gym 창을 직접 띄우며 noVNC를 사용하지 않는다. 기본 물리 GPU는 0이고
-`MA_GPU=1`처럼 바꿀 수 있다. 현재 `DISPLAY`를 사용하고 값이 없으면 `:0`을 쓴다. 여러
+`MA_GPU=1`처럼 바꿀 수 있다. graphics Vulkan ID도 기본적으로 같은 번호를 사용하며,
+Vulkan 순서가 CUDA physical 순서와 다르면 `TOKENHSI_GRAPHICS_DEVICE_ID`로 override한다.
+흰 선은 최신 planner 원본, 분홍/주황 선은 실제 실행 path, cyan/green은 정책 steering
+window, 파란 wireframe box는 retreat observation 속 가상 box다. invalid/slicing 상태 때문에
+원본과 실행 path가 다를 수 있으며 콘솔의 `valid/installed/retreat_ready`로 구분한다.
+현재 `DISPLAY`를 사용하고 값이 없으면 `:0`을 쓴다. 여러
 scene을 보고 싶으면 세 번째 인자에 env 수를 주고, 재계획 주기는
 `STACK_PLANNER_REPLAN_STEPS`로 바꿀 수 있다. 실행 속도 command는 replan 경계에서 즉시
 점프하지 않고 기본 `0.75m/s²` 제한으로 고정 목표 속도까지 이동한다.

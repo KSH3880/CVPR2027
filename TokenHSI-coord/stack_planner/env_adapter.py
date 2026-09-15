@@ -19,7 +19,9 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_sequential_stack_carry impor
     HumanoidMASequentialStackCarry,
 )
 from stack_planner.reward import StackPhysicalState
-from stack_planner.constraints import free_path_validity
+from stack_planner.constraints import (
+    free_path_validity, retreat_endpoint_change_cost, held_box_body_cost,
+)
 from stack_planner.execution import execution_view, retreat_box_geometry
 from tokenhsi.utils import steer_path as sp
 
@@ -85,10 +87,15 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         if self._planner_command_accel <= 0.0:
             raise ValueError("STACK_PLANNER_COMMAND_ACCEL must be positive")
         self._planner_virtual_retreat_pos = self._a1_retreat_pos.clone()
-        # Agent 1's retreat is a committed execution, not a receding target.
-        # One path is installed on entry to A1_RETREAT and kept until the
-        # phase ends, even though the planner continues producing full paths.
-        self._planner_retreat_latched = torch.zeros(
+        # Readiness gates A2 while awaiting the first valid planner retreat;
+        # it never blocks subsequent replans or fixes the retreat endpoint.
+        self._planner_retreat_ready = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device
+        )
+        self._planner_endpoint_history_valid = torch.zeros_like(self._planner_retreat_ready)
+        self._planner_endpoint_change_cost = torch.zeros(self.num_envs, device=self.device)
+        # Every active planner tick is a new decision, including retreat.
+        self._planner_policy_decision = torch.ones(
             self.num_envs, dtype=torch.bool, device=self.device
         )
         self._planner_retreat_box_path_penalty = torch.zeros(
@@ -150,7 +157,10 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         super()._reset_envs(env_ids)
         if hasattr(self, "_planner_virtual_retreat_pos") and len(env_ids):
             self._planner_virtual_retreat_pos[env_ids] = self._a1_retreat_pos[env_ids]
-            self._planner_retreat_latched[env_ids] = False
+            self._planner_retreat_ready[env_ids] = False
+            self._planner_endpoint_history_valid[env_ids] = False
+            self._planner_endpoint_change_cost[env_ids] = 0.0
+            self._planner_policy_decision[env_ids] = True
             self._planner_retreat_box_path_penalty[env_ids] = 0.0
             self._planner_retreat_box_min_clearance[env_ids] = 0.0
             rows = self.agent_rows(env_ids)
@@ -227,9 +237,69 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         original = self._a1_retreat_pos[env_ids].clone()
         try:
             self._a1_retreat_pos[env_ids] = self._planner_virtual_retreat_pos[env_ids]
-            return super()._virtual_retreat_carry_obs(rows, env_ids)
+            obs = super()._virtual_retreat_carry_obs(rows, env_ids).clone()
+            # The inherited bridge uses real box Z for its center, BPS and
+            # goal. Correct all three in observation space only. Its inverse
+            # heading transform is yaw-only, so a world Z shift is local Z.
+            ground = float(os.environ.get("STACK_GROUND_Z", "0.0"))
+            height = ground + 0.5 * self._box_lib._box_size[rows, 2]
+            real_z = self.humanoid_rows(self._box_states)[rows, 2]
+            dz = height - real_z
+            # Carry layout: velocity(3), angular velocity(3), center(3),
+            # rotation(6), BPS(3*N), placement goal(3).
+            obs[:, 8] += dz
+            bps = obs[:, 15:-3].reshape(len(rows), -1, 3)
+            bps[..., 2] += dz[:, None]
+            obs[:, -1] += dz
+            self._planner_virtual_retreat_pos[env_ids, 2] = height
+            return obs
         finally:
             self._a1_retreat_pos[env_ids] = original
+
+    def _update_retreat_goal(self, env_ids):
+        """Planner-only phase entry: no inherited outward retreat target."""
+        if not len(env_ids):
+            return
+        rows = self.agent_rows(env_ids).reshape(-1, 2)[:, 0]
+        root = self.humanoid_rows(self._humanoid_root_states)[rows, :3].clone()
+        self._a1_retreat_start[env_ids] = root[:, :2]
+        self._a1_retreat_dir[env_ids] = 0.0
+        self._a1_retreat_pos[env_ids] = root
+        if hasattr(self, "_planner_virtual_retreat_pos"):
+            self._planner_retreat_ready[env_ids] = False
+            self._planner_endpoint_history_valid[env_ids] = False
+
+    def _activate_retreat_steer(self, env_ids):
+        """Hold at phase-entry root until a learned retreat is accepted."""
+        if not len(env_ids):
+            return
+        rows = self.agent_rows(env_ids).reshape(-1, 2)[:, 0]
+        self._gt_path[rows] = self._a1_retreat_start[env_ids, None, :]
+        self._s_end[rows] = 0.0
+        self._arc_root[rows] = 0.0
+        self._arc_box[rows] = 0.0
+        self._prev_arc[rows] = 0.0
+        self._mscale[rows] = 0.0
+        self._prev_retreat_dist[env_ids] = 0.0
+
+    def _planner_a2_ready_ids(self, env_ids):
+        env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        if not hasattr(self, "_planner_retreat_ready"):
+            return env_ids
+        waiting = ((self._stack_phase[env_ids] == self.A1_RETREAT)
+                   & ~self._carry_rehearsal[env_ids]
+                   & ~self._planner_retreat_ready[env_ids])
+        return env_ids[~waiting]
+
+    def _activate_a2_top_goal(self, env_ids):
+        # Parent completion sees zero distance to a hold target. Prevent its
+        # side effects as well as the phase transition until a plan is accepted.
+        super()._activate_a2_top_goal(self._planner_a2_ready_ids(env_ids))
+
+    def _set_phase(self, env_ids, phase):
+        if phase == self.A2_RESUME:
+            env_ids = self._planner_a2_ready_ids(env_ids)
+        super()._set_phase(env_ids, phase)
 
     @torch.no_grad()
     def install_external_plan(self, output):
@@ -238,14 +308,24 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         phase = self._stack_phase
         active = carry_rows(phase, self._carry_rehearsal)
         retreat_env = (phase == self.A1_RETREAT) & ~self._carry_rehearsal
-        # Leaving phase 2 releases the latch for the next episode/rollback.
-        # The virtual endpoint value itself is retained so parked A1 keeps a
-        # stable Carry observation after A2 becomes active.
-        self._planner_retreat_latched &= retreat_env
-        new_retreat = retreat_env & ~self._planner_retreat_latched
+        # Retain the accepted virtual endpoint after A2 starts. Reset or a new
+        # retreat entry clears readiness, not simply leaving phase 2.
         retreat_rows = torch.zeros_like(active)
         retreat_rows[:, 0] = retreat_env
         model_path = output["path_world"][:, 0]
+        self._planner_endpoint_change_cost = retreat_endpoint_change_cost(
+            model_path[:, 0, -1], self._planner_virtual_retreat_pos[:, :2],
+            retreat_env & self._planner_endpoint_history_valid,
+            float(os.environ.get("STACK_PLANNER_RETREAT_ENDPOINT_TOLERANCE", "0.10")),
+        )
+        self._planner_endpoint_history_valid.copy_(retreat_env)
+        # Always use the raw world endpoint, without validity/readiness gates.
+        self._planner_virtual_retreat_pos[:, :2] = model_path[:, 0, -1]
+        a1_rows = self.all_rows().reshape(self.num_envs, 2)[:, 0]
+        self._planner_virtual_retreat_pos[:, 2] = (
+            float(os.environ.get("STACK_GROUND_Z", "0.0"))
+            + 0.5 * self._box_lib._box_size[a1_rows, 2]
+        )
         path = execution_view(
             model_path, state.box_xyz[..., :2], state.goal_xy, retreat_rows
         )
@@ -256,6 +336,7 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         valid = free_path_validity(
             output["path_world"], model_speed, state.root_xy, active
         )[:, 0]
+        self._planner_policy_decision = active.any(dim=-1)
 
         # Inactive roots are stationary for the safety projection.
         projected = torch.where(
@@ -266,12 +347,8 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         safe = separation.amin(dim=-1) >= 0.8
 
         install = valid[:, None] & active
-        # Do not reset A1's dense path or arc progress once retreat has been
-        # committed. Otherwise re-anchoring the suffix at every current root
-        # turns its endpoint into an unreachable moving target.
-        install[:, 0] &= ~self._planner_retreat_latched
         endpoint = path[:, 0, -1]
-        commit_retreat = new_retreat & install[:, 0]
+        commit_retreat = retreat_env & install[:, 0]
         self._planner_retreat_box_path_penalty.zero_()
         self._planner_retreat_box_min_clearance.zero_()
         if commit_retreat.any():
@@ -282,23 +359,22 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
             self._planner_retreat_box_min_clearance[commit_retreat] = geometry[
                 "minimum_clearance"
             ]
-            self._planner_virtual_retreat_pos[commit_retreat, :2] = endpoint[
-                commit_retreat
-            ]
             # The inherited phase-2 completion test must judge the exact same
             # learned endpoint that the frozen executor sees, not the legacy
             # manually generated retreat goal/direction.
-            root = state.root_xy[commit_retreat, 0]
+            # Keep the phase-entry progress origin even as targets replan.
+            root = self._a1_retreat_start[commit_retreat]
             delta = endpoint[commit_retreat] - root
             distance = delta.norm(dim=-1, keepdim=True)
             old_direction = self._a1_retreat_dir[commit_retreat]
             direction = torch.where(
                 distance > 1e-4, delta / distance.clamp(min=1e-4), old_direction
             )
-            self._a1_retreat_start[commit_retreat] = root
             self._a1_retreat_dir[commit_retreat] = direction
             self._a1_retreat_pos[commit_retreat, :2] = endpoint[commit_retreat]
-            self._planner_retreat_latched[commit_retreat] = True
+            self._planner_retreat_ready[commit_retreat] = True
+        # Invalid candidates leave the execution path untouched. The virtual
+        # box still follows the latest raw planner endpoint, with no fallback.
         if install.any():
             dense, dense_speed, end = _resample_unified_plan(path, speed)
             flat_install = install.reshape(-1)
@@ -350,7 +426,13 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         )
         speed_to_window = self.steer_m_nom / MAX_SPEED
         planned = speed_to_window * self._planner_command_speed[rows]
-        return torch.where(self._planner_applied[rows], planned, nominal)
+        command = torch.where(self._planner_applied[rows], planned, nominal)
+        env_ids = torch.div(rows, self.num_agents, rounding_mode="floor")
+        waiting = ((rows % self.num_agents == 0)
+                   & (self._stack_phase[env_ids] == self.A1_RETREAT)
+                   & ~self._carry_rehearsal[env_ids]
+                   & ~self._planner_retreat_ready[env_ids])
+        return torch.where(waiting, torch.zeros_like(command), command)
 
     def _compute_task_obs(self, env_ids=None):
         if hasattr(self, "_planner_command_speed"):
@@ -407,7 +489,17 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         bb = F.relu(radius.sum(-1) + 0.15 - (box[:, 0] - box[:, 1]).norm(dim=-1)).square()
         hb01 = F.relu(0.35 + radius[:, 1] - (root[:, 0] - box[:, 1]).norm(dim=-1)).square()
         hb10 = F.relu(0.35 + radius[:, 0] - (root[:, 1] - box[:, 0]).norm(dim=-1)).square()
-        return hh + bb + 0.5 * (hb01 + hb10)
+        # Root-distance proxies miss a carried box striking the other torso,
+        # legs or arms. Add a 3D oriented-box cost using real rigid-body state.
+        rigid = self.humanoid_rows(self._rigid_body_pos).reshape(self.num_envs, 2, -1, 3)
+        keep = torch.ones(rigid.shape[2], dtype=torch.bool, device=self.device)
+        keep[self._key_body_ids[[0, 1]]] = False
+        sizes = self._box_lib._box_size.reshape(self.num_envs, 2, 3)
+        body01 = held_box_body_cost(rigid[:, 0, keep], state.box_xyz[:, 1],
+                                   state.box_heading[:, 1], sizes[:, 1], state.held[:, 1])
+        body10 = held_box_body_cost(rigid[:, 1, keep], state.box_xyz[:, 0],
+                                   state.box_heading[:, 0], sizes[:, 0], state.held[:, 0])
+        return hh + bb + 0.5 * (hb01 + hb10) + 10.0 * (body01 + body10)
 
     def planner_fall(self):
         bottom_lost = self.extras.get(

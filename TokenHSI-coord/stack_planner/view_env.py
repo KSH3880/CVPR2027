@@ -6,6 +6,9 @@ import os
 from pathlib import Path
 
 import torch
+import numpy as np
+
+from tokenhsi.utils import steer_path as sp
 
 from .checkpoint import load_stack_checkpoint
 from .env_adapter import HumanoidMAStackPlannerTrain
@@ -37,6 +40,8 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._stack_planner_replans = 0
         self._stack_planner_invalid = 0
         self._stack_planner_unsafe = 0
+        self._stack_planner_latest_path = None
+        self._stack_planner_status = None
         self._stack_planner_view_ready = True
         self._compute_observations()
         print(
@@ -47,6 +52,8 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
             ),
             flush=True,
         )
+        print("[stack-planner-view] white=latest raw model output; pink/orange=executed path; "
+              "cyan/green=policy steering window; blue wire box=virtual retreat box", flush=True)
 
     def _update_marker(self):
         """Do not submit disabled multi-task actor IDs from the viewer.
@@ -73,12 +80,115 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         # Viewer batches are intentionally small. Replanning the whole batch
         # keeps the install ABI simple and makes phase changes immediately visible.
         output = self._stack_planner(self.planner_state())
+        self._stack_planner_latest_path = output["path_world"][:, 0].detach().clone()
         valid, safe = self.install_external_plan(output)
+        status = (phase.cpu().tolist(), valid.cpu().tolist(),
+                  self._planner_plan_installed.cpu().tolist(),
+                  self._planner_retreat_ready.cpu().tolist())
+        if status != self._stack_planner_status:
+            print("[stack-planner-view] phase={} valid={} installed={} retreat_ready={}"
+                  .format(*[item[:4] for item in status]), flush=True)
+            self._stack_planner_status = status
         self._stack_planner_replans += self.num_envs
         self._stack_planner_invalid += int((~valid).sum())
         self._stack_planner_unsafe += int((valid & ~safe).sum())
         self._stack_planner_tick.copy_(self.progress_buf)
         self._stack_planner_last_phase.copy_(phase)
+
+    def _draw_task(self):
+        """Show raw proposals separately from the actual executor buffers.
+
+        Do not use the inherited speed-run renderer: its point decimation and
+        run filtering can omit short curves and endpoints entirely.
+        """
+        if self.viewer is None:
+            return
+        self.gym.clear_lines(self.viewer)
+        if getattr(self, "_stack_planner_latest_path", None) is None:
+            return
+        raw = self._stack_planner_latest_path.cpu().numpy()
+        dense = self._gt_path.cpu().numpy()
+        ends = self._s_end.cpu().numpy()
+        roots = self.humanoid_rows(self._humanoid_root_states)
+        arc = self._arc_root
+        window = self._m_at(arc)
+        off = torch.arange(1, self.steer_k + 1, device=self.device) / self.steer_k
+        query = torch.minimum(arc[:, None] + window[:, None] * off,
+                              self._s_end[:, None])
+        q = (query / sp.DS).clamp(0, sp.V - 2)
+        lo = q.floor().long()
+        rows = torch.arange(self._rows, device=self.device)[:, None]
+        steering = (self._gt_path[rows, lo] + (q - lo)[..., None]
+                    * (self._gt_path[rows, lo + 1] - self._gt_path[rows, lo]))
+        steering = steering.cpu().numpy()
+        root_np = roots.cpu().numpy()
+        virtual = self._planner_virtual_retreat_pos.cpu().numpy()
+        sizes = self._box_lib._box_size.cpu().numpy()
+        phase = self._stack_phase.cpu().numpy()
+
+        def lines(env, points, color, width=0.10):
+            points = np.asarray(points, dtype=np.float32)
+            if len(points) < 2 or not np.isfinite(points).all():
+                return
+            start, finish = points[:-1], points[1:]
+            delta = finish - start
+            # Isaac Gym add_lines has no line-width argument.  Overlapping
+            # parallel segments create a visible world-space ribbon instead
+            # of a one-pixel thread, including at a distant top camera.
+            normal = np.column_stack((-delta[:, 1], delta[:, 0],
+                                      np.zeros(len(delta))))
+            norm = np.linalg.norm(normal, axis=-1, keepdims=True)
+            normal = normal / np.maximum(norm, 1e-6)
+            vertical = norm[:, 0] < 1e-6
+            normal[vertical] = (1.0, 0.0, 0.0)
+            offsets = np.linspace(-width / 2, width / 2,
+                                  max(3, int(np.ceil(width / 0.008)) + 1))
+            shift = offsets[:, None, None] * normal[None]
+            segments = np.concatenate((start[None] + shift, finish[None] + shift),
+                                      axis=-1).reshape(-1, 6).astype(np.float32)
+            colors = np.tile(np.asarray(color, dtype=np.float32), (len(segments), 1))
+            self.gym.add_lines(self.viewer, env, len(segments), segments, colors)
+
+        def lifted(points, z):
+            return np.column_stack((points, np.full(len(points), z)))
+
+        for e, env in enumerate(self.envs):
+            for a in range(self.num_agents):
+                r = e * self.num_agents + a
+                lines(env, lifted(raw[e, a], 0.14 + 0.02 * a), (1.0, 1.0, 1.0),
+                      width=0.10)
+                end_q = np.clip(ends[r] / sp.DS, 0, sp.V - 2)
+                end_lo = int(np.floor(end_q))
+                endpoint = (dense[r, end_lo] + (end_q - end_lo)
+                            * (dense[r, end_lo + 1] - dense[r, end_lo]))
+                executed = np.concatenate((dense[r, :end_lo + 1], endpoint[None]))
+                lines(env, lifted(executed, 0.05 + 0.02 * a),
+                      (1.0, 0.15, 0.65) if a == 0 else (1.0, 0.55, 0.1),
+                      width=0.30)
+                lines(env, lifted(np.concatenate((root_np[r:r + 1, :2], steering[r])),
+                                  root_np[r, 2]),
+                      (0.1, 0.95, 1.0) if a == 0 else (0.35, 1.0, 0.35),
+                      width=0.16)
+            if not self._carry_rehearsal[e].item():
+                r = e * self.num_agents
+                # Match observation-space position, size and yaw footprint,
+                # without moving or creating any physical simulator actor.
+                boxes = self.humanoid_rows(self._box_states)
+                pos = virtual[e].copy()
+                yaw = self._yaw(boxes[r:r + 1])[0].item()
+                c, s = np.cos(yaw), np.sin(yaw)
+                corners = np.array([[x, y, z] for z in (-1, 1)
+                                    for y in (-1, 1) for x in (-1, 1)], dtype=np.float32)
+                corners *= sizes[r] / 2
+                xy = corners[:, :2].copy()
+                corners[:, 0] = c * xy[:, 0] - s * xy[:, 1]
+                corners[:, 1] = s * xy[:, 0] + c * xy[:, 1]
+                corners += pos
+                for i in range(8):
+                    for bit in (1, 2, 4):
+                        j = i ^ bit
+                        if i < j:
+                            lines(env, corners[[i, j]], (0.1, 0.5, 1.0), width=0.05)
 
     def _compute_task_obs(self, env_ids=None):
         if getattr(self, "_stack_planner_view_ready", False):

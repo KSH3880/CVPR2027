@@ -17,7 +17,7 @@ def execution_view(
     goal_xy: torch.Tensor,
     retreat: torch.Tensor,
 ) -> torch.Tensor:
-    """Interpolate root->carry-goal or translate goal->endpoint to current root.
+    """Interpolate carry prefix or attach retreat suffix without moving its end.
 
     The planner itself always emits the same complete path.  This function is
     only the frozen Carry compatibility boundary.  It finds the goal visit
@@ -70,14 +70,12 @@ def execution_view(
     )
     sampled = sampled.reshape_as(path)
 
-    # Before placement, Carry must see its real carry goal as the exact path
-    # endpoint.  Afterwards the learned suffix is translated—not regenerated—
-    # so it begins at the actual current root.
-    shift = path[..., :1, :] - sampled[..., :1, :]
-    sampled = torch.where(retreat[..., None, None], sampled + shift, sampled)
+    # Attach the first suffix segment to the current root. All remaining
+    # suffix samples stay in their predicted world coordinates: translating
+    # the whole suffix also moved the virtual box, sometimes onto the root.
     sampled[..., 0, :] = path[..., 0, :]
     sampled[..., -1, :] = torch.where(
-        retreat[..., None], sampled[..., -1, :], goal_xy,
+        retreat[..., None], path[..., -1, :], goal_xy,
     )
     return sampled
 

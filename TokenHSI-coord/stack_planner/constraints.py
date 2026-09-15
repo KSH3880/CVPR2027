@@ -148,6 +148,25 @@ def retreat_box_clearance(
     }
 
 
+def retreat_endpoint_change_cost(current, previous, mask, tolerance=0.10):
+    """Soft, bounded world-space goal drift cost, never a goal latch."""
+    drift = (current - previous).norm(dim=-1)
+    return (drift - tolerance).clamp(min=0.0, max=2.0).square() * mask.float()
+
+
+def held_box_body_cost(body_xyz, box_xyz, box_yaw, box_size, held,
+                       body_radius=0.08, margin=0.15):
+    """Other-agent non-hand body proximity to an oriented held box (3D)."""
+    delta = body_xyz - box_xyz[:, None, :]
+    c, s = torch.cos(box_yaw)[:, None], torch.sin(box_yaw)[:, None]
+    local = torch.stack((c * delta[..., 0] + s * delta[..., 1],
+                         -s * delta[..., 0] + c * delta[..., 1],
+                         delta[..., 2]), dim=-1)
+    q = local.abs() - box_size[:, None, :] / 2
+    sdf = q.clamp(min=0).norm(dim=-1) + q.amax(-1).clamp(max=0)
+    return (body_radius + margin - sdf).clamp(min=0).square().amax(-1) * held.float()
+
+
 def free_path_validity(
     path: torch.Tensor, speed: torch.Tensor, root_xy: torch.Tensor,
     active: torch.Tensor,
