@@ -47,6 +47,7 @@ export MS_SCEN MS_GAP MS_DT MS_W MS_L MS_SEP MS_ENC_R
 # 보상·명령 knob. 여기 빠지면 값을 줘도 안 먹는데 **아무 오류도 안 난다** --
 # MS_CLIP 이 실제로 그렇게 조용히 무시됐다 (arc_end 가 안 잘려서 발견).
 export MS_VEL_W MS_VEL_K MS_ENDCLAMP MS_CLIP MS_DT_RAND MS_DT_SET MS_DECEL MS_PLACEBO MS_RECOV MS_DBG MS_GRADCHK
+export MS_TOKEN_MASK MS_TOKEN_ZERO
 mkdir -p "$(dirname "$MS_METRICS")"
 
 CFG_SRC=tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml

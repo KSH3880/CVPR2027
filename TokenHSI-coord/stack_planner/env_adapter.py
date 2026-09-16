@@ -8,6 +8,7 @@ needed by the currently coupled low-level policy.
 from __future__ import annotations
 
 import os
+import math
 
 import torch
 import torch.nn.functional as F
@@ -89,6 +90,14 @@ class HumanoidMAStackPlannerTrain(
         ))
         if self._planner_command_accel <= 0.0:
             raise ValueError("STACK_PLANNER_COMMAND_ACCEL must be positive")
+        self._planner_a2_stable_delay = float(os.environ.get(
+            "STACK_PLANNER_A2_STABLE_DELAY", "1.0"
+        ))
+        if self._planner_a2_stable_delay < 0.0:
+            raise ValueError("STACK_PLANNER_A2_STABLE_DELAY must be non-negative")
+        self._planner_a2_stable_delay_steps = int(math.ceil(
+            self._planner_a2_stable_delay / float(self.dt)
+        ))
         self._planner_virtual_retreat_pos = self._a1_retreat_pos.clone()
         # Readiness gates A2 while awaiting the first valid planner retreat;
         # it never blocks subsequent replans or fixes the retreat endpoint.
@@ -291,11 +300,14 @@ class HumanoidMAStackPlannerTrain(
 
     def _planner_a2_ready_ids(self, env_ids):
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
-        if not hasattr(self, "_planner_retreat_ready"):
+        if not hasattr(self, "_planner_a2_stable_delay_steps"):
             return env_ids
-        waiting = ((self._stack_phase[env_ids] == self.A1_RETREAT)
-                   & ~self._carry_rehearsal[env_ids]
-                   & ~self._planner_retreat_ready[env_ids])
+        # A2 handoff is governed only by continuous bottom-box stability:
+        # declare the placement stable, wait one second, then launch.  Neither
+        # A1's travelled distance nor its learned endpoint gates A2 anymore.
+        required = self.stack_stable_steps + self._planner_a2_stable_delay_steps
+        waiting = (~self._carry_rehearsal[env_ids]
+                   & (self._bottom_stable_count[env_ids] < required))
         return env_ids[~waiting]
 
     def _activate_a2_top_goal(self, env_ids):
@@ -307,6 +319,42 @@ class HumanoidMAStackPlannerTrain(
         if phase == self.A2_RESUME:
             env_ids = self._planner_a2_ready_ids(env_ids)
         super()._set_phase(env_ids, phase)
+
+    def _update_stack_coordinator(self):
+        """Use stable-bottom + fixed delay for planner-only A2 handoff."""
+        super()._update_stack_coordinator()
+        if not hasattr(self, "_planner_a2_stable_delay_steps"):
+            return
+
+        # The inherited coordinator can wait for hand clearance before opening
+        # retreat.  For planner training, physical bottom stability alone opens
+        # retreat so A1 gets the whole one-second overlap window to clear out.
+        phase = self._stack_phase
+        open_retreat = torch.nonzero(
+            (phase == self.VERIFY_BOTTOM)
+            & ~self._carry_rehearsal
+            & (self._bottom_stable_count >= self.stack_stable_steps),
+            as_tuple=False,
+        ).squeeze(-1)
+        if len(open_retreat):
+            self._commit_top_goal(open_retreat)
+            self._update_retreat_goal(open_retreat)
+            self._activate_retreat_steer(open_retreat)
+            self._set_phase(open_retreat, self.A1_RETREAT)
+
+        # Do not wait for retreat endpoint/distance completion.  Once the
+        # bottom box has stayed stable for one additional second, expose A2's
+        # committed top goal and start it immediately.
+        required = self.stack_stable_steps + self._planner_a2_stable_delay_steps
+        launch_a2 = torch.nonzero(
+            (self._stack_phase == self.A1_RETREAT)
+            & ~self._carry_rehearsal
+            & (self._bottom_stable_count >= required),
+            as_tuple=False,
+        ).squeeze(-1)
+        if len(launch_a2):
+            self._activate_a2_top_goal(launch_a2)
+            self._set_phase(launch_a2, self.A2_RESUME)
 
     @torch.no_grad()
     def install_external_plan(self, output):

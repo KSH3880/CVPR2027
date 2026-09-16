@@ -53,19 +53,27 @@ def decode_action(
 
 
 class StackPlannerActorCritic(nn.Module):
-    def __init__(self, planner: StackTrajectoryPlanner, init_std: float = 0.15):
+    def __init__(self, planner: StackTrajectoryPlanner, curve_std: float = 0.12,
+                 endpoint_std: float = 0.20, anchor_std: float = 0.03):
         super().__init__()
+        if min(curve_std, endpoint_std, anchor_std) <= 0.0:
+            raise ValueError("planner exploration stds must be positive")
         self.planner = planner
         path_n, self.action_dim = _sizes(planner)
-        std = torch.full((self.action_dim,), float(init_std))
-        # Preserve a mostly executable route prior while letting the endpoint
-        # explore whether it should remain at the Carry goal or move away.
-        std[:path_n] = 0.03
+        # Keep box/goal anchors precise, but give Bézier controls enough range
+        # to discover actual curved avoidance paths.  The old uniform 0.03
+        # path std moved a control by only about 9 cm after residual scaling,
+        # so PPO almost exclusively explored straight endpoint changes.
+        std = torch.full((self.action_dim,), float(anchor_std))
         path_per_candidate = (AGENTS * 6 + 3) * 2
         for candidate in range(planner.config.candidates):
             base = candidate * path_per_candidate
-            endpoint = base + AGENTS * 6 * 2
-            std[endpoint:endpoint + 2] = 0.20
+            for agent in range(AGENTS):
+                controls = base + (agent * 6 + 2) * 2
+                std[controls:controls + 8] = float(curve_std)
+            suffix = base + AGENTS * 6 * 2
+            std[suffix:suffix + 2] = float(endpoint_std)
+            std[suffix + 2:suffix + 6] = float(curve_std)
         self.action_log_std = nn.Parameter(std.log())
 
     def distribution(self, state: CoordinatorState):

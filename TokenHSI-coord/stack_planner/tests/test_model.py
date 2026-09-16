@@ -251,6 +251,23 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertEqual(decoded["path_world"].shape, (3, 1, 2, STACK_PATH_POINTS, 2))
         self.assertTrue(torch.isfinite(output["path_world"]).all())
 
+    def test_curve_controls_explore_more_than_route_anchors(self):
+        policy = StackPlannerActorCritic(
+            StackTrajectoryPlanner(StackPlannerConfig(candidates=1))
+        )
+        std = policy.action_log_std.exp()
+        # Agent-0 junction/goal anchors remain precise; its four Bézier
+        # controls receive enough variance to discover curved paths.
+        self.assertTrue(torch.allclose(std[0:4], torch.full((4,), 0.03)))
+        self.assertTrue(torch.allclose(std[4:12], torch.full((8,), 0.12)))
+        suffix = AGENTS * 6 * 2
+        self.assertTrue(torch.allclose(
+            std[suffix:suffix + 2], torch.full((2,), 0.20)
+        ))
+        self.assertTrue(torch.allclose(
+            std[suffix + 2:suffix + 6], torch.full((4,), 0.12)
+        ))
+
     def test_path_backward_reaches_transformer(self):
         state = make_state(batch=1)
         policy = StackPlannerActorCritic(

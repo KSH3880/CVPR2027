@@ -16,6 +16,57 @@ import torch.nn as nn
 import math
 import os
 
+
+def _token_mask_positions(spec, task_names, extra_ids, new_major_id,
+                          old_major_id, how_many_new_tasks):
+    """Resolve semantic ablation names to positions in the Transformer input.
+
+    The adapt actor does not concatenate tokens in ``task_names`` order.  Its
+    actual order is ``weight, self, extras..., new-major, old-tasks...``.
+    Keeping this translation here avoids brittle experiment knobs such as
+    "mask token 4", whose meaning changes when another extra token is added.
+    """
+    requested = [value.strip() for value in spec.split(",") if value.strip()]
+    if not requested:
+        return {}
+
+    task_pos = {}
+    for offset, task_id in enumerate(extra_ids):
+        task_pos[task_id] = 2 + offset
+    task_pos[new_major_id] = 2 + len(extra_ids)
+    old_start = 2 + len(extra_ids) + 1
+    for task_id in range(how_many_new_tasks, len(task_names)):
+        task_pos[task_id] = old_start + task_id - how_many_new_tasks
+
+    aliases = {
+        "teammate": [extra_ids[0]] if extra_ids else [],
+        "steer": [extra_ids[1]] if len(extra_ids) > 1 else [],
+        "new_carry": [new_major_id]
+        if task_names[new_major_id] == "new_carry" else [],
+        "old_carry": [old_major_id]
+        if task_names[old_major_id] == "old_carry" else [],
+    }
+    aliases["carry"] = aliases["new_carry"] + aliases["old_carry"]
+
+    resolved = {}
+    for name in requested:
+        if name not in aliases:
+            raise ValueError(
+                "unknown MS_TOKEN_MASK={!r}; expected a comma-separated subset "
+                "of teammate,steer,carry,new_carry,old_carry".format(name))
+        ids = aliases[name]
+        if not ids:
+            raise ValueError(
+                "MS_TOKEN_MASK={!r} is unavailable for task tokens {}".format(
+                    name, task_names))
+        for task_id in ids:
+            if task_id not in task_pos:
+                raise ValueError(
+                    "cannot map task token {!r} to Transformer position".format(
+                        task_names[task_id]))
+            resolved[task_names[task_id]] = task_pos[task_id]
+    return resolved
+
 class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
     def __init__(self, **kwargs):
@@ -185,9 +236,41 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
                 self.extra_task_obs_size = self.task_obs_each_size[self.extra_id]
                 self.mask_teammate_token = os.environ.get("MA_TOKEN", "live") == "mask"
                 self.teammate_token_pos = 2
+                self.token_mask_positions = _token_mask_positions(
+                    os.environ.get("MS_TOKEN_MASK", ""),
+                    self.each_subtask_name,
+                    self.extra_ids,
+                    self.new_major_id,
+                    self.old_major_id,
+                    self.how_many_new_tasks,
+                )
+                self.token_zero_positions = _token_mask_positions(
+                    os.environ.get("MS_TOKEN_ZERO", ""),
+                    self.each_subtask_name,
+                    self.extra_ids,
+                    self.new_major_id,
+                    self.old_major_id,
+                    self.how_many_new_tasks,
+                )
                 if self.mask_teammate_token:
                     print("[ma] teammate token: exact attention mask (MA_TOKEN=mask)",
                           flush=True)
+                if self.token_mask_positions:
+                    detail = ", ".join(
+                        "{}@{}".format(name, pos)
+                        for name, pos in sorted(
+                            self.token_mask_positions.items(),
+                            key=lambda item: item[1]))
+                    print("[ma-steer] exact token mask (MS_TOKEN_MASK): {}".format(
+                        detail), flush=True)
+                if self.token_zero_positions:
+                    detail = ", ".join(
+                        "{}@{}".format(name, pos)
+                        for name, pos in sorted(
+                            self.token_zero_positions.items(),
+                            key=lambda item: item[1]))
+                    print("[ma-steer] zero token padding (MS_TOKEN_ZERO): {}".format(
+                        detail), flush=True)
 
             ######## the first trainable task tokenizer
             s = self.task_obs_each_size[self.new_major_id]
@@ -585,6 +668,13 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
             else:
                 x = torch.cat((weight_token, self_token, new_task_token, task_token), dim=1)
 
+            if self.has_extra and self.token_zero_positions:
+                # Keep the token slots in attention, but remove their encoded
+                # values.  This intentionally differs from MS_TOKEN_MASK:
+                # zero tokens still participate in the softmax denominator.
+                x = x.clone()
+                x[:, list(self.token_zero_positions.values())] = 0.0
+
             # compute key padding mask
             src_key_padding_mask = torch.ones((B, x.shape[1]), dtype=torch.bool, device=x.device) # init to all True
             src_key_padding_mask[:, [0, 1]] = False
@@ -596,6 +686,9 @@ class AMPTransformerMultiTaskAdaptBuilder(AMPBuilder):
 
             if self.has_extra and self.mask_teammate_token:
                 src_key_padding_mask[:, self.teammate_token_pos] = True
+
+            if self.has_extra and self.token_mask_positions:
+                src_key_padding_mask[:, list(self.token_mask_positions.values())] = True
 
             if getattr(self, "use_hier_steer", False) and self.hier_target == "traj":
                 # Exact stage1 low-level path: mask newly added teammate/new

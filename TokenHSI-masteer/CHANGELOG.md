@@ -778,3 +778,24 @@ Bottom-box 추종 모드에서 A1 retreat 중 support가 움직인 경우에도 
 좌표로 path를 시작하지 않도록 수정했다. A2 활성화 순간 현재 bottom pose로 top target과
 committed bottom/yaw를 다시 계산한 다음 최초 steering path를 생성하며, 활성화 이후에는
 기존처럼 매 step bottom 이동량을 target/path에 반영한다.
+
+## 2026-09-16
+
+### ms18 steer/carry 토큰 분리 ablation
+
+`MS_TOKEN_MASK`를 추가해 학습된 체크포인트의 토큰을 값 0이 아니라 Transformer
+attention의 key/value에서 정확히 제외할 수 있게 했다. 숫자 위치 대신
+`teammate`, `steer`, `carry`, `new_carry`, `old_carry` 이름을 받으며 쉼표로 조합할 수
+있다. `carry`는 adapt 구조의 `new_carry`와 pretrained `old_carry`를 모두 가리킨다.
+ms18 기본 mask에서는 `old_carry`가 이미 비활성이고 `new_carry`만 활성이라,
+`MS_TOKEN_MASK=carry`의 실질적 추가 조작은 활성 `new_carry`를 빼고
+`weight+self+steer`만 남기는 것이다. `MA_TOKEN=mask`와도 합집합으로 동작한다.
+
+기본값은 빈 문자열이라 기존 체크포인트 동작을 바꾸지 않는다. 실행 시 실제로 제외한
+토큰 이름과 Transformer 위치를 `[ma-steer] exact token mask ...`로 출력하며, 알 수
+없는 이름이나 해당 태스크에 없는 토큰은 조용히 무시하지 않고 `ValueError`로 종료한다.
+
+같은 이름 문법의 `MS_TOKEN_ZERO`도 추가했다. `MS_TOKEN_ZERO=carry`는
+`new_carry`·`old_carry` 임베딩 값을 Transformer 입력에서 0으로 만들지만 토큰 위치는
+attention softmax에 남긴다. 따라서 `MS_TOKEN_MASK=carry`(완전 부재)와
+`MS_TOKEN_ZERO=carry`(zero padding)의 차이를 같은 체크포인트에서 직접 비교할 수 있다.

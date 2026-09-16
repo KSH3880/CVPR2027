@@ -34,7 +34,8 @@ from stack_planner.env_adapter import HumanoidMAStackPlannerTrain  # noqa: E402
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner  # noqa: E402
 from stack_planner.policy import StackPlannerActorCritic  # noqa: E402
 from stack_planner.reward import (  # noqa: E402
-    StackIntervalCosts, StackPhysicalState, compute_stack_planner_reward,
+    StackIntervalCosts, StackPhysicalState, StackRewardConfig,
+    compute_stack_planner_reward,
 )
 from utils.config import get_args, load_cfg, set_np_formatting, set_seed  # noqa: E402
 
@@ -88,7 +89,7 @@ def _refresh_obs(player):
 
 
 @torch.no_grad()
-def _macro_step(player, before, valid, safe, low_steps):
+def _macro_step(player, before, valid, safe, low_steps, reward_config):
     task = player.env.task
     n = task.num_envs
     collision = torch.zeros(n, device=task.device)
@@ -175,7 +176,7 @@ def _macro_step(player, before, valid, safe, low_steps):
         "bottom_postplace_intervals": (postplace_steps > 0).float(),
     }
     return (
-        compute_stack_planner_reward(before, after, interval),
+        compute_stack_planner_reward(before, after, interval, reward_config),
         done_env,
         diagnostics,
     )
@@ -287,9 +288,23 @@ def main():
         planner, payload = load_stack_checkpoint(init, device)
     else:
         planner = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).to(device)
-    policy = StackPlannerActorCritic(planner).to(device)
+    curve_std = _env_float("STACK_PLANNER_CURVE_STD", 0.12)
+    endpoint_std = _env_float("STACK_PLANNER_ENDPOINT_STD", 0.20)
+    anchor_std = _env_float("STACK_PLANNER_ANCHOR_STD", 0.03)
+    policy = StackPlannerActorCritic(
+        planner, curve_std=curve_std, endpoint_std=endpoint_std,
+        anchor_std=anchor_std,
+    ).to(device)
     if payload and payload.get("extras", {}).get("action_log_std") is not None:
-        policy.action_log_std.data.copy_(payload["extras"]["action_log_std"].to(device))
+        loaded_log_std = payload["extras"]["action_log_std"].to(device)
+        if loaded_log_std.shape != policy.action_log_std.shape:
+            raise ValueError("checkpoint action_log_std shape mismatch")
+        # Resuming an older straight-path run must not silently restore its
+        # 0.03 curve exploration. Preserve any larger learned std, while the
+        # configured initialization acts as a per-dimension resume floor.
+        policy.action_log_std.data.copy_(torch.maximum(
+            loaded_log_std, policy.action_log_std.detach()
+        ))
     optimizer = torch.optim.Adam(policy.parameters(), lr=_env_float("STACK_PLANNER_LR", 3e-4))
     if payload and "optimizer_state" in payload:
         optimizer.load_state_dict(payload["optimizer_state"])
@@ -301,7 +316,7 @@ def main():
     gamma = _env_float("STACK_PLANNER_GAMMA", 0.99)
     gae_lambda = _env_float("STACK_PLANNER_GAE", 0.95)
     consistency_coef = _env_float("STACK_PLANNER_CONSISTENCY_COEF", 1.0)
-    retreat_path_scale = _env_float("STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE", 0.10)
+    retreat_path_scale = _env_float("STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE", 0.05)
     endpoint_penalty_coef = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_PENALTY", 0.10)
     endpoint_tolerance = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_TOLERANCE", 0.10)
     if not 0 <= retreat_path_scale <= 1 or endpoint_penalty_coef < 0 or endpoint_tolerance < 0:
@@ -311,11 +326,17 @@ def main():
     visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
     visit_tolerance = _env_float("STACK_PLANNER_VISIT_TOLERANCE", 0.15)
     retreat_box_penalty_coef = _env_float(
-        "STACK_PLANNER_RETREAT_BOX_PENALTY", 10.0
+        "STACK_PLANNER_RETREAT_BOX_PENALTY", 25.0
+    )
+    bottom_disturbance_weight = _env_float(
+        "STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT", 2.0
     )
     if (visit_penalty_coef < 0 or visit_tolerance < 0
-            or retreat_box_penalty_coef < 0):
+            or retreat_box_penalty_coef < 0 or bottom_disturbance_weight < 0):
         raise ValueError("stack planner path-shaping coefficients must be non-negative")
+    reward_config = StackRewardConfig(
+        bottom_disturbance_weight=bottom_disturbance_weight,
+    )
     output_dir = Path(os.environ.get(
         "STACK_PLANNER_OUTPUT", str(WORKSPACE / "runs/stack_planner/default")
     )).expanduser().resolve()
@@ -335,8 +356,11 @@ def main():
     _refresh_obs(player)
     print(f"[stack-planner-train] envs={task.num_envs} horizon={horizon} "
           f"low_steps={low_steps} consistency={consistency_coef:g} "
+          f"curve_std={curve_std:g} endpoint_std={endpoint_std:g} "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
+          f"bottom_disturbance_weight={bottom_disturbance_weight:g} "
+          f"a2_stable_delay={task._planner_a2_stable_delay:g}s "
           f"minibatch={minibatch} optimizer_steps={optimizer_steps} "
           f"iterations={iterations} frozen={args.checkpoint}",
           flush=True)
@@ -385,6 +409,10 @@ def main():
                 )
                 valid, safe = task.install_external_plan(output)
                 decision = task._planner_policy_decision.clone()
+                retreat_decision = (
+                    (task._stack_phase == task.A1_RETREAT)
+                    & ~task._carry_rehearsal
+                ).clone()
                 if consistency_coef > 0.0:
                     consistency_target["valid"] &= decision[:, None, None, None]
                     scale = torch.ones_like(consistency_target["position"][..., 0])
@@ -406,8 +434,19 @@ def main():
             scored_valid = valid | ~decision
             scored_safe = safe | ~decision
             terms, done, macro_diag = _macro_step(
-                player, before, scored_valid, scored_safe, low_steps
+                player, before, scored_valid, scored_safe, low_steps,
+                reward_config,
             )
+            # Retreat is collision-driven.  The task potential contains an
+            # A1-box distance/clearance increase, which would otherwise teach
+            # "go farther" in addition to avoiding contact.  Keep potential
+            # learning for placement/stacking, but remove it from decisions
+            # sampled while A1 is retreating.
+            terms["retreat_potential_delta_removed"] = torch.where(
+                retreat_decision, terms["potential_delta"],
+                torch.zeros_like(terms["potential_delta"]),
+            )
+            terms["total"] -= terms["retreat_potential_delta_removed"]
             route_penalty = visit["penalty"][:, 0].mean(dim=-1)
             terms["route_visit_penalty"] = (
                 -visit_penalty_coef * route_penalty * decision.float()
@@ -542,10 +581,14 @@ def main():
             "visit_penalty_coef": visit_penalty_coef,
             "visit_tolerance": visit_tolerance,
             "retreat_box_penalty_coef": retreat_box_penalty_coef,
+            "bottom_disturbance_weight": bottom_disturbance_weight,
             "planner_decision_rate": float(flat_decision.float().mean()),
             "retreat_path_consistency_scale": retreat_path_scale,
             "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
             "retreat_endpoint_tolerance": endpoint_tolerance,
+            "curve_std": curve_std,
+            "endpoint_std": endpoint_std,
+            "anchor_std": anchor_std,
             **planner_metrics,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
@@ -553,6 +596,7 @@ def main():
         print("[stack-planner-train] " + " ".join(
             f"{key}={value:.5g}" for key, value in metrics.items()
             if key in {"iteration", "reward", "done_rate", "potential_delta",
+                       "retreat_potential_delta_removed",
                        "humanoid_fall_penalty", "route_visit_penalty",
                        "retreat_box_path_penalty",
                        "retreat_box_endpoint_clearance",
@@ -569,11 +613,15 @@ def main():
                         "consistency_coef": consistency_coef,
                         "commit_steps": low_steps,
                         "retreat_path_consistency_scale": retreat_path_scale,
+                        "curve_std": curve_std,
+                        "endpoint_std": endpoint_std,
+                        "anchor_std": anchor_std,
                         "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
                         "retreat_endpoint_tolerance": endpoint_tolerance,
                         "visit_penalty_coef": visit_penalty_coef,
                         "visit_tolerance": visit_tolerance,
-                        "retreat_box_penalty_coef": retreat_box_penalty_coef},
+                        "retreat_box_penalty_coef": retreat_box_penalty_coef,
+                        "bottom_disturbance_weight": bottom_disturbance_weight},
             )
 
 

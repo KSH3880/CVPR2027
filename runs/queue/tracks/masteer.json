@@ -97,7 +97,9 @@
     "MS_VEL_K",
     "MS_ENDCLAMP",
     "MS_GRADCHK",
-    "MS_CLIP"
+    "MS_CLIP",
+    "MS_TOKEN_MASK",
+    "MS_TOKEN_ZERO"
   ],
   "forbidden_env": [],
   "seed_env": "MS_SEED",

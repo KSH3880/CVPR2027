@@ -3,30 +3,56 @@
 # and requires both the frozen stage-1 checkpoint and the trained adapt policy.
 set -u
 
-ROOT=/home/hwanhee/juan/CVPR2027
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 TAG=${1:?usage: eval_one.sh <tag> <gpu> [envs]}
 GPU=${2:?usage: eval_one.sh <tag> <gpu> [envs]}
 ENVS=${3:-512}
+SOURCE=${QUEUE_EVAL_SOURCE:-$TAG}
 # MS_EVAL_SUFFIX 는 호출자가 준다. 잠금·로그·지표를 여기서 갈라야 정상 평가와
 # 대조군 평가가 서로 막지 않는다. 체크포인트와 cfg 는 원래 TAG 를 그대로 쓴다.
 SUF=${MS_EVAL_SUFFIX:-}
 if [ -n "$SUF" ]; then TAG_OUT="${TAG}__${SUF}"; else TAG_OUT="$TAG"; fi
 CLAIM=$ROOT/runs/queue/gpu_locks/eval_$TAG_OUT
-LOG=~/juan/CVPR2027/runs/queue/logs/eval_$TAG_OUT.log
-ENV_FILE=$ROOT/runs/queue/logs/$TAG.env
+LOG=$ROOT/runs/queue/logs/eval_$TAG_OUT.log
+ENV_FILE=$ROOT/runs/queue/logs/$SOURCE.env
 
+mkdir -p "$ROOT/runs/queue/gpu_locks" "$ROOT/runs/queue/logs"
 if ! mkdir "$CLAIM" 2>/dev/null; then
-    echo "masteer eval: $TAG_OUT is already claimed" >&2
+    if [ -d "$CLAIM" ]; then
+        echo "masteer eval: $TAG_OUT is already claimed: $CLAIM" >&2
+    else
+        echo "masteer eval: claim 생성 실패: $CLAIM" >&2
+    fi
     exit 3
 fi
 trap 'rm -rf "$CLAIM"' EXIT
 printf '%s\n' "$GPU" > "$CLAIM/gpu"
 
-if [ ! -f "$ENV_FILE" ]; then
+if [ -f "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+
+    # 예전 sidecar는 미지정 값도 export NAME=''로 기록했다. 숫자 설정에서
+    # int('')/float('')가 되지 않도록 replay 시 원래 의미인 unset으로 복원한다.
+    while IFS= read -r name; do
+        if [ -z "${!name}" ]; then
+            unset "$name"
+        fi
+    done < <(sed -n 's/^export \([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$ENV_FILE")
+elif [ "$SOURCE" = ms18_maskteam_origscale_c06_s0 ] && \
+        [ -f "$ROOT/TokenHSI-masteer/output/${SOURCE}_00009000.pth" ]; then
+    # 이 체크아웃에는 서버 sidecar 대신 배포된 epoch-9000 PTH만 있다. 아래 값은
+    # 당시 PLAN 큐 행과 train_local 기본값에 기록된 ms18의 정확한 학습 profile이다.
+    export MS_MODE=adapt MS_TASK=HumanoidMASteerCarry
+    export MS_TRAINCFG=tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml
+    export MS_AGENTS=2 MS_ENVS=2048 MS_CP=4 MS_SPACING=5 MS_ITERS=9000 MS_SEED=0
+    export MA_TOKENIZER_ZERO=1 MA_TOKEN=mask MA_SEP=0 MA_SPAWN_GAP=1.0 MA_C=0 MA_BETA=0
+    export MS_MRAND=4 MS_M_LO=0.25 MS_VEL_W=1 MS_REWARD_OUTER=1 MS_POS_C=0.6
+    export MS_CLIP=1 MS_SCEN=free MS_ZERO=0 MS_GRADCHK=1
+    echo "masteer eval: recovered documented ms18 profile (standalone epoch-9000 PTH)"
+else
     echo "masteer eval: missing $ENV_FILE; refusing to guess training settings" >&2
     exit 4
 fi
-source "$ENV_FILE"
 
 # 같은 정책을 다른 시나리오 설정으로 재평가하는 통로.
 #
@@ -46,7 +72,9 @@ if [ -n "${MS_EVAL_OVERRIDE:-}" ]; then
     echo "masteer eval: override $MS_EVAL_OVERRIDE"
 fi
 
-CK=$(python3 - "$ROOT/TokenHSI-masteer/output/masteer/$TAG" <<'PY'
+CK=${QUEUE_EVAL_CKPT:-}
+if [ -z "$CK" ]; then
+CK=$(python3 - "$ROOT/TokenHSI-masteer/output/masteer/$SOURCE" <<'PY'
 import sys
 from pathlib import Path
 
@@ -55,9 +83,42 @@ if paths:
     print(max(paths, key=lambda path: path.stat().st_mtime))
 PY
 )
-TRAIN_ENV=$ROOT/runs/gen_cfgs/masteer/$TAG.yaml
+fi
+if [ -z "$CK" ] && [ "$SOURCE" = ms18_maskteam_origscale_c06_s0 ]; then
+    CK=$ROOT/TokenHSI-masteer/output/${SOURCE}_00009000.pth
+fi
+if [ -n "$CK" ] && [ ! -f "$CK" ]; then
+    echo "masteer eval: checkpoint 없음: $CK" >&2
+    exit 4
+fi
+TRAIN_ENV=$ROOT/runs/gen_cfgs/masteer/$SOURCE.yaml
+if [ ! -f "$TRAIN_ENV" ] && [ "$SOURCE" = ms18_maskteam_origscale_c06_s0 ] && [ -f "$CK" ]; then
+    # 역사적 generated cfg와 현재 base cfg의 차이는 A=2, env 수, spacing,
+    # contact-pair 상한뿐이다. 같은 기계적 변환으로 원본을 복원한다.
+    mkdir -p "$(dirname "$TRAIN_ENV")"
+    python3 - "$ROOT/TokenHSI-masteer/tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml" "$TRAIN_ENV" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+src, dst = sys.argv[1:]
+text = Path(src).read_text()
+text = re.sub(r"^  numAgents:.*$", "  numAgents: 2", text, flags=re.M)
+text = re.sub(r"^  numEnvs:.*$", "  numEnvs: 2048", text, flags=re.M)
+text = re.sub(r"^  envSpacing:.*$", "  envSpacing: 5", text, flags=re.M)
+text = re.sub(
+    r"^(\s*)default_buffer_size_multiplier:",
+    r"\1max_gpu_contact_pairs: 4194304\n\1default_buffer_size_multiplier:",
+    text,
+    count=1,
+    flags=re.M,
+)
+Path(dst).write_text(text)
+PY
+    echo "masteer eval: recovered generated cfg: $TRAIN_ENV"
+fi
 if [ -z "$CK" ] || [ ! -f "$TRAIN_ENV" ]; then
-    echo "masteer eval: missing checkpoint or generated env config for $TAG" >&2
+    echo "masteer eval: missing checkpoint or generated env config for $SOURCE" >&2
     exit 4
 fi
 
@@ -70,28 +131,52 @@ text = re.sub(r"^  numEnvs:.*$", f"  numEnvs: {sys.argv[3]}", text, flags=re.M)
 open(sys.argv[2], "w").write(text)
 PY
 
-TRAIN_CFG=${MS_TRAINCFG:-~/CVPR2027/TokenHSI-masteertokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml}
-if [ -f "$ROOT/runs/gen_cfgs/masteer/${TAG}_train.yaml" ]; then
-    TRAIN_CFG=$ROOT/runs/gen_cfgs/masteer/${TAG}_train.yaml
+TRAIN_CFG=${MS_TRAINCFG:-tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml}
+if [ -f "$ROOT/runs/gen_cfgs/masteer/${SOURCE}_train.yaml" ]; then
+    TRAIN_CFG=$ROOT/runs/gen_cfgs/masteer/${SOURCE}_train.yaml
 fi
-BASE_CKPT=${MS_CKPT:-~/CVPR2027/TokenHSI-masteer/output/tokenhsi/ckpt_stage1.pth}
+BASE_CKPT=${MS_CKPT:-}
+if [ -z "$BASE_CKPT" ]; then
+    for candidate in \
+        "$ROOT/TokenHSI-masteer/output/tokenhsi/ckpt_stage1.pth" \
+        "$ROOT/TokenHSI-masteer/output/ckpt_stage1.pth" \
+        "$ROOT/TokenHSI/output/tokenhsi/ckpt_stage1.pth"; do
+        if [ -f "$candidate" ]; then BASE_CKPT=$candidate; break; fi
+    done
+fi
+if [ -z "$BASE_CKPT" ] || [ ! -f "$BASE_CKPT" ]; then
+    echo "masteer eval: stage1 checkpoint 없음. MS_CKPT로 지정한다." >&2
+    exit 4
+fi
 METRICS=$ROOT/runs/results/masteer/eval_$TAG_OUT.npy
 mkdir -p "$(dirname "$METRICS")"
 rm -f "$METRICS"
 
 cd "$ROOT/TokenHSI-masteer"
-source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
-conda activate tokenhsi
+if [ -z "${CONDA_BASE:-}" ]; then
+    if [ -n "${CONDA_EXE:-}" ]; then
+        CONDA_BASE=$("$CONDA_EXE" info --base)
+    elif command -v conda >/dev/null 2>&1; then
+        CONDA_BASE=$(conda info --base)
+    else
+        echo "masteer eval: conda를 찾지 못함" >&2
+        exit 1
+    fi
+fi
+set +u
+. "$CONDA_BASE/etc/profile.d/conda.sh"
+conda activate "${TOKENHSI_CONDA_ENV:-${CONDA_DEFAULT_ENV:-tokenhsi}}"
+set -u
 export CUDA_VISIBLE_DEVICES=$GPU
 # **env 코드가 읽는 이름은 MA_METRICS 다.** MS_METRICS 만 내보내면 지표가 안 쓰인다.
 export MS_METRICS=$METRICS
 export MA_METRICS=$METRICS
 
-python -u ~/CVPR2027/TokenHSI-masteer/tokenhsi/run.py \
+python -u ./tokenhsi/run.py \
     --task "${MS_TASK:-HumanoidMASteerCarry}" \
     --cfg_train "$TRAIN_CFG" \
     --cfg_env "$EVAL_ENV" \
-    --motion_file ~/CVPR2027/TokenHSI-masteer/tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+    --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --num_envs "$ENVS" --headless --seed "${MS_SEED:-0}" \
     --hrl_checkpoint "$BASE_CKPT" --checkpoint "$CK" \
     --test --eval --eval_task "${MS_EVAL_TASK:-carry}" > "$LOG" 2>&1

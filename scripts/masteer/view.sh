@@ -155,6 +155,7 @@ echo " 포워딩   ssh -L $PORT:localhost:$PORT $(hostname)"
 echo " 태그     $NAME   iter≈$ITER   (${AGE}초 전 저장본)"
 echo " 시나리오 ${MS_VIZ:-(직접지정)}"
  echo " env      $ENVS x 2명   배치=${MS_SCEN:-free}  지연=${MS_DT:-0}s  속도구간=${MS_MRAND:-0}  곡률=${MS_LAT_MAX:-2.2}  CLIP=${MS_CLIP:-1}"
+echo " token    teammate=${MA_TOKEN:-live}  exact-mask=${MS_TOKEN_MASK:-(없음)}  zero=${MS_TOKEN_ZERO:-(없음)}"
 [ -n "${VIDEO:-}" ] && echo " 영상     $VIDEO"
 echo "=============================================================="
 

@@ -6,8 +6,20 @@
 
 ### 고정 거리 대신 retreat 충돌 회피 shaping 강화
 
-- `STACK_RETREAT_DIST=1.5m`는 기존 실제 phase 완료 조건으로만 유지하고 predicted endpoint에
-  고정 거리 reward를 추가하지 않았다.
+- 직선 prior에서 곡선 우회를 거의 탐색하지 못하던 Bézier control std를 `0.03→0.12`로
+  높였다. box/goal anchor std는 `0.03`, A1 endpoint std는 `0.20`으로 유지하고 retreat path
+  consistency scale은 `0.10→0.05`로 낮췄다. 46도 invalid turn 제한은 유지한다.
+- Agent2를 피하다가 놓인 Box1을 치는 해를 억제하기 위해 retreat footprint penalty 기본값을
+  `10→25`, 실제 bottom-box displacement penalty weight를 `0.5→2.0`으로 높였다. 각각
+  `STACK_PLANNER_RETREAT_BOX_PENALTY`, `STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT`로 조절한다.
+- `A1_RETREAT`에서 선택된 planner transition은 total reward에서 `potential_delta`를 제거했다.
+  placement/A2 stack potential은 유지하되 retreat 중 A1-box 거리 증가 자체는 보상하지 않고,
+  collision·box disturbance·fall/time 및 analytic path collision penalty로 학습한다.
+- planner task의 A2 handoff를 A1 이동 거리/endpoint 완료와 분리했다. bottom box 안정 판정 즉시
+  retreat를 열고, 안정 상태가 추가로 1초(`STACK_PLANNER_A2_STABLE_DELAY`) 지속되면 A2를 바로
+  출발시킨다. planner 없는 sequential-stack task에는 영향을 주지 않는다.
+- planner task에서는 `STACK_RETREAT_DIST=1.5m`와 learned endpoint 도달을 A2 phase 전환에
+  사용하지 않으며, predicted endpoint에도 고정 거리 reward를 추가하지 않았다.
 - 놓인 box의 확장 footprint 안에서 retreat path가 끝나면 endpoint overlap penalty를 직접
   부과한다. footprint 밖으로 나온 뒤에는 더 멀리 갈수록 추가 reward를 주지 않는다.
 - valid plan으로 채택된 경로만 보던 기존 계산을 바꿔 모든 finite retreat 후보의 path와

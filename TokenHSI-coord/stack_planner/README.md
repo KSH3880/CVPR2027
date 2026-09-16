@@ -39,7 +39,10 @@ goal보다 먼저 방문되도록 제한한다. 허용 반경은 기본 0.15 m�
 retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENALTY`(default 0.10)는
 직전 retreat world endpoint에서 tolerance(default 0.10m)를 초과한 변화의 제곱에 적용되며
 최대 cost는 4로 제한한다. 최초 retreat/reset에는 적용하지 않는다. 경로 전체 consistency는
-`STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE`(default 0.10)로 약화해 우회 경로 변경을 허용한다.
+`STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE`(default 0.05)로 약화해 우회 경로 변경을 허용한다.
+Bezier control-point exploration std는 `STACK_PLANNER_CURVE_STD=0.12`, A1 suffix endpoint는
+`STACK_PLANNER_ENDPOINT_STD=0.20`, box/goal anchor residual은 `STACK_PLANNER_ANCHOR_STD=0.03`이다.
+따라서 anchor 정확도는 유지하면서 직선 endpoint 이동뿐 아니라 곡선 우회도 탐색한다.
 충돌 cost에는 root/box proxy 외에도 다른 agent의 held box와 비손 rigid-body의 3D proximity가
 포함된다. endpoint 유지보다 회피가 유리해질 수 있으며 위험 접근 event나 수동 switch는 없다.
 
@@ -52,8 +55,8 @@ retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENAL
   매 phase 2 planner tick의 유효 suffix를 다시 설치하며
   path·arc·virtual box도 함께 갱신한다. execution latch는 없으며 endpoint가 이동 중 변할 수 있다.
   planner 전용 task는 phase 2 진입 시 manual retreat 대신 현재 위치의 stationary hold를
-  설치한다. invalid 후보는 invalid penalty만 받고 다음 decision에서 재평가하며, 유효 path를
-  채택하기 전에는 A2 goal 활성화/phase 전환도 막는다. 가상 box는 이 실행 gate와 무관하게
+  설치한다. invalid 후보는 analytic collision/clearance penalty를 받고 다음 decision에서
+  재평가한다. 가상 box는 이 실행 gate와 무관하게
   매 최신 planner 원본 world endpoint에 배치하고 항상 표시한다. retreat observation도 그
   위치를 사용한다. 기존 planner 없는 task는 그대로다.
 - 두 구간 모두 이후 기존 0.1 m/320-point steering ABI로 다시 resample한다. 실행 속도는
@@ -62,12 +65,16 @@ retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENAL
 즉 33점은 항상 모델의 한 path다. carry용 33점과 retreat용 33점을 모델이 따로 출력하는
 구조가 아니다. 어느 구간을 frozen agent에 설치할지는 simulator의 실제 placement phase를
 사용하는 execution 문제이며, planner action이나 학습 head에는 switch가 없다.
-phase 2 완료 판정도 legacy manual retreat goal이 아니라 최신 learned endpoint를 사용한다.
+A2 출발은 learned endpoint 도달이나 A1 이동 거리로 판정하지 않는다. bottom box가 물리적으로
+안정화되면 A1 retreat를 열고, 그 안정 상태가 추가로 1초 유지되는 즉시 A2 goal을 활성화한다.
+대기 시간은 `STACK_PLANNER_A2_STABLE_DELAY`로 설정한다.
 phase 2의 매 설치 execution suffix에는 놓인 Box1의 yaw/XY size를 반영한 oriented footprint
 clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safety margin 0.10 m만큼
 팽창하며, release 직후 가까이 서 있는 것 자체보다 이후 point가 box 안쪽으로 파고들거나
 끝까지 안전 영역을 빠져나오지 않는 경로를 감점한다. 기본 계수는
-`STACK_PLANNER_RETREAT_BOX_PENALTY=10.0`이다.
+`STACK_PLANNER_RETREAT_BOX_PENALTY=25.0`이다. 실제 rollout에서 bottom box가 밀린 누적량도
+`STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT=2.0`으로 감점한다. 따라서 기본 agent-agent collision
+weight 1.0보다 box 경로 침범과 배치된 box 교란을 우선 회피한다.
 
 검증:
 
@@ -89,7 +96,10 @@ planner_reward = terms["total"]
 ```
 
 potential은 `bottom quality -> bottom quality * clearance -> bottom quality *
-clearance * top quality` 순서로 dependency를 구성한다. 고정 retreat 방향, GT path,
+clearance * top quality` 순서로 dependency를 구성하지만, `A1_RETREAT`에서 선택한 planner
+transition의 total reward에서는 `potential_delta`를 제거한다. 따라서 retreat는 실제 collision,
+box disturbance, fall/time과 analytic path collision penalty로 학습하며 A1-box 거리 증가 자체를
+보상하지 않는다. placement와 A2 stacking 구간의 potential 학습 신호는 유지한다. 고정 retreat 방향, GT path,
 virtual box 및 legacy Carry observation은 reward 입력에 포함하지 않는다. `collision`과
 `bottom_disturbance`는 짧은 접촉을 놓치지 않도록 planner macro interval 동안 simulator에서
 누적해 전달한다. `humanoid_fall`은 reset 전에 두 agent 중 하나라도 넘어졌는지를 latch한
