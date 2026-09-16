@@ -11,6 +11,9 @@
 # 선택값:
 #   TOKENHSI_CONDA_ENV=<env>, CONDA_BASE=<conda root>, MS_CKPT=<stage1 pth>
 #   TOKENHSI_DATA_ROOT=<원본 TokenHSI의 tokenhsi/data>
+#   MA_GPU=<물리 compute GPU index> (기본 0)
+#   VIEW_GRAPHICS_GPU=<물리 graphics GPU index> (기본 MA_GPU와 같음)
+#   VIEW_ENV_OVERRIDE_KEYS="MS_SCEN MS_DT"  sidecar보다 우선할 키를 명시
 #   LOCAL_HEADLESS=1  로컬 창 없이 기동 검증할 때만 사용
 #   MS_EVAL=1         final evaluation과 같은 loco 시작만 볼 때 사용
 set -eo pipefail
@@ -57,16 +60,22 @@ else
 fi
 
 # 태그로 실행할 때는 학습 당시 task와 reward/scenario 환경변수를 복원한다.
-# 호출자가 명시한 환경변수(ENVS, MS_CAM 또는 실험 override)는 그대로 우선한다.
+# 현재 셸에는 이전 태그를 source한 값이 남을 수 있으므로 sidecar를 기본 권위로 삼는다.
+# 의도적인 실험 override만 VIEW_ENV_OVERRIDE_KEYS에 키 이름을 명시해 보존한다.
 if [ -n "$SOURCE_TAG" ]; then
     ENV_FILE="$ROOT/runs/queue/logs/$SOURCE_TAG.env"
     if [ -f "$ENV_FILE" ]; then
         declare -A CALLER_ENV=()
-        while IFS= read -r key; do
+        override_keys=${VIEW_ENV_OVERRIDE_KEYS//,/ }
+        for key in $override_keys; do
+            if ! [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+                echo "VIEW_ENV_OVERRIDE_KEYS에 잘못된 키가 있다: $key" >&2
+                exit 2
+            fi
             if [ -n "${!key+x}" ]; then
                 CALLER_ENV["$key"]=${!key}
             fi
-        done < <(sed -n 's/^export \([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$ENV_FILE")
+        done
 
         . "$ENV_FILE"
 
@@ -109,6 +118,14 @@ fi
 if [ "${LOCAL_HEADLESS:-0}" = 0 ] && [ -z "${DISPLAY:-}" ]; then
     echo "DISPLAY가 없다. 데스크톱 터미널에서 실행하거나 LOCAL_HEADLESS=1로 검증한다." >&2
     exit 1
+fi
+if [ "${LOCAL_HEADLESS:-0}" = 0 ] && command -v xdpyinfo >/dev/null 2>&1; then
+    if ! xdpyinfo -display "$DISPLAY" 2>/dev/null | grep -w DRI3 >/dev/null; then
+        echo "현재 DISPLAY=$DISPLAY에 DRI3 확장이 없다." >&2
+        echo "Isaac Gym Vulkan viewer는 이 XWayland 세션에서 실행할 수 없다." >&2
+        echo "로그아웃 후 로그인 화면의 톱니바퀴에서 'Ubuntu on Xorg'를 선택한다." >&2
+        exit 2
+    fi
 fi
 
 # Git에 들어가지 않는 대용량 모션/오브젝트 데이터는 이미 받아 둔 원본 TokenHSI를
@@ -158,8 +175,53 @@ done
 . "$ROOT/scripts/masteer/viz_env.sh"
 viz_expand || exit 1
 
-# 단일 GPU 로컬 PC에서는 CUDA_VISIBLE_DEVICES나 MA_GPU를 지정하지 않는다.
-# 시스템이 노출한 기본 cuda:0을 그대로 쓴다.
+# 선택한 graphics GPU의 실제 Vulkan index를 UUID로 찾는다. compute와 graphics GPU가
+# 같으면 CUDA를 logical 0으로 마스킹하고, 다르면 물리 CUDA index를 그대로 사용한다.
+GPU=${MA_GPU:-0}
+GRAPHICS_GPU=${VIEW_GRAPHICS_GPU:-$GPU}
+if ! [[ "$GPU" =~ ^[0-9]+$ ]]; then
+    echo "MA_GPU는 음이 아닌 정수여야 한다: $GPU" >&2
+    exit 2
+fi
+for selected_gpu in "$GPU" "$GRAPHICS_GPU"; do
+    if ! [[ "$selected_gpu" =~ ^[0-9]+$ ]] || \
+       ! nvidia-smi -i "$selected_gpu" --query-gpu=uuid --format=csv,noheader >/dev/null 2>&1; then
+        echo "물리 GPU $selected_gpu를 nvidia-smi에서 찾을 수 없다" >&2
+        exit 2
+    fi
+done
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+if [ "$GPU" = "$GRAPHICS_GPU" ]; then
+    export CUDA_VISIBLE_DEVICES=$GPU
+    SIM_DEVICE=cuda:0
+else
+    unset CUDA_VISIBLE_DEVICES
+    SIM_DEVICE=cuda:$GPU
+fi
+export TOKENHSI_ALLOWED_GPUS=$GRAPHICS_GPU
+export TOKENHSI_VULKAN_ALLOW_EXTRA=1
+export TOKENHSI_VULKAN_OUTPUT_INDEX=1
+# GPU-backed Xorg에서는 NVIDIA/Isaac Gym이 고른 Vulkan 장치 순서를 그대로 써야 한다.
+# DRI_PRIME 또는 단일 ICD 강제는 이 로컬 드라이버에서 draw_viewer 세그폴트를 낸다.
+USE_SYSTEM_VULKAN=${TOKENHSI_USE_SYSTEM_VULKAN:-0}
+if [ "$USE_SYSTEM_VULKAN" = 1 ]; then
+    unset VK_ICD_FILENAMES VK_INSTANCE_LAYERS
+    export TOKENHSI_DRI_PRIME=none
+elif [ -z "${VK_ICD_FILENAMES:-}" ] && [ -f /usr/share/vulkan/icd.d/nvidia_icd.json ]; then
+    export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
+fi
+if [ -z "${TOKENHSI_DRI_PRIME:-}" ]; then
+    GRAPHICS_BUS=$(nvidia-smi -i "$GRAPHICS_GPU" --query-gpu=pci.bus_id \
+        --format=csv,noheader | tr '[:upper:]' '[:lower:]')
+    GRAPHICS_BUS=${GRAPHICS_BUS#0000}
+    export TOKENHSI_DRI_PRIME="pci-${GRAPHICS_BUS//[:.]/_}!"
+fi
+GRAPHICS_DEVICE_ID=$(python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GRAPHICS_GPU")
+if [ "$USE_SYSTEM_VULKAN" = 1 ]; then
+    unset DRI_PRIME
+else
+    export DRI_PRIME=$TOKENHSI_DRI_PRIME
+fi
 export MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_TOKEN=${MA_TOKEN:-live}
 export MA_SEP=${MA_SEP:-0}
@@ -252,6 +314,7 @@ echo "=============================================================="
 echo " 모드       $MODE${DISPLAY:+  DISPLAY=$DISPLAY}"
 echo " 정책       $CKPT"
 echo " task       ${MS_TASK:-HumanoidMASteerCarry}"
+echo " GPU        compute=$GPU ($SIM_DEVICE)  graphics=$GRAPHICS_GPU (Vulkan index $GRAPHICS_DEVICE_ID)"
 echo " stage1     $BASE_CKPT"
 echo " 데이터     $DATA_ROOT"
 echo " 시나리오   ${MS_VIZ:-(직접 지정)}"
@@ -269,5 +332,8 @@ python -u ./tokenhsi/run.py \
     --hrl_checkpoint "$BASE_CKPT" \
     --checkpoint "$SNAP" \
     --num_envs "$ENVS" \
+    --sim_device "$SIM_DEVICE" \
+    --graphics_device_id "$GRAPHICS_DEVICE_ID" \
+    --rl_device "$SIM_DEVICE" \
     --seed "$MS_SEED" \
     "${RUN_ARGS[@]}"

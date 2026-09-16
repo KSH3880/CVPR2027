@@ -868,10 +868,15 @@ class HumanoidTrajSitCarryClimb(Humanoid):
 
         asset_options.replace_cylinder_with_capsule = False # support cylinder
 
-        asset_root = "./"
         object_assets = []
         for urdf in object_urdfs:
-            object_assets.append(self.gym.load_asset(self.sim, asset_root, urdf, asset_options))
+            asset_root = os.path.dirname(urdf)
+            asset_file = os.path.basename(urdf)
+            object_assets.append(
+                self.gym.load_asset(
+                    self.sim, asset_root, asset_file, asset_options
+                )
+            )
 
         return object_assets
 

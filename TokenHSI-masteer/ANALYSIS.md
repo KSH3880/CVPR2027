@@ -1,5 +1,81 @@
 # TokenHSI-masteer 분석 기록
 
+## 2026-09-16 — ms67 epoch 9500: CLEAR 개선 뒤 STACK 안정화 병목
+
+### 평가 무결성과 설정
+
+- 대상: `ms67_ms18e9000_fade3_angle120_heading20_gate_stop_3000_s0`
+- checkpoint: `Humanoid_00009500.pth` (ms18 epoch 9000에서 추가 500 iteration)
+- 고정 평가: seed 0, 512 env, 90열 stage metric, `rc=0`
+- 실제 로그에서 checkpoint 로드, `retreat_dist=1.20–2.00 m`, box-relative
+  120–180도 random retreat, 3-step carry fade, `base_hold_r=0.10`,
+  `base_regrasp_pen_w=0.0`, `clear_bypass=0`을 확인했다.
+
+일반 `MS_EVAL_SUMMARY`의 carry harness 성공률은 `sr=0.8501`이다. 이 값은 부모 carry
+평가 성공률이며 sequential stack 성공률이 아니다. strict stack 성공은 별도 90열 stage
+metric의 success event로 판정한다. 이번에는 initial이나 다른 epoch 대조가 없으므로 아래
+결론은 e9500의 절대 funnel 진단이며 학습 향상량 판정은 아니다.
+
+원시 결과:
+
+- `runs/queue/logs/eval_ms67_ms18e9000_fade3_angle120_heading20_gate_stop_3000_s0__stage_e9500.log`
+- `runs/results/masteer/eval_ms67_ms18e9000_fade3_angle120_heading20_gate_stop_3000_s0__stage_e9500.npy`
+
+### 단계별 결과
+
+non-rehearsal base episode는 1,318개다.
+
+| 단계 | 전체 base 대비 | 조건부 통과율 |
+|---|---:|---:|
+| Base box PLACE | 1,010/1,318 = 0.766 | — |
+| RELEASE | 967/1,318 = 0.734 | PLACE 중 0.957 |
+| CLEAR→STACK 진입 | 616/1,318 = 0.467 | RELEASE 중 0.637 |
+| Top safety gate staged | 925/1,318 = 0.702 | — |
+| STACK 진입 후 Top above | 367/616 = 0.596 | STACK 진입 중 0.596 |
+| strict top-place 1 frame 이상 | 3/616 = 0.0049 | STACK 진입 중 0.0049 |
+| strict final success | 2/1,318 = 0.0015 | STACK 진입 중 0.0032 |
+
+역할별 pickup은 Base 0.873, Top 0.888이고, box 전달은 Base 0.768, Top 0.794다.
+PLACE 뒤 RELEASE는 95.7%라 손 떼기는 현재 주 병목이 아니다. CLEAR에서는 손 이격
+step 비율 0.789, 안정성 0.619이며, retreat arc p50/p95가 0.928/1.500 m다. 전체
+CLEAR 진입률 46.7%와 `clear_given_release=0.637`은 이전 CLEAR 실패 계열보다 충분한
+late-phase 표본을 만들지만 아직 episode 절반 이상은 STACK에 도달하지 못한다.
+
+STACK 진입 616건에서 Top은 상자를 잡은 채인 frame 비율이 0.972이고, 목표 거리 중앙값을
+1.061 m에서 최소 0.186 m까지 줄였다. 즉 Top의 grasp 유지와 큰 거리 접근은 작동한다.
+그러나 strict `top_place_ok` frame은 전체 STACK frame의 0.001뿐이고, 이를 한 frame이라도
+만족한 episode가 3개뿐이다. relaxed above 조건은 59.6%가 통과하는 반면 실제 성공에
+필요한 XY/Z, box 선·각속도, upright, base 위치, 15도 평행 조건의 동시 만족이 무너진다.
+최종 20-frame streak를 통과한 것은 2건이다.
+
+### Base HOLD와 하단 상자 이동
+
+Base box의 latch 이후 최대 XY 이동은 전체 p50/p95가 0.0535/0.2875 m다. STACK 진입
+여부로 나누면 차이가 크다.
+
+| 조건 | n | Base box 이동 p50 | p95 | max |
+|---|---:|---:|---:|---:|
+| STACK 진입 | 616 | 0.1429 m | 0.3213 m | 0.4060 m |
+| STACK 미진입 | 702 | 0.0193 m | 0.1524 m | 0.3257 m |
+| reason 6 실패 | 257 | 0.2443 m | 0.3562 m | 0.4060 m |
+| strict success | 2 | 0.0480 m | 0.0520 m | 0.0525 m |
+
+`STACK_DROP_XY=0.25`를 넘는 하단 상자 이동으로 종료된 reason 6은 257/1,318=0.195다.
+사용자 viewer 관찰에서는 STACK 전환 뒤 Base humanoid가 놓은 상자로 돌아가 다시 잡으려는
+행동이 보였다. 수치는 STACK 진입 뒤 하단 상자 이동과 실패가 커진다는 점에서 이 관찰과
+일치한다. 다만 현재 metric은 Base box 이동만 기록하므로, 이동 원인이 Base 재파지인지
+Top의 접근·충돌인지 비율까지 분리하지는 못한다.
+
+ms67은 STACK Base HOLD 보상이 최대 `0.10/frame`이고 명시적 Base regrasp penalty는 0이다.
+따라서 다음 `ms69`는 ms67 계약과 mandatory Top safety gate를 유지하면서 퇴각 거리를
+2–3 m로 늘리고 `STACK_BASE_HOLD_REWARD_W=0.50`만 강화한다. 우선 비교할 주 지표는
+reason 6 비율, STACK 진입 조건부 Base box displacement p50/p95, strict-place episode 수와
+최종 success다. HOLD 강화로 reason 6과 displacement가 내려가는데 strict place가 그대로면
+다음 병목은 Base HOLD가 아니라 Top의 정밀 위치·속도·평행 안정화로 판정한다.
+
+e9500은 전체 3000-iteration 학습 중 500 iteration 시점이므로 ms67 자체의 최종 채택·기각은
+e11000/e12000 동일 평가가 있어야 한다.
+
 ## 2026-09-12 — ms53 A2 direct carry-target 학습
 
 ### 설계

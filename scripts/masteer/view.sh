@@ -31,10 +31,29 @@
 # 태그 대신 .pth 경로를 직접 줘도 된다.
 # 원본 TokenHSI의 viewer/test처럼 기본은 학습 분포의 혼합 시작 skill을 쓴다.
 # final evaluation과 같은 loco 시작만 보려면 MS_EVAL=1을 준다.
+# 로컬 GPU 허용 목록이 서버와 다르면 명시적으로 연다:
+#   TOKENHSI_ALLOWED_GPUS=1 MA_GPU=1 PORT=6100 bash scripts/masteer/view.sh <tag>
 set -eo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-VNC_DIR=/home/hwanhee/opt/vnc
-NOVNC_DIR=/home/hwanhee/opt/novnc
+
+# 서버 번들과 로컬 패키지 설치를 모두 지원한다. 경로가 특수하면 환경변수로 지정한다.
+X11VNC=${TOKENHSI_X11VNC:-}
+if [ -z "$X11VNC" ]; then
+    if [ -x /home/hwanhee/opt/vnc/usr/bin/x11vnc ]; then
+        X11VNC=/home/hwanhee/opt/vnc/usr/bin/x11vnc
+    else
+        X11VNC=$(command -v x11vnc || true)
+    fi
+fi
+[ -n "$X11VNC" ] || { echo "x11vnc를 찾을 수 없습니다" >&2; exit 2; }
+
+NOVNC_DIR=${TOKENHSI_NOVNC_DIR:-}
+if [ -z "$NOVNC_DIR" ]; then
+    for candidate in /home/hwanhee/opt/novnc /usr/share/novnc /usr/local/share/novnc; do
+        if [ -d "$candidate" ]; then NOVNC_DIR=$candidate; break; fi
+    done
+fi
+[ -n "$NOVNC_DIR" ] || { echo "noVNC web 디렉터리를 찾을 수 없습니다" >&2; exit 2; }
 
 PORT=${PORT:-6100}
 TAG=${1:?사용법: view.sh <tag 또는 ckpt경로> [env수]}
@@ -77,20 +96,36 @@ DISP=":$DISPNUM"
 VNC_PORT=$((5900 + DISPNUM))
 
 cd $ROOT/TokenHSI-masteer
-source /home/hwanhee/anaconda3/etc/profile.d/conda.sh
-conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi_koo}"
+CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_koo}
+if [[ "${CONDA_DEFAULT_ENV:-}" != "$CONDA_ENV" ]]; then
+    CONDA_SH=${TOKENHSI_CONDA_SH:-}
+    if [ -z "$CONDA_SH" ]; then
+        for candidate in "$HOME/miniconda3/etc/profile.d/conda.sh" \
+                         "$HOME/anaconda3/etc/profile.d/conda.sh" \
+                         /home/hwanhee/anaconda3/etc/profile.d/conda.sh; do
+            if [ -f "$candidate" ]; then CONDA_SH=$candidate; break; fi
+        done
+    fi
+    [ -n "$CONDA_SH" ] || {
+        echo "conda.sh를 찾을 수 없습니다. tokenhsi 환경을 먼저 활성화하세요." >&2
+        exit 2
+    }
+    source "$CONDA_SH"
+    conda activate "$CONDA_ENV"
+fi
 
 GPU=${MA_GPU:-7}
-if [[ "$GPU" != 6 && "$GPU" != 7 ]]; then
-    echo "MA_GPU는 6 또는 7이어야 한다: $GPU" >&2
+ALLOWED_GPUS=${TOKENHSI_ALLOWED_GPUS:-6,7}
+if ! [[ ",$ALLOWED_GPUS," == *",$GPU,"* ]]; then
+    echo "MA_GPU=$GPU가 허용 목록($ALLOWED_GPUS)에 없습니다. 로컬은 TOKENHSI_ALLOWED_GPUS로 명시하세요." >&2
     exit 2
 fi
 export MA_GPU=$GPU
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES=$GPU
-export VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select
-export DRI_PRIME="${GPU}!"
-python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GPU" >/dev/null
+unset VK_INSTANCE_LAYERS
+DRI_PRIME=$(python3 "$ROOT/scripts/vulkan_gpu_guard.py" "$GPU")
+export DRI_PRIME
 
 if [ -f "$TAG" ]; then CKPT="$TAG"; NAME=$(basename $(dirname $(dirname "$TAG")))
 else
@@ -165,8 +200,13 @@ PY
 
 Xvfb $DISP -screen 0 1600x900x24 -nolisten tcp & XVFB_PID=$!
 sleep 2
-LD_LIBRARY_PATH=$VNC_DIR/usr/lib/x86_64-linux-gnu $VNC_DIR/usr/bin/x11vnc \
-    -display $DISP -rfbport $VNC_PORT -localhost -nopw -forever -shared -noxdamage -noshm -quiet & VNC_PID=$!
+if [[ "$X11VNC" == /home/hwanhee/opt/vnc/* ]]; then
+    LD_LIBRARY_PATH=/home/hwanhee/opt/vnc/usr/lib/x86_64-linux-gnu "$X11VNC" \
+        -display $DISP -rfbport $VNC_PORT -localhost -nopw -forever -shared -noxdamage -noshm -quiet & VNC_PID=$!
+else
+    "$X11VNC" -display $DISP -rfbport $VNC_PORT -localhost -nopw -forever \
+        -shared -noxdamage -noshm -quiet & VNC_PID=$!
+fi
 sleep 1
 websockify --web=$NOVNC_DIR 127.0.0.1:$PORT 127.0.0.1:$VNC_PORT > /dev/null 2>&1 & WEB_PID=$!
 sleep 1

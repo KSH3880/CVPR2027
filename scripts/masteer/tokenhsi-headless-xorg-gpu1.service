@@ -1,0 +1,12 @@
+[Unit]
+Description=TokenHSI NVIDIA GPU 1 headless Xorg display
+After=display-manager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/xorg/Xorg :43 -config /etc/X11/tokenhsi-headless-xorg-gpu1.conf -noreset -nolisten tcp -novtswitch -sharevts -ac -logfile /var/log/tokenhsi-headless-xorg-gpu1.log
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

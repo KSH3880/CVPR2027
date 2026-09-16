@@ -34,7 +34,7 @@ class BaseTask():
         self.headless = cfg["headless"]
 
         # double check!
-        self.graphics_device_id = self.device_id
+        self.graphics_device_id = cfg.get("graphics_device_id", self.device_id)
         # MA_VIDEO 로 녹화할 때는 headless 여도 그래픽 디바이스가 살아 있어야 한다.
         # 이 서버는 /dev/dri 권한이 없어 X11/OpenGL 뷰어가 안 되고 VNC 도 없다.
         # IsaacGym 카메라 센서는 X 를 안 거치고 GPU 파이프라인으로 직접 렌더하므로

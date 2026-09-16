@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 
-ALLOWED_GPUS = {"6", "7"}
+DEFAULT_ALLOWED_GPUS = {"6", "7"}
 VK_SUCCESS = 0
 VK_STRUCTURE_TYPE_APPLICATION_INFO = 0
 VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO = 1
@@ -29,18 +29,37 @@ def normalize_uuid(value: str) -> str:
     return value.replace("-", "")
 
 
-if len(sys.argv) != 2 or sys.argv[1] not in ALLOWED_GPUS:
-    fail("physical GPU must be exactly 6 or 7")
+allowed_raw = os.environ.get(
+    "TOKENHSI_ALLOWED_GPUS", ",".join(sorted(DEFAULT_ALLOWED_GPUS, key=int))
+)
+allowed_gpus = {value.strip() for value in allowed_raw.split(",") if value.strip()}
+if not allowed_gpus or any(not value.isdigit() for value in allowed_gpus):
+    fail("TOKENHSI_ALLOWED_GPUS must be a comma-separated list of GPU indices")
+if len(sys.argv) != 2 or sys.argv[1] not in allowed_gpus:
+    allowed_text = ", ".join(sorted(allowed_gpus, key=int))
+    fail(
+        f"physical GPU must be one of: {allowed_text} "
+        "(override explicitly with TOKENHSI_ALLOWED_GPUS)"
+    )
 
 if "NODEVICE_SELECT" in os.environ:
     fail("NODEVICE_SELECT is set and would disable the Vulkan device-select layer")
 
 gpu = sys.argv[1]
-selector = f"{gpu}!"
+selector = os.environ.get("TOKENHSI_DRI_PRIME", f"{gpu}!")
+selector_disabled = selector == "none"
+if not selector_disabled and not selector.endswith("!"):
+    fail("DRI_PRIME selector must end in ! so Vulkan exposes only one device")
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu
-os.environ["VK_INSTANCE_LAYERS"] = "VK_LAYER_MESA_device_select"
-os.environ["DRI_PRIME"] = selector
+# VK_LAYER_MESA_device_select is an implicit layer. Explicitly adding it through
+# VK_INSTANCE_LAYERS can load it twice on local Mesa/Vulkan installations and
+# duplicate the physical-device list.
+os.environ.pop("VK_INSTANCE_LAYERS", None)
+if selector_disabled:
+    os.environ.pop("DRI_PRIME", None)
+else:
+    os.environ["DRI_PRIME"] = selector
 
 try:
     expected = subprocess.run(
@@ -159,37 +178,57 @@ try:
     rc = vulkan.vkEnumeratePhysicalDevices(instance, C.byref(count), None)
     if rc != VK_SUCCESS:
         fail(f"vkEnumeratePhysicalDevices(count) failed with rc={rc}")
-    if count.value != 1:
-        fail(
-            f"DRI_PRIME={selector} exposed {count.value} Vulkan devices, expected exactly 1"
-        )
-
     devices = (C.c_void_p * count.value)()
     rc = vulkan.vkEnumeratePhysicalDevices(instance, C.byref(count), devices)
     if rc != VK_SUCCESS:
         fail(f"vkEnumeratePhysicalDevices(list) failed with rc={rc}")
 
-    id_props = PhysicalDeviceIDProperties(
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
-        None,
-    )
-    props = PhysicalDeviceProperties2(
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-        C.cast(C.pointer(id_props), C.c_void_p),
-    )
-    vulkan.vkGetPhysicalDeviceProperties2(devices[0], C.byref(props))
-    actual_uuid = bytes(id_props.deviceUUID).hex()
-    if actual_uuid != expected_uuid:
+    actual_uuids = []
+    for device in devices:
+        id_props = PhysicalDeviceIDProperties(
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
+            None,
+        )
+        props = PhysicalDeviceProperties2(
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+            C.cast(C.pointer(id_props), C.c_void_p),
+        )
+        vulkan.vkGetPhysicalDeviceProperties2(device, C.byref(props))
+        actual_uuids.append(bytes(id_props.deviceUUID).hex())
+
+    allow_extra = os.environ.get("TOKENHSI_VULKAN_ALLOW_EXTRA", "0") == "1"
+    if count.value != 1 and not allow_extra:
+        exposed = ", ".join(
+            f"{index}:{uuid}" for index, uuid in enumerate(actual_uuids)
+        )
         fail(
-            f"DRI_PRIME={selector} selected UUID {actual_uuid}, "
-            f"but physical GPU {gpu} is {expected_uuid}"
+            f"DRI_PRIME={selector} exposed {count.value} Vulkan devices "
+            f"({exposed}), expected exactly 1"
+        )
+
+    if not actual_uuids:
+        fail(f"DRI_PRIME={selector} exposed no Vulkan devices")
+    matches = [index for index, uuid in enumerate(actual_uuids) if uuid == expected_uuid]
+    if len(matches) != 1:
+        fail(
+            f"physical GPU {gpu} UUID {expected_uuid} occurs at Vulkan indices "
+            f"{matches}, expected exactly one match"
+        )
+    selected_index = matches[0]
+    if not allow_extra and selected_index != 0:
+        fail(
+            f"DRI_PRIME={selector} selected Vulkan index 0 UUID {actual_uuids[0]}, "
+            f"but physical GPU {gpu} is at index {selected_index} ({expected_uuid})"
         )
 finally:
     vulkan.vkDestroyInstance(instance, None)
 
 print(
     f"VULKAN_GPU_GUARD: physical GPU {gpu}, UUID {expected_uuid}, "
-    f"DRI_PRIME={selector}",
+    f"Vulkan index {selected_index}, DRI_PRIME={selector}",
     file=sys.stderr,
 )
-print(selector)
+if os.environ.get("TOKENHSI_VULKAN_OUTPUT_INDEX", "0") == "1":
+    print(selected_index)
+else:
+    print(selector)

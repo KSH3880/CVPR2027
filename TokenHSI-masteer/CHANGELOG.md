@@ -2,7 +2,229 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-16
+
+### ms68 재실행 래퍼의 Base HOLD와 Top WAIT 강화
+
+- 별도 phase, 높이 latch, 새 보상 항은 추가하지 않았다. 요청대로
+  `train_retreat_turnaway_ms68_local.sh`의 `PILOT_BASE_HOLD_REWARD_W`와
+  `PILOT_TOP_WAIT_REWARD_W`만 각각 `0.10 -> 0.50`으로 올렸다.
+- 기존 완료 산출물과 sidecar는 수정하지 않았으며, Bash syntax와
+  `git diff --check`를 확인했다. 학습은 시작하지 않았다.
+
+### stack stage 평가의 로컬 GPU 명시 허용
+
+- `stack_stage_eval.sh`의 서버 전용 GPU `6|7` 하드코딩을 기본 허용 목록 `6,7`로
+  유지하면서, 로컬에서는 `TOKENHSI_ALLOWED_GPUS=0`처럼 명시적으로 덮어쓸 수 있게 했다.
+  음수가 아닌 정수 GPU와 허용 목록 포함 여부를 평가 시작 전에 검사한다.
+- Bash syntax, `git diff --check`, GPU 0 허용 경로를 검증했으며 실제 평가는 시작하지
+  않았다.
+
+### ms69 ms67 계약의 2–3 m 퇴각과 STACK Base HOLD 강화
+
+- `ms67`의 단일 CLEAR, box-relative 120–180도 후방 경로, 3-step carry fade,
+  classic steering 설정을 그대로 둔 `train_retreat_turnaway_ms69_local.sh`를 추가했다.
+- 비교축은 퇴각 거리 `1.2–2.0 -> 2.0–3.0 m`와 STACK의 Base HOLD 보상
+  `0.10 -> 0.50`뿐이다. ms68의 `STACK_CLEAR_BYPASS_STAGE`는 사용하지 않아 Top은
+  기존 safety gate를 완료한 뒤 STACK으로 전환한다.
+- 새 래퍼의 실행 권한, Bash syntax와 `git diff --check`를 확인했으며 학습은
+  시작하지 않았다.
+
+### ms68 CLEAR 우선 완료 시 Top safety-gate 우회 생략
+
+- shared-goal carry에 opt-in `STACK_CLEAR_BYPASS_STAGE`를 추가했다. Base가 CLEAR를
+  먼저 완료하면 Top의 safety-gate stage latch를 더 기다리지 않고 STACK으로 전환해,
+  실제로 놓인 Base 상자 위의 committed goal로 즉시 retarget한다.
+- Top이 먼저 safety gate에 도착한 경우에는 기존처럼 그 자리에서 기다린다. 기본값은
+  꺼져 있어 ms67과 기존 sidecar 동작은 바뀌지 않으며, ms68 래퍼만 활성화한다.
+- Python compile, 두 Bash 래퍼 syntax, `git diff --check`를 통과했다. 학습이나 GPU
+  smoke는 시작하지 않았다.
+
+### ms67 rear-biased CLEAR와 3-step carry fade
+
+- CLEAR는 별도 TURN 상태로 나누지 않고 단일 phase로 유지한다. classic steering의
+  속도 보상을 몸 정면과 현재 aim 방향의 정렬도로 gate해 상자를 바라본 채
+  뒷걸음질하는 해에는 이동 보상을 주지 않는다. 정렬 후 명령 속도의 40% 미만으로
+  정지하면 opt-in stall penalty를 적용하며, classic 분기에서 로그만 남던 endpoint
+  stop reward를 실제 CLEAR 보상에 합산한다.
+- `ms67` 로컬 래퍼는 heading progress 가중치 2.0, stall 가중치 0.10을 사용한다.
+  퇴각 방향은 기존 box-relative 90~180도에서 120~180도로 좁히고, release된 Base의
+  두 carry 관측 창은 CLEAR 진입 후 3 policy step(30 Hz에서 약 0.10초)에 0으로 만든다.
+- 새 동작은 classic steering과 기존 opt-in knob를 켠 실행에만 적용되며 `ms66`의
+  sidecar와 실행 래퍼는 수정하지 않았다.
+
+### ms66 시간 기반 carry fade와 goal-heading progress
+
+- release 후 Base carry 관측을 retreat arc가 아니라 CLEAR age 10 frame 동안
+  `1 -> 0`으로 fade한다. 서 있어도 실제 박스 신호가 사라지므로, 움직여야 관측이
+  지워지던 ms65의 순환 병목을 제거했다.
+- 별도 TURN phase나 virtual box 없이 몸 정면과 retreat goal 방향의 cosine 개선량을
+  additive reward로 더한다. 절대 정렬값이 아니라 frame 간 signed progress를 쓰므로
+  goal을 바라보고 정지해 보상을 누적할 수 없고, 마지막 0.4 m 감속 구간에서는 끈다.
+- steering tokenizer와 internal adapter MLP는 둘 다 trainable로 유지하며 Top의
+  carry/stack reward는 바꾸지 않았다. heading alignment/progress/reward, retreat arc,
+  along-path velocity를 TensorBoard에 기록한다.
+
+## 2026-09-15
+
+### ms65 release 이후 classic steering-only CLEAR
+
+- Base가 손을 완전히 뗀 뒤 생성되는 object-free retreat path는 유지하되, CLEAR의
+  별도 move/forward/stall/reverse shaping 대신 기존 `HumanoidMASteerCarry`와 같은
+  aim-point 속도 추종 및 lateral steering 보상을 쓰는 opt-in
+  `STACK_CLEAR_CLASSIC_STEER`를 추가했다. pickup용 box-near pin과 carry/handheld/
+  putdown 항은 제외해 놓은 상자로 되돌아갈 보상은 만들지 않는다.
+- retreat path 마지막 감속 구간에서는 기존 steering의 속도 명령인 `M`을 선형으로
+  0까지 낮춘다. 따라서 같은 steering 관측과 보상으로 뒤쪽 경로를 향해 몸을 돌고
+  전진한 뒤, endpoint에서는 `v_tar=0` 정지 보상을 받는다.
+- 변경 범위는 Base의 CLEAR replacement reward뿐이다. Top row는 부모 native
+  carry/stack reward와 위치·안정성·평행 조건 및 terminal success bonus를 그대로
+  유지한다. `train_retreat_turnaway_local.sh`는 GPU 1, zero-fade, 1.2~2.0 m 경로,
+  classic steering을 사용하는 새 기본 태그 `ms65`로 갱신했다.
+
+### ms64 긴 CLEAR 경로와 완화된 CLEAR→STACK 정지 gate
+
+- ms63의 보상 스케일(move 5), zero-fade, forward gate, Top/Base HOLD 0.10은
+  유지하면서 random retreat endpoint 범위를 `0.8~1.5 -> 1.2~2.0 m`로 늘렸다.
+  carry 관측 zero-fade 완료와 `retreat_done`의 최소 arc는 기존 `0.60 m`를 유지한다.
+- 긴 경로 끝에서 CLEAR→STACK이 과도하게 막히지 않도록 감속 구간을
+  `0.30 -> 0.40 m`, 정지 streak를 `10 -> 5 frame`, 허용 root 선속도를
+  `0.10 -> 0.20 m/s`, 각속도를 `0.50 -> 1.00 rad/s`, upright 오차를
+  `15 -> 25 deg`로 완화하고 양발 접촉 문턱을 `1.0 -> 0.5`로 낮췄다.
+  각 값은 `PILOT_STOP_*` opt-in override이며 기존 실행 기본값은 바뀌지 않는다.
+- STACK의 Top은 기존 부모 `HumanoidMASteerCarry` 보상을 계속 받는다. 전환 때
+  `_box_tar_pos[top]`과 steering path가 적층 목표로 갱신되므로 root 경로 추종,
+  box 목표 접근, grasp/putdown 보상이 그 방향으로 증가한다. `MA_BETA=0`이라
+  dense reward를 Base와 공유하지 않으며 terminal success bonus만 두 agent에 지급된다.
+
+### ms63 CLEAR move reward 스케일 정상화
+
+- ms62 epoch 10000 TensorBoard에서 CLEAR가 rollout의 약 41%를 차지했고,
+  `move_positive`가 평균 `+9.29/frame`으로 native carry의 약 `+0.68/frame`보다
+  13배 이상 컸다. AMP reward도 `0.706 -> 0.366`으로 하락해 CLEAR 보상이
+  shared `internal_adapt_mlp`를 통해 기존 steering/carry를 덮는 현상과 일치했다.
+- `internal_adapt_mlp`는 새 CLEAR 동작 학습을 위해 계속 trainable로 둔다. 대신
+  `train_retreat_turnaway_local.sh`의 move weight를 `80 -> 5`로 낮췄다. ms62에서
+  관측한 품질 분포를 그대로 대입하면 기대 이동 보상은 약 `0.58/frame`으로 native
+  carry와 같은 규모다.
+- 기존 ms62 산출물과 레시피를 구분하기 위해 기본 태그를 ms63으로 올렸다. zero-fade,
+  path penalty 0, forward gate, Top/Base HOLD 0.10, GPU 1은 유지한다.
+
+### 뷰어의 태그 sidecar 우선 복원
+
+- `view_local.sh`가 현재 셸의 모든 기존 변수를 호출자 override로 오인해, 직전에
+  source한 다른 실험의 dynamic mask와 새 태그의 zero-fade를 동시에 켜던 문제를
+  수정했다. 태그로 볼 때는 해당 `.env`를 기본 권위로 사용하므로 설정값이 다른
+  실험을 연속해서 열어도 이전 태그가 새 태그를 오염시키지 않는다.
+- 의도적으로 scenario 등 학습 설정을 바꿔 볼 때만
+  `VIEW_ENV_OVERRIDE_KEYS="MS_SCEN MS_DT"`처럼 우선할 키를 명시한다. 카메라, env 수,
+  포트처럼 sidecar에 없는 일반 뷰어 옵션은 기존처럼 그대로 사용할 수 있다.
+
+### ms62 object-free turn-and-walk CLEAR와 ms52 HOLD 복원
+
+- CLEAR의 기존 이동 보상은 root 속도의 retreat 방향 투영만 보므로, 몸이 상자를
+  향한 채 뒷걸음질해도 정면 보행과 같은 점수를 받을 수 있었다. 기본 비활성
+  `STACK_CLEAR_FORWARD_GATE`를 추가해 활성 시 `move_reward`에 몸 정면과 retreat
+  방향의 cosine(`clamp 0..1`)을 곱한다. 옆걸음·뒷걸음은 이동 보상을 받지 못하고
+  몸을 돌려 steering 방향으로 전진해야 최대 보상을 받는다.
+- loco AMP phase override는 과거 `ms25`에서 shared adapter의 pickup을 깨뜨렸으므로
+  재도입하지 않았다. carry AMP와 340-D 관측 ABI는 유지하고, 목표 박스나 가상 박스
+  없이 기존 12-D steering 창만으로 회전을 학습한다.
+- Base carry 관측은 기존 zero-fade에 의해 CLEAR 후 0으로 유지된다. 재파지를 직접
+  벌하는 기본 비활성 `STACK_BASE_REGRASP_PEN_W`도 구현했지만, ms62에서는 이를
+  `0`으로 두고 ms52 W2S의 `STACK_TOP_WAIT_REWARD_W=0.10`과
+  `STACK_BASE_HOLD_REWARD_W=0.10`을 먼저 정확히 복원한다.
+- 새 `train_retreat_turnaway_local.sh`는 기존 ms61 계약(move 80, path penalty 0,
+  zero-fade, GPU 1)에 forward gate와 두 HOLD 보상만 더한 독립 ms62 실행이다.
+  dynamic carry mask·즉시 zero·virtual box는 계속 꺼져 있다. 새 노브는 sidecar와
+  Python export 목록에 포함했다.
+
+### ms61 zero-fade 후퇴 steering 보상 강화
+
+- `ms60`은 CLEAR의 정방향 경로 추종 보상이 최대 `+1`인 반면 경로 미이행
+  패널티는 최대 `-80`이라, `path_quality * move_ratio`가 약 0.988을 넘어야만
+  CLEAR 이동 shaping이 양수가 됐다. 이 비대칭은 RELEASE에서 손을 계속 대고
+  CLEAR 진입을 회피하는 국소해를 강화할 수 있다.
+- 공통 `ms52` 래퍼에 opt-in `PILOT_CLEAR_MOVE_W`를 추가했다. 보존된 `ms52`
+  재현 계약은 path penalty 미설정, 즉 `0.0`이므로 새 `ms61`도 이를 복원하고
+  zero-fade를 유지하면서 후퇴 steering 보상만 `80`으로 강화했다. 따라서 경로
+  미이행 때문에 CLEAR 진입 자체를 회피할 유인은 없고, 실제 추종 품질에 비례해
+  `0..+80`을 받는다.
+- 새 실행 래퍼는 로컬 머신용으로 GPU 1만 허용한다.
+
+### ms60 carry 관측 zero-fade와 후퇴 경로 패널티 강화
+
+- `ms60`의 release 이후 Base carry 처리를 attention mask에서 관측 zero-fade로
+  변경했다. CLEAR 경로 진행률 0에서 두 carry 관측 창을 100% 유지하고, 실제 후퇴
+  arc가 늘어날수록 선형으로 줄여 `STACK_CLEAR_ARC_DIST=0.60 m`에서 정확히 0이 된다.
+  carry token 자체는 계속 Transformer attention에 남는다.
+- 새 동작은 opt-in `STACK_CARRY_OBS_ZERO_FADE=1`일 때만 적용되며 기존 실험의 기본
+  동작은 바뀌지 않는다. 즉시 zero, dynamic mask, virtual retreat box와의 중복은
+  설정 오류로 거부하고, 재현용 sidecar에도 값을 기록한다.
+- `train_retreat_multisteer_mask_local.sh`의 `ms60` 기본 태그를 zero-fade/pathpen80으로
+  갱신하고 `STACK_DYNAMIC_CARRY_MASK=0`, CLEAR 경로 미이행 패널티 `40.0 -> 80.0`을
+  적용했다. 로컬 실행 GPU는 1로 지정했다.
+- Python `py_compile`, 관련 Bash `bash -n`, `git diff --check`를 통과했고, 0/0.15/
+  0.30/0.45/0.60 m 진행에서 fade 계수가 1/0.75/0.5/0.25/0이 되는 것을 확인했다.
+
+### masteer 뷰어 로컬 Conda·VNC·GPU 선택 지원
+
+- `scripts/masteer/view.sh`가 이미 활성화된 `tokenhsi_koo` 환경을 그대로 사용하고,
+  필요할 때는 사용자 홈의 Miniconda/Anaconda `conda.sh`를 자동 탐색하도록 바꿨다.
+  원 서버의 `/home/hwanhee/anaconda3` 하드코딩 때문에 로컬 클론에서 시작 전에
+  종료되던 문제를 제거했다.
+- 원 서버 VNC 번들이 없으면 시스템 `x11vnc`와 `/usr/share/novnc`를 사용한다.
+- 서버 기본 GPU 허용 목록 6,7은 유지하되, 로컬에서는
+  `TOKENHSI_ALLOWED_GPUS=1 MA_GPU=1`처럼 명시적으로 허용 목록을 덮어쓸 수 있다.
+  Vulkan 가드는 선택된 물리 GPU의 nvidia-smi UUID와 단일 노출 Vulkan UUID를
+  계속 대조한다.
+- 로컬에서 implicit device-select layer를 `VK_INSTANCE_LAYERS`로 다시 명시해 Vulkan
+  장치가 중복 열거되던 설정을 제거했다. `DRI_PRIME=<GPU>!`가 시스템 implicit
+  layer를 한 번만 활성화하도록 한다.
+- Bash/Python 구문 검사와 `git diff --check`, 로컬 noVNC 진입 파일 탐지를 통과했다.
+- 기존 `scripts/masteer/view_local.sh`도 2장 이상 GPU가 있는 로컬 PC를 지원한다.
+  `MA_GPU=N`을 주면 물리 GPU N을 CUDA logical 0과 Vulkan index 0으로 정렬한다.
+  로컬 Mesa가 나머지 Vulkan 장치를 숨기지 못하는 경우도 index 0 UUID가 선택한
+  NVIDIA GPU와 일치해야만 실행한다.
+- GPU 1의 UUID `24510087-3709-f07d-0b4b-835630c0b7a8`과 Vulkan index 0 일치를
+  실제 확인했다. 잘못된 Vulkan index 1은 CPU `libvulkan_lvp.so`를 가리켜 실제
+  segfault가 났으며 GPU 1을 index 0으로 맞춘 뒤에는 재발하지 않았다.
+- 현재 GNOME Wayland의 XWayland `:0`에는 DRI3 확장이 없어 Isaac Gym이
+  `No DRI3 support detected - required for presentation` 뒤 연결을 닫는 것도 확인했다.
+  로컬 viewer는 DRI3가 없으면 무거운 모델을 읽기 전에 중단하고 Ubuntu on Xorg
+  로그인 세션을 안내한다.
+
 ## 2026-09-14
+
+### 다중 CLEAR 후퇴 steering과 carry token mask
+
+- 연속 후퇴 curriculum을 추가했다. 새 실행은 매 CLEAR 전환마다 재현 가능한
+  난수로 몸 기준 90~180도 방향과 0.8~1.5 m endpoint를 뽑는다. 따라서 정후방,
+  160도 같은 후측방, 측면 경로가 고정 각도 없이 섞이며 명령은 박스 안쪽을
+  향하지 않는다. 실제 후퇴 arc 0.6 m의 CLEAR→STACK gate는 유지한다.
+- release를 마친 Base의 CLEAR 구간에서는 new/old carry 관측을 sentinel로 0으로
+  만든 뒤 두 carry token을 Transformer attention key/value에서 정확히 제외한다.
+  관측·token 수와 checkpoint ABI는 바꾸지 않았다.
+- `train_retreat_multisteer_mask_local.sh`는 GPU 1, 1024 env, 3000 epoch,
+  후퇴 stall penalty 40.0으로 위 축만 학습한다. 기존 ms58 기본 stall 1.5는
+  유지한다. 로컬 이전에서 ms52 sidecar가 빠진 경우 보존된 ms38 sidecar를 읽고
+  ms58 shared-goal/W2S 계약을 명시적으로 덮어쓴다.
+- 첫 64-env smoke는 로컬 fallback에 `STACK_STAGE_HOLD_STEPS`가 없어 환경 생성
+  guard에서 종료됐다. 실패 출력은 보존하고, ms58의 Top grasp·box 안정 5-frame
+  stage gate를 래퍼에 명시했다.
+- 두 번째 smoke는 서버 경로 이전 뒤 object loader가 절대 URDF 경로를 `./`에
+  다시 붙여 `.///home/...`로 넘겨 asset을 만들지 못해 종료됐다. 실패 출력은
+  보존했다. chair URDF 50개의 XML 선언을 표준 `version="1.0"`으로 교정하고,
+  loader가 각 URDF의 dirname/basename을 Isaac Gym에 따로 넘기도록 수정했다.
+- 최종 64-env smoke `smoke_ms59_retreatrand_dynmask_stall40_2it_s0_r3`는
+  GPU 1에서 rc=0으로 끝났다. 로그에서 random angle, 0.8~1.5 m, arc 0.6 m,
+  stall 40.0과 dynamic carry-token mask를 확인했다. 첫 backward의 steering
+  tokenizer/adaptation MLP gradient 합은 각각 5.101484e+02/1.532401e+03이고,
+  동결 carry tokenizer·Transformer·composer gradient는 0이었다.
+- 본 학습 `ms59_ms18e9000_retreatrand_dynmask_stall40_3000_s0`을 GPU 1,
+  1024 env, epoch 9000→12000으로 분리 실행했다(Python PID 83390). 첫 backward의
+  steering tokenizer/adaptation MLP gradient 합은 2.859331e+02/9.596468e+02이고,
+  초기 처리량은 step 18.4k~23.7k fps다. 실행 중 프로세스는 종료하지 않는다.
 
 ### masteer 뷰어 VNC 공유 메모리 부족 우회
 

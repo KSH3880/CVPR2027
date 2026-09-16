@@ -82,6 +82,9 @@ def parse_task(args, cfg, cfg_train, sim_params):
     rl_device = args.rl_device
 
     cfg["seed"] = cfg_train.get("seed", -1)
+    # Isaac Gym supports separate compute and graphics devices. Preserve the
+    # CLI graphics selection for GPU-backed remote Xorg displays.
+    cfg["graphics_device_id"] = args.graphics_device_id
     cfg_task = cfg["env"]
     cfg_task["seed"] = cfg["seed"]
 

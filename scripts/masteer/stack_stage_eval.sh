@@ -1,14 +1,28 @@
 #!/bin/bash
 # Evaluate one retained stack checkpoint and print the first failed stage.
-# Usage: stack_stage_eval.sh <tag> <gpu:6|7> <initial|epoch|latest> [envs]
+# Usage: stack_stage_eval.sh <tag> <gpu> <initial|epoch|latest> [envs]
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-TAG=${1:?usage: stack_stage_eval.sh <tag> <gpu:6|7> <initial|epoch|latest> [envs]}
-GPU=${2:?usage: stack_stage_eval.sh <tag> <gpu:6|7> <initial|epoch|latest> [envs]}
+TAG=${1:?usage: stack_stage_eval.sh <tag> <gpu> <initial|epoch|latest> [envs]}
+GPU=${2:?usage: stack_stage_eval.sh <tag> <gpu> <initial|epoch|latest> [envs]}
 EPOCH=${3:-latest}
 ENVS=${4:-512}
-case "$GPU" in 6|7) ;; *) echo "GPU must be 6 or 7" >&2; exit 2 ;; esac
+case "$GPU" in
+    ''|*[!0-9]*) echo "GPU must be a non-negative integer" >&2; exit 2 ;;
+esac
+ALLOWED_GPUS=${TOKENHSI_ALLOWED_GPUS:-6,7}
+GPU_ALLOWED=0
+for allowed in ${ALLOWED_GPUS//,/ }; do
+    if [ "$GPU" = "$allowed" ]; then
+        GPU_ALLOWED=1
+        break
+    fi
+done
+if [ "$GPU_ALLOWED" -ne 1 ]; then
+    echo "GPU $GPU is not allowed (TOKENHSI_ALLOWED_GPUS=$ALLOWED_GPUS)" >&2
+    exit 2
+fi
 
 OUT=$ROOT/TokenHSI-masteer/output/masteer/$TAG
 if [ "$EPOCH" = initial ]; then
