@@ -398,6 +398,9 @@ def main():
                 retreat_box_min_clearance = (
                     task._planner_retreat_box_min_clearance.clone()
                 )
+                retreat_box_endpoint_clearance = (
+                    task._planner_retreat_box_endpoint_clearance.clone()
+                )
             # Inactive ticks are not new planner attempts. Every active
             # retreat tick now replans and receives its own PPO credit.
             scored_valid = valid | ~decision
@@ -415,6 +418,9 @@ def main():
                 -retreat_box_penalty_coef * retreat_box_path_cost
             )
             terms["retreat_box_min_clearance"] = retreat_box_min_clearance
+            terms["retreat_box_endpoint_clearance"] = (
+                retreat_box_endpoint_clearance
+            )
             terms["total"] = (
                 terms["total"] + terms["route_visit_penalty"]
                 + terms["retreat_box_path_penalty"]
@@ -435,14 +441,6 @@ def main():
                 + terms["route_visit_penalty"]
                 + terms["retreat_box_path_penalty"]
                 + terms["retreat_endpoint_change_penalty"]
-            )
-            waiting_retreat = (
-                (task._stack_phase == task.A1_RETREAT)
-                & ~task._planner_retreat_ready
-                & invalid_decision
-            )
-            analytic = torch.where(
-                waiting_retreat, terms["invalid_plan_penalty"], analytic
             )
             terms["total"] = torch.where(
                 invalid_decision, analytic, terms["total"]
@@ -557,6 +555,7 @@ def main():
             if key in {"iteration", "reward", "done_rate", "potential_delta",
                        "humanoid_fall_penalty", "route_visit_penalty",
                        "retreat_box_path_penalty",
+                       "retreat_box_endpoint_clearance",
                        "path_mae", "fall_ratio", "collision_ratio",
                        "bottom_postplace_linear_speed",
                        "policy_loss", "value_loss"}

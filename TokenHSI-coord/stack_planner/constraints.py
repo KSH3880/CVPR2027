@@ -141,8 +141,13 @@ def retreat_box_clearance(
         signed_distance[..., :-1] - signed_distance[..., 1:]
     ).clamp(min=0.0)
     inward = inward_step.square().mean(dim=-1)
+    # A path that merely exits and then ends back inside the footprint is not
+    # a usable retreat. This is collision clearance, not a fixed-distance
+    # goal: there is no reward for moving farther once the endpoint is outside.
+    endpoint_overlap = (-signed_distance[..., -1]).clamp(min=0.0).square()
     return {
-        "penalty": lingering + inward,
+        "penalty": lingering + inward + endpoint_overlap,
+        "endpoint_overlap": endpoint_overlap,
         "minimum_clearance": signed_distance.amin(dim=-1),
         "endpoint_clearance": signed_distance[..., -1],
     }

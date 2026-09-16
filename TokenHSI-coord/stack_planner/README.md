@@ -185,8 +185,8 @@ bash TokenHSI-coord/stack_planner/view.sh \
 로컬 desktop에 Isaac Gym 창을 직접 띄우며 noVNC를 사용하지 않는다. 기본 물리 GPU는 0이고
 `MA_GPU=1`처럼 바꿀 수 있다. graphics Vulkan ID도 기본적으로 같은 번호를 사용하며,
 Vulkan 순서가 CUDA physical 순서와 다르면 `TOKENHSI_GRAPHICS_DEVICE_ID`로 override한다.
-흰 선은 최신 planner 원본, 분홍/주황 선은 실제 실행 path, cyan/green은 정책 steering
-window, 파란 wireframe box는 retreat observation 속 가상 box다. invalid/slicing 상태 때문에
+흰 선은 최신 planner 원본, 파란 wireframe box는 retreat observation 속 가상 box다.
+기존 실행 path와 steering window 색상 overlay는 표시하지 않는다. invalid/slicing 상태 때문에
 원본과 실행 path가 다를 수 있으며 콘솔의 `valid/installed/retreat_ready`로 구분한다.
 현재 `DISPLAY`를 사용하고 값이 없으면 `:0`을 쓴다. 여러
 scene을 보고 싶으면 세 번째 인자에 env 수를 주고, 재계획 주기는
@@ -196,3 +196,66 @@ scene을 보고 싶으면 세 번째 인자에 env 수를 주고, 재계획 주�
 viewer의 path renderer는 carry-only scene에 존재하지 않는 generic sit/climb marker actor를
 갱신하지 않는다. box와 task target은 reset/physics가 관리하고 planner path line만 추가로
 그리므로, 이 생략은 시뮬레이션 state나 planner 입력을 바꾸지 않는다.
+
+### Path 중간 release 진단 view
+
+Planner나 sequential-stack coordinator 없이 frozen `HumanoidMASteerCarry` agent가 path 중간의
+carry goal에서 box를 내려놓은 뒤에도 steering을 계속할 수 있는지 확인한다. reset마다 A1의
+고정 steering path를 `현재 root → 실제 box → carry goal → goal 너머`로 만든다.
+경로를 만들 때만 임시 endpoint를 사용하고, policy observation과 reward가 보는 실제 box carry
+target은 원래 goal로 즉시 복원한다. phase 전환이나 release/retreat signal은 전혀 주지 않는다.
+또한 box→endpoint 구간을 직선으로 만들어 carry goal을 정확히 지나도록 한다. 학습에는 쓰지 않는다.
+
+```bash
+MA_GPU=1 bash TokenHSI-coord/stack_planner/view_midpath_release.sh \
+  <frozen-agent.pth> 1
+```
+
+이 진단 스크립트는 CUDA remap을 사용하지 않고 compute/rl/graphics를 모두 physical GPU 1로
+명시한다. Python 진입 직후에도 `torch.cuda.set_device(1)`을 호출한다. `MA_GPU`로 다른 physical
+GPU를 선택할 수 있다.
+학습/view/eval launcher는 오래된 PhysX가 요구하는 unversioned `libcuda.so` 호환 링크를
+`$ROOT/.runtime/physx-lib`에 자동으로 만들고 `LD_LIBRARY_PATH`에 넣는다. `/tmp` 아래 수동
+링크에는 의존하지 않는다.
+환경 생성 reset의 초기 observation을 checkpoint 로드 뒤 재사용한다. 또한 carry-only scene에
+존재하지 않는 generic sit/climb marker actor 갱신은 생략한다. 두 처리는 각각 이 빌드의
+중복 full-reset 오류와 첫 render CUDA 오류를 막는다.
+표준 rl_games player는 1-env episode가 끝나면 다음 game 시작 시 `reset(None)`을 호출한다.
+이 진단은 그 경로를 사용하지 않고 계속 step하다가 done인 env의 agent row만 명시적으로
+reset한다. 따라서 프로세스를 다시 띄우지 않고 새 시나리오를 반복하며, 이는 planner 학습과
+독립 평가에서 사용하는 episode reset 방식과 같다.
+기본 goal 너머 거리는 2m이며 `STACK_MIDPATH_EXTENSION`으로 바꿀 수 있다. 콘솔의
+`carry_goal`, `path_end`, `installed_error`로 실제 carry target과 별도 endpoint 및 설치 오차를
+확인할 수 있다. cyan 띠가 policy 입력 path, 노란 십자가 carry goal, 빨간 십자가 endpoint다.
+
+## Retreat checkpoint 평가
+
+학습 프로세스를 수정하거나 종료하지 않는 별도 deterministic 평가다. 학습 run의
+`run.env`에서 executor/stage1/env config와 환경변수를 재사용하며 sidecar가 없으면 거부한다.
+GPU는 학습과 겹치지 않게 지정한다. 서버 예시:
+
+```bash
+MA_GPU=7 \
+STACK_PLANNER_EVAL_ENVS=64 STACK_PLANNER_EVAL_SEED=0 \
+bash TokenHSI-coord/stack_planner/eval_retreat.sh \
+  <training-tag> <planner-checkpoint.pth> <unique-eval-tag>
+```
+
+기본 3600 physics steps, replan 간격은 학습 `STACK_PLANNER_LOW_STEPS`를 사용한다.
+`STACK_PLANNER_EVAL_STEPS/STACK_PLANNER_EVAL_REPLAN`으로 override할 수 있다.
+로컬은 `TOKENHSI_CONDA_ENV=tokenhsi118 CONDA_BASE=/home/injesus1010/anaconda3 MA_GPU=1`을 추가한다.
+checkpoint 비교 시 seed/env 수/steps/replan과 학습 환경 설정을 같게 유지한다.
+
+결과는 `runs/stack_planner_eval/<eval-tag>/summary.json`과 `episodes.jsonl`이다.
+도달은 현재 endpoint 0.25m 이내, 정지는 그 범위에서 XY 속도 0.15m/s 이하를 한 번이라도
+만족한 비율(지속 정지 보장은 아님)이다. 완결되고 retreat에 진입한 episode만 비율의
+분모에 넣고, 평가 끝에서 잘린 episode는 censored로 별도 기록한다. retreat 진입 수와
+완결 수가 작거나 0이면 평가 길이를 늘려야 하며 0 표본 rate는 null이다.
+path MAE는 실제 A1 lateral deviation, endpoint drift는 retreat replan 사이 world 이동량이다.
+collision은 contact force가 아니라 학습과 같은 proximity proxy다. 최소 gap은 XY 원형
+근사의 body/box 표면 간격이고 episode 최소값의 평균이며 음수는 근사상 침범이다.
+프레임 진단은 censored 구간도 포함한다.
+
+Agent2 접근(radial speed >0.1m/s)/정지(XY speed <=0.1m/s) 자연 발생 여부와 조건별 도달·충돌
+통계를 기록한다. 두 subset은 겹칠 수 있으며 강제 접근/정지 시나리오나 인과적 비교가 아니다.
+동일 seed는 초기 난수 조건을 맞추지만 GPU physics의 bit-exact 재현을 보장하지 않는다.

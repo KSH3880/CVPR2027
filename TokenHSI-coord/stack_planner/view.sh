@@ -74,10 +74,7 @@ export STACK_TOP_XY_TOL=${STACK_TOP_XY_TOL:-0.15}
 export STACK_EPISODE_LENGTH=${STACK_EPISODE_LENGTH:-1200}
 export STACK_DEBUG=${STACK_DEBUG:-1}
 
-PHYSX_LIB_DIR=${PHYSX_LIB_DIR:-/tmp/hwanhee-physx-lib}
-if [ -d "$PHYSX_LIB_DIR" ]; then
-    export LD_LIBRARY_PATH="$PHYSX_LIB_DIR:${LD_LIBRARY_PATH:-}"
-fi
+. "$COORD/stack_planner/physx_cuda_compat.sh"
 
 echo "planner: $PLANNER"
 echo "agent:   $POLICY"

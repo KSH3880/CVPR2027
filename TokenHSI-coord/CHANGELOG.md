@@ -2,7 +2,94 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-16
+
+### 고정 거리 대신 retreat 충돌 회피 shaping 강화
+
+- `STACK_RETREAT_DIST=1.5m`는 기존 실제 phase 완료 조건으로만 유지하고 predicted endpoint에
+  고정 거리 reward를 추가하지 않았다.
+- 놓인 box의 확장 footprint 안에서 retreat path가 끝나면 endpoint overlap penalty를 직접
+  부과한다. footprint 밖으로 나온 뒤에는 더 멀리 갈수록 추가 reward를 주지 않는다.
+- valid plan으로 채택된 경로만 보던 기존 계산을 바꿔 모든 finite retreat 후보의 path와
+  endpoint clearance를 채점한다. 초기 invalid 후보도 방향별 충돌 위험을 구분해 PPO credit을
+  받을 수 있다.
+- 아직 plan이 채택되지 않은 retreat의 invalid action에서 clearance/route/unsafe shaping을
+  버리고 binary invalid penalty만 남기던 override를 제거했다.
+- `retreat_box_endpoint_clearance` metric을 checkpoint/log에 추가했다.
+- 검증: unit test 26개, Python compile 및 diff check 통과.
+
+### PhysX CUDA driver compatibility 경로 영속화
+
+- stack planner의 train/view/eval launcher가 사라질 수 있는
+  `/tmp/hwanhee-physx-lib`를 선택적으로 사용하는 대신, 시스템 `libcuda.so.1`을 찾아
+  저장소 `.runtime/physx-lib/libcuda.so` 호환 링크를 자동 생성하고 항상 로드한다.
+- local GPU 1 학습 wrapper가 로그와 달리 `MA_GPU=0`을 export하던 오류를 `MA_GPU=1`로
+  수정했다.
+- 검증: 생성된 링크에서 `ctypes.CDLL("libcuda.so")` 로드, 관련 launcher bash 문법 및
+  diff check 통과. GPU simulator 재실행은 수행하지 않았다.
+
+### Planner 환경 reset의 Isaac Gym state setter 단일화
+
+- episode 전환 로그를 CUDA 동기화해 확인한 결과 `env.step`은 정상 완료되고 reset 내부
+  state commit 직후 GPU pipeline이 깨지는 것으로 범위를 확정했다.
+- 상속된 multi-task/F22/sequential reset은 한 simulation step 안에서 indexed root-state
+  setter를 humanoid, object, platform, 최종 humanoid 순으로 여러 번 호출하고 있었다.
+- planner train/view 전용 mixin은 상속 reset의 텐서·bookkeeping 변경은 그대로 실행하되
+  중간 Gym setter/refresh를 보류하고, 마지막에 해당 env의 전체 actor root를 한 번과 humanoid
+  DOF를 한 번만 제출한다. 이후 simulator tensor, observation, AMP history를 다시 동기화한다.
+  `TokenHSI-masteer` 및 planner 없는 환경은 변경하지 않았다.
+- 검증: Python compile, unit test 26개 및 diff check 통과. 실제 GPU episode reset 재검증은
+  사용자가 실행할 단계로 남겼다.
+
+### Frozen agent의 path 중간 release 진단 view
+
+- 기존 진단이 의도와 다르게 sequential-stack의 `putdown_retreat` phase 전환을 사용하던 것을
+  수정했다. 이제 전용 task는 평범한 `HumanoidMASteerCarry`를 직접 상속하며 stack coordinator,
+  phase, release/retreat signal을 전혀 사용하지 않는다.
+- 실제 carry goal은 그대로 둔 채 경로 생성 순간에만 goal 너머 endpoint를 임시 target으로
+  사용한다. 생성 직후 carry target을 복원하므로 reward/observation은 중간 goal에 놓기를 요구하고,
+  steering path는 그 뒤까지 계속된다. box→endpoint leg는 직선으로 고정해 goal을 정확히 지난다.
+- planner 없이 frozen agent만 사용하는 `view_midpath_release.sh`와 전용 task를 추가했다.
+  이 진단만 변경하며 기존 task와 학습 실행은 변하지 않는다.
+- 전용 local view는 CUDA remap을 제거하고 sim/rl/graphics/default torch device를 모두 같은
+  physical `MA_GPU`(기본 1)로 명시한다. graphics logical 0이 physical GPU 1이라는 기존 판단은
+  잘못이어서 철회했다.
+- 생성 직후 observation을 그대로 쓰고, carry-only scene에 없는 generic sit/climb marker
+  actor 갱신도 생략한다. 실제 물리 state 갱신은 유지한다.
+- 표준 player의 episode 경계 `reset(None)` 대신 계속 실행되는 전용 loop에서 done env의
+  agent row만 명시적으로 reset한다. 한 episode로 종료하는 우회가 아니라 같은 프로세스에서
+  시나리오를 반복하며 planner 학습/평가의 reset 호출 규약과 맞췄다.
+- 전용 view는 기본적으로 각 physics step과 done-env reset 뒤 CUDA를 동기화한다. 비동기로
+  늦게 보고되는 illegal access가 `env.step`에서 시작됐는지 reset에서 시작됐는지 traceback에
+  최초 실패 구간을 표시한다. 필요하면 `STACK_CUDA_SYNC_DEBUG=0`으로 끌 수 있다.
+- generic marker actor 갱신을 끈 뒤 누락됐던 path 표시를 actor setter가 필요 없는 line
+  renderer로 복구했다. cyan 띠는 A1 정책에 실제 입력되는 `_gt_path`, 노란 십자는 stack goal,
+  빨간 십자는 path endpoint다. reset 로그에 생성 endpoint와 설치된 path 끝의 오차도 출력한다.
+- 단일 선이 checkerboard 바닥에 묻히므로 A1 path를 바닥에서 14cm 띄운 36cm 폭의 밝은
+  cyan 평행선 ribbon으로 변경하고 goal/endpoint 십자 크기도 키웠다.
+- framework construction reset의 hook 순서에 path 설치를 의존하지 않는다. checkpoint/player
+  생성 직후와 각 done-env reset 직후 `install_midpath_paths()`를 명시적으로 호출하고 policy
+  observation을 다시 계산한다. renderer는 endpoint 상태가 아직 없으면 안전하게 건너뛴다.
+- 검증: unit test 26개, Python compile, bash syntax 및 diff check 통과. 전용 반복 loop의 실제 GUI
+  episode 전환 검증은 사용자가 실행할 단계로 남겼다.
+
 ## 2026-09-15
+
+### Retreat checkpoint 독립 평가 하네스
+
+- eval_retreat.sh/py로 학습 sidecar를 재사용하는 deterministic 평가를 추가했다. 학습과
+  baseline은 수정하지 않으며 고유 eval 출력 디렉터리로 기존 결과 덮어쓰기를 거부한다.
+- episode raw 기록과 endpoint drift/path MAE, reach/stop/fall, collision proxy 및 minimum
+  gap 요약을 저장한다. 미완결 episode는 rate 분모에서 제외하고 censored 수를 보고한다.
+- Agent2 접근/정지 자연 발생 subset을 기록한다. 강제 개입 scenario는 아직 구현하지 않았다.
+- 검증: unit test 26개 통과, Python compile/bash syntax/diff check 통과. 실제 simulator
+  평가와 동적 회피 성능 검증은 아직 실행하지 않았다.
+
+### Planner view 기존 경로 overlay 제거
+
+- 실행 path(분홍/주황)와 steering window(cyan/초록) 표시를 제거하고 흰 planner 원본과
+  파란 가상 box만 남겼다. 실행·학습 로직과 non-planner viewer는 변경하지 않았다.
+- 검증: view_env Python compile 및 diff check 통과. GUI 육안 검증은 수행하지 않았다.
 
 ### Retreat goal 유지와 동적 body/held-box 회피 학습
 

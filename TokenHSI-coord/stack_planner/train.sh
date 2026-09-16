@@ -84,10 +84,7 @@ export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.50}
 export STACK_TOP_XY_TOL=${STACK_TOP_XY_TOL:-0.15}
 export STACK_TOP_FOLLOWS_BOTTOM=${STACK_TOP_FOLLOWS_BOTTOM:-1}
 
-PHYSX_LIB_DIR=${PHYSX_LIB_DIR:-/tmp/hwanhee-physx-lib}
-if [ -d "$PHYSX_LIB_DIR" ]; then
-    export LD_LIBRARY_PATH="$PHYSX_LIB_DIR:${LD_LIBRARY_PATH:-}"
-fi
+. "$COORD/stack_planner/physx_cuda_compat.sh"
 
 {
     printf 'executor=%q\n' "$(realpath -- "$EXEC_CKPT")"

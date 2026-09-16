@@ -8,8 +8,6 @@ from pathlib import Path
 import torch
 import numpy as np
 
-from tokenhsi.utils import steer_path as sp
-
 from .checkpoint import load_stack_checkpoint
 from .env_adapter import HumanoidMAStackPlannerTrain
 
@@ -52,8 +50,8 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
             ),
             flush=True,
         )
-        print("[stack-planner-view] white=latest raw model output; pink/orange=executed path; "
-              "cyan/green=policy steering window; blue wire box=virtual retreat box", flush=True)
+        print("[stack-planner-view] white=latest raw model output; "
+              "blue wire box=virtual retreat box", flush=True)
 
     def _update_marker(self):
         """Do not submit disabled multi-task actor IDs from the viewer.
@@ -96,7 +94,7 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._stack_planner_last_phase.copy_(phase)
 
     def _draw_task(self):
-        """Show raw proposals separately from the actual executor buffers.
+        """Show only raw planner proposals and the virtual retreat box.
 
         Do not use the inherited speed-run renderer: its point decimation and
         run filtering can omit short curves and endpoints entirely.
@@ -107,21 +105,6 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         if getattr(self, "_stack_planner_latest_path", None) is None:
             return
         raw = self._stack_planner_latest_path.cpu().numpy()
-        dense = self._gt_path.cpu().numpy()
-        ends = self._s_end.cpu().numpy()
-        roots = self.humanoid_rows(self._humanoid_root_states)
-        arc = self._arc_root
-        window = self._m_at(arc)
-        off = torch.arange(1, self.steer_k + 1, device=self.device) / self.steer_k
-        query = torch.minimum(arc[:, None] + window[:, None] * off,
-                              self._s_end[:, None])
-        q = (query / sp.DS).clamp(0, sp.V - 2)
-        lo = q.floor().long()
-        rows = torch.arange(self._rows, device=self.device)[:, None]
-        steering = (self._gt_path[rows, lo] + (q - lo)[..., None]
-                    * (self._gt_path[rows, lo + 1] - self._gt_path[rows, lo]))
-        steering = steering.cpu().numpy()
-        root_np = roots.cpu().numpy()
         virtual = self._planner_virtual_retreat_pos.cpu().numpy()
         sizes = self._box_lib._box_size.cpu().numpy()
         phase = self._stack_phase.cpu().numpy()
@@ -154,21 +137,8 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
 
         for e, env in enumerate(self.envs):
             for a in range(self.num_agents):
-                r = e * self.num_agents + a
                 lines(env, lifted(raw[e, a], 0.14 + 0.02 * a), (1.0, 1.0, 1.0),
                       width=0.10)
-                end_q = np.clip(ends[r] / sp.DS, 0, sp.V - 2)
-                end_lo = int(np.floor(end_q))
-                endpoint = (dense[r, end_lo] + (end_q - end_lo)
-                            * (dense[r, end_lo + 1] - dense[r, end_lo]))
-                executed = np.concatenate((dense[r, :end_lo + 1], endpoint[None]))
-                lines(env, lifted(executed, 0.05 + 0.02 * a),
-                      (1.0, 0.15, 0.65) if a == 0 else (1.0, 0.55, 0.1),
-                      width=0.30)
-                lines(env, lifted(np.concatenate((root_np[r:r + 1, :2], steering[r])),
-                                  root_np[r, 2]),
-                      (0.1, 0.95, 1.0) if a == 0 else (0.35, 1.0, 0.35),
-                      width=0.16)
             if not self._carry_rehearsal[e].item():
                 r = e * self.num_agents
                 # Match observation-space position, size and yaw footprint,

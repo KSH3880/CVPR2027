@@ -187,6 +187,19 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         crossing_cost.mean().backward()
         self.assertGreater(float(crossing.grad.abs().sum()), 0.0)
 
+        ends_inside = torch.tensor([[
+            [0.0, -0.7], [0.0, -1.1], [0.0, -0.9], [0.0, -0.5],
+        ]])
+        inside_result = retreat_box_clearance(
+            ends_inside, box_xy, box_yaw, box_size,
+        )
+        self.assertGreater(float(inside_result["endpoint_overlap"]), 0.0)
+        self.assertEqual(float(
+            retreat_box_clearance(safe, box_xy, box_yaw, box_size)[
+                "endpoint_overlap"
+            ]
+        ), 0.0)
+
         state = make_state(batch=1)
         state.box_xyz[0, 0, :2] = box_xy[0]
         state.box_heading[0, 0] = box_yaw[0]

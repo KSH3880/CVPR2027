@@ -23,6 +23,7 @@ from stack_planner.constraints import (
     free_path_validity, retreat_endpoint_change_cost, held_box_body_cost,
 )
 from stack_planner.execution import execution_view, retreat_box_geometry
+from stack_planner.reset_transaction import CarryOnlySingleCommitReset
 from tokenhsi.utils import steer_path as sp
 
 
@@ -60,7 +61,9 @@ def _resample_unified_plan(path, speed):
     return dense[..., :2], dense[..., 2].clamp(MIN_SPEED, MAX_SPEED), end
 
 
-class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
+class HumanoidMAStackPlannerTrain(
+    CarryOnlySingleCommitReset, HumanoidMASequentialStackCarry
+):
     """Sequential stack task with an externally installed stack-planner path."""
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
@@ -102,6 +105,9 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
             self.num_envs, device=self.device
         )
         self._planner_retreat_box_min_clearance = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self._planner_retreat_box_endpoint_clearance = torch.zeros(
             self.num_envs, device=self.device
         )
         self._planner_applied = torch.zeros(self._rows, dtype=torch.bool, device=self.device)
@@ -163,6 +169,7 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
             self._planner_policy_decision[env_ids] = True
             self._planner_retreat_box_path_penalty[env_ids] = 0.0
             self._planner_retreat_box_min_clearance[env_ids] = 0.0
+            self._planner_retreat_box_endpoint_clearance[env_ids] = 0.0
             rows = self.agent_rows(env_ids)
             self._planner_applied[rows] = False
             root = self.humanoid_rows(self._humanoid_root_states)[rows]
@@ -351,14 +358,23 @@ class HumanoidMAStackPlannerTrain(HumanoidMASequentialStackCarry):
         commit_retreat = retreat_env & install[:, 0]
         self._planner_retreat_box_path_penalty.zero_()
         self._planner_retreat_box_min_clearance.zero_()
-        if commit_retreat.any():
-            geometry = retreat_box_geometry(path, state, commit_retreat)
-            self._planner_retreat_box_path_penalty[commit_retreat] = geometry[
+        self._planner_retreat_box_endpoint_clearance.zero_()
+        # Score every finite retreat proposal, including invalid candidates.
+        # Otherwise early invalid actions all receive the same binary penalty
+        # and PPO cannot learn which direction clears the placed box.
+        finite_retreat = retreat_env & torch.isfinite(path).flatten(1).all(dim=-1)
+        if finite_retreat.any():
+            geometry = retreat_box_geometry(path, state, finite_retreat)
+            self._planner_retreat_box_path_penalty[finite_retreat] = geometry[
                 "penalty"
             ]
-            self._planner_retreat_box_min_clearance[commit_retreat] = geometry[
+            self._planner_retreat_box_min_clearance[finite_retreat] = geometry[
                 "minimum_clearance"
             ]
+            self._planner_retreat_box_endpoint_clearance[finite_retreat] = geometry[
+                "endpoint_clearance"
+            ]
+        if commit_retreat.any():
             # The inherited phase-2 completion test must judge the exact same
             # learned endpoint that the frozen executor sees, not the legacy
             # manually generated retreat goal/direction.
