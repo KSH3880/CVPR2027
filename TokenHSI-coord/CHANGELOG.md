@@ -13,6 +13,9 @@
   계속 적용한다. A2는 기존 placement row ownership과 stacking goal을 유지한다.
 - invalid raw 후보가 가상 box만 움직이고 `_gt_path`는 이전 값에 남던 command 불일치를 제거했다.
   이제 유효 A1 plan이 설치될 때만 가상 box와 path endpoint를 함께 갱신한다.
+- 서버의 긴 `ldconfig` 출력에서 `awk` 조기 종료가 SIGPIPE를 발생시키고 `set -eo pipefail`이
+  학습 launcher를 아무 로그 없이 종료하던 문제를 수정했다. CUDA driver 탐색은 입력 전체를
+  소비하면서 첫 `libcuda.so.1`만 선택한다.
 
 ## 2026-09-16
 

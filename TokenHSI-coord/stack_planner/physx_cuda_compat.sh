@@ -8,7 +8,12 @@ if [ -z "${ROOT:-}" ]; then
 fi
 
 PHYSX_LIB_DIR=${PHYSX_LIB_DIR:-"$ROOT/.runtime/physx-lib"}
-CUDA_DRIVER_SO1=$(ldconfig -p 2>/dev/null | awk '$1 == "libcuda.so.1" { print $NF; exit }')
+# Do not exit awk early here. Callers use `set -o pipefail`; on servers with a
+# long ldconfig listing, an early awk exit closes the pipe and makes ldconfig
+# return SIGPIPE, which `set -e` turns into a silent launcher termination.
+CUDA_DRIVER_SO1=$(ldconfig -p 2>/dev/null | awk '
+    $1 == "libcuda.so.1" && !found { print $NF; found=1 }
+')
 if [ -z "$CUDA_DRIVER_SO1" ] || [ ! -r "$CUDA_DRIVER_SO1" ]; then
     echo "readable libcuda.so.1 not found; NVIDIA driver install is incomplete" >&2
     return 2
