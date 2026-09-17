@@ -2,6 +2,18 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-17
+
+### A2 stacking 중 A1 동적 회피 유지
+
+- planner task에서 A1을 `A1_RETREAT`뿐 아니라 `A2_RESUME`와 `VERIFY_STACK`에서도 active row로
+  유지한다. A2가 접근하고 box를 올리는 동안 A1 goal 이후 suffix를 계속 재계획·설치하므로,
+  같은 macro action의 collision outcome이 실제 실행된 A1 회피 path에 귀속된다.
+- post-placement phase에서는 A1 suffix의 Box1 footprint penalty와 낮춘 consistency scale을
+  계속 적용한다. A2는 기존 placement row ownership과 stacking goal을 유지한다.
+- invalid raw 후보가 가상 box만 움직이고 `_gt_path`는 이전 값에 남던 command 불일치를 제거했다.
+  이제 유효 A1 plan이 설치될 때만 가상 box와 path endpoint를 함께 갱신한다.
+
 ## 2026-09-16
 
 ### 고정 거리 대신 retreat 충돌 회피 shaping 강화

@@ -52,13 +52,14 @@ Bezier control-point exploration std는 `STACK_PLANNER_CURVE_STD=0.12`, A1 suffi
   현재 root부터 그 위치까지를 33점으로 보간한다. 마지막 점은 실제 carry goal과 정확히 맞춘다.
 - placement 후: 같은 path의 goal 이후 suffix만 33점으로 보간하고, 첫 점만 실제 현재 root에
   연결한다. 나머지 world 좌표와 planner 원본 endpoint는 이동시키지 않는다.
-  매 phase 2 planner tick의 유효 suffix를 다시 설치하며
+  A1은 phase 2뿐 아니라 A2가 접근하고 stacking하는 phase 3/4에도 active row로 남는다.
+  매 planner tick의 유효 suffix를 다시 설치하며
   path·arc·virtual box도 함께 갱신한다. execution latch는 없으며 endpoint가 이동 중 변할 수 있다.
   planner 전용 task는 phase 2 진입 시 manual retreat 대신 현재 위치의 stationary hold를
   설치한다. invalid 후보는 analytic collision/clearance penalty를 받고 다음 decision에서
-  재평가한다. 가상 box는 이 실행 gate와 무관하게
-  매 최신 planner 원본 world endpoint에 배치하고 항상 표시한다. retreat observation도 그
-  위치를 사용한다. 기존 planner 없는 task는 그대로다.
+  재평가한다. invalid raw 후보는 실행 path와 가상 box 어느 쪽도 변경하지 않는다. 유효 후보가
+  설치될 때만 같은 endpoint를 path와 가상 box에 함께 적용하므로 steering token과 carry token이
+  서로 다른 목표를 가리키지 않는다. 기존 planner 없는 task는 그대로다.
 - 두 구간 모두 이후 기존 0.1 m/320-point steering ABI로 다시 resample한다. 실행 속도는
   adapter가 고정 `MAX_SPEED`로 부여하며 모델은 속도를 예측하지 않는다.
 
@@ -68,7 +69,7 @@ Bezier control-point exploration std는 `STACK_PLANNER_CURVE_STD=0.12`, A1 suffi
 A2 출발은 learned endpoint 도달이나 A1 이동 거리로 판정하지 않는다. bottom box가 물리적으로
 안정화되면 A1 retreat를 열고, 그 안정 상태가 추가로 1초 유지되는 즉시 A2 goal을 활성화한다.
 대기 시간은 `STACK_PLANNER_A2_STABLE_DELAY`로 설정한다.
-phase 2의 매 설치 execution suffix에는 놓인 Box1의 yaw/XY size를 반영한 oriented footprint
+A1이 active인 phase 2~4의 매 설치 execution suffix에는 놓인 Box1의 yaw/XY size를 반영한 oriented footprint
 clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safety margin 0.10 m만큼
 팽창하며, release 직후 가까이 서 있는 것 자체보다 이후 point가 box 안쪽으로 파고들거나
 끝까지 안전 영역을 빠져나오지 않는 경로를 감점한다. 기본 계수는

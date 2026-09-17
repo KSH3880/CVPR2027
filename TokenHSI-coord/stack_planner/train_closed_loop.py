@@ -24,7 +24,6 @@ sys.path.insert(0, str(COORD_ROOT))
 import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from coordinator.schema import AGENTS, STATE_KEYS, CoordinatorState  # noqa: E402
-from coordinator.sequential_bridge import carry_rows  # noqa: E402
 from stack_planner.checkpoint import load_stack_checkpoint, save_stack_checkpoint  # noqa: E402
 from stack_planner.consistency import (  # noqa: E402
     build_stack_consistency_target, stack_trajectory_consistency_loss,
@@ -121,7 +120,7 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
         disturbance += torch.where(active, step_disturbance, torch.zeros_like(step_disturbance))
         fall = torch.maximum(fall, task.planner_fall().float() * active.float())
         elapsed_steps += active.float()
-        owned = carry_rows(task._stack_phase, task._carry_rehearsal)
+        owned = task.planner_active_rows()
         owned &= active[:, None]
         lateral = task._lat_root.reshape(n, AGENTS).abs()
         path_error_sum += (lateral * owned.float()).sum(dim=-1)
@@ -416,7 +415,11 @@ def main():
                 if consistency_coef > 0.0:
                     consistency_target["valid"] &= decision[:, None, None, None]
                     scale = torch.ones_like(consistency_target["position"][..., 0])
-                    retreat = (task._stack_phase == task.A1_RETREAT) & ~task._carry_rehearsal
+                    retreat = (
+                        (task._stack_phase >= task.A1_RETREAT)
+                        & (task._stack_phase < task.DONE)
+                        & ~task._carry_rehearsal
+                    )
                     scale[retreat, :, 0] = retreat_path_scale
                     consistency_target["position_scale"] = scale
                 endpoint_change_cost = task._planner_endpoint_change_cost.clone()

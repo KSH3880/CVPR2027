@@ -168,6 +168,22 @@ class HumanoidMAStackPlannerTrain(
             size[..., :2], goal, held.float(), phase,
         )
 
+    def planner_active_rows(self):
+        """Rows controlled by the planner in the current stack phase.
+
+        A1 remains active after A2 starts: it must keep adapting its retreat
+        suffix around A2 and the carried top box instead of freezing the last
+        pre-handoff path.  A2 retains its normal placement ownership.
+        """
+        active = carry_rows(self._stack_phase, self._carry_rehearsal)
+        a1_avoids = (
+            (self._stack_phase >= self.A1_RETREAT)
+            & (self._stack_phase < self.DONE)
+            & ~self._carry_rehearsal
+        )
+        active[:, 0] |= a1_avoids
+        return active
+
     def _reset_envs(self, env_ids):
         super()._reset_envs(env_ids)
         if hasattr(self, "_planner_virtual_retreat_pos") and len(env_ids):
@@ -361,10 +377,14 @@ class HumanoidMAStackPlannerTrain(
         """Install candidate zero; return per-env (valid, conservative-safe)."""
         state = self.planner_state()
         phase = self._stack_phase
-        active = carry_rows(phase, self._carry_rehearsal)
-        retreat_env = (phase == self.A1_RETREAT) & ~self._carry_rehearsal
-        # Retain the accepted virtual endpoint after A2 starts. Reset or a new
-        # retreat entry clears readiness, not simply leaving phase 2.
+        active = self.planner_active_rows()
+        retreat_env = (
+            (phase >= self.A1_RETREAT)
+            & (phase < self.DONE)
+            & ~self._carry_rehearsal
+        )
+        # A1 keeps consuming the goal->endpoint suffix while A2 approaches and
+        # stacks, so it can dynamically yield instead of freezing at handoff.
         retreat_rows = torch.zeros_like(active)
         retreat_rows[:, 0] = retreat_env
         model_path = output["path_world"][:, 0]
@@ -374,8 +394,6 @@ class HumanoidMAStackPlannerTrain(
             float(os.environ.get("STACK_PLANNER_RETREAT_ENDPOINT_TOLERANCE", "0.10")),
         )
         self._planner_endpoint_history_valid.copy_(retreat_env)
-        # Always use the raw world endpoint, without validity/readiness gates.
-        self._planner_virtual_retreat_pos[:, :2] = model_path[:, 0, -1]
         a1_rows = self.all_rows().reshape(self.num_envs, 2)[:, 0]
         self._planner_virtual_retreat_pos[:, 2] = (
             float(os.environ.get("STACK_GROUND_Z", "0.0"))
@@ -436,9 +454,14 @@ class HumanoidMAStackPlannerTrain(
             )
             self._a1_retreat_dir[commit_retreat] = direction
             self._a1_retreat_pos[commit_retreat, :2] = endpoint[commit_retreat]
+            # The carry token and steering token must describe the same
+            # accepted action. Invalid raw proposals update neither one.
+            self._planner_virtual_retreat_pos[commit_retreat, :2] = (
+                endpoint[commit_retreat]
+            )
             self._planner_retreat_ready[commit_retreat] = True
-        # Invalid candidates leave the execution path untouched. The virtual
-        # box still follows the latest raw planner endpoint, with no fallback.
+        # Invalid candidates leave both execution path and virtual box at the
+        # last accepted action, preventing contradictory low-level commands.
         if install.any():
             dense, dense_speed, end = _resample_unified_plan(path, speed)
             flat_install = install.reshape(-1)
