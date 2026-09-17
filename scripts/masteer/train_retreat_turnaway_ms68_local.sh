@@ -1,10 +1,10 @@
 #!/bin/bash
-# ms67: keep one CLEAR phase while turning toward a rear-biased path, fading
-# released-box observations in three policy steps, walking forward, and stopping.
+# ms70: keep one CLEAR phase while turning toward a rear-biased path, use direct
+# yaw-error progress, fade released-box observations, walk forward, and stop.
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-TAG=${1:-ms68_ms18e9000_fade3_angle120_retreat2to3_3000_s0}
+TAG=${1:-ms70_ms18e9000_yaw15_wait10_hold10_1000_s0}
 
 # Local pilot profile. Do not alter the running ms66 wrapper in place.
 export PILOT_GPU=1
@@ -23,7 +23,7 @@ export PILOT_CLEAR_ARC_DIST=0.60
 # If Base finishes CLEAR before Top reaches the safety gate, commit Top's
 # target directly to the settled Base box instead of completing the obsolete
 # wait-point detour.  Top still uses and waits at the gate when it arrives first.
-export STACK_CLEAR_BYPASS_STAGE=1
+export PILOT_CLEAR_BYPASS_STAGE=${PILOT_CLEAR_BYPASS_STAGE:-1}
 
 # Fade both released-carrier carry windows to zero in 3 policy steps at 30 Hz
 # (about 0.10 s, or 6 simulator frames at 60 Hz).
@@ -39,7 +39,8 @@ export PILOT_CARRY_OBS_ZERO_FADE_STEPS=3
 export PILOT_NEGATIVE_CLEAR_REWARD=0
 export PILOT_CLEAR_CLASSIC_STEER=1
 export PILOT_CLEAR_CLASSIC_STOP_REWARD=1
-export PILOT_CLEAR_HEADING_PROGRESS_W=2.0
+export PILOT_CLEAR_HEADING_PROGRESS_W=${PILOT_CLEAR_HEADING_PROGRESS_W:-1.5}
+export PILOT_CLEAR_YAW_PROGRESS=${PILOT_CLEAR_YAW_PROGRESS:-1}
 export PILOT_CLEAR_FORWARD_GATE=1
 export PILOT_CLEAR_MOVE_W=0.0
 export PILOT_CLEAR_STALL_PEN_W=0.10
@@ -50,8 +51,8 @@ export PILOT_STOP_LIN=0.20
 export PILOT_STOP_ANG=1.00
 export PILOT_STOP_UPRIGHT_DEG=25.0
 export PILOT_STOP_CONTACT_FORCE=0.50
-export PILOT_TOP_WAIT_REWARD_W=0.50
-export PILOT_BASE_HOLD_REWARD_W=0.50
+export PILOT_TOP_WAIT_REWARD_W=${PILOT_TOP_WAIT_REWARD_W:-10.0}
+export PILOT_BASE_HOLD_REWARD_W=${PILOT_BASE_HOLD_REWARD_W:-10.0}
 export PILOT_BASE_REGRASP_PEN_W=0.0
 
 exec bash "$ROOT/scripts/masteer/train_ms52_shared_goal_safe_local.sh" "$TAG"

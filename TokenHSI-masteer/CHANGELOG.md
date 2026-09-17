@@ -2,7 +2,57 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-17
+
+### ms72 ms71 STACK reward + endpoint-latched hybrid-yaw retreat
+
+- `ms71`의 STACK Base reward 계약(`hold=1`, endpoint anchor gate, 관측 불가능한
+  legacy box/clear reward 제거)을 그대로 유지하는
+  `train_retreat_endpoint_ms72_local.sh`를 추가했다.
+- CLEAR 회전은 전 구간의 signed yaw-error progress에 1.5를 주고, 남은 yaw가 90도
+  안으로 들어오면 cosine alignment gain을 통해 최대 2.0을 추가한다. 새
+  `STACK_CLEAR_YAW_PROGRESS_W`가 0이면 ms70/ms71의 기존 단일 progress 계산을 그대로
+  사용하므로 기존 sidecar와 래퍼 동작은 바뀌지 않는다.
+- 2--3 m rear-biased path, `retreat_scale=0.25`, 마지막 0.4 m 감속, 3-step carry
+  observation fade와 Top wait 우회는 유지한다. `arc>=0.60 m`와 endpoint error
+  `<=0.12 m`를 동시에 만족하면 arrival을 latch하고 Base steering을 `M=0`으로 hold한다.
+- ms72에서만 base-box hard gate를 명시적으로 켜고 XY/Z 오차 `0.10/0.06 m`, 선/각속도
+  `0.08/0.20`을 사용한다. humanoid stop 문턱과 5-frame streak는 ms70과 동일하다.
+  새 설정은 sidecar에 저장·재생되도록 `train_local.sh`에도 등록했다.
+
+### ms71 STACK Base reward를 관측 가능한 퇴각점 HOLD로 축소
+
+- 기존 STACK Base HOLD는 퇴각점 위치와 정지·upright·양발 지지를 더하는 구조라,
+  퇴각점을 완전히 떠나도 자세 항만으로 최대 65%의 보상을 받을 수 있었다. 새 opt-in
+  `STACK_BASE_HOLD_ANCHOR_GATE`는 HOLD 전체를 퇴각점 proximity로 gate해, 해당 위치를
+  떠나면 자세 보상도 함께 사라지게 한다.
+- CLEAR 이후 Base의 두 carry 관측은 0이고 ms70의 masked teammate 토큰도 actor가
+  사용하지 않으므로, STACK에서 관측 불가능한 아래 박스 `support/stability`와 이미
+  포화된 `clear_score`를 더하지 않는 `STACK_BASE_LEGACY_REWARD=0` 옵션을 추가했다.
+  RELEASE와 CLEAR 보상 및 모든 phase 전환·실패·성공 조건은 그대로다.
+- 새 `ms71` 래퍼만 anchor gate와 legacy-off를 켜며 Base HOLD 가중치를 `10 -> 1`로
+  낮춘다. regrasp penalty는 0으로 유지해 퇴각점 HOLD 변경만 먼저 검증한다. 기존
+  ms70과 기본 동작은 각각 anchor gate off, legacy on으로 재현된다.
+
+### ms70 WAIT/HOLD 외부 override 허용
+
+- ms70 래퍼의 기본 Top WAIT와 Base HOLD는 10.0으로 유지하면서, 실행 명령에서
+  `PILOT_TOP_WAIT_REWARD_W`와 `PILOT_BASE_HOLD_REWARD_W`를 명시하면 덮어쓸 수 있게 했다.
+  동일 설정의 50.0 비교 실행을 별도 태그로 만들기 위한 변경이다.
+
 ## 2026-09-16
+
+### ms70 CLEAR yaw progress와 회전 시동 진단
+
+- CLEAR의 opt-in heading shaping을 cosine 차분 대신 실제 planar yaw 오차의
+  감소량(rad)으로 계산하는 `STACK_CLEAR_YAW_PROGRESS`를 추가했다. 기존 실행은
+  기본값 0으로 보존하고, 새 ms70 래퍼만 가중치 1.5로 활성화한다.
+- RELEASE 순간 yaw 오차, CLEAR 중 최소 yaw 오차, retreat arc 0.10 m 최초 도달
+  step을 metrics의 90~92열에 기록하고 `stack_stage_summary.py`에서 CLEAR 성공/실패
+  cohort별 회전 시동 통계를 출력한다. 기존 90열 metrics도 계속 읽는다.
+- 요청대로 새 래퍼의 Top WAIT와 Base HOLD 가중치를 모두 10.0으로 설정했다.
+  기존 완료 출력 덮어쓰기를 피하도록 기본 태그를
+  `ms70_ms18e9000_yaw15_wait10_hold10_1000_s0`로 분리했다.
 
 ### ms68 재실행 래퍼의 Base HOLD와 Top WAIT 강화
 

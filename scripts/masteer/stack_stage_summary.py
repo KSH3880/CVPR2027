@@ -248,6 +248,28 @@ if len(x):
     else:
         print("STACK_TOP_DEBUG unavailable=legacy_columns")
 
+    if m.shape[1] >= 93:
+        release_yaw, min_yaw, arc01_step = 90, 91, 92
+        released = x[:, release] >= 0
+        cleared = x[:, clear] >= 0
+        ignition = x[:, arc01_step] >= 0
+
+        def median_or_nan(values):
+            return np.median(values) if len(values) else float("nan")
+
+        print(
+            "STACK_CLEAR_IGNITION "
+            f"release_yaw_p50={median_or_nan(x[released, release_yaw]):.2f}deg "
+            f"min_yaw_p50={median_or_nan(x[released, min_yaw]):.2f}deg "
+            f"arc01_given_release={conditional_rate(ignition, released):.3f} "
+            f"arc01_step_p50={median_or_nan(x[ignition, arc01_step]):.0f} "
+            f"release_yaw_clear_p50={median_or_nan(x[cleared, release_yaw]):.2f}deg "
+            f"release_yaw_fail_p50={median_or_nan(x[released & ~cleared, release_yaw]):.2f}deg "
+            f"min_yaw_fail_p50={median_or_nan(x[released & ~cleared, min_yaw]):.2f}deg"
+        )
+    else:
+        print("STACK_CLEAR_IGNITION unavailable=legacy_columns")
+
 if len(sys.argv) >= 3:
     baseline_path = sys.argv[2]
     baseline = np.load(baseline_path)

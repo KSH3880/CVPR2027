@@ -131,6 +131,12 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         self._ss_top_wait_reward_w = _f("STACK_TOP_WAIT_REWARD_W", 0.0)
         self._ss_base_hold_reward_w = _f("STACK_BASE_HOLD_REWARD_W", 0.0)
+        self._ss_base_hold_anchor_gate = bool(
+            _i("STACK_BASE_HOLD_ANCHOR_GATE", 0)
+        )
+        self._ss_stack_base_legacy_reward = bool(
+            _i("STACK_BASE_LEGACY_REWARD", 1)
+        )
         self._ss_pre_steps = _i("STACK_PRE_STEPS", 0)
         self._ss_phase_steps = _i("STACK_PHASE_STEPS", 0)
         self._ss_body_clear = _f("STACK_BODY_CLEAR", 1.0)
@@ -308,6 +314,15 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_clear_heading_progress_w = _f(
             "STACK_CLEAR_HEADING_PROGRESS_W", 0.0
         )
+        self._ss_clear_yaw_progress = bool(
+            _i("STACK_CLEAR_YAW_PROGRESS", 0)
+        )
+        self._ss_clear_yaw_progress_w = _f(
+            "STACK_CLEAR_YAW_PROGRESS_W", 0.0
+        )
+        self._ss_clear_yaw_cosine_start_deg = _f(
+            "STACK_CLEAR_YAW_COSINE_START_DEG", 90.0
+        )
         self._ss_clear_move_w = _f("STACK_CLEAR_MOVE_W", 1.0)
         self._ss_clear_hand_pen_w = _f("STACK_CLEAR_HAND_PEN_W", 0.5)
         self._ss_clear_stall_pen_w = _f("STACK_CLEAR_STALL_PEN_W", 0.5)
@@ -328,6 +343,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_stop_upright_deg = _f("STACK_STOP_UPRIGHT_DEG", 15.0)
         self._ss_stop_contact_force = _f("STACK_STOP_CONTACT_FORCE", 1.0)
         self._ss_stop_reward_w = _f("STACK_STOP_REWARD_W", 0.0)
+        self._ss_retreat_endpoint_tol = _f(
+            "STACK_RETREAT_ENDPOINT_TOL", 0.0
+        )
         self._ss_carry_done_r = _f("STACK_CARRY_DONE_REWARD", 1.6)
         self._ss_release_done_r = _f("STACK_RELEASE_DONE_REWARD", 1.0)
         self._ss_clear_done_r = _f(
@@ -506,6 +524,12 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             raise ValueError("STACK_CARRY_OBS_ZERO_FADE_STEPS must be non-negative")
         if self._ss_clear_heading_progress_w < 0.0:
             raise ValueError("STACK_CLEAR_HEADING_PROGRESS_W must be non-negative")
+        if self._ss_clear_yaw_progress_w < 0.0:
+            raise ValueError("STACK_CLEAR_YAW_PROGRESS_W must be non-negative")
+        if not 0.0 < self._ss_clear_yaw_cosine_start_deg <= 180.0:
+            raise ValueError(
+                "STACK_CLEAR_YAW_COSINE_START_DEG must be in (0, 180]"
+            )
         if self._ss_virtual_rear_box and not self._ss_virtual_retreat:
             raise ValueError(
                 "STACK_VIRTUAL_RETREAT_REAR_BOX requires "
@@ -530,6 +554,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             raise ValueError("STACK stop thresholds must be positive")
         if self._ss_stop_reward_w < 0.0:
             raise ValueError("STACK_STOP_REWARD_W must be non-negative")
+        if self._ss_retreat_endpoint_tol < 0.0:
+            raise ValueError("STACK_RETREAT_ENDPOINT_TOL must be non-negative")
         if self._ss_stop_upright_deg <= 0.0 or self._ss_stop_upright_deg > 90.0:
             raise ValueError("STACK_STOP_UPRIGHT_DEG must be in (0, 90]")
         if self._ss_trace_path and min(
@@ -685,6 +711,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_prev_heading_alignment = torch.zeros(
             num_envs, device=self.device
         )
+        self._ss_prev_yaw_error = torch.zeros(num_envs, device=self.device)
+        self._ss_retreat_arrived = torch.zeros(
+            num_envs, dtype=torch.bool, device=self.device
+        )
         self._ss_stop_count = torch.zeros(
             num_envs, dtype=torch.long, device=self.device
         )
@@ -763,6 +793,13 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_dbg_above_bonus_sum = torch.zeros(num_envs, device=self.device)
         self._ss_dbg_success_bonus_sum = torch.zeros(num_envs, device=self.device)
         self._ss_dbg_end_reason = torch.full_like(self._ss_dbg_staged_step, -1)
+        self._ss_dbg_release_yaw_error = torch.full(
+            (num_envs,), -1.0, device=self.device
+        )
+        self._ss_dbg_min_yaw_error = torch.full(
+            (num_envs,), float("inf"), device=self.device
+        )
+        self._ss_dbg_arc01_step = torch.full_like(self._ss_dbg_staged_step, -1)
         self._ss_dbg_pick_count = torch.zeros(
             rows, dtype=torch.long, device=self.device
         )
@@ -803,7 +840,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"retry{self._ss_shared_path_retries}/"
             f"start_margin{self._ss_shared_path_start_margin:.2f}/"
             f"wait_r{self._ss_top_wait_reward_w:.2f}/"
-            f"base_hold_r{self._ss_base_hold_reward_w:.2f} "
+            f"base_hold_r{self._ss_base_hold_reward_w:.2f}/"
+            f"anchor_gate{int(self._ss_base_hold_anchor_gate)}/"
+            f"legacy{int(self._ss_stack_base_legacy_reward)} "
             f"budget={self._ss_pre_steps}+{self._ss_phase_steps} "
             f"bootstrap={self._ss_bootstrap_frac:.2f}/"
             f"wait{int(self._ss_bootstrap_keep_wait)}/"
@@ -853,6 +892,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"clear_classic_stop_reward="
             f"{int(self._ss_clear_classic_stop_reward)} "
             f"clear_heading_progress_w={self._ss_clear_heading_progress_w:.2f} "
+            f"clear_yaw_progress={int(self._ss_clear_yaw_progress)} "
+            f"clear_yaw_progress_w={self._ss_clear_yaw_progress_w:.2f}/"
+            f"cos{self._ss_clear_yaw_cosine_start_deg:.1f} "
             f"negative_clear_w={self._ss_clear_move_w:.2f}/"
             f"{self._ss_clear_hand_pen_w:.2f}/"
             f"{self._ss_clear_stall_pen_w:.2f}/"
@@ -863,7 +905,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"move_min_frac={self._ss_clear_move_min_frac:.2f} "
             f"stop={self._ss_stop_hold_steps}/{self._ss_stop_decel_dist:.2f}m/"
             f"{self._ss_stop_lin:.2f}/{self._ss_stop_ang:.2f}/"
-            f"{self._ss_stop_upright_deg:.1f}deg/{self._ss_stop_reward_w:.2f} "
+            f"{self._ss_stop_upright_deg:.1f}deg/{self._ss_stop_reward_w:.2f}/"
+            f"endpoint{self._ss_retreat_endpoint_tol:.2f} "
             f"clear_grace={self._ss_clear_grace_steps}",
             flush=True,
         )
@@ -1126,6 +1169,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_dbg_settled_step,
             self._ss_dbg_above_step,
             self._ss_dbg_end_reason,
+            self._ss_dbg_arc01_step,
         ):
             value[env_ids] = -1
         for value in (
@@ -1143,6 +1187,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         ):
             value[env_ids] = 0
         self._ss_dbg_stack_dist_min[env_ids] = float("inf")
+        self._ss_dbg_release_yaw_error[env_ids] = -1.0
+        self._ss_dbg_min_yaw_error[env_ids] = float("inf")
 
     def _post_object_reset(self, env_ids):
         self._finish_stack_trace(env_ids)
@@ -1181,6 +1227,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_retreat_dir[env_ids] = 0.0
         self._ss_clear_age[env_ids] = 0
         self._ss_prev_heading_alignment[env_ids] = 0.0
+        self._ss_prev_yaw_error[env_ids] = 0.0
+        self._ss_retreat_arrived[env_ids] = False
         self._ss_stop_count[env_ids] = 0
         self._ss_release_age[env_ids] = 0
         self._ss_prev_release_h[env_ids] = 0.0
@@ -1590,6 +1638,21 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_dbg_stack_dist_min,
             -torch.ones_like(self._ss_dbg_stack_dist_min),
         )
+        min_yaw_error = torch.where(
+            torch.isfinite(self._ss_dbg_min_yaw_error),
+            self._ss_dbg_min_yaw_error,
+            -torch.ones_like(self._ss_dbg_min_yaw_error),
+        )
+        release_yaw_deg = torch.where(
+            self._ss_dbg_release_yaw_error >= 0.0,
+            torch.rad2deg(self._ss_dbg_release_yaw_error),
+            self._ss_dbg_release_yaw_error,
+        )
+        min_yaw_deg = torch.where(
+            min_yaw_error >= 0.0,
+            torch.rad2deg(min_yaw_error),
+            min_yaw_error,
+        )
         return super()._metric_extra_cols(rows) + [
             self._ss_dbg_near_step[rows].float(),
             self._ss_dbg_pick_step[rows].float(),
@@ -1619,6 +1682,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             base_debug(self._ss_dbg_above_bonus_sum),
             base_debug(self._ss_dbg_success_bonus_sum),
             base_debug(self._ss_dbg_end_reason).float(),
+            base_debug(release_yaw_deg),
+            base_debug(min_yaw_deg),
+            base_debug(self._ss_dbg_arc01_step).float(),
         ]
 
     def _metric_reset_extra(self, rows):
@@ -1686,6 +1752,13 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             & double_support
         )
         return root_speed, root_ang, upright, double_support, stable
+
+    @staticmethod
+    def _planar_yaw_error(forward, target):
+        """Unsigned planar yaw error in radians, stable at the 180-degree case."""
+        dot = (forward * target).sum(dim=-1).clamp(-1.0, 1.0)
+        cross = forward[:, 0] * target[:, 1] - forward[:, 1] * target[:, 0]
+        return torch.atan2(cross.abs(), dot)
 
     def _classic_clear_steer_reward(self, base_rows):
         """Original path-steering walk reward, without carry/box attraction.
@@ -1850,6 +1923,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             "top_hold_penalty", "top_wait", "top_total", "base_stability",
             "top_stability", "base_hold", "base_regrasp_penalty",
             "base_loop_tracking", "stop_decel",
+            "heading_progress",
         ):
             self.extras[f"tb/stack_reward/{key}"] = nan
         for key in (
@@ -1861,6 +1935,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             "stop_decel_active", "stop_target_speed", "stop_root_speed",
             "stop_root_ang", "stop_double_support", "stop_stable",
             "stop_streak_fraction",
+            "heading_alignment", "heading_progress", "yaw_error_deg",
+            "yaw_progress_deg", "yaw_cosine_gain", "retreat_arc", "v_along",
+            "endpoint_error", "retreat_arrived",
         ):
             self.extras[f"tb/stack_state/{key}"] = nan
         for key in ("carry_native", "carry_foot_penalty"):
@@ -2204,16 +2281,57 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             world_forward * self._ss_retreat_dir
         ).sum(dim=-1).clamp(-1.0, 1.0)
         forward_alignment = heading_alignment.clamp(0.0, 1.0)
-        heading_progress = heading_alignment - self._ss_prev_heading_alignment
-        heading_active = clear_phase & (remaining > self._ss_stop_decel_dist)
-        heading_reward = (
-            self._ss_clear_heading_progress_w
-            * heading_progress
-            * heading_active.float()
+        cosine_progress = heading_alignment - self._ss_prev_heading_alignment
+        yaw_error = self._planar_yaw_error(
+            world_forward, self._ss_retreat_dir
         )
+        yaw_progress = self._ss_prev_yaw_error - yaw_error
+        heading_progress = (
+            yaw_progress if self._ss_clear_yaw_progress else cosine_progress
+        )
+        heading_active = clear_phase & (remaining > self._ss_stop_decel_dist)
+        cosine_start = math.cos(
+            math.radians(self._ss_clear_yaw_cosine_start_deg)
+        )
+        yaw_cosine_gain = torch.clamp(
+            (heading_alignment - cosine_start) / max(1.0 - cosine_start, 1e-6),
+            0.0,
+            1.0,
+        )
+        if self._ss_clear_yaw_progress_w > 0.0:
+            # ms72 hybrid: provide a linear yaw-error signal throughout the
+            # turn, then strengthen the same progress as alignment enters the
+            # configured cosine window.  A negative yaw_progress is penalized
+            # by both terms, so oscillating away from the target cannot farm it.
+            heading_reward = (
+                self._ss_clear_yaw_progress_w
+                + self._ss_clear_heading_progress_w * yaw_cosine_gain
+            ) * yaw_progress * heading_active.float()
+        else:
+            # Preserve the ms66--ms71 contract exactly when the new base yaw
+            # weight is absent.
+            heading_reward = (
+                self._ss_clear_heading_progress_w
+                * heading_progress
+                * heading_active.float()
+            )
         self._ss_prev_heading_alignment = torch.where(
             clear_phase, heading_alignment, self._ss_prev_heading_alignment
         )
+        self._ss_prev_yaw_error = torch.where(
+            clear_phase, yaw_error, self._ss_prev_yaw_error
+        )
+        self._ss_dbg_min_yaw_error = torch.where(
+            clear_phase,
+            torch.minimum(self._ss_dbg_min_yaw_error, yaw_error),
+            self._ss_dbg_min_yaw_error,
+        )
+        first_arc01 = (
+            clear_phase
+            & (arc >= 0.10)
+            & (self._ss_dbg_arc01_step < 0)
+        )
+        self._ss_dbg_arc01_step[first_arc01] = self.progress_buf[first_arc01]
         v_lateral = (
             roots[:, 7] * -self._ss_retreat_dir[:, 1]
             + roots[:, 8] * self._ss_retreat_dir[:, 0]
@@ -2359,12 +2477,27 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             -(stop_root_speed / self._ss_stop_lin).square()
             -(stop_root_ang / self._ss_stop_ang).square()
         )
-        base_hold_score = (
-            0.35 * torch.exp(-8.0 * base_hold_anchor_error.square())
-            + 0.25 * base_hold_speed_score
-            + 0.20 * stop_upright.clamp(0.0, 1.0)
-            + 0.20 * stop_double_support.float()
+        base_hold_anchor_score = torch.exp(
+            -8.0 * base_hold_anchor_error.square()
         )
+        if self._ss_base_hold_anchor_gate:
+            # All posture credit is conditional on remaining at the completed
+            # retreat endpoint.  The old additive form still paid up to 65%
+            # while arbitrarily far away, so walking back toward the released
+            # box retained a large positive reward.
+            base_hold_score = base_hold_anchor_score * (
+                0.35
+                + 0.25 * base_hold_speed_score
+                + 0.20 * stop_upright.clamp(0.0, 1.0)
+                + 0.20 * stop_double_support.float()
+            )
+        else:
+            base_hold_score = (
+                0.35 * base_hold_anchor_score
+                + 0.25 * base_hold_speed_score
+                + 0.20 * stop_upright.clamp(0.0, 1.0)
+                + 0.20 * stop_double_support.float()
+            )
         base_hold_reward = (
             self._ss_base_hold_reward_w
             * stack_phase.float()
@@ -2375,9 +2508,18 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             * stack_phase.float()
             * (1.0 - h)
         )
-        stack_r = (
+        stack_legacy_reward = (
             clear_now.float() * (0.40 * support + 0.25 * stable)
             + 0.35 * clear_score
+        )
+        if not self._ss_stack_base_legacy_reward:
+            # After the configured CLEAR fade, Base has no box observation;
+            # clear_score is also saturated at STACK entry.  Keep these terms
+            # in RELEASE/CLEAR, but do not feed hidden-state/constant credit
+            # into the STACK-only replacement reward.
+            stack_legacy_reward = torch.zeros_like(stack_legacy_reward)
+        stack_r = (
+            stack_legacy_reward
             + base_stability_reward
             + base_hold_reward
             - base_regrasp_penalty
@@ -2571,8 +2713,24 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self.extras["tb/stack_state/heading_progress"] = tb_stop(
             heading_progress
         )
+        self.extras["tb/stack_state/yaw_error_deg"] = tb_stop(
+            torch.rad2deg(yaw_error)
+        )
+        self.extras["tb/stack_state/yaw_progress_deg"] = tb_stop(
+            torch.rad2deg(yaw_progress)
+        )
+        self.extras["tb/stack_state/yaw_cosine_gain"] = tb_stop(
+            yaw_cosine_gain
+        )
         self.extras["tb/stack_state/retreat_arc"] = tb_stop(arc)
         self.extras["tb/stack_state/v_along"] = tb_stop(v_along)
+        endpoint_error = (
+            roots[:, 0:2] - self._ss_retreat_goal[:, 0:2]
+        ).norm(dim=-1)
+        self.extras["tb/stack_state/endpoint_error"] = tb_stop(endpoint_error)
+        self.extras["tb/stack_state/retreat_arrived"] = tb_stop(
+            self._ss_retreat_arrived.float()
+        )
 
         self.extras["tb/stack_reward/stop_decel"] = tb_stop(stop_reward)
         self.extras["tb/stack_state/stop_decel_active"] = tb_stop(
@@ -2948,6 +3106,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             lat_max = 0.35
 
         self._ss_retreat_dir[env_ids] = move_dir
+        self._ss_retreat_arrived[env_ids] = False
         root_states = self.humanoid_rows(self._humanoid_root_states)[base_rows]
         local_forward = torch.zeros_like(root_states[:, 0:3])
         local_forward[:, 0] = 1.0
@@ -2958,6 +3117,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_prev_heading_alignment[env_ids] = (
             world_forward * move_dir
         ).sum(dim=-1).clamp(-1.0, 1.0)
+        release_yaw_error = self._planar_yaw_error(world_forward, move_dir)
+        self._ss_prev_yaw_error[env_ids] = release_yaw_error
+        self._ss_dbg_release_yaw_error[env_ids] = release_yaw_error
+        self._ss_dbg_min_yaw_error[env_ids] = release_yaw_error
         self._ss_retreat_goal[env_ids, 0:2] = clear
         self._ss_retreat_goal[env_ids, 2] = base[:, 2]
         self._steer_tick += 1
@@ -3354,11 +3517,31 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             & (base[:, 7:10].norm(dim=-1) <= self._ss_clear_stable_lin)
             & (base[:, 10:13].norm(dim=-1) <= self._ss_clear_stable_ang)
         )
-        retreat_done = (
+        arc_done = (
             self._arc_root[base_rows] >= self._ss_clear_arc_dist
             if self._ss_clear_arc_dist > 0.0
             else root_dist >= self._ss_body_clear
         )
+        if self._ss_retreat_endpoint_tol > 0.0:
+            root_xy = self.humanoid_rows(
+                self._humanoid_root_states
+            )[base_rows, 0:2]
+            endpoint_error = (
+                root_xy - self._ss_retreat_goal[:, 0:2]
+            ).norm(dim=-1)
+            arrived_now = (
+                clear
+                & arc_done
+                & (endpoint_error <= self._ss_retreat_endpoint_tol)
+            )
+            self._ss_retreat_arrived |= arrived_now
+            retreat_done = self._ss_retreat_arrived
+            # Arrival is latched: issue the existing M=0 steering command even
+            # if projection noise moves arc/endpoint error on later frames.
+            arrived_rows = base_rows[self._ss_retreat_arrived]
+            self._mscale[arrived_rows] = 0.0
+        else:
+            retreat_done = arc_done
         if self._ss_stop_hold_steps > 0:
             remaining = (
                 self._s_end[base_rows] - self._arc_root[base_rows]

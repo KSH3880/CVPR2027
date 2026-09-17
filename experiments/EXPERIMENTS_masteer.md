@@ -67,6 +67,27 @@
 
 ## 해석
 
+### ms67·ms68 CLEAR yaw 병목 진단 (2026-09-16, 평가 중)
+
+cosine heading progress가 180도 부근에서 거의 신호를 주지 못하는지 확인하기 위해,
+기존 ms67·ms68 정책을 변경하지 않고 현재 진단 코드로 고정 정책 eval을 순차 실행한다.
+GPU 0, 512 env, suffix `yawdiag_latest`이며 `latest`는 ms67 epoch 9500과 ms68 epoch
+9800을 각각 선택한다.
+
+```bash
+export TOKENHSI_ALLOWED_GPUS=0
+STACK_STAGE_SUFFIX=yawdiag_latest bash scripts/masteer/stack_stage_eval.sh \
+  ms67_ms18e9000_fade3_angle120_heading20_gate_stop_3000_s0 0 latest 512 && \
+STACK_STAGE_SUFFIX=yawdiag_latest bash scripts/masteer/stack_stage_eval.sh \
+  ms68_ms18e9000_fade3_angle120_retreat2to3_bypasswait_3000_s0 0 latest 512
+```
+
+새 metrics 90~92열은 RELEASE 순간 yaw 오차, CLEAR 중 최소 yaw 오차, retreat arc
+0.10 m 최초 도달 step을 기록한다. eval에서는 `STACK_CLEAR_YAW_PROGRESS`를 켜지 않으므로
+기존 정책과 보상 계약을 바꾸지 않고 진단값만 추가한다. 완료 후 CLEAR 성공/실패를 release
+yaw와 최소 yaw 구간별로 나눠, 회전이 어느 각도에서 멈추는지와 0.10 m 이동 시동 실패가
+결합되는지를 판정한다. 현재 결과 수치는 미기록 상태이며 eval 완료 후 확정한다.
+
 ### 0. 순차 stacking release의 pickup 회귀 추적 (2026-09-04)
 
 목표는 모델 구조를 바꾸지 않고, 중앙 controller가 base 배치 뒤 가상 박스로 후퇴를
