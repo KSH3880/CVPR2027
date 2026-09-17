@@ -46,7 +46,7 @@ def main():
                 output = planner(history.observe(task.planner_state(), commit=True))
                 valid, _ = task.install_external_plan(output)
                 history.commit_path(
-                    output['path_parameters'][:, 0],
+                    output['path_world'][:, 0],
                     update_mask=valid & task._planner_policy_decision,
                 )
                 endpoints = output['path_world'][:, 0, 0, -1].cpu().tolist()

@@ -419,11 +419,11 @@ def main():
     history = StackHistoryBuffer(
         task.num_envs, planner.config.history_steps, device,
     )
-    curve_std = _env_float("STACK_PLANNER_CURVE_STD", 0.12)
+    point_std = _env_float("STACK_PLANNER_DELTA_STD", 0.12)
     endpoint_std = _env_float("STACK_PLANNER_ENDPOINT_STD", 0.20)
     anchor_std = _env_float("STACK_PLANNER_ANCHOR_STD", 0.03)
     policy = StackPlannerActorCritic(
-        planner, curve_std=curve_std, endpoint_std=endpoint_std,
+        planner, point_std=point_std, endpoint_std=endpoint_std,
         anchor_std=anchor_std,
     ).to(device)
     if payload and payload.get("extras", {}).get("action_log_std") is not None:
@@ -490,7 +490,7 @@ def main():
     _refresh_obs(player)
     print(f"[stack-planner-train] envs={task.num_envs} horizon={horizon} "
           f"low_steps={low_steps} consistency={consistency_coef:g} "
-          f"curve_std={curve_std:g} endpoint_std={endpoint_std:g} "
+          f"delta_std={point_std:g} endpoint_std={endpoint_std:g} "
           f"history_steps={planner.config.history_steps} "
           f"candidates={planner.config.candidates} "
           f"delta_scale={planner.config.delta_scale:g} "
@@ -583,17 +583,17 @@ def main():
                 with torch.no_grad():
                     next_state = task.planner_state()
                     plan_update = decision & ~invalid
-                    next_plan_raw = torch.where(
-                        plan_update[:, None],
-                        outputs["path_parameters"][:, candidate],
-                        observation.previous_path_raw,
+                    next_plan_world = torch.where(
+                        plan_update[:, None, None, None],
+                        outputs["path_world"][:, candidate],
+                        observation.previous_path_world,
                     )
                     next_plan_valid = (
                         observation.previous_path_valid | plan_update
                     )
                     next_observation = history.observe(
                         next_state, reset_mask=done, commit=False,
-                        previous_path_raw=next_plan_raw,
+                        previous_path_world=next_plan_world,
                         previous_path_valid=next_plan_valid,
                     )
                     next_value = policy.value(next_observation)
@@ -667,12 +667,12 @@ def main():
                     })
             rewards.append(terms["total"])
             dones.append(done)
-            selected_path_raw = outputs["path_parameters"][
+            selected_path_world = outputs["path_world"][
                 env_index, best_candidate
             ]
             commit_mask = decision & ~invalid & ~done
             history.commit_path(
-                selected_path_raw,
+                selected_path_world,
                 update_mask=commit_mask,
             )
             if consistency_coef > 0.0:
@@ -776,7 +776,7 @@ def main():
             "retreat_path_consistency_scale": retreat_path_scale,
             "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
             "retreat_endpoint_tolerance": endpoint_tolerance,
-            "curve_std": curve_std,
+            "delta_std": point_std,
             "endpoint_std": endpoint_std,
             "anchor_std": anchor_std,
             "history_steps": planner.config.history_steps,
@@ -825,7 +825,7 @@ def main():
                         "consistency_coef": consistency_coef,
                         "commit_steps": low_steps,
                         "retreat_path_consistency_scale": retreat_path_scale,
-                        "curve_std": curve_std,
+                        "delta_std": point_std,
                         "endpoint_std": endpoint_std,
                         "anchor_std": anchor_std,
                         "history_steps": planner.config.history_steps,

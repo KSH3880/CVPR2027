@@ -8,7 +8,7 @@ import torch
 
 from coordinator.geometry import TOKENS, TOKEN_DIM, state_to_tokens
 from coordinator.schema import STATE_KEYS, CoordinatorState
-from stack_planner.schema import STACK_PATH_PARAM_DIM
+from stack_planner.schema import AGENTS, STACK_PATH_POINTS
 
 
 @dataclass
@@ -18,7 +18,7 @@ class StackPlannerObservation:
     state: CoordinatorState
     history_tokens: torch.Tensor  # [B,H,6,12], includes current state
     history_valid: torch.Tensor   # [B,H]
-    previous_path_raw: torch.Tensor  # [B,30], last committed plan parameters
+    previous_path_world: torch.Tensor  # [B,2,33,2], last committed trajectory
     previous_path_valid: torch.Tensor  # [B]
 
     def validate(self, history_steps=None):
@@ -36,10 +36,10 @@ class StackPlannerObservation:
             raise ValueError("history_valid must be bool")
         if not self.history_valid[:, -1].all():
             raise ValueError("current history slot must always be valid")
-        if self.previous_path_raw.shape != (batch, STACK_PATH_PARAM_DIM):
-            raise ValueError(
-                f"previous_path_raw must be [B,{STACK_PATH_PARAM_DIM}]"
-            )
+        if self.previous_path_world.shape != (
+            batch, AGENTS, STACK_PATH_POINTS, 2,
+        ):
+            raise ValueError("previous_path_world must be [B,2,33,2]")
         if (self.previous_path_valid.shape != (batch,)
                 or self.previous_path_valid.dtype != torch.bool):
             raise ValueError("previous_path_valid must be bool [B]")
@@ -51,14 +51,14 @@ class StackPlannerObservation:
     def index(self, index):
         return StackPlannerObservation(
             self.state.index(index), self.history_tokens[index],
-            self.history_valid[index], self.previous_path_raw[index],
+            self.history_valid[index], self.previous_path_world[index],
             self.previous_path_valid[index],
         )
 
     def clone(self):
         return StackPlannerObservation(
             self.state.clone(), self.history_tokens.clone(),
-            self.history_valid.clone(), self.previous_path_raw.clone(),
+            self.history_valid.clone(), self.previous_path_world.clone(),
             self.previous_path_valid.clone(),
         )
 
@@ -76,8 +76,9 @@ class StackHistoryBuffer:
         self.valid = torch.zeros(
             batch_size, history_steps, device=device, dtype=torch.bool,
         )
-        self.previous_path_raw = torch.zeros(
-            batch_size, STACK_PATH_PARAM_DIM, device=device, dtype=dtype,
+        self.previous_path_world = torch.zeros(
+            batch_size, AGENTS, STACK_PATH_POINTS, 2,
+            device=device, dtype=dtype,
         )
         self.previous_path_valid = torch.zeros(
             batch_size, device=device, dtype=torch.bool,
@@ -91,14 +92,14 @@ class StackHistoryBuffer:
         env_mask = torch.as_tensor(env_mask, device=self.tokens.device, dtype=torch.bool)
         self.tokens[env_mask] = 0.0
         self.valid[env_mask] = False
-        self.previous_path_raw[env_mask] = 0.0
+        self.previous_path_world[env_mask] = 0.0
         self.previous_path_valid[env_mask] = False
 
-    def commit_path(self, path_raw, update_mask=None):
-        if path_raw.shape != self.previous_path_raw.shape:
+    def commit_path(self, path_world, update_mask=None):
+        if path_world.shape != self.previous_path_world.shape:
             raise ValueError(
-                f"committed path parameters must be "
-                f"{tuple(self.previous_path_raw.shape)}"
+                f"committed trajectory must be "
+                f"{tuple(self.previous_path_world.shape)}"
             )
         if update_mask is None:
             update_mask = torch.ones_like(self.previous_path_valid)
@@ -107,11 +108,11 @@ class StackHistoryBuffer:
         )
         if update_mask.shape != self.previous_path_valid.shape:
             raise ValueError("path update_mask must be [B]")
-        self.previous_path_raw[update_mask] = path_raw[update_mask].detach()
+        self.previous_path_world[update_mask] = path_world[update_mask].detach()
         self.previous_path_valid[update_mask] = True
 
     def observe(self, state, reset_mask=None, commit=True,
-                previous_path_raw=None, previous_path_valid=None):
+                previous_path_world=None, previous_path_valid=None):
         tokens_source = self.tokens
         valid_source = self.valid
         if reset_mask is not None:
@@ -133,23 +134,23 @@ class StackHistoryBuffer:
         valid = torch.cat((
             valid_source[:, 1:], torch.ones_like(valid_source[:, :1]),
         ), dim=1)
-        plan_raw = (
-            self.previous_path_raw if previous_path_raw is None
-            else previous_path_raw
+        plan_world = (
+            self.previous_path_world if previous_path_world is None
+            else previous_path_world
         )
         plan_valid = (
             self.previous_path_valid if previous_path_valid is None
             else previous_path_valid
         )
-        plan_raw = plan_raw.detach().clone()
+        plan_world = plan_world.detach().clone()
         plan_valid = torch.as_tensor(
             plan_valid, device=self.tokens.device, dtype=torch.bool,
         ).clone()
         if reset_mask is not None:
-            plan_raw[reset_mask] = 0.0
+            plan_world[reset_mask] = 0.0
             plan_valid[reset_mask] = False
         observation = StackPlannerObservation(
-            state, tokens, valid, plan_raw, plan_valid,
+            state, tokens, valid, plan_world, plan_valid,
         )
         observation.validate(self.history_steps)
         if commit:
@@ -168,7 +169,7 @@ def flatten_observations(observations):
         }),
         torch.cat([item.history_tokens for item in observations], dim=0),
         torch.cat([item.history_valid for item in observations], dim=0),
-        torch.cat([item.previous_path_raw for item in observations], dim=0),
+        torch.cat([item.previous_path_world for item in observations], dim=0),
         torch.cat([item.previous_path_valid for item in observations], dim=0),
     )
 

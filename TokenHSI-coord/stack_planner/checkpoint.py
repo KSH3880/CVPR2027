@@ -30,7 +30,7 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "path_points": STACK_PATH_POINTS,
         "path_only": True,
         "full_candidate_rollout": True,
-        "previous_plan_delta": True,
+        "previous_trajectory_correction": True,
         "path_ds": PATH_DS,
         "path_vertices": PATH_VERTICES,
         "steer_points": STEER_POINTS,

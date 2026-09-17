@@ -1,4 +1,4 @@
-# Stack path planner V8
+# Stack path planner V9
 
 Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 `trajectory_predictor/`의 코드 및 checkpoint namespace를 건드리지 않도록 별도 패키지로
@@ -7,14 +7,14 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 ## 현재 계약
 
 - 물리 입력: 기존 `coordinator.schema.CoordinatorState`와 동일한 10개 state tensor
-- planner memory: 최근 decision history와 직전 채택 path parameter 30D
+- planner memory: 최근 decision history와 직전 채택 33-point world trajectory
 - backbone: root/box/goal 전용 tokenizer와 learnable `[SCENE]` token을 쓰는 Transformer encoder
 - candidate 생성: 하나의 scene feature를 받는 독립 full-path head 4개
 - candidate 평가: `(scene feature, detached path proposal)` 공유 evaluator
 - 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path
 - hard anchor: 각 path의 `P0=root`만 유지
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
-- checkpoint schema: `tokenhsi-stack-planner-v8`
+- checkpoint schema: `tokenhsi-stack-planner-v9`
 
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
@@ -29,12 +29,14 @@ path = output["path_world"]  # selected path: [B, 1, 2, 33, 2]
 candidate = output["selected_candidate"]  # [B]
 ```
 
-한 decision에서 각 독립 head는 A1 carry부터 retreat까지와 A2 carry를 모두 포함한 동일한
-30차원 full-path parameter의 bounded delta를 제안한다. segment별 head가 아니다. 최초/reset
-decision은 zero geometric prior에서 시작하고, 이후에는 `직전 채택 parameter +
-0.5*tanh(delta)`로 새 full path를 만든다. 현재 root/box/goal로 매번 다시 decode하므로 누적
-drift가 world 좌표 anchor를 그대로 끌고 가지 않는다. 직전 parameter는 별도 plan token으로
-Transformer 입력에도 포함된다. evaluator가 네 proposal을
+한 decision에서 각 독립 head는 A1 carry부터 retreat까지와 A2 carry를 포함한 직전 33-point
+trajectory에 적용할 pointwise XY correction을 제안한다. segment별 head가 아니다. 최초/reset
+decision은 현재 `root → box → goal` geometric trajectory를 reference로 쓰고, 이후에는 직전
+채택 trajectory의 시작점만 현재 root로 부드럽게 re-anchor한 것을 reference로 쓴다. head는
+root를 제외한 `2 agents × 32 points × XY = 128D` correction을 출력한다. 이를 두 번 low-pass한
+`0.5*tanh(delta)`를 reference path에 직접 더한다. latent path parameter는 저장하거나 누적하지
+않는다. 직전 trajectory 자체를 shared frame으로 바꿔 plan token으로 Transformer 입력에도
+포함한다. evaluator가 네 proposal을
 점수화한다. 학습에서는 같은 simulator state를 snapshot한 뒤 네 proposal을 모두 각각 30
 low-level step 실행해 return을 직접 비교한다. evaluator는 최고 return 후보 index를 supervised
 target으로 배우고, 다음 decision은 env별 최고 후보의 실제 종료 state에서 이어진다. PPO의
@@ -56,11 +58,10 @@ retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENAL
 직전 retreat world endpoint에서 tolerance(default 0.10m)를 초과한 변화의 제곱에 적용되며
 최대 cost는 4로 제한한다. 최초 retreat/reset에는 적용하지 않는다. 경로 전체 consistency는
 `STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE`(default 0.05)로 약화해 우회 경로 변경을 허용한다.
-Bezier control-point exploration std는 `STACK_PLANNER_CURVE_STD=0.12`, A1 suffix endpoint는
-`STACK_PLANNER_ENDPOINT_STD=0.20`, box/goal anchor residual은 `STACK_PLANNER_ANCHOR_STD=0.03`이다.
-따라서 anchor 정확도는 유지하면서 직선 endpoint 이동뿐 아니라 곡선 우회도 탐색한다.
-endpoint만 강하게 안정화하고 중간 Bézier control point에는 이 항을 적용하지 않으므로,
-평상시 목표 왕복은 억제하면서 Agent2 접근 시 곡선 우회 자유도는 유지한다.
+pointwise correction exploration std는 `STACK_PLANNER_DELTA_STD=0.12`, 마지막 path point는
+`STACK_PLANNER_ENDPOINT_STD=0.20`, 초기 geometric box/goal 인근 point는
+`STACK_PLANNER_ANCHOR_STD=0.03`이다. correction을 path 축으로 low-pass하므로 지그재그를
+줄이면서도 Agent2 접근 시 전체 곡선 형태를 수정할 수 있다. 별도의 Bézier latent parameter는 없다.
 충돌 cost에는 root/box proxy 외에도 다른 agent의 held box와 비손 rigid-body의 3D proximity가
 포함된다. endpoint 유지보다 회피가 유리해질 수 있으며 위험 접근 event나 수동 switch는 없다.
 
@@ -105,7 +106,7 @@ env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recu
 transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
 `model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
 
-V8 이전 planner checkpoint는 encoder/action 계약이 달라 load하지 않는다. V8 checkpoint도
+V9 이전 planner checkpoint는 encoder/action 계약이 달라 load하지 않는다. V9 checkpoint도
 history 길이 또는 candidate 수가 다른 설정으로 resume하는 것은 거부한다.
 
 검증:
@@ -144,7 +145,7 @@ top 목표는 stage flag가 아니라 현재 bottom box의 물리 pose/크기에
 ## Closed-loop PPO
 
 `train_closed_loop.py`는 sequential-stack agent checkpoint를 inference-only로 고정하고 planner
-parameter와 candidate별 action log-std만 최적화한다. 한 PPO transition은 기본 30 action step(30 Hz에서
+network parameter와 candidate별 action log-std만 최적화한다. 한 PPO transition은 기본 30 action step(30 Hz에서
 약 1초) 동안 같은 plan을 유지한다. stack phase 전환은 이 hold를 기다리지 않는다.
 한 scene마다 후보 4개를 동일한 시작 snapshot에서 순차 실행하므로 simulator workload는
 단일 후보 방식의 약 4배다. evaluator는 rollout return argmax를 직접 분류하고,
@@ -160,7 +161,7 @@ reset에 섞지 않는다.
 ```bash
 MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v8_delta_fullcf_s0
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v9_trajcorr_fullcf_s0
 ```
 
 로컬 physical GPU 1에서는 로컬 checkpoint 배치와 `tokenhsi118` 환경을 사용하는
@@ -194,14 +195,14 @@ iteration마다 기록한다.
 
 마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
 도달하지 못한 것인지 구분할 수 있다.
-같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v8 설계의 서버 학습은 다음처럼
+같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v9 설계의 서버 학습은 다음처럼
 실행할 수 있다.
 
 ```bash
 MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
 STACK_PLANNER_DELTA_SCALE=0.5 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v8_delta_fullcf_s0
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v9_trajcorr_fullcf_s0
 ```
 
 launcher 기본값은 2,048 env지만 full candidate rollout은 후보 4개를 모두 물리 실행하고 branch
@@ -212,9 +213,9 @@ step이며 10 iteration마다 checkpoint를 저장한다. PPO minibatch 기본�
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
-STACK_PLANNER_INIT=runs/stack_planner/stack_path_v8_delta_fullcf_s0/planner_000200.pth \
+STACK_PLANNER_INIT=runs/stack_planner/stack_path_v9_trajcorr_fullcf_s0/planner_000200.pth \
 STACK_PLANNER_ITERS=200 MA_GPU=7 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v8_delta_fullcf_s0_resume1
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v9_trajcorr_fullcf_s0_resume1
 ```
 
 ## Checkpoint viewer

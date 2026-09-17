@@ -4,7 +4,18 @@
 
 ## 2026-09-17
 
-### Previous-plan delta planner (V8)
+### Previous-trajectory correction planner (V9)
+
+- V8의 latent 30D parameter 누적을 제거했다. planner memory에는 직전 채택된 실제
+  `[2 agents, 33 points, XY]` world trajectory를 저장하고 shared-frame plan token으로 입력한다.
+- 최초/reset에는 현재 root→box→goal geometric path를 reference로 사용한다. 이후 reference는
+  직전 trajectory의 시작점만 현재 root에 맞게 endpoint 방향으로 선형 감쇠 re-anchor한다.
+  각 head는 root를 제외한 128D pointwise XY correction을 직접 출력하고, 두 번 low-pass한
+  `delta_scale*tanh(delta)`를 reference trajectory에 더한다. latent parameter는 누적하지 않는다.
+- full counterfactual rollout의 유효한 최고 후보 trajectory만 다음 reference로 commit한다.
+  executor 출력은 계속 완성된 33-point path이며 action/encoder 계약 변경으로 schema는 V9다.
+
+### Previous-plan latent delta planner (V8 precursor, superseded)
 
 - 직전 실제 채택 path parameter 30D를 planner memory와 Transformer plan token으로 추가했다.
   각 full-path head는 absolute parameter 대신 bounded delta를 출력하며, 새 proposal은

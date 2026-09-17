@@ -93,7 +93,7 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._stack_planner_latest_path = output["path_world"][:, 0].detach().clone()
         valid, safe = self.install_external_plan(output)
         self._stack_history.commit_path(
-            output["path_parameters"][:, 0],
+            output["path_world"][:, 0],
             update_mask=valid & self._planner_policy_decision,
         )
         status = (phase.cpu().tolist(), selected.cpu().tolist(), valid.cpu().tolist(),
