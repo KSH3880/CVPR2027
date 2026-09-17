@@ -16,7 +16,7 @@ from coordinator.schema import (  # re-export the unchanged public input
 )
 
 
-STACK_SCHEMA_VERSION = "tokenhsi-stack-planner-v5"
+STACK_SCHEMA_VERSION = "tokenhsi-stack-planner-v7"
 STACK_CANDIDATES = 4
 STACK_PATH_POINTS = PATH_POINTS
 

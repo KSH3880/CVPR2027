@@ -4,6 +4,28 @@
 
 ## 2026-09-17
 
+### Full counterfactual multi-head planner (V7)
+
+- 같은 scene의 독립 full-path 후보 4개를 동일 simulator/task snapshot에서 전부 물리 rollout한다.
+  후보별 macro return을 continuous PPO credit으로 사용하고, env별 최고-return branch의 종료
+  state만 다음 decision으로 이어간다.
+- 공유 evaluator는 sampled categorical PPO 대신 실제 후보 return의 argmax를 supervised target으로
+  학습한다. 비선택 후보도 직접 실행 결과를 받으므로 evaluator와 path head의 credit assignment를
+  분리했다.
+- counterfactual preview가 decision history를 변경하지 않도록 non-commit reset을 분리하고,
+  checkpoint schema를 호환되지 않는 V7로 올렸다.
+
+### Scene-token + independent full-path multi-head planner (V6 precursor)
+
+- root/box/goal 전용 tokenizer 뒤에 learnable `[SCENE]` token을 붙여 Transformer encoder가
+  단일 scene representation을 만들도록 했다. candidate query와 Transformer decoder는 제거했다.
+- 독립 head 4개가 각각 A1 carry→retreat와 A2 carry를 포함한 완전한 30D joint path를 제안한다.
+  공유 evaluator는 scene과 detached proposal을 함께 보고 categorical candidate를 선택한다.
+- PPO action을 `선택 index + 선택된 30D path`로 바꿔 실제 실행된 head에만 continuous
+  rollout credit이 가도록 했다. deterministic view/eval은 evaluator argmax를 사용한다.
+- 후보 간 A1 full-path 거리에 diversity margin을 적용하고 candidate usage/distance metric을
+  추가했다. checkpoint schema는 호환되지 않는 V6로 올렸다.
+
 ### A2 stacking 중 A1 동적 회피 유지
 
 - planner task에서 A1을 `A1_RETREAT`뿐 아니라 `A2_RESUME`와 `VERIFY_STACK`에서도 active row로
@@ -25,6 +47,15 @@
   minibatch에서도 action 당시 입력을 그대로 재현한다. done env만 history를 초기화한다.
 - train, deterministic viewer, retreat eval이 checkpoint의 동일 history 길이를 사용한다. 기존
   state-only checkpoint는 `history_steps=1`로 호환하며 길이가 다른 checkpoint resume은 거부한다.
+
+### A1 retreat endpoint soft stabilization 강화
+
+- endpoint 변경 penalty 기본 계수를 `0.10→1.0`으로 높이고 0.10m deadband는 유지했다.
+  hard latch나 실행 clamp는 추가하지 않아 큰 위험에서는 endpoint 변경이 가능하다.
+- 전체 path consistency는 `0.05`로 유지한다. 따라서 endpoint 왕복만 억제하고 Bézier control
+  point를 통한 동적 곡선 회피 자유도는 제한하지 않는다.
+- analytic Box1 footprint penalty는 `25→10`으로 낮췄다. 근접 경로 shaping이 PPO reward를
+  지배하는 현상을 줄이되, 실제 rollout에서 box가 밀린 양의 penalty weight `2.0`은 유지한다.
 
 ## 2026-09-16
 

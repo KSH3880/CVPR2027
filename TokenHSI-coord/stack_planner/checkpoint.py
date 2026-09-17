@@ -24,11 +24,12 @@ from .schema import (
 def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
     return {
         "schema_version": STACK_SCHEMA_VERSION,
-        "model_kind": "stack_transformer",
+        "model_kind": "stack_scene_token_multihead",
         "agents": AGENTS,
         "candidate_k": config.candidates,
         "path_points": STACK_PATH_POINTS,
         "path_only": True,
+        "full_candidate_rollout": True,
         "path_ds": PATH_DS,
         "path_vertices": PATH_VERTICES,
         "steer_points": STEER_POINTS,

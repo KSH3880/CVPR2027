@@ -49,9 +49,10 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._compute_observations()
         print(
             "[stack-planner-view] checkpoint={} schema={} step={} replan={} "
-            "candidate=0 deterministic=True frozen_agent=True".format(
+            "candidates={} learned_argmax=True deterministic=True frozen_agent=True".format(
                 checkpoint.resolve(), payload["schema_version"],
                 payload.get("step", 0), period,
+                self._stack_planner.config.candidates,
             ),
             flush=True,
         )
@@ -85,13 +86,14 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         state = self.planner_state()
         observation = self._stack_history.observe(state, commit=True)
         output = self._stack_planner(observation)
+        selected = output["selected_candidate"]
         self._stack_planner_latest_path = output["path_world"][:, 0].detach().clone()
         valid, safe = self.install_external_plan(output)
-        status = (phase.cpu().tolist(), valid.cpu().tolist(),
+        status = (phase.cpu().tolist(), selected.cpu().tolist(), valid.cpu().tolist(),
                   self._planner_plan_installed.cpu().tolist(),
                   self._planner_retreat_ready.cpu().tolist())
         if status != self._stack_planner_status:
-            print("[stack-planner-view] phase={} valid={} installed={} retreat_ready={}"
+            print("[stack-planner-view] phase={} candidate={} valid={} installed={} retreat_ready={}"
                   .format(*[item[:4] for item in status]), flush=True)
             self._stack_planner_status = status
         self._stack_planner_replans += self.num_envs

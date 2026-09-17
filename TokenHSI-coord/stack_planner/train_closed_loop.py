@@ -14,6 +14,7 @@ from typing import Dict, List
 from isaacgym import gymapi as _gymapi  # noqa: F401
 
 import torch
+import torch.nn.functional as F
 
 COORD_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE = COORD_ROOT.parent
@@ -25,6 +26,7 @@ import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from coordinator.schema import AGENTS, STATE_KEYS, CoordinatorState  # noqa: E402
 from stack_planner.checkpoint import load_stack_checkpoint, save_stack_checkpoint  # noqa: E402
+from stack_planner.branching import TaskBranchSnapshot  # noqa: E402
 from stack_planner.consistency import (  # noqa: E402
     build_stack_consistency_target, stack_trajectory_consistency_loss,
 )
@@ -177,6 +179,73 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
     )
 
 
+def _counterfactual_rollout(
+    player, output, state, before, low_steps, reward_config,
+    visit_penalty_coef, visit_tolerance, retreat_box_penalty_coef,
+    endpoint_penalty_coef,
+):
+    """Execute one candidate branch and return its complete macro reward."""
+    task = player.env.task
+    with torch.no_grad():
+        visit = ordered_box_goal_visit(
+            output["path_world"],
+            state.box_xyz[:, None, :, :2],
+            state.goal_xy[:, None],
+            tolerance=visit_tolerance,
+        )
+        valid, safe = task.install_external_plan(output)
+        decision = task._planner_policy_decision.clone()
+        retreat_decision = (
+            (task._stack_phase == task.A1_RETREAT)
+            & ~task._carry_rehearsal
+        ).clone()
+        endpoint_change_cost = task._planner_endpoint_change_cost.clone()
+        retreat_box_path_cost = task._planner_retreat_box_path_penalty.clone()
+        retreat_box_min_clearance = task._planner_retreat_box_min_clearance.clone()
+        retreat_box_endpoint_clearance = (
+            task._planner_retreat_box_endpoint_clearance.clone()
+        )
+    scored_valid = valid | ~decision
+    scored_safe = safe | ~decision
+    terms, done, macro_diag = _macro_step(
+        player, before, scored_valid, scored_safe, low_steps, reward_config,
+    )
+    terms["retreat_potential_delta_removed"] = torch.where(
+        retreat_decision, terms["potential_delta"],
+        torch.zeros_like(terms["potential_delta"]),
+    )
+    terms["total"] -= terms["retreat_potential_delta_removed"]
+    route_penalty = visit["penalty"][:, 0].mean(dim=-1)
+    terms["route_visit_penalty"] = (
+        -visit_penalty_coef * route_penalty * decision.float()
+    )
+    terms["route_box_distance"] = visit["box_distance"][:, 0].mean(dim=-1)
+    terms["route_goal_distance"] = visit["goal_distance"][:, 0].mean(dim=-1)
+    terms["retreat_box_path_penalty"] = (
+        -retreat_box_penalty_coef * retreat_box_path_cost
+    )
+    terms["retreat_box_min_clearance"] = retreat_box_min_clearance
+    terms["retreat_box_endpoint_clearance"] = retreat_box_endpoint_clearance
+    terms["total"] += (
+        terms["route_visit_penalty"] + terms["retreat_box_path_penalty"]
+    )
+    terms["retreat_endpoint_change_penalty"] = (
+        -endpoint_penalty_coef * endpoint_change_cost * decision.float()
+    )
+    terms["retreat_endpoint_change_cost"] = endpoint_change_cost
+    terms["total"] += terms["retreat_endpoint_change_penalty"]
+    invalid_decision = decision & ~valid
+    analytic = (
+        terms["invalid_plan_penalty"]
+        + terms["unsafe_plan_penalty"]
+        + terms["route_visit_penalty"]
+        + terms["retreat_box_path_penalty"]
+        + terms["retreat_endpoint_change_penalty"]
+    )
+    terms["total"] = torch.where(invalid_decision, analytic, terms["total"])
+    return terms, done, macro_diag, decision, invalid_decision
+
+
 def _make_player(args, cfg, cfg_train):
     tokenhsi_run.args = args
     tokenhsi_run.cfg = cfg
@@ -197,19 +266,27 @@ def _make_player(args, cfg, cfg_train):
 
 
 def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
-                advantages, decision_mask, consistency_targets, epochs, minibatch,
-                clip_ratio, value_coef, entropy_coef, consistency_coef):
+                advantages, decision_mask, candidate_targets,
+                consistency_targets, epochs, minibatch,
+                clip_ratio, value_coef, entropy_coef, consistency_coef,
+                diversity_coef, diversity_margin, evaluator_coef):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
         "consistency": 0.0, "consistency_position": 0.0,
         "consistency_valid_fraction": 0.0,
+        "candidate_diversity_loss": 0.0,
+        "candidate_path_distance": 0.0,
+        "candidate_evaluator_loss": 0.0,
+        "candidate_evaluator_accuracy": 0.0,
     }
     updates = 0
     for _ in range(epochs):
         for index in torch.randperm(total, device=actions.device).split(minibatch):
             state = states.index(index)
-            log_prob, entropy, value, _ = policy.evaluate(state, actions[index])
+            log_prob, entropy, value, decoded = policy.evaluate(
+                state, actions[index]
+            )
             ratio = (log_prob - old_log_prob[index]).exp()
             objective = torch.minimum(
                 ratio * advantages[index],
@@ -239,10 +316,26 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
                     "total": zero, "position": zero,
                     "valid_fraction": zero,
                 }
+            diversity = policy.diversity(state, margin=diversity_margin)
+            evaluator_per_item = F.cross_entropy(
+                decoded["candidate_logits"], candidate_targets[index],
+                reduction="none",
+            )
+            if decided.any():
+                evaluator_loss = evaluator_per_item[decided].mean()
+                evaluator_accuracy = (
+                    decoded["candidate_logits"][decided].argmax(dim=-1)
+                    == candidate_targets[index][decided]
+                ).float().mean()
+            else:
+                evaluator_loss = evaluator_per_item.sum() * 0.0
+                evaluator_accuracy = evaluator_per_item.new_zeros(())
             loss = (
                 policy_loss + value_coef * value_loss
                 - entropy_coef * entropy_mean
                 + consistency_coef * consistency["total"]
+                + diversity_coef * diversity["loss"]
+                + evaluator_coef * evaluator_loss
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -255,6 +348,18 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
             sums["consistency_position"] += float(consistency["position"].detach())
             sums["consistency_valid_fraction"] += float(
                 consistency["valid_fraction"].detach()
+            )
+            sums["candidate_diversity_loss"] += float(
+                diversity["loss"].detach()
+            )
+            sums["candidate_path_distance"] += float(
+                diversity["distance"].detach()
+            )
+            sums["candidate_evaluator_loss"] += float(
+                evaluator_loss.detach()
+            )
+            sums["candidate_evaluator_accuracy"] += float(
+                evaluator_accuracy.detach()
             )
             updates += 1
     return {key: value / max(updates, 1) for key, value in sums.items()}
@@ -279,6 +384,9 @@ def main():
 
     init = os.environ.get("STACK_PLANNER_INIT", "")
     requested_history_steps = _env_int("STACK_PLANNER_HISTORY_STEPS", 4)
+    requested_candidates = _env_int("STACK_PLANNER_CANDIDATES", 4)
+    if requested_candidates < 1:
+        raise ValueError("STACK_PLANNER_CANDIDATES must be positive")
     payload = None
     if init:
         planner, payload = load_stack_checkpoint(init, device)
@@ -288,9 +396,15 @@ def main():
                 f"requested={requested_history_steps} "
                 f"checkpoint={planner.config.history_steps}"
             )
+        if planner.config.candidates != requested_candidates:
+            raise ValueError(
+                "STACK_PLANNER_CANDIDATES must match init checkpoint: "
+                f"requested={requested_candidates} "
+                f"checkpoint={planner.config.candidates}"
+            )
     else:
         planner = StackTrajectoryPlanner(StackPlannerConfig(
-            candidates=1, history_steps=requested_history_steps,
+            candidates=requested_candidates, history_steps=requested_history_steps,
         )).to(device)
     history = StackHistoryBuffer(
         task.num_envs, planner.config.history_steps, device,
@@ -321,19 +435,22 @@ def main():
     horizon = _env_int("STACK_PLANNER_HORIZON", 32)
     low_steps = _env_int("STACK_PLANNER_LOW_STEPS", 30)
     gamma = _env_float("STACK_PLANNER_GAMMA", 0.99)
-    gae_lambda = _env_float("STACK_PLANNER_GAE", 0.95)
     consistency_coef = _env_float("STACK_PLANNER_CONSISTENCY_COEF", 1.0)
+    diversity_coef = _env_float("STACK_PLANNER_DIVERSITY_COEF", 0.05)
+    diversity_margin = _env_float("STACK_PLANNER_DIVERSITY_MARGIN", 0.25)
+    evaluator_coef = _env_float("STACK_PLANNER_EVALUATOR_COEF", 1.0)
     retreat_path_scale = _env_float("STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE", 0.05)
-    endpoint_penalty_coef = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_PENALTY", 0.10)
+    endpoint_penalty_coef = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_PENALTY", 1.0)
     endpoint_tolerance = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_TOLERANCE", 0.10)
     if not 0 <= retreat_path_scale <= 1 or endpoint_penalty_coef < 0 or endpoint_tolerance < 0:
         raise ValueError("invalid retreat consistency/endpoint settings")
-    if consistency_coef < 0:
-        raise ValueError("STACK_PLANNER_CONSISTENCY_COEF must be non-negative")
+    if (consistency_coef < 0 or diversity_coef < 0
+            or diversity_margin < 0 or evaluator_coef < 0):
+        raise ValueError("planner consistency/diversity settings must be non-negative")
     visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
     visit_tolerance = _env_float("STACK_PLANNER_VISIT_TOLERANCE", 0.15)
     retreat_box_penalty_coef = _env_float(
-        "STACK_PLANNER_RETREAT_BOX_PENALTY", 25.0
+        "STACK_PLANNER_RETREAT_BOX_PENALTY", 10.0
     )
     bottom_disturbance_weight = _env_float(
         "STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT", 2.0
@@ -354,7 +471,7 @@ def main():
     minibatch = _env_int("STACK_PLANNER_MINIBATCH", 512)
     if ppo_epochs <= 0 or minibatch <= 0:
         raise ValueError("PPO epochs and minibatch must be positive")
-    transitions = task.num_envs * horizon
+    transitions = task.num_envs * horizon * planner.config.candidates
     optimizer_steps = ppo_epochs * math.ceil(transitions / minibatch)
 
     # Task construction already performs a complete reset and creates the
@@ -365,6 +482,9 @@ def main():
           f"low_steps={low_steps} consistency={consistency_coef:g} "
           f"curve_std={curve_std:g} endpoint_std={endpoint_std:g} "
           f"history_steps={planner.config.history_steps} "
+          f"candidates={planner.config.candidates} "
+          f"diversity={diversity_coef:g}/{diversity_margin:g}m "
+          f"evaluator_coef={evaluator_coef:g} full_candidate_rollout=True "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
           f"bottom_disturbance_weight={bottom_disturbance_weight:g} "
@@ -381,25 +501,37 @@ def main():
         consistency_targets = []
         actions: List[torch.Tensor] = []
         log_probs: List[torch.Tensor] = []
-        values: List[torch.Tensor] = []
+        candidate_returns: List[torch.Tensor] = []
+        candidate_advantages: List[torch.Tensor] = []
+        candidate_targets: List[torch.Tensor] = []
         rewards: List[torch.Tensor] = []
         dones: List[torch.Tensor] = []
-        gae_boundaries: List[torch.Tensor] = []
         decision_masks: List[torch.Tensor] = []
         diag: Dict[str, float] = {}
         planner_diag: Dict[str, float] = {}
+        candidate_counts = torch.zeros(
+            planner.config.candidates, device=device, dtype=torch.long,
+        )
+        candidate_score_sums = torch.zeros(
+            planner.config.candidates, device=device,
+        )
         for _ in range(horizon):
             state = task.planner_state()
             observation = history.observe(
                 state, reset_mask=previous_done, commit=True,
             )
             before = _clone_physical(task.planner_physical_state())
+            retreat_at_decision = (
+                (task._stack_phase >= task.A1_RETREAT)
+                & (task._stack_phase < task.DONE)
+                & ~task._carry_rehearsal
+            ).clone()
             with torch.no_grad():
+                mean_outputs = policy.all_mean_outputs(observation)
                 if consistency_coef > 0.0:
-                    mean_output = policy.planner(observation)
                     if previous_mean_output is None or previous_state is None:
                         consistency_target = build_stack_consistency_target(
-                            mean_output, state, state, 0.0,
+                            policy.mean_output(observation), state, state, 0.0,
                             torch.zeros_like(previous_done),
                         )
                     else:
@@ -407,112 +539,116 @@ def main():
                             previous_mean_output, previous_state, state,
                             low_steps * float(task.dt), ~previous_done,
                         )
-                output, action, log_prob, value = policy.act(observation)
-                visit = ordered_box_goal_visit(
-                    output["path_world"],
-                    state.box_xyz[:, None, :, :2].expand(
-                        -1, output["path_world"].shape[1], -1, -1
-                    ),
-                    state.goal_xy[:, None].expand(
-                        -1, output["path_world"].shape[1], -1, -1
-                    ),
-                    tolerance=visit_tolerance,
+                outputs, all_actions, all_log_probs, value = policy.sample_all(
+                    observation
                 )
-                valid, safe = task.install_external_plan(output)
-                decision = task._planner_policy_decision.clone()
-                retreat_decision = (
-                    (task._stack_phase == task.A1_RETREAT)
-                    & ~task._carry_rehearsal
-                ).clone()
-                if consistency_coef > 0.0:
-                    consistency_target["valid"] &= decision[:, None, None, None]
-                    scale = torch.ones_like(consistency_target["position"][..., 0])
-                    retreat = (
-                        (task._stack_phase >= task.A1_RETREAT)
-                        & (task._stack_phase < task.DONE)
-                        & ~task._carry_rehearsal
+
+            # Every head starts from an identical simulator/task snapshot.
+            # The best per-environment branch is merged back afterwards, so
+            # the next planning decision follows an actually executed result.
+            base_snapshot = TaskBranchSnapshot.capture(task)
+            best_snapshot = base_snapshot.clone()
+            best_score = torch.full(
+                (task.num_envs,), -torch.inf, device=device,
+            )
+            branch_terms = []
+            branch_dones = []
+            branch_diagnostics = []
+            branch_decisions = []
+            branch_scores = []
+            for candidate in range(planner.config.candidates):
+                base_snapshot.restore(task)
+                candidate_output = {
+                    "path_local": outputs["path_local"][:, candidate:candidate + 1],
+                    "path_world": outputs["path_world"][:, candidate:candidate + 1],
+                }
+                terms, done, macro_diag, decision, invalid = (
+                    _counterfactual_rollout(
+                        player, candidate_output, state, before, low_steps,
+                        reward_config, visit_penalty_coef, visit_tolerance,
+                        retreat_box_penalty_coef, endpoint_penalty_coef,
                     )
-                    scale[retreat, :, 0] = retreat_path_scale
-                    consistency_target["position_scale"] = scale
-                endpoint_change_cost = task._planner_endpoint_change_cost.clone()
-                retreat_box_path_cost = (
-                    task._planner_retreat_box_path_penalty.clone()
                 )
-                retreat_box_min_clearance = (
-                    task._planner_retreat_box_min_clearance.clone()
+                with torch.no_grad():
+                    next_state = task.planner_state()
+                    next_observation = history.observe(
+                        next_state, reset_mask=done, commit=False,
+                    )
+                    next_value = policy.value(next_observation)
+                    continuation = ~(done | invalid)
+                    score = terms["total"] + (
+                        gamma * next_value * continuation.float()
+                    )
+                candidate_snapshot = TaskBranchSnapshot.capture(task)
+                better = score > best_score
+                best_snapshot.update_where(candidate_snapshot, better)
+                best_score = torch.where(better, score, best_score)
+                branch_terms.append(terms)
+                branch_dones.append(done)
+                branch_diagnostics.append(macro_diag)
+                branch_decisions.append(decision)
+                branch_scores.append(score)
+
+            scores = torch.stack(branch_scores)             # [K,B]
+            candidate_score_sums += scores.mean(dim=1)
+            best_candidate = scores.argmax(dim=0)           # [B]
+            env_index = torch.arange(task.num_envs, device=device)
+            best_snapshot.restore(task)
+            _refresh_obs(player)
+
+            def select_branch(items, key):
+                stacked = torch.stack([item[key] for item in items])
+                return stacked[best_candidate, env_index]
+
+            terms = {
+                key: select_branch(branch_terms, key)
+                for key in branch_terms[0]
+            }
+            done = torch.stack(branch_dones)[best_candidate, env_index]
+            decision_stack = torch.stack(branch_decisions)
+            decision = decision_stack[best_candidate, env_index]
+            macro_diag = {
+                key: select_branch(branch_diagnostics, key)
+                for key in branch_diagnostics[0]
+            }
+            if decision.any():
+                candidate_counts += torch.bincount(
+                    best_candidate[decision],
+                    minlength=planner.config.candidates,
                 )
-                retreat_box_endpoint_clearance = (
-                    task._planner_retreat_box_endpoint_clearance.clone()
-                )
-            # Inactive ticks are not new planner attempts. Every active
-            # retreat tick now replans and receives its own PPO credit.
-            scored_valid = valid | ~decision
-            scored_safe = safe | ~decision
-            terms, done, macro_diag = _macro_step(
-                player, before, scored_valid, scored_safe, low_steps,
-                reward_config,
-            )
-            # Retreat is collision-driven.  The task potential contains an
-            # A1-box distance/clearance increase, which would otherwise teach
-            # "go farther" in addition to avoiding contact.  Keep potential
-            # learning for placement/stacking, but remove it from decisions
-            # sampled while A1 is retreating.
-            terms["retreat_potential_delta_removed"] = torch.where(
-                retreat_decision, terms["potential_delta"],
-                torch.zeros_like(terms["potential_delta"]),
-            )
-            terms["total"] -= terms["retreat_potential_delta_removed"]
-            route_penalty = visit["penalty"][:, 0].mean(dim=-1)
-            terms["route_visit_penalty"] = (
-                -visit_penalty_coef * route_penalty * decision.float()
-            )
-            terms["route_box_distance"] = visit["box_distance"][:, 0].mean(dim=-1)
-            terms["route_goal_distance"] = visit["goal_distance"][:, 0].mean(dim=-1)
-            terms["retreat_box_path_penalty"] = (
-                -retreat_box_penalty_coef * retreat_box_path_cost
-            )
-            terms["retreat_box_min_clearance"] = retreat_box_min_clearance
-            terms["retreat_box_endpoint_clearance"] = (
-                retreat_box_endpoint_clearance
-            )
-            terms["total"] = (
-                terms["total"] + terms["route_visit_penalty"]
-                + terms["retreat_box_path_penalty"]
-            )
-            terms["retreat_endpoint_change_penalty"] = (
-                -endpoint_penalty_coef * endpoint_change_cost * decision.float()
-            )
-            terms["retreat_endpoint_change_cost"] = endpoint_change_cost
-            terms["total"] += terms["retreat_endpoint_change_penalty"]
-            # An invalid decision does not execute the sampled action (retreat
-            # waits at its entry root). Cut the GAE chain and train that action
-            # only from its own analytic penalties; do not credit it with the
-            # fallback's subsequent physical outcome.
-            invalid_decision = decision & ~valid
-            analytic = (
-                terms["invalid_plan_penalty"]
-                + terms["unsafe_plan_penalty"]
-                + terms["route_visit_penalty"]
-                + terms["retreat_box_path_penalty"]
-                + terms["retreat_endpoint_change_penalty"]
-            )
-            terms["total"] = torch.where(
-                invalid_decision, analytic, terms["total"]
-            )
-            states.append(observation.clone())
+
             if consistency_coef > 0.0:
-                consistency_targets.append(consistency_target)
-            actions.append(action)
-            log_probs.append(log_prob)
-            values.append(value)
+                consistency_target["valid"] &= decision[:, None, None, None]
+                scale = torch.ones_like(consistency_target["position"][..., 0])
+                scale[retreat_at_decision, :, 0] = retreat_path_scale
+                consistency_target["position_scale"] = scale
+
+            # Store every physically evaluated candidate. The evaluator target
+            # is the best same-scene branch; continuous PPO credit remains on
+            # the head/path that produced each individual score.
+            for candidate in range(planner.config.candidates):
+                states.append(observation.clone())
+                actions.append(all_actions[:, candidate])
+                log_probs.append(all_log_probs[:, candidate])
+                candidate_returns.append(best_score.detach())
+                candidate_advantages.append(
+                    (scores[candidate] - value).detach()
+                )
+                decision_masks.append(branch_decisions[candidate])
+                candidate_targets.append(best_candidate)
+                if consistency_coef > 0.0:
+                    consistency_targets.append({
+                        key: item.clone()
+                        for key, item in consistency_target.items()
+                    })
             rewards.append(terms["total"])
             dones.append(done)
-            gae_boundaries.append(done | invalid_decision)
-            decision_masks.append(decision)
             if consistency_coef > 0.0:
+                selected_mean_path = mean_outputs["path_world"][
+                    env_index, best_candidate
+                ][:, None]
                 previous_mean_output = {
-                    key: mean_output[key].detach().clone()
-                    for key in ("path_world",)
+                    "path_world": selected_mean_path.detach().clone(),
                 }
                 previous_state = state.clone()
             previous_done = done.detach().clone()
@@ -522,29 +658,11 @@ def main():
                 planner_diag[key] = (
                     planner_diag.get(key, 0.0) + float(tensor.sum())
                 )
-
-        with torch.no_grad():
-            next_state = task.planner_state()
-            next_observation = history.observe(
-                next_state, reset_mask=previous_done, commit=False,
-            )
-            _, next_value, _ = policy.distribution(next_observation)
         reward_t = torch.stack(rewards)
         done_t = torch.stack(dones).float()
-        gae_boundary_t = torch.stack(gae_boundaries).float()
-        value_t = torch.stack(values)
-        advantage = torch.zeros_like(reward_t)
-        gae = torch.zeros(task.num_envs, device=device)
-        bootstrap = next_value
-        for step in reversed(range(horizon)):
-            mask = 1.0 - gae_boundary_t[step]
-            delta = reward_t[step] + gamma * bootstrap * mask - value_t[step]
-            gae = delta + gamma * gae_lambda * mask * gae
-            advantage[step] = gae
-            bootstrap = value_t[step]
-        returns = advantage + value_t
-        flat_decision = torch.stack(decision_masks).flatten()
-        flat_adv = advantage.flatten()
+        returns = torch.cat(candidate_returns)
+        flat_decision = torch.cat(decision_masks)
+        flat_adv = torch.cat(candidate_advantages)
         decided_adv = flat_adv[flat_decision]
         if decided_adv.numel() > 1:
             normalized = (
@@ -558,7 +676,8 @@ def main():
             flat_adv = torch.zeros_like(flat_adv)
         update = _ppo_update(
             policy, optimizer, flatten_observations(states), torch.cat(actions),
-            torch.cat(log_probs), returns.flatten(), flat_adv, flat_decision,
+            torch.cat(log_probs), returns, flat_adv, flat_decision,
+            torch.cat(candidate_targets),
             _flatten_consistency_targets(consistency_targets),
             ppo_epochs,
             minibatch,
@@ -566,6 +685,9 @@ def main():
             _env_float("STACK_PLANNER_VALUE_COEF", 0.5),
             _env_float("STACK_PLANNER_ENTROPY_COEF", 1e-4),
             consistency_coef,
+            diversity_coef,
+            diversity_margin,
+            evaluator_coef,
         )
         def ratio(numerator, denominator):
             return planner_diag.get(numerator, 0.0) / max(
@@ -609,6 +731,23 @@ def main():
             "endpoint_std": endpoint_std,
             "anchor_std": anchor_std,
             "history_steps": planner.config.history_steps,
+            "candidates": planner.config.candidates,
+            "diversity_coef": diversity_coef,
+            "diversity_margin": diversity_margin,
+            "full_candidate_rollout": 1.0,
+            **{
+                f"candidate_usage_{candidate}": float(
+                    candidate_counts[candidate].float()
+                    / candidate_counts.sum().clamp(min=1)
+                )
+                for candidate in range(planner.config.candidates)
+            },
+            **{
+                f"candidate_score_{candidate}": float(
+                    candidate_score_sums[candidate] / horizon
+                )
+                for candidate in range(planner.config.candidates)
+            },
             **planner_metrics,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
@@ -622,7 +761,10 @@ def main():
                        "retreat_box_endpoint_clearance",
                        "path_mae", "fall_ratio", "collision_ratio",
                        "bottom_postplace_linear_speed",
-                       "policy_loss", "value_loss"}
+                       "policy_loss", "value_loss",
+                       "candidate_path_distance",
+                       "candidate_evaluator_loss",
+                       "candidate_evaluator_accuracy"}
         ), flush=True)
         if iteration % save_every == 0 or iteration == first + iterations - 1:
             save_stack_checkpoint(
@@ -637,6 +779,11 @@ def main():
                         "endpoint_std": endpoint_std,
                         "anchor_std": anchor_std,
                         "history_steps": planner.config.history_steps,
+                        "candidates": planner.config.candidates,
+                        "full_candidate_rollout": True,
+                        "evaluator_coef": evaluator_coef,
+                        "diversity_coef": diversity_coef,
+                        "diversity_margin": diversity_margin,
                         "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
                         "retreat_endpoint_tolerance": endpoint_tolerance,
                         "visit_penalty_coef": visit_penalty_coef,

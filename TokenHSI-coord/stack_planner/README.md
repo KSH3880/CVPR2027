@@ -1,4 +1,4 @@
-# Stack path planner V5
+# Stack path planner V7
 
 Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 `trajectory_predictor/`의 코드 및 checkpoint namespace를 건드리지 않도록 별도 패키지로
@@ -7,12 +7,13 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 ## 현재 계약
 
 - 입력: 기존 `coordinator.schema.CoordinatorState`와 완전히 동일한 10개 state tensor
-- backbone: 6개 `(root, box, goal) x 2 agents` entity token Transformer encoder
-- candidate 생성: learned query를 쓰는 Transformer decoder
-- 모델 출력: 두 agent의 단일 end-to-end joint XY path만
+- backbone: root/box/goal 전용 tokenizer와 learnable `[SCENE]` token을 쓰는 Transformer encoder
+- candidate 생성: 하나의 scene feature를 받는 독립 full-path head 4개
+- candidate 평가: `(scene feature, detached path proposal)` 공유 evaluator
+- 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path
 - hard anchor: 각 path의 `P0=root`만 유지
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
-- checkpoint schema: `tokenhsi-stack-planner-v5`
+- checkpoint schema: `tokenhsi-stack-planner-v7`
 
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
@@ -23,8 +24,18 @@ from stack_planner.model import StackTrajectoryPlanner
 
 model = StackTrajectoryPlanner()
 output = model(coordinator_state)
-path = output["path_world"]  # [B, K, 2, 33, 2]
+path = output["path_world"]  # selected path: [B, 1, 2, 33, 2]
+candidate = output["selected_candidate"]  # [B]
 ```
+
+한 decision에서 각 독립 head는 A1 carry부터 retreat까지와 A2 carry를 모두 포함한 동일한
+30차원 full-path contract를 제안한다. segment별 head가 아니다. evaluator가 네 proposal을
+점수화한다. 학습에서는 같은 simulator state를 snapshot한 뒤 네 proposal을 모두 각각 30
+low-level step 실행해 return을 직접 비교한다. evaluator는 최고 return 후보 index를 supervised
+target으로 배우고, 다음 decision은 env별 최고 후보의 실제 종료 state에서 이어진다. PPO의
+continuous action credit은 각 후보가 직접 만든 return에만 연결된다. deterministic view/eval은
+evaluator argmax 하나를 실행한다. 후보 붕괴 방지를 위해 A1 full-path 간 기본 0.25m margin의
+diversity loss를 적용한다.
 
 별도 `retreat_path`, retreat goal, speed, switch output이나 사후 path concatenation은 없다.
 각 경로의 첫 점만 현재 root에 hard-anchor되고 나머지 32점은 planner가 한 번에 정한다.
@@ -36,13 +47,15 @@ goal보다 먼저 방문되도록 제한한다. 허용 반경은 기본 0.15 m�
 
 ### Frozen Carry execution bridge
 
-retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENALTY`(default 0.10)는
+retreat endpoint는 latch하지 않는다. `STACK_PLANNER_RETREAT_ENDPOINT_PENALTY`(default 1.0)는
 직전 retreat world endpoint에서 tolerance(default 0.10m)를 초과한 변화의 제곱에 적용되며
 최대 cost는 4로 제한한다. 최초 retreat/reset에는 적용하지 않는다. 경로 전체 consistency는
 `STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE`(default 0.05)로 약화해 우회 경로 변경을 허용한다.
 Bezier control-point exploration std는 `STACK_PLANNER_CURVE_STD=0.12`, A1 suffix endpoint는
 `STACK_PLANNER_ENDPOINT_STD=0.20`, box/goal anchor residual은 `STACK_PLANNER_ANCHOR_STD=0.03`이다.
 따라서 anchor 정확도는 유지하면서 직선 endpoint 이동뿐 아니라 곡선 우회도 탐색한다.
+endpoint만 강하게 안정화하고 중간 Bézier control point에는 이 항을 적용하지 않으므로,
+평상시 목표 왕복은 억제하면서 Agent2 접근 시 곡선 우회 자유도는 유지한다.
 충돌 cost에는 root/box proxy 외에도 다른 agent의 held box와 비손 rigid-body의 3D proximity가
 포함된다. endpoint 유지보다 회피가 유리해질 수 있으며 위험 접근 event나 수동 switch는 없다.
 
@@ -73,9 +86,10 @@ A1이 active인 phase 2~4의 매 설치 execution suffix에는 놓인 Box1의 ya
 clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safety margin 0.10 m만큼
 팽창하며, release 직후 가까이 서 있는 것 자체보다 이후 point가 box 안쪽으로 파고들거나
 끝까지 안전 영역을 빠져나오지 않는 경로를 감점한다. 기본 계수는
-`STACK_PLANNER_RETREAT_BOX_PENALTY=25.0`이다. 실제 rollout에서 bottom box가 밀린 누적량도
+`STACK_PLANNER_RETREAT_BOX_PENALTY=10.0`이다. 실제 rollout에서 bottom box가 밀린 누적량도
 `STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT=2.0`으로 감점한다. 따라서 기본 agent-agent collision
-weight 1.0보다 box 경로 침범과 배치된 box 교란을 우선 회피한다.
+weight 1.0보다 box 경로 침범과 배치된 box 교란을 우선 회피하되, analytic footprint shaping이
+전체 reward를 지배하지 않도록 한다.
 
 ### Decision history 입력
 
@@ -86,8 +100,8 @@ env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recu
 transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
 `model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
 
-기존 state-only checkpoint는 `history_steps=1`로 계속 load할 수 있지만, history 길이가 다른
-checkpoint를 `STACK_PLANNER_INIT`으로 resume하는 것은 거부한다.
+V7 이전 planner checkpoint는 encoder/training 계약이 달라 load하지 않는다. V7 checkpoint도
+history 길이 또는 candidate 수가 다른 설정으로 resume하는 것은 거부한다.
 
 검증:
 
@@ -125,8 +139,11 @@ top 목표는 stage flag가 아니라 현재 bottom box의 물리 pose/크기에
 ## Closed-loop PPO
 
 `train_closed_loop.py`는 sequential-stack agent checkpoint를 inference-only로 고정하고 planner
-parameter와 action log-std만 최적화한다. 한 PPO transition은 기본 30 action step(30 Hz에서
+parameter와 candidate별 action log-std만 최적화한다. 한 PPO transition은 기본 30 action step(30 Hz에서
 약 1초) 동안 같은 plan을 유지한다. stack phase 전환은 이 hold를 기다리지 않는다.
+한 scene마다 후보 4개를 동일한 시작 snapshot에서 순차 실행하므로 simulator workload는
+단일 후보 방식의 약 4배다. evaluator는 rollout return argmax를 직접 분류하고,
+`candidate_evaluator_loss/accuracy`, `candidate_usage_*`를 기록한다.
 다음 replan의 mean path에는 직전 mean plan을 elapsed time만큼 전진시킨
 remainder와 맞추는 temporal consistency loss를 기본 적용한다. 단일 33-point path 전체를
 비교하며, episode reset과 물리 상태 전환은 mask한다. `STACK_PLANNER_CONSISTENCY_COEF`로
@@ -136,8 +153,9 @@ remainder와 맞추는 temporal consistency loss를 기본 적용한다. 단일 
 reset에 섞지 않는다.
 
 ```bash
-STACK_PLANNER_ENVS=64 STACK_PLANNER_ITERS=200 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_planner_v0_s0
+MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
+STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v7_fullcf_s0
 ```
 
 로컬 physical GPU 1에서는 로컬 checkpoint 배치와 `tokenhsi118` 환경을 사용하는
@@ -171,24 +189,26 @@ iteration마다 기록한다.
 
 마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
 도달하지 못한 것인지 구분할 수 있다.
-같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v5 설계의 첫 학습은 다음처럼
+같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v7 설계의 서버 학습은 다음처럼
 실행할 수 있다.
 
 ```bash
-MA_GPU=7 STACK_PLANNER_SEED=0 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v5_s0
+MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
+STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v7_fullcf_s0
 ```
 
-기본값은 64 env, 200 iteration, planner action당 frozen executor 30 step이며 10 iteration마다
-checkpoint를 저장한다. PPO minibatch 기본값은 env와 horizon에 비례해 epoch당 항상 4개가
-되도록 정하므로, 64 env에서는 512이고 2,048 env에서는 16,384다. 중간 checkpoint에서
+launcher 기본값은 2,048 env지만 full candidate rollout은 후보 4개를 모두 물리 실행하고 branch
+snapshot도 보존하므로 첫 run은 512 env를 권장한다. 200 iteration, 후보당 frozen executor 30
+step이며 10 iteration마다 checkpoint를 저장한다. PPO minibatch 기본값은 env와 horizon에
+비례하며 candidate 4개 때문에 epoch당 16개 minibatch가 된다. 중간 checkpoint에서
 이어갈 때도 기존 run을 덮어쓰지 않고 새 tag를 쓴다.
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
-STACK_PLANNER_INIT=runs/stack_planner/stack_path_v5_s0/planner_000200.pth \
+STACK_PLANNER_INIT=runs/stack_planner/stack_path_v7_fullcf_s0/planner_000200.pth \
 STACK_PLANNER_ITERS=200 MA_GPU=7 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v5_s0_resume1
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v7_fullcf_s0_resume1
 ```
 
 ## Checkpoint viewer

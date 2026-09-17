@@ -75,11 +75,27 @@ class StackHistoryBuffer:
         self.valid[env_mask] = False
 
     def observe(self, state, reset_mask=None, commit=True):
+        tokens_source = self.tokens
+        valid_source = self.valid
         if reset_mask is not None:
-            self.reset(reset_mask)
+            reset_mask = torch.as_tensor(
+                reset_mask, device=self.tokens.device, dtype=torch.bool,
+            )
+            if commit:
+                self.reset(reset_mask)
+            else:
+                # Counterfactual branches must be able to bootstrap from a
+                # terminal state without mutating the single committed
+                # history shared by all candidates.
+                tokens_source = self.tokens.clone()
+                valid_source = self.valid.clone()
+                tokens_source[reset_mask] = 0.0
+                valid_source[reset_mask] = False
         current, _ = state_to_tokens(state)
-        tokens = torch.cat((self.tokens[:, 1:], current[:, None]), dim=1)
-        valid = torch.cat((self.valid[:, 1:], torch.ones_like(self.valid[:, :1])), dim=1)
+        tokens = torch.cat((tokens_source[:, 1:], current[:, None]), dim=1)
+        valid = torch.cat((
+            valid_source[:, 1:], torch.ones_like(valid_source[:, :1]),
+        ), dim=1)
         observation = StackPlannerObservation(state, tokens, valid)
         observation.validate(self.history_steps)
         if commit:

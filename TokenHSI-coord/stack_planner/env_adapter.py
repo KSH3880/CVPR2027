@@ -374,7 +374,7 @@ class HumanoidMAStackPlannerTrain(
 
     @torch.no_grad()
     def install_external_plan(self, output):
-        """Install candidate zero; return per-env (valid, conservative-safe)."""
+        """Install the policy-selected singleton path and report its validity."""
         state = self.planner_state()
         phase = self._stack_phase
         active = self.planner_active_rows()
@@ -387,6 +387,8 @@ class HumanoidMAStackPlannerTrain(
         # stacks, so it can dynamically yield instead of freezing at handoff.
         retreat_rows = torch.zeros_like(active)
         retreat_rows[:, 0] = retreat_env
+        if output["path_world"].shape[1] != 1:
+            raise ValueError("environment requires one policy-selected path")
         model_path = output["path_world"][:, 0]
         self._planner_endpoint_change_cost = retreat_endpoint_change_cost(
             model_path[:, 0, -1], self._planner_virtual_retreat_pos[:, :2],

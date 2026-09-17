@@ -1,107 +1,163 @@
-"""PPO policy wrapper for the isolated stack Transformer planner."""
+"""Continuous full-path heads evaluated by same-state counterfactual rollout."""
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict
 
 import torch
 from torch import nn
 from torch.distributions import Normal
 
-from coordinator.geometry import state_to_tokens
 from coordinator.schema import AGENTS, CoordinatorState
 
 from .model import StackTrajectoryPlanner
 
 
-def _sizes(model: StackTrajectoryPlanner) -> Tuple[int, int]:
-    k = model.config.candidates
-    path = k * (AGENTS * 6 + 3) * 2
-    return path, path
+def _path_dim() -> int:
+    return (AGENTS * 6 + 3) * 2
 
 
-def _raw_heads(model: StackTrajectoryPlanner, state: CoordinatorState) -> Dict[str, torch.Tensor]:
-    if hasattr(state, "history_tokens"):
-        state.validate(model.config.history_steps)
-        memory = model.scene_encoder(state.history_tokens, state.history_valid)
-    else:
-        tokens, _ = state_to_tokens(state)
-        if model.config.history_steps > 1:
-            raise ValueError("history-enabled planner requires StackPlannerObservation")
-        memory = model.scene_encoder(tokens)
-    return model.heads(model.candidate_decoder(memory))
-
-
-def pack_mean(model: StackTrajectoryPlanner, raw: Dict[str, torch.Tensor]) -> torch.Tensor:
-    return raw["path_raw"].flatten(start_dim=1)
-
-
-def decode_action(
-    model: StackTrajectoryPlanner,
-    state: CoordinatorState,
-    action: torch.Tensor,
-    template: Dict[str, torch.Tensor],
-) -> Dict[str, torch.Tensor]:
-    path_n, total = _sizes(model)
-    if action.shape != (state.batch_size, total):
-        raise ValueError(f"expected action [B,{total}], got {tuple(action.shape)}")
-    sizes = (path_n,)
-    names = ("path_raw",)
-    raw = dict(template)
-    start = 0
-    for name, size in zip(names, sizes):
-        raw[name] = action[:, start:start + size]
-        start += size
-    # Bounding happens in the differentiable path decoder.  A finite
-    # clamp only prevents extreme exploration samples from saturating it.
-    for name in names:
-        raw[name] = raw[name].clamp(-5.0, 5.0)
-    current = state.state if hasattr(state, "history_tokens") else state
-    return model.decode(current, raw)
+def _selected_path(raw: Dict[str, torch.Tensor], candidate: torch.Tensor):
+    batch = torch.arange(candidate.shape[0], device=candidate.device)
+    return raw["path_raw"][batch, candidate]
 
 
 class StackPlannerActorCritic(nn.Module):
+    """Sample full paths per head; evaluator selection is supervised."""
+
     def __init__(self, planner: StackTrajectoryPlanner, curve_std: float = 0.12,
                  endpoint_std: float = 0.20, anchor_std: float = 0.03):
         super().__init__()
         if min(curve_std, endpoint_std, anchor_std) <= 0.0:
             raise ValueError("planner exploration stds must be positive")
         self.planner = planner
-        path_n, self.action_dim = _sizes(planner)
-        # Keep box/goal anchors precise, but give Bézier controls enough range
-        # to discover actual curved avoidance paths.  The old uniform 0.03
-        # path std moved a control by only about 9 cm after residual scaling,
-        # so PPO almost exclusively explored straight endpoint changes.
-        std = torch.full((self.action_dim,), float(anchor_std))
-        path_per_candidate = (AGENTS * 6 + 3) * 2
-        for candidate in range(planner.config.candidates):
-            base = candidate * path_per_candidate
-            for agent in range(AGENTS):
-                controls = base + (agent * 6 + 2) * 2
-                std[controls:controls + 8] = float(curve_std)
-            suffix = base + AGENTS * 6 * 2
-            std[suffix:suffix + 2] = float(endpoint_std)
-            std[suffix + 2:suffix + 6] = float(curve_std)
-        self.action_log_std = nn.Parameter(std.log())
+        self.continuous_action_dim = _path_dim()
+        # The leading index identifies which independent head produced the
+        # path. It is supervised by full rollout comparison, not sampled as a
+        # PPO categorical action.
+        self.action_dim = self.continuous_action_dim + 1
+        std = torch.full((self.continuous_action_dim,), float(anchor_std))
+        for agent in range(AGENTS):
+            controls = (agent * 6 + 2) * 2
+            std[controls:controls + 8] = float(curve_std)
+        suffix = AGENTS * 6 * 2
+        std[suffix:suffix + 2] = float(endpoint_std)
+        std[suffix + 2:suffix + 6] = float(curve_std)
+        # Exploration can specialize per independent full-path head.
+        self.action_log_std = nn.Parameter(
+            std.log()[None].repeat(planner.config.candidates, 1)
+        )
 
     def distribution(self, state: CoordinatorState):
-        raw = _raw_heads(self.planner, state)
-        mean = pack_mean(self.planner, raw)
-        std = self.action_log_std.exp().clamp(0.005, 1.0).expand_as(mean)
-        value = raw["candidate_value"].mean(dim=1)
-        return Normal(mean, std), value, raw
+        current, raw = self.planner.raw_heads(state)
+        std = self.action_log_std.exp().clamp(0.005, 1.0)
+        std = std[None].expand(current.batch_size, -1, -1)
+        paths = Normal(raw["path_raw"], std)
+        return paths, raw["value"], raw
+
+    def value(self, state: CoordinatorState):
+        _, raw = self.planner.raw_heads(state)
+        return raw["value"]
+
+    def mean_output(self, state: CoordinatorState):
+        current, raw = self.planner.raw_heads(state)
+        candidate = raw["candidate_logits"].argmax(dim=-1)
+        selected = _selected_path(raw, candidate)
+        output = self.planner.decode(current, {"path_raw": selected[:, None]})
+        output["selected_candidate"] = candidate
+        output["candidate_logits"] = raw["candidate_logits"]
+        return output
+
+    def all_mean_outputs(self, state: CoordinatorState):
+        current, raw = self.planner.raw_heads(state)
+        output = self.planner.decode(current, {"path_raw": raw["path_raw"]})
+        output["candidate_logits"] = raw["candidate_logits"]
+        return output
 
     def act(self, state: CoordinatorState, deterministic: bool = False):
-        distribution, value, raw = self.distribution(state)
-        action = distribution.mean if deterministic else distribution.sample()
-        log_prob = distribution.log_prob(action).sum(dim=-1)
-        return decode_action(self.planner, state, action, raw), action, log_prob, value
+        paths, value, raw = self.distribution(state)
+        # Runtime selection always belongs to the learned evaluator. During
+        # training sample_all() evaluates every head instead.
+        candidate = raw["candidate_logits"].argmax(dim=-1)
+        batch = torch.arange(candidate.shape[0], device=candidate.device)
+        mean = paths.loc[batch, candidate]
+        std = paths.scale[batch, candidate]
+        selected_distribution = Normal(mean, std)
+        path_action = (
+            selected_distribution.mean if deterministic
+            else selected_distribution.sample()
+        )
+        log_prob = selected_distribution.log_prob(path_action).sum(dim=-1)
+        packed_action = torch.cat(
+            (candidate[:, None].to(path_action), path_action), dim=-1,
+        )
+        current = state.state if hasattr(state, "history_tokens") else state
+        output = self.planner.decode(
+            current, {"path_raw": path_action[:, None].clamp(-5.0, 5.0)}
+        )
+        output["selected_candidate"] = candidate
+        output["candidate_logits"] = raw["candidate_logits"]
+        return output, packed_action, log_prob, value
+
+    def sample_all(self, state: CoordinatorState):
+        """Sample and decode every full-path head from the same scene."""
+        paths, value, raw = self.distribution(state)
+        path_action = paths.sample()
+        log_prob = paths.log_prob(path_action).sum(dim=-1)
+        candidate = torch.arange(
+            self.planner.config.candidates, device=path_action.device,
+            dtype=path_action.dtype,
+        )[None, :, None].expand(path_action.shape[0], -1, -1)
+        packed_action = torch.cat((candidate, path_action), dim=-1)
+        current = state.state if hasattr(state, "history_tokens") else state
+        output = self.planner.decode(
+            current, {"path_raw": path_action.clamp(-5.0, 5.0)}
+        )
+        output["candidate_logits"] = raw["candidate_logits"]
+        return output, packed_action, log_prob, value
 
     def evaluate(self, state: CoordinatorState, action: torch.Tensor):
-        distribution, value, raw = self.distribution(state)
-        return (distribution.log_prob(action).sum(dim=-1),
-                distribution.entropy().sum(dim=-1), value,
-                decode_action(self.planner, state, action, raw))
+        if action.ndim != 2 or action.shape[-1] != self.action_dim:
+            raise ValueError(f"expected packed action [B,{self.action_dim}]")
+        paths, value, raw = self.distribution(state)
+        candidate_float = action[:, 0]
+        candidate = candidate_float.long()
+        if not torch.equal(candidate_float, candidate_float.round()):
+            raise ValueError("candidate action must be an integer")
+        if ((candidate < 0) | (candidate >= self.planner.config.candidates)).any():
+            raise ValueError("candidate action out of range")
+        path_action = action[:, 1:]
+        batch = torch.arange(candidate.shape[0], device=candidate.device)
+        selected_distribution = Normal(
+            paths.loc[batch, candidate], paths.scale[batch, candidate]
+        )
+        # Candidate selection is supervised from full counterfactual returns;
+        # it is not part of the PPO action probability.
+        log_prob = selected_distribution.log_prob(path_action).sum(dim=-1)
+        entropy = selected_distribution.entropy().sum(dim=-1)
+        current = state.state if hasattr(state, "history_tokens") else state
+        decoded = self.planner.decode(
+            current, {"path_raw": path_action[:, None].clamp(-5.0, 5.0)}
+        )
+        decoded["selected_candidate"] = candidate
+        decoded["candidate_logits"] = raw["candidate_logits"]
+        return log_prob, entropy, value, decoded
+
+    def diversity(self, state: CoordinatorState, margin: float = 0.25):
+        """Keep alternative full-path heads distinct in world-space metres."""
+        output = self.all_mean_outputs(state)
+        path = output["path_world"][:, :, 0]
+        candidates = path.shape[1]
+        if candidates < 2:
+            zero = path.new_zeros(())
+            return {"loss": zero, "distance": zero}
+        pairs = torch.triu_indices(candidates, candidates, 1, device=path.device)
+        difference = path[:, pairs[0]] - path[:, pairs[1]]
+        distance = difference.square().sum(dim=-1).mean(dim=-1).clamp(min=1e-8).sqrt()
+        return {
+            "loss": (margin - distance).clamp(min=0.0).square().mean(),
+            "distance": distance.mean(),
+        }
 
 
-__all__ = ["StackPlannerActorCritic", "decode_action", "pack_mean"]
+__all__ = ["StackPlannerActorCritic"]

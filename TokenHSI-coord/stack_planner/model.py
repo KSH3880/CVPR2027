@@ -1,4 +1,4 @@
-"""Transformer planner emitting one end-to-end XY path per stack agent."""
+"""Scene-token Transformer with independent full-path proposal heads."""
 
 from __future__ import annotations
 
@@ -23,7 +23,6 @@ class StackPlannerConfig:
     d_model: int = 128
     nhead: int = 4
     encoder_layers: int = 3
-    decoder_layers: int = 2
     feedforward: int = 256
     dropout: float = 0.0
     candidates: int = STACK_CANDIDATES
@@ -35,8 +34,8 @@ class StackPlannerConfig:
             raise ValueError(f"token_dim must preserve the existing input contract ({TOKEN_DIM})")
         if self.d_model <= 0 or self.nhead <= 0 or self.d_model % self.nhead:
             raise ValueError("d_model must be positive and divisible by nhead")
-        if self.encoder_layers <= 0 or self.decoder_layers <= 0:
-            raise ValueError("Transformer layer counts must be positive")
+        if self.encoder_layers <= 0:
+            raise ValueError("Transformer layer count must be positive")
         if self.feedforward <= 0 or self.candidates <= 0:
             raise ValueError("feedforward and candidates must be positive")
         if self.residual_scale <= 0:
@@ -49,13 +48,20 @@ class StackPlannerConfig:
 
 
 class StackSceneEncoder(nn.Module):
-    """Encode the unchanged six root/box/goal entity tokens."""
+    """Pool typed observation tokens into one learned scene token."""
 
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
-        self.input_projection = nn.Linear(config.token_dim, config.d_model)
+        # Root, box and goal carry different physical semantics.  Tokenize
+        # each type independently while sharing the tokenizer across agents
+        # and history slots.
+        self.tokenizers = nn.ModuleList([
+            nn.Linear(config.token_dim, config.d_model) for _ in range(3)
+        ])
         self.entity_embedding = nn.Embedding(3, config.d_model)
         self.agent_embedding = nn.Embedding(AGENTS, config.d_model)
+        self.scene_token = nn.Parameter(torch.empty(1, 1, config.d_model))
+        nn.init.normal_(self.scene_token, std=0.02)
         self.history_steps = config.history_steps
         if self.history_steps > 1:
             self.time_embedding = nn.Embedding(self.history_steps, config.d_model)
@@ -86,7 +92,12 @@ class StackSceneEncoder(nn.Module):
         if tokens.ndim != 4 or tokens.shape[1] != self.history_steps:
             raise ValueError("scene tokens must be [B,history,6,token_dim]")
         batch, steps, entities, _ = tokens.shape
-        value = self.input_projection(tokens)
+        value = torch.empty(
+            batch, steps, entities, self.tokenizers[0].out_features,
+            device=tokens.device, dtype=tokens.dtype,
+        )
+        for entity, tokenizer in enumerate(self.tokenizers):
+            value[:, :, entity::3] = tokenizer(tokens[:, :, entity::3])
         value = value + self.entity_embedding(self.entity_ids)[None, None]
         value = value + self.agent_embedding(self.agent_ids)[None, None]
         if self.history_steps > 1:
@@ -100,38 +111,19 @@ class StackSceneEncoder(nn.Module):
             padding = (~history_valid[..., None].expand(-1, -1, entities)).reshape(
                 batch, steps * entities
             )
-        return self.transformer(value, src_key_padding_mask=padding)
-
-
-class StackCandidateDecoder(nn.Module):
-    """Decode unnamed coordinated futures from learned candidate queries."""
-
-    def __init__(self, config: StackPlannerConfig):
-        super().__init__()
-        layer = nn.TransformerDecoderLayer(
-            d_model=config.d_model,
-            nhead=config.nhead,
-            dim_feedforward=config.feedforward,
-            dropout=config.dropout,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True,
-        )
-        self.transformer = nn.TransformerDecoder(
-            layer,
-            num_layers=config.decoder_layers,
-            norm=nn.LayerNorm(config.d_model),
-        )
-        self.queries = nn.Parameter(torch.empty(config.candidates, config.d_model))
-        nn.init.normal_(self.queries, std=0.02)
-
-    def forward(self, memory: torch.Tensor) -> torch.Tensor:
-        query = self.queries[None].expand(memory.shape[0], -1, -1)
-        return self.transformer(query, memory)
+        scene = self.scene_token.expand(batch, -1, -1)
+        value = torch.cat((scene, value), dim=1)
+        if padding is not None:
+            padding = torch.cat((
+                torch.zeros(batch, 1, dtype=torch.bool, device=tokens.device),
+                padding,
+            ), dim=1)
+        encoded = self.transformer(value, src_key_padding_mask=padding)
+        return encoded[:, 0]
 
 
 class StackPlannerHeads(nn.Module):
-    """One path head for the complete joint future."""
+    """Independent complete-path proposals plus a learned path evaluator."""
 
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
@@ -144,21 +136,37 @@ class StackPlannerHeads(nn.Module):
                 nn.Linear(hidden, size),
             )
 
-        # Six vectors per agent describe root->box->goal. Three more extend
-        # Agent 1 to the final point of the same path; this is not a separate
-        # retreat output/head.
-        self.path = head((AGENTS * 6 + 3) * 2)
+        self.path_dim = (AGENTS * 6 + 3) * 2
+        # Every head emits the same complete contract: both carry routes and
+        # A1's retreat suffix.  Heads do not own individual path segments.
+        self.paths = nn.ModuleList([
+            head(self.path_dim) for _ in range(config.candidates)
+        ])
+        # Score actual proposal parameters, rather than a candidate ID.  The
+        # proposal is detached here so selector gradients cannot improve a
+        # score by distorting an unexecuted path head.
+        self.candidate_evaluator = nn.Sequential(
+            nn.Linear(config.d_model + self.path_dim, hidden),
+            nn.GELU(),
+            nn.Linear(hidden, 1),
+        )
         self.value = head(1)
-        # A fresh planner starts from straight paths. PPO exploration, rather
-        # than arbitrary last-layer initialization, owns the first deviations
-        # from that executable prior.
-        nn.init.zeros_(self.path[-1].weight)
-        nn.init.zeros_(self.path[-1].bias)
+        # Tiny independent proposal initialization keeps every path close to
+        # the executable straight prior without making all heads identical.
+        for path in self.paths:
+            nn.init.normal_(path[-1].weight, std=1e-3)
+            nn.init.zeros_(path[-1].bias)
 
-    def forward(self, decoded: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, scene: torch.Tensor) -> Dict[str, torch.Tensor]:
+        path_raw = torch.stack([path(scene) for path in self.paths], dim=1)
+        expanded_scene = scene[:, None].expand(-1, path_raw.shape[1], -1)
+        evaluator_input = torch.cat((expanded_scene, path_raw.detach()), dim=-1)
         return {
-            "path_raw": self.path(decoded),
-            "candidate_value": self.value(decoded).squeeze(-1),
+            "path_raw": path_raw,
+            "candidate_logits": self.candidate_evaluator(
+                evaluator_input
+            ).squeeze(-1),
+            "value": self.value(scene).squeeze(-1),
         }
 
 
@@ -169,13 +177,10 @@ class StackTrajectoryPlanner(nn.Module):
         super().__init__()
         self.config = config or StackPlannerConfig()
         self.scene_encoder = StackSceneEncoder(self.config)
-        self.candidate_decoder = StackCandidateDecoder(self.config)
         self.heads = StackPlannerHeads(self.config)
 
-    def forward(
-        self,
-        state: Union[CoordinatorState, Mapping[str, torch.Tensor]],
-    ) -> Dict[str, torch.Tensor]:
+    def raw_heads(self, state):
+        """Return all complete proposals, evaluator logits and state value."""
         history_valid = None
         if hasattr(state, "history_tokens"):
             observation = state
@@ -189,11 +194,22 @@ class StackTrajectoryPlanner(nn.Module):
             tokens, _ = state_to_tokens(state)
             if self.config.history_steps > 1:
                 raise ValueError("history-enabled planner requires StackPlannerObservation")
-        memory = self.scene_encoder(tokens, history_valid)
-        decoded = self.candidate_decoder(memory)
-        raw = self.heads(decoded)
+        scene = self.scene_encoder(tokens, history_valid)
+        return state, self.heads(scene)
 
-        return self.decode(state, raw)
+    def forward(
+        self,
+        state: Union[CoordinatorState, Mapping[str, torch.Tensor]],
+    ) -> Dict[str, torch.Tensor]:
+        state, raw = self.raw_heads(state)
+        selected = raw["candidate_logits"].argmax(dim=-1)
+        batch = torch.arange(state.batch_size, device=state.device)
+        output = self.decode(state, {
+            "path_raw": raw["path_raw"][batch, selected][:, None],
+        })
+        output["selected_candidate"] = selected
+        output["candidate_logits"] = raw["candidate_logits"]
+        return output
 
     def decode(
         self,
@@ -203,12 +219,18 @@ class StackTrajectoryPlanner(nn.Module):
         """Decode network means or sampled PPO head values into trajectories."""
         _, frame = state_to_tokens(state)
 
-        path_raw = raw["path_raw"].reshape(
-            state.batch_size, self.config.candidates, AGENTS * 6 + 3, 2
+        packed = raw["path_raw"]
+        path_dim = (AGENTS * 6 + 3) * 2
+        if (packed.ndim != 3 or packed.shape[0] != state.batch_size
+                or packed.shape[-1] != path_dim):
+            raise ValueError(f"path_raw must be [B,K,{path_dim}]")
+        candidates = packed.shape[1]
+        path_raw = packed.reshape(
+            state.batch_size, candidates, AGENTS * 6 + 3, 2
         )
         route_residual = self.config.residual_scale * torch.tanh(
             path_raw[..., :AGENTS * 6, :].reshape(
-                state.batch_size, self.config.candidates, AGENTS, 6, 2
+                state.batch_size, candidates, AGENTS, 6, 2
             )
         )
         suffix_raw = path_raw[..., AGENTS * 6:, :]
