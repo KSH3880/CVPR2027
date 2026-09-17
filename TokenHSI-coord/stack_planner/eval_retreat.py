@@ -4,6 +4,7 @@ from .train_closed_loop import (
     _refresh_obs, load_stack_checkpoint,
 )
 from .retreat_metrics import summarize_retreat
+from .history import StackHistoryBuffer
 
 
 @torch.no_grad()
@@ -19,6 +20,9 @@ def main():
     player = _make_player(args, cfg, cfg_train)
     task = player.env.task
     planner, payload = load_stack_checkpoint(os.environ['STACK_PLANNER_EVAL_CKPT'], player.device)
+    history = StackHistoryBuffer(
+        task.num_envs, planner.config.history_steps, task.device,
+    )
     out = Path(os.environ['STACK_PLANNER_EVAL_OUTPUT'])
     out.mkdir(parents=True, exist_ok=False)
     steps = int(os.environ.get('STACK_PLANNER_EVAL_STEPS', '3600'))
@@ -39,7 +43,7 @@ def main():
             phase = task._stack_phase.clone()
             retreat = (phase == task.A1_RETREAT) & ~task._carry_rehearsal
             if tick % period == 0 or previous_phase is None or bool((phase != previous_phase).any()):
-                output = planner(task.planner_state())
+                output = planner(history.observe(task.planner_state(), commit=True))
                 task.install_external_plan(output)
                 endpoints = output['path_world'][:, 0, 0, -1].cpu().tolist()
                 for e in range(task.num_envs):
@@ -86,6 +90,7 @@ def main():
                         episodes[e] = dict(env=e, episode=number, retreat_steps=0, endpoint_changes=[], path_errors=[], min_box_gap=None, min_agent_gap=None, collision_steps=0, fall=False, reached=False, stopped=False, approaching_steps=0, stationary_steps=0)
                         previous_endpoint[e] = None
             if done_env.any():
+                history.reset(done_env)
                 ids = torch.nonzero(done_env.repeat_interleave(2), as_tuple=False).squeeze(-1)
                 obs = player.env.reset(ids)
                 previous_phase = None

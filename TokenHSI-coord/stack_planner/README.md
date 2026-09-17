@@ -77,6 +77,18 @@ clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safe
 `STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT=2.0`으로 감점한다. 따라서 기본 agent-agent collision
 weight 1.0보다 box 경로 침범과 배치된 box 교란을 우선 회피한다.
 
+### Decision history 입력
+
+새 학습은 기본적으로 최근 4번의 planner decision state token을 함께 입력한다.
+`STACK_PLANNER_HISTORY_STEPS`로 길이를 바꿀 수 있다. 각 시점은 기존과 동일한 6개
+root/box/goal entity token이며 temporal embedding과 valid mask를 추가한다. episode reset 시 해당
+env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recurrent hidden state가 아니므로 PPO가
+transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
+`model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
+
+기존 state-only checkpoint는 `history_steps=1`로 계속 load할 수 있지만, history 길이가 다른
+checkpoint를 `STACK_PLANNER_INIT`으로 resume하는 것은 거부한다.
+
 검증:
 
 ```bash

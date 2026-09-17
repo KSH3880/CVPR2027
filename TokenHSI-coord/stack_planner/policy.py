@@ -21,8 +21,15 @@ def _sizes(model: StackTrajectoryPlanner) -> Tuple[int, int]:
 
 
 def _raw_heads(model: StackTrajectoryPlanner, state: CoordinatorState) -> Dict[str, torch.Tensor]:
-    tokens, _ = state_to_tokens(state)
-    return model.heads(model.candidate_decoder(model.scene_encoder(tokens)))
+    if hasattr(state, "history_tokens"):
+        state.validate(model.config.history_steps)
+        memory = model.scene_encoder(state.history_tokens, state.history_valid)
+    else:
+        tokens, _ = state_to_tokens(state)
+        if model.config.history_steps > 1:
+            raise ValueError("history-enabled planner requires StackPlannerObservation")
+        memory = model.scene_encoder(tokens)
+    return model.heads(model.candidate_decoder(memory))
 
 
 def pack_mean(model: StackTrajectoryPlanner, raw: Dict[str, torch.Tensor]) -> torch.Tensor:
@@ -49,7 +56,8 @@ def decode_action(
     # clamp only prevents extreme exploration samples from saturating it.
     for name in names:
         raw[name] = raw[name].clamp(-5.0, 5.0)
-    return model.decode(state, raw)
+    current = state.state if hasattr(state, "history_tokens") else state
+    return model.decode(current, raw)
 
 
 class StackPlannerActorCritic(nn.Module):

@@ -30,6 +30,9 @@ from stack_planner.consistency import (  # noqa: E402
 )
 from stack_planner.constraints import ordered_box_goal_visit  # noqa: E402
 from stack_planner.env_adapter import HumanoidMAStackPlannerTrain  # noqa: E402
+from stack_planner.history import (  # noqa: E402
+    StackHistoryBuffer, flatten_observations,
+)
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner  # noqa: E402
 from stack_planner.policy import StackPlannerActorCritic  # noqa: E402
 from stack_planner.reward import (  # noqa: E402
@@ -47,13 +50,6 @@ def _env_int(name: str, default: int) -> int:
 
 def _env_float(name: str, default: float) -> float:
     return float(os.environ.get(name, str(default)))
-
-
-def _flatten_states(states: List[CoordinatorState]) -> CoordinatorState:
-    return CoordinatorState(**{
-        key: torch.cat([getattr(state, key) for state in states], dim=0)
-        for key in STATE_KEYS
-    })
 
 
 def _flatten_consistency_targets(targets):
@@ -282,11 +278,23 @@ def main():
     device = torch.device(player.device)
 
     init = os.environ.get("STACK_PLANNER_INIT", "")
+    requested_history_steps = _env_int("STACK_PLANNER_HISTORY_STEPS", 4)
     payload = None
     if init:
         planner, payload = load_stack_checkpoint(init, device)
+        if planner.config.history_steps != requested_history_steps:
+            raise ValueError(
+                "STACK_PLANNER_HISTORY_STEPS must match init checkpoint: "
+                f"requested={requested_history_steps} "
+                f"checkpoint={planner.config.history_steps}"
+            )
     else:
-        planner = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).to(device)
+        planner = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, history_steps=requested_history_steps,
+        )).to(device)
+    history = StackHistoryBuffer(
+        task.num_envs, planner.config.history_steps, device,
+    )
     curve_std = _env_float("STACK_PLANNER_CURVE_STD", 0.12)
     endpoint_std = _env_float("STACK_PLANNER_ENDPOINT_STD", 0.20)
     anchor_std = _env_float("STACK_PLANNER_ANCHOR_STD", 0.03)
@@ -356,6 +364,7 @@ def main():
     print(f"[stack-planner-train] envs={task.num_envs} horizon={horizon} "
           f"low_steps={low_steps} consistency={consistency_coef:g} "
           f"curve_std={curve_std:g} endpoint_std={endpoint_std:g} "
+          f"history_steps={planner.config.history_steps} "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
           f"bottom_disturbance_weight={bottom_disturbance_weight:g} "
@@ -368,7 +377,7 @@ def main():
     previous_state = None
     previous_done = torch.ones(task.num_envs, device=device, dtype=torch.bool)
     for iteration in range(first, first + iterations):
-        states: List[CoordinatorState] = []
+        states = []
         consistency_targets = []
         actions: List[torch.Tensor] = []
         log_probs: List[torch.Tensor] = []
@@ -381,10 +390,13 @@ def main():
         planner_diag: Dict[str, float] = {}
         for _ in range(horizon):
             state = task.planner_state()
+            observation = history.observe(
+                state, reset_mask=previous_done, commit=True,
+            )
             before = _clone_physical(task.planner_physical_state())
             with torch.no_grad():
                 if consistency_coef > 0.0:
-                    mean_output = policy.planner(state)
+                    mean_output = policy.planner(observation)
                     if previous_mean_output is None or previous_state is None:
                         consistency_target = build_stack_consistency_target(
                             mean_output, state, state, 0.0,
@@ -395,7 +407,7 @@ def main():
                             previous_mean_output, previous_state, state,
                             low_steps * float(task.dt), ~previous_done,
                         )
-                output, action, log_prob, value = policy.act(state)
+                output, action, log_prob, value = policy.act(observation)
                 visit = ordered_box_goal_visit(
                     output["path_world"],
                     state.box_xyz[:, None, :, :2].expand(
@@ -487,7 +499,7 @@ def main():
             terms["total"] = torch.where(
                 invalid_decision, analytic, terms["total"]
             )
-            states.append(state.clone())
+            states.append(observation.clone())
             if consistency_coef > 0.0:
                 consistency_targets.append(consistency_target)
             actions.append(action)
@@ -503,7 +515,7 @@ def main():
                     for key in ("path_world",)
                 }
                 previous_state = state.clone()
-                previous_done = done.detach().clone()
+            previous_done = done.detach().clone()
             for key, tensor in terms.items():
                 diag[key] = diag.get(key, 0.0) + float(tensor.mean())
             for key, tensor in macro_diag.items():
@@ -512,7 +524,11 @@ def main():
                 )
 
         with torch.no_grad():
-            _, next_value, _ = policy.distribution(task.planner_state())
+            next_state = task.planner_state()
+            next_observation = history.observe(
+                next_state, reset_mask=previous_done, commit=False,
+            )
+            _, next_value, _ = policy.distribution(next_observation)
         reward_t = torch.stack(rewards)
         done_t = torch.stack(dones).float()
         gae_boundary_t = torch.stack(gae_boundaries).float()
@@ -541,7 +557,7 @@ def main():
         else:
             flat_adv = torch.zeros_like(flat_adv)
         update = _ppo_update(
-            policy, optimizer, _flatten_states(states), torch.cat(actions),
+            policy, optimizer, flatten_observations(states), torch.cat(actions),
             torch.cat(log_probs), returns.flatten(), flat_adv, flat_decision,
             _flatten_consistency_targets(consistency_targets),
             ppo_epochs,
@@ -592,6 +608,7 @@ def main():
             "curve_std": curve_std,
             "endpoint_std": endpoint_std,
             "anchor_std": anchor_std,
+            "history_steps": planner.config.history_steps,
             **planner_metrics,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
@@ -619,6 +636,7 @@ def main():
                         "curve_std": curve_std,
                         "endpoint_std": endpoint_std,
                         "anchor_std": anchor_std,
+                        "history_steps": planner.config.history_steps,
                         "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
                         "retreat_endpoint_tolerance": endpoint_tolerance,
                         "visit_penalty_coef": visit_penalty_coef,

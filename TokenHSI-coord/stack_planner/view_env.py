@@ -10,6 +10,7 @@ import numpy as np
 
 from .checkpoint import load_stack_checkpoint
 from .env_adapter import HumanoidMAStackPlannerTrain
+from .history import StackHistoryBuffer
 
 
 class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
@@ -29,6 +30,10 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
         self._stack_planner, payload = load_stack_checkpoint(checkpoint, self.device)
         self._stack_planner.eval().requires_grad_(False)
+        self._stack_history = StackHistoryBuffer(
+            self.num_envs, self._stack_planner.config.history_steps,
+            self.device,
+        )
         self._stack_planner_tick = torch.full(
             (self.num_envs,), -period, dtype=torch.long, device=self.device
         )
@@ -77,7 +82,9 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
             return
         # Viewer batches are intentionally small. Replanning the whole batch
         # keeps the install ABI simple and makes phase changes immediately visible.
-        output = self._stack_planner(self.planner_state())
+        state = self.planner_state()
+        observation = self._stack_history.observe(state, commit=True)
+        output = self._stack_planner(observation)
         self._stack_planner_latest_path = output["path_world"][:, 0].detach().clone()
         valid, safe = self.install_external_plan(output)
         status = (phase.cpu().tolist(), valid.cpu().tolist(),
@@ -173,6 +180,11 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         finally:
             self._stack_planner_view_ready = ready
         if ready and len(env_ids):
+            reset_mask = torch.zeros(
+                self.num_envs, dtype=torch.bool, device=self.device
+            )
+            reset_mask[env_ids] = True
+            self._stack_history.reset(reset_mask)
             self._stack_planner_tick[env_ids] = -self._stack_planner_period
             self._stack_planner_last_phase[env_ids] = -99
             self._compute_observations(env_ids)

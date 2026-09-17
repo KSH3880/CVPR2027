@@ -18,6 +18,7 @@ from stack_planner.constraints import (
     retreat_box_clearance,
 )
 from stack_planner.execution import execution_view, retreat_box_geometry
+from stack_planner.history import StackHistoryBuffer
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner
 from stack_planner.policy import StackPlannerActorCritic
 from stack_planner.schema import STACK_PATH_POINTS, STACK_SCHEMA_VERSION
@@ -267,6 +268,26 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(torch.allclose(
             std[suffix + 2:suffix + 6], torch.full((4,), 0.12)
         ))
+
+    def test_history_observation_masks_reset_and_drives_planner(self):
+        state = make_state(batch=2)
+        buffer = StackHistoryBuffer(2, 4, state.device)
+        first = buffer.observe(state)
+        self.assertEqual(first.history_valid.sum(dim=1).tolist(), [1, 1])
+        moved = state.clone()
+        moved.root_xy[:, 0, 0] += 0.25
+        second = buffer.observe(moved)
+        self.assertEqual(second.history_valid.sum(dim=1).tolist(), [2, 2])
+        third = buffer.observe(moved, reset_mask=torch.tensor([True, False]))
+        self.assertEqual(third.history_valid.sum(dim=1).tolist(), [1, 3])
+        model = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, history_steps=4,
+        ))
+        output = model(third)
+        self.assertEqual(
+            output["path_world"].shape,
+            (2, 1, AGENTS, STACK_PATH_POINTS, 2),
+        )
 
     def test_path_backward_reaches_transformer(self):
         state = make_state(batch=1)

@@ -17,6 +17,15 @@
   학습 launcher를 아무 로그 없이 종료하던 문제를 수정했다. CUDA driver 탐색은 입력 전체를
   소비하면서 첫 `libcuda.so.1`만 선택한다.
 
+### 과거 decision state 기반 temporal planner 입력
+
+- planner observation에 최근 decision의 6개 entity token을 FIFO로 저장하고 temporal embedding과
+  padding mask를 적용했다. 기본 길이는 4이며 `STACK_PLANNER_HISTORY_STEPS`로 설정한다.
+- recurrent hidden state 대신 각 PPO transition에 history token/mask를 함께 저장하므로 shuffled
+  minibatch에서도 action 당시 입력을 그대로 재현한다. done env만 history를 초기화한다.
+- train, deterministic viewer, retreat eval이 checkpoint의 동일 history 길이를 사용한다. 기존
+  state-only checkpoint는 `history_steps=1`로 호환하며 길이가 다른 checkpoint resume은 거부한다.
+
 ## 2026-09-16
 
 ### 고정 거리 대신 retreat 충돌 회피 shaping 강화

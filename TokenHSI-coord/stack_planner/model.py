@@ -28,6 +28,7 @@ class StackPlannerConfig:
     dropout: float = 0.0
     candidates: int = STACK_CANDIDATES
     residual_scale: float = 3.0
+    history_steps: int = 1
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -40,6 +41,8 @@ class StackPlannerConfig:
             raise ValueError("feedforward and candidates must be positive")
         if self.residual_scale <= 0:
             raise ValueError("residual_scale must be positive")
+        if self.history_steps < 1:
+            raise ValueError("history_steps must be positive")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -53,6 +56,9 @@ class StackSceneEncoder(nn.Module):
         self.input_projection = nn.Linear(config.token_dim, config.d_model)
         self.entity_embedding = nn.Embedding(3, config.d_model)
         self.agent_embedding = nn.Embedding(AGENTS, config.d_model)
+        self.history_steps = config.history_steps
+        if self.history_steps > 1:
+            self.time_embedding = nn.Embedding(self.history_steps, config.d_model)
         layer = nn.TransformerEncoderLayer(
             d_model=config.d_model,
             nhead=config.nhead,
@@ -74,11 +80,27 @@ class StackSceneEncoder(nn.Module):
             "agent_ids", torch.tensor([0, 0, 0, 1, 1, 1]), persistent=False
         )
 
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+    def forward(self, tokens: torch.Tensor, history_valid=None) -> torch.Tensor:
+        if tokens.ndim == 3:
+            tokens = tokens[:, None]
+        if tokens.ndim != 4 or tokens.shape[1] != self.history_steps:
+            raise ValueError("scene tokens must be [B,history,6,token_dim]")
+        batch, steps, entities, _ = tokens.shape
         value = self.input_projection(tokens)
-        value = value + self.entity_embedding(self.entity_ids)[None]
-        value = value + self.agent_embedding(self.agent_ids)[None]
-        return self.transformer(value)
+        value = value + self.entity_embedding(self.entity_ids)[None, None]
+        value = value + self.agent_embedding(self.agent_ids)[None, None]
+        if self.history_steps > 1:
+            time_ids = torch.arange(steps, device=tokens.device)
+            value = value + self.time_embedding(time_ids)[None, :, None]
+        value = value.reshape(batch, steps * entities, -1)
+        padding = None
+        if history_valid is not None:
+            if history_valid.shape != (batch, steps):
+                raise ValueError("history_valid must be [B,history]")
+            padding = (~history_valid[..., None].expand(-1, -1, entities)).reshape(
+                batch, steps * entities
+            )
+        return self.transformer(value, src_key_padding_mask=padding)
 
 
 class StackCandidateDecoder(nn.Module):
@@ -154,11 +176,20 @@ class StackTrajectoryPlanner(nn.Module):
         self,
         state: Union[CoordinatorState, Mapping[str, torch.Tensor]],
     ) -> Dict[str, torch.Tensor]:
-        if not isinstance(state, CoordinatorState):
-            state = CoordinatorState.from_mapping(state)
-
-        tokens, frame = state_to_tokens(state)
-        memory = self.scene_encoder(tokens)
+        history_valid = None
+        if hasattr(state, "history_tokens"):
+            observation = state
+            observation.validate(self.config.history_steps)
+            state = observation.state
+            tokens = observation.history_tokens
+            history_valid = observation.history_valid
+        else:
+            if not isinstance(state, CoordinatorState):
+                state = CoordinatorState.from_mapping(state)
+            tokens, _ = state_to_tokens(state)
+            if self.config.history_steps > 1:
+                raise ValueError("history-enabled planner requires StackPlannerObservation")
+        memory = self.scene_encoder(tokens, history_valid)
         decoded = self.candidate_decoder(memory)
         raw = self.heads(decoded)
 
