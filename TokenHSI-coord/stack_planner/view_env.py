@@ -81,6 +81,9 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         )
         if not bool(due.any()):
             return
+        restarted = self.progress_buf < self._stack_planner_tick
+        if restarted.any():
+            self._stack_history.reset(restarted)
         # Viewer batches are intentionally small. Replanning the whole batch
         # keeps the install ABI simple and makes phase changes immediately visible.
         state = self.planner_state()
@@ -89,6 +92,10 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         selected = output["selected_candidate"]
         self._stack_planner_latest_path = output["path_world"][:, 0].detach().clone()
         valid, safe = self.install_external_plan(output)
+        self._stack_history.commit_path(
+            output["path_parameters"][:, 0],
+            update_mask=valid & self._planner_policy_decision,
+        )
         status = (phase.cpu().tolist(), selected.cpu().tolist(), valid.cpu().tolist(),
                   self._planner_plan_installed.cpu().tolist(),
                   self._planner_retreat_ready.cpu().tolist())

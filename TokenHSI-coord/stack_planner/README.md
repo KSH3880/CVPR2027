@@ -1,4 +1,4 @@
-# Stack path planner V7
+# Stack path planner V8
 
 Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 `trajectory_predictor/`의 코드 및 checkpoint namespace를 건드리지 않도록 별도 패키지로
@@ -6,14 +6,15 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 
 ## 현재 계약
 
-- 입력: 기존 `coordinator.schema.CoordinatorState`와 완전히 동일한 10개 state tensor
+- 물리 입력: 기존 `coordinator.schema.CoordinatorState`와 동일한 10개 state tensor
+- planner memory: 최근 decision history와 직전 채택 path parameter 30D
 - backbone: root/box/goal 전용 tokenizer와 learnable `[SCENE]` token을 쓰는 Transformer encoder
 - candidate 생성: 하나의 scene feature를 받는 독립 full-path head 4개
 - candidate 평가: `(scene feature, detached path proposal)` 공유 evaluator
 - 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path
 - hard anchor: 각 path의 `P0=root`만 유지
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
-- checkpoint schema: `tokenhsi-stack-planner-v7`
+- checkpoint schema: `tokenhsi-stack-planner-v8`
 
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
@@ -29,7 +30,11 @@ candidate = output["selected_candidate"]  # [B]
 ```
 
 한 decision에서 각 독립 head는 A1 carry부터 retreat까지와 A2 carry를 모두 포함한 동일한
-30차원 full-path contract를 제안한다. segment별 head가 아니다. evaluator가 네 proposal을
+30차원 full-path parameter의 bounded delta를 제안한다. segment별 head가 아니다. 최초/reset
+decision은 zero geometric prior에서 시작하고, 이후에는 `직전 채택 parameter +
+0.5*tanh(delta)`로 새 full path를 만든다. 현재 root/box/goal로 매번 다시 decode하므로 누적
+drift가 world 좌표 anchor를 그대로 끌고 가지 않는다. 직전 parameter는 별도 plan token으로
+Transformer 입력에도 포함된다. evaluator가 네 proposal을
 점수화한다. 학습에서는 같은 simulator state를 snapshot한 뒤 네 proposal을 모두 각각 30
 low-level step 실행해 return을 직접 비교한다. evaluator는 최고 return 후보 index를 supervised
 target으로 배우고, 다음 decision은 env별 최고 후보의 실제 종료 state에서 이어진다. PPO의
@@ -100,7 +105,7 @@ env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recu
 transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
 `model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
 
-V7 이전 planner checkpoint는 encoder/training 계약이 달라 load하지 않는다. V7 checkpoint도
+V8 이전 planner checkpoint는 encoder/action 계약이 달라 load하지 않는다. V8 checkpoint도
 history 길이 또는 candidate 수가 다른 설정으로 resume하는 것은 거부한다.
 
 검증:
@@ -155,7 +160,7 @@ reset에 섞지 않는다.
 ```bash
 MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v7_fullcf_s0
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v8_delta_fullcf_s0
 ```
 
 로컬 physical GPU 1에서는 로컬 checkpoint 배치와 `tokenhsi118` 환경을 사용하는
@@ -189,13 +194,14 @@ iteration마다 기록한다.
 
 마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
 도달하지 못한 것인지 구분할 수 있다.
-같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v7 설계의 서버 학습은 다음처럼
+같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v8 설계의 서버 학습은 다음처럼
 실행할 수 있다.
 
 ```bash
 MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v7_fullcf_s0
+STACK_PLANNER_DELTA_SCALE=0.5 \
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v8_delta_fullcf_s0
 ```
 
 launcher 기본값은 2,048 env지만 full candidate rollout은 후보 4개를 모두 물리 실행하고 branch
@@ -206,9 +212,9 @@ step이며 10 iteration마다 checkpoint를 저장한다. PPO minibatch 기본�
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
-STACK_PLANNER_INIT=runs/stack_planner/stack_path_v7_fullcf_s0/planner_000200.pth \
+STACK_PLANNER_INIT=runs/stack_planner/stack_path_v8_delta_fullcf_s0/planner_000200.pth \
 STACK_PLANNER_ITERS=200 MA_GPU=7 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v7_fullcf_s0_resume1
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_v8_delta_fullcf_s0_resume1
 ```
 
 ## Checkpoint viewer

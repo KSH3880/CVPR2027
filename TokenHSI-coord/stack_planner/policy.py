@@ -52,7 +52,7 @@ class StackPlannerActorCritic(nn.Module):
         current, raw = self.planner.raw_heads(state)
         std = self.action_log_std.exp().clamp(0.005, 1.0)
         std = std[None].expand(current.batch_size, -1, -1)
-        paths = Normal(raw["path_raw"], std)
+        paths = Normal(raw["path_delta_raw"], std)
         return paths, raw["value"], raw
 
     def value(self, state: CoordinatorState):
@@ -64,6 +64,7 @@ class StackPlannerActorCritic(nn.Module):
         candidate = raw["candidate_logits"].argmax(dim=-1)
         selected = _selected_path(raw, candidate)
         output = self.planner.decode(current, {"path_raw": selected[:, None]})
+        output["path_parameters"] = selected[:, None]
         output["selected_candidate"] = candidate
         output["candidate_logits"] = raw["candidate_logits"]
         return output
@@ -71,6 +72,7 @@ class StackPlannerActorCritic(nn.Module):
     def all_mean_outputs(self, state: CoordinatorState):
         current, raw = self.planner.raw_heads(state)
         output = self.planner.decode(current, {"path_raw": raw["path_raw"]})
+        output["path_parameters"] = raw["path_raw"]
         output["candidate_logits"] = raw["candidate_logits"]
         return output
 
@@ -83,18 +85,22 @@ class StackPlannerActorCritic(nn.Module):
         mean = paths.loc[batch, candidate]
         std = paths.scale[batch, candidate]
         selected_distribution = Normal(mean, std)
-        path_action = (
+        delta_action = (
             selected_distribution.mean if deterministic
             else selected_distribution.sample()
         )
-        log_prob = selected_distribution.log_prob(path_action).sum(dim=-1)
+        log_prob = selected_distribution.log_prob(delta_action).sum(dim=-1)
         packed_action = torch.cat(
-            (candidate[:, None].to(path_action), path_action), dim=-1,
+            (candidate[:, None].to(delta_action), delta_action), dim=-1,
         )
         current = state.state if hasattr(state, "history_tokens") else state
-        output = self.planner.decode(
-            current, {"path_raw": path_action[:, None].clamp(-5.0, 5.0)}
+        path_raw = self.planner.combine_delta(
+            raw["base_path_raw"], delta_action[:, None],
         )
+        output = self.planner.decode(
+            current, {"path_raw": path_raw}
+        )
+        output["path_parameters"] = path_raw
         output["selected_candidate"] = candidate
         output["candidate_logits"] = raw["candidate_logits"]
         return output, packed_action, log_prob, value
@@ -102,17 +108,21 @@ class StackPlannerActorCritic(nn.Module):
     def sample_all(self, state: CoordinatorState):
         """Sample and decode every full-path head from the same scene."""
         paths, value, raw = self.distribution(state)
-        path_action = paths.sample()
-        log_prob = paths.log_prob(path_action).sum(dim=-1)
+        delta_action = paths.sample()
+        log_prob = paths.log_prob(delta_action).sum(dim=-1)
         candidate = torch.arange(
-            self.planner.config.candidates, device=path_action.device,
-            dtype=path_action.dtype,
-        )[None, :, None].expand(path_action.shape[0], -1, -1)
-        packed_action = torch.cat((candidate, path_action), dim=-1)
+            self.planner.config.candidates, device=delta_action.device,
+            dtype=delta_action.dtype,
+        )[None, :, None].expand(delta_action.shape[0], -1, -1)
+        packed_action = torch.cat((candidate, delta_action), dim=-1)
         current = state.state if hasattr(state, "history_tokens") else state
-        output = self.planner.decode(
-            current, {"path_raw": path_action.clamp(-5.0, 5.0)}
+        path_raw = self.planner.combine_delta(
+            raw["base_path_raw"], delta_action,
         )
+        output = self.planner.decode(
+            current, {"path_raw": path_raw}
+        )
+        output["path_parameters"] = path_raw
         output["candidate_logits"] = raw["candidate_logits"]
         return output, packed_action, log_prob, value
 
@@ -126,19 +136,23 @@ class StackPlannerActorCritic(nn.Module):
             raise ValueError("candidate action must be an integer")
         if ((candidate < 0) | (candidate >= self.planner.config.candidates)).any():
             raise ValueError("candidate action out of range")
-        path_action = action[:, 1:]
+        delta_action = action[:, 1:]
         batch = torch.arange(candidate.shape[0], device=candidate.device)
         selected_distribution = Normal(
             paths.loc[batch, candidate], paths.scale[batch, candidate]
         )
         # Candidate selection is supervised from full counterfactual returns;
         # it is not part of the PPO action probability.
-        log_prob = selected_distribution.log_prob(path_action).sum(dim=-1)
+        log_prob = selected_distribution.log_prob(delta_action).sum(dim=-1)
         entropy = selected_distribution.entropy().sum(dim=-1)
         current = state.state if hasattr(state, "history_tokens") else state
-        decoded = self.planner.decode(
-            current, {"path_raw": path_action[:, None].clamp(-5.0, 5.0)}
+        path_raw = self.planner.combine_delta(
+            raw["base_path_raw"], delta_action[:, None],
         )
+        decoded = self.planner.decode(
+            current, {"path_raw": path_raw}
+        )
+        decoded["path_parameters"] = path_raw
         decoded["selected_candidate"] = candidate
         decoded["candidate_logits"] = raw["candidate_logits"]
         return log_prob, entropy, value, decoded

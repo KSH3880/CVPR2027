@@ -44,7 +44,11 @@ def main():
             retreat = (phase == task.A1_RETREAT) & ~task._carry_rehearsal
             if tick % period == 0 or previous_phase is None or bool((phase != previous_phase).any()):
                 output = planner(history.observe(task.planner_state(), commit=True))
-                task.install_external_plan(output)
+                valid, _ = task.install_external_plan(output)
+                history.commit_path(
+                    output['path_parameters'][:, 0],
+                    update_mask=valid & task._planner_policy_decision,
+                )
                 endpoints = output['path_world'][:, 0, 0, -1].cpu().tolist()
                 for e in range(task.num_envs):
                     if retreat[e]:
@@ -79,6 +83,8 @@ def main():
                     row['approaching_steps'] += int(closing[e] > .1)
                     row['stationary_steps'] += int(roots[e, 1, 7:9].norm() <= .1)
             done_env = done.reshape(task.num_envs, 2).any(-1)
+            if done_env.any():
+                history.reset(done_env)
             for e in range(task.num_envs):
                 if done_env[e] or tick == steps-1:
                     row = episodes[e]

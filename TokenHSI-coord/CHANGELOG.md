@@ -4,6 +4,17 @@
 
 ## 2026-09-17
 
+### Previous-plan delta planner (V8)
+
+- 직전 실제 채택 path parameter 30D를 planner memory와 Transformer plan token으로 추가했다.
+  각 full-path head는 absolute parameter 대신 bounded delta를 출력하며, 새 proposal은
+  `previous + delta_scale*tanh(delta)`로 만든 뒤 현재 root/box/goal 기준으로 다시 decode한다.
+- full counterfactual rollout에서 최고 후보의 유효하게 실행된 proposal만 다음 decision base로
+  commit한다. invalid/inactive 후보는 이전 base를 보존하고 episode reset은 zero geometric prior로
+  되돌린다. 후보 branch의 bootstrap value도 해당 후보가 commit된 다음 observation으로 계산한다.
+- frozen executor에는 이전과 동일한 완성된 33-point world trajectory만 전달한다. PPO action
+  의미와 encoder 입력이 바뀌므로 checkpoint schema를 호환되지 않는 V8로 올렸다.
+
 ### Full counterfactual multi-head planner (V7)
 
 - 같은 scene의 독립 full-path 후보 4개를 동일 simulator/task snapshot에서 전부 물리 rollout한다.
@@ -14,6 +25,9 @@
   분리했다.
 - counterfactual preview가 decision history를 변경하지 않도록 non-commit reset을 분리하고,
   checkpoint schema를 호환되지 않는 V7로 올렸다.
+- 첫 low-level step에서 task에 lazy cache tensor가 추가되어 pre/post snapshot key 집합이 달라지는
+  경우, 시작 snapshot을 authoritative state layout으로 사용한다. 시작 state tensor의 누락이나
+  shape 변경은 계속 fail-closed하고 rollout 중 새로 생긴 derived/cache tensor만 병합에서 제외한다.
 
 ### Scene-token + independent full-path multi-head planner (V6 precursor)
 

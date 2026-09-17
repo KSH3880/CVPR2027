@@ -13,6 +13,7 @@ from coordinator.geometry import TOKEN_DIM, shared_to_world, state_to_tokens
 from .schema import (
     AGENTS,
     STACK_CANDIDATES,
+    STACK_PATH_PARAM_DIM,
     CoordinatorState,
 )
 
@@ -27,6 +28,7 @@ class StackPlannerConfig:
     dropout: float = 0.0
     candidates: int = STACK_CANDIDATES
     residual_scale: float = 3.0
+    delta_scale: float = 0.5
     history_steps: int = 1
 
     def __post_init__(self) -> None:
@@ -40,6 +42,8 @@ class StackPlannerConfig:
             raise ValueError("feedforward and candidates must be positive")
         if self.residual_scale <= 0:
             raise ValueError("residual_scale must be positive")
+        if self.delta_scale <= 0:
+            raise ValueError("delta_scale must be positive")
         if self.history_steps < 1:
             raise ValueError("history_steps must be positive")
 
@@ -52,6 +56,7 @@ class StackSceneEncoder(nn.Module):
 
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
+        self.config = config
         # Root, box and goal carry different physical semantics.  Tokenize
         # each type independently while sharing the tokenizer across agents
         # and history slots.
@@ -62,6 +67,8 @@ class StackSceneEncoder(nn.Module):
         self.agent_embedding = nn.Embedding(AGENTS, config.d_model)
         self.scene_token = nn.Parameter(torch.empty(1, 1, config.d_model))
         nn.init.normal_(self.scene_token, std=0.02)
+        self.plan_tokenizer = nn.Linear(STACK_PATH_PARAM_DIM, config.d_model)
+        self.plan_valid_embedding = nn.Embedding(2, config.d_model)
         self.history_steps = config.history_steps
         if self.history_steps > 1:
             self.time_embedding = nn.Embedding(self.history_steps, config.d_model)
@@ -86,7 +93,8 @@ class StackSceneEncoder(nn.Module):
             "agent_ids", torch.tensor([0, 0, 0, 1, 1, 1]), persistent=False
         )
 
-    def forward(self, tokens: torch.Tensor, history_valid=None) -> torch.Tensor:
+    def forward(self, tokens: torch.Tensor, history_valid=None,
+                previous_path_raw=None, previous_path_valid=None) -> torch.Tensor:
         if tokens.ndim == 3:
             tokens = tokens[:, None]
         if tokens.ndim != 4 or tokens.shape[1] != self.history_steps:
@@ -112,10 +120,22 @@ class StackSceneEncoder(nn.Module):
                 batch, steps * entities
             )
         scene = self.scene_token.expand(batch, -1, -1)
-        value = torch.cat((scene, value), dim=1)
+        if previous_path_raw is None:
+            previous_path_raw = tokens.new_zeros(batch, STACK_PATH_PARAM_DIM)
+        if previous_path_valid is None:
+            previous_path_valid = torch.zeros(
+                batch, device=tokens.device, dtype=torch.bool,
+            )
+        if previous_path_raw.shape != (batch, STACK_PATH_PARAM_DIM):
+            raise ValueError("previous_path_raw shape mismatch")
+        if previous_path_valid.shape != (batch,):
+            raise ValueError("previous_path_valid shape mismatch")
+        plan = self.plan_tokenizer(previous_path_raw)
+        plan = plan + self.plan_valid_embedding(previous_path_valid.long())
+        value = torch.cat((scene, plan[:, None], value), dim=1)
         if padding is not None:
             padding = torch.cat((
-                torch.zeros(batch, 1, dtype=torch.bool, device=tokens.device),
+                torch.zeros(batch, 2, dtype=torch.bool, device=tokens.device),
                 padding,
             ), dim=1)
         encoded = self.transformer(value, src_key_padding_mask=padding)
@@ -127,6 +147,7 @@ class StackPlannerHeads(nn.Module):
 
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
+        self.config = config
         hidden = 2 * config.d_model
 
         def head(size: int) -> nn.Sequential:
@@ -136,7 +157,7 @@ class StackPlannerHeads(nn.Module):
                 nn.Linear(hidden, size),
             )
 
-        self.path_dim = (AGENTS * 6 + 3) * 2
+        self.path_dim = STACK_PATH_PARAM_DIM
         # Every head emits the same complete contract: both carry routes and
         # A1's retreat suffix.  Heads do not own individual path segments.
         self.paths = nn.ModuleList([
@@ -157,12 +178,19 @@ class StackPlannerHeads(nn.Module):
             nn.init.normal_(path[-1].weight, std=1e-3)
             nn.init.zeros_(path[-1].bias)
 
-    def forward(self, scene: torch.Tensor) -> Dict[str, torch.Tensor]:
-        path_raw = torch.stack([path(scene) for path in self.paths], dim=1)
+    def forward(self, scene: torch.Tensor,
+                previous_path_raw: torch.Tensor) -> Dict[str, torch.Tensor]:
+        path_delta_raw = torch.stack([path(scene) for path in self.paths], dim=1)
+        path_raw = (
+            previous_path_raw[:, None]
+            + self.config.delta_scale * torch.tanh(path_delta_raw)
+        ).clamp(-5.0, 5.0)
         expanded_scene = scene[:, None].expand(-1, path_raw.shape[1], -1)
         evaluator_input = torch.cat((expanded_scene, path_raw.detach()), dim=-1)
         return {
+            "path_delta_raw": path_delta_raw,
             "path_raw": path_raw,
+            "base_path_raw": previous_path_raw,
             "candidate_logits": self.candidate_evaluator(
                 evaluator_input
             ).squeeze(-1),
@@ -182,20 +210,42 @@ class StackTrajectoryPlanner(nn.Module):
     def raw_heads(self, state):
         """Return all complete proposals, evaluator logits and state value."""
         history_valid = None
+        previous_path_raw = None
+        previous_path_valid = None
         if hasattr(state, "history_tokens"):
             observation = state
             observation.validate(self.config.history_steps)
             state = observation.state
             tokens = observation.history_tokens
             history_valid = observation.history_valid
+            previous_path_raw = observation.previous_path_raw
+            previous_path_valid = observation.previous_path_valid
         else:
             if not isinstance(state, CoordinatorState):
                 state = CoordinatorState.from_mapping(state)
             tokens, _ = state_to_tokens(state)
             if self.config.history_steps > 1:
                 raise ValueError("history-enabled planner requires StackPlannerObservation")
-        scene = self.scene_encoder(tokens, history_valid)
-        return state, self.heads(scene)
+        if previous_path_raw is None:
+            previous_path_raw = tokens.new_zeros(
+                state.batch_size, STACK_PATH_PARAM_DIM,
+            )
+        elif previous_path_valid is not None:
+            previous_path_raw = torch.where(
+                previous_path_valid[:, None], previous_path_raw,
+                torch.zeros_like(previous_path_raw),
+            )
+        scene = self.scene_encoder(
+            tokens, history_valid, previous_path_raw, previous_path_valid,
+        )
+        return state, self.heads(scene, previous_path_raw)
+
+    def combine_delta(self, base_path_raw, path_delta_raw):
+        """Apply a bounded one-decision update to committed path parameters."""
+        return (
+            base_path_raw[:, None]
+            + self.config.delta_scale * torch.tanh(path_delta_raw)
+        ).clamp(-5.0, 5.0)
 
     def forward(
         self,
@@ -207,6 +257,7 @@ class StackTrajectoryPlanner(nn.Module):
         output = self.decode(state, {
             "path_raw": raw["path_raw"][batch, selected][:, None],
         })
+        output["path_parameters"] = raw["path_raw"][batch, selected][:, None]
         output["selected_candidate"] = selected
         output["candidate_logits"] = raw["candidate_logits"]
         return output
@@ -220,7 +271,7 @@ class StackTrajectoryPlanner(nn.Module):
         _, frame = state_to_tokens(state)
 
         packed = raw["path_raw"]
-        path_dim = (AGENTS * 6 + 3) * 2
+        path_dim = STACK_PATH_PARAM_DIM
         if (packed.ndim != 3 or packed.shape[0] != state.batch_size
                 or packed.shape[-1] != path_dim):
             raise ValueError(f"path_raw must be [B,K,{path_dim}]")

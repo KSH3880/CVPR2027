@@ -385,8 +385,11 @@ def main():
     init = os.environ.get("STACK_PLANNER_INIT", "")
     requested_history_steps = _env_int("STACK_PLANNER_HISTORY_STEPS", 4)
     requested_candidates = _env_int("STACK_PLANNER_CANDIDATES", 4)
+    requested_delta_scale = _env_float("STACK_PLANNER_DELTA_SCALE", 0.5)
     if requested_candidates < 1:
         raise ValueError("STACK_PLANNER_CANDIDATES must be positive")
+    if requested_delta_scale <= 0:
+        raise ValueError("STACK_PLANNER_DELTA_SCALE must be positive")
     payload = None
     if init:
         planner, payload = load_stack_checkpoint(init, device)
@@ -402,9 +405,16 @@ def main():
                 f"requested={requested_candidates} "
                 f"checkpoint={planner.config.candidates}"
             )
+        if planner.config.delta_scale != requested_delta_scale:
+            raise ValueError(
+                "STACK_PLANNER_DELTA_SCALE must match init checkpoint: "
+                f"requested={requested_delta_scale} "
+                f"checkpoint={planner.config.delta_scale}"
+            )
     else:
         planner = StackTrajectoryPlanner(StackPlannerConfig(
             candidates=requested_candidates, history_steps=requested_history_steps,
+            delta_scale=requested_delta_scale,
         )).to(device)
     history = StackHistoryBuffer(
         task.num_envs, planner.config.history_steps, device,
@@ -483,6 +493,7 @@ def main():
           f"curve_std={curve_std:g} endpoint_std={endpoint_std:g} "
           f"history_steps={planner.config.history_steps} "
           f"candidates={planner.config.candidates} "
+          f"delta_scale={planner.config.delta_scale:g} "
           f"diversity={diversity_coef:g}/{diversity_margin:g}m "
           f"evaluator_coef={evaluator_coef:g} full_candidate_rollout=True "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
@@ -527,7 +538,6 @@ def main():
                 & ~task._carry_rehearsal
             ).clone()
             with torch.no_grad():
-                mean_outputs = policy.all_mean_outputs(observation)
                 if consistency_coef > 0.0:
                     if previous_mean_output is None or previous_state is None:
                         consistency_target = build_stack_consistency_target(
@@ -555,6 +565,7 @@ def main():
             branch_dones = []
             branch_diagnostics = []
             branch_decisions = []
+            branch_invalid = []
             branch_scores = []
             for candidate in range(planner.config.candidates):
                 base_snapshot.restore(task)
@@ -571,8 +582,19 @@ def main():
                 )
                 with torch.no_grad():
                     next_state = task.planner_state()
+                    plan_update = decision & ~invalid
+                    next_plan_raw = torch.where(
+                        plan_update[:, None],
+                        outputs["path_parameters"][:, candidate],
+                        observation.previous_path_raw,
+                    )
+                    next_plan_valid = (
+                        observation.previous_path_valid | plan_update
+                    )
                     next_observation = history.observe(
                         next_state, reset_mask=done, commit=False,
+                        previous_path_raw=next_plan_raw,
+                        previous_path_valid=next_plan_valid,
                     )
                     next_value = policy.value(next_observation)
                     continuation = ~(done | invalid)
@@ -587,6 +609,7 @@ def main():
                 branch_dones.append(done)
                 branch_diagnostics.append(macro_diag)
                 branch_decisions.append(decision)
+                branch_invalid.append(invalid)
                 branch_scores.append(score)
 
             scores = torch.stack(branch_scores)             # [K,B]
@@ -607,6 +630,7 @@ def main():
             done = torch.stack(branch_dones)[best_candidate, env_index]
             decision_stack = torch.stack(branch_decisions)
             decision = decision_stack[best_candidate, env_index]
+            invalid = torch.stack(branch_invalid)[best_candidate, env_index]
             macro_diag = {
                 key: select_branch(branch_diagnostics, key)
                 for key in branch_diagnostics[0]
@@ -643,14 +667,39 @@ def main():
                     })
             rewards.append(terms["total"])
             dones.append(done)
+            selected_path_raw = outputs["path_parameters"][
+                env_index, best_candidate
+            ]
+            commit_mask = decision & ~invalid & ~done
+            history.commit_path(
+                selected_path_raw,
+                update_mask=commit_mask,
+            )
             if consistency_coef > 0.0:
-                selected_mean_path = mean_outputs["path_world"][
+                selected_sample_path = outputs["path_world"][
                     env_index, best_candidate
                 ][:, None]
-                previous_mean_output = {
-                    "path_world": selected_mean_path.detach().clone(),
-                }
-                previous_state = state.clone()
+                if previous_mean_output is None:
+                    previous_mean_output = {
+                        "path_world": selected_sample_path.detach().clone(),
+                    }
+                    previous_state = state.clone()
+                else:
+                    path_mask = commit_mask.reshape(-1, 1, 1, 1, 1)
+                    previous_mean_output["path_world"] = torch.where(
+                        path_mask, selected_sample_path,
+                        previous_mean_output["path_world"],
+                    ).detach()
+                    for key in STATE_KEYS:
+                        old = getattr(previous_state, key)
+                        new = getattr(state, key)
+                        state_mask = commit_mask.reshape(
+                            -1, *((1,) * (old.ndim - 1))
+                        )
+                        setattr(
+                            previous_state, key,
+                            torch.where(state_mask, new, old).detach(),
+                        )
             previous_done = done.detach().clone()
             for key, tensor in terms.items():
                 diag[key] = diag.get(key, 0.0) + float(tensor.mean())
@@ -732,6 +781,7 @@ def main():
             "anchor_std": anchor_std,
             "history_steps": planner.config.history_steps,
             "candidates": planner.config.candidates,
+            "delta_scale": planner.config.delta_scale,
             "diversity_coef": diversity_coef,
             "diversity_margin": diversity_margin,
             "full_candidate_rollout": 1.0,
@@ -780,6 +830,7 @@ def main():
                         "anchor_std": anchor_std,
                         "history_steps": planner.config.history_steps,
                         "candidates": planner.config.candidates,
+                        "delta_scale": planner.config.delta_scale,
                         "full_candidate_rollout": True,
                         "evaluator_coef": evaluator_coef,
                         "diversity_coef": diversity_coef,

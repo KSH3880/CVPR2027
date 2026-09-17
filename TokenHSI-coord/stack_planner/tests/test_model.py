@@ -92,6 +92,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertNotIn("trajectory", output)
         self.assertEqual(set(output), {
             "path_local", "path_world", "selected_candidate", "candidate_logits",
+            "path_parameters",
         })
         self.assertTrue(torch.allclose(output["path_world"][..., 0, :], state.root_xy[:, None], atol=1e-5))
         self.assertLess(float((output["path_world"][..., 10, :] - state.box_xyz[:, None, :, :2]).abs().max()), 0.1)
@@ -256,6 +257,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
             output["path_world"].shape,
             (3, 4, AGENTS, STACK_PATH_POINTS, 2),
         )
+        self.assertEqual(output["path_parameters"].shape, (3, 4, 30))
         expected = torch.arange(4).reshape(1, 4).expand(3, -1)
         self.assertTrue(torch.equal(action[..., 0].long(), expected))
 
@@ -340,6 +342,32 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(torch.equal(buffer.valid, saved_valid))
         self.assertEqual(preview.history_valid.sum(dim=1).tolist(), [1, 2])
 
+    def test_selected_path_parameters_become_next_delta_base(self):
+        state = make_state(batch=2)
+        buffer = StackHistoryBuffer(2, 4, state.device)
+        first = buffer.observe(state)
+        model = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, history_steps=4, delta_scale=0.5,
+        )).eval()
+        for head in model.heads.paths:
+            torch.nn.init.zeros_(head[-1].weight)
+            torch.nn.init.zeros_(head[-1].bias)
+        with torch.no_grad():
+            initial = model(first)
+        committed = torch.full((2, 30), 0.2)
+        buffer.commit_path(committed)
+        second = buffer.observe(state)
+        with torch.no_grad():
+            refined = model(second)
+        self.assertTrue(torch.equal(initial["path_parameters"], torch.zeros(2, 1, 30)))
+        self.assertTrue(torch.allclose(
+            refined["path_parameters"][:, 0], committed,
+        ))
+        buffer.reset(torch.tensor([True, False]))
+        reset_observation = buffer.observe(state, commit=False)
+        self.assertFalse(bool(reset_observation.previous_path_valid[0]))
+        self.assertTrue(bool(reset_observation.previous_path_valid[1]))
+
     def test_path_backward_reaches_transformer(self):
         state = make_state(batch=1)
         policy = StackPlannerActorCritic(
@@ -359,7 +387,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         with torch.inference_mode():
             before = model(state)
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v7.pth"
+            path = Path(directory) / "stack_v8.pth"
             save_stack_checkpoint(path, model, step=7)
             loaded, payload = load_stack_checkpoint(path)
             with torch.inference_mode():
@@ -370,13 +398,13 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         for key in before:
             self.assertTrue(torch.equal(before[key], after[key]), key)
 
-    def test_v6_schema_is_rejected_after_full_candidate_rollout_change(self):
+    def test_v7_schema_is_rejected_after_previous_plan_delta_change(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "old_schema.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
-            payload["schema_version"] = "tokenhsi-stack-planner-v6"
+            payload["schema_version"] = "tokenhsi-stack-planner-v7"
             torch.save(payload, path)
             with self.assertRaisesRegex(ValueError, "checkpoint mismatch"):
                 load_stack_checkpoint(path)
@@ -384,7 +412,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
     def test_checkpoint_records_single_path_contract(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v7.pth"
+            path = Path(directory) / "stack_v8.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
             loaded, migrated = load_stack_checkpoint(path)
@@ -393,6 +421,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertNotIn("endpoint_distance", migrated)
         self.assertTrue(migrated["path_only"])
         self.assertTrue(migrated["full_candidate_rollout"])
+        self.assertTrue(migrated["previous_plan_delta"])
         self.assertEqual(loaded.config, model.config)
 
 

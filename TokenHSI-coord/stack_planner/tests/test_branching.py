@@ -37,6 +37,34 @@ class TaskBranchSnapshotTest(unittest.TestCase):
         self.assertEqual(float(target.tensors["_root_states"][:2].sum()), 0.0)
         self.assertEqual(float(target.tensors["_dof_state"][8:].sum()), 0.0)
 
+    def test_update_where_ignores_lazily_added_source_buffers(self):
+        target = TaskBranchSnapshot(
+            tensors={"_root_states": torch.zeros(2, 1)},
+            factors={"_root_states": 1},
+            num_envs=2,
+        )
+        source = TaskBranchSnapshot(
+            tensors={
+                "_root_states": torch.ones(2, 1),
+                "_lazy_render_cache": torch.full((2, 1), 9.0),
+            },
+            factors={"_root_states": 1, "_lazy_render_cache": 1},
+            num_envs=2,
+        )
+        target.update_where(source, torch.tensor([True, False]))
+        self.assertEqual(target.tensors["_root_states"].flatten().tolist(), [1.0, 0.0])
+        self.assertNotIn("_lazy_render_cache", target.tensors)
+
+    def test_update_where_rejects_changed_base_buffer(self):
+        target = TaskBranchSnapshot(
+            tensors={"_root_states": torch.zeros(2, 1)},
+            factors={"_root_states": 1},
+            num_envs=2,
+        )
+        source = TaskBranchSnapshot(tensors={}, factors={}, num_envs=2)
+        with self.assertRaisesRegex(ValueError, "missing=.*_root_states"):
+            target.update_where(source, torch.ones(2, dtype=torch.bool))
+
 
 if __name__ == "__main__":
     unittest.main()

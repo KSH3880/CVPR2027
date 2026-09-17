@@ -55,8 +55,26 @@ class TaskBranchSnapshot:
 
     @torch.no_grad()
     def update_where(self, source: "TaskBranchSnapshot", env_mask):
-        if self.num_envs != source.num_envs or self.factors != source.factors:
-            raise ValueError("branch snapshot layouts do not match")
+        if self.num_envs != source.num_envs:
+            raise ValueError("branch snapshot num_envs do not match")
+        # A low-level step may lazily attach derived/cache tensors to the task.
+        # They are absent from the pre-branch snapshot and must not redefine
+        # the branch state contract halfway through a candidate comparison.
+        # Use the starting snapshot as the authoritative layout, while still
+        # failing if one of its state tensors disappeared or changed shape.
+        missing = sorted(set(self.tensors) - set(source.tensors))
+        changed = sorted(
+            name for name in self.tensors
+            if name in source.tensors and (
+                self.factors[name] != source.factors[name]
+                or self.tensors[name].shape != source.tensors[name].shape
+            )
+        )
+        if missing or changed:
+            raise ValueError(
+                "branch snapshot base layout changed: "
+                f"missing={missing}, changed={changed}"
+            )
         mask = torch.as_tensor(env_mask, dtype=torch.bool,
                                device=next(iter(self.tensors.values())).device)
         if mask.shape != (self.num_envs,):
