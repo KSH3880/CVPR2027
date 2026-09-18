@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from torch import nn
 
-from coordinator.schema import AGENTS, MIN_SPEED, PATH_POINTS
+from coordinator.schema import AGENTS, MAX_SPEED, MIN_SPEED, PATH_POINTS
 from coordinator.tests.common import make_state
 from stack_planner.checkpoint import load_stack_checkpoint, save_stack_checkpoint
 from stack_planner.consistency import (
@@ -25,6 +25,7 @@ from stack_planner.model import (
 from stack_planner.policy import StackPlannerActorCritic
 from stack_planner.schema import (
     STACK_PATH_DELTA_DIM, STACK_PATH_POINTS, STACK_SCHEMA_VERSION,
+    STACK_SPEED_DIM,
 )
 
 
@@ -90,16 +91,20 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertEqual(model.scene_encoder.scene_token.shape, (1, 1, 128))
         self.assertEqual(len(model.scene_encoder.tokenizers), 3)
         self.assertEqual(len(model.heads.paths), 3)
+        self.assertEqual(len(model.heads.speeds), 3)
         self.assertIsNot(model.heads.paths[0], model.heads.paths[1])
         self.assertEqual(raw["path_delta_raw"].shape, (2, 3, STACK_PATH_DELTA_DIM))
+        self.assertEqual(raw["speed_raw"].shape, (2, 3, STACK_SPEED_DIM))
         self.assertEqual(raw["reference_path_local"].shape, (2, 2, 33, 2))
         self.assertEqual(raw["candidate_logits"].shape, (2, 3))
         self.assertEqual(output["path_world"].shape, (2, 1, 2, STACK_PATH_POINTS, 2))
-        self.assertNotIn("speed", output)
+        self.assertEqual(output["speed"].shape, (2, 1, AGENTS, STACK_PATH_POINTS))
+        self.assertTrue(((output["speed"] >= MIN_SPEED) & (output["speed"] <= MAX_SPEED)).all())
         self.assertNotIn("acceleration", output)
         self.assertNotIn("trajectory", output)
         self.assertEqual(set(output), {
-            "path_local", "path_world", "selected_candidate", "candidate_logits",
+            "path_local", "path_world", "speed", "selected_candidate",
+            "candidate_logits",
         })
         self.assertTrue(torch.allclose(output["path_world"][..., 0, :], state.root_xy[:, None], atol=1e-5))
         self.assertLess(float((output["path_world"][..., 10, :] - state.box_xyz[:, None, :, :2]).abs().max()), 0.1)
@@ -183,6 +188,17 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertAlmostEqual(float(retreat[0, 0, 0, 1]), 0.0, places=5)
         self.assertTrue(torch.equal(retreat[0, 0, -1], path[0, 0, -1]))
 
+        source_speed = torch.tensor([0.4, 0.7, 1.0, 1.3])
+        source_speed = source_speed[None, None].repeat(1, 2, 1)
+        retreat, speed = execution_view(
+            path, box, goal, torch.tensor([[True, False]]), root,
+            speed=source_speed,
+        )
+        # A1 starts at original arc 2.6, so speed must be sampled from that
+        # arc as well rather than copied from source index zero.
+        self.assertAlmostEqual(float(speed[0, 0, 0]), 1.18, places=5)
+        self.assertAlmostEqual(float(speed[0, 0, -1]), 1.3, places=5)
+
     def test_retreat_clearance_prefers_moving_away_over_crossing_box(self):
         safe = torch.tensor([[
             [0.0, -0.7], [0.0, -1.0], [0.0, -1.3], [0.0, -1.6],
@@ -261,12 +277,15 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
             state, action
         )
         self.assertEqual(action.shape, (3, policy.action_dim))
-        self.assertEqual(policy.action_dim, STACK_PATH_DELTA_DIM + 1)
+        self.assertEqual(
+            policy.action_dim, STACK_PATH_DELTA_DIM + STACK_SPEED_DIM + 1
+        )
         self.assertTrue(((action[:, 0] >= 0) & (action[:, 0] < 4)).all())
         self.assertTrue(torch.allclose(log_prob, evaluated_log_prob))
         self.assertTrue(torch.allclose(value, evaluated_value))
         self.assertEqual(entropy.shape, (3,))
         self.assertEqual(decoded["path_world"].shape, (3, 1, 2, STACK_PATH_POINTS, 2))
+        self.assertEqual(decoded["speed"].shape, (3, 1, 2, STACK_PATH_POINTS))
         self.assertTrue(torch.isfinite(output["path_world"]).all())
 
     def test_policy_samples_every_candidate_from_same_scene(self):
@@ -319,8 +338,13 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         selected_grad = policy.planner.heads.paths[0][-1].weight.grad
         self.assertIsNotNone(selected_grad)
         self.assertGreater(float(selected_grad.abs().sum()), 0.0)
+        selected_speed_grad = policy.planner.heads.speeds[0][-1].weight.grad
+        self.assertIsNotNone(selected_speed_grad)
+        self.assertGreater(float(selected_speed_grad.abs().sum()), 0.0)
         for candidate in (1, 2):
             grad = policy.planner.heads.paths[candidate][-1].weight.grad
+            self.assertTrue(grad is None or float(grad.abs().sum()) == 0.0)
+            grad = policy.planner.heads.speeds[candidate][-1].weight.grad
             self.assertTrue(grad is None or float(grad.abs().sum()) == 0.0)
 
     def test_independent_heads_start_distinct_and_have_diversity_objective(self):
@@ -359,11 +383,14 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         policy = StackPlannerActorCritic(
             StackTrajectoryPlanner(StackPlannerConfig(candidates=1))
         )
-        std = policy.action_log_std.exp().reshape(1, AGENTS, 32, 2)
-        self.assertTrue(torch.allclose(std[:, :, 9], torch.full((1, 2, 2), 0.03)))
-        self.assertTrue(torch.allclose(std[:, :, 20], torch.full((1, 2, 2), 0.03)))
-        self.assertTrue(torch.allclose(std[:, :, 5], torch.full((1, 2, 2), 0.12)))
-        self.assertTrue(torch.allclose(std[:, :, -1], torch.full((1, 2, 2), 0.20)))
+        path_std = policy.action_log_std.exp()[..., :STACK_PATH_DELTA_DIM]
+        path_std = path_std.reshape(1, AGENTS, 32, 2)
+        speed_std = policy.action_log_std.exp()[..., STACK_PATH_DELTA_DIM:]
+        self.assertTrue(torch.allclose(path_std[:, :, 9], torch.full((1, 2, 2), 0.03)))
+        self.assertTrue(torch.allclose(path_std[:, :, 20], torch.full((1, 2, 2), 0.03)))
+        self.assertTrue(torch.allclose(path_std[:, :, 5], torch.full((1, 2, 2), 0.12)))
+        self.assertTrue(torch.allclose(path_std[:, :, -1], torch.full((1, 2, 2), 0.20)))
+        self.assertTrue(torch.allclose(speed_std, torch.full_like(speed_std, 0.20)))
 
     def test_history_observation_masks_reset_and_drives_planner(self):
         state = make_state(batch=2)
@@ -469,7 +496,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         with torch.inference_mode():
             before = model(state)
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v12.pth"
+            path = Path(directory) / "stack_v13.pth"
             save_stack_checkpoint(path, model, step=7)
             loaded, payload = load_stack_checkpoint(path)
             with torch.inference_mode():
@@ -480,28 +507,29 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         for key in before:
             self.assertTrue(torch.equal(before[key], after[key]), key)
 
-    def test_v11_schema_is_rejected_after_joint_a2_preplan_change(self):
+    def test_v12_schema_is_rejected_after_speed_output_change(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "old_schema.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
-            payload["schema_version"] = "tokenhsi-stack-planner-v11"
+            payload["schema_version"] = "tokenhsi-stack-planner-v12"
             torch.save(payload, path)
             with self.assertRaisesRegex(ValueError, "checkpoint mismatch"):
                 load_stack_checkpoint(path)
 
-    def test_checkpoint_records_single_path_contract(self):
+    def test_checkpoint_records_path_and_speed_contract(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v12.pth"
+            path = Path(directory) / "stack_v13.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
             loaded, migrated = load_stack_checkpoint(path)
         self.assertEqual(migrated["path_points"], PATH_POINTS)
         self.assertNotIn("retreat_path_points", migrated)
         self.assertNotIn("endpoint_distance", migrated)
-        self.assertTrue(migrated["path_only"])
+        self.assertFalse(migrated["path_only"])
+        self.assertTrue(migrated["pointwise_speed_profile"])
         self.assertTrue(migrated["full_candidate_rollout"])
         self.assertTrue(migrated["previous_trajectory_correction"])
         self.assertTrue(migrated["fixed_origin_reference"])

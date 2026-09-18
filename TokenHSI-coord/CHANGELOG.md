@@ -4,6 +4,15 @@
 
 ## 2026-09-18
 
+### Learned pointwise speed profile (V13)
+
+- 각 후보 action을 128D path correction과 66D pointwise speed profile로 확장했다. speed는
+  `[0.375, 1.5] m/s`로 bounded decode하고 path와 같은 arc에서 frozen steering ABI로 보간한다.
+- full candidate rollout, PPO log-prob 및 evaluator가 path와 speed를 함께 평가한다. 인접 speed의
+  제곱 차이에 별도 smoothness loss를 적용하고 실행 시 기존 `0.75 m/s²` command limiter를 유지한다.
+- 고정 `MAX_SPEED` adapter를 제거하고 schema를 V13으로 올려 path-only V12 checkpoint resume을
+  명시적으로 거부한다. CPU 단위 테스트 40개를 통과했다.
+
 ### Joint A2 preplan with deferred Carry goal (V12)
 
 - A2 path를 handoff 때 새로 만드는 대신 최초 joint planner decision부터 A1과 함께

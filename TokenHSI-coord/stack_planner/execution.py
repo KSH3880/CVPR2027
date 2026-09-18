@@ -17,7 +17,8 @@ def execution_view(
     goal_xy: torch.Tensor,
     retreat: torch.Tensor,
     root_xy: torch.Tensor,
-) -> torch.Tensor:
+    speed: torch.Tensor = None,
+):
     """Interpolate carry prefix or attach retreat suffix without moving its end.
 
     The planner itself always emits the same complete path.  This function is
@@ -33,6 +34,8 @@ def execution_view(
         raise ValueError("retreat must be bool [B,2]")
     if root_xy.shape != path.shape[:2] + (2,):
         raise ValueError("root_xy must match [B,2,2]")
+    if speed is not None and speed.shape != path.shape[:-1]:
+        raise ValueError("speed must match path [B,2,P]")
 
     visit = ordered_box_goal_visit(path, box_xy, goal_xy, tolerance=0.0)
     goal_projection = project_points_to_segments(path, goal_xy)
@@ -101,7 +104,13 @@ def execution_view(
     sampled[..., -1, :] = torch.where(
         retreat[..., None], path[..., -1, :], goal_xy,
     )
-    return sampled
+    if speed is None:
+        return sampled
+    speed_values = speed.reshape(-1, speed.shape[-1])
+    sampled_speed = speed_values[row, lower] + t * (
+        speed_values[row, lower + 1] - speed_values[row, lower]
+    )
+    return sampled, sampled_speed.reshape_as(speed)
 
 
 def retreat_box_geometry(

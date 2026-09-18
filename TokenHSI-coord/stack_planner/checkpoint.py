@@ -11,7 +11,7 @@ import torch
 from .model import StackPlannerConfig, StackTrajectoryPlanner
 from .schema import (
     AGENTS,
-    MAX_SPEED,
+    MAX_ACCEL,
     PATH_DS,
     PATH_VERTICES,
     STACK_SCHEMA_VERSION,
@@ -28,7 +28,9 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "agents": AGENTS,
         "candidate_k": config.candidates,
         "path_points": STACK_PATH_POINTS,
-        "path_only": True,
+        "path_only": False,
+        "pointwise_speed_profile": True,
+        "runtime_acceleration_limit": MAX_ACCEL,
         "full_candidate_rollout": True,
         "previous_trajectory_correction": True,
         "fixed_origin_reference": True,
@@ -41,7 +43,6 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "path_vertices": PATH_VERTICES,
         "steer_points": STEER_POINTS,
         "steer_horizon_seconds": STEER_HORIZON_SECONDS,
-        "execution_speed": MAX_SPEED,
     }
 
 

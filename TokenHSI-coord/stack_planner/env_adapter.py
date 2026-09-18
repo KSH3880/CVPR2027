@@ -458,14 +458,15 @@ class HumanoidMAStackPlannerTrain(
             float(os.environ.get("STACK_GROUND_Z", "0.0"))
             + 0.5 * self._box_lib._box_size[a1_rows, 2]
         )
-        path = execution_view(
+        if output.get("speed") is None or output["speed"].shape != output[
+            "path_world"
+        ].shape[:-1]:
+            raise ValueError("planner speed must align with path_world")
+        model_speed = output["speed"]
+        path, speed = execution_view(
             model_path, state.box_xyz[..., :2], state.goal_xy, retreat_rows,
-            state.root_xy,
+            state.root_xy, speed=model_speed[:, 0],
         )
-        speed = torch.full(
-            path.shape[:-1], MAX_SPEED, device=path.device, dtype=path.dtype,
-        )
-        model_speed = torch.full_like(output["path_world"][..., 0], MAX_SPEED)
         valid = free_path_validity(
             output["path_world"], model_speed, state.root_xy, execute
         )[:, 0]

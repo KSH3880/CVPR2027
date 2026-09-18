@@ -11,20 +11,21 @@ from torch.distributions import Normal
 from coordinator.schema import AGENTS, CoordinatorState
 
 from .model import StackTrajectoryPlanner
-from .schema import STACK_PATH_DELTA_DIM, STACK_PATH_POINTS
+from .schema import STACK_PATH_DELTA_DIM, STACK_PATH_POINTS, STACK_SPEED_DIM
 
 
 def _path_dim() -> int:
-    return STACK_PATH_DELTA_DIM
+    return STACK_PATH_DELTA_DIM + STACK_SPEED_DIM
 
 
 class StackPlannerActorCritic(nn.Module):
     """Sample full paths per head; evaluator selection is supervised."""
 
     def __init__(self, planner: StackTrajectoryPlanner, point_std: float = 0.12,
-                 endpoint_std: float = 0.20, anchor_std: float = 0.03):
+                 endpoint_std: float = 0.20, anchor_std: float = 0.03,
+                 speed_std: float = 0.20):
         super().__init__()
-        if min(point_std, endpoint_std, anchor_std) <= 0.0:
+        if min(point_std, endpoint_std, anchor_std, speed_std) <= 0.0:
             raise ValueError("planner exploration stds must be positive")
         self.planner = planner
         self.continuous_action_dim = _path_dim()
@@ -38,7 +39,9 @@ class StackPlannerActorCritic(nn.Module):
         std[:, 9, :] = float(anchor_std)   # full-path index 10
         std[:, 20, :] = float(anchor_std)  # full-path index 21
         std[:, -1, :] = float(endpoint_std)
-        std = std.reshape(-1)
+        std = torch.cat((
+            std.reshape(-1), torch.full((STACK_SPEED_DIM,), float(speed_std)),
+        ))
         # Exploration can specialize per independent full-path head.
         self.action_log_std = nn.Parameter(
             std.log()[None].repeat(planner.config.candidates, 1)
@@ -48,8 +51,19 @@ class StackPlannerActorCritic(nn.Module):
         current, raw = self.planner.raw_heads(state)
         std = self.action_log_std.exp().clamp(0.005, 1.0)
         std = std[None].expand(current.batch_size, -1, -1)
-        paths = Normal(raw["path_delta_raw"], std)
-        return paths, raw["value"], raw
+        mean = torch.cat((raw["path_delta_raw"], raw["speed_raw"]), dim=-1)
+        actions = Normal(mean, std)
+        return actions, raw["value"], raw
+
+    @staticmethod
+    def _split_action(action):
+        return action[..., :STACK_PATH_DELTA_DIM], action[..., STACK_PATH_DELTA_DIM:]
+
+    @staticmethod
+    def _action_mask(raw, dtype):
+        return torch.cat((
+            raw["path_action_mask"], raw["speed_action_mask"],
+        ), dim=-1).to(dtype)
 
     def value(self, state: CoordinatorState):
         _, raw = self.planner.raw_heads(state)
@@ -62,6 +76,7 @@ class StackPlannerActorCritic(nn.Module):
         output = self.planner.decode_delta(
             current, raw["reference_path_local"],
             raw["path_delta_raw"][batch, candidate][:, None],
+            raw["speed_raw"][batch, candidate][:, None],
             raw["path_point_weight"],
         )
         output["selected_candidate"] = candidate
@@ -72,6 +87,7 @@ class StackPlannerActorCritic(nn.Module):
         current, raw = self.planner.raw_heads(state)
         output = self.planner.decode_delta(
             current, raw["reference_path_local"], raw["path_delta_raw"],
+            raw["speed_raw"],
             raw["path_point_weight"],
         )
         output["candidate_logits"] = raw["candidate_logits"]
@@ -90,7 +106,7 @@ class StackPlannerActorCritic(nn.Module):
             selected_distribution.mean if deterministic
             else selected_distribution.sample()
         )
-        action_mask = raw["path_action_mask"].to(delta_action.dtype)
+        action_mask = self._action_mask(raw, delta_action.dtype)
         log_prob = (
             selected_distribution.log_prob(delta_action) * action_mask
         ).sum(dim=-1)
@@ -98,8 +114,10 @@ class StackPlannerActorCritic(nn.Module):
             (candidate[:, None].to(delta_action), delta_action), dim=-1,
         )
         current = state.state if hasattr(state, "history_tokens") else state
+        path_action, speed_action = self._split_action(delta_action)
         output = self.planner.decode_delta(
-            current, raw["reference_path_local"], delta_action[:, None],
+            current, raw["reference_path_local"], path_action[:, None],
+            speed_action[:, None],
             raw["path_point_weight"],
         )
         output["selected_candidate"] = candidate
@@ -110,7 +128,7 @@ class StackPlannerActorCritic(nn.Module):
         """Sample and decode every full-path head from the same scene."""
         paths, value, raw = self.distribution(state)
         delta_action = paths.sample()
-        action_mask = raw["path_action_mask"][:, None].to(delta_action.dtype)
+        action_mask = self._action_mask(raw, delta_action.dtype)[:, None]
         log_prob = (paths.log_prob(delta_action) * action_mask).sum(dim=-1)
         candidate = torch.arange(
             self.planner.config.candidates, device=delta_action.device,
@@ -118,8 +136,9 @@ class StackPlannerActorCritic(nn.Module):
         )[None, :, None].expand(delta_action.shape[0], -1, -1)
         packed_action = torch.cat((candidate, delta_action), dim=-1)
         current = state.state if hasattr(state, "history_tokens") else state
+        path_action, speed_action = self._split_action(delta_action)
         output = self.planner.decode_delta(
-            current, raw["reference_path_local"], delta_action,
+            current, raw["reference_path_local"], path_action, speed_action,
             raw["path_point_weight"],
         )
         output["candidate_logits"] = raw["candidate_logits"]
@@ -142,14 +161,16 @@ class StackPlannerActorCritic(nn.Module):
         )
         # Candidate selection is supervised from full counterfactual returns;
         # it is not part of the PPO action probability.
-        action_mask = raw["path_action_mask"].to(delta_action.dtype)
+        action_mask = self._action_mask(raw, delta_action.dtype)
         log_prob = (
             selected_distribution.log_prob(delta_action) * action_mask
         ).sum(dim=-1)
         entropy = (selected_distribution.entropy() * action_mask).sum(dim=-1)
         current = state.state if hasattr(state, "history_tokens") else state
+        path_action, speed_action = self._split_action(delta_action)
         decoded = self.planner.decode_delta(
-            current, raw["reference_path_local"], delta_action[:, None],
+            current, raw["reference_path_local"], path_action[:, None],
+            speed_action[:, None],
             raw["path_point_weight"],
         )
         decoded["selected_candidate"] = candidate
@@ -185,12 +206,15 @@ class StackPlannerActorCritic(nn.Module):
             future_second.sum() * correction.new_tensor(correction.shape[1])
         ).clamp(min=1.0)
         smoothness = smoothness_numerator / smoothness_denominator
+        speed_difference = output["speed"][..., 1:] - output["speed"][..., :-1]
+        speed_smoothness = speed_difference.square().mean()
         candidates = path.shape[1]
         if candidates < 2:
             zero = path.new_zeros(())
             return {
                 "loss": zero, "distance": zero,
                 "smoothness_loss": smoothness,
+                "speed_smoothness_loss": speed_smoothness,
             }
         pairs = torch.triu_indices(candidates, candidates, 1, device=path.device)
         difference = coarse[:, pairs[0]] - coarse[:, pairs[1]]
@@ -204,6 +228,7 @@ class StackPlannerActorCritic(nn.Module):
             "loss": (margin - distance).clamp(min=0.0).square().mean(),
             "distance": distance.mean(),
             "smoothness_loss": smoothness,
+            "speed_smoothness_loss": speed_smoothness,
         }
 
 

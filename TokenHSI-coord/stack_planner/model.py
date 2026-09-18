@@ -14,8 +14,8 @@ from coordinator.geometry import (
 )
 
 from .schema import (
-    AGENTS, STACK_CANDIDATES, STACK_PATH_DELTA_DIM,
-    STACK_PATH_INPUT_DIM, STACK_PATH_POINTS, CoordinatorState,
+    AGENTS, MAX_SPEED, MIN_SPEED, STACK_CANDIDATES, STACK_PATH_DELTA_DIM,
+    STACK_PATH_INPUT_DIM, STACK_PATH_POINTS, STACK_SPEED_DIM, CoordinatorState,
 )
 
 
@@ -147,6 +147,15 @@ def _smooth_delta(delta: torch.Tensor, passes: int = 2) -> torch.Tensor:
     return delta
 
 
+def _smooth_speed(speed: torch.Tensor, passes: int = 2) -> torch.Tensor:
+    """Low-pass a bounded pointwise speed profile without changing length."""
+    for _ in range(passes):
+        left = torch.cat((speed[..., :1], speed[..., :-1]), dim=-1)
+        right = torch.cat((speed[..., 1:], speed[..., -1:]), dim=-1)
+        speed = 0.25 * left + 0.50 * speed + 0.25 * right
+    return speed
+
+
 def _future_point_weight(path_progress: torch.Tensor,
                          previous_path_valid: torch.Tensor) -> torch.Tensor:
     """Continuous future mask with a two-point correction ramp at the root."""
@@ -161,7 +170,7 @@ def _future_point_weight(path_progress: torch.Tensor,
 
 
 class StackPlannerHeads(nn.Module):
-    """Independent pointwise path-correction proposals and evaluator."""
+    """Independent path-correction/speed proposals and evaluator."""
 
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
@@ -177,21 +186,34 @@ class StackPlannerHeads(nn.Module):
         self.paths = nn.ModuleList([
             head(STACK_PATH_DELTA_DIM) for _ in range(config.candidates)
         ])
+        self.speeds = nn.ModuleList([
+            head(STACK_SPEED_DIM) for _ in range(config.candidates)
+        ])
         self.candidate_evaluator = nn.Sequential(
-            nn.Linear(config.d_model + STACK_PATH_INPUT_DIM, hidden),
+            nn.Linear(
+                config.d_model + STACK_PATH_INPUT_DIM + STACK_SPEED_DIM, hidden,
+            ),
             nn.GELU(), nn.Linear(hidden, 1),
         )
         self.value = head(1)
         for path in self.paths:
             nn.init.normal_(path[-1].weight, std=1e-3)
             nn.init.zeros_(path[-1].bias)
+        for speed in self.speeds:
+            nn.init.normal_(speed[-1].weight, std=1e-3)
+            # Start close to the old MAX_SPEED execution behavior, while
+            # retaining enough sigmoid gradient to learn slowdowns.
+            nn.init.constant_(speed[-1].bias, 2.0)
 
-    def decode_delta(self, reference_path_local, path_delta_raw,
+    def decode_delta(self, reference_path_local, path_delta_raw, speed_raw,
                      path_point_weight):
         batch, candidates = path_delta_raw.shape[:2]
         expected = (batch, candidates, STACK_PATH_DELTA_DIM)
         if path_delta_raw.shape != expected:
             raise ValueError(f"path_delta_raw must be {expected}")
+        speed_expected = (batch, candidates, STACK_SPEED_DIM)
+        if speed_raw.shape != speed_expected:
+            raise ValueError(f"speed_raw must be {speed_expected}")
         delta = self.config.delta_scale * torch.tanh(path_delta_raw)
         delta = delta.reshape(
             batch, candidates, AGENTS, STACK_PATH_POINTS - 1, 2,
@@ -203,27 +225,41 @@ class StackPlannerHeads(nn.Module):
         delta = delta * path_point_weight[:, None, :, :, None]
         path_local = reference_path_local[:, None] + delta
         path_local[..., 0, :] = reference_path_local[:, None, :, 0, :]
-        return path_local, delta
+        speed = speed_raw.reshape(
+            batch, candidates, AGENTS, STACK_PATH_POINTS,
+        )
+        speed = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * torch.sigmoid(speed)
+        speed = _smooth_speed(speed)
+        return path_local, delta, speed
 
     def forward(self, scene, reference_path_local, path_point_weight):
         batch = scene.shape[0]
         path_delta_raw = torch.stack([path(scene) for path in self.paths], dim=1)
-        path_local, path_delta_local = self.decode_delta(
-            reference_path_local, path_delta_raw, path_point_weight,
+        speed_raw = torch.stack([speed(scene) for speed in self.speeds], dim=1)
+        path_local, path_delta_local, speed = self.decode_delta(
+            reference_path_local, path_delta_raw, speed_raw, path_point_weight,
         )
         expanded_scene = scene[:, None].expand(-1, path_local.shape[1], -1)
         evaluator_input = torch.cat((
             expanded_scene,
             (path_local.detach() / POSITION_SCALE).flatten(start_dim=2),
+            ((speed.detach() - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)).flatten(
+                start_dim=2
+            ),
         ), dim=-1)
         return {
             "path_delta_raw": path_delta_raw,
+            "speed_raw": speed_raw,
+            "speed": speed,
             "path_delta_local": path_delta_local,
             "reference_path_local": reference_path_local,
             "path_point_weight": path_point_weight,
             "path_action_mask": path_point_weight[..., 1:, None].expand(
                 -1, -1, -1, 2
             ).reshape(batch, -1) > 0,
+            "speed_action_mask": torch.ones(
+                batch, STACK_SPEED_DIM, dtype=torch.bool, device=scene.device,
+            ),
             "candidate_logits": self.candidate_evaluator(
                 evaluator_input
             ).squeeze(-1),
@@ -315,10 +351,10 @@ class StackTrajectoryPlanner(nn.Module):
         return state, self.heads(scene, reference_local, point_weight)
 
     def decode_delta(self, state, reference_path_local, path_delta_raw,
-                     path_point_weight):
+                     speed_raw, path_point_weight):
         _, frame = state_to_tokens(state)
-        path_local, path_delta_local = self.heads.decode_delta(
-            reference_path_local, path_delta_raw, path_point_weight,
+        path_local, path_delta_local, speed = self.heads.decode_delta(
+            reference_path_local, path_delta_raw, speed_raw, path_point_weight,
         )
         path_world = shared_to_world(
             path_local, frame["center"][:, None], frame["angle"][:, None],
@@ -326,6 +362,7 @@ class StackTrajectoryPlanner(nn.Module):
         return {
             "path_local": path_local,
             "path_world": path_world,
+            "speed": speed,
             "path_delta_local": path_delta_local,
             "reference_path_local": reference_path_local,
             "path_point_weight": path_point_weight,
@@ -338,10 +375,12 @@ class StackTrajectoryPlanner(nn.Module):
         output = self.decode_delta(
             current, raw["reference_path_local"],
             raw["path_delta_raw"][batch, selected][:, None],
+            raw["speed_raw"][batch, selected][:, None],
             raw["path_point_weight"],
         )
         # Correction/reference tensors are training internals. Keep the public
-        # planner output contract path-only plus candidate metadata.
+        # Keep correction/reference tensors internal; path and speed are the
+        # public execution contract.
         output.pop("path_delta_local")
         output.pop("reference_path_local")
         output.pop("path_point_weight")

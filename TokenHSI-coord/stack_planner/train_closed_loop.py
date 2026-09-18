@@ -270,6 +270,7 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
                 consistency_targets, epochs, minibatch,
                 clip_ratio, value_coef, entropy_coef, consistency_coef,
                 diversity_coef, diversity_margin, smoothness_coef,
+                speed_smoothness_coef,
                 evaluator_coef):
     total = actions.shape[0]
     sums = {
@@ -279,6 +280,7 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
         "candidate_diversity_loss": 0.0,
         "candidate_path_distance": 0.0,
         "path_smoothness_loss": 0.0,
+        "speed_smoothness_loss": 0.0,
         "candidate_evaluator_loss": 0.0,
         "candidate_evaluator_accuracy": 0.0,
     }
@@ -338,6 +340,7 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
                 + consistency_coef * consistency["total"]
                 + diversity_coef * diversity["loss"]
                 + smoothness_coef * diversity["smoothness_loss"]
+                + speed_smoothness_coef * diversity["speed_smoothness_loss"]
                 + evaluator_coef * evaluator_loss
             )
             optimizer.zero_grad(set_to_none=True)
@@ -360,6 +363,9 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
             )
             sums["path_smoothness_loss"] += float(
                 diversity["smoothness_loss"].detach()
+            )
+            sums["speed_smoothness_loss"] += float(
+                diversity["speed_smoothness_loss"].detach()
             )
             sums["candidate_evaluator_loss"] += float(
                 evaluator_loss.detach()
@@ -428,9 +434,10 @@ def main():
     point_std = _env_float("STACK_PLANNER_DELTA_STD", 0.12)
     endpoint_std = _env_float("STACK_PLANNER_ENDPOINT_STD", 0.20)
     anchor_std = _env_float("STACK_PLANNER_ANCHOR_STD", 0.03)
+    speed_std = _env_float("STACK_PLANNER_SPEED_STD", 0.20)
     policy = StackPlannerActorCritic(
         planner, point_std=point_std, endpoint_std=endpoint_std,
-        anchor_std=anchor_std,
+        anchor_std=anchor_std, speed_std=speed_std,
     ).to(device)
     if payload and payload.get("extras", {}).get("action_log_std") is not None:
         loaded_log_std = payload["extras"]["action_log_std"].to(device)
@@ -455,6 +462,9 @@ def main():
     diversity_coef = _env_float("STACK_PLANNER_DIVERSITY_COEF", 0.05)
     diversity_margin = _env_float("STACK_PLANNER_DIVERSITY_MARGIN", 0.25)
     smoothness_coef = _env_float("STACK_PLANNER_SMOOTHNESS_COEF", 10.0)
+    speed_smoothness_coef = _env_float(
+        "STACK_PLANNER_SPEED_SMOOTHNESS_COEF", 1.0
+    )
     evaluator_coef = _env_float("STACK_PLANNER_EVALUATOR_COEF", 1.0)
     retreat_path_scale = _env_float("STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE", 0.05)
     endpoint_penalty_coef = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_PENALTY", 1.0)
@@ -462,6 +472,7 @@ def main():
     if not 0 <= retreat_path_scale <= 1 or endpoint_penalty_coef < 0 or endpoint_tolerance < 0:
         raise ValueError("invalid retreat consistency/endpoint settings")
     if (consistency_coef < 0 or diversity_coef < 0 or smoothness_coef < 0
+            or speed_smoothness_coef < 0
             or diversity_margin < 0 or evaluator_coef < 0):
         raise ValueError("planner consistency/diversity settings must be non-negative")
     visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
@@ -498,11 +509,12 @@ def main():
     print(f"[stack-planner-train] envs={task.num_envs} horizon={horizon} "
           f"low_steps={low_steps} consistency={consistency_coef:g} "
           f"delta_std={point_std:g} endpoint_std={endpoint_std:g} "
+          f"speed_std={speed_std:g} "
           f"history_steps={planner.config.history_steps} "
           f"candidates={planner.config.candidates} "
           f"delta_scale={planner.config.delta_scale:g} "
           f"diversity={diversity_coef:g}/{diversity_margin:g}m "
-          f"smoothness={smoothness_coef:g} "
+          f"smoothness={smoothness_coef:g}/{speed_smoothness_coef:g} "
           f"evaluator_coef={evaluator_coef:g} full_candidate_rollout=True "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
@@ -580,6 +592,7 @@ def main():
                 candidate_output = {
                     "path_local": outputs["path_local"][:, candidate:candidate + 1],
                     "path_world": outputs["path_world"][:, candidate:candidate + 1],
+                    "speed": outputs["speed"][:, candidate:candidate + 1],
                 }
                 terms, done, macro_diag, decision, invalid = (
                     _counterfactual_rollout(
@@ -745,6 +758,7 @@ def main():
             diversity_coef,
             diversity_margin,
             smoothness_coef,
+            speed_smoothness_coef,
             evaluator_coef,
         )
         def ratio(numerator, denominator):
@@ -788,12 +802,14 @@ def main():
             "delta_std": point_std,
             "endpoint_std": endpoint_std,
             "anchor_std": anchor_std,
+            "speed_std": speed_std,
             "history_steps": planner.config.history_steps,
             "candidates": planner.config.candidates,
             "delta_scale": planner.config.delta_scale,
             "diversity_coef": diversity_coef,
             "diversity_margin": diversity_margin,
             "smoothness_coef": smoothness_coef,
+            "speed_smoothness_coef": speed_smoothness_coef,
             "full_candidate_rollout": 1.0,
             **{
                 f"candidate_usage_{candidate}": float(
@@ -824,6 +840,7 @@ def main():
                        "policy_loss", "value_loss",
                        "candidate_path_distance",
                        "path_smoothness_loss", "collision_cost",
+                       "speed_smoothness_loss",
                        "candidate_evaluator_loss",
                        "candidate_evaluator_accuracy"}
         ), flush=True)
@@ -839,6 +856,7 @@ def main():
                         "delta_std": point_std,
                         "endpoint_std": endpoint_std,
                         "anchor_std": anchor_std,
+                        "speed_std": speed_std,
                         "history_steps": planner.config.history_steps,
                         "candidates": planner.config.candidates,
                         "delta_scale": planner.config.delta_scale,
@@ -847,6 +865,7 @@ def main():
                         "diversity_coef": diversity_coef,
                         "diversity_margin": diversity_margin,
                         "smoothness_coef": smoothness_coef,
+                        "speed_smoothness_coef": speed_smoothness_coef,
                         "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
                         "retreat_endpoint_tolerance": endpoint_tolerance,
                         "visit_penalty_coef": visit_penalty_coef,

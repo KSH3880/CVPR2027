@@ -1,4 +1,4 @@
-# Stack path planner V12
+# Stack path-and-speed planner V13
 
 Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 `trajectory_predictor/`의 코드 및 checkpoint namespace를 건드리지 않도록 별도 패키지로
@@ -10,12 +10,12 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 - planner memory: 최근 decision history, 고정-origin 33-point world trajectory,
   agent별 monotonic point progress
 - backbone: root/box/goal 전용 tokenizer와 learnable `[SCENE]` token을 쓰는 Transformer encoder
-- candidate 생성: 하나의 scene feature를 받는 독립 full-path head 4개
-- candidate 평가: `(scene feature, detached path proposal)` 공유 evaluator
-- 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path
+- candidate 생성: 하나의 scene feature를 받는 독립 path-and-speed head 4개
+- candidate 평가: `(scene feature, detached path/speed proposal)` 공유 evaluator
+- 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path와 pointwise speed profile
 - hard anchor: 첫 decision의 `P0=departure root`; 이후 실행한 prefix는 고정
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
-- checkpoint schema: `tokenhsi-stack-planner-v12`
+- checkpoint schema: `tokenhsi-stack-planner-v13`
 
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
@@ -27,6 +27,7 @@ from stack_planner.model import StackTrajectoryPlanner
 model = StackTrajectoryPlanner()
 output = model(coordinator_state)
 path = output["path_world"]  # selected path: [B, 1, 2, 33, 2]
+speed = output["speed"]      # selected speed: [B, 1, 2, 33], m/s
 candidate = output["selected_candidate"]  # [B]
 ```
 
@@ -38,9 +39,11 @@ monotonic point progress를 구하고, progress 이전 correction은 0으로 고
 걸쳐 correction 자유도를 부드럽게 연다. 따라서 목적지에 가까워져도 짧아진 잔여 경로를 다시
 33점으로 늘리지 않고 이미 지나온 prefix도 재계획하지 않는다. progress는 plan embedding에도
 명시적으로 들어간다. head는
-root를 제외한 `2 agents × 32 points × XY = 128D` correction을 출력한다. 이를 두 번 low-pass한
+root를 제외한 `2 agents × 32 points × XY = 128D` correction과
+`2 agents × 33 points = 66D` speed profile을 함께 출력한다. path correction은 두 번 low-pass한
 `0.5*tanh(delta)`를 reference path에 직접 더한다. latent path parameter는 저장하거나 누적하지
-않는다. 직전 trajectory 자체를 shared frame으로 바꿔 plan token으로 Transformer 입력에도
+않는다. speed는 sigmoid로 `[0.375, 1.5] m/s`에 제한하고 두 번 low-pass한다. 직전 trajectory
+자체를 shared frame으로 바꿔 plan token으로 Transformer 입력에도
 포함한다. evaluator가 네 proposal을
 점수화한다. 학습에서는 같은 simulator state를 snapshot한 뒤 네 proposal을 모두 각각 30
 low-level step 실행해 return을 직접 비교한다. evaluator는 최고 return 후보 index를 supervised
@@ -54,7 +57,7 @@ diversity loss를 적용한다. diversity는 raw point가 아니라 네 차례 l
 `STACK_PLANNER_SMOOTHNESS_COEF`(기본 10.0)를 적용해 좌우 교대 zigzag가 후보 차이로 인정되지
 않게 한다.
 
-별도 `retreat_path`, retreat goal, speed, switch output이나 사후 path concatenation은 없다.
+별도 `retreat_path`, retreat goal, switch output이나 사후 path concatenation은 없다.
 각 경로의 첫 점은 departure root로 고정되고 아직 실행하지 않은 point만 planner가 계속 수정한다.
 box와 stack goal은 특정 index에 묶지 않고 모든 path segment에 수선의 발을 내려 최소 거리를
 구한다. 같은 segment이면 projection fraction, 다른 segment이면 index를 이용해 box가 stack
@@ -98,8 +101,10 @@ parameter는 없다.
   재평가한다. invalid raw 후보는 실행 path와 가상 box 어느 쪽도 변경하지 않는다. 유효 후보가
   설치될 때만 같은 endpoint를 path와 가상 box에 함께 적용하므로 steering token과 carry token이
   서로 다른 목표를 가리키지 않는다. 기존 planner 없는 task는 그대로다.
-- 두 구간 모두 이후 기존 0.1 m/320-point steering ABI로 다시 resample한다. 실행 속도는
-  adapter가 고정 `MAX_SPEED`로 부여하며 모델은 속도를 예측하지 않는다.
+- 두 구간 모두 이후 기존 0.1 m/320-point steering ABI로 다시 resample한다. 모델이 예측한
+  pointwise speed도 path와 같은 arc로 보간한다. 독립 replan 사이의 명령 변화는
+  `STACK_PLANNER_COMMAND_ACCEL`(기본 `0.75 m/s²`)로 rate-limit한다. 학습 중 speed profile의
+  pointwise 요동은 `STACK_PLANNER_SPEED_SMOOTHNESS_COEF`(기본 1.0)로 감점한다.
 
 즉 33점은 항상 모델의 한 path다. carry용 33점과 retreat용 33점을 모델이 따로 출력하는
 구조가 아니다. 어느 구간을 frozen agent에 설치할지는 simulator의 실제 placement phase를
@@ -125,7 +130,7 @@ env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recu
 transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
 `model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
 
-V12 이전 planner checkpoint는 reference, A2 preplan 및 executor 계약이 달라 load하지 않는다. V12 checkpoint도
+V13 이전 planner checkpoint는 speed action/output 및 executor 계약이 달라 load하지 않는다. V13 checkpoint도
 history 길이 또는 candidate 수가 다른 설정으로 resume하는 것은 거부한다.
 
 검증:
@@ -180,7 +185,7 @@ reset에 섞지 않는다.
 ```bash
 MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v12_joint_a2_s0
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0
 ```
 
 로컬 physical GPU 1에서는 로컬 checkpoint 배치와 `tokenhsi118` 환경을 사용하는
@@ -208,6 +213,7 @@ iteration마다 기록한다.
 - `collision_ratio`: 실행 low-level step 중 기존 collision proxy가 양수인 비율
 - `collision_cost`: macro별 연속 collision cost 평균
 - `path_smoothness_loss`: mean correction의 second-difference 제곱 평균
+- `speed_smoothness_loss`: mean speed profile의 adjacent-point difference 제곱 평균
 - `bottom_postplace_linear_speed`: bottom placement 이후 평균 선속도(m/s)
 - `bottom_postplace_angular_speed`: bottom placement 이후 평균 각속도(rad/s)
 - `bottom_postplace_motion_per_interval`: bottom placement가 관측된 macro당 누적 이동량(m)
@@ -215,7 +221,7 @@ iteration마다 기록한다.
 
 마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
 도달하지 못한 것인지 구분할 수 있다.
-같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v12 설계의 서버 학습은 다음처럼
+같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v13 설계의 서버 학습은 다음처럼
 실행할 수 있다.
 
 ```bash
@@ -223,7 +229,9 @@ MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
 STACK_PLANNER_DELTA_SCALE=0.5 \
 STACK_PLANNER_SMOOTHNESS_COEF=10.0 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v12_joint_a2_s0
+STACK_PLANNER_SPEED_STD=0.20 \
+STACK_PLANNER_SPEED_SMOOTHNESS_COEF=1.0 \
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0
 ```
 
 launcher 기본값은 2,048 env지만 full candidate rollout은 후보 4개를 모두 물리 실행하고 branch
@@ -234,9 +242,9 @@ step이며 10 iteration마다 checkpoint를 저장한다. PPO minibatch 기본�
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
-STACK_PLANNER_INIT=runs/stack_planner/stack_path_v12_joint_a2_s0/planner_000200.pth \
+STACK_PLANNER_INIT=runs/stack_planner/stack_path_speed_v13_s0/planner_000200.pth \
 STACK_PLANNER_ITERS=200 MA_GPU=7 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_v12_joint_a2_s0_resume1
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0_resume1
 ```
 
 ## Checkpoint viewer
