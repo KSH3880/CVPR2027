@@ -31,7 +31,9 @@ def build_stack_consistency_target(
     ).expand(-1, previous_output["path_world"].shape[1], -1, points)
     return {
         "position": previous_output["path_world"].detach().clone(),
-        "valid": base_valid.detach(),
+        # expand() creates a stride-0 view. Training further intersects this
+        # mask in place with the planner-decision mask, so materialize it.
+        "valid": base_valid.detach().clone(),
     }
 
 

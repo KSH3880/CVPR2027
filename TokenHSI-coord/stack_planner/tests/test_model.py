@@ -56,6 +56,9 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertFalse(target["valid"][0].any())
         self.assertFalse(target["valid"][1, :, 0].any())
         self.assertTrue(target["valid"][1, :, 1].any())
+        # The training loop applies an additional decision mask in place.
+        # Expanded stride-0 masks must therefore be materialized first.
+        target["valid"] &= torch.ones_like(target["valid"])
 
     def test_consistency_reaches_unified_path_head(self):
         state = make_state(batch=2)

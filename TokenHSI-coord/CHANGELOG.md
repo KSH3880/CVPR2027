@@ -14,6 +14,8 @@
 - `STACK_TOP_FOLLOWS_BOTTOM=1`에서도 inherited 코드처럼 `_gt_path`를 매 frame 평행이동하지 않고,
   물리 Carry goal만 support를 따라가게 한다. path 수정은 다음 planner replan이 담당한다.
 - planner input/execution 의미가 달라 schema를 V12로 올리고 V11 checkpoint resume을 거부한다.
+- fixed-index consistency valid mask의 `expand()` 결과를 그대로 반환해 decision mask의 in-place
+  intersection에서 stride-0 alias 오류가 나던 것을 materialized clone으로 수정했다.
 
 ### Fixed-origin future-masked trajectory planner (V11)
 
