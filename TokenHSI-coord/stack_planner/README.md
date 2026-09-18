@@ -20,6 +20,9 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
 Carry가 분리되면 이 adapter만 제거하고 planner의 물리 경로 출력은 유지할 수 있다.
+placement 전 마지막으로 유효했던 unified A1 endpoint를 보관하며, `A1_RETREAT` 진입 순간
+virtual box를 그 endpoint로 즉시 이동한다. 따라서 phase 전환 후 다음 planner period까지
+현재 위치에 virtual box가 남는 한 tick 지연이 없다.
 
 ```python
 from stack_planner.model import StackTrajectoryPlanner
@@ -112,6 +115,11 @@ parameter는 없다.
 A2 출발은 learned endpoint 도달이나 A1 이동 거리로 판정하지 않는다. bottom box가 물리적으로
 안정화되면 A1 retreat를 열고, 그 안정 상태가 추가로 1초 유지되는 즉시 A2 goal을 활성화한다.
 대기 시간은 `STACK_PLANNER_A2_STABLE_DELAY`로 설정한다.
+planner task의 성공 `DONE`은 기본적으로 `STACK_PLANNER_RELAXED_DONE=1`을 사용한다. top box
+중심의 XY가 bottom box 중심에서 footprint 반대각선
+`0.5 * sqrt(size_x^2 + size_y^2)` 이내이고 목표 높이 오차가 tolerance 안이면 성공이다.
+속도 및 연속 안정화 frame 조건은 요구하지 않는다. `0`으로 설정하면 parent sequential task의
+strict stable-DONE을 사용하며, planner 없는 기존 환경의 판정은 변경하지 않는다.
 A1이 active인 phase 2~4의 매 설치 execution suffix에는 놓인 Box1의 yaw/XY size를 반영한 oriented footprint
 clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safety margin 0.10 m만큼
 팽창하며, release 직후 가까이 서 있는 것 자체보다 이후 point가 box 안쪽으로 파고들거나
@@ -212,6 +220,10 @@ iteration마다 기록한다.
 - `fall_ratio`: planner macro transition 중 한 agent라도 넘어진 비율
 - `collision_ratio`: 실행 low-level step 중 기존 collision proxy가 양수인 비율
 - `collision_cost`: macro별 연속 collision cost 평균
+- `collision_agent_agent_{ratio,cost}`: 두 humanoid root proximity
+- `collision_box_box_{ratio,cost}`: 두 box footprint proximity
+- `collision_agent_box_{ratio,cost}`: 각 agent root와 상대 box proximity
+- `collision_held_box_body_{ratio,cost}`: 들고 있는 box와 상대 humanoid rigid-body의 3-D proximity
 - `path_smoothness_loss`: mean correction의 second-difference 제곱 평균
 - `speed_smoothness_loss`: mean speed profile의 adjacent-point difference 제곱 평균
 - `bottom_postplace_linear_speed`: bottom placement 이후 평균 선속도(m/s)
@@ -236,7 +248,7 @@ STACK_PLANNER_SPEED_SMOOTHNESS_COEF=1.0 \
 
 launcher 기본값은 2,048 env지만 full candidate rollout은 후보 4개를 모두 물리 실행하고 branch
 snapshot도 보존하므로 첫 run은 512 env를 권장한다. 200 iteration, 후보당 frozen executor 30
-step이며 10 iteration마다 checkpoint를 저장한다. PPO minibatch 기본값은 env와 horizon에
+step이며 5 iteration마다 checkpoint를 저장한다. PPO minibatch 기본값은 env와 horizon에
 비례하며 candidate 4개 때문에 epoch당 16개 minibatch가 된다. 중간 checkpoint에서
 이어갈 때도 기존 run을 덮어쓰지 않고 새 tag를 쓴다.
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.

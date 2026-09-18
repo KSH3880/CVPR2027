@@ -102,6 +102,15 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
     path_error_sum = torch.zeros(n, device=task.device)
     path_samples = torch.zeros(n, device=task.device)
     collision_steps = torch.zeros(n, device=task.device)
+    collision_names = (
+        "agent_agent", "box_box", "agent_box", "held_box_body",
+    )
+    collision_component_cost = {
+        name: torch.zeros(n, device=task.device) for name in collision_names
+    }
+    collision_component_steps = {
+        name: torch.zeros(n, device=task.device) for name in collision_names
+    }
     postplace_steps = torch.zeros(n, device=task.device)
     postplace_motion = torch.zeros(n, device=task.device)
     postplace_angular_motion = torch.zeros(n, device=task.device)
@@ -109,12 +118,21 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
         action = player.get_action({"obs": obs}, is_determenistic=True)
         obs, _, done_rows, _ = player.env.step(action)
         current = _clone_physical(task.planner_physical_state())
-        step_collision = task.planner_collision_cost()
+        step_collision_terms = task.planner_collision_terms()
+        step_collision = step_collision_terms["total"]
         step_disturbance = (
             current.bottom_position_error - last_bottom_error
         ).norm(dim=-1)
         collision += torch.where(active, step_collision, torch.zeros_like(step_collision))
         collision_steps += active.float() * (step_collision > 0.0).float()
+        for name in collision_names:
+            component = step_collision_terms[name]
+            collision_component_cost[name] += torch.where(
+                active, component, torch.zeros_like(component),
+            )
+            collision_component_steps[name] += (
+                active.float() * (component > 0.0).float()
+            )
         disturbance += torch.where(active, step_disturbance, torch.zeros_like(step_disturbance))
         fall = torch.maximum(fall, task.planner_fall().float() * active.float())
         elapsed_steps += active.float()
@@ -172,6 +190,11 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
         "bottom_postplace_seconds": postplace_steps * float(task.dt),
         "bottom_postplace_intervals": (postplace_steps > 0).float(),
     }
+    for name in collision_names:
+        diagnostics[f"collision_{name}_steps"] = collision_component_steps[name]
+        diagnostics[f"collision_{name}_cost_sum"] = (
+            collision_component_cost[name] / denom
+        )
     return (
         compute_stack_planner_reward(before, after, interval, reward_config),
         done_env,
@@ -494,7 +517,7 @@ def main():
     )).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = output_dir / "metrics.jsonl"
-    save_every = _env_int("STACK_PLANNER_SAVE_EVERY", 10)
+    save_every = _env_int("STACK_PLANNER_SAVE_EVERY", 5)
     ppo_epochs = _env_int("STACK_PLANNER_PPO_EPOCHS", 3)
     minibatch = _env_int("STACK_PLANNER_MINIBATCH", 512)
     if ppo_epochs <= 0 or minibatch <= 0:
@@ -784,6 +807,15 @@ def main():
                 "bottom_postplace_seconds", "executed_steps"
             ) / float(task.dt),
         }
+        for collision_name in (
+            "agent_agent", "box_box", "agent_box", "held_box_body",
+        ):
+            planner_metrics[f"collision_{collision_name}_ratio"] = ratio(
+                f"collision_{collision_name}_steps", "executed_steps",
+            )
+            planner_metrics[f"collision_{collision_name}_cost"] = ratio(
+                f"collision_{collision_name}_cost_sum", "macro_samples",
+            )
         metrics = {
             "iteration": iteration,
             "reward": float(reward_t.mean()),
@@ -840,6 +872,14 @@ def main():
                        "policy_loss", "value_loss",
                        "candidate_path_distance",
                        "path_smoothness_loss", "collision_cost",
+                       "collision_agent_agent_ratio",
+                       "collision_box_box_ratio",
+                       "collision_agent_box_ratio",
+                       "collision_held_box_body_ratio",
+                       "collision_agent_agent_cost",
+                       "collision_box_box_cost",
+                       "collision_agent_box_cost",
+                       "collision_held_box_body_cost",
                        "speed_smoothness_loss",
                        "candidate_evaluator_loss",
                        "candidate_evaluator_accuracy"}

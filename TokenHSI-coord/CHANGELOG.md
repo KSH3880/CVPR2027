@@ -12,6 +12,15 @@
   제곱 차이에 별도 smoothness loss를 적용하고 실행 시 기존 `0.75 m/s²` command limiter를 유지한다.
 - 고정 `MAX_SPEED` adapter를 제거하고 schema를 V13으로 올려 path-only V12 checkpoint resume을
   명시적으로 거부한다. CPU 단위 테스트 40개를 통과했다.
+- planner 전용 `DONE`을 기본 box-radius cutoff로 맞췄다. top-box 중심 XY가 bottom footprint의
+  반대각선 안이고 높이 tolerance를 만족하면 종료하며, parent sequential 환경의 strict 판정은
+  유지한다. `STACK_PLANNER_RELAXED_DONE=0`으로 strict 판정을 다시 사용할 수 있다.
+- planner checkpoint 기본 저장 주기를 10 iteration에서 5 iteration으로 단축했다.
+- aggregate collision metric을 agent-agent, box-box, agent-box, held-box/body 네 종류의
+  ratio와 cost로 분해했다. 기존 total collision reward는 네 cost의 합으로 유지한다.
+- placement 전에 출력된 마지막 유효 A1 unified-path endpoint를 보관하고 `A1_RETREAT` phase
+  진입 즉시 virtual box에 적용한다. 종전처럼 phase 전환 뒤 한 planner period 동안 virtual
+  box가 이전/current-root 위치에 남는 지연을 제거했다.
 
 ### Joint A2 preplan with deferred Carry goal (V12)
 

@@ -98,7 +98,18 @@ class HumanoidMAStackPlannerTrain(
         self._planner_a2_stable_delay_steps = int(math.ceil(
             self._planner_a2_stable_delay / float(self.dt)
         ))
+        self._planner_relaxed_done = bool(int(os.environ.get(
+            "STACK_PLANNER_RELAXED_DONE", "1"
+        )))
         self._planner_virtual_retreat_pos = self._a1_retreat_pos.clone()
+        # The unified path already contains A1's retreat endpoint before the
+        # placement transition. Preserve the latest valid proposal so phase
+        # entry can move the virtual box immediately instead of waiting one
+        # additional planner period for another install.
+        self._planner_latest_a1_endpoint = self._a1_retreat_pos[:, :2].clone()
+        self._planner_latest_a1_endpoint_valid = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device,
+        )
         # Readiness gates A2 while awaiting the first valid planner retreat;
         # it never blocks subsequent replans or fixes the retreat endpoint.
         self._planner_retreat_ready = torch.zeros(
@@ -213,6 +224,10 @@ class HumanoidMAStackPlannerTrain(
         super()._reset_envs(env_ids)
         if hasattr(self, "_planner_virtual_retreat_pos") and len(env_ids):
             self._planner_virtual_retreat_pos[env_ids] = self._a1_retreat_pos[env_ids]
+            self._planner_latest_a1_endpoint[env_ids] = self._a1_retreat_pos[
+                env_ids, :2
+            ]
+            self._planner_latest_a1_endpoint_valid[env_ids] = False
             self._planner_retreat_ready[env_ids] = False
             self._planner_endpoint_history_valid[env_ids] = False
             self._planner_endpoint_change_cost[env_ids] = 0.0
@@ -325,6 +340,19 @@ class HumanoidMAStackPlannerTrain(
         if hasattr(self, "_planner_virtual_retreat_pos"):
             self._planner_retreat_ready[env_ids] = False
             self._planner_endpoint_history_valid[env_ids] = False
+            cached = self._planner_latest_a1_endpoint_valid[env_ids]
+            cached_ids = env_ids[cached]
+            if len(cached_ids):
+                endpoint = self._planner_latest_a1_endpoint[cached_ids]
+                self._planner_virtual_retreat_pos[cached_ids, :2] = endpoint
+                self._a1_retreat_pos[cached_ids, :2] = endpoint
+                delta = endpoint - self._a1_retreat_start[cached_ids]
+                distance = delta.norm(dim=-1, keepdim=True)
+                self._a1_retreat_dir[cached_ids] = torch.where(
+                    distance > 1e-4,
+                    delta / distance.clamp(min=1e-4),
+                    self._a1_retreat_dir[cached_ids],
+                )
 
     def _activate_retreat_steer(self, env_ids):
         """Hold at phase-entry root until a learned retreat is accepted."""
@@ -428,6 +456,39 @@ class HumanoidMAStackPlannerTrain(
             self._activate_a2_top_goal(launch_a2)
             self._set_phase(launch_a2, self.A2_RESUME)
 
+        if self._planner_relaxed_done:
+            # Match the planner reward's box-radius success event: the top
+            # center may lie anywhere inside the bottom footprint's
+            # center-to-corner radius. Keep the vertical placement check, but
+            # do not require low velocity for N consecutive frames. This is
+            # planner-only; the parent sequential task retains strict DONE.
+            rows = self.all_rows().view(self.num_envs, self.num_agents)
+            r0, r1 = rows[:, 0], rows[:, 1]
+            boxes = self.humanoid_rows(self._box_states)
+            support_radius = 0.5 * torch.norm(
+                self._box_lib._box_size[r0, :2], dim=-1,
+            )
+            xy_distance = torch.norm(
+                boxes[r1, :2] - boxes[r0, :2], dim=-1,
+            )
+            top_z_error = torch.abs(
+                boxes[r1, 2] - self._committed_top_pos[:, 2]
+            )
+            active = (
+                ((self._stack_phase == self.A2_RESUME)
+                 | (self._stack_phase == self.VERIFY_STACK))
+                & ~self._carry_rehearsal
+            )
+            relaxed_done = torch.nonzero(
+                active
+                & (xy_distance <= support_radius)
+                & (top_z_error < self.stack_top_z_tol),
+                as_tuple=False,
+            ).squeeze(-1)
+            if len(relaxed_done):
+                self._seq_top_reached[relaxed_done] = True
+                self._set_phase(relaxed_done, self.DONE)
+
     @torch.no_grad()
     def install_external_plan(self, output):
         """Install the policy-selected singleton path and report its validity."""
@@ -471,6 +532,15 @@ class HumanoidMAStackPlannerTrain(
             output["path_world"], model_speed, state.root_xy, execute
         )[:, 0]
         self._planner_policy_decision = active.any(dim=-1)
+
+        # Cache the raw unified endpoint, not the carry execution view whose
+        # pre-placement endpoint is intentionally clipped to the stack goal.
+        cache_endpoint = valid & execute[:, 0]
+        if cache_endpoint.any():
+            self._planner_latest_a1_endpoint[cache_endpoint] = model_path[
+                cache_endpoint, 0, -1
+            ]
+            self._planner_latest_a1_endpoint_valid[cache_endpoint] = True
 
         # Inactive roots are stationary for the safety projection.
         projected = torch.where(
@@ -634,7 +704,8 @@ class HumanoidMAStackPlannerTrain(
             self._seq_top_reached.float(),
         )
 
-    def planner_collision_cost(self):
+    def planner_collision_terms(self):
+        """Return separately attributable proximity/contact proxy costs."""
         state = self.planner_state()
         root, box = state.root_xy, state.box_xyz[..., :2]
         radius = 0.5 * state.box_size_xy.norm(dim=-1)
@@ -652,7 +723,17 @@ class HumanoidMAStackPlannerTrain(
                                    state.box_heading[:, 1], sizes[:, 1], state.held[:, 1])
         body10 = held_box_body_cost(rigid[:, 1, keep], state.box_xyz[:, 0],
                                    state.box_heading[:, 0], sizes[:, 0], state.held[:, 0])
-        return hh + bb + 0.5 * (hb01 + hb10) + 10.0 * (body01 + body10)
+        terms = {
+            "agent_agent": hh,
+            "box_box": bb,
+            "agent_box": 0.5 * (hb01 + hb10),
+            "held_box_body": 10.0 * (body01 + body10),
+        }
+        terms["total"] = sum(terms.values())
+        return terms
+
+    def planner_collision_cost(self):
+        return self.planner_collision_terms()["total"]
 
     def planner_fall(self):
         bottom_lost = self.extras.get(
