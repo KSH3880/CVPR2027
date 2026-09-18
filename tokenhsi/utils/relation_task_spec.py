@@ -61,13 +61,15 @@ def validate_relation_config(config):
     nested = {
         'soft_gate': {'beta', 'center'},
         'progress': {'kind', 'target_speed', 'velocity_scale', 'normalization_epsilon',
-                     'at_approach_radius', 'approach_radius'},
+                     'at_approach_radius', 'approach_radius', 'delta', 'sigma'},
         'holding': {'hand_distance_scale'},
         'at': {'state_definition', 'near_distance_scale', 'near_fraction',
                'putdown_xy_tolerance', 'putdown_z_tolerance'},
         'observation': {'include_relation_state', 'relation_state_fields', 'include_subgoal_done'},
         'success': {'require_achieved_target_prerequisites', 'once_per_subgoal',
                     'require_current_target_prerequisites', 'z_tolerance', 'saturate_edge_rewards',
+                    'saturate_edge_rewards_while_current', 'current_saturation_z_tolerance',
+                    'current_success_reward',
                     'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success',
                     'terminate_when_all_subgoals_done'},
         'diagnostics': {'enabled', 'log_interval', 'sample_envs', 'validate_tensors',
@@ -89,8 +91,18 @@ def validate_relation_config(config):
             raise ValueError('diagnostics.' + key + ' has an invalid integer value')
     progress = config.get('progress', {})
     progress_kind = progress.get('kind', 'velocity')
-    if progress_kind not in ('velocity', 'direction'):
+    if progress_kind not in ('velocity', 'direction', 'distance'):
         raise ValueError('Unsupported progress kind: ' + str(progress_kind))
+    if progress_kind == 'distance':
+        if set(progress) - {'kind', 'delta', 'sigma'}:
+            raise ValueError('distance progress accepts only kind, delta and sigma; no direction/velocity/blending options')
+        for key, default, allow_zero in (('delta', .5, True), ('sigma', 1., False)):
+            value = progress.get(key, default)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0 or (not allow_zero and value == 0)):
+                raise ValueError('Invalid distance progress ' + key)
+    elif set(progress) & {'delta', 'sigma'}:
+        raise ValueError('delta/sigma require distance progress')
     if progress_kind == 'direction' and set(progress) & {'target_speed', 'velocity_scale'}:
         raise ValueError('direction progress does not accept Gaussian speed parameters')
     if 'at_approach_radius' in progress and 'approach_radius' in progress:
@@ -110,12 +122,31 @@ def validate_relation_config(config):
         raise ValueError('Success requires exactly one of current or achieved target prerequisites')
     if type(success.get('saturate_edge_rewards', False)) is not bool:
         raise ValueError('success.saturate_edge_rewards must be boolean')
+    if type(success.get('saturate_edge_rewards_while_current', False)) is not bool:
+        raise ValueError('success.saturate_edge_rewards_while_current must be boolean')
+    if (success.get('saturate_edge_rewards', False)
+            and success.get('saturate_edge_rewards_while_current', False)):
+        raise ValueError('Latched and current edge saturation are mutually exclusive')
     if 'z_tolerance' in success:
         tolerance = success['z_tolerance']
         if not current:
             raise ValueError('success.z_tolerance requires current target prerequisites')
         if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
             raise ValueError('success.z_tolerance must be finite and positive')
+    if 'current_saturation_z_tolerance' in success:
+        tolerance = success['current_saturation_z_tolerance']
+        if not success.get('saturate_edge_rewards_while_current', False):
+            raise ValueError('success.current_saturation_z_tolerance requires current edge saturation')
+        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
+            raise ValueError('success.current_saturation_z_tolerance must be finite and positive')
+    elif success.get('saturate_edge_rewards_while_current', False):
+        raise ValueError('Current edge saturation requires current_saturation_z_tolerance')
+    current_reward = success.get('current_success_reward', 0.)
+    if (isinstance(current_reward, bool) or not isinstance(current_reward, (int, float))
+            or not math.isfinite(current_reward) or current_reward < 0):
+        raise ValueError('success.current_success_reward must be finite and nonnegative')
+    if current_reward and not success.get('saturate_edge_rewards_while_current', False):
+        raise ValueError('success.current_success_reward requires current edge saturation')
     for key in ('once_per_subgoal',
                 'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success'):
         if success.get(key, True) is not True:
@@ -128,7 +159,7 @@ def validate_relation_config(config):
     if tuple(obs.get('relation_state_fields', STATE_FIELDS)) != STATE_FIELDS:
         raise ValueError('relation state fields must be phi,gate,satisfied,achieved')
     positive = [config.get('state_reward_weight', 1.), config.get('progress_reward_weight', .2),
-                config.get('subgoal_success_bonus', 5.), config.get('soft_gate', {}).get('beta', 30.),
+                config.get('soft_gate', {}).get('beta', 30.),
                 config.get('progress', {}).get('target_speed', 1.5),
                 config.get('progress', {}).get('velocity_scale', 5.),
                 config.get('progress', {}).get('normalization_epsilon', 1e-6),
@@ -138,6 +169,9 @@ def validate_relation_config(config):
                 config.get('at', {}).get('putdown_z_tolerance', .001)]
     if not all(math.isfinite(v) and v > 0 for v in positive):
         raise ValueError('relation reward weights, scales and tolerances must be finite and positive')
+    bonus = config.get('subgoal_success_bonus', 5.)
+    if isinstance(bonus, bool) or not isinstance(bonus, (int, float)) or not math.isfinite(bonus) or bonus < 0:
+        raise ValueError('subgoal_success_bonus must be finite and nonnegative')
     for v in (config.get('satisfaction_threshold', .9), config.get('soft_gate', {}).get('center', .8)):
         if not math.isfinite(v) or not 0 < v < 1:
             raise ValueError('relation thresholds must be inside (0,1)')

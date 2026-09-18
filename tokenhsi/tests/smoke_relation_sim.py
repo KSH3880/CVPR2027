@@ -60,7 +60,7 @@ def check_simulator(self):
         saved_obs = (obs['obs'] if isinstance(obs, dict) else obs).clone()
         action = self.get_action(obs, True)
         obs, reward, done, info = self.env_step(self.env, action)
-        phi, _ = task._evaluate_relations()
+        phi, relation_diag = task._evaluate_relations()
         objects = task._assigned_box_values(task._box_states)[..., :3]
         root = task._humanoid_root_states[..., :3]
         ph = relation_progress(task._prev_root_pos, root, objects, task.dt, progress_cfg)
@@ -74,7 +74,20 @@ def check_simulator(self):
                                  gate_center=cfg.get('soft_gate', {}).get('center', .8),
                                  satisfaction_threshold=cfg.get('satisfaction_threshold', .9),
                                  at_distance_xy=(task._tar_pos[..., :2] - objects[..., :2]).norm(dim=-1),
-                                 at_approach_radius=progress_cfg.get('at_approach_radius'))
+                                 at_approach_radius=progress_cfg.get('at_approach_radius'),
+                                 require_current_target_prerequisites=cfg.get('success', {}).get(
+                                     'require_current_target_prerequisites', False),
+                                 at_z_error=relation_diag.get('goal_z_error'),
+                                 success_z_tolerance=cfg.get('success', {}).get('z_tolerance'),
+                                 saturate_edge_rewards=cfg.get('success', {}).get(
+                                     'saturate_edge_rewards', False),
+                                 progress_kind=progress_cfg.get('kind', 'velocity'),
+                                 saturate_edge_rewards_while_current=cfg.get('success', {}).get(
+                                     'saturate_edge_rewards_while_current', False),
+                                 current_saturation_z_tolerance=cfg.get('success', {}).get(
+                                     'current_saturation_z_tolerance'),
+                                 current_success_reward=cfg.get('success', {}).get(
+                                     'current_success_reward', 0.))
         torch.testing.assert_close(runtime.phi, phi)
         torch.testing.assert_close(runtime.achieved, expected['achieved_next'])
         torch.testing.assert_close(runtime.done, expected['done_next'])

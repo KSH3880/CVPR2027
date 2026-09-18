@@ -113,6 +113,8 @@ class CarryRelationMixin:
         self.extras['subgoal_done'] = runtime.done.clone()
         self.extras['all_subgoals_done'] = runtime.done.all(-1)
         self.extras['current_target_valid'] = result['valid_next'][:, 1::2]
+        self.extras['current_success_state'] = result['current_success_state'].clone()
+        self.extras['saturation_active'] = result['saturation_active'].clone()
         self._record_relation_diagnostics(diag, result, previous_satisfied, live, objects, ph, pa)
 
     def _record_relation_diagnostics(self, diag, result, previous_satisfied, live, objects, ph, pa):
@@ -133,12 +135,16 @@ class CarryRelationMixin:
         diag.update(box_speed=speed, progress_holding=ph, progress_at=pa,
                     task_relation_total=result['agent_task_reward'],
                     success_bonus=result['success_bonus'],
+                    first_success_bonus=result['first_success_bonus'],
+                    current_success_reward=result['current_success_reward'],
                     box_bottom_height_proxy=objects[..., 2] - self._assigned_box_values(self._box_size)[..., 2] / 2,
                     target_xy_crossing=(((self._tar_pos - self._prev_box_pos)[..., :2] *
                                         (self._tar_pos - objects)[..., :2]).sum(-1) < 0).float(),
                     done=runtime.done.float(), active=live.float(),
                     first_success=result['first_success'].float(),
                     current_target_valid=result['valid_next'][:, 1::2].float(),
+                    current_success_state=result['current_success_state'].float(),
+                    saturation_active=result['saturation_active'].float(),
                     first_holding_seconds=self._relation_first_holding,
                     first_valid_seconds=self._relation_first_valid)
         for j, name in enumerate(('holding', 'at')):
@@ -163,8 +169,7 @@ class CarryRelationMixin:
             timeline = dict(diag)
             timeline['placement_valid'] = placed.float()
             timeline['initially_placed'] = self._placement_metrics.initial.float()
-            timeline['saturation_active'] = (runtime.done & self._relation_cfg.get(
-                'success', {}).get('saturate_edge_rewards', False)).float()
+            timeline['saturation_active'] = result['saturation_active'].float()
             for j, name in enumerate(('holding', 'at')):
                 timeline[name + '/prerequisite_used'] = result['activation'][:, j::2]
                 timeline[name + '/progress_blend_used'] = result['progress_blend'][:, j::2]

@@ -62,10 +62,22 @@ def direction_progress(source_prev, source_next, target_next, dt, eps=1e-6):
     return torch.where(distance > eps, cosine.clamp(0., 1.), torch.zeros_like(cosine))
 
 
+def distance_progress(source, target, delta=.5, sigma=1.):
+    """Relation-agnostic current XY approach; no motion, Z, or type inputs."""
+    if isinstance(delta, bool) or not isinstance(delta, (int, float)) or not math.isfinite(delta) or delta < 0:
+        raise ValueError('distance delta must be finite and nonnegative')
+    if isinstance(sigma, bool) or not isinstance(sigma, (int, float)) or not math.isfinite(sigma) or sigma <= 0:
+        raise ValueError('distance sigma must be finite and positive')
+    distance = torch.linalg.vector_norm(source[..., :2] - target[..., :2], dim=-1)
+    return 1. / (1. + (distance - delta).clamp_min(0.) / sigma)
+
+
 def relation_progress(source_prev, source_next, target_next, dt, config=None):
     """Select raw progress; omitted kind preserves existing Gaussian experiments."""
     cfg = config or {}
     kind = cfg.get('kind', 'velocity')
+    if kind == 'distance':
+        return distance_progress(source_next, target_next, cfg.get('delta', .5), cfg.get('sigma', 1.))
     eps = cfg.get('normalization_epsilon', 1e-6)
     if kind == 'direction':
         return direction_progress(source_prev, source_next, target_next, dt, eps)
@@ -111,6 +123,16 @@ def current_target_success(satisfied, graph, at_z_error=None, z_tolerance=None):
     return target
 
 
+def current_at_success(satisfied, graph, at_z_error, z_tolerance):
+    """Current At/Z success only; deliberately independent of Holding/history."""
+    target = satisfied[:, graph.subgoal_target]
+    if at_z_error is None or at_z_error.shape != target.shape:
+        raise ValueError('Current saturation Z errors must have shape [N,M]')
+    if at_z_error.device != satisfied.device:
+        raise ValueError('Current saturation Z errors must share the relation device')
+    return target & (at_z_error.abs() <= z_tolerance)
+
+
 def advance_relation_history(satisfied_next, achieved_prev, done_prev, graph, target_success=None):
     valid = satisfied_next & prerequisite_all(achieved_prev, graph.prereq_mask)
     if target_success is not None:
@@ -128,7 +150,9 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
                   at_distance_xy=None, at_approach_radius=None,
                   edge_distance_xy=None, approach_radius=None,
                   require_current_target_prerequisites=False, at_z_error=None,
-                  success_z_tolerance=None, saturate_edge_rewards=False):
+                  success_z_tolerance=None, saturate_edge_rewards=False, progress_kind='velocity',
+                  saturate_edge_rewards_while_current=False,
+                  current_saturation_z_tolerance=None, current_success_reward=0.):
     if phi_prev.shape != phi_next.shape or progress.shape != phi_prev.shape:
         raise ValueError('phi/progress shapes must agree')
     if phi_prev.ndim != 2 or phi_prev.shape[1] != graph.edge_src.numel():
@@ -151,7 +175,13 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
     gate = relation_gate(phi_prev, beta, gate_center)
     activation = prerequisite_minimum(gate, graph.prereq_mask)
     progress_blend = gate
-    if approach_radius is not None:
+    if progress_kind == 'distance':
+        if approach_radius is not None or at_approach_radius is not None:
+            raise ValueError('distance progress cannot use approach blending')
+        # Diagnostic blend weight zero: paid progress is exactly the supplied
+        # distance score, NOT self-gated or pinned. Prerequisite activation stays.
+        progress_blend = torch.zeros_like(progress)
+    elif approach_radius is not None:
         if at_approach_radius is not None:
             raise ValueError('Use either approach_radius or at_approach_radius, not both')
         if edge_distance_xy is None or edge_distance_xy.shape != phi_prev.shape:
@@ -174,33 +204,49 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
         # prerequisite activation, state, success and observations still use XYZ phi/gate.
         progress_blend = gate.clone()
         progress_blend[:, graph.subgoal_target] = approach_satisfaction(at_distance_xy, at_approach_radius)
-    pinned_progress = pin_progress(progress, progress_blend)
+    pinned_progress = progress if progress_kind == 'distance' else pin_progress(progress, progress_blend)
     reward_mask = graph.edge_mask.to(phi_prev.dtype)
     state = state_weight * activation * phi_next * reward_mask
     progress_reward = progress_weight * activation * pinned_progress * reward_mask
     satisfied = phi_next >= satisfaction_threshold
+    if saturate_edge_rewards and saturate_edge_rewards_while_current:
+        raise ValueError('Latched and current edge saturation are mutually exclusive')
+    current_success_state = torch.zeros_like(done_prev)
+    if saturate_edge_rewards_while_current:
+        if current_saturation_z_tolerance is None:
+            raise ValueError('Current edge saturation requires a Z tolerance')
+        current_success_state = current_at_success(
+            satisfied, graph, at_z_error, current_saturation_z_tolerance)
     target_success = None
     if require_current_target_prerequisites:
         target_success = current_target_success(satisfied, graph, at_z_error, success_z_tolerance)
     achieved, done, valid, first = advance_relation_history(
         satisfied, achieved_prev, done_prev, graph, target_success)
     raw_state, raw_progress = state, progress_reward
-    if saturate_edge_rewards:
+    saturation_active = (done if saturate_edge_rewards else current_success_state
+                         if saturate_edge_rewards_while_current else torch.zeros_like(done))
+    if saturate_edge_rewards or saturate_edge_rewards_while_current:
         # Override only paid rewards, AFTER prerequisite gating. Actual state,
-        # gates, progress and observations remain untouched, including after release.
-        completed_edges = done[:, graph.edge_owner]
-        state = torch.where(completed_edges, state_weight * reward_mask, state)
-        progress_reward = torch.where(completed_edges, progress_weight * reward_mask, progress_reward)
+        # gates, progress and observations remain untouched. The current mode
+        # drops this override immediately when At/Z leaves the success state.
+        saturated_edges = saturation_active[:, graph.edge_owner]
+        state = torch.where(saturated_edges, state_weight * reward_mask, state)
+        progress_reward = torch.where(saturated_edges, progress_weight * reward_mask, progress_reward)
     agent = torch.zeros_like(done_prev, dtype=phi_prev.dtype)
     agent.scatter_add_(1, graph.edge_owner.unsqueeze(0).expand(phi_prev.shape[0], -1), state + progress_reward)
-    bonus = success_bonus * first.to(phi_prev.dtype)
+    first_bonus = success_bonus * first.to(phi_prev.dtype)
+    current_bonus = current_success_reward * current_success_state.to(phi_prev.dtype)
+    bonus = first_bonus + current_bonus
     return dict(agent_task_reward=agent + bonus, edge_reward=state + progress_reward,
                 activation=activation, pinned_progress=pinned_progress, progress_blend=progress_blend,
                 state_component=state,
                 raw_state_component=raw_state, raw_progress_component=raw_progress,
-                progress_component=progress_reward, success_bonus=bonus, first_success=first,
+                progress_component=progress_reward, success_bonus=bonus,
+                first_success_bonus=first_bonus, current_success_reward=current_bonus,
+                first_success=first,
                 achieved_next=achieved, done_next=done, valid_next=valid,
-                gate_next=relation_gate(phi_next, beta, gate_center), satisfied_next=satisfied)
+                gate_next=relation_gate(phi_next, beta, gate_center), satisfied_next=satisfied,
+                current_success_state=current_success_state, saturation_active=saturation_active)
 
 
 class RelationRuntime:
@@ -240,7 +286,13 @@ class RelationRuntime:
             require_current_target_prerequisites=c.get('success', {}).get('require_current_target_prerequisites', False),
             at_z_error=at_z_error,
             success_z_tolerance=c.get('success', {}).get('z_tolerance'),
-            saturate_edge_rewards=c.get('success', {}).get('saturate_edge_rewards', False))
+            saturate_edge_rewards=c.get('success', {}).get('saturate_edge_rewards', False),
+            progress_kind=c.get('progress', {}).get('kind', 'velocity'),
+            saturate_edge_rewards_while_current=c.get('success', {}).get(
+                'saturate_edge_rewards_while_current', False),
+            current_saturation_z_tolerance=c.get('success', {}).get(
+                'current_saturation_z_tolerance'),
+            current_success_reward=c.get('success', {}).get('current_success_reward', 0.))
         self.phi.copy_(phi)
         self.achieved.copy_(result['achieved_next'])
         self.done.copy_(result['done_next'])
