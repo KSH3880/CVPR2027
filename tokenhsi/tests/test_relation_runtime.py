@@ -5,7 +5,7 @@ from env.tasks.multi_agent.relation_reward import RelationRuntime
 
 
 def runtime(n=2, m=2, o=3):
-    return RelationRuntime(n, compile_carry_subgoal(m, o), {}, 'cpu')
+    return RelationRuntime(n, compile_carry_subgoal(m, o), {'subgoal_success_bonus': 10.}, 'cpu')
 
 
 def test_graph_layout_and_directions():
@@ -29,7 +29,7 @@ def test_one_time_bonus_previous_achievement_and_independent_agents():
     first = r.step(phi, torch.zeros_like(phi))
     assert not first['first_success'].any()  # same-step touch isn't previous achievement
     second = r.step(phi, torch.zeros_like(phi))
-    assert second['success_bonus'].tolist() == [[5., 0.]]
+    assert second['success_bonus'].tolist() == [[10., 0.]]
     third = r.step(torch.tensor([[0., 0., .5, 0.]]), torch.ones_like(phi))
     assert third['agent_task_reward'][0, 0] > 0  # done only suppresses another bonus
     assert third['agent_task_reward'][0, 1] > 0
@@ -59,10 +59,10 @@ def test_documented_pick_once_then_kick_and_goal_first_touch():
     r = runtime(1, 1, 1)
     r.reset(torch.tensor([0]), torch.tensor([[1., 0.]]))
     out = r.step(torch.tensor([[0., 1.]]), torch.zeros(1, 2))
-    assert out['success_bonus'].item() == 5  # limitation, not prevention assertion
+    assert out['success_bonus'].item() == 10  # limitation, not prevention assertion
     r.reset(torch.tensor([0]), torch.tensor([[0., 1.]]))
     assert not r.done.any()
     out = r.step(torch.tensor([[1., 1.]]), torch.zeros(1, 2))
     assert out['success_bonus'].item() == 0
     out = r.step(torch.tensor([[0., 1.]]), torch.zeros(1, 2))
-    assert out['success_bonus'].item() == 5
+    assert out['success_bonus'].item() == 10

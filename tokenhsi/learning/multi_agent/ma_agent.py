@@ -23,6 +23,7 @@ import learning.amp_datasets as amp_datasets
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
 from utils.rsi_curriculum import SkillInitCurriculum
+from env.tasks.multi_agent.relation_diagnostics import relation_tensorboard_tag
 
 
 class EntityRunningMeanStd(nn.Module):
@@ -549,7 +550,7 @@ class MAAgent(amp_agent.AMPAgent):
         disc_reward_mean = train_info["disc_rewards"].mean()
         self.writer.add_scalar("reward_terms/amp", disc_reward_mean.item(), frame)
         for key, value in train_info.get('relation_diagnostics', {}).items():
-            self.writer.add_scalar('relation/' + key, value.item(), frame)
+            self.writer.add_scalar(relation_tensorboard_tag(key), value.item(), frame)
         network = self.model.a2c_network
         for name in ('actor', 'critic'):
             encoder = getattr(network, name + '_encoder')

@@ -11,8 +11,7 @@ import isaacgym  # noqa: F401
 import torch
 import run as entry
 from learning.multi_agent.ma_players import MAPlayerContinuous
-from env.tasks.multi_agent.relation_reward import relation_step, velocity_progress, relation_progress
-from env.tasks.multi_agent.humanoid_ma_carry import compute_walk_reward, compute_carry_reward, compute_handheld_reward
+from env.tasks.multi_agent.relation_reward import relation_step, relation_progress
 
 
 @torch.no_grad()
@@ -67,21 +66,23 @@ def check_simulator(self):
         pa = relation_progress(task._prev_box_pos, objects, task._tar_pos, task.dt, progress_cfg)
         expected = relation_step(before_phi, phi, torch.stack([ph, pa], -1).flatten(1),
                                  before_a, before_done, runtime.graph,
-                                 state_weight=cfg.get('state_reward_weight', 1.),
+                                 state_weight=cfg.get('state_reward_weight', .2),
                                  progress_weight=cfg.get('progress_reward_weight', .2),
-                                 success_bonus=cfg.get('subgoal_success_bonus', 5.),
+                                 success_bonus=cfg.get('subgoal_success_bonus', 0.),
                                  beta=cfg.get('soft_gate', {}).get('beta', 30.),
                                  gate_center=cfg.get('soft_gate', {}).get('center', .8),
                                  satisfaction_threshold=cfg.get('satisfaction_threshold', .9),
-                                 at_distance_xy=(task._tar_pos[..., :2] - objects[..., :2]).norm(dim=-1),
-                                 at_approach_radius=progress_cfg.get('at_approach_radius'),
                                  require_current_target_prerequisites=cfg.get('success', {}).get(
                                      'require_current_target_prerequisites', False),
                                  at_z_error=relation_diag.get('goal_z_error'),
                                  success_z_tolerance=cfg.get('success', {}).get('z_tolerance'),
                                  saturate_edge_rewards=cfg.get('success', {}).get(
                                      'saturate_edge_rewards', False),
-                                 progress_kind=progress_cfg.get('kind', 'velocity'),
+                                 progress_kind=progress_cfg.get('kind', 'distance'),
+                                 approach_radius=progress_cfg.get('approach_radius'),
+                                 edge_distance_xy=torch.stack([
+                                     (objects[..., :2] - root[..., :2]).norm(dim=-1),
+                                     relation_diag['goal_xy_error']], -1).flatten(1),
                                  saturate_edge_rewards_while_current=cfg.get('success', {}).get(
                                      'saturate_edge_rewards_while_current', False),
                                  current_saturation_z_tolerance=cfg.get('success', {}).get(
@@ -103,22 +104,8 @@ def check_simulator(self):
                                   torch.stack([before_phi[:, 0], torch.sigmoid(30 * (before_phi[:, 0] - .8)),
                                                (before_phi[:, 0] >= .9).float(), before_a[:, 0].float()], -1))
         prev_done_rows = done.nonzero().flatten()[::M]
-    # Compare only original velocity terms outside pinning and anti-kick masks.
-    prev = torch.tensor([[0., 0., 1.]], device=task.device)
-    cur = torch.tensor([[.05, 0., 1.]], device=task.device)
-    target = torch.tensor([[2., 0., 1.]], device=task.device)
-    p = velocity_progress(prev, cur, target, task.dt)
-    torch.testing.assert_close(compute_walk_reward(cur, prev, target, task.dt, 1.5, True), .2 * p)
-    near = torch.exp(-10 * (cur - target).square().sum(-1))
-    old_carry = compute_carry_reward(cur, prev, target, task.dt, 1.5,
-                                    torch.full_like(cur, .4), True, False, 1., 2.5)
-    torch.testing.assert_close(old_carry, .2 * p + .2 * near)
-    bodies = torch.zeros(1, 3, 3, device=task.device)
-    bodies[:, 1:3] = cur[:, None]
-    bodies[:, 0] = cur
-    assert compute_handheld_reward(bodies, cur, torch.tensor([1, 2], device=task.device), False).item() > .199
     print('PASS relation simulator: M={} O={}, 64 transitions, reset subset, stored suffix, '
-          'reward/history agreement, clipping bypass, no success termination, legacy scalar shadow'.format(
+          'reward/history agreement, clipping bypass, no success termination'.format(
               M, task.num_objects), flush=True)
 
 

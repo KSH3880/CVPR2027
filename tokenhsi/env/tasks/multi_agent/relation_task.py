@@ -41,9 +41,8 @@ class CarryRelationMixin:
         h_cfg, a_cfg = self._relation_cfg.get('holding', {}), self._relation_cfg.get('at', {})
         h, hand_error = evaluate_holding(hands, objects, h_cfg.get('hand_distance_scale', 5.))
         a, near, put, xy, z = evaluate_at(objects, goals,
-            a_cfg.get('near_distance_scale', 10.), a_cfg.get('near_fraction', .5),
-            a_cfg.get('putdown_xy_tolerance', .1), a_cfg.get('putdown_z_tolerance', .001),
-            a_cfg.get('state_definition', 'near_putdown'))
+            near_scale=a_cfg.get('near_distance_scale', 10.),
+            state_definition=a_cfg.get('state_definition', 'box_near'))
         return torch.stack([h, a], -1).flatten(1), dict(
             hand_midpoint_distance=hand_error,
             right_hand_center_distance=(hands[..., 0, :] - objects).norm(dim=-1),
@@ -89,7 +88,6 @@ class CarryRelationMixin:
             edge_distance_xy = torch.stack(
                 [holding_distance_xy, diag['goal_xy_error']], -1).flatten(1)
         result = runtime.step(phi, torch.stack([ph, pa], -1).flatten(1),
-                              at_distance_xy=diag.get('goal_xy_error'),
                               edge_distance_xy=edge_distance_xy,
                               at_z_error=diag.get('goal_z_error'))
         power = torch.zeros_like(result['agent_task_reward'])
@@ -163,7 +161,6 @@ class CarryRelationMixin:
         progress_cfg = self._relation_cfg.get('progress', {})
         if 'approach_radius' in progress_cfg:
             diag['holding/approach'] = result['progress_blend'][:, 0::2]
-        if 'at_approach_radius' in progress_cfg or 'approach_radius' in progress_cfg:
             diag['at/approach'] = result['progress_blend'][:, 1::2]
         if self._relation_timeline.selected:
             timeline = dict(diag)

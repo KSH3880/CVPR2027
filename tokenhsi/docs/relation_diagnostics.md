@@ -23,20 +23,29 @@ reset as newly achieved placement. Episodes that start near but outside the
 placement tolerance remain eligible; the metrics do not prove full-distance
 transport or continuous grasping.
 
-## Recommended pins (10 total)
+## Recommended pins (5 total)
 
 | TensorBoard tag | Scale and meaning |
 | --- | --- |
-| `relation/holding/satisfied` | 0–1, rollout step fraction with Holding phi >= 0.9. |
-| `relation/at/satisfied` | 0–1, rollout step fraction with At phi >= 0.9; no Holding prerequisite. |
-| `relation/placement/episode_ever_rate` | 0–1, reached placement at least once / eligible completed agent-episodes. |
-| `relation/placement/episode_final_rate` | 0–1, placed at termination / eligible completed agent-episodes. |
-| `relation/placement/post_first_retention` | 0–1, mean per-episode placement occupancy after first placement, reached eligible episodes only. |
-| `relation/placement/first_seconds` | Seconds to first placement, reached eligible episodes only; lower is faster. |
-| `relation/placement/longest_hold_seconds` | Mean longest uninterrupted geometric placement duration, reached eligible episodes only; NOT duration of grasping. |
-| `relation/placement/eligible_completed_count` | Number of eligible agent-episodes completed during this logging window. |
-| `relation/placement/reached_count` | Number of those episodes that reached placement; denominator for conditional metrics. |
-| `relation/placement/initially_placed_count` | Completed agent-episodes excluded because they started placed. |
+| `relation/00_main/01_placement_episode_final_rate` | Placed at termination / eligible completed agent-episodes; final outcome. |
+| `relation/00_main/02_placement_episode_ever_rate` | Reached placement at least once / eligible completed agent-episodes. |
+| `relation/00_main/03_placement_post_first_retention` | Mean placement occupancy after first placement, reached eligible episodes only. |
+| `relation/00_main/04_current_success_state` | Rollout agent-step fraction meeting the current At/Z reward success predicate. |
+| `relation/00_main/05_holding_satisfied` | Rollout agent-step fraction with Holding phi >= 0.9; acquisition diagnostic. |
+
+Tags use numbered groups and card prefixes: `00_main`, `01_placement`
+(errors, At satisfaction, timing), `02_reward` (saturation, bonuses, paid/raw
+edge rewards), `03_samples` (denominators and reset exclusions), `04_state`,
+`05_motion`, then `90_debug` (including distance-band diagnostics).
+Use ascending tag order. Each scalar is written once; raw diagnostic keys and
+CSV columns retain their names. The mapping is in `relation_diagnostics.py`.
+
+This changes display tags only on the next launch/resume. Historical events
+remain under their original tags; their points are not copied into the new
+series. Browser pins are not changed by the writer: unpin the old cards and pin
+the five cards under `relation/00_main`. The current-success bonus is redundant
+with current success fraction (0.2 times that fraction in experiments 12/13),
+and saturation is a comparison setting check; both belong in the reward group.
 
 All new `placement/` metrics aggregate **completed episodes since the previous
 logging call**, not every rollout frame and not lifetime totals. Counts reset at
@@ -50,7 +59,7 @@ For example, placement at step 400 in a 600-step episode gives a 201-frame
 post-first window. If placement holds for 100 of those frames, its retention is
 100/201. An episode reaching placement only on its final frame has retention 1
 but only one frame of evidence. Use `longest_hold_seconds` and the additional
-`relation/placement/post_first_seconds` (mean observed post-first window length)
+`relation/01_placement/06_placement_post_first_seconds` (mean observed post-first window length)
 to distinguish long maintenance from a late lucky hit.
 
 If no eligible episodes completed, ever/final rates are omitted. If none of the
@@ -60,9 +69,9 @@ may connect points across these missing intervals: check `reached_count` at the
 same frame and use smoothing 0 when debugging. A lower first-time metric alone
 does not prove improvement if reach rate also falls.
 
-Additional tags: `relation/placement/completed_count`,
-`relation/placement/initially_placed_fraction`, and
-`relation/placement/initially_placed_final_rate` identify the excluded group.
+Additional tags: `relation/03_samples/05_placement_completed_count`,
+`relation/03_samples/04_placement_initially_placed_fraction`, and
+`relation/03_samples/06_placement_initially_placed_final_rate` identify the excluded group.
 
 ## How to interpret the combination
 
@@ -73,7 +82,7 @@ Additional tags: `relation/placement/completed_count`,
 - Low Holding step fraction is not alone proof of failure: placing and releasing
   can legitimately reduce Holding after the task is complete.
 
-`relation/done` and `at/achieved` remain history-flag **step averages**. They are
+`relation/04_state/09_done` and `at/achieved` remain history-flag **step averages**. They are
 not episode success rates. Their success criteria can differ between reward
 experiments, so do not use them as the common placement comparison.
 

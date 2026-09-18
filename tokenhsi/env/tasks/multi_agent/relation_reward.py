@@ -8,40 +8,20 @@ def evaluate_holding(hands_pos, object_pos, hand_scale=5.):
     return torch.exp(-hand_scale * error.square()), error
 
 
-def evaluate_at(object_pos, goal_pos, near_scale=10., alpha=.5,
-                xy_tolerance=.1, z_tolerance=.001, state_definition='near_putdown'):
+def evaluate_at(object_pos, goal_pos, near_scale=10.,
+                xy_tolerance=.1, z_tolerance=.001, state_definition='box_near'):
     delta = goal_pos - object_pos
     xy = torch.linalg.vector_norm(delta[..., :2], dim=-1)
     z = delta[..., 2].abs()
     near = torch.exp(-near_scale * delta.square().sum(-1))
     put = (xy <= xy_tolerance) & (z <= z_tolerance)
-    if state_definition == 'box_near':
-        state = near
-    elif state_definition == 'near_putdown':
-        # Checkpoint-compatible definition used only by the existing v0/state02 configs.
-        state = near * (alpha + (1 - alpha) * put.float())
-    else:
+    if state_definition != 'box_near':
         raise ValueError('Unsupported At state definition: ' + str(state_definition))
-    return state, near, put, xy, z
+    return near, near, put, xy, z
 
 
 def relation_gate(phi, beta=30., center=.8):
     return torch.sigmoid(beta * (phi - center))
-
-
-def velocity_progress(source_prev, source_next, target_next, dt,
-                      target_speed=1.5, velocity_scale=5., eps=1e-6):
-    """Source XY velocity along the post-step target direction."""
-    if dt <= 0:
-        raise ValueError('control dt must be positive')
-    if target_speed <= 0:
-        raise ValueError('target_speed must be positive')
-    delta = target_next[..., :2] - source_next[..., :2]
-    distance = torch.linalg.vector_norm(delta, dim=-1)
-    direction = delta / distance.clamp_min(eps).unsqueeze(-1)
-    along = (((source_next - source_prev) / dt)[..., :2] * direction).sum(-1)
-    p = torch.exp(-velocity_scale * (target_speed - along).square())
-    return torch.where((distance > eps) & (along > 0), p, torch.zeros_like(p))
 
 
 def box_speed_penalty(previous, current, dt, coefficient=1., threshold=2.5):
@@ -73,17 +53,14 @@ def distance_progress(source, target, delta=.5, sigma=1.):
 
 
 def relation_progress(source_prev, source_next, target_next, dt, config=None):
-    """Select raw progress; omitted kind preserves existing Gaussian experiments."""
+    """Select current-distance or all-edge direction progress."""
     cfg = config or {}
-    kind = cfg.get('kind', 'velocity')
+    kind = cfg.get('kind', 'distance')
     if kind == 'distance':
         return distance_progress(source_next, target_next, cfg.get('delta', .5), cfg.get('sigma', 1.))
     eps = cfg.get('normalization_epsilon', 1e-6)
     if kind == 'direction':
         return direction_progress(source_prev, source_next, target_next, dt, eps)
-    if kind == 'velocity':
-        return velocity_progress(source_prev, source_next, target_next, dt,
-                                 cfg.get('target_speed', 1.5), cfg.get('velocity_scale', 5.), eps)
     raise ValueError('Unsupported progress kind: ' + str(kind))
 
 
@@ -145,12 +122,11 @@ def advance_relation_history(satisfied_next, achieved_prev, done_prev, graph, ta
 
 
 def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
-                  state_weight=1., progress_weight=.2, success_bonus=5.,
+                  state_weight=.2, progress_weight=.2, success_bonus=0.,
                   beta=30., gate_center=.8, satisfaction_threshold=.9, validate=True,
-                  at_distance_xy=None, at_approach_radius=None,
                   edge_distance_xy=None, approach_radius=None,
                   require_current_target_prerequisites=False, at_z_error=None,
-                  success_z_tolerance=None, saturate_edge_rewards=False, progress_kind='velocity',
+                  success_z_tolerance=None, saturate_edge_rewards=False, progress_kind='distance',
                   saturate_edge_rewards_while_current=False,
                   current_saturation_z_tolerance=None, current_success_reward=0.):
     if phi_prev.shape != phi_next.shape or progress.shape != phi_prev.shape:
@@ -174,16 +150,15 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
             raise ValueError('progress must be finite values in [0,1]')
     gate = relation_gate(phi_prev, beta, gate_center)
     activation = prerequisite_minimum(gate, graph.prereq_mask)
-    progress_blend = gate
     if progress_kind == 'distance':
-        if approach_radius is not None or at_approach_radius is not None:
+        if approach_radius is not None:
             raise ValueError('distance progress cannot use approach blending')
         # Diagnostic blend weight zero: paid progress is exactly the supplied
         # distance score, NOT self-gated or pinned. Prerequisite activation stays.
         progress_blend = torch.zeros_like(progress)
-    elif approach_radius is not None:
-        if at_approach_radius is not None:
-            raise ValueError('Use either approach_radius or at_approach_radius, not both')
+    elif progress_kind == 'direction':
+        if approach_radius is None:
+            raise ValueError('direction progress requires approach_radius')
         if edge_distance_xy is None or edge_distance_xy.shape != phi_prev.shape:
             raise ValueError('Edge approach progress requires XY distances with shape [N,E]')
         if edge_distance_xy.device != phi_prev.device or edge_distance_xy.dtype != phi_prev.dtype:
@@ -193,17 +168,8 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
         # Every edge uses the same distance-based approach blend. State-derived
         # gates remain solely in prerequisite activation, not self-pinning.
         progress_blend = approach_satisfaction(edge_distance_xy, approach_radius)
-    elif at_approach_radius is not None:
-        if at_distance_xy is None or at_distance_xy.shape != done_prev.shape:
-            raise ValueError('At approach progress requires XY distances with shape [N,M]')
-        if at_distance_xy.device != phi_prev.device or at_distance_xy.dtype != phi_prev.dtype:
-            raise ValueError('At XY distances must share phi device and dtype')
-        if validate and (not torch.isfinite(at_distance_xy).all() or (at_distance_xy < 0).any()):
-            raise ValueError('At XY distances must be finite and nonnegative')
-        # Carry target edges are At. Replace ONLY their self-pinning weight;
-        # prerequisite activation, state, success and observations still use XYZ phi/gate.
-        progress_blend = gate.clone()
-        progress_blend[:, graph.subgoal_target] = approach_satisfaction(at_distance_xy, at_approach_radius)
+    else:
+        raise ValueError('Unsupported progress kind: ' + str(progress_kind))
     pinned_progress = progress if progress_kind == 'distance' else pin_progress(progress, progress_blend)
     reward_mask = graph.edge_mask.to(phi_prev.dtype)
     state = state_weight * activation * phi_next * reward_mask
@@ -212,9 +178,9 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
     if saturate_edge_rewards and saturate_edge_rewards_while_current:
         raise ValueError('Latched and current edge saturation are mutually exclusive')
     current_success_state = torch.zeros_like(done_prev)
-    if saturate_edge_rewards_while_current:
+    if saturate_edge_rewards_while_current or current_success_reward > 0:
         if current_saturation_z_tolerance is None:
-            raise ValueError('Current edge saturation requires a Z tolerance')
+            raise ValueError('Current edge saturation or current success reward requires a Z tolerance')
         current_success_state = current_at_success(
             satisfied, graph, at_z_error, current_saturation_z_tolerance)
     target_success = None
@@ -272,22 +238,20 @@ class RelationRuntime:
             satisfied, seeded, torch.zeros_like(self.done[env_ids]), self.graph, target_success)
         self.achieved[env_ids], self.done[env_ids] = achieved, done
 
-    def step(self, phi, progress, at_distance_xy=None, edge_distance_xy=None, at_z_error=None):
+    def step(self, phi, progress, edge_distance_xy=None, at_z_error=None):
         c = self.config
         result = relation_step(self.phi, phi, progress, self.achieved, self.done, self.graph,
-            c.get('state_reward_weight', 1.), c.get('progress_reward_weight', .2),
-            c.get('subgoal_success_bonus', 5.), c.get('soft_gate', {}).get('beta', 30.),
+            c.get('state_reward_weight', .2), c.get('progress_reward_weight', .2),
+            c.get('subgoal_success_bonus', 0.), c.get('soft_gate', {}).get('beta', 30.),
             c.get('soft_gate', {}).get('center', .8), c.get('satisfaction_threshold', .9),
             validate=c.get('diagnostics', {}).get('validate_tensors', False),
-            at_distance_xy=at_distance_xy,
-            at_approach_radius=c.get('progress', {}).get('at_approach_radius'),
             edge_distance_xy=edge_distance_xy,
             approach_radius=c.get('progress', {}).get('approach_radius'),
             require_current_target_prerequisites=c.get('success', {}).get('require_current_target_prerequisites', False),
             at_z_error=at_z_error,
             success_z_tolerance=c.get('success', {}).get('z_tolerance'),
             saturate_edge_rewards=c.get('success', {}).get('saturate_edge_rewards', False),
-            progress_kind=c.get('progress', {}).get('kind', 'velocity'),
+            progress_kind=c.get('progress', {}).get('kind', 'distance'),
             saturate_edge_rewards_while_current=c.get('success', {}).get(
                 'saturate_edge_rewards_while_current', False),
             current_saturation_z_tolerance=c.get('success', {}).get(

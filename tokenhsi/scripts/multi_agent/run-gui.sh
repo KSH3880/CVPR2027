@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run a command on a temporary Xvfb display and expose it through noVNC.
 #
-#   sh tokenhsi/scripts/multi_agent/run-gui.sh \
+#   TOKENHSI_GPU=5 sh tokenhsi/scripts/multi_agent/run-gui.sh \
 #     sh tokenhsi/scripts/multi_agent/ma_carry_test.sh <checkpoint> 2 1 3
 #
 # Every external dependency is auto-detected on PATH and in the usual system /
@@ -15,7 +15,7 @@
 #   NOVNC_DIR           directory containing vnc.html
 #   WEBSOCKIFY          full path to the websockify executable
 #   TOKENHSI_CONDA_ENV  conda env to search for websockify   default "tokenhsi"
-#   TOKENHSI_GPU        value for CUDA_VISIBLE_DEVICES       default 0
+#   TOKENHSI_GPU        NVIDIA GPU index or UUID for both CUDA and rendering.
 
 set -e
 
@@ -25,10 +25,18 @@ RESOLUTION=${RESOLUTION:-1600x900x24}
 VNC_DIR=${VNC_DIR:-}
 CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
 
+if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
+    echo "usage: TOKENHSI_GPU=5 run-gui.sh <command> [args...]"
+    exit 0
+fi
+if [ "${1:-}" = -- ]; then shift; fi
 if [ $# -eq 0 ]; then
-    echo "usage: run-gui.sh <command> [args...]" >&2
+    echo "usage: TOKENHSI_GPU=5 run-gui.sh <command> [args...]" >&2
     exit 1
 fi
+
+# Resolve the same physical GPU for CUDA and Vulkan before starting services.
+. "$ROOT/tokenhsi/scripts/multi_agent/gui_gpu_env.sh"
 
 first_executable() {
     for _candidate in "$@"; do
@@ -159,12 +167,10 @@ echo "=============================================================="
 echo " noVNC    http://localhost:$WEB_PORT/vnc.html?autoconnect=1&resize=remote"
 echo " VS Code  PORTS에서 $WEB_PORT 포워딩"
 echo " display  $DISPLAY_NAME"
-echo " GPU      physical ${TOKENHSI_GPU:-0} (set TOKENHSI_GPU to change)"
+echo " GPU      physical $TOKENHSI_GUI_GPU_INDEX / $TOKENHSI_GPU"
+echo " Vulkan   $DRI_PRIME (same GPU as CUDA; local device 0)"
 echo " 종료     Ctrl+C"
 echo "=============================================================="
 
 cd "$ROOT"
-DISPLAY="$DISPLAY_NAME" HEADLESS=0 \
-CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="${TOKENHSI_GPU:-0}" \
-VK_INSTANCE_LAYERS=VK_LAYER_MESA_device_select DRI_PRIME=0! \
-"$@"
+DISPLAY="$DISPLAY_NAME" HEADLESS=0 "$@"

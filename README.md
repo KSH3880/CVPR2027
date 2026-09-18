@@ -28,27 +28,28 @@ New algorithm keys registered in `run.py`: algo `ma`, player `ma`, network `amp_
 
 ## Documentation
 
-Design notes and operational docs live in [`markdowns/`](markdowns/) (written in Korean):
+Start with the short current references (mostly in Korean):
 
-- [`MULTI_AGENT.md`](markdowns/MULTI_AGENT.md) — architecture and implementation of the extension
-- [`PORTING_GUIDE.md`](markdowns/PORTING_GUIDE.md) — how the single-agent task was ported
-- [`USAGE.md`](markdowns/USAGE.md) — environment setup and run recipes as actually verified
-- [`CRITICAL_ISSUES.md`](markdowns/CRITICAL_ISSUES.md) — known issues and pitfalls
-- `MA_CARRY_COORDINATE_PORTING_FIX.md`, `CARRY_VIEWER_BOX_RESET_FIX.md` — specific fixes
+- [`AGENTS.md`](AGENTS.md) — Codex reading order and repository conventions
+- [`changelog.md`](changelog.md) — recent changes and validation results
+- [`structure.md`](markdowns/structure.md) — code map and task entry points
+- [`config.md`](markdowns/config.md) — all experiment configs, training, evaluation, and remote VNC
+
+Read detailed references as needed:
+
+- [`ma_clean_scene_gta.md`](markdowns/ma_clean_scene_gta.md) — current GTA policy architecture
+- [`relation_diagnostics.md`](tokenhsi/docs/relation_diagnostics.md) — placement metrics and traces
+- [`USAGE.md`](markdowns/USAGE.md), [`PORTING_GUIDE.md`](markdowns/PORTING_GUIDE.md) — installation and machine setup
 
 ## Setup
 
-Same dependencies as upstream TokenHSI:
+This checkout uses the existing `tokenhsi` environment on the RTX PRO 6000 server.
+Training uses **2048 environments**. See [`USAGE.md`](markdowns/USAGE.md) for the
+installed environment and data paths.
 
 ```bash
-conda create -n tokenhsi python=3.8
 conda activate tokenhsi
-conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
-pip install -r requirements.txt
-
-# IsaacGym Preview 4 (download from https://developer.nvidia.com/isaac-gym)
-cd IsaacGym_Preview_4_Package/isaacgym/python && pip install -e .
-export LD_LIBRARY_PATH="your_conda_env_path/lib:$LD_LIBRARY_PATH"
+nvidia-smi
 ```
 
 Assets that are **not** in this repository and must be fetched separately:
@@ -70,25 +71,25 @@ location, and everything else is auto-detected with an environment-variable over
 |---|---|---|
 | `TOKENHSI_CONDA_ENV` | the env you already activated, else `tokenhsi` | conda env to activate |
 | `CONDA_BASE` | `conda info --base`, then the usual install prefixes | conda installation prefix |
-| `TOKENHSI_GPU` | `0` | value for `CUDA_VISIBLE_DEVICES` |
+| `TOKENHSI_GPU` | `0` | physical GPU for both CUDA and viewer rendering |
 | `X11VNC` / `VNC_DIR` | `x11vnc` on `PATH` | x11vnc binary, or the prefix of a user-local install |
 | `NOVNC_DIR` | `/usr/share/novnc`, `~/opt/novnc`, … | directory containing `vnc.html` |
 | `WEBSOCKIFY` | `PATH` → conda env → noVNC bundle | websockify executable |
 | `PORT` | `6080` | noVNC web port |
 
 So a machine whose env is named differently just needs, e.g.
-`TOKENHSI_CONDA_ENV=my-env sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 1024 3`.
+`TOKENHSI_CONDA_ENV=my-env sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 2048 3`.
 
 ```bash
 # Train: <num_agents> <num_envs> <num_objects>
-sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 1024 3
+sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 2048 3
 
 # Test / evaluate a checkpoint
 sh tokenhsi/scripts/multi_agent/ma_carry_test.sh output/ma_carry/nn/xxx.pth 2 16 3
 
-# Watch a few environments in a viewer (through the noVNC helper)
-sh tokenhsi/scripts/multi_agent/run-gui.sh \
-  sh tokenhsi/scripts/multi_agent/ma_carry_watch.sh 2 4 3
+# View a saved checkpoint through noVNC on GPU 6
+TOKENHSI_GPU=6 VNC_DIR="$HOME/opt/vnc" sh tokenhsi/scripts/multi_agent/run-gui.sh \
+  sh tokenhsi/scripts/multi_agent/approach_distance_success_test.sh /path/to/checkpoint.pth 2 1 3
 ```
 
 Or invoke the runner directly:
@@ -98,7 +99,7 @@ python ./tokenhsi/run.py --task HumanoidMACarry \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_ma_carry.yaml \
     --cfg_env tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml \
     --motion_file tokenhsi/data/dataset_carry/dataset_carry.yaml \
-    --num_envs 1024 --num_agents 2 --num_objects 3 \
+    --num_envs 2048 --num_agents 2 --num_objects 3 \
     --output_path output/ma_carry --headless
 ```
 

@@ -60,11 +60,9 @@ def validate_relation_config(config):
         raise ValueError('Unsupported relationReward fields/operators: ' + ', '.join(sorted(unknown)))
     nested = {
         'soft_gate': {'beta', 'center'},
-        'progress': {'kind', 'target_speed', 'velocity_scale', 'normalization_epsilon',
-                     'at_approach_radius', 'approach_radius', 'delta', 'sigma'},
+        'progress': {'kind', 'normalization_epsilon', 'approach_radius', 'delta', 'sigma'},
         'holding': {'hand_distance_scale'},
-        'at': {'state_definition', 'near_distance_scale', 'near_fraction',
-               'putdown_xy_tolerance', 'putdown_z_tolerance'},
+        'at': {'state_definition', 'near_distance_scale'},
         'observation': {'include_relation_state', 'relation_state_fields', 'include_subgoal_done'},
         'success': {'require_achieved_target_prerequisites', 'once_per_subgoal',
                     'require_current_target_prerequisites', 'z_tolerance', 'saturate_edge_rewards',
@@ -90,8 +88,8 @@ def validate_relation_config(config):
         if type(value) is not int or value < minimum:
             raise ValueError('diagnostics.' + key + ' has an invalid integer value')
     progress = config.get('progress', {})
-    progress_kind = progress.get('kind', 'velocity')
-    if progress_kind not in ('velocity', 'direction', 'distance'):
+    progress_kind = progress.get('kind', 'distance')
+    if progress_kind not in ('direction', 'distance'):
         raise ValueError('Unsupported progress kind: ' + str(progress_kind))
     if progress_kind == 'distance':
         if set(progress) - {'kind', 'delta', 'sigma'}:
@@ -103,16 +101,8 @@ def validate_relation_config(config):
                 raise ValueError('Invalid distance progress ' + key)
     elif set(progress) & {'delta', 'sigma'}:
         raise ValueError('delta/sigma require distance progress')
-    if progress_kind == 'direction' and set(progress) & {'target_speed', 'velocity_scale'}:
-        raise ValueError('direction progress does not accept Gaussian speed parameters')
-    if 'at_approach_radius' in progress and 'approach_radius' in progress:
-        raise ValueError('Use either approach_radius for all edges or at_approach_radius, not both')
-    for radius_key in ('at_approach_radius', 'approach_radius'):
-        if radius_key not in progress:
-            continue
-        radius = progress[radius_key]
-        if progress_kind != 'direction':
-            raise ValueError('Approach blending requires direction progress')
+    if progress_kind == 'direction':
+        radius = progress.get('approach_radius')
         if isinstance(radius, bool) or not isinstance(radius, (int, float)) or not math.isfinite(radius) or radius <= 0:
             raise ValueError('Approach radius must be finite and positive')
     success = config.get('success', {})
@@ -133,20 +123,21 @@ def validate_relation_config(config):
             raise ValueError('success.z_tolerance requires current target prerequisites')
         if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
             raise ValueError('success.z_tolerance must be finite and positive')
-    if 'current_saturation_z_tolerance' in success:
-        tolerance = success['current_saturation_z_tolerance']
-        if not success.get('saturate_edge_rewards_while_current', False):
-            raise ValueError('success.current_saturation_z_tolerance requires current edge saturation')
-        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
-            raise ValueError('success.current_saturation_z_tolerance must be finite and positive')
-    elif success.get('saturate_edge_rewards_while_current', False):
-        raise ValueError('Current edge saturation requires current_saturation_z_tolerance')
     current_reward = success.get('current_success_reward', 0.)
     if (isinstance(current_reward, bool) or not isinstance(current_reward, (int, float))
             or not math.isfinite(current_reward) or current_reward < 0):
         raise ValueError('success.current_success_reward must be finite and nonnegative')
-    if current_reward and not success.get('saturate_edge_rewards_while_current', False):
-        raise ValueError('success.current_success_reward requires current edge saturation')
+    current_success_enabled = success.get('saturate_edge_rewards_while_current', False) or current_reward > 0
+    # Keep the existing tolerance key for checkpoint compatibility. Both the
+    # optional saturation and the independent per-step bonus use this At/Z test.
+    if 'current_saturation_z_tolerance' in success:
+        tolerance = success['current_saturation_z_tolerance']
+        if not current_success_enabled:
+            raise ValueError('success.current_saturation_z_tolerance requires current edge saturation or current success reward')
+        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
+            raise ValueError('success.current_saturation_z_tolerance must be finite and positive')
+    elif current_success_enabled:
+        raise ValueError('Current edge saturation or current success reward requires current_saturation_z_tolerance')
     for key in ('once_per_subgoal',
                 'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success'):
         if success.get(key, True) is not True:
@@ -158,33 +149,23 @@ def validate_relation_config(config):
         raise ValueError('state_relation_v0 requires relation state and done observations')
     if tuple(obs.get('relation_state_fields', STATE_FIELDS)) != STATE_FIELDS:
         raise ValueError('relation state fields must be phi,gate,satisfied,achieved')
-    positive = [config.get('state_reward_weight', 1.), config.get('progress_reward_weight', .2),
+    positive = [config.get('state_reward_weight', .2), config.get('progress_reward_weight', .2),
                 config.get('soft_gate', {}).get('beta', 30.),
-                config.get('progress', {}).get('target_speed', 1.5),
-                config.get('progress', {}).get('velocity_scale', 5.),
                 config.get('progress', {}).get('normalization_epsilon', 1e-6),
                 config.get('holding', {}).get('hand_distance_scale', 5.),
-                config.get('at', {}).get('near_distance_scale', 10.),
-                config.get('at', {}).get('putdown_xy_tolerance', .1),
-                config.get('at', {}).get('putdown_z_tolerance', .001)]
+                config.get('at', {}).get('near_distance_scale', 10.)]
     if not all(math.isfinite(v) and v > 0 for v in positive):
         raise ValueError('relation reward weights, scales and tolerances must be finite and positive')
-    bonus = config.get('subgoal_success_bonus', 5.)
+    bonus = config.get('subgoal_success_bonus', 0.)
     if isinstance(bonus, bool) or not isinstance(bonus, (int, float)) or not math.isfinite(bonus) or bonus < 0:
         raise ValueError('subgoal_success_bonus must be finite and nonnegative')
     for v in (config.get('satisfaction_threshold', .9), config.get('soft_gate', {}).get('center', .8)):
         if not math.isfinite(v) or not 0 < v < 1:
             raise ValueError('relation thresholds must be inside (0,1)')
     at = config.get('at', {})
-    state_definition = at.get('state_definition', 'near_putdown')
-    if state_definition not in ('near_putdown', 'box_near'):
+    state_definition = at.get('state_definition', 'box_near')
+    if state_definition != 'box_near':
         raise ValueError('Unsupported At state definition: ' + str(state_definition))
-    if state_definition == 'near_putdown':
-        alpha = at.get('near_fraction', .5)
-        if not 0 < alpha < config.get('satisfaction_threshold', .9):
-            raise ValueError('near_fraction must be positive and below satisfaction_threshold')
-    elif set(at) & {'near_fraction', 'putdown_xy_tolerance', 'putdown_z_tolerance'}:
-        raise ValueError('box_near At state does not accept legacy PutDown mixture fields')
 
 
 def checkpoint_metadata(config):

@@ -1,5 +1,5 @@
 #!/bin/bash
-# [num_agents=2] [num_envs=2048] [num_objects=3]; SMOKE=1 uses small batches.
+# [num_agents=2] [num_envs=2048] [num_objects=3]; PRO 6000 training baseline.
 . "$(dirname "$0")/runtime_env.sh"
 set -eu
 NUM_AGENTS=${1:-2}
@@ -8,11 +8,6 @@ NUM_OBJECTS=${3:-3}
 RELATION_ENV_CFG=tokenhsi/data/cfg/multi_agent/approach_distance.yaml
 RELATION_OUTPUT_DEFAULT=output/approach_distance
 TRAIN_CFG=tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation.yaml
-if [ "${SMOKE:-0}" = 1 ]; then
-    NUM_ENVS=${2:-32}
-    TRAIN_CFG=tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_smoke.yaml
-    MAX_ITERATIONS=${MAX_ITERATIONS:-3}
-fi
 set --
 if [ -n "${MAX_ITERATIONS:-}" ]; then
     set -- "$@" --max_iterations "$MAX_ITERATIONS"

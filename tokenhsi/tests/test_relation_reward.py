@@ -1,37 +1,14 @@
 """Pure CPU tensor fixtures, including known (not solved) reward exploits."""
-import math
 import pytest
 import torch
 from utils.relation_task_spec import compile_carry_subgoal, validate_relation_config, STATE_MODE
 from env.tasks.multi_agent.relation_reward import (
-    evaluate_holding, evaluate_at, relation_gate, velocity_progress,
+    evaluate_holding, evaluate_at, relation_gate,
     prerequisite_minimum, pin_progress, relation_step, box_speed_penalty)
 
 
-@pytest.mark.parametrize('speed,expected', [(1.5, 1.), (0., 0.), (-1., 0.),
-                                           (1., math.exp(-1.25)), (2., math.exp(-1.25))])
-def test_velocity(speed, expected):
-    prev = torch.tensor([[0., 0., 0.]])
-    cur = torch.tensor([[speed * .1, 0., 0.]])
-    goal = torch.tensor([[4., 0., 0.]])
-    result = velocity_progress(prev, cur, goal, .1)
-    torch.testing.assert_close(result, torch.tensor([expected]))
-    # Global translation/yaw, and target vertical offset do not affect XY progress.
-    rot = torch.tensor([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
-    torch.testing.assert_close(result, velocity_progress(prev @ rot + 2, cur @ rot + 2, goal @ rot + 2, .1))
-    goal[:, 2] = 10
-    torch.testing.assert_close(result, velocity_progress(prev, cur, goal, .1))
 
 
-def test_velocity_vertical_zero_distance_and_moving_target():
-    prev = torch.zeros(1, 3)
-    cur = torch.tensor([[0., 0., 1.]])
-    assert velocity_progress(prev, cur, cur, .1).item() == 0
-    assert velocity_progress(prev, cur, torch.tensor([[1., 0., 1.]]), .1).item() == 0
-    cur = torch.tensor([[.15, 0., 0.]])
-    assert velocity_progress(prev, cur, cur + torch.tensor([[1., 0., 0.]]), .1).item() == pytest.approx(1.)
-    with pytest.raises(ValueError):
-        velocity_progress(prev, cur, cur, 0)
 
 
 def test_state_evaluators_boundaries_and_proxy_limitation():
@@ -45,8 +22,9 @@ def test_state_evaluators_boundaries_and_proxy_limitation():
     far_z = torch.tensor([[0., 0., .00101]])
     assert evaluate_at(obj, near_z)[2].item()
     assert not evaluate_at(obj, far_z)[2].item()
-    assert evaluate_at(obj, far_z)[0].item() < .5
-    assert evaluate_at(obj, near_z)[0].item() - evaluate_at(obj, far_z)[0].item() > .49
+    # Placement is a separate diagnostic; crossing Z tolerance does not jump phi.
+    assert evaluate_at(obj, far_z)[0].item() > .9
+    assert abs(evaluate_at(obj, near_z)[0].item() - evaluate_at(obj, far_z)[0].item()) < 1e-5
     assert evaluate_at(obj, torch.tensor([[.09999, 0., 0.]]))[2].item()
     assert not evaluate_at(obj, torch.tensor([[.10001, 0., 0.]]))[2].item()
 
@@ -71,9 +49,9 @@ def test_box_near_state_threshold_drives_success_without_legacy_putdown():
     after = torch.stack([torch.ones_like(at), at], -1)
     achieved = torch.tensor([[True, False]])
     result = relation_step(before, after, torch.zeros_like(after), achieved,
-                           torch.zeros(1, 1, dtype=torch.bool), graph)
+                           torch.zeros(1, 1, dtype=torch.bool), graph, success_bonus=10.)
     assert result['first_success'].item()
-    assert result['success_bonus'].item() == 5.
+    assert result['success_bonus'].item() == 10.
 
 
 def test_gate_and_prerequisite_minimum():
@@ -89,7 +67,7 @@ def test_gate_and_prerequisite_minimum():
     assert result[0, 3].item() == pytest.approx(gate[0, :3].min().item())
 
 
-def test_absolute_state_soft_pinned_progress_and_no_mutation():
+def test_distance_state_progress_and_no_mutation():
     graph = compile_carry_subgoal(1, 1)
     before = torch.tensor([[.8, .2]])
     after = torch.tensor([[.9, .4]])
@@ -99,10 +77,10 @@ def test_absolute_state_soft_pinned_progress_and_no_mutation():
     result = relation_step(before, after, progress, achieved, done, graph)
     gate = relation_gate(before)
     activation = torch.tensor([[1., gate[0, 0]]])
-    pinned = pin_progress(progress, gate)
+    pinned = progress
     torch.testing.assert_close(result['activation'], activation)
     torch.testing.assert_close(result['pinned_progress'], pinned)
-    torch.testing.assert_close(result['state_component'], activation * after)
+    torch.testing.assert_close(result['state_component'], .2 * activation * after)
     torch.testing.assert_close(result['progress_component'], .2 * activation * pinned)
     assert not achieved.any() and not done.any()
 

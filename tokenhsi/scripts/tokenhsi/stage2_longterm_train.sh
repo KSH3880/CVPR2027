@@ -6,5 +6,5 @@ python ./tokenhsi/run.py --task HumanoidLongTerm4BasicSkills \
     --cfg_task_plan tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/cfg.yaml \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth \
-    --num_envs 1024 \
+    --num_envs 2048 \
     --headless

@@ -86,7 +86,7 @@ def test_position_only_ignores_motion_dt_and_z_for_arbitrary_edges():
 def test_runtime_keeps_prerequisites_state_and_history_but_never_pins(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError('Distance progress must never call motion or pinning functions')
-    for name in ('direction_progress', 'velocity_progress', 'pin_progress', 'approach_satisfaction'):
+    for name in ('direction_progress', 'pin_progress', 'approach_satisfaction'):
         monkeypatch.setattr(reward, name, forbidden)
     cfg = configs()[1]['env']['relationReward']
     graph = compile_carry_subgoal(2, 3)
@@ -143,6 +143,74 @@ def test_current_success_is_at_and_z_only(at, z, success):
     assert suffix[0, 0, 2].item() == 0
 
 
+def no_saturation_config():
+    path = Path(__file__).resolve().parents[1] / 'data/cfg/multi_agent/approach_distance_success_no_sat.yaml'
+    return yaml.safe_load(path.read_text())
+
+
+def test_no_saturation_ablation_changes_only_saturation_and_rejects_other_checkpoint():
+    original = configs()[1]
+    ablation = no_saturation_config()
+    expected = copy.deepcopy(original)
+    expected['env']['relationReward']['success']['saturate_edge_rewards_while_current'] = False
+    assert ablation == expected
+    cfg = ablation['env']['relationReward']
+    validate_relation_config(cfg)
+    with pytest.raises(ValueError, match='reward config differs'):
+        check_checkpoint_metadata(
+            {'relation_metadata': checkpoint_metadata(original['env']['relationReward'])},
+            checkpoint_metadata(cfg))
+
+
+def test_no_saturation_keeps_raw_edges_bonus_and_history_independent():
+    cfg = no_saturation_config()['env']['relationReward']
+    graph = compile_carry_subgoal(2, 3)
+    runtime = reward.RelationRuntime(1, graph, cfg, 'cpu')
+    saturated = reward.RelationRuntime(1, graph, configs()[1]['env']['relationReward'], 'cpu')
+    # Agent 0 has Holding history; agent 1 never held the box. Both qualify
+    # for the current At/Z bonus, independently of Holding and latched done.
+    before = torch.tensor([[1., 0., 0., 0.]])
+    for instance in (runtime, saturated):
+        instance.reset(torch.tensor([0]), before, at_z_error=torch.zeros(1, 2))
+    phi = torch.tensor([[.2, .95, 0., .95]])
+    progress = torch.tensor([[.3, .7, .1, .8]])
+    for _ in range(2):
+        result = runtime.step(phi, progress, at_z_error=torch.zeros(1, 2))
+        base = saturated.step(phi, progress, at_z_error=torch.zeros(1, 2))
+        assert result['current_success_state'].all()
+        assert not result['saturation_active'].any()
+        torch.testing.assert_close(result['state_component'], base['raw_state_component'])
+        torch.testing.assert_close(result['progress_component'], base['raw_progress_component'])
+        torch.testing.assert_close(result['current_success_reward'], torch.full((1, 2), .2))
+        expected_edges = base['raw_state_component'] + base['raw_progress_component']
+        torch.testing.assert_close(result['agent_task_reward'], expected_edges.reshape(1, 2, 2).sum(-1) + .2)
+        assert (result['agent_task_reward'] < 1.).all()
+        assert not result['first_success_bonus'].any()
+        torch.testing.assert_close(runtime.suffix(), saturated.suffix())
+    assert runtime.done.tolist() == [[True, False]]
+    # A Z failure for agent 0 and an At failure for agent 1 remove the bonus,
+    # even though agent 0's history remains latched.
+    released = runtime.step(torch.tensor([[.2, .95, 0., .89]]), progress,
+                            at_z_error=torch.tensor([[.00101, 0.]]))
+    assert not released['current_success_state'].any()
+    assert not released['success_bonus'].any()
+    assert not released['saturation_active'].any()
+    assert runtime.done.tolist() == [[True, False]]
+    regained = runtime.step(phi, progress, at_z_error=torch.zeros(1, 2))
+    torch.testing.assert_close(regained['current_success_reward'], torch.full((1, 2), .2))
+
+
+@pytest.mark.parametrize('tolerance', [None, 0, -1, True, float('nan'), float('inf')])
+def test_no_saturation_bonus_requires_valid_z_tolerance(tolerance):
+    cfg = no_saturation_config()['env']['relationReward']
+    if tolerance is None:
+        del cfg['success']['current_saturation_z_tolerance']
+    else:
+        cfg['success']['current_saturation_z_tolerance'] = tolerance
+    with pytest.raises(ValueError, match='current_saturation_z_tolerance'):
+        validate_relation_config(cfg)
+
+
 def test_current_saturation_does_not_follow_latched_done():
     cfg = configs()[1]['env']['relationReward']
     runtime = reward.RelationRuntime(1, compile_carry_subgoal(1, 1), cfg, 'cpu')
@@ -197,11 +265,11 @@ def test_invalid_distance_parameters(key, value):
 def test_distance_rejects_obsolete_progress_options(extra):
     cfg = configs()[1]['env']['relationReward']
     cfg['progress'][extra] = .5
-    with pytest.raises(ValueError, match='distance progress accepts only'):
+    with pytest.raises(ValueError, match='progress'):
         validate_relation_config(cfg)
 
 
-@pytest.mark.parametrize('kind', ['velocity', 'direction'])
+@pytest.mark.parametrize('kind', ['direction'])
 def test_distance_parameters_do_not_silently_affect_other_modes(kind):
     with pytest.raises(ValueError, match='delta/sigma'):
         validate_relation_config({'mode': 'state_relation_v0', 'progress': {'kind': kind, 'delta': .5}})

@@ -1,12 +1,12 @@
 #!/bin/bash
 # Multi-agent carry training.
 #   sh tokenhsi/scripts/multi_agent/ma_carry_train.sh [num_agents] [num_envs] [num_objects]
-# Defaults are sized for a 16GB GPU.
+# Training baseline: 2048 environments on RTX PRO 6000.
 
 . "$(dirname "$0")/runtime_env.sh"
 
 NUM_AGENTS=${1:-1}
-NUM_ENVS=${2:-1024}
+NUM_ENVS=${2:-2048}
 NUM_OBJECTS=${3:-0}
 if [ -n "${MAX_ITERATIONS:-}" ]; then
     set -- --max_iterations "$MAX_ITERATIONS"

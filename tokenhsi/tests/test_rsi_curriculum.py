@@ -4,14 +4,13 @@ import pytest
 import yaml
 
 from utils.rsi_curriculum import SkillInitCurriculum
-from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata
 
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / 'data/cfg/multi_agent'
 
 
 def load_config():
-    return yaml.safe_load((CONFIG_DIR / 'approach_rsi.yaml').read_text())
+    return yaml.safe_load((CONFIG_DIR / 'approach_rsi_all_edges.yaml').read_text())
 
 
 def schedule():
@@ -36,15 +35,6 @@ def test_absolute_epoch_schedule(epoch, expected, blend):
     assert sum(probabilities) == pytest.approx(1)
 
 
-def test_config_changes_only_rsi_and_remains_checkpoint_compatible():
-    base = yaml.safe_load((CONFIG_DIR /
-        'amp_humanoid_ma_carry_relation_state02_near_dir_success10_approach.yaml').read_text())
-    new = load_config()
-    new['env'].pop('skillInitCurriculum')
-    assert new == base
-    check_checkpoint_metadata(
-        {'relation_metadata': checkpoint_metadata(base['env']['relationReward'])},
-        checkpoint_metadata(new['env']['relationReward']))
 
 
 @pytest.mark.parametrize('change', [

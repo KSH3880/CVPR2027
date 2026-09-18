@@ -1,5 +1,4 @@
-"""The RSI variant changes only Holding's progress blend from g_H to a_H."""
-import copy
+"""All-edge RSI progress, prerequisites and history for the retained experiments."""
 from pathlib import Path
 
 import pytest
@@ -10,60 +9,37 @@ from env.tasks.multi_agent.relation_reward import (
     RelationRuntime, approach_satisfaction, evaluate_at, relation_gate)
 from env.tasks.multi_agent.relation_task import CarryRelationMixin
 from utils.relation_task_spec import (
-    STATE_MODE, compile_carry_subgoal, validate_relation_config,
-    checkpoint_metadata, check_checkpoint_metadata)
+    STATE_MODE, compile_carry_subgoal, validate_relation_config)
 
 
-def configs():
+def load_config():
     directory = Path(__file__).resolve().parents[1] / 'data/cfg/multi_agent'
-    return tuple(yaml.safe_load((directory / name).read_text()) for name in
-                 ('approach_rsi.yaml', 'approach_rsi_all_edges.yaml'))
+    return yaml.safe_load((directory / 'approach_rsi_all_edges.yaml').read_text())
 
 
-def test_config_keeps_rsi_and_all_other_settings():
-    base, new = configs()
-    expected = copy.deepcopy(base)
-    progress = expected['env']['relationReward']['progress']
-    progress['approach_radius'] = progress.pop('at_approach_radius')
-    assert new == expected
-    old_cfg, cfg = base['env']['relationReward'], new['env']['relationReward']
-    validate_relation_config(cfg)
-    check_checkpoint_metadata({'relation_metadata': checkpoint_metadata(cfg)}, checkpoint_metadata(cfg))
-    with pytest.raises(ValueError, match='reward config differs'):
-        check_checkpoint_metadata({'relation_metadata': checkpoint_metadata(old_cfg)}, checkpoint_metadata(cfg))
-
-
-def test_common_progress_formula_changes_only_holding_progress():
-    base, new = configs()
+def test_common_progress_formula_preserves_prerequisites_and_history():
     graph = compile_carry_subgoal(2, 3)
-    old = RelationRuntime(2, graph, base['env']['relationReward'], 'cpu')
-    current = RelationRuntime(2, graph, new['env']['relationReward'], 'cpu')
+    current = RelationRuntime(2, graph, load_config()['env']['relationReward'], 'cpu')
     before = torch.tensor([[.99, .2, .3, .1], [.8, .1, .95, .2]])
     phi = torch.tensor([[.3, .95, .99, .95], [.99, .95, .7, .95]])
     raw = torch.tensor([[0., .2, .7, .4], [.5, .8, 1., 0.]])
     distances = torch.tensor([[.5, .1, 0., .5], [2., 0., .1, 3.]])
-    for runtime in (old, current):
-        runtime.reset(torch.arange(2), before)
-    baseline = old.step(phi, raw, at_distance_xy=distances[:, 1::2])
+    current.reset(torch.arange(2), before)
     result = current.step(phi, raw, edge_distance_xy=distances)
-    for key in ('activation', 'state_component', 'success_bonus', 'first_success',
-                'achieved_next', 'done_next', 'valid_next', 'gate_next', 'satisfied_next'):
-        torch.testing.assert_close(result[key], baseline[key])
-    torch.testing.assert_close(current.suffix(), old.suffix())
     a = approach_satisfaction(distances, .5)
     expected_progress = a + (1 - a) * raw
+    activation = torch.ones_like(phi)
+    activation[:, 1::2] = relation_gate(before)[:, 0::2]
+    torch.testing.assert_close(result['activation'], activation)
+    torch.testing.assert_close(result['state_component'], .2 * activation * phi)
     torch.testing.assert_close(result['progress_blend'], a)
     torch.testing.assert_close(result['pinned_progress'], expected_progress)
-    torch.testing.assert_close(result['progress_component'][:, 0::2], .2 * expected_progress[:, 0::2])
-    torch.testing.assert_close(result['progress_component'][:, 1::2],
-                               .2 * relation_gate(before)[:, 0::2] * expected_progress[:, 1::2])
-    torch.testing.assert_close(result['progress_component'][:, 1::2],
-                               baseline['progress_component'][:, 1::2])
-    assert not torch.allclose(result['progress_component'][:, 0::2],
-                             baseline['progress_component'][:, 0::2])
-    # Mere approach without previous Holding satisfaction does not award At success.
-    assert not result['first_success'][0, 1]
+    torch.testing.assert_close(result['progress_component'], .2 * activation * expected_progress)
+    assert result['first_success'].tolist() == [[True, False], [False, True]]
+    torch.testing.assert_close(result['success_bonus'], torch.tensor([[10., 0.], [0., 10.]]))
     assert result['activation'][0, 3] < 1e-5
+    again = current.step(phi, raw, edge_distance_xy=distances)
+    assert again['success_bonus'][0, 0] == 0  # repeat success does not re-award the bonus
 
 
 @pytest.mark.parametrize('radius', [0., -1., float('nan'), float('inf'), None, True, '.5'])
@@ -73,16 +49,16 @@ def test_bad_common_radius_rejected(radius):
             'progress': {'kind': 'direction', 'approach_radius': radius}})
 
 
-def test_common_blend_requires_direction_and_unambiguous_config():
-    with pytest.raises(ValueError, match='requires direction'):
+def test_common_blend_requires_direction_and_rejects_at_only_option():
+    with pytest.raises(ValueError, match='distance progress'):
         validate_relation_config({'mode': STATE_MODE, 'progress': {'approach_radius': .5}})
-    with pytest.raises(ValueError, match='not both'):
+    with pytest.raises(ValueError, match='Unsupported relationReward.progress'):
         validate_relation_config({'mode': STATE_MODE, 'progress': {
             'kind': 'direction', 'approach_radius': .5, 'at_approach_radius': .5}})
 
 
 def test_edge_distances_are_required_and_validated():
-    cfg = configs()[1]['env']['relationReward']
+    cfg = load_config()['env']['relationReward']
     cfg['diagnostics']['validate_tensors'] = True
     runtime = RelationRuntime(1, compile_carry_subgoal(1, 1), cfg, 'cpu')
     phi = torch.zeros(1, 2)
@@ -109,7 +85,7 @@ class ToyCarry(CarryRelationMixin):
 def test_task_passes_poststep_root_box_and_box_target_xy_distances():
     task = ToyCarry()
     task.num_envs, task.num_agents, task.dt = 1, 2, .1
-    task._relation_cfg = configs()[1]['env']['relationReward']
+    task._relation_cfg = load_config()['env']['relationReward']
     task.relation_runtime = RelationRuntime(1, compile_carry_subgoal(2, 3), task._relation_cfg, 'cpu')
     before = torch.tensor([[.8, .1, .99, .2]])
     task.relation_runtime.reset(torch.tensor([0]), before)

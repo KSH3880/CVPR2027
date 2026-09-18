@@ -5,5 +5,5 @@ python ./tokenhsi/run.py --task HumanoidCompTrajCarry \
     --cfg_env tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_traj_carry.yaml \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint output/tokenhsi/ckpt_stage1.pth \
-    --num_envs 4096 \
+    --num_envs 2048 \
     --headless

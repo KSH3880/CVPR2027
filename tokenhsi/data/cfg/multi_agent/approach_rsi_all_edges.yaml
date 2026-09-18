@@ -1,6 +1,6 @@
 # All edges: prerequisite * (state reward + distance-blended direction progress).
 # Shared a_e = 1/(1+(d_xy/0.5)^2): Holding root->box, At box->target.
-# State, prerequisite gates, success, AMP and network match the original approach.
+# Uses box-near At state, prerequisite gates and once-per-subgoal success reward.
 # RSI curriculum uses the restored absolute PPO epoch (1000 warmup, 2000 end).
 
 env:

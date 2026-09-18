@@ -49,25 +49,24 @@ CUDA_VISIBLE_DEVICES=${TOKENHSI_GPU:-0} conda run -n "${TOKENHSI_CONDA_ENV:-toke
   "import isaacgym, torch; print(torch.cuda.device_count(), torch.cuda.get_device_name(0))"
 
 # 학습 1 epoch: 스모크 전용 환경변수이며 기본 학습 설정은 바꾸지 않는다.
-MAX_ITERATIONS=1 sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 1 256 0
+MAX_ITERATIONS=1 sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 2048 3
 
 # headless 테스트
 sh tokenhsi/scripts/multi_agent/ma_carry_test.sh \
   output/ma_carry/<run>/nn/HumanoidMA.pth 1 1 0
 
 # GUI + noVNC
-sh tokenhsi/scripts/multi_agent/run-gui.sh \
+TOKENHSI_GPU=6 sh tokenhsi/scripts/multi_agent/run-gui.sh \
   sh tokenhsi/scripts/multi_agent/ma_carry_test.sh \
   output/ma_carry/<run>/nn/HumanoidMA.pth 1 1 0
 
-# GUI 학습 1 epoch
-MAX_ITERATIONS=1 sh tokenhsi/scripts/multi_agent/run-gui.sh \
-  sh tokenhsi/scripts/multi_agent/ma_carry_watch.sh 1 4 0
 ```
 
 학습은 최소 1 epoch의 rollout과 update가 완료되어야 한다. 테스트는 체크포인트 로드 후
 시뮬레이션 step이 진행되어야 한다. GUI는 noVNC HTTP 응답만으로 판정하지 말고
 X display에 Isaac Gym viewer 창이 실제로 생성되는지도 확인한다.
+GPU 선택은 현재 PRO 6000 서버에서 검증했다. 다른 서버로 이관할 때는 CUDA/Vulkan
+장치 열거 순서도 확인하고, viewer PID의 `C+G`가 지정한 GPU 하나에만 나타나는지 검사한다.
 
 ## 변경 금지 범위
 
