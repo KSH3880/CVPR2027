@@ -97,7 +97,7 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
     active = torch.ones(n, dtype=torch.bool, device=task.device)
     done_env = torch.zeros_like(active)
     after = _clone_physical(before)
-    last_bottom_error = before.bottom_position_error.clone()
+    last_bottom_position = task.planner_bottom_position().clone()
     obs = _refresh_obs(player)
     player.get_batch_size(obs, 1)
     elapsed_steps = torch.zeros(n, device=task.device)
@@ -122,9 +122,10 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
         current = _clone_physical(task.planner_physical_state())
         step_collision_terms = task.planner_collision_terms()
         step_collision = step_collision_terms["total"]
+        bottom_position = task.planner_bottom_position()
         step_disturbance = (
-            current.bottom_position_error - last_bottom_error
-        ).norm(dim=-1)
+            bottom_position - last_bottom_position
+        ).norm(dim=-1) * task._planner_bottom_stable_seen.float()
         collision += torch.where(active, step_collision, torch.zeros_like(step_collision))
         collision_steps += active.float() * (step_collision > 0.0).float()
         for name in collision_names:
@@ -159,8 +160,8 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
             * float(task.dt) * postplace.float()
         )
         _masked_update(after, current, active)
-        last_bottom_error = torch.where(
-            active[:, None], current.bottom_position_error, last_bottom_error
+        last_bottom_position = torch.where(
+            active[:, None], bottom_position, last_bottom_position
         )
         just_done = done_rows.reshape(n, AGENTS).any(dim=1) & active
         if just_done.any():
@@ -518,7 +519,7 @@ def main():
         "STACK_PLANNER_RETREAT_BOX_PENALTY", 10.0
     )
     bottom_disturbance_weight = _env_float(
-        "STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT", 2.0
+        "STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT", 10.0
     )
     if (visit_penalty_coef < 0 or visit_tolerance < 0 or turn_penalty_coef < 0
             or retreat_box_penalty_coef < 0 or bottom_disturbance_weight < 0):
@@ -882,6 +883,7 @@ def main():
             if key in {"iteration", "reward", "done_rate", "potential_delta",
                        "retreat_potential_delta_removed",
                        "humanoid_fall_penalty", "route_visit_penalty",
+                       "bottom_disturbance_penalty",
                        "route_turn_penalty", "route_max_turn_deg",
                        "retreat_box_path_penalty",
                        "retreat_box_endpoint_clearance",

@@ -28,6 +28,15 @@
 - 46도 turn 제한이 모든 curved proposal을 hard-invalid로 만들어 physical rollout과 virtual box
   갱신을 차단하던 문제를 수정했다. 46도 초과는 differentiable-shaped soft reward로 옮기고,
   175도 이상의 사실상 역주행만 emergency invalid로 유지했다.
+- A2 launch가 `stable_steps + delay`의 연속 안정성을 요구해 A1이 bottom box를 한 번 차기만 해도
+  영원히 취소되던 문제를 수정했다. 최초 안정화 사건을 latch한 뒤 1초 countdown을 monotonic하게
+  진행하며, 이후 box 교란은 launch gate가 아니라 물리 penalty로 처리한다.
+- 실제 placed bottom-box 이동 누적량의 기본 weight를 2에서 10으로 높이고
+  `bottom_disturbance_penalty`를 iteration 콘솔 로그에 노출했다. A2 countdown은 box 교란과
+  무관하게 계속 진행한다.
+- `STACK_TOP_FOLLOWS_BOTTOM=1`에서 moving target이 bottom position error를 상쇄하던 측정 허점을
+  제거했다. 최초 안정화 이후 실제 bottom-box world position의 frame 간 이동 거리를 직접
+  누적하므로 A1이 support box를 차거나 미는 동작이 그대로 disturbance penalty에 들어간다.
 
 ### Joint A2 preplan with deferred Carry goal (V12)
 

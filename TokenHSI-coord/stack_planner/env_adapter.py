@@ -98,6 +98,12 @@ class HumanoidMAStackPlannerTrain(
         self._planner_a2_stable_delay_steps = int(math.ceil(
             self._planner_a2_stable_delay / float(self.dt)
         ))
+        self._planner_bottom_stable_seen = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device,
+        )
+        self._planner_a2_delay_count = torch.zeros(
+            self.num_envs, dtype=torch.long, device=self.device,
+        )
         self._planner_relaxed_done = bool(int(os.environ.get(
             "STACK_PLANNER_RELAXED_DONE", "1"
         )))
@@ -230,6 +236,8 @@ class HumanoidMAStackPlannerTrain(
             self._planner_latest_a1_endpoint_valid[env_ids] = False
             self._planner_retreat_ready[env_ids] = False
             self._planner_endpoint_history_valid[env_ids] = False
+            self._planner_bottom_stable_seen[env_ids] = False
+            self._planner_a2_delay_count[env_ids] = 0
             self._planner_endpoint_change_cost[env_ids] = 0.0
             self._planner_policy_decision[env_ids] = True
             self._planner_retreat_box_path_penalty[env_ids] = 0.0
@@ -371,12 +379,16 @@ class HumanoidMAStackPlannerTrain(
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
         if not hasattr(self, "_planner_a2_stable_delay_steps"):
             return env_ids
-        # A2 handoff is governed only by continuous bottom-box stability:
-        # declare the placement stable, wait one second, then launch.  Neither
-        # A1's travelled distance nor its learned endpoint gates A2 anymore.
-        required = self.stack_stable_steps + self._planner_a2_stable_delay_steps
-        waiting = (~self._carry_rehearsal[env_ids]
-                   & (self._bottom_stable_count[env_ids] < required))
+        # Once bottom stability has been observed, the one-second delay is a
+        # monotonic countdown. A later A1 kick remains penalized physically,
+        # but cannot suppress A2 forever by repeatedly resetting the parent's
+        # continuous-stability counter.
+        ready = (
+            self._planner_bottom_stable_seen[env_ids]
+            & (self._planner_a2_delay_count[env_ids]
+               >= self._planner_a2_stable_delay_steps)
+        )
+        waiting = ~self._carry_rehearsal[env_ids] & ~ready
         return env_ids[~waiting]
 
     def _activate_a2_top_goal(self, env_ids):
@@ -422,6 +434,19 @@ class HumanoidMAStackPlannerTrain(
 
     def _update_stack_coordinator(self):
         """Use stable-bottom + fixed delay for planner-only A2 handoff."""
+        if hasattr(self, "_planner_bottom_stable_seen"):
+            stable_now = (
+                self._bottom_stable_count >= self.stack_stable_steps
+            ) & ~self._carry_rehearsal
+            newly_stable = stable_now & ~self._planner_bottom_stable_seen
+            self._planner_bottom_stable_seen |= stable_now
+            counting = (
+                self._planner_bottom_stable_seen
+                & ~newly_stable
+                & (self._stack_phase < self.A2_RESUME)
+                & ~self._carry_rehearsal
+            )
+            self._planner_a2_delay_count[counting] += 1
         super()._update_stack_coordinator()
         if not hasattr(self, "_planner_a2_stable_delay_steps"):
             return
@@ -433,7 +458,7 @@ class HumanoidMAStackPlannerTrain(
         open_retreat = torch.nonzero(
             (phase == self.VERIFY_BOTTOM)
             & ~self._carry_rehearsal
-            & (self._bottom_stable_count >= self.stack_stable_steps),
+            & self._planner_bottom_stable_seen,
             as_tuple=False,
         ).squeeze(-1)
         if len(open_retreat):
@@ -445,11 +470,12 @@ class HumanoidMAStackPlannerTrain(
         # Do not wait for retreat endpoint/distance completion.  Once the
         # bottom box has stayed stable for one additional second, expose A2's
         # committed top goal and start it immediately.
-        required = self.stack_stable_steps + self._planner_a2_stable_delay_steps
         launch_a2 = torch.nonzero(
             (self._stack_phase == self.A1_RETREAT)
             & ~self._carry_rehearsal
-            & (self._bottom_stable_count >= required),
+            & self._planner_bottom_stable_seen
+            & (self._planner_a2_delay_count
+               >= self._planner_a2_stable_delay_steps),
             as_tuple=False,
         ).squeeze(-1)
         if len(launch_a2):
@@ -717,6 +743,11 @@ class HumanoidMAStackPlannerTrain(
             (roots[r1, :2] - top[:, :2]).norm(dim=-1),
             self._seq_top_reached.float(),
         )
+
+    def planner_bottom_position(self):
+        """Physical bottom-box world position, independent of moving goals."""
+        rows = self.all_rows().view(self.num_envs, self.num_agents)[:, 0]
+        return self.humanoid_rows(self._box_states)[rows, :3]
 
     def planner_collision_terms(self):
         """Return separately attributable proximity/contact proxy costs."""

@@ -115,8 +115,10 @@ parameter는 없다.
 구조가 아니다. 어느 구간을 frozen agent에 설치할지는 simulator의 실제 placement phase를
 사용하는 execution 문제이며, planner action이나 학습 head에는 switch가 없다.
 A2 출발은 learned endpoint 도달이나 A1 이동 거리로 판정하지 않는다. bottom box가 물리적으로
-안정화되면 A1 retreat를 열고, 그 안정 상태가 추가로 1초 유지되는 즉시 A2 goal을 활성화한다.
-대기 시간은 `STACK_PLANNER_A2_STABLE_DELAY`로 설정한다.
+처음 안정화되면 그 사건을 latch해 A1 retreat를 열고 monotonic 1초 countdown을 시작한다.
+countdown 중 A1이 box를 다시 흔들어도 A2 출발을 취소하지 않으며, 해당 교란은 별도
+bottom-disturbance/collision penalty로 학습한다. 대기 시간은
+`STACK_PLANNER_A2_STABLE_DELAY`로 설정한다.
 planner task의 성공 `DONE`은 기본적으로 `STACK_PLANNER_RELAXED_DONE=1`을 사용한다. top box
 중심의 XY가 bottom box 중심에서 footprint 반대각선
 `0.5 * sqrt(size_x^2 + size_y^2)` 이내이고 목표 높이 오차가 tolerance 안이면 성공이다.
@@ -127,7 +129,7 @@ clearance penalty도 적용한다. footprint는 agent root 반경 0.35 m와 safe
 팽창하며, release 직후 가까이 서 있는 것 자체보다 이후 point가 box 안쪽으로 파고들거나
 끝까지 안전 영역을 빠져나오지 않는 경로를 감점한다. 기본 계수는
 `STACK_PLANNER_RETREAT_BOX_PENALTY=10.0`이다. 실제 rollout에서 bottom box가 밀린 누적량도
-`STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT=2.0`으로 감점한다. 따라서 기본 agent-agent collision
+`STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT=10.0`으로 감점한다. 따라서 기본 agent-agent collision
 weight 1.0보다 box 경로 침범과 배치된 box 교란을 우선 회피하되, analytic footprint shaping이
 전체 reward를 지배하지 않도록 한다.
 
@@ -168,8 +170,10 @@ transition의 total reward에서는 `potential_delta`를 제거한다. 따라서
 box disturbance, fall/time과 analytic path collision penalty로 학습하며 A1-box 거리 증가 자체를
 보상하지 않는다. placement와 A2 stacking 구간의 potential 학습 신호는 유지한다. 고정 retreat 방향, GT path,
 virtual box 및 legacy Carry observation은 reward 입력에 포함하지 않는다. `collision`과
-`bottom_disturbance`는 짧은 접촉을 놓치지 않도록 planner macro interval 동안 simulator에서
-누적해 전달한다. `humanoid_fall`은 reset 전에 두 agent 중 하나라도 넘어졌는지를 latch한
+`bottom_disturbance`는 짧은 접촉을 놓치지 않도록 planner macro interval 동안 누적한다.
+특히 `bottom_disturbance`는 최초 placement 안정화 이후 moving goal/target 오차와 무관하게
+실제 bottom-box world position의 frame 간 이동 거리를 사용한다. `humanoid_fall`은 reset 전에
+두 agent 중 하나라도 넘어졌는지를 latch한
 0/1 값이며, frame마다 반복하지 않고 macro transition에 기본 `-3.0`을 한 번 적용한다.
 
 초기 접근 구간도 학습되도록 실제 root-box 거리의 bounded rational quality를 쓰며, 이 항은

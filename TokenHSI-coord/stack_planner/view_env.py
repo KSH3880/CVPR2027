@@ -129,6 +129,14 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
                 ),
                 flush=True,
             )
+            print(
+                "[stack-planner-view] a2_gate stable_seen={} delay={}/{}".format(
+                    bool(self._planner_bottom_stable_seen[0]),
+                    int(self._planner_a2_delay_count[0]),
+                    self._planner_a2_stable_delay_steps,
+                ),
+                flush=True,
+            )
         if status != self._stack_planner_status:
             print("[stack-planner-view] phase={} candidate={} valid={} installed={} retreat_ready={}"
                   .format(*[item[:4] for item in status]), flush=True)
