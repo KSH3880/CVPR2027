@@ -176,7 +176,7 @@ def free_path_validity(
     path: torch.Tensor, speed: torch.Tensor, root_xy: torch.Tensor,
     active: torch.Tensor,
 ) -> torch.Tensor:
-    """Validate unified paths with only the current-root hard anchor."""
+    """Validate fixed-origin unified paths near the current executing root."""
     expected = (AGENTS, STACK_PATH_POINTS, 2)
     if path.shape != (*speed.shape, 2) or path.shape[2:] != expected:
         raise ValueError(
@@ -186,7 +186,13 @@ def free_path_validity(
         torch.isfinite(path).flatten(start_dim=-2).all(dim=-1)
         & torch.isfinite(speed).all(dim=-1)
     )
-    root_anchor = (path[..., 0, :] - root_xy[:, None]).norm(dim=-1) < 0.01
+    root_projection = project_points_to_segments(
+        path, root_xy[:, None].expand(-1, path.shape[1], -1, -1),
+    )
+    # After the first decision P0 is the immutable departure point. The live
+    # root therefore only has to remain reachable from the full polyline; the
+    # executor resumes at its projected arc instead of demanding P0 == root.
+    root_reachable = root_projection["distance2"].amin(dim=-1) < 1.0
     delta = path[..., 1:, :] - path[..., :-1, :]
     lengths = delta.norm(dim=-1)
     buffer_ok = lengths.sum(dim=-1) < (PATH_VERTICES - 2) * PATH_DS
@@ -201,7 +207,10 @@ def free_path_validity(
     turns[..., 8:11] = 0
     turns[..., 19:22] = 0
     speed_ok = ((speed >= MIN_SPEED) & (speed <= MAX_SPEED)).all(dim=-1)
-    valid = finite & root_anchor & buffer_ok & speed_ok & (turns.amax(dim=-1) <= 46)
+    valid = (
+        finite & root_reachable & buffer_ok & speed_ok
+        & (turns.amax(dim=-1) <= 46)
+    )
     return (valid | ~active[:, None]).all(dim=-1)
 
 

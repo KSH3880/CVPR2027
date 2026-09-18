@@ -64,6 +64,7 @@ class StackSceneEncoder(nn.Module):
         self.scene_token = nn.Parameter(torch.empty(1, 1, config.d_model))
         nn.init.normal_(self.scene_token, std=0.02)
         self.plan_tokenizer = nn.Linear(STACK_PATH_INPUT_DIM, config.d_model)
+        self.progress_tokenizer = nn.Linear(AGENTS, config.d_model)
         self.plan_valid_embedding = nn.Embedding(2, config.d_model)
         self.history_steps = config.history_steps
         if self.history_steps > 1:
@@ -89,7 +90,7 @@ class StackSceneEncoder(nn.Module):
         )
 
     def forward(self, tokens, history_valid, reference_path_local,
-                previous_path_valid):
+                previous_path_valid, path_progress):
         if tokens.ndim == 3:
             tokens = tokens[:, None]
         if tokens.ndim != 4 or tokens.shape[1] != self.history_steps:
@@ -112,6 +113,9 @@ class StackSceneEncoder(nn.Module):
             reference_path_local.reshape(batch, -1) / POSITION_SCALE
         )
         plan = plan + self.plan_valid_embedding(previous_path_valid.long())
+        plan = plan + self.progress_tokenizer(
+            path_progress / float(STACK_PATH_POINTS - 1)
+        )
         scene = self.scene_token.expand(batch, -1, -1)
         value = torch.cat((scene, plan[:, None], value), dim=1)
         if history_valid is not None:
@@ -143,6 +147,19 @@ def _smooth_delta(delta: torch.Tensor, passes: int = 2) -> torch.Tensor:
     return delta
 
 
+def _future_point_weight(path_progress: torch.Tensor,
+                         previous_path_valid: torch.Tensor) -> torch.Tensor:
+    """Continuous future mask with a two-point correction ramp at the root."""
+    if path_progress.ndim != 2 or path_progress.shape[-1] != AGENTS:
+        raise ValueError("path_progress must be [B,2]")
+    index = torch.arange(
+        STACK_PATH_POINTS, device=path_progress.device, dtype=path_progress.dtype,
+    )
+    future = ((index - path_progress[..., None]) / 2.0).clamp(0.0, 1.0)
+    initial = (index > 0).to(path_progress.dtype).expand_as(future)
+    return torch.where(previous_path_valid[:, None, None], future, initial)
+
+
 class StackPlannerHeads(nn.Module):
     """Independent pointwise path-correction proposals and evaluator."""
 
@@ -169,7 +186,8 @@ class StackPlannerHeads(nn.Module):
             nn.init.normal_(path[-1].weight, std=1e-3)
             nn.init.zeros_(path[-1].bias)
 
-    def decode_delta(self, reference_path_local, path_delta_raw):
+    def decode_delta(self, reference_path_local, path_delta_raw,
+                     path_point_weight):
         batch, candidates = path_delta_raw.shape[:2]
         expected = (batch, candidates, STACK_PATH_DELTA_DIM)
         if path_delta_raw.shape != expected:
@@ -182,13 +200,17 @@ class StackPlannerHeads(nn.Module):
             torch.zeros_like(delta[..., :1, :]), delta,
         ), dim=-2)
         delta = _smooth_delta(delta)
+        delta = delta * path_point_weight[:, None, :, :, None]
         path_local = reference_path_local[:, None] + delta
         path_local[..., 0, :] = reference_path_local[:, None, :, 0, :]
         return path_local, delta
 
-    def forward(self, scene, reference_path_local):
+    def forward(self, scene, reference_path_local, path_point_weight):
+        batch = scene.shape[0]
         path_delta_raw = torch.stack([path(scene) for path in self.paths], dim=1)
-        path_local, _ = self.decode_delta(reference_path_local, path_delta_raw)
+        path_local, path_delta_local = self.decode_delta(
+            reference_path_local, path_delta_raw, path_point_weight,
+        )
         expanded_scene = scene[:, None].expand(-1, path_local.shape[1], -1)
         evaluator_input = torch.cat((
             expanded_scene,
@@ -196,7 +218,12 @@ class StackPlannerHeads(nn.Module):
         ), dim=-1)
         return {
             "path_delta_raw": path_delta_raw,
+            "path_delta_local": path_delta_local,
             "reference_path_local": reference_path_local,
+            "path_point_weight": path_point_weight,
+            "path_action_mask": path_point_weight[..., 1:, None].expand(
+                -1, -1, -1, 2
+            ).reshape(batch, -1) > 0,
             "candidate_logits": self.candidate_evaluator(
                 evaluator_input
             ).squeeze(-1),
@@ -229,7 +256,8 @@ class StackTrajectoryPlanner(nn.Module):
             first, second[..., 1:, :], suffix[..., 1:, :],
         ), dim=-2)
 
-    def _reference_path(self, state, previous_path_world, previous_path_valid):
+    def _reference_path(self, state, previous_path_world, previous_path_valid,
+                        path_progress):
         _, frame = state_to_tokens(state)
         geometric_local = self._geometric_reference_local(frame)
         geometric_world = shared_to_world(
@@ -240,21 +268,15 @@ class StackTrajectoryPlanner(nn.Module):
             previous_path_valid = torch.zeros(
                 state.batch_size, dtype=torch.bool, device=state.device,
             )
-        start_offset = state.root_xy - previous_path_world[..., 0, :]
-        decay = torch.linspace(
-            1.0, 0.0, STACK_PATH_POINTS,
-            device=state.device, dtype=state.root_xy.dtype,
-        ).reshape(1, 1, STACK_PATH_POINTS, 1)
-        reanchored_world = previous_path_world + start_offset[..., None, :] * decay
         reference_world = torch.where(
             previous_path_valid[:, None, None, None],
-            reanchored_world, geometric_world,
+            previous_path_world, geometric_world,
         )
-        reference_world[..., 0, :] = state.root_xy
         reference_local = world_to_shared(
             reference_world, frame["center"], frame["angle"],
         )
-        return frame, reference_local
+        point_weight = _future_point_weight(path_progress, previous_path_valid)
+        return frame, reference_local, point_weight
 
     def raw_heads(self, observation):
         history_valid = None
@@ -266,6 +288,7 @@ class StackTrajectoryPlanner(nn.Module):
             history_valid = observation.history_valid
             previous_path_world = observation.previous_path_world
             previous_path_valid = observation.previous_path_valid
+            path_progress = observation.path_progress
         else:
             state = observation
             if not isinstance(state, CoordinatorState):
@@ -278,18 +301,24 @@ class StackTrajectoryPlanner(nn.Module):
             previous_path_valid = torch.zeros(
                 state.batch_size, dtype=torch.bool, device=state.device,
             )
-        _, reference_local = self._reference_path(
-            state, previous_path_world, previous_path_valid,
+            path_progress = torch.zeros(
+                state.batch_size, AGENTS, device=state.device,
+                dtype=state.root_xy.dtype,
+            )
+        _, reference_local, point_weight = self._reference_path(
+            state, previous_path_world, previous_path_valid, path_progress,
         )
         scene = self.scene_encoder(
             tokens, history_valid, reference_local, previous_path_valid,
+            path_progress,
         )
-        return state, self.heads(scene, reference_local)
+        return state, self.heads(scene, reference_local, point_weight)
 
-    def decode_delta(self, state, reference_path_local, path_delta_raw):
+    def decode_delta(self, state, reference_path_local, path_delta_raw,
+                     path_point_weight):
         _, frame = state_to_tokens(state)
-        path_local, _ = self.heads.decode_delta(
-            reference_path_local, path_delta_raw,
+        path_local, path_delta_local = self.heads.decode_delta(
+            reference_path_local, path_delta_raw, path_point_weight,
         )
         path_world = shared_to_world(
             path_local, frame["center"][:, None], frame["angle"][:, None],
@@ -297,6 +326,9 @@ class StackTrajectoryPlanner(nn.Module):
         return {
             "path_local": path_local,
             "path_world": path_world,
+            "path_delta_local": path_delta_local,
+            "reference_path_local": reference_path_local,
+            "path_point_weight": path_point_weight,
         }
 
     def forward(self, state: Union[CoordinatorState, Mapping[str, torch.Tensor]]):
@@ -306,10 +338,18 @@ class StackTrajectoryPlanner(nn.Module):
         output = self.decode_delta(
             current, raw["reference_path_local"],
             raw["path_delta_raw"][batch, selected][:, None],
+            raw["path_point_weight"],
         )
+        # Correction/reference tensors are training internals. Keep the public
+        # planner output contract path-only plus candidate metadata.
+        output.pop("path_delta_local")
+        output.pop("reference_path_local")
+        output.pop("path_point_weight")
         output["selected_candidate"] = selected
         output["candidate_logits"] = raw["candidate_logits"]
         return output
 
 
-__all__ = ["StackPlannerConfig", "StackTrajectoryPlanner"]
+__all__ = [
+    "StackPlannerConfig", "StackTrajectoryPlanner", "_future_point_weight",
+]

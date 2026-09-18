@@ -16,6 +16,7 @@ def execution_view(
     box_xy: torch.Tensor,
     goal_xy: torch.Tensor,
     retreat: torch.Tensor,
+    root_xy: torch.Tensor,
 ) -> torch.Tensor:
     """Interpolate carry prefix or attach retreat suffix without moving its end.
 
@@ -30,6 +31,8 @@ def execution_view(
         raise ValueError("box/goal must match [B,2,2]")
     if retreat.shape != path.shape[:2] or retreat.dtype != torch.bool:
         raise ValueError("retreat must be bool [B,2]")
+    if root_xy.shape != path.shape[:2] + (2,):
+        raise ValueError("root_xy must match [B,2,2]")
 
     visit = ordered_box_goal_visit(path, box_xy, goal_xy, tolerance=0.0)
     goal_projection = project_points_to_segments(path, goal_xy)
@@ -46,11 +49,29 @@ def execution_view(
         cumulative.gather(-1, segment[..., None]).squeeze(-1)
         + fraction * lengths.gather(-1, segment[..., None]).squeeze(-1)
     )
+    root_projection = project_points_to_segments(path, root_xy)
+    segment_index = torch.arange(
+        path.shape[-2] - 1, device=path.device,
+    ).reshape((1,) * (path.ndim - 2) + (-1,))
+    root_distance2 = root_projection["distance2"].masked_fill(
+        segment_index < segment[..., None], float("inf"),
+    )
+    root_segment = root_distance2.argmin(dim=-1)
+    root_fraction = root_projection["fraction"].gather(
+        -1, root_segment[..., None]
+    ).squeeze(-1)
+    root_arc = (
+        cumulative.gather(-1, root_segment[..., None]).squeeze(-1)
+        + root_fraction
+        * lengths.gather(-1, root_segment[..., None]).squeeze(-1)
+    )
     end_arc = cumulative[..., -1]
     unit = torch.linspace(
         0.0, 1.0, path.shape[-2], device=path.device, dtype=path.dtype,
     )
-    start = torch.where(retreat, goal_arc, torch.zeros_like(goal_arc))
+    start = torch.where(
+        retreat, torch.maximum(goal_arc, root_arc), torch.zeros_like(goal_arc),
+    )
     end = torch.where(retreat, end_arc, goal_arc)
     query = start[..., None] + unit * (end - start)[..., None]
 
@@ -70,10 +91,13 @@ def execution_view(
     )
     sampled = sampled.reshape_as(path)
 
-    # Attach the first suffix segment to the current root. All remaining
-    # suffix samples stay in their predicted world coordinates: translating
-    # the whole suffix also moved the virtual box, sometimes onto the root.
-    sampled[..., 0, :] = path[..., 0, :]
+    # Carry retains the fixed departure point. Retreat starts at the live
+    # root's projection on the goal->endpoint suffix, so both execution and
+    # clearance reward exclude already traversed points. Injecting P0 here
+    # would create a synthetic backwards segment on every replan.
+    sampled[..., 0, :] = torch.where(
+        retreat[..., None], sampled[..., 0, :], path[..., 0, :],
+    )
     sampled[..., -1, :] = torch.where(
         retreat[..., None], path[..., -1, :], goal_xy,
     )

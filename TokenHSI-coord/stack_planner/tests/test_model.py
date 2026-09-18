@@ -18,8 +18,10 @@ from stack_planner.constraints import (
     retreat_box_clearance,
 )
 from stack_planner.execution import execution_view, retreat_box_geometry
-from stack_planner.history import StackHistoryBuffer
-from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner
+from stack_planner.history import StackHistoryBuffer, project_path_progress
+from stack_planner.model import (
+    StackPlannerConfig, StackTrajectoryPlanner, _future_point_weight,
+)
 from stack_planner.policy import StackPlannerActorCritic
 from stack_planner.schema import (
     STACK_PATH_DELTA_DIM, STACK_PATH_POINTS, STACK_SCHEMA_VERSION,
@@ -139,14 +141,15 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         goal = torch.tensor([[[2.0, 0.0], [2.0, 0.0]]])
 
         carry = execution_view(
-            path, box, goal, torch.zeros(1, 2, dtype=torch.bool),
+            path, box, goal, torch.zeros(1, 2, dtype=torch.bool), goal,
         )
         self.assertTrue(torch.equal(carry[..., 0, :], path[..., 0, :]))
         self.assertTrue(torch.equal(carry[..., -1, :], goal))
 
         retreat_mask = torch.tensor([[True, False]])
-        mixed = execution_view(path, box, goal, retreat_mask)
-        self.assertTrue(torch.equal(mixed[..., 0, :], path[..., 0, :]))
+        mixed = execution_view(path, box, goal, retreat_mask, goal)
+        self.assertTrue(torch.equal(mixed[0, 0, 0], goal[0, 0]))
+        self.assertTrue(torch.equal(mixed[0, 1, 0], path[0, 1, 0]))
         self.assertTrue(torch.equal(mixed[0, 0, -1], path[0, 0, -1]))
         self.assertTrue(torch.equal(mixed[0, 1, -1], goal[0, 1]))
 
@@ -155,10 +158,27 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         path = points[None, None].repeat(1, 2, 1, 1)
         box = torch.tensor([[[1., 0.], [1., 0.]]])
         goal = torch.tensor([[[2., 0.], [2., 0.]]])
-        retreat = execution_view(path, box, goal, torch.tensor([[True, False]]))
-        self.assertTrue(torch.equal(retreat[0, 0, 0], path[0, 0, 0]))
+        retreat = execution_view(
+            path, box, goal, torch.tensor([[True, False]]), goal,
+        )
+        self.assertTrue(torch.equal(retreat[0, 0, 0], goal[0, 0]))
         self.assertTrue(torch.equal(retreat[0, 0, -1], path[0, 0, -1]))
-        self.assertFalse(torch.equal(retreat[0, 0, -1], retreat[0, 0, 0]))
+        self.assertTrue(torch.equal(retreat[0, 0, -1], retreat[0, 0, 0]))
+
+    def test_retreat_execution_drops_already_traversed_suffix(self):
+        points = torch.tensor([
+            [0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [3.0, 0.0],
+        ])
+        path = points[None, None].repeat(1, 2, 1, 1)
+        box = torch.tensor([[[1.0, 0.0], [1.0, 0.0]]])
+        goal = torch.tensor([[[2.0, 0.0], [2.0, 0.0]]])
+        root = torch.tensor([[[2.6, 0.2], [2.0, 0.0]]])
+        retreat = execution_view(
+            path, box, goal, torch.tensor([[True, False]]), root,
+        )
+        self.assertAlmostEqual(float(retreat[0, 0, 0, 0]), 2.6, places=5)
+        self.assertAlmostEqual(float(retreat[0, 0, 0, 1]), 0.0, places=5)
+        self.assertTrue(torch.equal(retreat[0, 0, -1], path[0, 0, -1]))
 
     def test_retreat_clearance_prefers_moving_away_over_crossing_box(self):
         safe = torch.tensor([[
@@ -262,6 +282,25 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         expected = torch.arange(4).reshape(1, 4).expand(3, -1)
         self.assertTrue(torch.equal(action[..., 0].long(), expected))
 
+    def test_executed_action_dimensions_do_not_change_log_probability(self):
+        state = make_state(batch=1)
+        previous = torch.zeros(1, AGENTS, STACK_PATH_POINTS, 2)
+        previous[..., 0] = torch.arange(STACK_PATH_POINTS)
+        state.root_xy[0, 0] = torch.tensor([8.0, 0.0])
+        state.root_xy[0, 1] = torch.tensor([0.0, 0.0])
+        buffer = StackHistoryBuffer(1, 1, state.device)
+        buffer.commit_path(previous)
+        observation = buffer.observe(state)
+        policy = StackPlannerActorCritic(
+            StackTrajectoryPlanner(StackPlannerConfig(candidates=1))
+        )
+        _, action, log_prob, _ = policy.act(observation, deterministic=True)
+        modified = action.clone()
+        # A1 point 1..8 XY corrections are behind progress=8.
+        modified[:, 1:1 + 8 * 2] += 5.0
+        modified_log_prob, _, _, _ = policy.evaluate(observation, modified)
+        self.assertTrue(torch.allclose(log_prob, modified_log_prob))
+
     def test_only_selected_full_path_head_gets_continuous_action_credit(self):
         state = make_state(batch=2)
         policy = StackPlannerActorCritic(
@@ -294,6 +333,24 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         diversity = policy.diversity(state, margin=0.25)
         self.assertTrue(torch.isfinite(diversity["loss"]))
         self.assertGreaterEqual(float(diversity["distance"]), 0.0)
+        self.assertTrue(torch.isfinite(diversity["smoothness_loss"]))
+
+    def test_smoothness_objective_penalizes_zigzag_mean_correction(self):
+        state = make_state(batch=1)
+        policy = StackPlannerActorCritic(
+            StackTrajectoryPlanner(StackPlannerConfig(candidates=1))
+        )
+        final = policy.planner.heads.paths[0][-1]
+        nn.init.zeros_(final.weight)
+        raw = torch.zeros(AGENTS, STACK_PATH_POINTS - 1, 2)
+        raw[..., 0] = torch.where(
+            torch.arange(STACK_PATH_POINTS - 1) % 2 == 0, 1.0, -1.0,
+        )
+        final.bias.data.copy_(raw.reshape(-1))
+        regularity = policy.diversity(state)
+        self.assertGreater(float(regularity["smoothness_loss"]), 0.0)
+        regularity["smoothness_loss"].backward()
+        self.assertGreater(float(final.bias.grad.abs().sum()), 0.0)
 
     def test_pointwise_delta_exploration_scales(self):
         policy = StackPlannerActorCritic(
@@ -353,16 +410,42 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         committed = initial["path_world"][:, 0].clone()
         committed[..., 5:, 1] += 0.2
         buffer.commit_path(committed)
-        second = buffer.observe(state)
+        moved = state.clone()
+        direction = committed[:, :, 1] - committed[:, :, 0]
+        moved.root_xy = committed[:, :, 0] + 0.6 * direction
+        second = buffer.observe(moved)
         with torch.no_grad():
             refined = model(second)
         self.assertTrue(torch.allclose(
             refined["path_world"][:, 0], committed, atol=1e-6,
         ))
+        self.assertTrue(torch.allclose(
+            refined["path_world"][:, 0, :, 0], committed[:, :, 0], atol=1e-6,
+        ))
+        self.assertFalse(torch.allclose(
+            refined["path_world"][:, 0, :, 0], moved.root_xy, atol=1e-6,
+        ))
         buffer.reset(torch.tensor([True, False]))
         reset_observation = buffer.observe(state, commit=False)
         self.assertFalse(bool(reset_observation.previous_path_valid[0]))
         self.assertTrue(bool(reset_observation.previous_path_valid[1]))
+
+    def test_previous_path_keeps_origin_and_masks_executed_prefix(self):
+        previous = torch.zeros(1, AGENTS, STACK_PATH_POINTS, 2)
+        previous[..., 0] = torch.arange(STACK_PATH_POINTS)
+        root = previous[..., 0, :].clone()
+        root[:, 0, 0] = 8.0
+        progress = project_path_progress(previous, root)
+        weight = _future_point_weight(progress, torch.tensor([True]))
+        self.assertAlmostEqual(float(progress[0, 0]), 8.0)
+        self.assertTrue(torch.equal(previous[0, 0, 0], torch.tensor([0., 0.])))
+        self.assertTrue(torch.equal(weight[0, 0, :9], torch.zeros(9)))
+        self.assertAlmostEqual(float(weight[0, 0, 9]), 0.5)
+        self.assertAlmostEqual(float(weight[0, 0, 10]), 1.0)
+        later_root = root.clone()
+        later_root[:, 0, 0] = 6.0
+        monotonic = project_path_progress(previous, later_root, progress)
+        self.assertEqual(float(monotonic[0, 0]), 8.0)
 
     def test_path_backward_reaches_transformer(self):
         state = make_state(batch=1)
@@ -383,7 +466,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         with torch.inference_mode():
             before = model(state)
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v9.pth"
+            path = Path(directory) / "stack_v12.pth"
             save_stack_checkpoint(path, model, step=7)
             loaded, payload = load_stack_checkpoint(path)
             with torch.inference_mode():
@@ -394,13 +477,13 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         for key in before:
             self.assertTrue(torch.equal(before[key], after[key]), key)
 
-    def test_v8_schema_is_rejected_after_trajectory_correction_change(self):
+    def test_v11_schema_is_rejected_after_joint_a2_preplan_change(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "old_schema.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
-            payload["schema_version"] = "tokenhsi-stack-planner-v8"
+            payload["schema_version"] = "tokenhsi-stack-planner-v11"
             torch.save(payload, path)
             with self.assertRaisesRegex(ValueError, "checkpoint mismatch"):
                 load_stack_checkpoint(path)
@@ -408,7 +491,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
     def test_checkpoint_records_single_path_contract(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v9.pth"
+            path = Path(directory) / "stack_v12.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
             loaded, migrated = load_stack_checkpoint(path)
@@ -418,6 +501,12 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(migrated["path_only"])
         self.assertTrue(migrated["full_candidate_rollout"])
         self.assertTrue(migrated["previous_trajectory_correction"])
+        self.assertTrue(migrated["fixed_origin_reference"])
+        self.assertTrue(migrated["future_action_mask"])
+        self.assertTrue(migrated["projected_executor_resume"])
+        self.assertTrue(migrated["joint_a2_preplan"])
+        self.assertTrue(migrated["deferred_a2_carry_goal"])
+        self.assertTrue(migrated["smooth_path_regularization"])
         self.assertEqual(loaded.config, model.config)
 
 

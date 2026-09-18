@@ -2,7 +2,78 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-18
+
+### Joint A2 preplan with deferred Carry goal (V12)
+
+- A2 path를 handoff 때 새로 만드는 대신 최초 joint planner decision부터 A1과 함께
+  `departure → Box2 → eventual stack top`으로 출력하고 A2 executor에도 미리 설치한다.
+- planner observation의 A2 goal은 handoff 전에도 예정된 stack top XY를 사용하지만 frozen Carry의
+  실제 `_box_tar_pos`는 Box2 초기 위치에 유지한다. 안정화 신호가 열리면 steering path를
+  `_reset_steer_to()`로 덮어쓰지 않고 Carry goal만 실제 Box1 top으로 변경한다.
+- `STACK_TOP_FOLLOWS_BOTTOM=1`에서도 inherited 코드처럼 `_gt_path`를 매 frame 평행이동하지 않고,
+  물리 Carry goal만 support를 따라가게 한다. path 수정은 다음 planner replan이 담당한다.
+- planner input/execution 의미가 달라 schema를 V12로 올리고 V11 checkpoint resume을 거부한다.
+
+### Fixed-origin future-masked trajectory planner (V11)
+
+- 잔여 경로를 매 decision마다 33점으로 재보간하던 V10 reference를 제거했다. 최초 departure에서
+  만든 33-point index와 P0를 유지하고, 현재 root의 monotonic point progress 이전 correction을
+  freeze한다. 경계는 두 point ramp로 연결해 현재 위치에서 꺾임이 생기지 않게 했다.
+- progress를 plan embedding에 추가하고 이미 실행한 action dimension은 PPO log-prob과 entropy에서
+  제외한다. temporal consistency도 같은 고정 point index끼리 비교하도록 변경했다.
+- frozen executor는 새 plan 설치 때 arc 0으로 돌아가지 않고 현재 root를 실행 path에 투영한 arc에서
+  재개한다. retreat 실행과 box-clearance reward는 현재 root 이후 suffix만 사용해 과거 carry/retreat
+  구간을 미래 충돌로 재채점하지 않는다.
+- 모델 입력, action credit, 실행 계약 변경으로 schema를 V11로 올리고 V10 resume을 거부한다.
+  CPU 단위 테스트 40개를 통과했다.
+
+### Progress-advanced smooth trajectory correction planner (V10)
+
+- 직전 채택 path의 point 0만 현재 root로 옮기던 V9 reference 갱신을 제거했다. 현재 root를
+  직전 polyline에 투영하고 이미 실행한 prefix를 버린 뒤 남은 point sequence를 33점으로
+  재보간한다. endpoint는 보존하며 stationary replan은 기존 point를 그대로 유지한다.
+- 후보 diversity를 raw 33 points 대신 4회 low-pass한 coarse route에서 계산한다. mean
+  pointwise correction의 second finite difference 제곱을 `STACK_PLANNER_SMOOTHNESS_COEF`
+  (기본 10.0)로 penalize해 좌우 zigzag가 diversity나 path correction으로 남지 않게 했다.
+- `path_smoothness_loss`와 기존에 파일에만 있던 `collision_cost`를 콘솔에도 출력한다.
+  reference/checkpoint 의미가 바뀌므로 schema를 V10으로 올리고 V9 checkpoint resume을 거부한다.
+
 ## 2026-09-17
+
+### E2E DAgger planner 전용 viewer
+
+- 저장소 루트에 `visualize_e2e_planner.sh`와 `e2e_viewer/run_view.py`를 추가했다.
+  별도 e2e checkout을 읽기 전용 source로 사용해 `m4_bc_r5/last.pth`와 frozen executor를
+  native Isaac Gym 창에서 실행한다.
+- 발표 수치 0.249의 실행 조건인 `E2E_CARRY_END_OFFSET=0.15`를 기본으로 재현한다.
+  화면에는 agent별 설치 전체 경로, 실제 steering window, aim point를 구분해 표시한다.
+- viewer subclass는 dataset URDF 절대경로를 parent directory와 basename으로 분리해 Isaac Gym에
+  전달한다. 원본의 `./` + 절대경로 결합으로 asset 전체가 parse 실패하고 PhysX CUDA illegal
+  access로 이어지던 문제를 viewer 범위에서 수정했다.
+- 연속 speed profile에서는 동일 속도 run이 없어 ribbon이 생략될 수 있으므로 전체 path band를
+  기본으로 그리고, agent별 planner route 중심선을 바닥 위에 항상 추가로 표시한다.
+- checkpoint 계약 사전 검사와 source/checkpoint/GPU/Vulkan/env/seed override를 지원한다.
+
+### Stack planner viewer 루트 진입점
+
+- 저장소 루트에 `visualize_planner.sh`를 추가했다. 현재 planner schema와 호환되는 최신
+  checkpoint 자동 선택, `--list` metadata 확인, `--check` 사전 검증, GPU/Vulkan device와
+  env 수 선택을 지원하고 기존 deterministic Isaac Gym viewer를 호출한다.
+- 구 checkpoint를 현재 모델로 암묵 변환하지 않으며 schema가 다르면 창을 띄우기 전에
+  명시적으로 거부한다.
+
+### Stack planner 평가 box/layout coverage
+
+- deterministic retreat 평가가 기본적으로 small/medium/large bottom/top box의 3x3 size
+  grid를 환경 벡터에 배정하도록 했다. 박스 asset은 env 생성 시 고정되므로 episode별 resize를
+  시도하지 않고 env 간 다양성으로 평가한다.
+- `STACK_PLANNER_EVAL_SCEN=free|cross|parallel|solo`를 추가하고, 네 배치를 순차 평가하는
+  `eval_retreat_suite.sh`를 추가했다. 학습 sidecar를 읽은 뒤 평가 scenario를 명시적으로
+  덮어써 외부 shell의 낡은 `MA_LAYOUT`이 평가를 오염시키지 않게 했다.
+- summary에 scenario, box-grid 활성 여부, unique bottom/top/pair 크기 수를 기록한다.
+  학습 분포는 변경하지 않았다. 기존 학습은 env 생성 시 box size를 env별로 배정하고,
+  free 배치에서 box/goal 위치를 episode reset마다 다시 샘플링한다.
 
 ### Previous-trajectory correction planner (V9)
 

@@ -6,6 +6,8 @@
 #     bash scripts/masteer/eval_sequential_stack.sh /abs/Humanoid.pth [tag]
 # Default grid sizes are testSizes indices 0,4,7 = 0.22/0.42/0.57 m cubes.
 # Override with STACK_EVAL_BOX_SIZE_IDS=i,j,k.
+# Use STACK_EVAL_SUCCESS_MODE=tokenhsi_carry for TokenHSI's original
+# 3-D carry success threshold instead of the default box-radius criterion.
 #
 # Results:
 #   runs/results/sequential_stack/eval_<tag>.npy
@@ -35,6 +37,11 @@ case "$ENVS" in
 esac
 [ "$ENVS" -gt 0 ] || exit 2
 BOX_GRID=${STACK_EVAL_BOX_GRID:-1}
+SUCCESS_MODE=${STACK_EVAL_SUCCESS_MODE:-box_radius}
+case "$SUCCESS_MODE" in
+    box_radius|tokenhsi_carry) ;;
+    *) echo "STACK_EVAL_SUCCESS_MODE은 box_radius 또는 tokenhsi_carry여야 한다: $SUCCESS_MODE" >&2; exit 2 ;;
+esac
 if [ "$BOX_GRID" != 0 ] && [ $((ENVS % 9)) -ne 0 ]; then
     echo "3x3 box grid에서는 STACK_EVAL_ENVS가 9의 배수여야 한다: $ENVS" >&2
     exit 2
@@ -79,6 +86,7 @@ export MA_EVAL_ALL_AGENT_ROWS=1
 export MA_EVAL_FLUSH_DONE=1
 export STACK_EVAL_BOX_GRID="$BOX_GRID"
 export STACK_EVAL_BOX_SIZE_IDS=${STACK_EVAL_BOX_SIZE_IDS:-0,4,7}
+export STACK_EVAL_SUCCESS_MODE="$SUCCESS_MODE"
 export MS_MRAND=${MS_MRAND:-4}
 export MS_M_LO=${MS_M_LO:-0.25}
 export MS_CLIP=${MS_CLIP:-1}
@@ -95,7 +103,7 @@ export STACK_BOTTOM_Z_TOL=${STACK_BOTTOM_Z_TOL:-0.05}
 export STACK_BOTTOM_DISPLACE_TOL=${STACK_BOTTOM_DISPLACE_TOL:-0.50}
 export STACK_TOP_XY_TOL=${STACK_TOP_XY_TOL:-0.15}
 
-echo "sequential-stack eval: policy=$POLICY envs=$ENVS gpu=$GPU box_grid=$STACK_EVAL_BOX_GRID size_ids=$STACK_EVAL_BOX_SIZE_IDS" | tee "$LOG"
+echo "sequential-stack eval: policy=$POLICY envs=$ENVS gpu=$GPU box_grid=$STACK_EVAL_BOX_GRID size_ids=$STACK_EVAL_BOX_SIZE_IDS success_mode=$STACK_EVAL_SUCCESS_MODE" | tee "$LOG"
 cd "$REPO"
 python -u ./tokenhsi/run.py \
     --task HumanoidMASequentialStackCarry \
@@ -110,14 +118,15 @@ python -u ./tokenhsi/run.py \
 
 [ -f "$METRICS" ] || { echo "metric 파일이 생성되지 않았다: $METRICS" >&2; exit 5; }
 python3 - "$TAG" "$METRICS" "$ENVS" "$BOX_GRID" <<'PY' | tee -a "$LOG"
+import os
 import sys
 import numpy as np
 
 tag, path, envs = sys.argv[1], sys.argv[2], int(sys.argv[3])
 box_grid = int(sys.argv[4]) != 0
 m = np.load(path)
-if m.ndim != 2 or m.shape[1] < 54:
-    raise SystemExit(f"sequential metric columns >=54 expected, got {m.shape}")
+if m.ndim != 2 or m.shape[1] < 55:
+    raise SystemExit(f"sequential metric columns >=55 expected, got {m.shape}")
 
 # Metrics arrive in asynchronous episode-completion order, not repeat order.
 # Group first, discard each environment's own warm-up episode, then take
@@ -147,6 +156,7 @@ warmup = "per_env_discarded"
 a1 = np.stack([pair[0] for pair in episodes])
 a2 = np.stack([pair[1] for pair in episodes])
 success = a1[:, 40] > 0.5
+terminate_reason = a1[:, 54].astype(np.int64)
 root_sum = a1[:, 26] + a2[:, 26]
 box_sum = a1[:, 27] + a2[:, 27]
 steps = np.maximum(a1[:, 30] + a2[:, 30], 1.0)
@@ -162,8 +172,20 @@ def stats(prefix, mask):
             f" {prefix}_root_mae={mean(root_sum[mask] / steps[mask]):.4f}"
             f" {prefix}_box_mae={mean(box_sum[mask] / steps[mask]):.4f}")
 
+def term_stats(mask):
+    reason = terminate_reason[mask]
+    return (f" terminate_n={int(np.sum(reason != 0))}"
+            f" terminate_rate={mean(reason != 0):.4f}"
+            f" term_fall_a1_n={int(np.sum(reason == 1))}"
+            f" term_fall_a2_n={int(np.sum(reason == 2))}"
+            f" term_fall_both_n={int(np.sum(reason == 3))}"
+            f" term_bottom_displaced_n={int(np.sum(reason == 4))}"
+            f" term_multiple_n={int(np.sum(reason == 5))}"
+            f" term_unknown_n={int(np.sum(reason == 6))}")
+
 parts = [
     f"SEQ_STACK_EVAL tag={tag}",
+    f"success_mode={os.environ['STACK_EVAL_SUCCESS_MODE']}",
     f"episodes={len(episodes)}",
     f"success_n={int(success.sum())}",
     f"success_rate={success.mean():.4f}",
@@ -185,7 +207,8 @@ for name, source, col in (("place", a1, 42),
         f"{name}_box_mae={mean(source[:, col + 1] / n):.4f}",
     ))
 
-print(" ".join(parts) + stats("success", success))
+print(" ".join(parts) + stats("success", success)
+      + term_stats(np.ones(len(episodes), dtype=bool)))
 
 def size_label(row):
     return "x".join(f"{value:.2f}" for value in row[51:54])
@@ -216,7 +239,8 @@ for bottom, top in combo_keys:
         f"root_cum={mean(root_sum[mask]):.4f} "
         f"box_cum={mean(box_sum[mask]):.4f} "
         f"root_mae={mean(root_sum[mask] / steps[mask]):.4f} "
-        f"box_mae={mean(box_sum[mask] / steps[mask]):.4f}")
+        f"box_mae={mean(box_sum[mask] / steps[mask]):.4f}"
+        + term_stats(mask))
 PY
 
 echo "metrics: $METRICS"

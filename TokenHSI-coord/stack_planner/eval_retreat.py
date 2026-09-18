@@ -20,6 +20,10 @@ def main():
     player = _make_player(args, cfg, cfg_train)
     task = player.env.task
     planner, payload = load_stack_checkpoint(os.environ['STACK_PLANNER_EVAL_CKPT'], player.device)
+    box_sizes = task._box_lib._box_size.reshape(task.num_envs, 2, 3)
+    unique_bottom_sizes = int(torch.unique(box_sizes[:, 0], dim=0).shape[0])
+    unique_top_sizes = int(torch.unique(box_sizes[:, 1], dim=0).shape[0])
+    unique_size_pairs = int(torch.unique(box_sizes.reshape(task.num_envs, -1), dim=0).shape[0])
     history = StackHistoryBuffer(
         task.num_envs, planner.config.history_steps, task.device,
     )
@@ -102,6 +106,11 @@ def main():
                 previous_phase = None
     summary = dict(checkpoint=os.environ['STACK_PLANNER_EVAL_CKPT'], checkpoint_step=payload['step'],
                    seed=seed, steps=steps, envs=task.num_envs, replan_steps=period,
+                   scenario=os.environ.get('STACK_PLANNER_EVAL_SCEN', 'free'),
+                   box_grid=bool(int(os.environ.get('STACK_EVAL_BOX_GRID', '0'))),
+                   unique_bottom_sizes=unique_bottom_sizes,
+                   unique_top_sizes=unique_top_sizes,
+                   unique_box_size_pairs=unique_size_pairs,
                    **summarize_retreat(records))
     (out / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     print('[stack-planner-retreat-eval] ' + json.dumps(summary), flush=True)

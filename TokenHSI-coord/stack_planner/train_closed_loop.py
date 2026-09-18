@@ -269,7 +269,8 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
                 advantages, decision_mask, candidate_targets,
                 consistency_targets, epochs, minibatch,
                 clip_ratio, value_coef, entropy_coef, consistency_coef,
-                diversity_coef, diversity_margin, evaluator_coef):
+                diversity_coef, diversity_margin, smoothness_coef,
+                evaluator_coef):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
@@ -277,6 +278,7 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
         "consistency_valid_fraction": 0.0,
         "candidate_diversity_loss": 0.0,
         "candidate_path_distance": 0.0,
+        "path_smoothness_loss": 0.0,
         "candidate_evaluator_loss": 0.0,
         "candidate_evaluator_accuracy": 0.0,
     }
@@ -335,6 +337,7 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
                 - entropy_coef * entropy_mean
                 + consistency_coef * consistency["total"]
                 + diversity_coef * diversity["loss"]
+                + smoothness_coef * diversity["smoothness_loss"]
                 + evaluator_coef * evaluator_loss
             )
             optimizer.zero_grad(set_to_none=True)
@@ -354,6 +357,9 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
             )
             sums["candidate_path_distance"] += float(
                 diversity["distance"].detach()
+            )
+            sums["path_smoothness_loss"] += float(
+                diversity["smoothness_loss"].detach()
             )
             sums["candidate_evaluator_loss"] += float(
                 evaluator_loss.detach()
@@ -448,13 +454,14 @@ def main():
     consistency_coef = _env_float("STACK_PLANNER_CONSISTENCY_COEF", 1.0)
     diversity_coef = _env_float("STACK_PLANNER_DIVERSITY_COEF", 0.05)
     diversity_margin = _env_float("STACK_PLANNER_DIVERSITY_MARGIN", 0.25)
+    smoothness_coef = _env_float("STACK_PLANNER_SMOOTHNESS_COEF", 10.0)
     evaluator_coef = _env_float("STACK_PLANNER_EVALUATOR_COEF", 1.0)
     retreat_path_scale = _env_float("STACK_PLANNER_RETREAT_PATH_CONSISTENCY_SCALE", 0.05)
     endpoint_penalty_coef = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_PENALTY", 1.0)
     endpoint_tolerance = _env_float("STACK_PLANNER_RETREAT_ENDPOINT_TOLERANCE", 0.10)
     if not 0 <= retreat_path_scale <= 1 or endpoint_penalty_coef < 0 or endpoint_tolerance < 0:
         raise ValueError("invalid retreat consistency/endpoint settings")
-    if (consistency_coef < 0 or diversity_coef < 0
+    if (consistency_coef < 0 or diversity_coef < 0 or smoothness_coef < 0
             or diversity_margin < 0 or evaluator_coef < 0):
         raise ValueError("planner consistency/diversity settings must be non-negative")
     visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
@@ -495,6 +502,7 @@ def main():
           f"candidates={planner.config.candidates} "
           f"delta_scale={planner.config.delta_scale:g} "
           f"diversity={diversity_coef:g}/{diversity_margin:g}m "
+          f"smoothness={smoothness_coef:g} "
           f"evaluator_coef={evaluator_coef:g} full_candidate_rollout=True "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
@@ -736,6 +744,7 @@ def main():
             consistency_coef,
             diversity_coef,
             diversity_margin,
+            smoothness_coef,
             evaluator_coef,
         )
         def ratio(numerator, denominator):
@@ -784,6 +793,7 @@ def main():
             "delta_scale": planner.config.delta_scale,
             "diversity_coef": diversity_coef,
             "diversity_margin": diversity_margin,
+            "smoothness_coef": smoothness_coef,
             "full_candidate_rollout": 1.0,
             **{
                 f"candidate_usage_{candidate}": float(
@@ -813,6 +823,7 @@ def main():
                        "bottom_postplace_linear_speed",
                        "policy_loss", "value_loss",
                        "candidate_path_distance",
+                       "path_smoothness_loss", "collision_cost",
                        "candidate_evaluator_loss",
                        "candidate_evaluator_accuracy"}
         ), flush=True)
@@ -835,6 +846,7 @@ def main():
                         "evaluator_coef": evaluator_coef,
                         "diversity_coef": diversity_coef,
                         "diversity_margin": diversity_margin,
+                        "smoothness_coef": smoothness_coef,
                         "retreat_endpoint_penalty_coef": endpoint_penalty_coef,
                         "retreat_endpoint_tolerance": endpoint_tolerance,
                         "visit_penalty_coef": visit_penalty_coef,

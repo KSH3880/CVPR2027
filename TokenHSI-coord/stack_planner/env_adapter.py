@@ -144,6 +144,20 @@ class HumanoidMAStackPlannerTrain(
         box = self.humanoid_rows(self._box_states)[rows].reshape(-1, 2, 13)
         size = self._box_lib._box_size[rows].reshape(-1, 2, 3)
         goal = self._box_tar_pos[rows, :2].reshape(-1, 2, 2)
+        # A2 is planned in the same joint pass as A1 even while its frozen
+        # Carry goal remains parked on Box2. Expose the eventual stack XY to
+        # the planner, but do not expose it to the low-level carry observation
+        # until the coordinator opens A2_RESUME.
+        planned_top = self._bottom_nominal_pos[env_ids, :2]
+        if hasattr(self, "_top_committed"):
+            planned_top = torch.where(
+                self._top_committed[env_ids, None],
+                self._committed_top_pos[env_ids, :2], planned_top,
+            )
+        stack_episode = ~self._carry_rehearsal[env_ids]
+        goal[:, 1] = torch.where(
+            stack_episode[:, None], planned_top, goal[:, 1],
+        )
         bottom = box[..., 2] - size[..., 2] / 2
         lifted = bottom > self._initial_box_bottom_z[rows].reshape(-1, 2) + 0.08
         near = (root[..., :2] - box[..., :2]).norm(dim=-1) <= 0.7
@@ -183,6 +197,17 @@ class HumanoidMAStackPlannerTrain(
         )
         active[:, 0] |= a1_avoids
         return active
+
+    def planner_execution_rows(self):
+        """Rows that receive the jointly planned route, including queued A2."""
+        execute = self.planner_active_rows()
+        queued_a2 = (
+            (self._stack_phase >= self.A1_PLACE)
+            & (self._stack_phase < self.A2_RESUME)
+            & ~self._carry_rehearsal
+        )
+        execute[:, 1] |= queued_a2
+        return execute
 
     def _reset_envs(self, env_ids):
         super()._reset_envs(env_ids)
@@ -327,9 +352,40 @@ class HumanoidMAStackPlannerTrain(
         return env_ids[~waiting]
 
     def _activate_a2_top_goal(self, env_ids):
-        # Parent completion sees zero distance to a hold target. Prevent its
-        # side effects as well as the phase transition until a plan is accepted.
-        super()._activate_a2_top_goal(self._planner_a2_ready_ids(env_ids))
+        """Expose the top goal without replacing A2's pre-installed plan."""
+        env_ids = self._planner_a2_ready_ids(env_ids)
+        if not len(env_ids):
+            return
+        # Refresh the target from the actual support pose at the signal. The
+        # parent implementation also calls _reset_steer_to(), which would
+        # overwrite the joint planner path with a manual straight path.
+        self._commit_top_goal(env_ids)
+        rows = self.agent_rows(env_ids).view(-1, 2)
+        r1 = rows[:, 1]
+        top = self._committed_top_pos[env_ids]
+        self._box_tar_pos[r1] = top
+        boxes = self.humanoid_rows(self._box_states)
+        self._prev_top_dist[env_ids] = torch.norm(
+            boxes[r1, 0:3] - top, dim=-1,
+        )
+
+    def _update_following_top_goal(self):
+        """Follow the support with the Carry goal, never by moving the path."""
+        if (not getattr(self, "stack_top_follows_bottom", False)
+                or not hasattr(self, "_stack_phase")
+                or self._carry_rehearsal is None):
+            return
+        active = (
+            (self._stack_phase >= self.A2_RESUME)
+            & (self._stack_phase < self.DONE)
+            & ~self._carry_rehearsal
+        )
+        env_ids = torch.nonzero(active, as_tuple=False).squeeze(-1)
+        if not len(env_ids):
+            return
+        self._commit_top_goal(env_ids)
+        r1 = self.agent_rows(env_ids).view(-1, 2)[:, 1]
+        self._box_tar_pos[r1] = self._committed_top_pos[env_ids]
 
     def _set_phase(self, env_ids, phase):
         if phase == self.A2_RESUME:
@@ -378,6 +434,7 @@ class HumanoidMAStackPlannerTrain(
         state = self.planner_state()
         phase = self._stack_phase
         active = self.planner_active_rows()
+        execute = self.planner_execution_rows()
         retreat_env = (
             (phase >= self.A1_RETREAT)
             & (phase < self.DONE)
@@ -402,26 +459,27 @@ class HumanoidMAStackPlannerTrain(
             + 0.5 * self._box_lib._box_size[a1_rows, 2]
         )
         path = execution_view(
-            model_path, state.box_xyz[..., :2], state.goal_xy, retreat_rows
+            model_path, state.box_xyz[..., :2], state.goal_xy, retreat_rows,
+            state.root_xy,
         )
         speed = torch.full(
             path.shape[:-1], MAX_SPEED, device=path.device, dtype=path.dtype,
         )
         model_speed = torch.full_like(output["path_world"][..., 0], MAX_SPEED)
         valid = free_path_validity(
-            output["path_world"], model_speed, state.root_xy, active
+            output["path_world"], model_speed, state.root_xy, execute
         )[:, 0]
         self._planner_policy_decision = active.any(dim=-1)
 
         # Inactive roots are stationary for the safety projection.
         projected = torch.where(
-            active[..., None, None], path,
+            execute[..., None, None], path,
             state.root_xy[..., None, :].expand_as(path),
         )
         separation = (projected[:, 0] - projected[:, 1]).norm(dim=-1)
         safe = separation.amin(dim=-1) >= 0.8
 
-        install = valid[:, None] & active
+        install = valid[:, None] & execute
         endpoint = path[:, 0, -1]
         commit_retreat = retreat_env & install[:, 0]
         self._planner_retreat_box_path_penalty.zero_()
@@ -432,6 +490,9 @@ class HumanoidMAStackPlannerTrain(
         # and PPO cannot learn which direction clears the placed box.
         finite_retreat = retreat_env & torch.isfinite(path).flatten(1).all(dim=-1)
         if finite_retreat.any():
+            # Score only the executable goal->retreat suffix. The fixed full
+            # path intentionally retains its historical carry prefix through
+            # the placed box and must not be counted as a future collision.
             geometry = retreat_box_geometry(path, state, finite_retreat)
             self._planner_retreat_box_path_penalty[finite_retreat] = geometry[
                 "penalty"
@@ -472,8 +533,10 @@ class HumanoidMAStackPlannerTrain(
             self._gt_path[rows] = flat_path
             self._mscale[rows] = dense_speed.reshape(-1, sp.V)[flat_install] / MAX_SPEED
             self._s_end[rows] = end.reshape(-1)[flat_install]
-            self._arc_root[rows] = 0
-            self._prev_arc[rows] = 0
+            root_xy = state.root_xy.reshape(-1, 2)[flat_install]
+            root_arc = sp.project(root_xy, flat_path)[0]
+            self._arc_root[rows] = root_arc
+            self._prev_arc[rows] = root_arc
             planner_box = state.box_xyz[..., :2].clone()
             planner_box[retreat_env, 0] = self._planner_virtual_retreat_pos[retreat_env, :2]
             self._arc_box[rows] = sp.project(

@@ -20,6 +20,7 @@ class StackPlannerObservation:
     history_valid: torch.Tensor   # [B,H]
     previous_path_world: torch.Tensor  # [B,2,33,2], last committed trajectory
     previous_path_valid: torch.Tensor  # [B]
+    path_progress: torch.Tensor        # [B,2], monotonic point-index progress
 
     def validate(self, history_steps=None):
         batch = self.state.batch_size
@@ -43,6 +44,8 @@ class StackPlannerObservation:
         if (self.previous_path_valid.shape != (batch,)
                 or self.previous_path_valid.dtype != torch.bool):
             raise ValueError("previous_path_valid must be bool [B]")
+        if self.path_progress.shape != (batch, AGENTS):
+            raise ValueError("path_progress must be [B,2]")
 
     @property
     def batch_size(self):
@@ -52,15 +55,48 @@ class StackPlannerObservation:
         return StackPlannerObservation(
             self.state.index(index), self.history_tokens[index],
             self.history_valid[index], self.previous_path_world[index],
-            self.previous_path_valid[index],
+            self.previous_path_valid[index], self.path_progress[index],
         )
 
     def clone(self):
         return StackPlannerObservation(
             self.state.clone(), self.history_tokens.clone(),
             self.history_valid.clone(), self.previous_path_world.clone(),
-            self.previous_path_valid.clone(),
+            self.previous_path_valid.clone(), self.path_progress.clone(),
         )
+
+
+def project_path_progress(path_world, root_xy, minimum=None):
+    """Project roots onto fixed-index paths without allowing progress regress."""
+    if path_world.ndim != 4 or path_world.shape[-1] != 2:
+        raise ValueError("path_world must be [B,A,P,2]")
+    if root_xy.shape != path_world.shape[:2] + (2,):
+        raise ValueError("root_xy must be [B,A,2]")
+    if minimum is None:
+        minimum = torch.zeros_like(root_xy[..., 0])
+    if minimum.shape != root_xy.shape[:2]:
+        raise ValueError("minimum progress must be [B,A]")
+    start = path_world[..., :-1, :]
+    segment = path_world[..., 1:, :] - start
+    relative = root_xy[..., None, :] - start
+    fraction = (
+        (relative * segment).sum(dim=-1)
+        / segment.square().sum(dim=-1).clamp(min=1e-8)
+    ).clamp(0.0, 1.0)
+    projection = start + fraction[..., None] * segment
+    distance2 = (projection - root_xy[..., None, :]).square().sum(dim=-1)
+    segment_index = torch.arange(
+        path_world.shape[-2] - 1, device=path_world.device,
+        dtype=path_world.dtype,
+    )
+    # Keep the segment containing the previous continuous progress available,
+    # but never select a segment wholly behind it.
+    behind = segment_index + 1.0 < minimum[..., None]
+    distance2 = distance2.masked_fill(behind, float("inf"))
+    nearest = distance2.argmin(dim=-1)
+    nearest_fraction = fraction.gather(-1, nearest[..., None]).squeeze(-1)
+    projected = nearest.to(path_world.dtype) + nearest_fraction
+    return torch.maximum(projected, minimum).clamp(0.0, path_world.shape[-2] - 1)
 
 
 class StackHistoryBuffer:
@@ -83,6 +119,9 @@ class StackHistoryBuffer:
         self.previous_path_valid = torch.zeros(
             batch_size, device=device, dtype=torch.bool,
         )
+        self.path_progress = torch.zeros(
+            batch_size, AGENTS, device=device, dtype=dtype,
+        )
 
     @property
     def history_steps(self):
@@ -94,6 +133,7 @@ class StackHistoryBuffer:
         self.valid[env_mask] = False
         self.previous_path_world[env_mask] = 0.0
         self.previous_path_valid[env_mask] = False
+        self.path_progress[env_mask] = 0.0
 
     def commit_path(self, path_world, update_mask=None):
         if path_world.shape != self.previous_path_world.shape:
@@ -149,13 +189,20 @@ class StackHistoryBuffer:
         if reset_mask is not None:
             plan_world[reset_mask] = 0.0
             plan_valid[reset_mask] = False
+        progress = project_path_progress(
+            plan_world, state.root_xy, self.path_progress,
+        )
+        progress = torch.where(
+            plan_valid[:, None], progress, torch.zeros_like(progress),
+        )
         observation = StackPlannerObservation(
-            state, tokens, valid, plan_world, plan_valid,
+            state, tokens, valid, plan_world, plan_valid, progress,
         )
         observation.validate(self.history_steps)
         if commit:
             self.tokens.copy_(tokens)
             self.valid.copy_(valid)
+            self.path_progress.copy_(progress)
         return observation
 
 
@@ -171,7 +218,11 @@ def flatten_observations(observations):
         torch.cat([item.history_valid for item in observations], dim=0),
         torch.cat([item.previous_path_world for item in observations], dim=0),
         torch.cat([item.previous_path_valid for item in observations], dim=0),
+        torch.cat([item.path_progress for item in observations], dim=0),
     )
 
 
-__all__ = ["StackHistoryBuffer", "StackPlannerObservation", "flatten_observations"]
+__all__ = [
+    "StackHistoryBuffer", "StackPlannerObservation", "flatten_observations",
+    "project_path_progress",
+]

@@ -33,6 +33,14 @@ from utils import torch_utils
 class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
     """A1 putdown -> A1 retreat -> A2 carry-to-top, with a 340-D ABI."""
 
+    TERM_NONE = 0
+    TERM_FALL_A1 = 1
+    TERM_FALL_A2 = 2
+    TERM_FALL_BOTH = 3
+    TERM_BOTTOM_DISPLACED = 4
+    TERM_MULTIPLE = 5
+    TERM_UNKNOWN = 6
+
     PHASE_NAMES = (
         "A1_PLACE", "VERIFY_BOTTOM", "A1_RETREAT",
         "A2_RESUME", "VERIFY_STACK", "DONE",
@@ -83,6 +91,10 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         # even if the box later moves before the episode is flushed.
         self._seq_top_reached = torch.zeros(
             self.num_envs, dtype=torch.bool, device=self.device)
+        # Per-episode abnormal termination reason.  Keep this separate from
+        # reset_buf because timeout and DONE are normal episode endings.
+        self._seq_terminate_reason = torch.zeros(
+            self.num_envs, dtype=torch.long, device=self.device)
         # Episode-direct evaluation metrics.  Columns are grouped as
         # placement / retreat / A2 so a long wait in one phase cannot hide a
         # steering regression in another phase.  Shape is (agent rows, 3).
@@ -130,6 +142,13 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             "STACK_A2_TILT_PENALTY", "0.0"))
         self.stack_top_follows_bottom = bool(int(os.environ.get(
             "STACK_TOP_FOLLOWS_BOTTOM", "0")))
+        self.stack_eval_success_mode = os.environ.get(
+            "STACK_EVAL_SUCCESS_MODE", "box_radius").strip()
+        if self.stack_eval_success_mode not in (
+                "box_radius", "tokenhsi_carry"):
+            raise ValueError(
+                "STACK_EVAL_SUCCESS_MODE must be box_radius or "
+                "tokenhsi_carry")
         if self.stack_hand_clear_done <= self.stack_hand_clear_start:
             raise ValueError(
                 "STACK_HAND_CLEAR_DONE must exceed STACK_HAND_CLEAR_START")
@@ -196,6 +215,29 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
 
     def _compute_reset(self):
         super()._compute_reset()
+        if hasattr(self, "_seq_terminate_reason"):
+            # Reproduce the inherited fall predicate before it is folded from
+            # agent rows into one env-level terminate bit.  This preserves
+            # which agent caused the shared environment to terminate.
+            contact = self.humanoid_rows(self._contact_forces).clone()
+            contact[:, self._contact_body_ids, :] = 0
+            fall_contact = torch.any(torch.abs(contact) > 0.1, dim=-1)
+            fall_contact = torch.any(fall_contact, dim=-1)
+            body_height = self.humanoid_rows(self._rigid_body_pos)[..., 2]
+            fall_height = body_height < self._termination_heights
+            fall_height[:, self._contact_body_ids] = False
+            fall_height = torch.any(fall_height, dim=-1)
+            fallen = (fall_contact & fall_height
+                      & (self.progress_rows() > 1))
+            fallen = fallen.view(self.num_envs, self.num_agents)
+            fall_code = (fallen[:, 0].long() * self.TERM_FALL_A1
+                         + fallen[:, 1].long() * self.TERM_FALL_A2)
+            terminated = self._terminate_buf.bool()
+            self._seq_terminate_reason[terminated] = torch.where(
+                fall_code[terminated] > 0,
+                fall_code[terminated],
+                torch.full_like(
+                    fall_code[terminated], self.TERM_UNKNOWN))
         if (int(os.environ.get("STACK_DEBUG", "0")) != 0
                 and hasattr(self, "_sequential_reset_reported")):
             ended = self.reset_buf.bool() & ~self._sequential_reset_reported
@@ -231,6 +273,12 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
                           & ~self._carry_rehearsal)
         bottom_lost = (monitor_bottom
                        & (bottom_disp > self.stack_bottom_displace_tol))
+        if hasattr(self, "_seq_terminate_reason"):
+            prior = self._seq_terminate_reason[bottom_lost]
+            self._seq_terminate_reason[bottom_lost] = torch.where(
+                prior == self.TERM_NONE,
+                torch.full_like(prior, self.TERM_BOTTOM_DISPLACED),
+                torch.full_like(prior, self.TERM_MULTIPLE))
         self.reset_buf[bottom_lost] = 1
         self._terminate_buf[bottom_lost] = 1
         self._seq_top_reached[bottom_lost] = False
@@ -289,6 +337,7 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
         Columns 40..50 are success, final phase, then root/box cumulative
         lateral error and step count for place, retreat and A2 respectively.
         Columns 51..53 record the physical box XYZ size for stratified eval.
+        Column 54 records the env-level abnormal termination reason.
         """
         cols = super()._metric_extra_cols(rows)
         env = torch.div(rows, self.num_agents, rounding_mode="floor")
@@ -303,6 +352,7 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             ))
         cols.extend((self._box_lib._box_size[rows, axis]
                      for axis in range(3)))
+        cols.append(self._seq_terminate_reason[env].float())
         return cols
 
     def _metric_reset_extra(self, rows):
@@ -311,6 +361,9 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
             self._seq_ep_lat_root[rows] = 0.0
             self._seq_ep_lat_box[rows] = 0.0
             self._seq_ep_steps[rows] = 0
+        if hasattr(self, "_seq_terminate_reason"):
+            env = torch.div(rows, self.num_agents, rounding_mode="floor")
+            self._seq_terminate_reason[env] = self.TERM_NONE
 
     def _hand_box_clearance(self, rows):
         """Minimum hand-center distance from the owned oriented-box surface."""
@@ -781,26 +834,50 @@ class HumanoidMASequentialStackCarry(HumanoidMAStackCarry):
 
         phase = self._stack_phase
         top_delta = boxes[r1, 0:3] - self._committed_top_pos
-        top_xy_err = torch.norm(top_delta[:, 0:2], dim=-1)
         top_z_err = torch.abs(top_delta[:, 2])
+        # Scale A2's placement region with the current physical support.
+        # For a rectangular footprint this is the center-to-corner radius;
+        # for the evaluation cubes it is side * sqrt(2) / 2.
+        support_xy_radius = 0.5 * torch.norm(
+            self._box_lib._box_size[r0, 0:2], dim=-1)
+        top_from_bottom_xy = torch.norm(
+            boxes[r1, 0:2] - boxes[r0, 0:2], dim=-1)
+        top_on_support = top_from_bottom_xy <= support_xy_radius
         top_slow = (
             (torch.norm(boxes[r1, 7:10], dim=-1) < self.stack_vel_tol)
             & (torch.norm(boxes[r1, 10:13], dim=-1)
                < self.stack_ang_vel_tol))
         top_candidate = (
-            (top_xy_err < self.stack_top_xy_tol)
-            & (top_z_err < self.stack_top_z_tol) & top_slow)
+            top_on_support & (top_z_err < self.stack_top_z_tol) & top_slow)
         self._top_stable_count = torch.where(
             top_candidate, self._top_stable_count + 1,
             torch.zeros_like(self._top_stable_count))
 
-        enter_verify = torch.nonzero(
-            (phase == self.A2_RESUME)
-            & (top_xy_err < self.stack_top_xy_tol)
-            & (top_z_err < self.stack_top_z_tol),
-            as_tuple=False).squeeze(-1)
+        a2_active = ((phase == self.A2_RESUME)
+                     | (phase == self.VERIFY_STACK))
+        if self.stack_eval_success_mode == "tokenhsi_carry":
+            # Match TokenHSI's original carry evaluation predicate: 3-D box
+            # center-to-target distance <= env.successThreshold (0.20 m in
+            # the inherited config).  Gate it to A2's active phases because
+            # its pre-handoff wait target initially equals its box position.
+            carry_pos_err = torch.norm(
+                self._box_tar_pos[r1] - boxes[r1, 0:3], dim=-1)
+            eval_top_reached = (
+                a2_active & (carry_pos_err <= self._success_threshold))
+        else:
+            eval_top_reached = (
+                a2_active
+                & top_on_support
+                & (top_z_err < self.stack_top_z_tol))
         if hasattr(self, "_seq_top_reached"):
-            self._seq_top_reached[enter_verify] = True
+            self._seq_top_reached[eval_top_reached] = True
+
+        enter_verify_mask = (
+            (phase == self.A2_RESUME)
+            & top_on_support
+            & (top_z_err < self.stack_top_z_tol))
+        enter_verify = torch.nonzero(
+            enter_verify_mask, as_tuple=False).squeeze(-1)
         self._set_phase(enter_verify, self.VERIFY_STACK)
 
         phase = self._stack_phase

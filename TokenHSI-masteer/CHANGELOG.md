@@ -1,5 +1,27 @@
 # TokenHSI-ma — 변경 기록
 
+## 2026-09-17
+
+### Sequential-stack A2 평가 성공 반경을 아래 상자 크기에 맞춤
+
+- 평가용 `_seq_top_reached`의 XY 조건을 고정 `STACK_TOP_XY_TOL`에서 현재 아래 상자
+  중심 기준 `0.5 * sqrt(size_x^2 + size_y^2)`로 변경했다. 따라서 크기가 다른 아래
+  상자도 중심에서 윗면 모서리까지의 거리 안에 top 상자 중심이 들어오면 성공으로 센다.
+- 같은 크기 기반 XY 조건을 `A2_RESUME -> VERIFY_STACK` 진입과 `VERIFY_STACK` 유지,
+  `DONE`의 20-step 안정화에도 적용했다. Z 오차, 선·각속도와 안정화 시간 조건은 유지했다.
+- `STACK_EVAL_SUCCESS_MODE=tokenhsi_carry`를 추가했다. 이 모드의 평가 성공은 원본
+  TokenHSI carry와 같은 `norm(box_xyz - target_xyz) <= successThreshold`이며 현재 cfg의
+  문턱은 0.20 m다. A2 대기 위치가 즉시 성공으로 잡히지 않도록 A2 활성 phase에서만 센다.
+  기본 `box_radius` 모드와 phase 전이는 위 크기 기반 기준을 계속 사용한다.
+- 일반 및 coordinator sequential 평가 로그와 `SEQ_STACK_EVAL` 요약에 success mode를
+  기록하고, 지원하지 않는 mode는 simulator 시작 전에 거부하게 했다.
+- sequential metric 54번 열에 비정상 종료 원인을 저장한다. 상속된 낙상 판정을 agent
+  row에서 다시 계산해 `fall_a1`, `fall_a2`, `fall_both`로 보존하고, 별도 stack 검사인
+  `bottom_displaced`, 같은 step의 `multiple`, 미분류 `unknown`도 구분한다. timeout과
+  정상 `DONE`은 terminate로 세지 않는다. 일반·coordinator 평가 요약과 각 box 조합에
+  원인별 건수와 전체 terminate 비율을 출력한다.
+- Python 구문 검사와 0.22/0.42/0.57 m 정사각 상자의 기대 반경 계산을 확인했다.
+
 ## 2026-09-11
 
 ### Sequential-stack viewer를 visitor SSH용 noVNC로 이식

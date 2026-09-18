@@ -62,6 +62,7 @@ class StackPlannerActorCritic(nn.Module):
         output = self.planner.decode_delta(
             current, raw["reference_path_local"],
             raw["path_delta_raw"][batch, candidate][:, None],
+            raw["path_point_weight"],
         )
         output["selected_candidate"] = candidate
         output["candidate_logits"] = raw["candidate_logits"]
@@ -71,6 +72,7 @@ class StackPlannerActorCritic(nn.Module):
         current, raw = self.planner.raw_heads(state)
         output = self.planner.decode_delta(
             current, raw["reference_path_local"], raw["path_delta_raw"],
+            raw["path_point_weight"],
         )
         output["candidate_logits"] = raw["candidate_logits"]
         return output
@@ -88,13 +90,17 @@ class StackPlannerActorCritic(nn.Module):
             selected_distribution.mean if deterministic
             else selected_distribution.sample()
         )
-        log_prob = selected_distribution.log_prob(delta_action).sum(dim=-1)
+        action_mask = raw["path_action_mask"].to(delta_action.dtype)
+        log_prob = (
+            selected_distribution.log_prob(delta_action) * action_mask
+        ).sum(dim=-1)
         packed_action = torch.cat(
             (candidate[:, None].to(delta_action), delta_action), dim=-1,
         )
         current = state.state if hasattr(state, "history_tokens") else state
         output = self.planner.decode_delta(
             current, raw["reference_path_local"], delta_action[:, None],
+            raw["path_point_weight"],
         )
         output["selected_candidate"] = candidate
         output["candidate_logits"] = raw["candidate_logits"]
@@ -104,7 +110,8 @@ class StackPlannerActorCritic(nn.Module):
         """Sample and decode every full-path head from the same scene."""
         paths, value, raw = self.distribution(state)
         delta_action = paths.sample()
-        log_prob = paths.log_prob(delta_action).sum(dim=-1)
+        action_mask = raw["path_action_mask"][:, None].to(delta_action.dtype)
+        log_prob = (paths.log_prob(delta_action) * action_mask).sum(dim=-1)
         candidate = torch.arange(
             self.planner.config.candidates, device=delta_action.device,
             dtype=delta_action.dtype,
@@ -113,6 +120,7 @@ class StackPlannerActorCritic(nn.Module):
         current = state.state if hasattr(state, "history_tokens") else state
         output = self.planner.decode_delta(
             current, raw["reference_path_local"], delta_action,
+            raw["path_point_weight"],
         )
         output["candidate_logits"] = raw["candidate_logits"]
         return output, packed_action, log_prob, value
@@ -134,30 +142,68 @@ class StackPlannerActorCritic(nn.Module):
         )
         # Candidate selection is supervised from full counterfactual returns;
         # it is not part of the PPO action probability.
-        log_prob = selected_distribution.log_prob(delta_action).sum(dim=-1)
-        entropy = selected_distribution.entropy().sum(dim=-1)
+        action_mask = raw["path_action_mask"].to(delta_action.dtype)
+        log_prob = (
+            selected_distribution.log_prob(delta_action) * action_mask
+        ).sum(dim=-1)
+        entropy = (selected_distribution.entropy() * action_mask).sum(dim=-1)
         current = state.state if hasattr(state, "history_tokens") else state
         decoded = self.planner.decode_delta(
             current, raw["reference_path_local"], delta_action[:, None],
+            raw["path_point_weight"],
         )
         decoded["selected_candidate"] = candidate
         decoded["candidate_logits"] = raw["candidate_logits"]
         return log_prob, entropy, value, decoded
 
     def diversity(self, state: CoordinatorState, margin: float = 0.25):
-        """Keep alternative full-path heads distinct in world-space metres."""
+        """Keep coarse routes distinct without rewarding pointwise zigzags."""
         output = self.all_mean_outputs(state)
         path = output["path_world"][:, :, 0]
+        # Diversity on raw points can be satisfied by alternating left/right
+        # corrections. Compare only a strongly low-passed, coarse route.
+        coarse = path
+        for _ in range(4):
+            coarse = 0.25 * torch.cat((
+                coarse[..., :1, :], coarse[..., :-1, :],
+            ), dim=-2) + 0.50 * coarse + 0.25 * torch.cat((
+                coarse[..., 1:, :], coarse[..., -1:, :],
+            ), dim=-2)
+        coarse = coarse[..., ::4, :]
+        correction = output["path_delta_local"]
+        second = (
+            correction[..., 2:, :]
+            - 2.0 * correction[..., 1:-1, :]
+            + correction[..., :-2, :]
+        )
+        future_second = output["path_point_weight"][..., 2:]
+        smoothness_numerator = (
+            second.square().sum(dim=-1)
+            * future_second[:, None]
+        ).sum()
+        smoothness_denominator = (
+            future_second.sum() * correction.new_tensor(correction.shape[1])
+        ).clamp(min=1.0)
+        smoothness = smoothness_numerator / smoothness_denominator
         candidates = path.shape[1]
         if candidates < 2:
             zero = path.new_zeros(())
-            return {"loss": zero, "distance": zero}
+            return {
+                "loss": zero, "distance": zero,
+                "smoothness_loss": smoothness,
+            }
         pairs = torch.triu_indices(candidates, candidates, 1, device=path.device)
-        difference = path[:, pairs[0]] - path[:, pairs[1]]
-        distance = difference.square().sum(dim=-1).mean(dim=-1).clamp(min=1e-8).sqrt()
+        difference = coarse[:, pairs[0]] - coarse[:, pairs[1]]
+        future_coarse = output["path_point_weight"][:, 0, ::4]
+        squared = difference.square().sum(dim=-1)
+        distance = (
+            (squared * future_coarse[:, None]).sum(dim=-1)
+            / future_coarse[:, None].sum(dim=-1).clamp(min=1.0)
+        ).clamp(min=1e-8).sqrt()
         return {
             "loss": (margin - distance).clamp(min=0.0).square().mean(),
             "distance": distance.mean(),
+            "smoothness_loss": smoothness,
         }
 
 
