@@ -114,11 +114,11 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
     def train(self):
         self.init_tensors()
-        self.last_mean_rewards = -100500
         start_time = time.time()
         total_time = 0
         rep_count = 0
-        self.frame = 0
+        # Runner restores epoch/frame before train(); preserve those counters.
+        self._update_training_curriculum()
         self.obs = self.env_reset()
         self.curr_frames = self.batch_size_envs
         
@@ -131,6 +131,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
         while True:
             epoch_num = self.update_epoch()
+            self._update_training_curriculum()
             train_info = self.train_epoch()
 
             sum_time = train_info['total_time']
@@ -193,6 +194,10 @@ class CommonAgent(a2c_continuous.A2CAgent):
                     return self.last_mean_rewards, epoch_num
 
                 update_time = 0
+        return
+
+    def _update_training_curriculum(self):
+        """Apply epoch-dependent settings before resets/rollouts, if configured."""
         return
 
     def set_full_state_weights(self, weights):

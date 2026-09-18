@@ -851,6 +851,8 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
             self._compute_observations()
             self._compute_reward(self.actions)
         self._compute_reset()
+        if self._state_relation:
+            self._finish_relation_diagnostics()
 
         self.extras["terminate"] = self._terminate_buf
 

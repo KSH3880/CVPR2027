@@ -61,34 +61,62 @@ def validate_relation_config(config):
     nested = {
         'soft_gate': {'beta', 'center'},
         'progress': {'kind', 'target_speed', 'velocity_scale', 'normalization_epsilon',
-                     'at_approach_radius'},
+                     'at_approach_radius', 'approach_radius'},
         'holding': {'hand_distance_scale'},
         'at': {'state_definition', 'near_distance_scale', 'near_fraction',
                'putdown_xy_tolerance', 'putdown_z_tolerance'},
         'observation': {'include_relation_state', 'relation_state_fields', 'include_subgoal_done'},
         'success': {'require_achieved_target_prerequisites', 'once_per_subgoal',
+                    'require_current_target_prerequisites', 'z_tolerance', 'saturate_edge_rewards',
                     'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success',
                     'terminate_when_all_subgoals_done'},
-        'diagnostics': {'enabled', 'log_interval', 'sample_envs', 'validate_tensors'}}
+        'diagnostics': {'enabled', 'log_interval', 'sample_envs', 'validate_tensors',
+                        'timeline_enabled', 'timeline_sample_envs',
+                        'timeline_every_episodes', 'timeline_max_steps'}}
     for key, keys in nested.items():
         if not isinstance(config.get(key, {}), dict) or set(config.get(key, {})) - keys:
             raise ValueError('Unsupported relationReward.' + key + ' configuration')
     if config.get('schema_version', 1) != 1:
         raise ValueError('Unsupported relation schema_version')
+    diagnostics = config.get('diagnostics', {})
+    if type(diagnostics.get('timeline_enabled', True)) is not bool:
+        raise ValueError('diagnostics.timeline_enabled must be boolean')
+    for key, default, minimum in (('timeline_sample_envs', 1, 0),
+                                 ('timeline_every_episodes', 100, 1),
+                                 ('timeline_max_steps', 600, 1)):
+        value = diagnostics.get(key, default)
+        if type(value) is not int or value < minimum:
+            raise ValueError('diagnostics.' + key + ' has an invalid integer value')
     progress = config.get('progress', {})
     progress_kind = progress.get('kind', 'velocity')
     if progress_kind not in ('velocity', 'direction'):
         raise ValueError('Unsupported progress kind: ' + str(progress_kind))
     if progress_kind == 'direction' and set(progress) & {'target_speed', 'velocity_scale'}:
         raise ValueError('direction progress does not accept Gaussian speed parameters')
-    if 'at_approach_radius' in progress:
-        radius = progress['at_approach_radius']
+    if 'at_approach_radius' in progress and 'approach_radius' in progress:
+        raise ValueError('Use either approach_radius for all edges or at_approach_radius, not both')
+    for radius_key in ('at_approach_radius', 'approach_radius'):
+        if radius_key not in progress:
+            continue
+        radius = progress[radius_key]
         if progress_kind != 'direction':
-            raise ValueError('At approach blending requires direction progress')
+            raise ValueError('Approach blending requires direction progress')
         if isinstance(radius, bool) or not isinstance(radius, (int, float)) or not math.isfinite(radius) or radius <= 0:
-            raise ValueError('At approach radius must be finite and positive')
+            raise ValueError('Approach radius must be finite and positive')
     success = config.get('success', {})
-    for key in ('require_achieved_target_prerequisites', 'once_per_subgoal',
+    current = success.get('require_current_target_prerequisites', False)
+    historical = success.get('require_achieved_target_prerequisites', True)
+    if type(current) is not bool or type(historical) is not bool or current == historical:
+        raise ValueError('Success requires exactly one of current or achieved target prerequisites')
+    if type(success.get('saturate_edge_rewards', False)) is not bool:
+        raise ValueError('success.saturate_edge_rewards must be boolean')
+    if 'z_tolerance' in success:
+        tolerance = success['z_tolerance']
+        if not current:
+            raise ValueError('success.z_tolerance requires current target prerequisites')
+        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance <= 0:
+            raise ValueError('success.z_tolerance must be finite and positive')
+    for key in ('once_per_subgoal',
                 'seed_achieved_from_valid_reset_state', 'suppress_bonus_for_initial_success'):
         if success.get(key, True) is not True:
             raise ValueError('state_relation_v0 requires success.' + key + '=true')

@@ -98,8 +98,23 @@ def prerequisite_all(values, mask):
     return torch.where(mask.unsqueeze(0), values.unsqueeze(1), torch.ones_like(values).unsqueeze(1)).all(-1)
 
 
-def advance_relation_history(satisfied_next, achieved_prev, done_prev, graph):
+def current_target_success(satisfied, graph, at_z_error=None, z_tolerance=None):
+    """Current-state success, independent of prerequisite achievement history."""
+    valid = satisfied & prerequisite_all(satisfied, graph.prereq_mask)
+    target = valid[:, graph.subgoal_target]
+    if z_tolerance is not None:
+        if at_z_error is None or at_z_error.shape != target.shape:
+            raise ValueError('Success Z errors must have shape [N,M]')
+        if at_z_error.device != satisfied.device:
+            raise ValueError('Success Z errors must share the relation device')
+        target = target & (at_z_error.abs() <= z_tolerance)
+    return target
+
+
+def advance_relation_history(satisfied_next, achieved_prev, done_prev, graph, target_success=None):
     valid = satisfied_next & prerequisite_all(achieved_prev, graph.prereq_mask)
+    if target_success is not None:
+        valid[:, graph.subgoal_target] = target_success
     history_live = ~done_prev[:, graph.edge_owner]
     achieved = achieved_prev | (valid & history_live)
     target_valid = valid[:, graph.subgoal_target]
@@ -110,7 +125,10 @@ def advance_relation_history(satisfied_next, achieved_prev, done_prev, graph):
 def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
                   state_weight=1., progress_weight=.2, success_bonus=5.,
                   beta=30., gate_center=.8, satisfaction_threshold=.9, validate=True,
-                  at_distance_xy=None, at_approach_radius=None):
+                  at_distance_xy=None, at_approach_radius=None,
+                  edge_distance_xy=None, approach_radius=None,
+                  require_current_target_prerequisites=False, at_z_error=None,
+                  success_z_tolerance=None, saturate_edge_rewards=False):
     if phi_prev.shape != phi_next.shape or progress.shape != phi_prev.shape:
         raise ValueError('phi/progress shapes must agree')
     if phi_prev.ndim != 2 or phi_prev.shape[1] != graph.edge_src.numel():
@@ -133,7 +151,19 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
     gate = relation_gate(phi_prev, beta, gate_center)
     activation = prerequisite_minimum(gate, graph.prereq_mask)
     progress_blend = gate
-    if at_approach_radius is not None:
+    if approach_radius is not None:
+        if at_approach_radius is not None:
+            raise ValueError('Use either approach_radius or at_approach_radius, not both')
+        if edge_distance_xy is None or edge_distance_xy.shape != phi_prev.shape:
+            raise ValueError('Edge approach progress requires XY distances with shape [N,E]')
+        if edge_distance_xy.device != phi_prev.device or edge_distance_xy.dtype != phi_prev.dtype:
+            raise ValueError('Edge XY distances must share phi device and dtype')
+        if validate and (not torch.isfinite(edge_distance_xy).all() or (edge_distance_xy < 0).any()):
+            raise ValueError('Edge XY distances must be finite and nonnegative')
+        # Every edge uses the same distance-based approach blend. State-derived
+        # gates remain solely in prerequisite activation, not self-pinning.
+        progress_blend = approach_satisfaction(edge_distance_xy, approach_radius)
+    elif at_approach_radius is not None:
         if at_distance_xy is None or at_distance_xy.shape != done_prev.shape:
             raise ValueError('At approach progress requires XY distances with shape [N,M]')
         if at_distance_xy.device != phi_prev.device or at_distance_xy.dtype != phi_prev.dtype:
@@ -149,13 +179,25 @@ def relation_step(phi_prev, phi_next, progress, achieved_prev, done_prev, graph,
     state = state_weight * activation * phi_next * reward_mask
     progress_reward = progress_weight * activation * pinned_progress * reward_mask
     satisfied = phi_next >= satisfaction_threshold
-    achieved, done, valid, first = advance_relation_history(satisfied, achieved_prev, done_prev, graph)
+    target_success = None
+    if require_current_target_prerequisites:
+        target_success = current_target_success(satisfied, graph, at_z_error, success_z_tolerance)
+    achieved, done, valid, first = advance_relation_history(
+        satisfied, achieved_prev, done_prev, graph, target_success)
+    raw_state, raw_progress = state, progress_reward
+    if saturate_edge_rewards:
+        # Override only paid rewards, AFTER prerequisite gating. Actual state,
+        # gates, progress and observations remain untouched, including after release.
+        completed_edges = done[:, graph.edge_owner]
+        state = torch.where(completed_edges, state_weight * reward_mask, state)
+        progress_reward = torch.where(completed_edges, progress_weight * reward_mask, progress_reward)
     agent = torch.zeros_like(done_prev, dtype=phi_prev.dtype)
     agent.scatter_add_(1, graph.edge_owner.unsqueeze(0).expand(phi_prev.shape[0], -1), state + progress_reward)
     bonus = success_bonus * first.to(phi_prev.dtype)
     return dict(agent_task_reward=agent + bonus, edge_reward=state + progress_reward,
                 activation=activation, pinned_progress=pinned_progress, progress_blend=progress_blend,
                 state_component=state,
+                raw_state_component=raw_state, raw_progress_component=raw_progress,
                 progress_component=progress_reward, success_bonus=bonus, first_success=first,
                 achieved_next=achieved, done_next=done, valid_next=valid,
                 gate_next=relation_gate(phi_next, beta, gate_center), satisfied_next=satisfied)
@@ -170,16 +212,21 @@ class RelationRuntime:
         self.achieved = torch.zeros_like(self.phi, dtype=torch.bool)
         self.done = torch.zeros(num_envs, graph.subgoal_target.numel(), dtype=torch.bool, device=device)
 
-    def reset(self, env_ids, phi):
+    def reset(self, env_ids, phi, at_z_error=None):
         self.phi[env_ids] = phi
         satisfied = phi >= self.config.get('satisfaction_threshold', .9)
         # Root relations are seeded from initial state; targets use these initial parents.
         seeded = satisfied & ~self.graph.prereq_mask.any(-1).unsqueeze(0)
+        success = self.config.get('success', {})
+        target_success = None
+        if success.get('require_current_target_prerequisites', False):
+            target_success = current_target_success(
+                satisfied, self.graph, at_z_error, success.get('z_tolerance'))
         achieved, done, _, _ = advance_relation_history(
-            satisfied, seeded, torch.zeros_like(self.done[env_ids]), self.graph)
+            satisfied, seeded, torch.zeros_like(self.done[env_ids]), self.graph, target_success)
         self.achieved[env_ids], self.done[env_ids] = achieved, done
 
-    def step(self, phi, progress, at_distance_xy=None):
+    def step(self, phi, progress, at_distance_xy=None, edge_distance_xy=None, at_z_error=None):
         c = self.config
         result = relation_step(self.phi, phi, progress, self.achieved, self.done, self.graph,
             c.get('state_reward_weight', 1.), c.get('progress_reward_weight', .2),
@@ -187,7 +234,13 @@ class RelationRuntime:
             c.get('soft_gate', {}).get('center', .8), c.get('satisfaction_threshold', .9),
             validate=c.get('diagnostics', {}).get('validate_tensors', False),
             at_distance_xy=at_distance_xy,
-            at_approach_radius=c.get('progress', {}).get('at_approach_radius'))
+            at_approach_radius=c.get('progress', {}).get('at_approach_radius'),
+            edge_distance_xy=edge_distance_xy,
+            approach_radius=c.get('progress', {}).get('approach_radius'),
+            require_current_target_prerequisites=c.get('success', {}).get('require_current_target_prerequisites', False),
+            at_z_error=at_z_error,
+            success_z_tolerance=c.get('success', {}).get('z_tolerance'),
+            saturate_edge_rewards=c.get('success', {}).get('saturate_edge_rewards', False))
         self.phi.copy_(phi)
         self.achieved.copy_(result['achieved_next'])
         self.done.copy_(result['done_next'])

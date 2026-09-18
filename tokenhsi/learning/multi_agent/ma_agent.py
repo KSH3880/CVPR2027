@@ -22,6 +22,7 @@ import learning.amp_agent as amp_agent
 import learning.amp_datasets as amp_datasets
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
+from utils.rsi_curriculum import SkillInitCurriculum
 
 
 class EntityRunningMeanStd(nn.Module):
@@ -65,6 +66,13 @@ class MAAgent(amp_agent.AMPAgent):
         super().__init__(base_name, config)
 
         task = self.vec_env.env.task
+        curriculum_cfg = task.cfg['env'].get('skillInitCurriculum')
+        args = task.cfg['args']
+        self._skill_init_curriculum = None
+        if (curriculum_cfg is not None and task._mode == 'train'
+                and not any(getattr(args, flag, False) for flag in ('test', 'play', 'eval'))):
+            self._skill_init_curriculum = SkillInitCurriculum(
+                task._skill, task.cfg['env']['skillInitProb'], curriculum_cfg)
         if task._state_relation:
             task._relation_output_directory = self.experiment_dir
             with open(task.cfg['args'].cfg_train) as f:
@@ -129,6 +137,19 @@ class MAAgent(amp_agent.AMPAgent):
             self.experience_buffer.tensor_dict['next_obses'] = torch.zeros(
                 shape, dtype=torch.float32, device=self.ppo_device)
         return
+
+    def _update_training_curriculum(self):
+        if self._skill_init_curriculum is None:
+            return
+        task = self.vec_env.env.task
+        probabilities, blend = self._skill_init_curriculum.at_epoch(self.epoch_num)
+        # Only future reset sampling changes; AMP demonstrations and live episodes
+        # retain their state. Keep skillInitProb in the config as the final target.
+        task._skill_init_prob.copy_(task._skill_init_prob.new_tensor(probabilities))
+        if self.rank == 0:
+            for skill, probability in zip(self._skill_init_curriculum.skills, probabilities):
+                self.writer.add_scalar('rsi/init_prob/' + skill, probability, self.epoch_num)
+            self.writer.add_scalar('rsi/blend', blend, self.epoch_num)
 
     def get_stats_weights(self):
         weights = super().get_stats_weights()

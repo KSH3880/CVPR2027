@@ -6,6 +6,8 @@ import torch
 from utils.relation_task_spec import compile_carry_subgoal
 from env.tasks.multi_agent.relation_reward import (
     RelationRuntime, evaluate_holding, evaluate_at, relation_progress, box_speed_penalty)
+from env.tasks.multi_agent.relation_diagnostics import (
+    PlacementEpisodeMetrics, RelationTimeline, placement_valid)
 
 
 class CarryRelationMixin:
@@ -20,6 +22,12 @@ class CarryRelationMixin:
         self._relation_first_holding = torch.full((self.num_envs, self.num_agents), -1., device=self.device)
         self._relation_first_valid = torch.full_like(self._relation_first_holding, -1.)
         self._relation_csv_path = None
+        diagnostics = self._relation_cfg.get('diagnostics', {})
+        self._placement_metrics = (PlacementEpisodeMetrics(
+            self.num_envs, self.num_agents, self.dt, self.device)
+            if diagnostics.get('enabled', True) else None)
+        self._relation_timeline = RelationTimeline(
+            os.path.join(self.cfg['args'].output_path, 'diagnostics'), self.num_envs, diagnostics)
 
     def _evaluate_relations(self, env_ids=None):
         if env_ids is None:
@@ -44,14 +52,23 @@ class CarryRelationMixin:
             goal_xy_error=xy, goal_z_error=z, near=near, put=put.float())
 
     def _reset_relation_history(self, env_ids):
-        phi, _ = self._evaluate_relations(env_ids)
-        self.relation_runtime.reset(env_ids, phi)
+        phi, diag = self._evaluate_relations(env_ids)
+        self.relation_runtime.reset(env_ids, phi, at_z_error=diag.get('goal_z_error'))
         self._prev_root_pos[env_ids] = self._kinematic_humanoid_rigid_body_states[env_ids, :, 0, :3]
         self._prev_box_pos[env_ids] = self._assigned_box_values(self._box_states, env_ids)[..., :3]
         self._relation_episode_id[env_ids] += 1
         holding = self.relation_runtime.achieved[env_ids, 0::2]
         self._relation_first_holding[env_ids] = torch.where(holding, 0., -1.)
         self._relation_first_valid[env_ids] = torch.where(self.relation_runtime.done[env_ids], 0., -1.)
+        if self._placement_metrics is not None:
+            self._placement_metrics.reset(env_ids, placement_valid(diag['goal_xy_error'], diag['goal_z_error']))
+        self._relation_timeline.reset(env_ids)
+
+    def _finish_relation_diagnostics(self):
+        # Called AFTER _compute_reset, while terminal box states are still live.
+        if self._placement_metrics is not None:
+            self._placement_metrics.finish(self.reset_buf)
+        self._relation_timeline.finish(self.reset_buf)
 
     @torch.no_grad()
     def _compute_relation_reward(self, collision_fn):
@@ -64,8 +81,17 @@ class CarryRelationMixin:
         pa = relation_progress(self._prev_box_pos, objects, self._tar_pos, self.dt, cfg)
         previous_satisfied = runtime.phi >= self._relation_cfg.get('satisfaction_threshold', .9)
         live = ~runtime.done.clone()
+        edge_distance_xy = None
+        if 'approach_radius' in cfg:
+            # Same post-step XY endpoints as each edge's direction progress:
+            # Human root -> assigned Object, assigned Object -> Target.
+            holding_distance_xy = (objects[..., :2] - roots[..., :2]).norm(dim=-1)
+            edge_distance_xy = torch.stack(
+                [holding_distance_xy, diag['goal_xy_error']], -1).flatten(1)
         result = runtime.step(phi, torch.stack([ph, pa], -1).flatten(1),
-                              at_distance_xy=diag.get('goal_xy_error'))
+                              at_distance_xy=diag.get('goal_xy_error'),
+                              edge_distance_xy=edge_distance_xy,
+                              at_z_error=diag.get('goal_z_error'))
         power = torch.zeros_like(result['agent_task_reward'])
         collision = torch.zeros_like(power)
         box_penalty = torch.zeros_like(power)
@@ -101,6 +127,8 @@ class CarryRelationMixin:
         dcfg = self._relation_cfg.get('diagnostics', {})
         if not dcfg.get('enabled', True):
             return
+        placed = placement_valid(diag['goal_xy_error'], diag['goal_z_error'])
+        self._placement_metrics.step(placed)
         speed = ((objects - self._prev_box_pos) / self.dt).norm(dim=-1)
         diag.update(box_speed=speed, progress_holding=ph, progress_at=pa,
                     task_relation_total=result['agent_task_reward'],
@@ -117,6 +145,8 @@ class CarryRelationMixin:
             for field, value in (('phi', runtime.phi), ('gate', result['gate_next']),
                                  ('satisfied', result['satisfied_next']), ('achieved', runtime.achieved),
                                  ('state_reward', result['state_component']),
+                                 ('raw_state_reward', result['raw_state_component']),
+                                 ('raw_progress_reward', result['raw_progress_component']),
                                  ('progress_bar', result['pinned_progress']),
                                  ('progress_reward', result['progress_component'])):
                 diag[name + '/' + field] = value[:, j::2].float()
@@ -124,8 +154,25 @@ class CarryRelationMixin:
                                            result['satisfied_next'][:, j::2]).float()
             diag[name + '/threshold_down'] = (previous_satisfied[:, j::2] &
                                              (~result['satisfied_next'][:, j::2])).float()
-        if 'at_approach_radius' in self._relation_cfg.get('progress', {}):
+        progress_cfg = self._relation_cfg.get('progress', {})
+        if 'approach_radius' in progress_cfg:
+            diag['holding/approach'] = result['progress_blend'][:, 0::2]
+        if 'at_approach_radius' in progress_cfg or 'approach_radius' in progress_cfg:
             diag['at/approach'] = result['progress_blend'][:, 1::2]
+        if self._relation_timeline.selected:
+            timeline = dict(diag)
+            timeline['placement_valid'] = placed.float()
+            timeline['initially_placed'] = self._placement_metrics.initial.float()
+            timeline['saturation_active'] = (runtime.done & self._relation_cfg.get(
+                'success', {}).get('saturate_edge_rewards', False)).float()
+            for j, name in enumerate(('holding', 'at')):
+                timeline[name + '/prerequisite_used'] = result['activation'][:, j::2]
+                timeline[name + '/progress_blend_used'] = result['progress_blend'][:, j::2]
+            if self._relation_timeline.path is None:
+                self._relation_timeline.directory = os.path.join(getattr(
+                    self, '_relation_output_directory', self.cfg['args'].output_path), 'diagnostics')
+            self._relation_timeline.record(self._relation_steps, self._relation_episode_id,
+                                           self.progress_buf, self.dt, timeline)
         stats = {k: v.mean() for k, v in diag.items() if not k.startswith('first_') or k == 'first_success'}
         self.extras['relation_near_unplaced_slow'] = (
             (diag['goal_xy_error'] < .5) & (speed < .05) & ~diag['put'].bool() & live).flatten()
@@ -173,9 +220,12 @@ class CarryRelationMixin:
                         writer.writerow([self._relation_steps, env, agent] + row)
 
     def consume_relation_diagnostics(self):
-        if not self._state_relation or not self._relation_diagnostic_count:
+        if not self._state_relation:
             return {}
         result = {k: v / self._relation_diagnostic_count for k, v in self._relation_diagnostic_sums.items()}
+        if self._placement_metrics is not None:
+            result.update(self._placement_metrics.consume())
+        self._relation_timeline.flush()
         self._relation_diagnostic_sums = {}
         self._relation_diagnostic_count = 0
         return result
