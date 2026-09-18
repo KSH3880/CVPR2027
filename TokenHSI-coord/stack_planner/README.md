@@ -20,9 +20,9 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
 Carry가 분리되면 이 adapter만 제거하고 planner의 물리 경로 출력은 유지할 수 있다.
-placement 전 마지막으로 유효했던 unified A1 endpoint를 보관하며, `A1_RETREAT` 진입 순간
-virtual box를 그 endpoint로 즉시 이동한다. 따라서 phase 전환 후 다음 planner period까지
-현재 위치에 virtual box가 남는 한 tick 지연이 없다.
+유효한 plan이 설치될 때마다 phase와 무관하게 virtual box XY를 raw unified A1 path의 마지막
+점과 즉시 동기화한다. placement 전에는 observation에 노출하지 않지만 좌표는 이미 endpoint를
+따라가므로 `A1_RETREAT` 진입 후 다음 planner period까지 이전 위치에 남는 지연이 없다.
 
 ```python
 from stack_planner.model import StackTrajectoryPlanner
@@ -58,7 +58,9 @@ evaluator argmax 하나를 실행한다. 후보 붕괴 방지를 위해 A1 full-
 diversity loss를 적용한다. diversity는 raw point가 아니라 네 차례 low-pass하고 4점 간격으로
 고른 coarse route에서 계산한다. 각 mean correction의 second finite difference에도
 `STACK_PLANNER_SMOOTHNESS_COEF`(기본 10.0)를 적용해 좌우 교대 zigzag가 후보 차이로 인정되지
-않게 한다.
+않게 한다. point turn 46도를 넘는 부분은 실행을 폐기하지 않고
+`STACK_PLANNER_TURN_PENALTY`(기본 2.0)로 soft penalty를 준다. 175도를 넘는 사실상 역주행만
+emergency invalid로 거부한다.
 
 별도 `retreat_path`, retreat goal, switch output이나 사후 path concatenation은 없다.
 각 경로의 첫 점은 departure root로 고정되고 아직 실행하지 않은 point만 planner가 계속 수정한다.

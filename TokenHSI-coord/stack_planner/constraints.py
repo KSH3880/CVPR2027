@@ -11,6 +11,10 @@ from coordinator.schema import MAX_SPEED, MIN_SPEED, PATH_DS, PATH_VERTICES
 from .schema import AGENTS, STACK_PATH_POINTS
 
 
+SOFT_TURN_LIMIT_DEG = 46.0
+HARD_TURN_LIMIT_DEG = 175.0
+
+
 def project_points_to_segments(
     path: torch.Tensor, points: torch.Tensor,
 ) -> Dict[str, torch.Tensor]:
@@ -177,6 +181,14 @@ def free_path_validity(
     active: torch.Tensor,
 ) -> torch.Tensor:
     """Validate fixed-origin unified paths near the current executing root."""
+    return free_path_validity_details(path, speed, root_xy, active)["valid"]
+
+
+def free_path_validity_details(
+    path: torch.Tensor, speed: torch.Tensor, root_xy: torch.Tensor,
+    active: torch.Tensor,
+) -> Dict[str, torch.Tensor]:
+    """Return the complete validity decision and each hard-gate component."""
     expected = (AGENTS, STACK_PATH_POINTS, 2)
     if path.shape != (*speed.shape, 2) or path.shape[2:] != expected:
         raise ValueError(
@@ -207,14 +219,30 @@ def free_path_validity(
     turns[..., 8:11] = 0
     turns[..., 19:22] = 0
     speed_ok = ((speed >= MIN_SPEED) & (speed <= MAX_SPEED)).all(dim=-1)
-    valid = (
+    max_turn = turns.amax(dim=-1)
+    turn_excess_cost = (
+        ((turns - SOFT_TURN_LIMIT_DEG).clamp(min=0.0) / 90.0).square()
+    ).mean(dim=-1)
+    agent_valid = (
         finite & root_reachable & buffer_ok & speed_ok
-        & (turns.amax(dim=-1) <= 46)
+        & (max_turn <= HARD_TURN_LIMIT_DEG)
     )
-    return (valid | ~active[:, None]).all(dim=-1)
+    return {
+        "valid": (agent_valid | ~active[:, None]).all(dim=-1),
+        "agent_valid": agent_valid,
+        "finite": finite,
+        "root_reachable": root_reachable,
+        "buffer_ok": buffer_ok,
+        "speed_ok": speed_ok,
+        "max_turn_deg": max_turn,
+        "turn_excess_cost": turn_excess_cost,
+        "path_length": lengths.sum(dim=-1),
+    }
 
 
 __all__ = [
-    "free_path_validity", "ordered_box_goal_visit", "retreat_box_clearance",
-    "project_points_to_segments",
+    "free_path_validity", "free_path_validity_details",
+    "ordered_box_goal_visit", "retreat_box_clearance",
+    "project_points_to_segments", "SOFT_TURN_LIMIT_DEG",
+    "HARD_TURN_LIMIT_DEG",
 ]

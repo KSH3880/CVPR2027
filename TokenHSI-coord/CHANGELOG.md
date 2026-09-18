@@ -21,6 +21,13 @@
 - placement 전에 출력된 마지막 유효 A1 unified-path endpoint를 보관하고 `A1_RETREAT` phase
   진입 즉시 virtual box에 적용한다. 종전처럼 phase 전환 뒤 한 planner period 동안 virtual
   box가 이전/current-root 위치에 남는 지연을 제거했다.
+- 캐시 복사에만 의존하지 않고 모든 유효 plan 설치 시 virtual box XY를 raw A1 path 마지막
+  point와 직접 동기화한다. retreat 설치 후 두 좌표가 다르면 즉시 실패하는 invariant도 추가했다.
+- viewer의 invalid plan을 finite/root-reachable/32m-buffer/speed/46도-turn gate로 분해해 출력한다.
+  virtual box가 갱신되지 않을 때 endpoint 연결 문제와 hard validity 거부를 즉시 구분할 수 있다.
+- 46도 turn 제한이 모든 curved proposal을 hard-invalid로 만들어 physical rollout과 virtual box
+  갱신을 차단하던 문제를 수정했다. 46도 초과는 differentiable-shaped soft reward로 옮기고,
+  175도 이상의 사실상 역주행만 emergency invalid로 유지했다.
 
 ### Joint A2 preplan with deferred Carry goal (V12)
 

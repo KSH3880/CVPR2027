@@ -30,7 +30,9 @@ from stack_planner.branching import TaskBranchSnapshot  # noqa: E402
 from stack_planner.consistency import (  # noqa: E402
     build_stack_consistency_target, stack_trajectory_consistency_loss,
 )
-from stack_planner.constraints import ordered_box_goal_visit  # noqa: E402
+from stack_planner.constraints import (  # noqa: E402
+    free_path_validity_details, ordered_box_goal_visit,
+)
 from stack_planner.env_adapter import HumanoidMAStackPlannerTrain  # noqa: E402
 from stack_planner.history import (  # noqa: E402
     StackHistoryBuffer, flatten_observations,
@@ -205,7 +207,7 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
 def _counterfactual_rollout(
     player, output, state, before, low_steps, reward_config,
     visit_penalty_coef, visit_tolerance, retreat_box_penalty_coef,
-    endpoint_penalty_coef,
+    endpoint_penalty_coef, turn_penalty_coef,
 ):
     """Execute one candidate branch and return its complete macro reward."""
     task = player.env.task
@@ -215,6 +217,10 @@ def _counterfactual_rollout(
             state.box_xyz[:, None, :, :2],
             state.goal_xy[:, None],
             tolerance=visit_tolerance,
+        )
+        turn = free_path_validity_details(
+            output["path_world"], output["speed"], state.root_xy,
+            task.planner_execution_rows(),
         )
         valid, safe = task.install_external_plan(output)
         decision = task._planner_policy_decision.clone()
@@ -244,13 +250,19 @@ def _counterfactual_rollout(
     )
     terms["route_box_distance"] = visit["box_distance"][:, 0].mean(dim=-1)
     terms["route_goal_distance"] = visit["goal_distance"][:, 0].mean(dim=-1)
+    turn_cost = turn["turn_excess_cost"][:, 0].mean(dim=-1)
+    terms["route_turn_penalty"] = (
+        -turn_penalty_coef * turn_cost * decision.float()
+    )
+    terms["route_max_turn_deg"] = turn["max_turn_deg"][:, 0].amax(dim=-1)
     terms["retreat_box_path_penalty"] = (
         -retreat_box_penalty_coef * retreat_box_path_cost
     )
     terms["retreat_box_min_clearance"] = retreat_box_min_clearance
     terms["retreat_box_endpoint_clearance"] = retreat_box_endpoint_clearance
     terms["total"] += (
-        terms["route_visit_penalty"] + terms["retreat_box_path_penalty"]
+        terms["route_visit_penalty"] + terms["route_turn_penalty"]
+        + terms["retreat_box_path_penalty"]
     )
     terms["retreat_endpoint_change_penalty"] = (
         -endpoint_penalty_coef * endpoint_change_cost * decision.float()
@@ -262,6 +274,7 @@ def _counterfactual_rollout(
         terms["invalid_plan_penalty"]
         + terms["unsafe_plan_penalty"]
         + terms["route_visit_penalty"]
+        + terms["route_turn_penalty"]
         + terms["retreat_box_path_penalty"]
         + terms["retreat_endpoint_change_penalty"]
     )
@@ -500,13 +513,14 @@ def main():
         raise ValueError("planner consistency/diversity settings must be non-negative")
     visit_penalty_coef = _env_float("STACK_PLANNER_VISIT_PENALTY", 10.0)
     visit_tolerance = _env_float("STACK_PLANNER_VISIT_TOLERANCE", 0.15)
+    turn_penalty_coef = _env_float("STACK_PLANNER_TURN_PENALTY", 2.0)
     retreat_box_penalty_coef = _env_float(
         "STACK_PLANNER_RETREAT_BOX_PENALTY", 10.0
     )
     bottom_disturbance_weight = _env_float(
         "STACK_PLANNER_BOTTOM_DISTURBANCE_WEIGHT", 2.0
     )
-    if (visit_penalty_coef < 0 or visit_tolerance < 0
+    if (visit_penalty_coef < 0 or visit_tolerance < 0 or turn_penalty_coef < 0
             or retreat_box_penalty_coef < 0 or bottom_disturbance_weight < 0):
         raise ValueError("stack planner path-shaping coefficients must be non-negative")
     reward_config = StackRewardConfig(
@@ -540,6 +554,7 @@ def main():
           f"smoothness={smoothness_coef:g}/{speed_smoothness_coef:g} "
           f"evaluator_coef={evaluator_coef:g} full_candidate_rollout=True "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
+          f"turn_penalty={turn_penalty_coef:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
           f"bottom_disturbance_weight={bottom_disturbance_weight:g} "
           f"a2_stable_delay={task._planner_a2_stable_delay:g}s "
@@ -622,6 +637,7 @@ def main():
                         player, candidate_output, state, before, low_steps,
                         reward_config, visit_penalty_coef, visit_tolerance,
                         retreat_box_penalty_coef, endpoint_penalty_coef,
+                        turn_penalty_coef,
                     )
                 )
                 with torch.no_grad():
@@ -825,6 +841,7 @@ def main():
             "consistency_coef": consistency_coef,
             "visit_penalty_coef": visit_penalty_coef,
             "visit_tolerance": visit_tolerance,
+            "turn_penalty_coef": turn_penalty_coef,
             "retreat_box_penalty_coef": retreat_box_penalty_coef,
             "bottom_disturbance_weight": bottom_disturbance_weight,
             "planner_decision_rate": float(flat_decision.float().mean()),
@@ -865,6 +882,7 @@ def main():
             if key in {"iteration", "reward", "done_rate", "potential_delta",
                        "retreat_potential_delta_removed",
                        "humanoid_fall_penalty", "route_visit_penalty",
+                       "route_turn_penalty", "route_max_turn_deg",
                        "retreat_box_path_penalty",
                        "retreat_box_endpoint_clearance",
                        "path_mae", "fall_ratio", "collision_ratio",
@@ -910,6 +928,7 @@ def main():
                         "retreat_endpoint_tolerance": endpoint_tolerance,
                         "visit_penalty_coef": visit_penalty_coef,
                         "visit_tolerance": visit_tolerance,
+                        "turn_penalty_coef": turn_penalty_coef,
                         "retreat_box_penalty_coef": retreat_box_penalty_coef,
                         "bottom_disturbance_weight": bottom_disturbance_weight},
             )

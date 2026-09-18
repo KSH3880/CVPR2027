@@ -537,10 +537,16 @@ class HumanoidMAStackPlannerTrain(
         # pre-placement endpoint is intentionally clipped to the stack goal.
         cache_endpoint = valid & execute[:, 0]
         if cache_endpoint.any():
-            self._planner_latest_a1_endpoint[cache_endpoint] = model_path[
-                cache_endpoint, 0, -1
-            ]
+            accepted_endpoint = model_path[cache_endpoint, 0, -1]
+            self._planner_latest_a1_endpoint[cache_endpoint] = accepted_endpoint
             self._planner_latest_a1_endpoint_valid[cache_endpoint] = True
+            # The virtual Carry box is the raw unified planner endpoint. Keep
+            # it synchronized on every accepted plan, including before the
+            # placement transition. It is not exposed to A1 until retreat,
+            # but phase entry can no longer depend on a delayed cache copy.
+            self._planner_virtual_retreat_pos[
+                cache_endpoint, :2
+            ] = accepted_endpoint
 
         # Inactive roots are stationary for the safety projection.
         projected = torch.where(
@@ -594,6 +600,14 @@ class HumanoidMAStackPlannerTrain(
                 endpoint[commit_retreat]
             )
             self._planner_retreat_ready[commit_retreat] = True
+            endpoint_error = torch.norm(
+                self._planner_virtual_retreat_pos[commit_retreat, :2]
+                - model_path[commit_retreat, 0, -1], dim=-1,
+            )
+            if not bool((endpoint_error <= 1e-5).all()):
+                raise RuntimeError(
+                    "virtual retreat box diverged from planner endpoint"
+                )
         # Invalid candidates leave both execution path and virtual box at the
         # last accepted action, preventing contradictory low-level commands.
         if install.any():

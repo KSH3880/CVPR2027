@@ -9,6 +9,7 @@ import torch
 import numpy as np
 
 from .checkpoint import load_stack_checkpoint
+from .constraints import free_path_validity_details
 from .env_adapter import HumanoidMAStackPlannerTrain
 from .history import StackHistoryBuffer
 
@@ -99,6 +100,35 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         status = (phase.cpu().tolist(), selected.cpu().tolist(), valid.cpu().tolist(),
                   self._planner_plan_installed.cpu().tolist(),
                   self._planner_retreat_ready.cpu().tolist())
+        if int(os.environ.get("STACK_DEBUG", "0")) != 0:
+            endpoint = output["path_world"][:, 0, 0, -1]
+            virtual = self._planner_virtual_retreat_pos[:, :2]
+            error = torch.norm(endpoint - virtual, dim=-1)
+            validity = free_path_validity_details(
+                output["path_world"], output["speed"], state.root_xy,
+                self.planner_execution_rows(),
+            )
+            print(
+                "[stack-planner-view] endpoint={} virtual={} error={} valid={}".format(
+                    endpoint[0].detach().cpu().tolist(),
+                    virtual[0].detach().cpu().tolist(),
+                    float(error[0]), bool(valid[0]),
+                ),
+                flush=True,
+            )
+            print(
+                "[stack-planner-view] validity agent={} finite={} root={} "
+                "buffer={} speed={} max_turn_deg={} path_length={}".format(
+                    validity["agent_valid"][0, 0].detach().cpu().tolist(),
+                    validity["finite"][0, 0].detach().cpu().tolist(),
+                    validity["root_reachable"][0, 0].detach().cpu().tolist(),
+                    validity["buffer_ok"][0, 0].detach().cpu().tolist(),
+                    validity["speed_ok"][0, 0].detach().cpu().tolist(),
+                    validity["max_turn_deg"][0, 0].detach().cpu().tolist(),
+                    validity["path_length"][0, 0].detach().cpu().tolist(),
+                ),
+                flush=True,
+            )
         if status != self._stack_planner_status:
             print("[stack-planner-view] phase={} candidate={} valid={} installed={} retreat_ready={}"
                   .format(*[item[:4] for item in status]), flush=True)
