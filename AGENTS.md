@@ -19,6 +19,7 @@
 - 이 서버의 conda 환경은 `tokenhsi`; 실행 준비는 `tokenhsi/scripts/multi_agent/runtime_env.sh`를 사용한다. Isaac Gym을 직접 import할 때는 torch보다 먼저 한다.
 - 공유 데이터 원본 `/home/hwanhee/CVPR2027/TokenHSI`는 읽기 전용으로 취급한다. 이 repo의 데이터는 심링크로 연결한다.
 - reward 비교 실험은 config, train/test 스크립트, output 이름을 분리한다. 현재 실험과 checkpoint 호환 규칙은 `config.md`를 따른다.
+- 새 실행용 config를 추가할 때는 전용 `<실험명>_train.sh`, `<실험명>_test.sh`(로컬 viewer: `HEADLESS=0`, 화면 없는 평가: `HEADLESS=1`), `<실험명>_vnc.sh`(서버 viewer)를 함께 만든다. `markdowns/config.md` 전체 목록과 해당 실험 섹션에 학습·로컬 추론·서버 VNC 명령을 모두 기재한다. 설계 명세만 요청받은 경우에는 실행 가능 여부를 명확히 구분한다.
 - 변경에 맞는 검증만 수행한다. reward/성공 조건 변경은 관련 CPU 테스트, 실행 경로 변경은 짧은 시뮬레이션으로 확인한다. 문서만 바꾸면 링크·경로·diff를 확인하고 학습은 실행하지 않는다.
 - 짧은 학습 확인에는 별도 `OUTPUT_PATH=output/<실험명>_check`와 `MAX_ITERATIONS`를 사용한다. 장기 본학습 실행과 확인용 실행을 구분한다.
 

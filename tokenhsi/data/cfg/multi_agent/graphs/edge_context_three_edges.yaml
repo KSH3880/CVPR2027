@@ -1,0 +1,5 @@
+# Evaluation override example: two agents, three edges. Does not establish generalization quality.
+edges:
+  - {id: hold_a, owner: 0, src: H_0, relation: HOLDING, dst: O_0, pre: [], term: at_a, required_goal: false}
+  - {id: at_a, owner: 0, src: O_0, relation: AT, dst: G_0, pre: [hold_a], term: null, required_goal: true}
+  - {id: at_b, owner: 1, src: O_1, relation: AT, dst: G_1, pre: [], term: null, required_goal: true}

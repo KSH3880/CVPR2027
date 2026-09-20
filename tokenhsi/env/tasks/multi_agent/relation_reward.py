@@ -67,7 +67,7 @@ def relation_progress(source_prev, source_next, target_next, dt, config=None):
 def prerequisite_minimum(values, mask):
     """Return the bottleneck prerequisite value, or one for a root edge."""
     return torch.where(
-        mask.unsqueeze(0), values.unsqueeze(1), torch.ones_like(values).unsqueeze(1)
+        (mask.unsqueeze(0) if mask.ndim == 2 else mask), values.unsqueeze(1), torch.ones_like(values).unsqueeze(1)
     ).amin(-1)
 
 
@@ -84,7 +84,7 @@ def approach_satisfaction(distance_xy, radius=.5):
 
 
 def prerequisite_all(values, mask):
-    return torch.where(mask.unsqueeze(0), values.unsqueeze(1), torch.ones_like(values).unsqueeze(1)).all(-1)
+    return torch.where((mask.unsqueeze(0) if mask.ndim == 2 else mask), values.unsqueeze(1), torch.ones_like(values).unsqueeze(1)).all(-1)
 
 
 def current_target_success(satisfied, graph, at_z_error=None, z_tolerance=None):
@@ -228,14 +228,17 @@ class RelationRuntime:
         self.phi[env_ids] = phi
         satisfied = phi >= self.config.get('satisfaction_threshold', .9)
         # Root relations are seeded from initial state; targets use these initial parents.
-        seeded = satisfied & ~self.graph.prereq_mask.any(-1).unsqueeze(0)
+        from utils.ontop_task_spec import graph_for_envs
+        graph = graph_for_envs(self.graph, env_ids)
+        roots = ~graph.prereq_mask.any(-1)
+        seeded = satisfied & (roots.unsqueeze(0) if roots.ndim == 1 else roots)
         success = self.config.get('success', {})
         target_success = None
         if success.get('require_current_target_prerequisites', False):
             target_success = current_target_success(
-                satisfied, self.graph, at_z_error, success.get('z_tolerance'))
+                satisfied, graph, at_z_error, success.get('z_tolerance'))
         achieved, done, _, _ = advance_relation_history(
-            satisfied, seeded, torch.zeros_like(self.done[env_ids]), self.graph, target_success)
+            satisfied, seeded, torch.zeros_like(self.done[env_ids]), graph, target_success)
         self.achieved[env_ids], self.done[env_ids] = achieved, done
 
     def step(self, phi, progress, edge_distance_xy=None, at_z_error=None):

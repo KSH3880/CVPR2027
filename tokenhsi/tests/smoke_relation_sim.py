@@ -31,11 +31,25 @@ def check_simulator(self):
         print('PASS legacy strict-load / finite simulator rollout', flush=True)
         return
     runtime = task.relation_runtime
+    mixed = getattr(task, '_ontop_mixed', False)
+    suffix_width = task.get_relation_suffix_size()
+    if mixed:
+        assert task._ontop_scenario.bincount(minlength=3).min() > 0
+        independent = task._ontop_scenario == 1
+        assert not (task._agent_box_assignment[independent] == 2).any()
+        fixed_pose = task._box_states[independent, 2, :7].clone()
+        _, _, _, is_top = task._ontop_geometry()
+        assert not task._ontop_reset_rejected(torch.arange(N, device=task.device)).any()
     cfg = task._relation_cfg
     progress_cfg = cfg.get('progress', {})
     ids = torch.arange(N, device=task.device)
     torch.testing.assert_close(runtime.phi, task._evaluate_relations(ids)[0])
     assert not runtime.done.all(-1).any()
+    if mixed:
+        # Commit the initial all-env reset before exercising a subset reset:
+        # Isaac Gym permits only one indexed root-state setter per physics step.
+        obs, _, _, _ = self.env_step(self.env, self.get_action(obs, True))
+        torch.testing.assert_close(task._box_states[independent, 2, :7], fixed_pose, atol=1e-6, rtol=0)
     before = runtime.suffix().clone()
     self.env_reset(torch.tensor([0], device=task.device))
     torch.testing.assert_close(runtime.suffix()[1:], before[1:])
@@ -54,6 +68,8 @@ def check_simulator(self):
     prev_done_rows = []
     for step in range(64):
         obs = self.env_reset(prev_done_rows)
+        if mixed:
+            fixed_pose = task._box_states[independent, 2, :7].clone()
         before_phi = runtime.phi.clone()
         before_a, before_done = runtime.achieved.clone(), runtime.done.clone()
         saved_obs = (obs['obs'] if isinstance(obs, dict) else obs).clone()
@@ -63,7 +79,8 @@ def check_simulator(self):
         objects = task._assigned_box_values(task._box_states)[..., :3]
         root = task._humanoid_root_states[..., :3]
         ph = relation_progress(task._prev_root_pos, root, objects, task.dt, progress_cfg)
-        pa = relation_progress(task._prev_box_pos, objects, task._tar_pos, task.dt, progress_cfg)
+        targets = task._ontop_geometry()[2] if mixed else task._tar_pos
+        pa = relation_progress(task._prev_box_pos, objects, targets, task.dt, progress_cfg)
         expected = relation_step(before_phi, phi, torch.stack([ph, pa], -1).flatten(1),
                                  before_a, before_done, runtime.graph,
                                  state_weight=cfg.get('state_reward_weight', .2),
@@ -92,15 +109,34 @@ def check_simulator(self):
         torch.testing.assert_close(runtime.phi, phi)
         torch.testing.assert_close(runtime.achieved, expected['achieved_next'])
         torch.testing.assert_close(runtime.done, expected['done_next'])
-        torch.testing.assert_close(task.obs_buf[:, -9 * M:], runtime.suffix())
-        torch.testing.assert_close(info['policy_obs'][:, -9 * M:], runtime.suffix())
+        expected_suffix = runtime.suffix()
+        if mixed:
+            expected_suffix = torch.cat([expected_suffix, task._ontop_scenario[:, None].float(),
+                                         task._ontop_base_agent[:, None].float()], -1)
+        torch.testing.assert_close(task.obs_buf[:, -suffix_width:], expected_suffix)
+        torch.testing.assert_close(info['policy_obs'][:, -suffix_width:], expected_suffix)
         terms = info['reward_terms'].reshape(N, M, -1)
-        torch.testing.assert_close(terms[..., :2], expected['state_component'].reshape(N, M, 2))
-        torch.testing.assert_close(terms[..., 2:4], expected['progress_component'].reshape(N, M, 2))
-        torch.testing.assert_close(terms[..., :5].sum(-1), expected['agent_task_reward'], atol=2e-6, rtol=2e-6)
+        state = terms[..., :2].clone()
+        progress = terms[..., 2:4].clone()
+        task_reward = terms[..., :5].sum(-1)
+        if mixed:
+            state[..., 1] += terms[..., 8]
+            progress[..., 1] += terms[..., 9]
+            task_reward += terms[..., 8:10].sum(-1)
+        torch.testing.assert_close(state, expected['state_component'].reshape(N, M, 2))
+        torch.testing.assert_close(progress, expected['progress_component'].reshape(N, M, 2))
+        torch.testing.assert_close(task_reward, expected['agent_task_reward'], atol=2e-6, rtol=2e-6)
         torch.testing.assert_close(terms[..., -1].flatten(), reward)
         assert torch.isfinite(task.obs_buf).all() and torch.isfinite(reward).all()
-        torch.testing.assert_close(saved_obs[:, -9 * M:-9 * M + 4] if M > 1 else saved_obs[:, -9:-5],
+        if mixed:
+            torch.testing.assert_close(task._box_states[independent, 2, :7], fixed_pose, atol=1e-6, rtol=0)
+            indices = torch.arange(N - 1, -1, -1, device=task.device)
+            network = self.model.a2c_network
+            for encoder in ((network.actor_encoder, network.critic_encoder) if step == 0 else ()):
+                # PPO minibatch reordering must reconstruct the same scene graph.
+                normalized = self._preproc_obs(saved_obs)
+                torch.testing.assert_close(encoder(normalized[indices]), encoder(normalized)[indices], atol=2e-5, rtol=2e-5)
+        torch.testing.assert_close(saved_obs[:, -suffix_width:][:, :4],
                                   torch.stack([before_phi[:, 0], torch.sigmoid(30 * (before_phi[:, 0] - .8)),
                                                (before_phi[:, 0] >= .9).float(), before_a[:, 0].float()], -1))
         prev_done_rows = done.nonzero().flatten()[::M]

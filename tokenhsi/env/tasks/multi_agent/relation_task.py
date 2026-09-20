@@ -7,7 +7,7 @@ from utils.relation_task_spec import compile_carry_subgoal
 from env.tasks.multi_agent.relation_reward import (
     RelationRuntime, evaluate_holding, evaluate_at, relation_progress, box_speed_penalty)
 from env.tasks.multi_agent.relation_diagnostics import (
-    PlacementEpisodeMetrics, RelationTimeline, placement_valid)
+    PlacementEpisodeMetrics, RelationTimeline, placement_valid, split_ontop_reward_terms)
 
 
 class CarryRelationMixin:
@@ -15,6 +15,8 @@ class CarryRelationMixin:
         self.relation_runtime = RelationRuntime(self.num_envs,
             compile_carry_subgoal(self.num_agents, self.num_objects, self.device),
             self._relation_cfg, self.device)
+        if getattr(self, '_ontop_mixed', False):
+            self._init_ontop_runtime()
         self._relation_diagnostic_sums = {}
         self._relation_diagnostic_count = 0
         self._relation_steps = 0
@@ -43,6 +45,12 @@ class CarryRelationMixin:
         a, near, put, xy, z = evaluate_at(objects, goals,
             near_scale=a_cfg.get('near_distance_scale', 10.),
             state_definition=a_cfg.get('state_definition', 'box_near'))
+        if getattr(self, '_ontop_mixed', False):
+            source, target, _, is_top = self._ontop_geometry(env_ids)
+            top, top_near, top_put, top_xy, top_z = evaluate_at(source, target,
+                near_scale=self._relation_cfg['ontop']['distance_scale'])
+            a, near, put, xy, z = [torch.where(is_top, new, old) for new, old in
+                                   zip((top, top_near, top_put, top_xy, top_z), (a, near, put, xy, z))]
         return torch.stack([h, a], -1).flatten(1), dict(
             hand_midpoint_distance=hand_error,
             right_hand_center_distance=(hands[..., 0, :] - objects).norm(dim=-1),
@@ -68,6 +76,8 @@ class CarryRelationMixin:
         if self._placement_metrics is not None:
             self._placement_metrics.finish(self.reset_buf)
         self._relation_timeline.finish(self.reset_buf)
+        if getattr(self, '_ontop_mixed', False):
+            self._finish_ontop_metrics()
 
     @torch.no_grad()
     def _compute_relation_reward(self, collision_fn):
@@ -77,7 +87,8 @@ class CarryRelationMixin:
         roots = self._humanoid_root_states[..., :3]
         cfg = self._relation_cfg.get('progress', {})
         ph = relation_progress(self._prev_root_pos, roots, objects, self.dt, cfg)
-        pa = relation_progress(self._prev_box_pos, objects, self._tar_pos, self.dt, cfg)
+        progress_targets = self._ontop_geometry()[2] if getattr(self, '_ontop_mixed', False) else self._tar_pos
+        pa = relation_progress(self._prev_box_pos, objects, progress_targets, self.dt, cfg)
         previous_satisfied = runtime.phi >= self._relation_cfg.get('satisfaction_threshold', .9)
         live = ~runtime.done.clone()
         edge_distance_xy = None
@@ -90,6 +101,8 @@ class CarryRelationMixin:
         result = runtime.step(phi, torch.stack([ph, pa], -1).flatten(1),
                               edge_distance_xy=edge_distance_xy,
                               at_z_error=diag.get('goal_z_error'))
+        if getattr(self, '_ontop_mixed', False):
+            self._ontop_step_metrics(result)
         power = torch.zeros_like(result['agent_task_reward'])
         collision = torch.zeros_like(power)
         box_penalty = torch.zeros_like(power)
@@ -104,6 +117,9 @@ class CarryRelationMixin:
         terms = torch.stack([result['state_component'][:, 0::2], result['state_component'][:, 1::2],
             result['progress_component'][:, 0::2], result['progress_component'][:, 1::2],
             result['success_bonus'], power, collision, box_penalty, reward], -1).flatten(0, 1)
+        if getattr(self, '_ontop_mixed', False):
+            from utils.ontop_task_spec import REL_ONTOP
+            terms = split_ontop_reward_terms(terms, (runtime.graph.edge_relation[:, 1::2] == REL_ONTOP).flatten())
         self.rew_buf.copy_(reward.flatten())
         self.extras['reward_terms'] = terms
         self._reward_term_sums += terms.sum(0)
@@ -228,6 +244,8 @@ class CarryRelationMixin:
         if self._placement_metrics is not None:
             result.update(self._placement_metrics.consume())
         self._relation_timeline.flush()
+        if getattr(self, '_ontop_mixed', False):
+            result.update(self._consume_ontop_metrics())
         self._relation_diagnostic_sums = {}
         self._relation_diagnostic_count = 0
         return result

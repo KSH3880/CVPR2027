@@ -6,8 +6,27 @@ import pytest
 import torch
 
 from env.tasks.multi_agent.relation_diagnostics import (
-    PlacementEpisodeMetrics, RelationTimeline, placement_valid)
+    PlacementEpisodeMetrics, RelationTimeline, placement_valid, split_ontop_reward_terms)
 from utils.relation_task_spec import validate_relation_config, checkpoint_metadata, check_checkpoint_metadata
+
+
+@pytest.mark.parametrize('mask', [[False, True, True, False], [False] * 4, [True] * 4])
+def test_ontop_reporting_separates_edges_without_changing_reward(mask):
+    terms = torch.tensor([[.2, .17, .2, .13, .0, -.02, -.01, -.03, .64]]).repeat(4, 1)
+    # Include a saturated success and different physical-agent roles.
+    terms[1, [1, 3, 4]] = torch.tensor([.2, .2, .2])
+    terms[:, -1] = terms[:, :-1].sum(-1)
+    original = terms.clone()
+    top = torch.tensor(mask)
+    reported = split_ontop_reward_terms(terms, top)
+    torch.testing.assert_close(terms, original, atol=0, rtol=0)
+    torch.testing.assert_close(reported[:, -1], terms[:, -1], atol=0, rtol=0)
+    torch.testing.assert_close(reported[:, :-1].sum(-1), terms[:, -1])
+    torch.testing.assert_close(reported[:, 1] + reported[:, 8], terms[:, 1], atol=0, rtol=0)
+    torch.testing.assert_close(reported[:, 3] + reported[:, 9], terms[:, 3], atol=0, rtol=0)
+    assert not reported[top][:, [1, 3]].any()
+    assert not reported[~top][:, [8, 9]].any()
+    torch.testing.assert_close(reported.mean(0)[:-1].sum(), terms.mean(0)[-1])
 
 
 def test_common_placement_boundaries():

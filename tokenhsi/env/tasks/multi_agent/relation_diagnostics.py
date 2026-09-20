@@ -6,6 +6,26 @@ import uuid
 import torch
 
 
+def split_ontop_reward_terms(terms, ontop_mask):
+    """Split the reported terminal state/progress; preserve paid reward exactly.
+
+    Input columns: holding state, terminal state, holding progress, terminal
+    progress, success, power, collision, speed, total. Output appends the two
+    OnTop contributions before total and removes them from the At columns.
+    All means retain the same all-agent denominator, so components remain additive.
+    """
+    if terms.ndim != 2 or terms.shape[1] != 9 or ontop_mask.shape != terms.shape[:1]:
+        raise ValueError('Expected reward terms [N*M,9] and OnTop mask [N*M]')
+    if ontop_mask.dtype != torch.bool:
+        raise ValueError('OnTop mask must be boolean')
+    top_state = torch.where(ontop_mask, terms[:, 1], 0.)
+    top_progress = torch.where(ontop_mask, terms[:, 3], 0.)
+    reported = torch.cat([terms[:, :-1], top_state[:, None], top_progress[:, None], terms[:, -1:]], -1)
+    reported[:, 1] = torch.where(ontop_mask, 0., terms[:, 1])
+    reported[:, 3] = torch.where(ontop_mask, 0., terms[:, 3])
+    return reported
+
+
 # Order is encoded in tags so TensorBoard's tag sorting keeps the useful cards
 # together. Each metric is emitted once; raw diagnostic/CSV keys stay unchanged.
 RELATION_TB_GROUPS = (
@@ -55,6 +75,10 @@ _RELATION_TB_TAGS = {
 
 def relation_tensorboard_tag(key):
     """Presentation only; preserve unlisted metrics in a trailing debug group."""
+    if key.startswith(('edge/', 'agent/', 'goal/', 'penalty/', 'sampling/', 'sharing/', 'ontop/')):
+        return 'relation/' + key
+    if key.startswith('scenario/'):
+        return 'relation/06_scenarios/' + key[len('scenario/'):]
     return _RELATION_TB_TAGS.get(key, 'relation/90_debug/' + key)
 
 

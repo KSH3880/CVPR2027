@@ -125,7 +125,13 @@ def build_relation_matrix(num_agents, num_objects=None):
 
 
 from utils.relation_task_spec import (
-    LEGACY_MODE, STATE_MODE, compile_carry_subgoal, build_state_relation_matrix)
+    LEGACY_MODE, STATE_MODE, ONTOP_MODE, compile_carry_subgoal, build_state_relation_matrix)
+from utils.ontop_task_spec import mixed_policy_graph
+
+
+from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
+from learning.multi_agent.edge_context_encoder import EdgeContextFusion, PackedEdgeContextFusion
+from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size
 
 
 class EdgeEncoder(nn.Module):
@@ -158,14 +164,19 @@ class EdgeEncoder(nn.Module):
 
     def build_edge_embeddings(self, entity_types, relation_matrix):
         L = entity_types.shape[0]
-        assert relation_matrix.shape == (L, L)
+        assert relation_matrix.shape[-2:] == (L, L)
         source = self.source_type_embed(entity_types).unsqueeze(1).expand(-1, L, -1)
         relation = self.relation_embed(relation_matrix)
         target = self.target_type_embed(entity_types).unsqueeze(0).expand(L, -1, -1)
+        if relation_matrix.ndim == 3:
+            source = source.unsqueeze(0).expand(relation_matrix.shape[0], -1, -1, -1)
+            target = target.unsqueeze(0).expand_as(source)
         return self.edge_mlp(torch.cat([source, relation, target], dim=-1))
 
     def project_bias(self, edge_embeddings):
         """(L,L,D) -> (layers,heads,L,L)."""
+        if edge_embeddings.ndim == 4:
+            return torch.einsum("bijd,lhd->lbhij", edge_embeddings, self.bias_projection)
         return torch.einsum("ijd,lhd->lhij", edge_embeddings, self.bias_projection)
 
     def forward(self, entity_types, relation_matrix):
@@ -472,17 +483,23 @@ class RelationEncoder(nn.Module):
                  observation_mode="legacy_multirow", kinematic_size=13,
                  relation_bias=True, relation_bias_mode=RELATION_BIAS_LOOKUP,
                  geometry_cfg=None, gta_cfg=None, diagnostics_name="encoder",
-                 relation_reward_mode=LEGACY_MODE, diagnostics_interval=100):
+                 relation_reward_mode=LEGACY_MODE, diagnostics_interval=100, relation_graph_spec=None):
         super().__init__()
-        if relation_reward_mode not in (LEGACY_MODE, STATE_MODE):
+        if relation_reward_mode not in (LEGACY_MODE, STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE):
             raise ValueError('Unsupported relation reward mode')
-        self.state_relation = relation_reward_mode == STATE_MODE
-        self.suffix_width = 9 * num_agents if self.state_relation else 0
+        self.packed_context = relation_reward_mode == ONTOP_CONTEXT_MODE
+        self.edge_context = relation_reward_mode in (CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
+        self.ontop_mixed = relation_reward_mode == ONTOP_MODE
+        if self.ontop_mixed and (num_agents, num_objects) != (2, 3):
+            raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
+        self.state_relation = relation_reward_mode in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        self.suffix_width = (9 * num_agents + (2 if self.ontop_mixed else 0)) if self.state_relation else 0
         self.diagnostics_interval = max(1, int(diagnostics_interval))
         self.last_diagnostics = {}
         if self.state_relation and (observation_mode != 'clean_scene' or
                 relation_bias_mode != RELATION_BIAS_EDGE_MLP or not relation_bias):
-            raise ValueError('state_relation_v0 requires clean_scene and enabled edge_mlp relation bias')
+            raise ValueError('State relation modes require clean_scene and enabled edge_mlp relation bias')
         if relation_bias_mode not in RELATION_BIAS_MODES:
             raise ValueError("unknown relation_bias_mode {!r}; expected one of {}".format(
                 relation_bias_mode, RELATION_BIAS_MODES))
@@ -506,14 +523,14 @@ class RelationEncoder(nn.Module):
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
         else:
             self.edge_encoder = EdgeEncoder(num_layers, num_heads,
-                                            num_relation_types=8 if self.state_relation else NUM_REL_TYPES)
+                                            num_relation_types=9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES)
 
         # non-persistent: derived from entity counts, so it must NOT end up in the
         # checkpoint -- otherwise loading M=2,O=2 into M=2,O=3 would fail on shape.
         self.register_buffer("rel_matrix", build_relation_matrix(num_agents, num_objects), persistent=False)
         self.register_buffer("entity_types", build_entity_type_ids(num_agents, num_objects),
                              persistent=False)
-        if self.state_relation:
+        if self.state_relation and not self.edge_context:
             self.rel_matrix = build_state_relation_matrix(num_agents, num_objects)
             graph = compile_carry_subgoal(num_agents, num_objects)
             self.register_buffer('state_edge_src', graph.edge_src, persistent=False)
@@ -522,6 +539,13 @@ class RelationEncoder(nn.Module):
             self.dynamic_edge_mlp = nn.Sequential(nn.Linear(5, 32), nn.ReLU(), nn.Linear(32, 64))
             # Parameter (not Linear): the builder's global Linear init cannot overwrite zero init.
             self.dynamic_bias_projection = nn.Parameter(torch.zeros(num_layers, num_heads, 64))
+
+        if self.edge_context:
+            compiler = compile_ontop_graph if self.packed_context else compile_edge_context_graph
+            graph = compiler(self.relation_graph_spec, num_agents, num_objects)
+            self.context_fusion = PackedEdgeContextFusion() if self.packed_context else EdgeContextFusion(graph)
+            self.suffix_width = (packet_size if self.packed_context else context_suffix_size)(len(graph.ids))
+            self._set_context_background()
 
         self.layers = nn.ModuleList([
             RelationTransformerLayer(d_model, num_heads, dim_feedforward) for _ in range(num_layers)
@@ -593,6 +617,8 @@ class RelationEncoder(nn.Module):
         """Re-target the encoder at different entity counts (weights are unchanged)."""
         if num_objects is None:
             num_objects = num_agents
+        if self.ontop_mixed and (num_agents, num_objects) != (2, 3):
+            raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
         self.num_agents = num_agents
         self.num_objects = num_objects
         self.entity_counts = [num_agents, num_objects, num_agents]
@@ -600,12 +626,31 @@ class RelationEncoder(nn.Module):
         self.rel_matrix = build_relation_matrix(num_agents, num_objects).to(device)
         self.entity_types = build_entity_type_ids(
             num_agents, num_objects, device=device)
-        if self.state_relation:
+        if self.state_relation and not self.edge_context:
             self.rel_matrix = build_state_relation_matrix(num_agents, num_objects, device)
             graph = compile_carry_subgoal(num_agents, num_objects, device)
             self.state_edge_src, self.state_edge_dst = graph.edge_src, graph.edge_dst
             self.state_edge_owner = graph.edge_owner
-            self.suffix_width = 9 * num_agents
+            self.suffix_width = 9 * num_agents + (2 if self.ontop_mixed else 0)
+
+        if self.edge_context:
+            self.set_task_graph(self.relation_graph_spec)
+
+    def _set_context_background(self):
+        # No legacy ownership/task edges in the new graph's background.
+        self.rel_matrix.zero_()
+        self.rel_matrix.fill_diagonal_(1)
+
+    def set_task_graph(self, spec):
+        if not self.edge_context:
+            raise ValueError('Explicit task graphs require edge-context mode')
+        compiler = compile_ontop_graph if self.packed_context else compile_edge_context_graph
+        graph = compiler(spec, self.num_agents, self.num_objects, self._relation_device())
+        self.relation_graph_spec = spec
+        if not self.packed_context:
+            self.context_fusion.set_graph(graph)
+        self.suffix_width = (packet_size if self.packed_context else context_suffix_size)(len(graph.ids))
+        self._set_context_background()
 
     def set_num_agents(self, num_agents):
         """Backward-compatible shorthand for the old 1:1:1 entity layout."""
@@ -628,6 +673,17 @@ class RelationEncoder(nn.Module):
             return self.rel_embed[:, :, self.rel_matrix]
         return self.edge_encoder(self.entity_types, self.rel_matrix)
 
+    def build_mixed_relation_bias(self, suffix):
+        scenario, base_agent = suffix[:, -2].long(), suffix[:, -1].long()
+        # Only six possible semantic graphs; encode once per graph, then gather.
+        ids = torch.arange(6, device=suffix.device)
+        _, matrices, _ = mixed_policy_graph(ids // 2, ids % 2)
+        semantic = self.edge_encoder(self.entity_types, matrices)
+        semantic = semantic[:, scenario * 2 + base_agent]
+        _, _, valid_nodes = mixed_policy_graph(scenario, base_agent)
+        mask = (~valid_nodes)[None, :, None, None, :].to(semantic.dtype) * -1e4
+        return semantic + self.build_dynamic_relation_bias(suffix) + mask
+
     def build_dynamic_relation_bias(self, suffix):
         """Stored rollout history -> (layers,batch,heads,L,L), directed edges only."""
         B, E, L = suffix.shape[0], 2 * self.num_agents, sum(self.entity_counts)
@@ -637,7 +693,12 @@ class RelationEncoder(nn.Module):
         edges = self.dynamic_edge_mlp(torch.cat([state, done], -1))
         values = torch.einsum('bed,lhd->lbhe', edges, self.dynamic_bias_projection)
         dense = values.new_zeros(*values.shape[:-1], L * L)
-        dense = dense.index_copy(-1, self.state_edge_src * L + self.state_edge_dst, values)
+        if self.ontop_mixed:
+            graph, _, _ = mixed_policy_graph(suffix[:, -2].long(), suffix[:, -1].long())
+            indices = graph.edge_src[None] * L + graph.edge_dst
+            dense = dense.scatter(-1, indices[None, :, None].expand_as(values), values)
+        else:
+            dense = dense.index_copy(-1, self.state_edge_src * L + self.state_edge_dst, values)
         return dense.reshape(*values.shape[:-1], L, L)
 
     def forward(self, obs):
@@ -699,10 +760,19 @@ class RelationEncoder(nn.Module):
             assert offset == obs.shape[1], \
                 "obs row is {} wide, entity blocks cover {}".format(obs.shape[1], offset)
 
-        relation_bias = self.build_relation_bias() if self.use_relation_bias else None
+        relation_bias = self.build_relation_bias() if self.use_relation_bias and not self.ontop_mixed else None
         collect = self.state_relation and (self.forward_calls == 1 or
                                            self.forward_calls % self.diagnostics_interval == 0)
-        if self.state_relation:
+        if self.edge_context:
+            relation_bias = self.context_fusion(obs[:, -self.suffix_width:], self.edge_encoder,
+                                                self.entity_types, relation_bias)
+            if collect:
+                self.last_diagnostics = {}
+        elif self.ontop_mixed:
+            relation_bias = self.build_mixed_relation_bias(obs[:, -self.suffix_width:])
+            if collect:
+                self.last_diagnostics = {}
+        elif self.state_relation:
             dynamic = self.build_dynamic_relation_bias(obs[:, -self.suffix_width:])
             if collect:
                 with torch.no_grad():
@@ -770,6 +840,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                      kwargs["goal_obs_size"]]
             self.scene_kinematic_size = kwargs.get("scene_kinematic_size", 13)
             self.relation_reward_mode = kwargs.get('relation_reward_mode', LEGACY_MODE)
+            self.relation_graph_spec = kwargs.get('relation_graph_spec')
             self.scene_arena_scale = float(kwargs.get("scene_arena_scale", 1.0))
             assert self.scene_arena_scale > 0.0
 
@@ -843,6 +914,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                        geometry_cfg=geometry_cfg,
                                        gta_cfg=gta_cfg,
                                        relation_reward_mode=self.relation_reward_mode,
+                                       relation_graph_spec=self.relation_graph_spec,
                                        diagnostics_interval=tp.get('relation_diagnostics_interval', 100),
                                        diagnostics_name=diagnostics_name)
 
@@ -877,6 +949,11 @@ class AMPMultiAgentBuilder(AMPBuilder):
             self.actor_encoder.set_entity_counts(num_agents, num_objects)
             self.critic_encoder.set_entity_counts(num_agents, num_objects)
             return
+
+        def set_task_graph(self, spec):
+            self.actor_encoder.set_task_graph(spec)
+            self.critic_encoder.set_task_graph(spec)
+            self.relation_graph_spec = spec
 
         def set_num_agents(self, num_agents):
             """Backward-compatible shorthand for the old 1:1:1 entity layout."""

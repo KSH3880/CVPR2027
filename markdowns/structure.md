@@ -1,19 +1,32 @@
 # 레포 구조
 
-TokenHSI의 multi-agent carry 실험 저장소. 현재 비교는 distance progress의 **성공 시 edge 포화 on/off**이며 세부 설정과 명령은 [config.md](config.md)에 모은다.
+TokenHSI의 multi-agent carry 실험 저장소. 현재 비교는 distance progress의 **성공 시 edge 포화 on/off**와 포화 on 기준 **Holding k=5/10**이며 세부 설정과 명령은 [config.md](config.md)에 모은다.
 
 ## 코드 위치
 
 | 경로 | 역할 |
 | --- | --- |
+| `mps/` | GPU별 MPS 단축 함수·운영 안내. 이 서버의 개인 설치본은 `~/.local/share/gpu-mps/shell.sh`, 새 Bash에서 자동 로드 |
+| `tokenhsi/scripts/multi_agent/mps_auto_env.sh` | runtime에서 지정 GPU의 내 MPS를 검증·자동 연결. 데몬 시작·종료는 하지 않음 |
 | `tokenhsi/run.py` | 학습·평가 진입점, 환경·알고리즘 등록 |
-| `tokenhsi/scripts/multi_agent/` | 실험별 train/test, 현재 실험 VNC 단축 실행 `approach_distance_success_vnc.sh`, `runtime_env.sh`, 범용 `run-gui.sh`와 GPU 선택 `gui_gpu_env.sh` |
-| `tokenhsi/data/cfg/multi_agent/` | 환경·reward 실험 YAML 6개: 기존 ID 1, 9~13 유지 |
+| `tokenhsi/scripts/multi_agent/` | 실험별 train/test(로컬 viewer·평가), 12번 `approach_distance_success_vnc.sh`, 14번 `approach_distance_success_holding_k10_vnc.sh`, 15번 `approach_distance_success_ontop_mixed_vnc.sh`, 16번 `approach_distance_edge_context_success_vnc.sh`, 17번 `approach_distance_edge_context_ontop_vnc.sh`, `runtime_env.sh`, 공통 `run-gui.sh`·`gui_gpu_env.sh` |
+| `tokenhsi/data/cfg/multi_agent/` | 실행 가능 환경·reward YAML 10개(ID 1, 9~17); 15번 `approach_distance_success_ontop_mixed.yaml`은 세 시나리오 혼합 |
 | `tokenhsi/data/cfg/train/rlg/` | PPO/AMP/Transformer 학습 설정. 현재 relation 학습은 `amp_ma_carry_relation.yaml` |
 | `tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py` | 박스 배정·reset·물리 환경·관측 통합 |
 | `tokenhsi/env/tasks/multi_agent/relation_task.py` | 환경 상태를 relation reward/diagnostics에 연결 |
 | `tokenhsi/env/tasks/multi_agent/relation_reward.py` | state/progress/reward 계산, 성공 조건, history runtime |
 | `tokenhsi/env/tasks/multi_agent/relation_diagnostics.py` | TensorBoard 표시 순서(`RELATION_TB_GROUPS`)·배치 유지·CSV 진단 |
+| `tokenhsi/env/tasks/multi_agent/ontop_task.py` | OnTop reset·역할 배정·면 좌표 연결·시나리오별 진단 |
+| `tokenhsi/utils/edge_ontop_spec.py` | 17번 batched graph·reset 샘플러·preset·7-field packet·schema 3 검증 |
+| `tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py` | 회전 bbox의 월드 Z extent·OnTop 상태·같은 환경 task 공유 |
+| `tokenhsi/env/tasks/multi_agent/edge_ontop_task.py` | dynamic Ox·AT-only 플랫폼·물리 reset 제약·sampling/기하학 진단·viewer |
+| `tokenhsi/utils/edge_context_spec.py` | 새 schema 검증, explicit graph compile, PRE/TERM 참조, resume task 계약 |
+| `tokenhsi/env/tasks/multi_agent/edge_context_reward.py` | Holding·At binding 기반 평가, raw context, edge-local live 성공·포화 |
+| `tokenhsi/env/tasks/multi_agent/edge_context_task.py` | 새 mode의 reset/reward/관측·CSV·성공률 연결 |
+| `tokenhsi/learning/multi_agent/edge_context_encoder.py`, `edge_context_eval.py` | scalar context/fusion bias와 required-goal 평가 |
+| `tokenhsi/data/cfg/multi_agent/graphs/` | 평가용 explicit graph override 예제 (환경/실험 YAML과 구분) |
+| `tokenhsi/utils/ontop_task_spec.py` | 혼합 시나리오 검증·환경 배분·환경별 그래프·회전된 면 중심 계산 |
+| `tokenhsi/learning/multi_agent/transfer.py` | carry 가중치·기존 relation 행 복사와 OnTop 행 확장 검증 |
 | `tokenhsi/utils/relation_task_spec.py` | relation graph, config 검증, checkpoint 호환 계약 |
 | `tokenhsi/env/tasks/multi_agent/scene_features.py` | scene token/pose feature 구성 |
 | `tokenhsi/learning/multi_agent/amp_network_builder_ma.py` | A2 relation bias와 GTA actor/critic |
@@ -27,7 +40,13 @@ TokenHSI의 multi-agent carry 실험 저장소. 현재 비교는 distance progre
 
 ## 작업별 최소 탐색
 
+- **17번 sampled OnTop:** [edge_context_ontop.md](edge_context_ontop.md), `approach_distance_edge_context_ontop_{train,test,vnc}.sh`. CPU `test_edge_ontop.py`, 실제 PPO/GAE 저장 경로 `smoke_edge_ontop_train.py`, 물리 접촉·preset·replay `smoke_edge_ontop_sim.py`.
+
+- **16번 Holding·At edge context:** [edge_context_success.md](edge_context_success.md), `approach_distance_edge_context_success_{train,test,vnc}.sh`. CPU 검증 `test_edge_context_success.py`, 실제 실행 검증 `smoke_edge_context_sim.py`. 새 학습과 기존 실험을 분리한다.
+
 - **보상/성공 조건:** 실험 YAML → `relation_task_spec.py` → `relation_reward.py` → `relation_task.py`. 회귀 테스트는 `test_relation_distance.py`와 관련 `test_relation_*.py`.
+- **Holding k=10 수식·입력 좌표:** [approach_distance_success_holding_k10_reward.md](approach_distance_success_holding_k10_reward.md).
+- **OnTop 혼합학습·전이·실행:** [ontop_mixed_config.md](ontop_mixed_config.md). 512/768/768 동시학습, epoch 18000 전이, 전용 `approach_distance_success_ontop_mixed_{train,test,vnc}.sh`. CPU 테스트 `test_ontop_mixed.py`, 실제 시뮬레이터 확인 `smoke_relation_sim.py`.
 - **reset/박스/좌표:** `humanoid_ma_carry.py`, `scene_features.py`, 해당 환경 YAML.
 - **네트워크/관측:** `amp_network_builder_ma.py`, `scene_normalizer.py`, `ma_agent.py`; 현재 구조 상세는 [ma_clean_scene_gta.md](ma_clean_scene_gta.md).
 - **학습 실행/VNC:** [config.md](config.md)와 대상 train/test, `runtime_env.sh`, `run-gui.sh`.

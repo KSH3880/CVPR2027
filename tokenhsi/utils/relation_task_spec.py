@@ -2,9 +2,13 @@
 from dataclasses import dataclass
 import math
 import torch
+from utils.edge_context_spec import CONTEXT_MODE, validate_edge_context_config
+
+from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, PACKET_FIELDS, validate_ontop_context_config
 
 LEGACY_MODE = 'legacy_tokenhsi'
 STATE_MODE = 'state_relation_v0'
+ONTOP_MODE = 'state_relation_ontop_mixed_v1'
 REL_HOLDING, REL_AT = 6, 7
 STATE_FIELDS = ('phi', 'gate', 'satisfied', 'achieved')
 
@@ -48,6 +52,16 @@ def build_state_relation_matrix(num_agents, num_objects, device=None):
 
 def validate_relation_config(config):
     mode = config.get('mode', LEGACY_MODE)
+    if mode == ONTOP_CONTEXT_MODE:
+        validate_ontop_context_config(config)
+        return
+    if mode == CONTEXT_MODE:
+        validate_edge_context_config(config)
+        return
+    if mode == ONTOP_MODE:
+        from utils.ontop_task_spec import validate_ontop_reward
+        validate_ontop_reward(config)
+        return
     if mode not in (LEGACY_MODE, STATE_MODE):
         raise ValueError('Unsupported relationReward mode: ' + str(mode))
     if mode == LEGACY_MODE:
@@ -170,6 +184,24 @@ def validate_relation_config(config):
 
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
+    if mode == ONTOP_CONTEXT_MODE:
+        return {'reward_mode': mode, 'schema_version': 3,
+                'relation_taxonomy': {'holding': 6, 'at': 7, 'ontop': 8},
+                'suffix_fields': list(PACKET_FIELDS), 'packet_version': 1, 'graph_record_width': 7,
+                'context_dim_per_edge': 2,
+                'context_fusion': 'semantic64_context2x32x64_concat128x64x64',
+                'relation_reward_config': config}
+    if mode == CONTEXT_MODE:
+        return {'reward_mode': mode, 'schema_version': 2,
+                'relation_taxonomy': {'holding': REL_HOLDING, 'at': REL_AT},
+                'suffix_fields': ['pre', 'term'], 'context_dim_per_edge': 2,
+                'context_fusion': 'semantic64_context2x32x64_concat128x64x64',
+                'relation_reward_config': config}
+    if mode == ONTOP_MODE:
+        return {'reward_mode': mode, 'schema_version': 1,
+                'relation_taxonomy': {'holding': REL_HOLDING, 'at': REL_AT, 'ontop': 8},
+                'suffix_fields': list(STATE_FIELDS) + ['subgoal_done', 'scenario', 'base_agent'],
+                'relation_reward_config': config}
     return {'reward_mode': mode, 'schema_version': 1 if mode == STATE_MODE else 0,
             'relation_taxonomy': {'holding': REL_HOLDING, 'at': REL_AT} if mode == STATE_MODE else {},
             'suffix_fields': list(STATE_FIELDS) + ['subgoal_done'] if mode == STATE_MODE else [],
@@ -180,13 +212,21 @@ def check_checkpoint_metadata(weights, expected):
     saved = weights.get('relation_metadata')
     if saved is None:
         if expected['reward_mode'] != LEGACY_MODE:
-            raise ValueError('Legacy checkpoint cannot resume state_relation_v0; explicit conversion is required')
+            raise ValueError('Legacy checkpoint cannot load a state relation mode; explicit conversion is required')
         return
     for key in ('reward_mode', 'schema_version', 'relation_taxonomy', 'suffix_fields'):
         if saved.get(key) != expected[key]:
             raise ValueError('Checkpoint relation schema mismatch: ' + key)
+    if expected['reward_mode'] in (CONTEXT_MODE, ONTOP_CONTEXT_MODE):
+        for key in ('context_dim_per_edge', 'context_fusion'):
+            if saved.get(key) != expected[key]:
+                raise ValueError('Checkpoint context architecture mismatch: ' + key)
+    if expected['reward_mode'] == ONTOP_CONTEXT_MODE:
+        for key in ('packet_version', 'graph_record_width'):
+            if saved.get(key) != expected[key]:
+                raise ValueError('Checkpoint graph packet mismatch: ' + key)
     # Training and evaluation must use the same reward definition. Diagnostics may vary.
     def objective(c):
         return {k: v for k, v in c.items() if k != 'diagnostics'}
-    if expected['reward_mode'] == STATE_MODE and objective(saved.get('relation_reward_config', {})) != objective(expected['relation_reward_config']):
+    if expected['reward_mode'] in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE) and objective(saved.get('relation_reward_config', {})) != objective(expected['relation_reward_config']):
         raise ValueError('Checkpoint relation reward config differs (diagnostics-only overrides allowed)')

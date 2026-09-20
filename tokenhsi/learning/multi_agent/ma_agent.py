@@ -8,6 +8,7 @@
 import time
 import os
 import copy
+import json
 import yaml
 import numpy as np
 import torch
@@ -93,7 +94,8 @@ class MAAgent(amp_agent.AMPAgent):
             self._relation_experiment_config = {'env': copy.deepcopy(task.cfg['env']),
                 'train': resolved, 'num_envs': task.num_envs, 'num_agents': task.num_agents,
                 'num_objects': task.num_objects, 'control_dt': task.dt,
-                'observation_size': task.get_obs_size()}
+                'observation_size': task.get_obs_size(),
+                'experiment': copy.deepcopy(task.cfg.get('experiment', {}))}
             with open(os.path.join(self.experiment_dir, 'relation_config.yaml'), 'w') as f:
                 yaml.safe_dump(self._relation_experiment_config, f, sort_keys=False)
         self._scene_policy = task.is_scene_policy()
@@ -124,6 +126,19 @@ class MAAgent(amp_agent.AMPAgent):
             self.dataset = amp_datasets.AMPDataset(
                 scene_batch_size, scene_minibatch_size, self.is_discrete,
                 self.is_rnn, self.ppo_device, self.seq_len)
+        if getattr(task, '_ontop_mixed', False) and args.resume <= 0:
+            from learning.multi_agent.transfer import transfer_carry_weights
+            path = task.cfg['experiment']['transfer']['checkpoint']
+            checkpoint = torch.load(path, map_location=self.ppo_device, weights_only=False)
+            report = transfer_carry_weights(self.model, checkpoint, task._relation_cfg)
+            self.set_stats_weights(checkpoint)
+            report['checkpoint'] = path
+            report['normalizers'] = [key for key in ('running_mean_std', 'reward_mean_std', 'amp_input_mean_std')
+                                     if key in checkpoint]
+            with open(os.path.join(self.experiment_dir, 'transfer_report.json'), 'w') as f:
+                json.dump(report, f, indent=2)
+            print('[OnTop transfer] epoch {}, {} tensors copied, {} embeddings extended; no extra freeze'.format(
+                report['source_epoch'], len(report['copied_tensors']), len(report['expanded_embeddings'])), flush=True)
         return
 
     def init_tensors(self):
@@ -156,11 +171,18 @@ class MAAgent(amp_agent.AMPAgent):
         weights = super().get_stats_weights()
         task = self.vec_env.env.task
         weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        if getattr(task, '_edge_context', False):
+            from utils.edge_context_spec import task_instance
+            weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)
         if task._state_relation:
             weights['relation_experiment_config'] = self._relation_experiment_config
         return weights
 
     def set_weights(self, weights):
+        task = self.vec_env.env.task
+        if getattr(task, '_edge_context', False):
+            from utils.edge_context_spec import check_task_resume
+            check_task_resume(weights, task._relation_graph_spec, task.num_agents, task.num_objects)
         check_checkpoint_metadata(weights, checkpoint_metadata(self.vec_env.env.task._relation_cfg))
         return super().set_weights(weights)
 
@@ -175,6 +197,7 @@ class MAAgent(amp_agent.AMPAgent):
         config["goal_obs_size"] = task.get_goal_obs_size()
         config["observation_mode"] = task.get_policy_obs_mode()
         config['relation_reward_mode'] = task._relation_cfg.get('mode', LEGACY_MODE)
+        config['relation_graph_spec'] = task._relation_graph_spec
         if task.is_scene_policy():
             config["scene_entity_sizes"] = task.get_scene_entity_sizes()
             config["scene_kinematic_size"] = task.get_scene_kinematic_size()

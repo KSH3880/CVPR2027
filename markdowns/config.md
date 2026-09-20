@@ -1,6 +1,6 @@
 # Multi-Agent Carry Config 가이드
 
-`tokenhsi/data/cfg/multi_agent`의 **6개 config 전체**와 각각의 학습·시각화 명령을 정리한다. 모든 명령은 저장소 루트에서 실행한다.
+`tokenhsi/data/cfg/multi_agent`의 **실행 가능한 10개 config**와 각각의 학습·시각화 명령을 정리한다. 15번은 기존 carry checkpoint를 전이하는 OnTop 혼합학습이다. 모든 명령은 저장소 루트에서 실행한다.
 
 ```bash
 cd /home/hwanhee/ksh/approach_distance_success
@@ -17,20 +17,26 @@ cd /home/hwanhee/ksh/approach_distance_success
 
 - 현재 비교: **12번 `approach_distance_success`**(성공 중 edge 포화) / **13번 `approach_distance_success_no_sat`**(포화 없음).
 - 둘 다 현재 `At phi ≥ 0.9 AND |Z error| ≤ 1 mm`일 때 매 step `+0.2`; 포화 여부만 다르다.
+- Holding 계수 비교: **14번 `approach_distance_success_holding_k10`**은 12번에서 Holding `k`만 `5 → 10`으로 바꾼 실험이다. `0.9` 만족 기준과 gate 설정은 유지한다.
+- **17번 sampled OnTop:** [새 OnTop 학습·viewer](#sampled-ontop-edge-context-17번). reset별 랜덤 그래프, dynamic Ox, k=10, PRE/TERM context, 전체 그래프 task reward 0.9/0.1 공유, scratch.
+- **16번 edge context:** [Holding·At 새 학습](#edge-context-성공-포화-16번). k=10, PRE/TERM scalar context, reward gate 제거, edge별 최대 0.6. 기존 checkpoint 전이 없이 scratch 학습.
+- **15번 OnTop 혼합학습:** [설정·구현 상태](#ontop-혼합학습-15번). carry/carry 512 + 독립 OnTop 768 + 의존 OnTop 768, Holding k=5, 지정 epoch 18000 checkpoint 전이. 전용 train/test/VNC 스크립트로 실행한다.
 - 11번 `approach_distance`는 과거 +10/latch 실험이다. 12·13번과 혼동하지 않는다.
 - 기본 학습: 에이전트 2 / 환경 2048 / 물체 3. GPU는 `TOKENHSI_GPU`, conda는 `TOKENHSI_CONDA_ENV=tokenhsi`로 지정한다.
+- MPS: `mps_start 6`으로 GPU 6 서버를 먼저 켜면, `TOKENHSI_GPU=6 bash <train/test/vnc 스크립트>`는 해당 GPU의 내 MPS에 자동 연결한다. `mps_run`은 필요 없다. 이미 실행 중인 학습에는 소급 적용되지 않는다. [MPS 안내](../mps/README.md).
 - 실행: `tokenhsi/scripts/multi_agent/<실험명>_{train,test}.sh`; 결과: `output/<실험명>/`.
 - 학습 YAML: `tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation.yaml`; 환경 YAML: `tokenhsi/data/cfg/multi_agent/<실험명>.yaml`.
 - config가 다른 checkpoint는 resume/evaluate 호환되지 않는다. checkpoint의 config와 test 스크립트를 맞춘다.
 - VNC: 현재 12번은 `TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_success_vnc.sh "$CKPT"`로 실행한다.
+- OnTop VNC: `TOKENHSI_GPU=4 ONTOP_SCENARIO=carry_ontop_dependent bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_vnc.sh "$CKPT"`. 로컬 viewer는 같은 실험의 `_test.sh`에 `HEADLESS=0`을 지정한다.
 - 본학습 전 `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여 설정을 확인한다.
-- 목차에서 필요한 부분만 읽는다: [전체 목록](#config-전체-목록), [학습](#새-학습-명령--전체), [시각화](#시각화-명령--전체), [VNC](#원격-서버에서-vnc로-시각화), [현재 보상](#현재-실험-unified-distance-progress), [포화 비교](#비교-실험-성공-시-포화-끄기), [TensorBoard](#tensorboard).
+- 목차에서 필요한 부분만 읽는다: [전체 목록](#config-전체-목록), [학습](#새-학습-명령--전체), [시각화](#시각화-명령--전체), [VNC](#원격-서버에서-vnc로-시각화), [현재 보상](#현재-실험-unified-distance-progress), [포화 비교](#비교-실험-성공-시-포화-끄기), [Holding k 비교](#비교-실험-holding-k10), [TensorBoard](#tensorboard).
 
 ## Config 전체 목록
 
 번호는 기존 실험 ID를 유지한다. 2~8번은 config·스크립트·전용 연산과 함께 삭제했다.
 
-| 번호 | Config | 핵심 차이 | Train / Test script |
+| 번호 | Config | 핵심 차이 | 실행 스크립트 |
 | ---: | --- | --- | --- |
 | 1 | [amp_humanoid_ma_carry.yaml](../tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml) | 원본 TokenHSI 방식, state-relation 미사용 | `ma_carry_train.sh` / `ma_carry_test.sh` |
 | 9 | [approach_rsi_all_edges.yaml](../tokenhsi/data/cfg/multi_agent/approach_rsi_all_edges.yaml) | Holding과 At 모두 XY approach blending + RSI 웜업 | `approach_rsi_all_edges_train.sh` / `..._test.sh` |
@@ -38,12 +44,129 @@ cd /home/hwanhee/ksh/approach_distance_success
 | 11 | [approach_distance.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance.yaml) | 10번 기반 통합 XY distance progress + RSI 웜업 제거. 기존 +10/latch 유지 | `approach_distance_train.sh` / `approach_distance_test.sh` |
 | 12 | [approach_distance_success.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_success.yaml) | 11번의 distance progress + 현재 At/Z edge saturation + 매-step success 0.2 | `approach_distance_success_train.sh` / `approach_distance_success_test.sh` |
 | 13 | [approach_distance_success_no_sat.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_success_no_sat.yaml) | 12번에서 edge saturation만 해제, 현재 성공 +0.2 유지 | `approach_distance_success_no_sat_train.sh` / `..._test.sh` |
+| 14 | [approach_distance_success_holding_k10.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_success_holding_k10.yaml) | 12번에서 Holding `hand_distance_scale`만 10으로 변경 | [학습](../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_vnc.sh) |
+| 15 | [approach_distance_success_ontop_mixed.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_success_ontop_mixed.yaml) | Holding k=5, carry/독립 OnTop/의존 OnTop 혼합, 기존 checkpoint 전이 | [학습](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_vnc.sh) |
+| 16 | [approach_distance_edge_context_success.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_success.yaml) | Holding·At k=10, PRE/TERM context, edge 성공/TERM 포화, scratch | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_vnc.sh) |
+| 17 | [approach_distance_edge_context_ontop.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_ontop.yaml) | 16번 + OnTop·reset별 그래프·0.9/0.1 task 공유, scratch | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_vnc.sh) |
 
 `..._test.sh`는 같은 행의 train script 이름에서 `_train.sh`를 `_test.sh`로 바꾼 전체 이름이다.
 
+## Sampled OnTop edge context (17번)
+
+[설정·수식·샘플링·checkpoint 상세](edge_context_ontop.md). 16번 구조를 확장한 별도 scratch 실험이다. 2명 각각 Holding 필수 + 없음/AT/OnTop을 .2/.5/.3으로 독립 샘플링한다. A/B 역할은 고정하지 않는다. PRE는 context이며 reward gate가 아니다. 모든 그래프에서 자기 task 90% + 상대 10%를 적용하고 각자 penalty·기존 AMP/PPO를 유지한다.
+
+```bash
+# 새 학습: 2048환경
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_train.sh 2 2048 3
+
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextOntop.pth'
+# 로컬 추론
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_test.sh "$CKPT" 2 1 3 10
+# 화면 없는 평가
+TOKENHSI_GPU=5 HEADLESS=1 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_test.sh "$CKPT" 2 16 3 1
+# 서버 VNC (기본: A AT, B OnTop Oa)
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_vnc.sh "$CKPT"
+# 연속 쌓기
+TOKENHSI_GPU=5 TASK_GRAPH=ontop_chain bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_vnc.sh "$CKPT"
+```
+
+Viewer `TASK_GRAPH=at_ontop|ontop_chain|independent_ontop|random`, `TASK_ROLE_SWAP=1`로 역할 반전. 기본 loco 초기화이며 성공만으로 reset하지 않는다. Train은 viewer 설정과 무관하게 random이다. Ox는 일반 dynamic box이고 OnTop target 플랫폼은 없다. 3단 적층의 물리 높이를 위해 이 실험의 **실제 box 크기는 0.2~0.4m**다(기존 16번 0.2~0.6m와 구분).
+
+Output은 `output/approach_distance_edge_context_ontop/`, 확인용은 `_check`로 분리한다. 같은 실험의 `RESUME_CHECKPOINT`, 짧은 검증의 `MAX_ITERATIONS`를 지원한다. 16번/15번 checkpoint는 직접 호환되지 않는다. 기본 관측 615차원, context 입력은 여전히 edge당 2개이며 나머지는 rollout에 보존하는 그래프 연결 정보다. TensorBoard 핵심은 `relation/edge/ontop/{phi_raw,own_success,reward_saturated}`, `relation/goal/*`; reset 분포는 `relation/sampling/*`, 보상 공유는 `relation/sharing/*`다.
+
+## Edge context 성공 포화 (16번)
+
+[구현·수식·graph·checkpoint 상세](edge_context_success.md). Holding·At만 사용하며 새 학습으로 시작한다. 기존 12~15번 실험과 output을 분리한다. PRE/TERM은 정책에 raw scalar로 전달하고 reward에는 곱하지 않는다. 자기 성공 또는 TERM의 현재 실제 성공이면 edge의 state/progress/success를 각각 0.2로 포화한다. 기본 2-edge/agent task reward 상한은 1.2다. 기존 패널티·AMP·PPO·reset 설정은 유지한다.
+
+이 서버에서는 GPU 5·6 중 빈 장치를 사용한다. 아래 명령은 GPU 6 예시이며 실행 전 점유를 확인한다.
+
+```bash
+# 새 학습: 2048환경, 기존 checkpoint 로드 없음
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_train.sh 2 2048 3
+
+# 로컬 추론
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextSuccess.pth'
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_test.sh "$CKPT" 2 1 3 10
+
+# 서버 VNC 추론
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_vnc.sh "$CKPT"
+
+# 화면 없는 평가
+TOKENHSI_GPU=6 HEADLESS=1 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_test.sh "$CKPT" 2 16 3 1
+```
+
+Output: `output/approach_distance_edge_context_success/`. `MAX_ITERATIONS`와 별도 `OUTPUT_PATH=output/approach_distance_edge_context_success_check`로 짧게 검증한다. 같은 새 checkpoint의 resume은 `RESUME_CHECKPOINT`를 지정한다. 기존 v0/OnTop checkpoint는 거부한다. 평가 시 `RELATION_GRAPH=<graph.yaml>`과 사람/물체 수 변경을 지원하며, training resume에서는 task graph·사람/물체 수를 유지한다. 성공률은 `relation/goal/*`, raw state/포화는 `relation/edge/{holding,at}/*`에서 확인한다.
+
+## OnTop 혼합학습 (15번)
+
+**구현 완료:** `state_relation_ontop_mixed_v1`이 환경별 그래프·역할 셔플·OnTop 보상과 actor/critic 관측에 연결되어 있다. 아래 설정으로 전용 스크립트를 실행한다. 짧은 실행 검증과 장기 수렴은 구분한다.
+
+| 실행 목적 | 전용 스크립트 | 설정 |
+| --- | --- | --- |
+| 학습 | [approach_distance_success_ontop_mixed_train.sh](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh) | 기본 2명 / 2048환경 / 물체 3개 |
+| 로컬 화면 추론 | [approach_distance_success_ontop_mixed_test.sh](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_test.sh) | `HEADLESS=0`, 실행 머신에 그래픽 display 필요 |
+| 서버 VNC 추론 | [approach_distance_success_ontop_mixed_vnc.sh](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_vnc.sh) | 임시 display·noVNC 자동 시작, 기본 포트 6080 |
+
+| 시나리오 | 환경 수 | A 역할 | B 역할 |
+| --- | ---: | --- | --- |
+| carry + carry | 512 | Oa를 Ga에 배치 | Ob를 Gb에 배치 |
+| carry + 독립 OnTop | 768 | Oa를 Ga에 배치 | Ob를 고정 받침 Ox에 쌓기 |
+| carry + 의존 OnTop | 768 | Oa를 Ga에 배치 | Ob를 A가 운반하는 Oa에 쌓기 |
+
+- 총 **2048환경 / 사람 2 / 물체 3**, 하나의 공유 정책으로 처음부터 동시학습. 환경 그룹과 비율은 고정한다.
+- A/B는 논리적 역할이다. reset마다 사람에 무작위 배정하고 episode 안에서는 유지한다.
+- 기존 carry 초기 배치·상자 크기·물리·AMP 설정을 유지한다. 쌓인 상태로 초기화하지 않는다. 독립 OnTop의 Ox는 고정 받침이며 reset 때 재배치하고, Ox용 At edge는 만들지 않는다.
+- Holding **k=5**, At/OnTop **k=10**. OnTop 상태 입력은 위 상자 바닥면 중심 → 받침 상자 윗면 중심, progress 입력은 두 상자 중심의 XY다.
+- 독립 OnTop gate는 자기 Holding gate, 의존 OnTop gate는 `min(자기 Holding gate, 상대 At gate)`다.
+- 각자 terminal edge의 `phi >= 0.9 AND abs(Z error) <= 0.001 m`에 기존 성공 포화와 매-step `+0.2`를 적용한다. B 성공에 A 성공 조건을 추가하지 않는다. 성공 직후 종료하지 않는다.
+
+전이할 checkpoint:
+
+```text
+/home/hwanhee/ksh/approach_distance_success/output/approach_distance_success/ApproachDistanceSuccess_18-14-22-43/nn/ApproachDistanceSuccess_00018000.pth
+```
+
+실제 파일에서 epoch 18000·Holding k=5를 확인했다. 호환 가중치·정규화 통계와 기존 relation embedding 행을 가져오고 OnTop 행은 새로 초기화한다. 추가 freeze 없이 학습하며 optimizer·학습 카운터·환경 상태는 복원하지 않는다. 새 학습에서는 전이 로더를 자동 사용하고 `transfer_report.json`에 복사·신규 초기화 항목을 기록한다. `RESUME_CHECKPOINT`를 지정하면 OnTop checkpoint의 optimizer·카운터까지 복원하며 원래 carry checkpoint의 전이를 다시 수행하지 않는다.
+
+output은 `output/approach_distance_success_ontop_mixed`, 짧은 검증은 `output/approach_distance_success_ontop_mixed_check`로 분리한다. 자세한 입력·수식·전이 계약은 [OnTop 설정 설명](ontop_mixed_config.md)에 정리했다.
+
+```bash
+# 새 학습: 위 epoch 18000 checkpoint를 자동 로드. 환경 수는 2048.
+TOKENHSI_GPU=4 bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh
+
+# 확인용 짧은 학습: 본학습 output과 분리
+TOKENHSI_GPU=4 MAX_ITERATIONS=1 OUTPUT_PATH=output/approach_distance_success_ontop_mixed_check \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh
+
+# OnTop 학습을 이어서 실행: 실제 OnTop checkpoint 경로로 지정
+CKPT='/absolute/path/to/ApproachDistanceSuccessOntopMixed.pth'
+TOKENHSI_GPU=4 RESUME_CHECKPOINT="$CKPT" \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh
+
+# 화면 없는 평가: 16환경을 4/6/6으로 배분, 1회씩 평가
+TOKENHSI_GPU=4 HEADLESS=1 \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_test.sh "$CKPT" 2 16 3 1
+
+# 로컬 화면에서 의존 OnTop 추론: 실행 머신의 display에 viewer 표시
+TOKENHSI_GPU=4 HEADLESS=0 ONTOP_SCENARIO=carry_ontop_dependent \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_test.sh "$CKPT" 2 1 3 10
+
+# 의존 OnTop만 VNC로 보기
+TOKENHSI_GPU=4 ONTOP_SCENARIO=carry_ontop_dependent \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_vnc.sh "$CKPT"
+```
+
+- GPU 번호는 실행 전 점유 확인 후 선택한다. 본학습에서는 `MAX_ITERATIONS`와 확인용 `OUTPUT_PATH`가 남아 있지 않은지 확인한다.
+- 새 학습의 원본 파일만 바꾸려면 `TRANSFER_CHECKPOINT=/path/to/carry.pth`를 지정한다. `RESUME_CHECKPOINT`와 동시에 지정할 수 없다. 모델 구조·기존 reward가 맞지 않으면 거부한다.
+- 평가/VNC의 `ONTOP_SCENARIO`: `mixed`(기본), `carry_carry`, `carry_ontop_independent`, `carry_ontop_dependent`. `mixed`의 소수 환경 배분은 학습 비율을 근사한다. 한 장면으로 특정 시나리오를 보려면 이름을 지정한다.
+- OnTop의 `reward_terms/at_state`, `at_progress`는 At만, `reward_terms/ontop_state`, `ontop_progress`는 OnTop만 기록한다. 전체 agent 평균을 사용하므로 항들을 더하면 기존 total과 일치한다. 이는 로그 분리이며 실제 보상·checkpoint 계약은 바뀌지 않는다. 수정 전에 시작한 프로세스는 At 이름에 OnTop을 합쳐 기록한다. 새 표시 적용은 다음 실행/resume부터이며 기존 event는 변경하지 않는다.
+- OnTop viewer 로그는 env 0의 두 사람을 모두 출력하고 `scenario`, `agent`, `role`을 표시한다. k=10 carry 모델은 OnTop 관계가 없으므로 OnTop 항이 없는 것이 정상이다.
+- TensorBoard `relation/06_scenarios/<시나리오>/`: A/B 현재 성공, 공동 성공·유지, B terminal gate/phi, 역할 비율을 기록한다. 의존 시나리오에는 B 첫 성공 시 Oa–Ga 거리와 표본 수도 기록한다. 표본 수가 0인 거리 평균은 아직 성공 관측이 없다는 뜻이다.
+- 현재 구현 범위는 **사람 2 / 물체 3 / 세 시나리오**다. 다인원·임의 edge 그래프 추론 확장은 별도 작업이다.
+
 ## 새 학습 명령 — 전체
 
-각 명령 중 원하는 **하나만** 실행한다.
+현재 실행 가능한 1, 9~17번 중 원하는 **하나만** 실행한다. 15번은 지정 carry checkpoint를 자동 전이하며, **16·17번은 checkpoint 전이 없이 scratch 학습**한다. 이 서버에서는 GPU 5·6 중 빈 장치를 선택한다.
 
 ```bash
 # 1. Original TokenHSI-style carry
@@ -63,9 +186,21 @@ bash tokenhsi/scripts/multi_agent/approach_distance_success_train.sh 2 2048 3
 
 # 13. Current-success +0.2 유지, edge saturation 해제
 bash tokenhsi/scripts/multi_agent/approach_distance_success_no_sat_train.sh 2 2048 3
+
+# 14. 성공 시 포화 유지, Holding k=10
+bash tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_train.sh 2 2048 3
+
+# 15. Carry + independent OnTop + dependent OnTop, pretrained k=5 transfer
+bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh 2 2048 3
+
+# 16. Holding·At k=10 + PRE/TERM context + edge 성공 포화 (scratch)
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_train.sh 2 2048 3
+
+# 17. Sampled OnTop + PRE/TERM context + task 0.9/0.1 공유 (scratch)
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_train.sh 2 2048 3
 ```
 
-재현 가능한 seed가 필요하면 명령 앞에 `SEED=42`를 붙인다. 9~13번 relation 학습은 같은 config에서 만든 checkpoint로 재개할 수 있다.
+재현 가능한 seed가 필요하면 명령 앞에 `SEED=42`를 붙인다. 9~17번 relation 학습은 같은 config에서 만든 checkpoint로 재개할 수 있다. 15번 resume에는 OnTop checkpoint, 16·17번에는 각각 해당 실험의 새 edge-context checkpoint를 사용한다.
 
 ```bash
 RESUME_CHECKPOINT='/absolute/path/checkpoint.pth' SEED=42 \
@@ -102,6 +237,22 @@ HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_success_test.sh "
 # 13
 CKPT='/path/to/ApproachDistanceSuccessNoSat.pth'
 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_success_no_sat_test.sh "$CKPT" 2 1 3 10
+
+# 14
+CKPT='/path/to/ApproachDistanceSuccessHoldingK10.pth'
+HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_test.sh "$CKPT" 2 1 3 10
+
+# 15. OnTop checkpoint로 의존 시나리오 보기
+CKPT='/path/to/ApproachDistanceSuccessOntopMixed.pth'
+HEADLESS=0 ONTOP_SCENARIO=carry_ontop_dependent bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_test.sh "$CKPT" 2 1 3 10
+
+# 16. Holding·At edge context
+CKPT='/path/to/ApproachDistanceEdgeContextSuccess.pth'
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_test.sh "$CKPT" 2 1 3 10
+
+# 17. 기본 at_ontop viewer
+CKPT='/path/to/ApproachDistanceEdgeContextOntop.pth'
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_test.sh "$CKPT" 2 1 3 10
 ```
 
 화면 없이 평가하려면 `HEADLESS=1`로 바꾸고 필요하면 환경 수를 `1`에서 `64`로 늘린다. 결과 JSON은 각 output 폴더의 `metrics/`에 저장된다.
@@ -112,7 +263,7 @@ HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_success_no_sat_te
 
 ### 1. 서버에서 실행
 
-12번 실험은 전용 실행 스크립트로 GPU와 checkpoint만 지정한다. `TOKENHSI_GPU=5` 한 곳에서 GPU를 정하면 CUDA와 viewer 렌더링에 모두 적용된다.
+12·14·15·16·17번 실험은 각각 전용 VNC 스크립트로 GPU와 해당 실험의 checkpoint를 지정한다. 아래 명령 중 원하는 실험 하나만 실행한다. `TOKENHSI_GPU=5` 한 곳에서 GPU를 정하면 CUDA와 viewer 렌더링에 모두 적용된다.
 
 ```bash
 cd /home/hwanhee/ksh/approach_distance_success
@@ -123,7 +274,39 @@ CKPT='output/approach_distance_success/ApproachDistanceSuccess_18-14-22-43/nn/Ap
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_success_vnc.sh "$CKPT"
 ```
 
-conda `tokenhsi`, 서버 VNC 설치 경로, 포트 `6080`, 출력 `output/approach_distance_success_vnc`, 평가 인자 `2 1 3 10`을 기본으로 사용한다. 필요할 때만 `PORT=6081` 같은 환경변수나 checkpoint 뒤의 평가 인자를 덮어쓴다.
+14번 Holding k=10:
+
+```bash
+CKPT='/home/hwanhee/ksh/approach_distance_success/output/approach_distance_success_holding_k10/ApproachDistanceSuccessHoldingK10_19-16-10-18/nn/ApproachDistanceSuccessHoldingK10.pth'
+TOKENHSI_GPU=4 bash tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_vnc.sh "$CKPT"
+```
+
+15번 OnTop (의존 시나리오):
+
+```bash
+CKPT='/path/to/ApproachDistanceSuccessOntopMixed.pth'
+TOKENHSI_GPU=4 ONTOP_SCENARIO=carry_ontop_dependent \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_vnc.sh "$CKPT"
+```
+
+16번 Holding·At edge context:
+
+```bash
+CKPT='/path/to/ApproachDistanceEdgeContextSuccess.pth'
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_vnc.sh "$CKPT"
+```
+
+17번 sampled OnTop edge context:
+
+```bash
+CKPT='/path/to/ApproachDistanceEdgeContextOntop.pth'
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_vnc.sh "$CKPT"
+```
+
+`TASK_GRAPH=ontop_chain|independent_ontop|random`으로 preset을 바꾼다. 기본은 `at_ontop`이며 `TASK_ROLE_SWAP=1`로 역할을 반전한다.
+
+
+conda `tokenhsi`, 서버 VNC 설치 경로, 포트 `6080`, 실험별 출력 `output/<실험명>_vnc`, 평가 인자 `2 1 3 10`을 기본으로 사용한다. 필요할 때만 `PORT=6081` 같은 환경변수나 checkpoint 뒤의 평가 인자를 덮어쓴다.
 
 `CKPT`는 이미 저장된 파일이어야 한다. 본학습 설정은 500 epoch마다 정기 저장하므로, 학습 초반에 파일이 없다면 저장 후 실행한다. 저장된 파일 목록은 다음 명령으로 확인한다.
 
@@ -213,6 +396,32 @@ TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi \
 ```
 
 결과는 `output/approach_distance_success_no_sat`에 저장된다. reward config가 다르므로 12번 checkpoint로 13번을 직접 resume/evaluate할 수 없다. 새로 학습하고, 시각화에는 13번의 test 스크립트와 checkpoint를 사용한다. VNC 실행 방법은 위와 같고 `OUTPUT_PATH`도 `output/approach_distance_success_no_sat_vnc`로 바꾸면 된다. 같은 seed로 두 실험을 새로 학습하려면 양쪽 명령 앞에 동일한 `SEED` 값을 지정한다.
+
+## 비교 실험: Holding k=10
+
+14번 `approach_distance_success_holding_k10.yaml`은 잘 동작하는 12번을 복사해 `relationReward.holding.hand_distance_scale`만 `5.0 → 10.0`으로 변경했다. At 계수 10, progress, gate의 `beta=30 / center=0.8`, 만족 기준 0.9, 성공 시 포화·매-step +0.2, reset·학습 설정은 그대로다.
+
+상태함수·progress 입력과 gate·성공 시 포화 계산은 [수식 문서](approach_distance_success_holding_k10_reward.md)에 코드 블록으로 정리했다.
+
+Holding 상태는 `exp(-10 * 손 평균–상자 중심의 3D 거리²)`다. Holding 만족 거리 상한은 약 14.5cm에서 10.3cm로 좁아지고, 같은 자세에서 At 보상에 곱하는 Holding gate도 작아진다. 학습 성능 개선 여부는 비교 실험으로 확인해야 한다.
+
+새 학습 예시(실행 전 GPU 점유를 확인한다):
+
+```bash
+TOKENHSI_GPU=4 TOKENHSI_CONDA_ENV=tokenhsi \
+RESUME_CHECKPOINT= MAX_ITERATIONS= OUTPUT_PATH=output/approach_distance_success_holding_k10 \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_train.sh 2 2048 3
+```
+
+기본 결과 폴더는 `output/approach_distance_success_holding_k10`, 실험 이름은 `ApproachDistanceSuccessHoldingK10`이다. 기존 k=5와 reward config가 달라 checkpoint를 직접 resume/evaluate할 수 없다. 새로 학습하고 이 실험의 checkpoint에는 전용 `_test.sh`를 사용한다. 같은 seed 비교는 기존 12번과 14번 모두 새 실행에 `SEED=42`를 지정한다.
+
+짧은 확인은 별도 output과 반복 제한을 사용한다.
+
+```bash
+TOKENHSI_GPU=4 TOKENHSI_CONDA_ENV=tokenhsi RESUME_CHECKPOINT= MAX_ITERATIONS=1 \
+OUTPUT_PATH=output/approach_distance_success_holding_k10_check \
+    bash tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_train.sh 2 2048 3
+```
 
 ## 정리한 범위와 유지하는 기능
 

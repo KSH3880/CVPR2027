@@ -84,6 +84,24 @@ def load_cfg(args):
     with open(os.path.join(os.getcwd(), args.cfg_env), 'r') as f:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
 
+    graph_path = getattr(args, 'relation_graph', '')
+    if graph_path:
+        if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1'):
+            raise ValueError('--relation_graph is an edge-context evaluation override only')
+        with open(graph_path) as f:
+            cfg['env']['relationGraph'] = yaml.safe_load(f)
+
+    transfer = getattr(args, 'transfer_checkpoint', '')
+    if transfer and (args.resume > 0 or args.test or args.eval):
+        raise ValueError('--transfer_checkpoint is for new training only; use --checkpoint for resume/evaluation')
+    if cfg.get('experiment', {}).get('transfer') and not (args.resume > 0 or args.test or args.eval):
+        transfer = transfer or cfg['experiment']['transfer']['checkpoint']
+        if not os.path.isfile(transfer):
+            raise FileNotFoundError('Transfer checkpoint: ' + transfer)
+        cfg['experiment']['transfer']['checkpoint'] = os.path.abspath(transfer)
+    elif transfer:
+        raise ValueError('This config does not define a transfer experiment')
+
     # Override number of environments if passed on the command line
     if args.num_envs > 0:
         cfg["env"]["numEnvs"] = args.num_envs
@@ -246,6 +264,15 @@ def parse_sim_params(args, cfg, cfg_train):
 
 def get_args(benchmark=False):
     custom_parameters = [
+        {"name": "--task_camera", "type": str, "default": "stack", "help": "OnTop viewer camera: stack or agent"},
+        {"name": "--task_graph", "type": str, "default": "", "help": "OnTop viewer: at_ontop, ontop_chain, independent_ontop, random"},
+        {"name": "--task_role_swap", "action": "store_true", "default": False, "help": "Swap A/B roles in fixed OnTop viewer presets"},
+        {"name": "--relation_graph", "type": str, "default": "",
+            "help": "Evaluation-only YAML explicit edges or independent_carry template"},
+        {"name": "--transfer_checkpoint", "type": str, "default": "",
+            "help": "Carry weights for a new mixed OnTop run (no optimizer/history restore)"},
+        {"name": "--ontop_scenario", "type": str, "default": "mixed",
+            "help": "Evaluation: mixed, carry_carry, carry_ontop_independent, carry_ontop_dependent"},
         {"name": "--test", "action": "store_true", "default": False,
             "help": "Run trained policy, no training"},
         {"name": "--play", "action": "store_true", "default": False,

@@ -26,7 +26,9 @@ from isaacgym import gymtorch
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.scene_features import build_gta_pose_records
 from env.tasks.multi_agent.relation_task import CarryRelationMixin
-from utils.relation_task_spec import STATE_MODE, LEGACY_MODE, validate_relation_config
+from utils.relation_task_spec import STATE_MODE, ONTOP_MODE, LEGACY_MODE, validate_relation_config
+from utils.ontop_task_spec import scenario_ids
+from env.tasks.multi_agent.ontop_task import OnTopTaskMixin
 from env.tasks.humanoid import dof_to_obs
 from utils.motion_lib import MotionLib
 from isaacgym.torch_utils import *
@@ -34,7 +36,14 @@ from isaacgym.torch_utils import *
 from utils import torch_utils
 
 
-class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
+from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
+from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
+from env.tasks.multi_agent.edge_context_reward import scene_success
+from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
+from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
+
+
+class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixin, CarryRelationMixin, HumanoidMA):
     _PLATFORM_COLLISION_FILTER = 1 << 30
     REWARD_TERM_NAMES = ("walk", "carry", "handheld", "putdown", "power", "collision", "total")
 
@@ -47,17 +56,44 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._relation_cfg = cfg['env'].get('relationReward', {})
         validate_relation_config(self._relation_cfg)
-        self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) == STATE_MODE
+        self._edge_ontop = self._relation_cfg.get('mode') == ONTOP_CONTEXT_MODE
+        self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or ('at_ontop' if cfg['args'].test or cfg['args'].eval else 'random')
+        self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
+        if self._edge_ontop and (self._task_graph_preset not in PRESETS or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
+            raise ValueError('Unknown OnTop graph preset or camera mode')
+        if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
+            if self._task_graph_preset != 'random' or (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2,3):
+                raise ValueError('OnTop training requires random graphs, 2 agents and 3 objects')
+        self._relation_graph_spec = cfg['env'].get('relationGraph', {'template': 'independent_carry'})
+        self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
+        self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        if self._ontop_mixed:
+            if (cfg['env'].get('numAgents'), cfg['env'].get('numObjects')) != (2, 3):
+                raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
+            self._ontop_scenario_list = scenario_ids(
+                cfg['env']['scenarioMixture'], cfg['env']['numEnvs'],
+                evaluation=bool(cfg['args'].test or cfg['args'].eval),
+                selected=getattr(cfg['args'], 'ontop_scenario', 'mixed')).tolist()
         if self._state_relation:
             if cfg['env'].get('policyObsMode', 'legacy_multirow') != 'clean_scene':
-                raise ValueError('state_relation_v0 requires policyObsMode=clean_scene')
+                raise ValueError('State relation modes require policyObsMode=clean_scene')
             self.REWARD_TERM_NAMES = ('holding_state', 'at_state', 'holding_progress',
                 'at_progress', 'success_bonus', 'power', 'collision', 'box_speed', 'total')
+            if self._ontop_mixed:
+                self.REWARD_TERM_NAMES = self.REWARD_TERM_NAMES[:-1] + ('ontop_state', 'ontop_progress', 'total')
         num_agents = int(cfg["env"].get("numAgents", 1))
         configured_objects = int(cfg["env"].get("numObjects", 0))
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects
         assert self.num_objects >= num_agents, \
             "numObjects ({}) must be >= numAgents ({})".format(self.num_objects, num_agents)
+
+        if self._edge_context:
+            compiler = compile_ontop_graph if self._edge_ontop else compile_edge_context_graph
+            graph = compiler(self._relation_graph_spec, num_agents, self.num_objects)
+            self._context_suffix_width = (packet_size if self._edge_ontop else context_suffix_size)(len(graph.ids))
+            self.REWARD_TERM_NAMES = ('edge_state', 'edge_progress', 'edge_success',
+                                      'power', 'collision', 'box_speed', 'total')
 
         self._enable_task_obs = cfg["env"]["enableTaskObs"]
         self._only_vel_reward = cfg["env"]["onlyVelReward"]
@@ -186,7 +222,9 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
     # ------------------------------------------------------------------ sizes
 
     def get_relation_suffix_size(self):
-        return 9 * self.num_agents if self._state_relation else 0
+        if self._edge_context:
+            return self._context_suffix_width
+        return (9 * self.num_agents + (2 if self._ontop_mixed else 0)) if self._state_relation else 0
 
     def get_object_obs_size(self):
         # lin vel (3) + ang vel (3) + pos (3) + rot tan-norm (6) + bbox points (8 * 3)
@@ -355,6 +393,9 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
         self._box_density = torch.full((num_boxes,), 100.0, dtype=torch.float32, device=self.device)
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale
 
+        if self._edge_ontop and (self._box_size.reshape(N, O, 3)[..., 2].sum(-1) > self._reset_max_top_surface_height + 1e-6).any():
+            raise ValueError('Actual box assets must fit the configured maximum 3-box stack height')
+
         self._box_assets = []
         for i in range(num_boxes):
             asset_options = gymapi.AssetOptions()
@@ -362,6 +403,13 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
             asset_options.linear_damping = 0.01
             asset_options.max_angular_velocity = 100.0
             asset_options.density = self._box_density[i]
+            if self._ontop_mixed and self._ontop_scenario_list[i // O] == 1 and i % O == 2:
+                # Same resettable support construction as _load_platform_asset:
+                # GPU PhysX cannot teleport static collision shapes at reset.
+                asset_options.density = 1.0e10
+                asset_options.disable_gravity = True
+                asset_options.max_linear_velocity = 0.0
+                asset_options.max_angular_velocity = 0.0
             asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
             self._box_assets.append(self.gym.create_box(self.sim,
                                                         self._box_size[i, 0],
@@ -525,6 +573,13 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
         else:
             assignment = torch.arange(M, device=self.device, dtype=torch.long).unsqueeze(0).expand(K, -1)
 
+        if self._ontop_mixed:
+            self._reset_ontop_roles(env_ids)
+            # Physical box 2 is the fixed Ox only in independent-stack environments.
+            fixed = self._ontop_scenario[env_ids] == 1
+            assignment = assignment.clone()
+            assignment[fixed] = torch.rand(int(fixed.sum()), M, device=self.device).argsort(-1)
+
         all_ids = torch.arange(O, device=self.device, dtype=torch.long).unsqueeze(0).expand(K, -1)
         assigned_mask = torch.zeros(K, O, device=self.device, dtype=torch.bool)
         assigned_mask.scatter_(1, assignment, True)
@@ -683,7 +738,12 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
             tar_pos, origins)
         parts = [nodes, entity_poses.reshape(B, -1)]
         if self._state_relation:
-            parts.append(self.relation_runtime.suffix(env_ids))
+            suffix = self.relation_runtime.suffix(env_ids)
+            if self._ontop_mixed:
+                ids = slice(None) if env_ids is None else env_ids
+                suffix = torch.cat([suffix, self._ontop_scenario[ids, None].float(),
+                                    self._ontop_base_agent[ids, None].float()], -1)
+            parts.append(suffix)
         return torch.cat(parts, dim=-1)
 
     def _compute_task_obs(self, env_ids=None):
@@ -872,13 +932,26 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
 
         if self.viewer and self.debug_viz:
             self._update_debug_viz()
+        if self._edge_ontop:
+            self._draw_ontop_context()
 
         return
 
     def _compute_metrics_evaluation(self):
         if self._state_relation:
             self._success_buf.copy_(self.relation_runtime.done.flatten().long())
+            if self._edge_context:
+                _, diag = self._evaluate_relations()
+                graph = self.relation_runtime.graph
+                from env.tasks.multi_agent.edge_context_reward import owner_sum
+                mask = batched(graph.required_goal & graph.edge_valid, self.num_envs).float()
+                errors = owner_sum(diag['distance'] * mask, graph) / owner_sum(mask.expand(self.num_envs, -1), graph).clamp_min(1)
+                self._precision_buf.copy_(errors.flatten())
+                return
             errors = (self._assigned_box_values(self._box_states)[..., :3] - self._tar_pos).norm(dim=-1)
+            if self._ontop_mixed:
+                source, target, _, _ = self._ontop_geometry()
+                errors = (source - target).norm(dim=-1)
             self._precision_buf.copy_(errors.flatten())
             return
         B = self.num_envs * self.num_agents
@@ -891,6 +964,8 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
         return
 
     def _video_focus_points(self):
+        if self._edge_ontop and self._video_focus == 'stack':
+            return torch.cat([self._humanoid_root_states[0, :, :3], self._box_states[0, :, :3]], 0)
         # Only the characters. Including the boxes pushes the camera back and, worse, tends
         # to park a box between the camera and the humanoid it belongs to.
         if self._video_focus == "agent0":
@@ -900,6 +975,8 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
     # ------------------------------------------------------------------ resets
 
     def _reset_envs(self, env_ids):
+        if self._edge_ontop:
+            return self._reset_ontop_context_envs(env_ids)
         if self._state_relation:
             pending = env_ids
             for attempt in range(16):
@@ -913,12 +990,20 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
                 self._sample_box_assignments(pending)
                 self._reset_boxes(pending)
                 self._reset_task(pending)
+                if self._ontop_mixed:
+                    self._reset_ontop_targets(pending)
                 self._reset_env_tensors(pending)
                 self._refresh_sim_tensors()
                 self._reset_relation_history(pending)
                 self._compute_observations(pending)
                 self._init_amp_obs(pending)
-                pending = pending[self.relation_runtime.done[pending].all(-1)]
+                if self._edge_context:
+                    # Live success at reset is legal and paid; do not suppress/resample it.
+                    return
+                rejected = self.relation_runtime.done[pending].all(-1)
+                if self._ontop_mixed:
+                    rejected |= self._ontop_reset_rejected(pending)
+                pending = pending[rejected]
             if len(pending):
                 raise RuntimeError('All-subgoal-success reset persisted after 16 resamples')
             return
@@ -1336,6 +1421,12 @@ class HumanoidMACarry(CarryRelationMixin, HumanoidMA):
         ids = [self._box_actor_ids[env_ids].contiguous().view(-1)]
         if self._enable_markers:
             self._marker_pos[env_ids] = self._tar_pos[env_ids]
+            if self._edge_ontop:
+                from env.tasks.multi_agent.edge_context_reward import owner_sum
+                from utils.edge_ontop_spec import select_graph
+                graph = select_graph(self.relation_runtime.graph, env_ids)
+                active = owner_sum(((graph.edge_relation == 7) & graph.edge_valid).long(), graph).bool()
+                self._marker_pos[env_ids, :, 2] = torch.where(active, self._tar_pos[env_ids, :, 2], 20.)
             ids.append(self._marker_actor_ids[env_ids].contiguous().view(-1))
         if self._reset_random_height:
             self._platform_states[env_ids, :, 3:6] = 0.0

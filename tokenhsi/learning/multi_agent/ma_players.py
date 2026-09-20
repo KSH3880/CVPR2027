@@ -77,6 +77,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             config["goal_obs_size"] = task.get_goal_obs_size()
             config["observation_mode"] = task.get_policy_obs_mode()
             config['relation_reward_mode'] = task._relation_cfg.get('mode', LEGACY_MODE)
+            config['relation_graph_spec'] = task._relation_graph_spec
             if task.is_scene_policy():
                 config["scene_entity_sizes"] = task.get_scene_entity_sizes()
                 config["scene_kinematic_size"] = task.get_scene_kinematic_size()
@@ -108,6 +109,21 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         if self._reward_debug_step % self._reward_print_interval != 0 and not info["terminate"][0]:
             return
 
+        task = self.env.task
+        if getattr(task, '_ontop_mixed', False):
+            from utils.ontop_task_spec import SCENARIOS
+            rows = info['reward_terms'][:task.num_agents].detach().cpu().tolist()
+            amps = self._calc_amp_rewards(info['amp_obs'][:task.num_agents])['disc_rewards'].flatten().tolist()
+            scenario = SCENARIOS[int(task._ontop_scenario[0])]
+            base_agent = int(task._ontop_base_agent[0])
+            for agent, (terms, amp_reward) in enumerate(zip(rows, amps)):
+                values = dict(zip(task.REWARD_TERM_NAMES, terms))
+                combined = self._task_reward_w * terms[-1] + self._disc_reward_w * amp_reward
+                print('reward step={} env=0 scenario={} agent={} role={} {} amp={:.4f} combined={:.4f}'.format(
+                    self._reward_debug_step, scenario, agent, 'a' if agent == base_agent else 'b',
+                    values, amp_reward, combined), flush=True)
+            return
+
         terms = info["reward_terms"][0].detach().cpu().tolist()
         amp_reward = self._calc_amp_rewards(info["amp_obs"][0:1])["disc_rewards"][0, 0].item()
         combined = self._task_reward_w * terms[-1] + self._disc_reward_w * amp_reward
@@ -130,6 +146,9 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     @torch.no_grad()
     def run_eval(self):
         task = self.env.task
+        if getattr(task, '_edge_context', False):
+            from learning.multi_agent.edge_context_eval import run_edge_context_eval
+            return run_edge_context_eval(self)
         if not task._state_relation:
             return super().run_eval()
         N, M = task.num_envs, task.num_agents
@@ -145,6 +164,11 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             first_h = torch.full((N, M), -1., device=self.device)
             first_valid = torch.full_like(first_h, -1.)
             terminated = torch.zeros(N, device=self.device, dtype=torch.bool)
+            mixed = getattr(task, '_ontop_mixed', False)
+            if mixed:
+                stack_distance = torch.full((N,), -1., device=self.device)
+                joint_steps = torch.zeros(N, device=self.device)
+                after_joint_steps = torch.zeros_like(joint_steps)
             resets = []
             for step in range(task.max_episode_length + 1):
                 obs = self.env_reset(resets)
@@ -155,7 +179,11 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 ending = done.reshape(N, M).bool().any(-1)
                 collect = ending & alive
                 done_final[collect] = info['subgoal_done'][collect]
-                current_final[collect] = info['current_target_valid'][collect]
+                current_final[collect] = info['current_success_state' if mixed else 'current_target_valid'][collect]
+                if mixed:
+                    stack_distance[collect] = task._ontop_first_distance[collect]
+                    joint_steps[collect] = task._ontop_joint_steps[collect]
+                    after_joint_steps[collect] = task._ontop_after_joint_steps[collect]
                 raw_current[collect] = diagnostic['put'][collect].bool()
                 first_h[collect] = task._relation_first_holding[collect]
                 first_valid[collect] = task._relation_first_valid[collect]
@@ -178,6 +206,20 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 first_holding_seconds_mean=time_mean(first_h),
                 first_valid_success_seconds_mean=time_mean(first_valid),
                 scene_termination_rate=terminated.float().mean().item())
+            if mixed:
+                from utils.ontop_task_spec import SCENARIOS
+                metrics['scenarios'] = {}
+                for i, name in enumerate(SCENARIOS):
+                    rows = task._ontop_scenario == i
+                    if not rows.any():
+                        continue
+                    valid_distance = rows & (stack_distance >= 0)
+                    metrics['scenarios'][name] = dict(
+                        num_scenes=int(rows.sum()),
+                        final_joint_success_rate=current_final[rows].all(-1).float().mean().item(),
+                        joint_retention_after_first=(joint_steps[rows].sum() / after_joint_steps[rows].sum().clamp_min(1)).item(),
+                        first_b_success_distance_samples=int(valid_distance.sum()),
+                        first_b_success_oa_ga_distance=(stack_distance[valid_distance].mean().item() if valid_distance.any() else None))
             results['repeat_{}'.format(repeat)] = metrics
             print('[relation evaluation]', metrics, flush=True)
         directory = os.path.join(task.cfg['args'].output_path, 'metrics')

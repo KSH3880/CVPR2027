@@ -70,6 +70,10 @@ cd "$TOKENHSI_ROOT" || exit 1
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES=${TOKENHSI_GPU:-${CUDA_VISIBLE_DEVICES:-0}}
 
+# A verified MPS daemon on the selected GPU is discovered even in a fresh
+# terminal. Never rely on mps_run or an inherited pipe variable being present.
+. "$TOKENHSI_ROOT/tokenhsi/scripts/multi_agent/mps_auto_env.sh" || exit 1
+
 # --- libcuda shim ----------------------------------------------------------
 # Some driver packages ship libcuda.so.1 but no unversioned libcuda.so, which
 # IsaacGym's loader wants. Provide it through a throwaway symlink dir.
