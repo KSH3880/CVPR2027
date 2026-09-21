@@ -279,7 +279,9 @@ def main():
     print(
         f"[carry-planner-train] envs={task.num_envs} horizon={horizon} "
         f"low_steps={low_steps} history={history_steps} delta={delta_scale:g} "
-        f"collision_coef={collision_coef:g} frozen={args.checkpoint}",
+        f"collision_coef={collision_coef:g} "
+        f"converge_prob={task._carry_converge_prob:g} "
+        f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
         flush=True,
     )
 
@@ -369,6 +371,9 @@ def main():
             "collision_box_box_cost": ratio(
                 "collision_box_box_cost", "executed_steps",
             ),
+            "converge_fraction": float(
+                task._carry_converge_layout.float().mean()
+            ),
             **update,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
@@ -390,6 +395,8 @@ def main():
                     "planner_task": "plain_carry_collision_avoidance",
                     "collision_coef": collision_coef,
                     "commit_steps": low_steps,
+                    "converge_probability": task._carry_converge_prob,
+                    "goal_margin": task._carry_goal_margin,
                 },
             )
 

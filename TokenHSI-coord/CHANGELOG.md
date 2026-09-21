@@ -28,6 +28,25 @@
   고정하는 stack planner 계약과 맞지 않아 두 번째 decision부터 정상 경로를 invalid 처리했다.
   plain Carry adapter에서는 이 동적 검사만 제외하고 최초 pickup/goal hard anchor와
   finite/buffer/speed/curvature 검사를 유지했다.
+- `HumanoidMACarryPlannerView`와 `carry_planner/view.sh`를 추가했다. plain-carry checkpoint를
+  deterministic mean으로 로드하고 학습과 동일한 decision history/고정-origin EMA path를
+  6 action-step마다 갱신하며, 기존 steer Carry의 installed-path/speed renderer로 표시한다.
+- recurrent fixed-origin plan을 다시 설치할 때 기존 Carry bridge가 `_arc_root/_arc_box`를 0으로
+  초기화해 pickup 직후 출발 경로를 역주행시키던 문제를 수정했다. 첫 plan만 0에서 시작하고,
+  이후 replan은 실행 cursor와 metric cursor를 보존하며 새 path 끝 범위로만 clamp한다.
+- plain Carry planner viewer의 기본 Cross를 viewer-only timed-cross 배치로 강화했다. 두
+  agent-box 패키지의 정속 기준 교차 도착 시각을 맞추고 goal을 공통 교차점 너머에 배치해,
+  회피가 없으면 실제 동시 충돌이 나도록 한다. 학습·평가 분포에는 적용되지 않으며
+  `MS_VIEW_TIMED_CROSS=0`으로 기존 무작위 Cross를 볼 수 있다.
+- Carry planner viewer에서 generic `enableDebugVis`를 끈다. 해당 hook은 매 action step의
+  post-physics에서 모든 debug line을 지우지만 planner ribbon은 render 뒤에 다시 그려져,
+  action step마다 한 프레임씩 경로가 사라지는 깜박임을 만들었다. 전용 path/speed ribbon은
+  `render()`의 `_draw_task()`가 독립적으로 그리므로 그대로 유지된다.
+- Carry planner 학습 reset을 일반 Cross 25%와 close-goal convergence 75%로 섞었다.
+  hard case는 두 goal을 공통 중심 주위의 임의 축에 배치하되 box circumscribed radius 합과
+  0.25 m margin을 보장해 불가능한 최종 중첩은 만들지 않는다. 선행 agent/box가 goal에서
+  정지한 뒤 후발 agent가 돌아가야 하므로 속도 조절만으로 끝나는 해를 줄인다. fresh run의
+  기본 path correction 폭은 이 우회를 허용하도록 0.5 m에서 1.0 m로 넓혔다.
 
 ### Full stack과 분리한 post-place A1 retreat 검증 task (V15)
 

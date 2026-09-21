@@ -194,7 +194,7 @@ if [ -z "${CONDA_BASE:-}" ]; then
     fi
 fi
 . "$CONDA_BASE/etc/profile.d/conda.sh"
-conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi}"
+conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi118}"
 
 SAFE_NAME=$(printf '%s' "$NAME" | tr -c 'A-Za-z0-9_.-' '_')
 CFG_SRC="$REPO/tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml"
