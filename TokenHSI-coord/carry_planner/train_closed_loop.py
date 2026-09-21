@@ -169,8 +169,10 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             policy_loss = -objective.mean()
             value_loss = F.mse_loss(value, returns[index])
             entropy_mean = entropy.mean()
-            regularization = policy.diversity(observation)
             mean_output = policy.all_mean_outputs(observation)
+            regularization = policy.diversity(
+                observation, output=mean_output,
+            )
             analytic = carry_analytic_collision_loss(
                 mean_output, observation.state,
                 ~observation.previous_path_valid,

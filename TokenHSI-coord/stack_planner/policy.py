@@ -193,9 +193,11 @@ class StackPlannerActorCritic(nn.Module):
         decoded["candidate_logits"] = raw["candidate_logits"]
         return log_prob, entropy, value, decoded
 
-    def diversity(self, state: CoordinatorState, margin: float = 0.25):
+    def diversity(self, state: CoordinatorState, margin: float = 0.25,
+                  output=None):
         """Keep coarse routes distinct without rewarding pointwise zigzags."""
-        output = self.all_mean_outputs(state)
+        if output is None:
+            output = self.all_mean_outputs(state)
         path = output["path_world"][:, :, 0]
         # Diversity on raw points can be satisfied by alternating left/right
         # corrections. Compare only a strongly low-passed, coarse route.
