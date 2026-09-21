@@ -36,7 +36,7 @@ if [ -z "${CONDA_BASE:-}" ]; then
     fi
 fi
 . "$CONDA_BASE/etc/profile.d/conda.sh"
-conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi118}"
+conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi_juan}"
 
 export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU"
 export COORD_PROVIDER=external COORD_MODEL=c1 COORD_DRAW_CANDIDATES=0
