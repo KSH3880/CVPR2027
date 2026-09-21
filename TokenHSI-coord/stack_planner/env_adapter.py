@@ -755,7 +755,6 @@ class HumanoidMAStackPlannerTrain(
         root, box = state.root_xy, state.box_xyz[..., :2]
         radius = 0.5 * state.box_size_xy.norm(dim=-1)
         hh = F.relu(1.0 - (root[:, 0] - root[:, 1]).norm(dim=-1)).square()
-        bb = F.relu(radius.sum(-1) + 0.15 - (box[:, 0] - box[:, 1]).norm(dim=-1)).square()
         hb01 = F.relu(0.35 + radius[:, 1] - (root[:, 0] - box[:, 1]).norm(dim=-1)).square()
         hb10 = F.relu(0.35 + radius[:, 0] - (root[:, 1] - box[:, 0]).norm(dim=-1)).square()
         # Root-distance proxies miss a carried box striking the other torso,
@@ -770,7 +769,6 @@ class HumanoidMAStackPlannerTrain(
                                    state.box_heading[:, 0], sizes[:, 0], state.held[:, 0])
         terms = {
             "agent_agent": hh,
-            "box_box": bb,
             "agent_box": 0.5 * (hb01 + hb10),
             "held_box_body": 10.0 * (body01 + body10),
         }

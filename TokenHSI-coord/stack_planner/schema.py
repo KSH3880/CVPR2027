@@ -17,7 +17,9 @@ from coordinator.schema import (  # re-export the unchanged public input
 
 
 STACK_SCHEMA_VERSION = "tokenhsi-stack-planner-v13"
-STACK_CANDIDATES = 4
+# Establish the path planner with a single policy head first. Multi-head
+# candidate evaluation remains available through an explicit config override.
+STACK_CANDIDATES = 1
 STACK_PATH_POINTS = PATH_POINTS
 STACK_PATH_DELTA_DIM = AGENTS * (STACK_PATH_POINTS - 1) * 2
 STACK_PATH_INPUT_DIM = AGENTS * STACK_PATH_POINTS * 2

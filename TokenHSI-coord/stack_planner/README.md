@@ -10,8 +10,8 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 - planner memory: 최근 decision history, 고정-origin 33-point world trajectory,
   agent별 monotonic point progress
 - backbone: root/box/goal 전용 tokenizer와 learnable `[SCENE]` token을 쓰는 Transformer encoder
-- candidate 생성: 하나의 scene feature를 받는 독립 path-and-speed head 4개
-- candidate 평가: `(scene feature, detached path/speed proposal)` 공유 evaluator
+- candidate 생성: 기본은 하나의 scene feature를 받는 단일 path-and-speed head
+- multi-head 확장: `STACK_PLANNER_CANDIDATES>1`일 때만 독립 head와 공유 evaluator 사용
 - 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path와 pointwise speed profile
 - hard anchor: 첫 decision의 `P0=departure root`; 이후 실행한 prefix는 고정
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
@@ -47,15 +47,16 @@ root를 제외한 `2 agents × 32 points × XY = 128D` correction과
 `0.5*tanh(delta)`를 reference path에 직접 더한다. latent path parameter는 저장하거나 누적하지
 않는다. speed는 sigmoid로 `[0.375, 1.5] m/s`에 제한하고 두 번 low-pass한다. 직전 trajectory
 자체를 shared frame으로 바꿔 plan token으로 Transformer 입력에도
-포함한다. evaluator가 네 proposal을
-점수화한다. 학습에서는 같은 simulator state를 snapshot한 뒤 네 proposal을 모두 각각 30
-low-level step 실행해 return을 직접 비교한다. evaluator는 최고 return 후보 index를 supervised
-target으로 배우고, 다음 decision은 env별 최고 후보의 실제 종료 state에서 이어진다. PPO의
+포함한다. 기본 K=1 학습은 evaluator 선택 없이 단일 proposal을 30 low-level step 실행한다.
+`STACK_PLANNER_CANDIDATES>1`로 확장하면 evaluator가 proposal들을 점수화하고, 같은 simulator
+state를 snapshot한 뒤 모든 proposal을 각각 실행해 return을 비교한다. 다음 decision은 env별
+최고 후보의 실제 종료 state에서 이어진다. PPO의
 log-prob과 entropy에서도 progress 이전 action dimension을 mask하므로 이미 실행한 point에는
 collision reward의 credit이 돌아가지 않는다. 나머지 continuous action credit은 각 후보가 직접
 만든 return에만 연결된다. deterministic view/eval은
-evaluator argmax 하나를 실행한다. 후보 붕괴 방지를 위해 A1 full-path 간 기본 0.25m margin의
-diversity loss를 적용한다. diversity는 raw point가 아니라 네 차례 low-pass하고 4점 간격으로
+K=1에서는 유일한 head를, K>1에서는 evaluator argmax 하나를 실행한다. multi-head 후보 붕괴
+방지를 위해 A1 full-path 간 기본 0.25m margin의 diversity loss를 적용한다. diversity는 raw
+point가 아니라 네 차례 low-pass하고 4점 간격으로
 고른 coarse route에서 계산한다. 각 mean correction의 second finite difference에도
 `STACK_PLANNER_SMOOTHNESS_COEF`(기본 10.0)를 적용해 좌우 교대 zigzag가 후보 차이로 인정되지
 않게 한다. point turn 46도를 넘는 부분은 실행을 폐기하지 않고
@@ -87,8 +88,10 @@ pointwise correction exploration std는 `STACK_PLANNER_DELTA_STD=0.12`, 마지�
 `STACK_PLANNER_ANCHOR_STD=0.03`이다. correction을 path 축으로 low-pass하고 second-difference
 loss를 적용하므로 완만한 우회는 허용하면서 고주파 지그재그를 억제한다. 별도의 Bézier latent
 parameter는 없다.
-충돌 cost에는 root/box proxy 외에도 다른 agent의 held box와 비손 rigid-body의 3D proximity가
-포함된다. endpoint 유지보다 회피가 유리해질 수 있으며 위험 접근 event나 수동 switch는 없다.
+충돌 cost에는 humanoid root proximity, agent와 상대 box proximity, 다른 agent의 held box와
+비손 rigid-body의 3D proximity가 포함된다. 정상 stack에서 필연적인 box-box XY overlap은
+reward와 collision metric 모두에서 제외한다. endpoint 유지보다 회피가 유리해질 수 있으며
+위험 접근 event나 수동 switch는 없다.
 
 학습 모델과 frozen agent 사이에서만 `execution.py`가 같은 path의 실행 구간을 만든다.
 
@@ -185,9 +188,8 @@ top 목표는 stage flag가 아니라 현재 bottom box의 물리 pose/크기에
 `train_closed_loop.py`는 sequential-stack agent checkpoint를 inference-only로 고정하고 planner
 network parameter와 candidate별 action log-std만 최적화한다. 한 PPO transition은 기본 30 action step(30 Hz에서
 약 1초) 동안 같은 plan을 유지한다. stack phase 전환은 이 hold를 기다리지 않는다.
-한 scene마다 후보 4개를 동일한 시작 snapshot에서 순차 실행하므로 simulator workload는
-단일 후보 방식의 약 4배다. evaluator는 rollout return argmax를 직접 분류하고,
-`candidate_evaluator_loss/accuracy`, `candidate_usage_*`를 기록한다.
+기본 K=1은 scene마다 trajectory 하나만 rollout한다. `STACK_PLANNER_CANDIDATES>1`이면 후보들을
+동일한 시작 snapshot에서 순차 실행하므로 simulator workload가 후보 수에 비례해 증가한다.
 다음 replan의 mean path에는 직전 mean plan의 같은 고정 point index와 맞추는 temporal
 consistency loss를 기본 적용한다. 실행한 prefix는 correction/action 양쪽에서 이미 freeze되므로
 미실행 future의 불필요한 흔들림만 억제한다. episode reset과 물리 상태 전환은 mask하며,
@@ -197,8 +199,8 @@ consistency loss를 기본 적용한다. 실행한 prefix는 correction/action �
 reset에 섞지 않는다.
 
 ```bash
-MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
-STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
+MA_GPU=7 STACK_PLANNER_ENVS=2048 STACK_PLANNER_ITERS=200 \
+STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=1 \
   bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0
 ```
 
@@ -227,7 +229,6 @@ iteration마다 기록한다.
 - `collision_ratio`: 실행 low-level step 중 기존 collision proxy가 양수인 비율
 - `collision_cost`: macro별 연속 collision cost 평균
 - `collision_agent_agent_{ratio,cost}`: 두 humanoid root proximity
-- `collision_box_box_{ratio,cost}`: 두 box footprint proximity
 - `collision_agent_box_{ratio,cost}`: 각 agent root와 상대 box proximity
 - `collision_held_box_body_{ratio,cost}`: 들고 있는 box와 상대 humanoid rigid-body의 3-D proximity
 - `path_smoothness_loss`: mean correction의 second-difference 제곱 평균
@@ -243,8 +244,8 @@ iteration마다 기록한다.
 실행할 수 있다.
 
 ```bash
-MA_GPU=7 STACK_PLANNER_ENVS=512 STACK_PLANNER_ITERS=200 \
-STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=4 \
+MA_GPU=7 STACK_PLANNER_ENVS=2048 STACK_PLANNER_ITERS=200 \
+STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=1 \
 STACK_PLANNER_DELTA_SCALE=0.5 \
 STACK_PLANNER_SMOOTHNESS_COEF=10.0 \
 STACK_PLANNER_SPEED_STD=0.20 \
@@ -252,10 +253,9 @@ STACK_PLANNER_SPEED_SMOOTHNESS_COEF=1.0 \
   bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0
 ```
 
-launcher 기본값은 2,048 env지만 full candidate rollout은 후보 4개를 모두 물리 실행하고 branch
-snapshot도 보존하므로 첫 run은 512 env를 권장한다. 200 iteration, 후보당 frozen executor 30
-step이며 5 iteration마다 checkpoint를 저장한다. PPO minibatch 기본값은 env와 horizon에
-비례하며 candidate 4개 때문에 epoch당 16개 minibatch가 된다. 중간 checkpoint에서
+launcher 기본값은 2,048 env와 후보 1개다. 200 iteration, 후보당 frozen executor 30 step이며
+5 iteration마다 checkpoint를 저장한다. multi-head를 다시 켜면 모든 후보를 물리 실행하고
+branch snapshot도 보존하므로 env 수를 후보 수에 맞춰 낮춘다. 중간 checkpoint에서
 이어갈 때도 기존 run을 덮어쓰지 않고 새 tag를 쓴다.
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 

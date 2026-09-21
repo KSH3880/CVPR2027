@@ -4,6 +4,16 @@
 
 ## 2026-09-18
 
+### Single-head baseline 및 정상 stack 접촉 제거
+
+- planner launcher와 model config의 기본 candidate 수를 4에서 1로 바꿨다. full candidate
+  rollout 구현과 checkpoint별 candidate 복원은 유지하므로 이후 명시적인
+  `STACK_PLANNER_CANDIDATES=4` 확장은 가능하지만, 우선 evaluator 없이 단일 path head의
+  학습 가능성을 검증한다.
+- 정상 stack에서도 XY footprint가 필연적으로 겹치는 box-box proximity를 collision reward,
+  aggregate collision cost와 학습 metric에서 제거했다. agent-agent, agent-box 및 held-box/body
+  proximity는 유지한다.
+
 ### Learned pointwise speed profile (V13)
 
 - 각 후보 action을 128D path correction과 66D pointwise speed profile로 확장했다. speed는

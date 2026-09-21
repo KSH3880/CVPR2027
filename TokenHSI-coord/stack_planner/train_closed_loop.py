@@ -104,9 +104,7 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
     path_error_sum = torch.zeros(n, device=task.device)
     path_samples = torch.zeros(n, device=task.device)
     collision_steps = torch.zeros(n, device=task.device)
-    collision_names = (
-        "agent_agent", "box_box", "agent_box", "held_box_body",
-    )
+    collision_names = ("agent_agent", "agent_box", "held_box_body")
     collision_component_cost = {
         name: torch.zeros(n, device=task.device) for name in collision_names
     }
@@ -358,11 +356,12 @@ def _ppo_update(policy, optimizer, states, actions, old_log_prob, returns,
                     "valid_fraction": zero,
                 }
             diversity = policy.diversity(state, margin=diversity_margin)
+            evaluator_active = decoded["candidate_logits"].shape[-1] > 1
             evaluator_per_item = F.cross_entropy(
                 decoded["candidate_logits"], candidate_targets[index],
                 reduction="none",
             )
-            if decided.any():
+            if evaluator_active and decided.any():
                 evaluator_loss = evaluator_per_item[decided].mean()
                 evaluator_accuracy = (
                     decoded["candidate_logits"][decided].argmax(dim=-1)
@@ -433,7 +432,7 @@ def main():
 
     init = os.environ.get("STACK_PLANNER_INIT", "")
     requested_history_steps = _env_int("STACK_PLANNER_HISTORY_STEPS", 4)
-    requested_candidates = _env_int("STACK_PLANNER_CANDIDATES", 4)
+    requested_candidates = _env_int("STACK_PLANNER_CANDIDATES", 1)
     requested_delta_scale = _env_float("STACK_PLANNER_DELTA_SCALE", 0.5)
     if requested_candidates < 1:
         raise ValueError("STACK_PLANNER_CANDIDATES must be positive")
@@ -553,7 +552,8 @@ def main():
           f"delta_scale={planner.config.delta_scale:g} "
           f"diversity={diversity_coef:g}/{diversity_margin:g}m "
           f"smoothness={smoothness_coef:g}/{speed_smoothness_coef:g} "
-          f"evaluator_coef={evaluator_coef:g} full_candidate_rollout=True "
+          f"evaluator_coef={evaluator_coef:g} "
+          f"full_candidate_rollout={planner.config.candidates > 1} "
           f"visit_penalty={visit_penalty_coef:g} visit_tol={visit_tolerance:g} "
           f"turn_penalty={turn_penalty_coef:g} "
           f"retreat_box_penalty={retreat_box_penalty_coef:g} "
@@ -825,7 +825,7 @@ def main():
             ) / float(task.dt),
         }
         for collision_name in (
-            "agent_agent", "box_box", "agent_box", "held_box_body",
+            "agent_agent", "agent_box", "held_box_body",
         ):
             planner_metrics[f"collision_{collision_name}_ratio"] = ratio(
                 f"collision_{collision_name}_steps", "executed_steps",
@@ -855,12 +855,15 @@ def main():
             "speed_std": speed_std,
             "history_steps": planner.config.history_steps,
             "candidates": planner.config.candidates,
+            "candidate_evaluator_active": float(
+                planner.config.candidates > 1
+            ),
             "delta_scale": planner.config.delta_scale,
             "diversity_coef": diversity_coef,
             "diversity_margin": diversity_margin,
             "smoothness_coef": smoothness_coef,
             "speed_smoothness_coef": speed_smoothness_coef,
-            "full_candidate_rollout": 1.0,
+            "full_candidate_rollout": float(planner.config.candidates > 1),
             **{
                 f"candidate_usage_{candidate}": float(
                     candidate_counts[candidate].float()
@@ -893,11 +896,9 @@ def main():
                        "candidate_path_distance",
                        "path_smoothness_loss", "collision_cost",
                        "collision_agent_agent_ratio",
-                       "collision_box_box_ratio",
                        "collision_agent_box_ratio",
                        "collision_held_box_body_ratio",
                        "collision_agent_agent_cost",
-                       "collision_box_box_cost",
                        "collision_agent_box_cost",
                        "collision_held_box_body_cost",
                        "speed_smoothness_loss",
@@ -920,7 +921,7 @@ def main():
                         "history_steps": planner.config.history_steps,
                         "candidates": planner.config.candidates,
                         "delta_scale": planner.config.delta_scale,
-                        "full_candidate_rollout": True,
+                        "full_candidate_rollout": planner.config.candidates > 1,
                         "evaluator_coef": evaluator_coef,
                         "diversity_coef": diversity_coef,
                         "diversity_margin": diversity_margin,
