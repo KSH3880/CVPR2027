@@ -248,6 +248,103 @@ if len(x):
     else:
         print("STACK_TOP_DEBUG unavailable=legacy_columns")
 
+    if m.shape[1] >= 106:
+        (clear_progress_steps, clear_endpoint_steps, clear_arrived_steps,
+         clear_stop_stable_steps, clear_stop_candidate_steps,
+         clear_prestop_ready_steps, clear_combined_ready_steps,
+         clear_stop_streak_max, clear_endpoint_error_min,
+         clear_root_speed_min, clear_root_ang_min, clear_upright_max,
+         clear_double_support_steps) = range(93, 106)
+        released_x = x[x[:, release] >= 0]
+
+        def any_count(column):
+            return int((released_x[:, column] > 0).sum())
+
+        def any_field(name, column):
+            count = any_count(column)
+            value = rate(released_x[:, column] > 0)
+            return f"{name}={count}/{len(released_x)}({value:.3f})"
+
+        if len(released_x):
+            cleared_count = int((released_x[:, clear] >= 0).sum())
+            stop5_count = int(
+                (released_x[:, clear_stop_streak_max] >= 5).sum()
+            )
+            base_stable_count = int(
+                (released_x[:, diag_start + 18] > 0).sum()
+            )
+            print(
+                "STACK_CLEAR_STOP_FUNNEL "
+                f"released={len(released_x)} "
+                f"{any_field('arc_done', clear_progress_steps)} "
+                f"{any_field('endpoint', clear_endpoint_steps)} "
+                f"{any_field('arrived', clear_arrived_steps)} "
+                f"base_stable={base_stable_count}/{len(released_x)}"
+                f"({base_stable_count / len(released_x):.3f}) "
+                f"{any_field('stop_stable', clear_stop_stable_steps)} "
+                f"{any_field('stop_candidate', clear_stop_candidate_steps)} "
+                f"{any_field('prestop_ready', clear_prestop_ready_steps)} "
+                f"{any_field('combined_ready', clear_combined_ready_steps)} "
+                f"stop_streak5={stop5_count}/{len(released_x)}"
+                f"({stop5_count / len(released_x):.3f}) "
+                f"clear={cleared_count}/{len(released_x)}"
+                f"({cleared_count / len(released_x):.3f})"
+            )
+            valid_endpoint = released_x[:, clear_endpoint_error_min]
+            valid_endpoint = valid_endpoint[valid_endpoint >= 0]
+            valid_speed = released_x[:, clear_root_speed_min]
+            valid_speed = valid_speed[valid_speed >= 0]
+            valid_ang = released_x[:, clear_root_ang_min]
+            valid_ang = valid_ang[valid_ang >= 0]
+
+            def quantile(values, p):
+                return np.quantile(values, p) if len(values) else float("nan")
+
+            print(
+                "STACK_CLEAR_STOP_STATE "
+                f"endpoint_min_p50={quantile(valid_endpoint, 0.50):.3f} "
+                f"endpoint_min_p90={quantile(valid_endpoint, 0.90):.3f} "
+                f"root_speed_min_p50={quantile(valid_speed, 0.50):.3f} "
+                f"root_ang_min_p50={quantile(valid_ang, 0.50):.3f} "
+                f"upright_max_p50="
+                f"{np.median(released_x[:, clear_upright_max]):.3f} "
+                f"{any_field('double_support', clear_double_support_steps)} "
+                f"stop_streak_p50="
+                f"{np.median(released_x[:, clear_stop_streak_max]):.0f} "
+                f"stop_streak_p95="
+                f"{np.quantile(released_x[:, clear_stop_streak_max], 0.95):.0f} "
+                f"stop_streak_max="
+                f"{released_x[:, clear_stop_streak_max].max():.0f}"
+            )
+        else:
+            print("STACK_CLEAR_STOP_FUNNEL released=0")
+    else:
+        print("STACK_CLEAR_STOP_DIAG unavailable=legacy_columns")
+
+    if m.shape[1] >= 110:
+        wait_target_z, wait_xy_z, wait_min_z, wait_freeze_z = range(106, 110)
+        wait_x = x[x[:, wait_xy_z] >= 0]
+        frozen_x = wait_x[wait_x[:, wait_freeze_z] >= 0]
+
+        def wait_quantile(values, p):
+            return np.quantile(values, p) if len(values) else float("nan")
+
+        print(
+            "STACK_TOP_WAIT_Z "
+            f"xy_arrived={len(wait_x)}/{len(x)} "
+            f"frozen={len(frozen_x)}/{len(wait_x)} "
+            f"target_p50={wait_quantile(wait_x[:, wait_target_z], 0.50):.3f} "
+            f"xy_z_p10={wait_quantile(wait_x[:, wait_xy_z], 0.10):.3f} "
+            f"xy_z_p50={wait_quantile(wait_x[:, wait_xy_z], 0.50):.3f} "
+            f"xy_z_p90={wait_quantile(wait_x[:, wait_xy_z], 0.90):.3f} "
+            f"min_z_p50={wait_quantile(frozen_x[:, wait_min_z], 0.50):.3f} "
+            f"freeze_z_p50={wait_quantile(frozen_x[:, wait_freeze_z], 0.50):.3f} "
+            f"descent_p50={wait_quantile(frozen_x[:, wait_xy_z] - frozen_x[:, wait_min_z], 0.50):.3f} "
+            f"rebound_p50={wait_quantile(frozen_x[:, wait_freeze_z] - frozen_x[:, wait_min_z], 0.50):.3f}"
+        )
+    else:
+        print("STACK_TOP_WAIT_Z unavailable=legacy_columns")
+
 if len(sys.argv) >= 3:
     baseline_path = sys.argv[2]
     baseline = np.load(baseline_path)

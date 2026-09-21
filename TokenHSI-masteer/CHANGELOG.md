@@ -2,6 +2,134 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-19
+
+### Top WAIT XY 도착 즉시 M=0
+
+- ms75 e12000의 512-env eval에서 freeze 성공 29개 중 23개가 safety-gate XY 도착
+  이후 box center Z 중앙값 0.996m에서 0.200m까지 내려갔다가 0.993m로 다시 든 뒤
+  freeze됐다. 목표 Z 0.900m 자체가 아니라 안정 5-frame을 기다리는 동안 계속된
+  steering이 native Carry의 내려놓기·재집기 루프를 허용한 것으로 판정했다.
+- opt-in `STACK_TOP_WAIT_XY_ZERO=1`은 grasp를 유지한 Top이 기존 safety-gate XY
+  tolerance에 최초 진입하는 순간 steering `M=0`만 적용한다. 3-D WAIT 목표,
+  안정 5-frame, CLEAR→STACK gate와 final goal commit/reset은 그대로 유지한다.
+
+### Top WAIT 높이 하강·반등 eval 계측
+
+- sequential stack eval metric 끝에 WAIT 목표 Z, safety-gate XY 최초 도착 시
+  Top box Z, 도착 후 freeze 전 최저 Z, `M=0` freeze 순간 Z 4열을
+  append했다. 정책·관측·보상·상태 전환은 바꾸지 않는 계측 전용이다.
+- `stack_stage_summary.py`에 `STACK_TOP_WAIT_Z`를 추가해 XY 도착 Z 분포와
+  도착 후 하강량(`descent`), 최저점에서 freeze까지 반등량(`rebound`)을
+  바로 비교한다. 기존 106열 결과는 legacy로 계속 읽힌다.
+
+## 2026-09-18
+
+### 평가 반복 횟수를 실행별로 지정
+
+- `trans_players.py`와 `amp_players.py`의 평가 반복 3회 기본값은 유지하면서
+  `EVAL_NUM_REPEAT`로 덮어쓸 수 있게 했다. GUI 평가·녹화에서 더 많은
+  reset 시나리오를 연속으로 보려는 용도이며, 1 미만 값은 거부한다.
+
+## 2026-09-17
+
+### STACK Base의 비행동성 box 보상 제거
+
+- STACK에서 이미 배치된 Base box의 support/stability에 지급하던
+  `0.40 * support + 0.25 * stable`을 제거했다. Base의 STACK 보상은 endpoint
+  position-gated hold와 regrasp/foot-box 억제를 중심으로 두며 Top은 바꾸지 않는다.
+
+### STACK Base hold reward를 endpoint 위치로 gate
+
+- STACK의 Base hold reward에서 위치·속도·upright·양발 지지 항 전체를
+  `exp(-8 * endpoint_error^2)`로 gate한다. endpoint에서 멀어진 Base가 자세와 양발
+  지지만으로 hold reward를 받던 누수를 제거하며 Top reward는 바꾸지 않는다.
+- TensorBoard에 `stack_state/base_hold_position_score`를 추가했다. 실행 중인 ms75는
+  수정 전 코드를 이미 로드했으므로 이 변경이 적용되지 않는다.
+
+### CLEAR endpoint 허용치 0.18 m
+
+- ms74 epoch 10000의 end-cell-fix 평가에서 release 조건부 endpoint 도달이
+  0.12 m에서는 0.625였지만, 기록된 최소 오차 기준 0.18 m에서는 0.819로 예상됐다.
+  CLEAR→STACK 전환의 endpoint 허용치를 0.12 m에서 0.18 m로 완화했다.
+- 실행 중인 ms74 프로세스에는 이미 로드된 0.12 m 조건이 유지되며, 새로 시작하는
+  학습·평가부터 0.18 m 조건이 적용된다.
+- `train_local.sh` sidecar에 `STACK_RETREAT_ENDPOINT_GATE`와
+  `STACK_RETREAT_END_CELL_FIX`를 저장·재생하도록 추가했다.
+
+### local ms68 PTH의 CLEAR gate zero-shot 대조
+
+- 서버의 기존 endpoint-arrival 동작을 기본값으로 보존하면서,
+  `STACK_RETREAT_ENDPOINT_GATE=0`일 때만 과거 local ms68의
+  `arc 완료 + endpoint 감속/정지` CLEAR→STACK gate를 재생하는 평가용 opt-in을
+  추가했다. reward·observation·정책 weight는 바꾸지 않는다.
+- 같은 local ms68 e9800 PTH에 대해 legacy gate, 서버 0.12 m endpoint gate,
+  endpoint gate + end-cell fix를 동일 seed/eval 설정에서 비교할 수 있다.
+
+### ms70 retreat endpoint cell 정합 평가
+
+- STACK_RETREAT_END_CELL_FIX를 기본 비활성 opt-in으로 추가했다. 활성화하면 retreat
+  path의 끝을 기존 path[n_end-1]에서 다음 0.1 m cell까지 연장해, M=0 정지점과 원래
+  clear goal의 0.12 m endpoint gate를 맞춘다. 기존 sidecar 재생 동작은 유지한다.
+- CPU 1000-path 검사에서 기존 정지점의 goal 오차는 0.1000/0.1503/0.1998 m
+  (min/median/max), 보정 후 0.0002/0.0513/0.0999 m였고 0.12 m 이내 비율은
+  0.197에서 1.000으로 증가했다.
+- ms70 e12000 checkpoint를 GPU 7, 512 env에서
+  STACK_RETREAT_END_CELL_FIX=1로 재평가했다. release 조건부 endpoint 도달은
+  0.513에서 0.702, CLEAR 통과는 0.278에서 0.395로 증가했다. 전체 base episode의
+  STACK 진입은 0.211에서 0.290으로 증가했지만 strict final success는 여전히 0이다.
+  남은 CLEAR 주 병목은 endpoint 이후 base 안정과의 동시 충족이다.
+
+### CLEAR endpoint/stop 평가 funnel 계측
+
+- sequential stack metrics의 기존 93열 뒤에 CLEAR 진단 13열을 append했다. 정책·보상·
+  observation·gate는 바꾸지 않고, retreat arc 완료, endpoint 0.12 m 도달/arrival latch,
+  humanoid stop 안정, stop candidate, pre-stop gate, 결합 gate, 최대 stop streak와
+  endpoint/속도/자세/양발접촉 상태만 episode 단위로 누적한다.
+- stack_stage_summary.py는 106열 결과에서 STACK_CLEAR_STOP_FUNNEL과
+  STACK_CLEAR_STOP_STATE를 출력한다. 기존 93열 결과는
+  STACK_CLEAR_STOP_DIAG unavailable=legacy_columns로 계속 읽는다.
+- 두 Python 파일의 py_compile, 기존 ms70 e12000 93열 summary 호환성, 합성 106열
+  summary 출력 경로를 GPU 없이 검증했다. checkpoint 재학습은 필요 없으며 새 suffix로
+  동일 checkpoint를 재평가해야 한다.
+
+## 2026-09-16
+
+### ms70 하이브리드 CLEAR 회전 보상
+
+- CLEAR 회전 중 yaw 오차 감소량에는 항상 계수 1.5를 주고, 남은 yaw 오차가
+  90도 이하가 된 뒤에는 목표에 가까워질수록 0에서 2.0까지 증가하는 cosine
+  gain을 추가한다. 새 보상은
+  `STACK_CLEAR_YAW_PROGRESS=1`인 ms70에서만 활성화되어 기존 실험은 유지된다.
+- RELEASE yaw 오차, CLEAR 최소 yaw 오차, retreat arc 0.1 m 최초 통과 step을
+  metrics 마지막 3개 열에 추가했다. 기록은 새 보상 활성화 여부와 무관하다.
+- ms70은 ms68 경로·fade·bypass 설정을 유지하고 Top wait와 Base hold 계수를
+  각각 10.0으로 설정한다.
+
+### inkyu-local ms67/ms68 서버 이식
+
+- `inkyu-local`의 단일 CLEAR classic steering, heading-progress, 3-step carry 관측
+  fade와 ms68 safety-gate bypass를 opt-in knob로 이식했다. 기존 서버 ms63/ms64의
+  humanoid 기준 ±60도 안전 경로와 reward 기본값은 그대로 유지한다.
+- ms67/ms68 wrapper에서는 Base box 기준 one-sided 0-60도 경로를 선택한다. ms67은
+  1.2-2.0 m와 gate 유지, ms68은 2.0-3.0 m와 Base-first gate bypass를 사용한다.
+- 로컬 GPU 1 하드코딩과 로컬 fallback 경로, 생성 YAML은 가져오지 않았다. 서버에서는
+  기존 데이터·checkpoint 경로와 `MA_GPU=6|7`을 사용해 새 설정 파일을 생성한다.
+
+### Base-first Top wait 생략과 CLEAR 후퇴 방향 보상
+
+- shared-goal에서 Base가 strict CLEAR를 먼저 끝내면 Top의 safety wait 선행 조건을
+  생략하고 현재 위치에서 실제 base box 위의 최종 goal로 즉시 재계획한다. Top이 먼저
+  도착하면 기존처럼 safety gate에서 기다린다. 기존 sidecar는 기본값 0으로 재현된다.
+- 랜덤 후퇴 거리 min/max와 후방 반각 knob를 추가했다. ms61 후속 wrapper는 env별
+  2.0-3.0 m, 후방 중심 ±60도로 샘플링한다.
+- CLEAR heading reward를 negative-clear 모드와 분리하고 후속 wrapper 가중치를 2.0으로
+  설정했다. Python py_compile, 관련 Bash 구문 검사와 git diff --check를 통과했다.
+- 총 120도 후퇴 범위에서 무작위 후보가 모두 Top box와 겹쳐 학습 전체가 종료된 문제를
+  수정했다. 2도 간격의 후보 61개를 검사해 안전한 방향을 seed 기반으로 고르고, 경로가
+  전혀 없는 환경만 실패로 기록해 reset한다.
+- ms64부터 Top wait와 CLEAR 완료 후 Base hold reward 계수를 각각 0.50에서 1.0으로 높였다.
+
 ## 2026-09-15
 
 ### CLEAR를 기존 smooth steering + 도착 hold로 단순화

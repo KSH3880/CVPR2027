@@ -166,7 +166,9 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         num_envs = self.env.num_envs
         num_trials = num_envs
         assert num_envs == num_trials
-        num_repeat = 3
+        num_repeat = int(os.environ.get("EVAL_NUM_REPEAT", "3"))
+        if num_repeat < 1:
+            raise ValueError("EVAL_NUM_REPEAT must be a positive integer")
 
         print("evaluating policy: {} trials".format(num_envs))
 
