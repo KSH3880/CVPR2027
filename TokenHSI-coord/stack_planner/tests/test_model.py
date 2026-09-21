@@ -301,6 +301,18 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
             output["path_world"].shape,
             (3, 4, AGENTS, STACK_PATH_POINTS, 2),
         )
+        self.assertEqual(
+            output["mean_path_world"].shape,
+            (3, 4, AGENTS, STACK_PATH_POINTS, 2),
+        )
+        with torch.no_grad():
+            expected_mean = policy.all_mean_outputs(state)
+        self.assertTrue(torch.allclose(
+            output["mean_path_world"], expected_mean["path_world"],
+        ))
+        self.assertFalse(torch.allclose(
+            output["path_world"], output["mean_path_world"],
+        ))
         expected = torch.arange(4).reshape(1, 4).expand(3, -1)
         self.assertTrue(torch.equal(action[..., 0].long(), expected))
 

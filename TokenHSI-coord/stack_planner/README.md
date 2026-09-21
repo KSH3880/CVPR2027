@@ -36,16 +36,20 @@ candidate = output["selected_candidate"]  # [B]
 
 한 decision에서 각 독립 head는 A1 carry부터 retreat까지와 A2 carry를 포함한 직전 33-point
 trajectory에 적용할 pointwise XY correction을 제안한다. segment별 head가 아니다. 최초/reset
-decision은 현재 `root → box → goal` geometric trajectory를 reference로 쓴다. 이후에는 이
-33개 point의 출발점과 index를 그대로 유지한다. 현재 root를 직전 trajectory에 투영해 agent별
+decision은 현재 `root → box → goal` geometric trajectory를 reference로 쓴다. 이후에는 직전
+noise-free mean trajectory의 33개 point 출발점과 index를 그대로 유지한다. 현재 root를 그 mean
+trajectory에 투영해 agent별
 monotonic point progress를 구하고, progress 이전 correction은 0으로 고정하며 경계 두 point에
 걸쳐 correction 자유도를 부드럽게 연다. 따라서 목적지에 가까워져도 짧아진 잔여 경로를 다시
 33점으로 늘리지 않고 이미 지나온 prefix도 재계획하지 않는다. progress는 plan embedding에도
 명시적으로 들어간다. head는
 root를 제외한 `2 agents × 32 points × XY = 128D` correction과
 `2 agents × 33 points = 66D` speed profile을 함께 출력한다. path correction은 두 번 low-pass한
-`0.5*tanh(delta)`를 reference path에 직접 더한다. latent path parameter는 저장하거나 누적하지
-않는다. speed는 sigmoid로 `[0.375, 1.5] m/s`에 제한하고 두 번 low-pass한다. 직전 trajectory
+`0.5*tanh(delta)`를 reference path에 직접 더한다. 학습 중 frozen executor에는
+`mean_delta + exploration_noise`를 적용한 sampled path를 설치하지만, 다음 decision의 reference에는
+noise 없는 `previous_mean_path + mean_delta`만 commit한다. 따라서 PPO action은 실제 sampled
+결과로 credit을 받되 exploration noise가 recurrent path에 random walk로 누적되지 않는다.
+speed는 sigmoid로 `[0.375, 1.5] m/s`에 제한하고 두 번 low-pass한다. 직전 mean trajectory
 자체를 shared frame으로 바꿔 plan token으로 Transformer 입력에도
 포함한다. 기본 K=1 학습은 evaluator 선택 없이 단일 proposal을 30 low-level step 실행한다.
 `STACK_PLANNER_CANDIDATES>1`로 확장하면 evaluator가 proposal들을 점수화하고, 같은 simulator

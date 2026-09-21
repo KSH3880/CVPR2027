@@ -646,7 +646,7 @@ def main():
                     plan_update = decision & ~invalid
                     next_plan_world = torch.where(
                         plan_update[:, None, None, None],
-                        outputs["path_world"][:, candidate],
+                        outputs["mean_path_world"][:, candidate],
                         observation.previous_path_world,
                     )
                     next_plan_valid = (
@@ -728,27 +728,27 @@ def main():
                     })
             rewards.append(terms["total"])
             dones.append(done)
-            selected_path_world = outputs["path_world"][
+            selected_mean_path_world = outputs["mean_path_world"][
                 env_index, best_candidate
             ]
             commit_mask = decision & ~invalid & ~done
             history.commit_path(
-                selected_path_world,
+                selected_mean_path_world,
                 update_mask=commit_mask,
             )
             if consistency_coef > 0.0:
-                selected_sample_path = outputs["path_world"][
+                selected_mean_path = outputs["mean_path_world"][
                     env_index, best_candidate
                 ][:, None]
                 if previous_mean_output is None:
                     previous_mean_output = {
-                        "path_world": selected_sample_path.detach().clone(),
+                        "path_world": selected_mean_path.detach().clone(),
                     }
                     previous_state = state.clone()
                 else:
                     path_mask = commit_mask.reshape(-1, 1, 1, 1, 1)
                     previous_mean_output["path_world"] = torch.where(
-                        path_mask, selected_sample_path,
+                        path_mask, selected_mean_path,
                         previous_mean_output["path_world"],
                     ).detach()
                     for key in STATE_KEYS:

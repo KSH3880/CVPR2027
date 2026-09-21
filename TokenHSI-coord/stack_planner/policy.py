@@ -125,7 +125,7 @@ class StackPlannerActorCritic(nn.Module):
         return output, packed_action, log_prob, value
 
     def sample_all(self, state: CoordinatorState):
-        """Sample and decode every full-path head from the same scene."""
+        """Decode sampled execution paths and noise-free reference paths."""
         paths, value, raw = self.distribution(state)
         delta_action = paths.sample()
         action_mask = self._action_mask(raw, delta_action.dtype)[:, None]
@@ -141,6 +141,18 @@ class StackPlannerActorCritic(nn.Module):
             current, raw["reference_path_local"], path_action, speed_action,
             raw["path_point_weight"],
         )
+        mean_path_action, mean_speed_action = self._split_action(paths.loc)
+        mean_output = self.planner.decode_delta(
+            current, raw["reference_path_local"],
+            mean_path_action, mean_speed_action,
+            raw["path_point_weight"],
+        )
+        # The sampled output is physically executed for on-policy credit. The
+        # noise-free output is the recurrent planning reference, preventing
+        # exploration noise from accumulating as a trajectory random walk.
+        output["mean_path_local"] = mean_output["path_local"]
+        output["mean_path_world"] = mean_output["path_world"]
+        output["mean_speed"] = mean_output["speed"]
         output["candidate_logits"] = raw["candidate_logits"]
         return output, packed_action, log_prob, value
 

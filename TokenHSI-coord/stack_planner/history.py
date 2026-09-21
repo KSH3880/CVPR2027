@@ -18,7 +18,7 @@ class StackPlannerObservation:
     state: CoordinatorState
     history_tokens: torch.Tensor  # [B,H,6,12], includes current state
     history_valid: torch.Tensor   # [B,H]
-    previous_path_world: torch.Tensor  # [B,2,33,2], last committed trajectory
+    previous_path_world: torch.Tensor  # [B,2,33,2], last committed mean trajectory
     previous_path_valid: torch.Tensor  # [B]
     path_progress: torch.Tensor        # [B,2], monotonic point-index progress
 

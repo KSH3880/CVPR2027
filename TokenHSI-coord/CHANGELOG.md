@@ -4,6 +4,14 @@
 
 ## 2026-09-18
 
+### Sampled execution과 mean planning reference 분리
+
+- PPO rollout은 기존처럼 `mean_delta + exploration noise`로 만든 sampled path를 frozen executor에
+  설치한다. 반면 다음 decision의 `previous_path`, bootstrap observation과 temporal consistency에는
+  동일 head의 noise-free mean path만 commit하도록 분리했다.
+- K=1에서 sampled delta가 매 replan마다 reference에 누적되어 route가 random walk로 밀리는 경로를
+  차단한다. deterministic view/eval은 원래부터 mean path를 실행하므로 동작 계약은 변하지 않는다.
+
 ### Single-head baseline 및 정상 stack 접촉 제거
 
 - planner launcher와 model config의 기본 candidate 수를 4에서 1로 바꿨다. full candidate
