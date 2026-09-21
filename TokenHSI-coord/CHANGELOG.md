@@ -20,6 +20,14 @@
 - 검증: `tokenhsi118`에서 stack planner 단위 테스트 45개 통과. GPU0에서
   `4 env x 2 agent`, 1 iteration smoke를 실행해 reset, path 설치, frozen ms18 rollout,
   PPO backward, checkpoint 저장까지 통과했다. `invalid=0`, fallback=0.
+- 2,048 env 첫 episode reset에서 inherited multi-task reset이 indexed root setter를 여러 번
+  제출해 PhysX GPU pipeline이 illegal memory access로 무너지는 것을 확인했다. plain Carry
+  adapter에도 carry-only single-commit reset transaction을 적용해 모든 tensor mutation을 먼저
+  staging하고 root/DOF state를 각각 한 번만 제출하도록 수정했다.
+- 기존 coordinator의 매-replan current-root/current-box anchor equality 검사는 실행 prefix를
+  고정하는 stack planner 계약과 맞지 않아 두 번째 decision부터 정상 경로를 invalid 처리했다.
+  plain Carry adapter에서는 이 동적 검사만 제외하고 최초 pickup/goal hard anchor와
+  finite/buffer/speed/curvature 검사를 유지했다.
 
 ### Full stack과 분리한 post-place A1 retreat 검증 task (V15)
 

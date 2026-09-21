@@ -16,9 +16,12 @@ from coordinator.schema import AGENTS
 from env.tasks.adapt_interaction_skills.humanoid_ma_coord_carry import (
     HumanoidMACoordCarry,
 )
+from stack_planner.reset_transaction import CarryOnlySingleCommitReset
 
 
-class HumanoidMACarryPlannerTrain(HumanoidMACoordCarry):
+class HumanoidMACarryPlannerTrain(
+    CarryOnlySingleCommitReset, HumanoidMACoordCarry,
+):
     """Simultaneous Carry task controlled by an external joint planner."""
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
@@ -53,6 +56,14 @@ class HumanoidMACarryPlannerTrain(HumanoidMACoordCarry):
         speed = speed[:, 0]
         state = self._coord_state(env_ids)
         checks = self._plan_validity_checks(state, path, speed)
+        # The shared stack planner has a fixed-origin recurrent trajectory:
+        # executed prefix points remain where they were first committed while
+        # the current root (and a held box) advances along that trajectory.
+        # The older coordinator instead regenerates root/box anchors on every
+        # replan. Its dynamic equality check is therefore inapplicable here.
+        # Initial pickup/goal anchors are still hard-coded and action-masked by
+        # StackTrajectoryPlanner; retain finite/buffer/speed/curvature checks.
+        checks[:, 1] = True
         valid = checks.all(dim=-1)
         self._coord_replans[env_ids] += 1
         self._coord_invalid[env_ids] += (~valid).long()
