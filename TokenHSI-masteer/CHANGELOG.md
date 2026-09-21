@@ -2,6 +2,98 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-21
+### Executor-aware world-model MPPI planner V2 스캐폴드
+
+- `coordinator_v2/`에 actual-state history GRU, 저차원 joint path/speed proposal,
+  recurrent ensemble world model, uncertainty-aware MPPI와 BOOM식 value-weighted
+  alignment loss를 추가했다. TokenHSI action/observation과 MS18 checkpoint는 수정하지 않는다.
+- 기존 33점 root/box/goal 계약과 deterministic collision/curvature selector를 재사용하고,
+  `HumanoidMACoordCarry`에서 `COORD_MODEL=v2`일 때만 새 planner를 불러와 기존
+  320점 `_gt_path`/`_mscale` bridge로 보낸다. 매 실제 step history를 갱신하며 기존
+  6-step/phase-change replan과 invalid-plan fallback을 유지한다.
+- strict atomic checkpoint와 초기화 스크립트, CPU 단위검사를 추가했다. 초기 체크포인트는
+  학습 결과가 아니며 현재 MS18 Carry의 고정 agent-box 계약 때문에 role/assignment 선택은
+  아직 구현 범위 밖이다.
+- 검증: CUDA 비활성 Python compile, unit test 2개, checkpoint round-trip,
+  WM supervised loss finite, `git diff --check` 통과. Isaac Gym GPU bridge smoke는 미실행이다.
+
+### Top box 접촉면 평행 reward pilot
+
+- 기존 `_box_parallel_error_deg`의 모서리/yaw 정렬 판정은 과거 ms75 replay를
+  보존하도록 기본값으로 유지하고, opt-in `STACK_TOP_SURFACE_PARALLEL=1`에서만
+  base 윗면과 top 아랫면의 signed normal 각도를 사용한다.
+- `STACK_TOP_PARALLEL_REWARD_*`를 추가해 STACK phase의 목표 XY/Z 근처에서만
+  `exp(-0.5 * (error_deg / sigma_deg)^2)` dense reward를 top agent에 지급한다.
+  손 파지 수와 hand-clear는 reward gate에 사용하지 않는다.
+- `train_ms75_faceparallel_local.sh`는 ms75와 같은 초기 checkpoint/설정을 재생하면서
+  면 법선 성공 기준 10도, reward weight 0.25를 사용하고 release 관련 보상과
+  hand-clear 요구는 0으로 고정한다.
+
+### Local 환경의 Juan sequential-stack 평가기
+
+- `juan_eval_sequential_stack.sh`와 전용 task/집계기를 추가해 ms75 sidecar와
+  `HumanoidMASequentialStackRelease` 시나리오는 유지하면서 Juan의 env별 warm-up 제거,
+  3x3 box grid, 540-episode 균형 집계와 성공 latch를 적용했다.
+- 성공 모드는 `strict_done`, `box_radius`, `tokenhsi_carry`를 지원한다. 기존 player 변경은
+  `MA_EVAL_ALL_AGENT_ROWS`/`MA_EVAL_FLUSH_DONE` opt-in일 때만 활성화된다.
+- `bash -n`, Python compile, 합성 270-env/55열 집계 smoke를 통과했다.
+
+
+### CLEAR 박스 39-D fade + 후퇴 goal 3-D 유지 및 goal reward
+
+- opt-in `STACK_CARRY_OBS_KEEP_GOAL=1`은 ms75의 3-step Carry observation
+  zero-fade에서 각 42-D 블록의 박스 상태 39-D만 fade하고, 마지막 goal 3-D는 고정된
+  후퇴 endpoint를 매 frame root-local로 유지한다. local Z는 0으로 두어 낮은 box
+  placement/putDown 목표로 해석되는 혼선을 줄였다.
+- CLEAR에 endpoint 거리 감소, endpoint 도착 보상을 추가하고 CLEAR 진입 root 높이보다
+  낮아지는 crouch와 배치한 박스 재접촉을 감점하는 opt-in reward를 추가했다. 기본값은
+  모두 0이어서 기존 ms75/ms77 replay는 변하지 않는다.
+- `STACK_RETREAT_GOAL_TOL`의 기본값은 기존 0.18m로 유지하고 새 wrapper만 0.05m를
+  사용한다. 0.1m path cell보다 작은 tolerance도 실제 도달할 수 있도록 새 조건에서는
+  마지막 활성 path cell을 요청된 retreat goal 좌표에 정확히 맞춘다. 따라서 감속 뒤
+  goal 0.05m 안에서만 도착 latch, `M=0`, CLEAR→STACK 정지 확인이 시작된다.
+- `train_ms75_goal3_boxfade_local.sh`는 ms75 sidecar를 재생해 ms18 epoch 9000,
+  phase·10% carry rehearsal·freeze 계약을 보존하고 새 관측/reward만 켠다.
+  `MA_TOKEN=mask`는 teammate를, train config의 `use_prior_knowledge: false`는 old-carry를
+  attention에서 제외하므로 실제 입력 비교는 steering + goal-only new-carry다.
+- 새 노브를 학습 sidecar 저장·재생 목록에 추가했다.
+- Python `py_compile`, wrapper와 `train_local.sh`의 `bash -n`, `git diff --check`,
+- 학습 shell의 PATH에 `rg`가 없어 시작 전 검사가 중단된 문제를 표준 `grep`으로 바꿨다.
+  old-carry mask config 검사 통과와 동일 tag 재실행 가능 상태를 확인했다.
+  기본 tag 미존재와 wrapper 실행 권한을 확인했다. 학습은 시작하지 않았다.
+
+### 박스 없는 단일-agent steering 전용 뷰어
+
+- 기존 `scripts/masteer/view.sh`를 변경하지 않는 `view_only_steering.sh`와
+  viewer 전용 `HumanoidMAOnlySteering` 태스크를 추가했다. 래퍼는 원본을 `/tmp`에
+  복사해 `--eval_task carry`만 `traj`로 치환하므로 Vulkan GPU guard, VNC,
+  체크포인트 스냅샷 경로는 그대로 사용한다.
+- A=1 `traj`로 carry box/platform과 carry 관측을 비활성화한다. 원래 TokenHSI
+  traj와 custom steering 경로가 달라 4 m 이탈 시 조기 종료되던 문제를 막고,
+  약 32 m steering 경로와 창을 600-frame 에피소드 내내 유지한다.
+- `MS_CLIP=1`, `MS_ENDCLAMP=0`을 강제하며 낙상 또는 타임아웃 때만 새 위치와
+  새 steering 경로로 리셋한다. 기존 학습·평가 태스크의 기본 동작은 바뀌지 않는다.
+
+### Top WAIT의 최종 Carry goal 유지 zero-shot
+
+- opt-in `STACK_TOP_WAIT_FINAL_GOAL=1`은 shared-goal Top의 safety path와 stage
+  gate는 기존 중간점 W에 유지하면서, 42-D Carry observation/reward의
+  `_box_tar_pos`만 nominal 최종 적층점 G로 복원한다. 관측 차원과 모델 ABI는
+  바꾸지 않는다.
+- 이에 따라 WAIT는 `distance(box,G)>0 + M=0`, 최종 placement는
+  `distance(box,G)≈0 + M≈0`으로 구분된다. path 후보 생성에는 W가 필요하므로
+  final G 복원은 `_reset_shared_goal_paths`가 끝난 뒤에만 수행한다.
+- 기본값은 0으로 두어 기존 ms75/ms77 replay를 보존하고, 새 노브를 학습 sidecar
+  저장·재생 목록에 추가했다.
+- Python compile, `bash -n`, `git diff --check`를 통과했다. ms75 e12000에
+  `STACK_TOP_WAIT_XY_ZERO=1 STACK_TOP_WAIT_FINAL_GOAL=1`을 zero-shot 적용한
+  512-env 기본 3-repeat 실행은 2824행을 남겼지만 최종 rc 요약 전에 종료되어 진단
+  결과로만 판정했다. 기존 waitxy1 대비 staged 0.442→0.011, XY 도착 후 freeze
+  568/816→14/610으로 붕괴했고, 드문 freeze의 하강/반등 중앙값도
+  0.748/0.780m로 유지됐다. full final G의 낮은 stack Z가 0.9m WAIT 높이와
+  충돌하므로 이 zero-shot 표현은 기각한다.
+
 ## 2026-09-19
 
 ### Top WAIT XY 도착 즉시 M=0

@@ -1,0 +1,48 @@
+#!/bin/bash
+# ms75 ablation: retain only the retreat goal 3-D in Carry while the physical
+# box state 39-D follows the original 3-step zero fade. CLEAR reward is tied
+# to that endpoint and penalizes crouching and box recontact.
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+BASE_TAG=ms75_ms18e9000_endcell18_hold1_regrasp1_hybridyaw_3000_s0
+BASE_ENV="$ROOT/runs/queue/logs/$BASE_TAG.env"
+TAG=${1:-ms78_ms18e9000_goal3_boxfade_goalr_g05_3000_s0}
+GPU=${MA_GPU:-6}
+
+if [[ "$GPU" != 6 && "$GPU" != 7 ]]; then
+    echo "MA_GPU must be 6 or 7: $GPU" >&2
+    exit 2
+fi
+if [ ! -f "$BASE_ENV" ]; then
+    echo "ms75 sidecar 없음: $BASE_ENV" >&2
+    exit 1
+fi
+
+source "$BASE_ENV"
+export MS_TAG="$TAG"
+export MA_GPU="$GPU"
+export MS_ENVS=${PILOT_ENVS:-1024}
+export MS_ITERS=${PILOT_ITERS:-3000}
+export STACK_CARRY_OBS_KEEP_GOAL=1
+export STACK_RETREAT_GOAL_TOL=${PILOT_RETREAT_GOAL_TOL:-0.05}
+export STACK_CLEAR_GOAL_PROGRESS_W=${PILOT_GOAL_PROGRESS_W:-1.0}
+export STACK_CLEAR_GOAL_ARRIVE_W=${PILOT_GOAL_ARRIVE_W:-0.5}
+export STACK_CLEAR_GOAL_K=${PILOT_GOAL_K:-20.0}
+export STACK_CLEAR_CROUCH_PEN_W=${PILOT_CROUCH_PEN_W:-0.5}
+export STACK_CLEAR_CROUCH_MARGIN=${PILOT_CROUCH_MARGIN:-0.08}
+export STACK_CLEAR_CROUCH_RANGE=${PILOT_CROUCH_RANGE:-0.15}
+export STACK_CLEAR_RECONTACT_PEN_W=${PILOT_RECONTACT_PEN_W:-1.0}
+
+# MA_TOKEN=mask excludes teammate. The ms75 adapt config independently masks
+# old-carry through use_prior_knowledge=false, leaving steering + new-carry.
+if [ "${MA_TOKEN:-}" != mask ]; then
+    echo "ms75 replay expected MA_TOKEN=mask, got ${MA_TOKEN:-unset}" >&2
+    exit 2
+fi
+if ! grep -q '^    use_prior_knowledge: False' "$MS_TRAINCFG"; then
+    echo "ms75 train cfg must mask old-carry: $MS_TRAINCFG" >&2
+    exit 2
+fi
+
+exec bash "$ROOT/scripts/masteer/train_local.sh" "$TAG"

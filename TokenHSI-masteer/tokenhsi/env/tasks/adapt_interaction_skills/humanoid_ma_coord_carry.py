@@ -29,6 +29,8 @@ from coordinator.schema import (
     PATH_VERTICES,
     CoordinatorState,
 )
+from coordinator_v2 import encode_state as encode_v2_state
+from coordinator_v2 import load_checkpoint as load_v2_checkpoint
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
 from tokenhsi.utils import steer_path as sp
 
@@ -92,13 +94,15 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
         ))
         if self._coord_random_priority and self._coord_learned_priority:
             raise ValueError("random_priority and learned_priority are exclusive")
-        if self._coord_model_kind not in ("c1", "c2", "simple"):
-            raise ValueError("COORD_MODEL must be c1, c2, or simple")
+        if self._coord_model_kind not in ("c1", "c2", "simple", "v2"):
+            raise ValueError("COORD_MODEL must be c1, c2, simple, or v2")
         if self._coord_random_priority and self._coord_model_kind != "c2":
             raise ValueError("COORD_C2_RANDOM_PRIORITY requires COORD_MODEL=c2")
         self._coord_candidates_k = C2_CANDIDATES if self._coord_model_kind == "c2" else CANDIDATES
         if self._coord_provider not in ("learned", "analytic", "external"):
             raise ValueError("COORD_PROVIDER must be learned, analytic, or external")
+        if self._coord_model_kind == "v2" and self._coord_provider != "learned":
+            raise ValueError("COORD_MODEL=v2 requires COORD_PROVIDER=learned")
         self._coord_replan_steps = int(os.environ.get("COORD_REPLAN_STEPS", "6"))
         if self._coord_replan_steps <= 0:
             raise ValueError("COORD_REPLAN_STEPS must be positive")
@@ -122,7 +126,9 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
             if not raw:
                 raise ValueError("COORD_CKPT is required for COORD_PROVIDER=learned")
             checkpoint = self._resolve_checkpoint(raw)
-            if self._coord_model_kind == "simple":
+            if self._coord_model_kind == "v2":
+                loader = load_v2_checkpoint
+            elif self._coord_model_kind == "simple":
                 loader = load_simple_checkpoint
             elif self._coord_model_kind == "c2":
                 loader = load_c2_checkpoint
@@ -130,6 +136,8 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
                 loader = load_checkpoint
             self._coordinator, self._coord_checkpoint = loader(checkpoint, self.device)
             self._coordinator.eval()
+            if self._coord_model_kind == "v2":
+                self._coord_candidates_k = self._coordinator.config.result_candidates
             checkpoint_priority = self._coord_checkpoint.get(
                 "extras", {}
             ).get("random_priority")
@@ -232,6 +240,14 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
         env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
         self._sample_coord_priority(env_ids)
         state = self._coord_state(env_ids)
+        if self._coord_model_kind == "v2":
+            encoded = encode_v2_state(state)
+            self._coord_v2_history = encoded[:, None].expand(
+                -1, self._coordinator.config.history_frames, -1
+            ).clone()
+            self._coord_v2_history_tick = torch.full(
+                (self.num_envs,), -1, device=self.device, dtype=torch.long
+            )
         self._coord_phase[:] = state.phase
         self._set_speed_anchor(self.agent_rows(env_ids))
         self._plan_envs(env_ids)
@@ -505,6 +521,15 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
             candidate_valid = torch.ones(len(env_ids), device=self.device, dtype=torch.bool)
             candidate_safe = candidate_valid
             selected = torch.full((len(env_ids),), -1, device=self.device, dtype=torch.long)
+        elif self._coord_model_kind == "v2":
+            with torch.inference_mode():
+                result = self._coordinator.plan(
+                    self._coord_v2_history[env_ids], state
+                )
+            path, speed = result.path_world, result.speed
+            candidate_valid, candidate_safe = result.valid, result.safe
+            selected = result.index
+            self._coord_candidates[env_ids] = result.candidate_path_world
         else:
             with torch.inference_mode():
                 output = self._coordinator(state)
@@ -614,6 +639,12 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
         self._sample_coord_priority(env_ids)
         self._coord_has_valid[env_ids] = False
         self._coord_last_replan[env_ids] = -self._coord_replan_steps
+        if self._coord_model_kind == "v2":
+            encoded = encode_v2_state(self._coord_state(env_ids))
+            self._coord_v2_history[env_ids] = encoded[:, None].expand(
+                -1, self._coordinator.config.history_frames, -1
+            )
+            self._coord_v2_history_tick[env_ids] = -1
         self._set_speed_anchor(self.agent_rows(env_ids))
         self._plan_envs(env_ids)
 
@@ -625,6 +656,22 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
         phase_changed = (state.phase != self._coord_phase[env_ids]).any(dim=1)
         due = (self.progress_buf[env_ids] - self._coord_last_replan[env_ids]) >= self._coord_replan_steps
         self._plan_envs(env_ids[due | phase_changed])
+
+    def _append_v2_history(self, env_ids):
+        if self._coord_model_kind != "v2" or len(env_ids) == 0:
+            return
+        env_ids = env_ids.unique()
+        tick = self.progress_buf[env_ids]
+        changed = tick != self._coord_v2_history_tick[env_ids]
+        if not changed.any():
+            return
+        chosen = env_ids[changed]
+        encoded = encode_v2_state(self._coord_state(chosen))
+        history = self._coord_v2_history[chosen]
+        self._coord_v2_history[chosen] = torch.cat(
+            (history[:, 1:], encoded[:, None]), dim=1
+        )
+        self._coord_v2_history_tick[chosen] = self.progress_buf[chosen]
 
     def coord_state(self, env_ids=None) -> CoordinatorState:
         """Public refreshed-state interface used by the high-level trainer."""
@@ -791,6 +838,7 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
 
     def _compute_task_obs(self, env_ids=None):
         active = torch.arange(self.num_envs, device=self.device) if env_ids is None else env_ids
+        self._append_v2_history(active)
         self._maybe_replan(active)
         rows = self.all_rows() if env_ids is None else self.agent_rows(env_ids)
         self._update_speed_command(rows)

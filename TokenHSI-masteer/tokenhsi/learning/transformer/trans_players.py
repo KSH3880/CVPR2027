@@ -216,8 +216,10 @@ class TransPlayerContinuous(common_player.CommonPlayer):
     def run_eval(self):
         is_determenistic = self.is_determenistic
         num_envs = self.env.num_envs
-        num_trials = num_envs
-        assert num_envs == num_trials
+        if int(os.environ.get("MA_EVAL_ALL_AGENT_ROWS", "0")):
+            num_trials = num_envs * self.num_agents
+        else:
+            num_trials = num_envs
         num_repeat = int(os.environ.get("EVAL_NUM_REPEAT", "3"))
         if num_repeat < 1:
             raise ValueError("EVAL_NUM_REPEAT must be a positive integer")
@@ -282,6 +284,8 @@ class TransPlayerContinuous(common_player.CommonPlayer):
                         sum_success_precision += percision_done[success_indices].sum().cpu().numpy()
   
                 # self._post_step(info)
+            if int(os.environ.get("MA_EVAL_FLUSH_DONE", "0")):
+                self.env_reset(normal_done_indices)
             
             success_rate = games_success / games_played
             if games_success > 0:

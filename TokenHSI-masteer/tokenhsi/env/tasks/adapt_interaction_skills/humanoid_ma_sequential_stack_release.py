@@ -118,6 +118,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_top_wait_xy_zero = bool(
             _i("STACK_TOP_WAIT_XY_ZERO", 0)
         )
+        self._ss_top_wait_final_goal = bool(
+            _i("STACK_TOP_WAIT_FINAL_GOAL", 0)
+        )
         self._ss_top_wait_at_start = bool(_i("STACK_TOP_WAIT_AT_START", 0))
         self._ss_top_commit_goal = bool(_i("STACK_TOP_COMMIT_GOAL", 0))
         self._ss_shared_goal_carry = bool(_i("STACK_SHARED_GOAL_CARRY", 0))
@@ -166,6 +169,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_retreat_endpoint_gate = bool(
             _i("STACK_RETREAT_ENDPOINT_GATE", 1)
         )
+        self._ss_retreat_goal_tol = _f("STACK_RETREAT_GOAL_TOL", 0.18)
         # resample() reports a valid count whose old terminal index is one
         # 0.1 m cell before the closest stored point to the requested goal.
         # Keep the historical default for replay and opt in only for endpoint
@@ -283,9 +287,23 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_top_stable_lin = _f("STACK_TOP_STABLE_LIN", self._ss_stable_lin)
         self._ss_top_stable_ang = _f("STACK_TOP_STABLE_ANG", self._ss_stable_ang)
         self._ss_top_upright_deg = _f("STACK_TOP_UPRIGHT_DEG", 10.0)
-        # Backward-compatible by default. New runs can require the top and
-        # base box faces to be parallel before the terminal success bonus is
-        # paid. Cube/square symmetry is handled modulo 90 degrees below.
+        self._ss_top_surface_parallel = bool(
+            _i("STACK_TOP_SURFACE_PARALLEL", 0)
+        )
+        self._ss_top_parallel_reward_w = _f(
+            "STACK_TOP_PARALLEL_REWARD_W", 0.0
+        )
+        self._ss_top_parallel_reward_sigma_deg = _f(
+            "STACK_TOP_PARALLEL_REWARD_SIGMA_DEG", 10.0
+        )
+        self._ss_top_parallel_reward_xy = _f(
+            "STACK_TOP_PARALLEL_REWARD_XY", 0.25
+        )
+        self._ss_top_parallel_reward_z = _f(
+            "STACK_TOP_PARALLEL_REWARD_Z", 0.15
+        )
+        # Compare only the two contacting surface normals. Rotation around
+        # that normal (yaw) does not change whether the faces are parallel.
         self._ss_top_parallel_deg = _f("STACK_TOP_PARALLEL_DEG", 180.0)
         self._ss_top_steps = _i("STACK_TOP_STEPS", 20)
         self._ss_drop_xy = _f("STACK_DROP_XY", 0.25)
@@ -319,6 +337,28 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         self._ss_carry_obs_zero_fade_steps = _i(
             "STACK_CARRY_OBS_ZERO_FADE_STEPS", 0
+        )
+        self._ss_carry_obs_keep_goal = bool(
+            _i("STACK_CARRY_OBS_KEEP_GOAL", 0)
+        )
+        self._ss_clear_goal_progress_w = _f(
+            "STACK_CLEAR_GOAL_PROGRESS_W", 0.0
+        )
+        self._ss_clear_goal_arrive_w = _f(
+            "STACK_CLEAR_GOAL_ARRIVE_W", 0.0
+        )
+        self._ss_clear_goal_k = _f("STACK_CLEAR_GOAL_K", 20.0)
+        self._ss_clear_crouch_pen_w = _f(
+            "STACK_CLEAR_CROUCH_PEN_W", 0.0
+        )
+        self._ss_clear_crouch_margin = _f(
+            "STACK_CLEAR_CROUCH_MARGIN", 0.08
+        )
+        self._ss_clear_crouch_range = _f(
+            "STACK_CLEAR_CROUCH_RANGE", 0.15
+        )
+        self._ss_clear_recontact_pen_w = _f(
+            "STACK_CLEAR_RECONTACT_PEN_W", 0.0
         )
         self._ss_clear_signed = bool(_i("STACK_CLEAR_SIGNED", 0))
         self._ss_sequential_reward_mask = bool(_i("STACK_SEQUENTIAL_REWARD_MASK", 0))
@@ -437,6 +477,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             raise ValueError("STACK_ABOVE_BONUS must be non-negative")
         if self._ss_clear_route_margin < 0.0:
             raise ValueError("STACK_CLEAR_ROUTE_MARGIN must be non-negative")
+        if self._ss_retreat_goal_tol <= 0.0:
+            raise ValueError("STACK_RETREAT_GOAL_TOL must be positive")
         if self._ss_top_scale <= 0.0 or self._ss_top_scale > 1.0:
             raise ValueError("STACK_TOP_SCALE must be in (0, 1]")
         if min(
@@ -451,6 +493,16 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             raise ValueError("STACK top/above tolerances must be positive")
         if self._ss_top_upright_deg <= 0.0 or self._ss_top_upright_deg > 90.0:
             raise ValueError("STACK_TOP_UPRIGHT_DEG must be in (0, 90]")
+        if self._ss_top_parallel_reward_w < 0.0:
+            raise ValueError("STACK_TOP_PARALLEL_REWARD_W must be non-negative")
+        if min(
+            self._ss_top_parallel_reward_sigma_deg,
+            self._ss_top_parallel_reward_xy,
+            self._ss_top_parallel_reward_z,
+        ) <= 0.0:
+            raise ValueError(
+                "STACK_TOP_PARALLEL_REWARD sigma/XY/Z must be positive"
+            )
         if self._ss_top_parallel_deg <= 0.0 or self._ss_top_parallel_deg > 180.0:
             raise ValueError("STACK_TOP_PARALLEL_DEG must be in (0, 180]")
         if self._ss_shared_wait_dist <= 0.0:
@@ -488,6 +540,11 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         if self._ss_top_wait_xy_zero and not self._ss_shared_goal_carry:
             raise ValueError(
                 "STACK_TOP_WAIT_XY_ZERO requires "
+                "STACK_SHARED_GOAL_CARRY=1"
+            )
+        if self._ss_top_wait_final_goal and not self._ss_shared_goal_carry:
+            raise ValueError(
+                "STACK_TOP_WAIT_FINAL_GOAL requires "
                 "STACK_SHARED_GOAL_CARRY=1"
             )
         if self._ss_top_release_progress_w < 0.0 or self._ss_top_hold_pen_w < 0.0:
@@ -556,6 +613,28 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             )
         if self._ss_carry_obs_zero_fade_steps < 0:
             raise ValueError("STACK_CARRY_OBS_ZERO_FADE_STEPS must be non-negative")
+        if self._ss_carry_obs_keep_goal and not self._ss_carry_obs_zero_fade:
+            raise ValueError(
+                "STACK_CARRY_OBS_KEEP_GOAL requires "
+                "STACK_CARRY_OBS_ZERO_FADE=1"
+            )
+        if min(
+            self._ss_clear_goal_progress_w,
+            self._ss_clear_goal_arrive_w,
+            self._ss_clear_crouch_pen_w,
+            self._ss_clear_recontact_pen_w,
+        ) < 0.0:
+            raise ValueError("CLEAR goal/stance reward weights must be non-negative")
+        if self._ss_clear_goal_k <= 0.0:
+            raise ValueError("STACK_CLEAR_GOAL_K must be positive")
+        if (
+            self._ss_clear_crouch_margin < 0.0
+            or self._ss_clear_crouch_range <= 0.0
+        ):
+            raise ValueError(
+                "STACK_CLEAR_CROUCH_MARGIN/RANGE must satisfy "
+                "margin >= 0, range > 0"
+            )
         if self._ss_clear_heading_progress_w < 0.0:
             raise ValueError("STACK_CLEAR_HEADING_PROGRESS_W must be non-negative")
         if self._ss_clear_yaw_progress_w < 0.0:
@@ -739,6 +818,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         self._ss_retreat_goal = torch.zeros((num_envs, 3), device=self.device)
         self._ss_retreat_dir = torch.zeros((num_envs, 2), device=self.device)
+        self._ss_clear_start_root_z = torch.zeros(num_envs, device=self.device)
         self._ss_clear_age = torch.zeros(
             num_envs, dtype=torch.long, device=self.device
         )
@@ -896,11 +976,13 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"{self._ss_clear_route_margin:.2f}/"
             f"{int(self._ss_clear_stop_on_stack)}/"
             f"endpoint{int(self._ss_retreat_endpoint_gate)}/"
+            f"goaltol{self._ss_retreat_goal_tol:.2f}/"
             f"endcell{int(self._ss_retreat_end_cell_fix)} "
             f"stage={self._ss_stage_dist:.2f}m/"
             f"handz{int(self._ss_stage_use_hand_z)}/"
             f"zero{int(self._ss_stage_force_zero)}/"
             f"xyzero{int(self._ss_top_wait_xy_zero)}/"
+            f"finalgoal{int(self._ss_top_wait_final_goal)}/"
             f"{self._ss_stage_hold_steps}/req{int(self._ss_require_staged)} "
             f"clear_bypass{int(self._ss_clear_bypass_stage)} "
             f"top_wait={int(self._ss_top_wait_at_start)}/"
@@ -938,6 +1020,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"top_premature={self._ss_top_premature_release_pen_w:.2f} "
             f"top_settle={self._ss_top_settle_steps} "
             f"top_parallel={self._ss_top_parallel_deg:.1f}deg "
+            f"top_parallel_reward={self._ss_top_parallel_reward_w:.2f}/"
+            f"{self._ss_top_parallel_reward_sigma_deg:.1f}deg/"
+            f"{self._ss_top_parallel_reward_xy:.2f}xy/"
+            f"{self._ss_top_parallel_reward_z:.2f}z "
             f"release_progress_w={self._ss_release_progress_w:.2f} "
             f"release_hold={self._ss_release_hold_pen_w:.2f}/"
             f"{self._ss_release_hold_grace_steps} "
@@ -956,6 +1042,11 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"dynamic_carry_mask={int(self._ss_dynamic_carry_mask)} "
             f"carry_obs_zero_fade={int(self._ss_carry_obs_zero_fade)} "
             f"carry_obs_zero_fade_steps={self._ss_carry_obs_zero_fade_steps} "
+            f"carry_obs_keep_goal={int(self._ss_carry_obs_keep_goal)} "
+            f"clear_goal={self._ss_clear_goal_progress_w:.2f}/"
+            f"{self._ss_clear_goal_arrive_w:.2f}/k{self._ss_clear_goal_k:.1f} "
+            f"clear_stance={self._ss_clear_crouch_pen_w:.2f}/"
+            f"{self._ss_clear_recontact_pen_w:.2f} "
             f"top_carry_target_only={int(self._ss_debug_top_carry_target_only)} "
             f"top_direct_carry_reward={int(self._ss_top_direct_carry_reward)} "
             f"negative_clear_reward={int(self._ss_negative_clear_reward)} "
@@ -1310,6 +1401,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_latched_base[env_ids] = 0.0
         self._ss_retreat_goal[env_ids] = 0.0
         self._ss_retreat_dir[env_ids] = 0.0
+        self._ss_clear_start_root_z[env_ids] = 0.0
         self._ss_clear_age[env_ids] = 0
         self._ss_retreat_arrived[env_ids] = False
         self._ss_prev_heading_alignment[env_ids] = 0.0
@@ -1428,6 +1520,14 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._reset_shared_goal_paths(env_ids, base_rows, top_rows)
         else:
             self._reset_steer(self.agent_rows(env_ids))
+        if self._ss_top_wait_final_goal:
+            # Keep W as the Top steering endpoint and staging gate, but expose
+            # the nominal final stack goal G through the unchanged 42-D Carry
+            # observation/reward. Thus WAIT is (distance-to-G > 0, M=0),
+            # whereas final placement remains (distance-to-G ~= 0, M ~= 0).
+            # Path generation temporarily needs box_tar_pos=W, so restore G
+            # only after the shared safety path has been selected.
+            self._box_tar_pos[top_rows] = self._ss_top_goal[env_ids]
         self._mscale[base_rows] = 1.0
         self._mscale[top_rows] = 1.0
         self._reset_progress_ref(env_ids)
@@ -1802,12 +1902,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
 
     @staticmethod
     def _box_parallel_error_deg(base_quat, top_quat):
-        """Return face-alignment error, treating quarter turns as parallel.
-
-        A cube rotated 90 degrees still has parallel faces, while the unstable
-        45-degree diamond placement does not. The normal-axis term also rejects
-        a top box whose upper/lower face is tilted relative to the base box.
-        """
+        """Face-axis alignment error retained for old checkpoint replay."""
         axes = torch.eye(3, device=base_quat.device, dtype=base_quat.dtype)
         axes = axes.unsqueeze(0).expand(len(base_quat), -1, -1)
         base_axes = quat_rotate(
@@ -1818,9 +1913,6 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             top_quat[:, None, :].expand(-1, 3, -1).reshape(-1, 4),
             axes.reshape(-1, 3),
         ).view(-1, 3, 3)
-
-        # Each horizontal top-box edge may align with either horizontal base
-        # edge. Absolute dot products make 180-degree flips equivalent.
         horizontal = torch.abs(
             torch.einsum("nai,nbi->nab", top_axes[:, :2], base_axes[:, :2])
         )
@@ -1828,6 +1920,21 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         top_y = horizontal[:, 1].amax(dim=-1)
         normal = torch.abs((top_axes[:, 2] * base_axes[:, 2]).sum(dim=-1))
         alignment = torch.minimum(normal, torch.minimum(top_x, top_y))
+        return torch.rad2deg(torch.acos(alignment.clamp(-1.0, 1.0)))
+
+    @staticmethod
+    def _surface_parallel_error_deg(base_quat, top_quat):
+        """Angle between the base top face and top-box bottom face.
+
+        Both are represented by their local +Z axes. This intentionally
+        ignores yaw: rotating a box within a plane leaves the faces parallel.
+        The signed dot rejects an upside-down top box.
+        """
+        up = torch.zeros((len(base_quat), 3), device=base_quat.device)
+        up[:, 2] = 1.0
+        base_up = quat_rotate(base_quat, up)
+        top_up = quat_rotate(top_quat, up)
+        alignment = (base_up * top_up).sum(dim=-1)
         return torch.rad2deg(torch.acos(alignment.clamp(-1.0, 1.0)))
 
     def _base_stop_features(self, base_rows):
@@ -2012,7 +2119,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             "top_native", "top_approach_progress",
             "top_premature_release_penalty", "top_release_progress",
             "top_hold_penalty", "top_wait", "top_total", "base_stability",
-            "top_stability", "base_hold", "base_regrasp_penalty",
+            "top_stability", "top_parallel", "base_hold", "base_regrasp_penalty",
             "base_loop_tracking", "stop_decel",
         ):
             self.extras[f"tb/stack_reward/{key}"] = nan
@@ -2020,6 +2127,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             "top_distance", "top_above", "top_grasp_ok", "top_settled",
             "top_release_ready", "top_hand_factor", "top_grasp_factor", "top_hand_clear",
             "top_stack_age", "top_waiting", "top_wait_steps",
+            "top_parallel_error_deg", "top_parallel_reward_active",
             "base_hold_anchor_error", "base_hold_position_score", "base_hold_speed_score",
             "base_regrasp_rate",
             "stop_decel_active", "stop_target_speed", "stop_root_speed",
@@ -2072,6 +2180,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             or self._ss_top_premature_release_pen_w > 0.0
             or self._ss_top_wait_reward_w > 0.0
             or self._ss_top_settle_steps > 0
+            or self._ss_top_parallel_reward_w > 0.0
         )
         if not (
             bool(post.any()) or bool(failed.any()) or use_carry_foot or top_debug
@@ -2159,6 +2268,22 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 + 0.20 * top_stability
             )
         )
+        top_parallel_error_deg = self._surface_parallel_error_deg(
+            base[:, 3:7], top[:, 3:7]
+        )
+        top_parallel_reward_active = (
+            stack_phase
+            & (top_xy_err <= self._ss_top_parallel_reward_xy)
+            & (top_z_err <= self._ss_top_parallel_reward_z)
+        )
+        top_parallel_reward = (
+            self._ss_top_parallel_reward_w
+            * torch.exp(
+                -0.5
+                * (top_parallel_error_deg / self._ss_top_parallel_reward_sigma_deg).square()
+            )
+            * top_parallel_reward_active.float()
+        )
         release_ready = stack_phase & self._ss_top_settled
         top_approach_progress = (
             self._ss_top_approach_progress_w
@@ -2195,6 +2320,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             + top_release_progress
             - top_hold_penalty
             + top_wait_reward
+            + top_parallel_reward
             + above_bonus
         )
         self.rew_buf[top_rows] += top_local
@@ -2224,6 +2350,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             ("top_release_progress", top_release_progress),
             ("top_hold_penalty", -top_hold_penalty),
             ("top_wait", top_wait_reward),
+            ("top_parallel", top_parallel_reward),
             ("top_total", self.rew_buf[top_rows]),
         ):
             self.extras[f"tb/stack_reward/{key}"] = torch.where(
@@ -2247,6 +2374,8 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             ("top_stack_age", self._ss_stack_age.float()),
             ("top_waiting", top_waiting.float()),
             ("top_wait_steps", self._ss_top_wait_steps.float()),
+            ("top_parallel_error_deg", top_parallel_error_deg),
+            ("top_parallel_reward_active", top_parallel_reward_active.float()),
         ):
             self.extras[f"tb/stack_state/{key}"] = torch.where(
                 top_sample, value, nan
@@ -2561,9 +2690,37 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         ms20_clear_r = clear_now.float() * (
             static_gate * (0.40 * support + 0.25 * stable) + 0.35 * clear_score
         )
-        base_hold_anchor_error = (
+        goal_distance = (
             roots[:, 0:2] - self._ss_retreat_goal[:, 0:2]
         ).norm(dim=-1)
+        prev_goal_distance = (
+            self._prev_root_pos[base_rows, 0:2]
+            - self._ss_retreat_goal[:, 0:2]
+        ).norm(dim=-1)
+        goal_progress = (
+            (prev_goal_distance - goal_distance) / self.dt
+        ).clamp(-1.0, 1.0)
+        goal_arrival = torch.exp(
+            -self._ss_clear_goal_k * goal_distance.square()
+        )
+        goal_reward = (
+            self._ss_clear_goal_progress_w * goal_progress
+            + self._ss_clear_goal_arrive_w * goal_arrival
+        )
+        clear_height_drop = (
+            self._ss_clear_start_root_z - roots[:, 2]
+        ).clamp(min=0.0)
+        crouch_ratio = torch.clamp(
+            (clear_height_drop - self._ss_clear_crouch_margin)
+            / self._ss_clear_crouch_range,
+            0.0,
+            1.0,
+        )
+        crouch_penalty = self._ss_clear_crouch_pen_w * crouch_ratio
+        recontact_penalty = (
+            self._ss_clear_recontact_pen_w * (~clear_now).float()
+        )
+        base_hold_anchor_error = goal_distance
         base_hold_position_score = torch.exp(
             -8.0 * base_hold_anchor_error.square()
         )
@@ -2808,7 +2965,14 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             )
             if self._ss_clear_classic_stop_reward:
                 clear_r = clear_r + stop_reward
-        clear_r = clear_r + heading_reward + yaw_progress_reward
+        clear_r = (
+            clear_r
+            + heading_reward
+            + yaw_progress_reward
+            + goal_reward
+            - crouch_penalty
+            - recontact_penalty
+        )
         def tb_stop(value):
             return torch.where(clear_phase, value, nan)
 
@@ -2819,6 +2983,22 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         )
         self.extras["tb/stack_reward/yaw_progress"] = tb_stop(
             yaw_progress_reward
+        )
+        self.extras["tb/stack_reward/goal_progress"] = tb_stop(
+            self._ss_clear_goal_progress_w * goal_progress
+        )
+        self.extras["tb/stack_reward/goal_arrival"] = tb_stop(
+            self._ss_clear_goal_arrive_w * goal_arrival
+        )
+        self.extras["tb/stack_reward/crouch_penalty"] = tb_stop(
+            -crouch_penalty
+        )
+        self.extras["tb/stack_reward/recontact_penalty"] = tb_stop(
+            -recontact_penalty
+        )
+        self.extras["tb/stack_state/goal_distance"] = tb_stop(goal_distance)
+        self.extras["tb/stack_state/clear_height_drop"] = tb_stop(
+            clear_height_drop
         )
         if self._ss_clear_classic_steer:
             self.extras["tb/stack_reward/stall_penalty"] = tb_stop(
@@ -3324,6 +3504,12 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             # path[n_end - 1] terminal is 0.1-0.2 m short, conflicting with
             # the 0.12 m endpoint gate and M=0 stop command.
             retreat_n_end = (n_end + 1).clamp(max=sp.V)
+        if self._ss_retreat_goal_tol < sp.DS:
+            # A sub-cell goal latch must be reachable. Pin the final active
+            # path cell to the requested world-space retreat endpoint instead
+            # of leaving the resampled terminal up to one DS cell short.
+            terminal = (retreat_n_end - 1).clamp(min=0, max=sp.V - 1)
+            self._gt_path[base_rows, terminal] = clear
         self._s_end[base_rows] = (retreat_n_end.float() - 1.0) * sp.DS
         self._arc_root[base_rows] = 0.0
         self._arc_box[base_rows] = s_waypoint
@@ -3462,6 +3648,31 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                     1.0,
                 )
             out[retreat, carry_start:carry_start + 2 * carry_dim] *= fade[:, None]
+            if self._ss_carry_obs_keep_goal:
+                # Each 42-D Carry window ends in the 3-D root-local goal. Fade
+                # only the preceding 39-D physical-box state, then retain the
+                # fixed retreat endpoint as a horizontal navigation goal.
+                retreat_rows = rows[retreat]
+                retreat_envs = env[retreat]
+                roots = self.humanoid_rows(
+                    self._humanoid_root_states
+                )[retreat_rows]
+                goal_world = self._ss_retreat_goal[retreat_envs].clone()
+                goal_world[:, 2] = roots[:, 2]
+                heading_inv = torch_utils.calc_heading_quat_inv(roots[:, 3:7])
+                local_goal = quat_rotate(
+                    heading_inv, goal_world - roots[:, 0:3]
+                )
+                goal_offset = carry_dim - 3
+                out[
+                    retreat,
+                    carry_start + goal_offset:carry_start + carry_dim,
+                ] = local_goal
+                out[
+                    retreat,
+                    carry_start + carry_dim + goal_offset:
+                    carry_start + 2 * carry_dim,
+                ] = local_goal
         elif bool(retreat.any()) and (
             self._ss_zero_carry_obs or self._ss_dynamic_carry_mask
         ):
@@ -3727,6 +3938,10 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             self._ss_dbg_release_step[rows] = self.progress_rows()[rows]
             self._ss_phase[ids] = self.CLEAR
             self._ss_clear_age[ids] = 0
+            clear_roots = self.humanoid_rows(
+                self._humanoid_root_states
+            )[rows]
+            self._ss_clear_start_root_z[ids] = clear_roots[:, 2]
             self._ss_bonus_pending[ids] = True
             self._set_retreat_path(ids, rows, base[ids])
             self._compute_observations()
@@ -3749,7 +3964,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         endpoint_error = (
             base_roots[:, 0:2] - self._ss_retreat_goal[:, 0:2]
         ).norm(dim=-1)
-        endpoint_reached = retreat_progress_done & (endpoint_error <= 0.18)
+        endpoint_reached = retreat_progress_done & (
+            endpoint_error <= self._ss_retreat_goal_tol
+        )
         if self._ss_clear_stop_on_stack and self._ss_retreat_endpoint_gate:
             just_arrived = (
                 clear
@@ -3957,9 +4174,14 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                 (base[ids, 0:2] - self._ss_base_goal[ids, 0:2]).norm(dim=-1)
                 <= self._ss_drop_xy
             )
-            parallel_error_deg = self._box_parallel_error_deg(
-                base[ids, 3:7], top[ids, 3:7]
-            )
+            if self._ss_top_surface_parallel:
+                parallel_error_deg = self._surface_parallel_error_deg(
+                    base[ids, 3:7], top[ids, 3:7]
+                )
+            else:
+                parallel_error_deg = self._box_parallel_error_deg(
+                    base[ids, 3:7], top[ids, 3:7]
+                )
             top_parallel_error_deg[ids] = parallel_error_deg
             # Quaternion arithmetic can report 15.00003 for an exact 15-degree
             # rotation, so keep the configured boundary inclusive.
