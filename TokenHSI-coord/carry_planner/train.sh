@@ -7,7 +7,7 @@ COORD="$ROOT/TokenHSI-coord"
 EXEC_REPO=${CARRY_PLANNER_EXEC_REPO:-"$ROOT/TokenHSI-masteer"}
 TAG=${1:?usage: train.sh <tag> <ms18-policy.pth>}
 EXEC_CKPT=${2:?usage: train.sh <tag> <ms18-policy.pth>}
-STAGE1=${MS_CKPT:-"$EXEC_REPO/output/ckpt_stage1.pth"}
+STAGE1=${MS_CKPT:-"/home/hwanhee/juan/CVPR2027/TokenHSI-masteer/output/tokenhsi/ckpt_stage1.pth"}
 ENVS=${CARRY_PLANNER_ENVS:-2048}
 GPU=${MA_GPU:-7}
 SEED=${CARRY_PLANNER_SEED:-0}
@@ -28,7 +28,7 @@ CFG="$ROOT/runs/gen_cfgs/carry_planner/$TAG.yaml"
 sed -e 's/^  numAgents:.*/  numAgents: 2/' \
     -e "s/^  numEnvs:.*/  numEnvs: $ENVS/" \
     -e 's/^  envSpacing:.*/  envSpacing: 5/' \
-    "$COORD/tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml" > "$CFG"
+    "/home/hwanhee/juan/CVPR2027/TokenHSI-masteer/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" > "$CFG"
 
 if [ -z "${CONDA_BASE:-}" ]; then
     if command -v conda >/dev/null 2>&1; then CONDA_BASE=$(conda info --base)
@@ -96,8 +96,8 @@ echo "carry planner: tag=$TAG envs=$ENVS gpu=$GPU scene=$MS_SCEN frozen=$EXEC_CK
 cd "$COORD"
 python -u -m carry_planner.train_closed_loop \
     --test --headless --task HumanoidMACarryPlannerTrain \
-    --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
+    --cfg_train /home/hwanhee/juan/CVPR2027/TokenHSI-masteer/tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \
-    --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+    --motion_file /home/hwanhee/juan/CVPR2027/TokenHSI-masteer/tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint "$STAGE1" --checkpoint "$EXEC_CKPT" \
     --num_envs "$ENVS" --seed "$SEED" --output_path "$OUT/executor_unused"
