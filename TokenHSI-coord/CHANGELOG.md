@@ -47,6 +47,10 @@
   0.25 m margin을 보장해 불가능한 최종 중첩은 만들지 않는다. 선행 agent/box가 goal에서
   정지한 뒤 후발 agent가 돌아가야 하므로 속도 조절만으로 끝나는 해를 줄인다. fresh run의
   기본 path correction 폭은 이 우회를 허용하도록 0.5 m에서 1.0 m로 넓혔다.
+- `carry_planner/train.sh`가 실수로 motion dataset YAML을 `--cfg_env`에 넘겨
+  `load_cfg()`에서 `KeyError: 'env'`로 중단되던 경로를 정식 multi-task environment
+  config로 복구했다. 생성 전 source 존재 여부와 생성 후 최상위 `env:`를 검사해 같은
+  오배선을 Isaac Gym 초기화 전에 명확한 오류로 차단한다.
 
 ### Full stack과 분리한 post-place A1 retreat 검증 task (V15)
 

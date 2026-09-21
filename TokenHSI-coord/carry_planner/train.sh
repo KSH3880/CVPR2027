@@ -28,7 +28,7 @@ CFG="$ROOT/runs/gen_cfgs/carry_planner/$TAG.yaml"
 sed -e 's/^  numAgents:.*/  numAgents: 2/' \
     -e "s/^  numEnvs:.*/  numEnvs: $ENVS/" \
     -e 's/^  envSpacing:.*/  envSpacing: 5/' \
-    "/home/hwanhee/juan/CVPR2027/TokenHSI-masteer/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" > "$CFG"
+    "/home/hwanhee/juan/CVPR2027/TokenHSI-masteer/tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml" > "$CFG"
 
 if [ -z "${CONDA_BASE:-}" ]; then
     if command -v conda >/dev/null 2>&1; then CONDA_BASE=$(conda info --base)
