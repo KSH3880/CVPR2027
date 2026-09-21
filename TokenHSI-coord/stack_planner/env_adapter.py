@@ -226,6 +226,19 @@ class HumanoidMAStackPlannerTrain(
         execute[:, 1] |= queued_a2
         return execute
 
+    def planner_route_visit_enabled(self):
+        return True
+
+    def planner_remove_retreat_potential(self):
+        return True
+
+    def _planner_execution_view(self, model_path, state, retreat_rows,
+                                model_speed):
+        return execution_view(
+            model_path, state.box_xyz[..., :2], state.goal_xy, retreat_rows,
+            state.root_xy, speed=model_speed[:, 0],
+        )
+
     def _reset_envs(self, env_ids):
         super()._reset_envs(env_ids)
         if hasattr(self, "_planner_virtual_retreat_pos") and len(env_ids):
@@ -550,9 +563,8 @@ class HumanoidMAStackPlannerTrain(
         ].shape[:-1]:
             raise ValueError("planner speed must align with path_world")
         model_speed = output["speed"]
-        path, speed = execution_view(
-            model_path, state.box_xyz[..., :2], state.goal_xy, retreat_rows,
-            state.root_xy, speed=model_speed[:, 0],
+        path, speed = self._planner_execution_view(
+            model_path, state, retreat_rows, model_speed,
         )
         valid = free_path_validity(
             output["path_world"], model_speed, state.root_xy, execute

@@ -510,6 +510,29 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
             2.0 + 1e-5,
         )
 
+    def test_retreat_only_uses_root_path_and_masks_a2_action(self):
+        state = make_state(batch=2)
+        model = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, retreat_only=True,
+        )).eval()
+        _, raw = model.raw_heads(state)
+        with torch.no_grad():
+            output = model(state)
+
+        root_path = state.root_xy[:, :, None].expand(
+            -1, -1, STACK_PATH_POINTS, -1,
+        )
+        self.assertTrue(torch.allclose(
+            output["base_path_world"], root_path, atol=1e-5,
+        ))
+        path_mask = raw["path_action_mask"].reshape(2, 2, 32, 2)
+        speed_mask = raw["speed_action_mask"].reshape(2, 2, 33)
+        self.assertTrue(path_mask[:, 0].all())
+        self.assertFalse(path_mask[:, 1].any())
+        self.assertFalse(speed_mask[:, 0, 0].any())
+        self.assertTrue(speed_mask[:, 0, 1:].all())
+        self.assertFalse(speed_mask[:, 1].any())
+
     def test_previous_path_keeps_origin_and_masks_executed_prefix(self):
         previous = torch.zeros(1, AGENTS, STACK_PATH_POINTS, 2)
         previous[..., 0] = torch.arange(STACK_PATH_POINTS)
@@ -546,7 +569,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         with torch.inference_mode():
             before = model(state)
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v14.pth"
+            path = Path(directory) / "stack_v15.pth"
             save_stack_checkpoint(path, model, step=7)
             loaded, payload = load_stack_checkpoint(path)
             with torch.inference_mode():
@@ -557,13 +580,13 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         for key in before:
             self.assertTrue(torch.equal(before[key], after[key]), key)
 
-    def test_v13_schema_is_rejected_after_absolute_target_change(self):
+    def test_v14_schema_is_rejected_after_retreat_only_contract_change(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "old_schema.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
-            payload["schema_version"] = "tokenhsi-stack-planner-v13"
+            payload["schema_version"] = "tokenhsi-stack-planner-v14"
             torch.save(payload, path)
             with self.assertRaisesRegex(ValueError, "checkpoint mismatch"):
                 load_stack_checkpoint(path)
@@ -571,7 +594,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
     def test_checkpoint_records_path_and_speed_contract(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v14.pth"
+            path = Path(directory) / "stack_v15.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
             loaded, migrated = load_stack_checkpoint(path)
@@ -585,6 +608,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(migrated["bounded_absolute_path_target"])
         self.assertEqual(migrated["path_update_alpha"], 0.25)
         self.assertEqual(migrated["retreat_delta_scale"], 2.0)
+        self.assertEqual(migrated["planner_task"], "full_stack")
         self.assertTrue(migrated["fixed_origin_reference"])
         self.assertTrue(migrated["future_action_mask"])
         self.assertTrue(migrated["projected_executor_resume"])

@@ -34,6 +34,9 @@ from stack_planner.constraints import (  # noqa: E402
     free_path_validity_details, ordered_box_goal_visit,
 )
 from stack_planner.env_adapter import HumanoidMAStackPlannerTrain  # noqa: E402
+from stack_planner.retreat_only_env import (  # noqa: E402
+    HumanoidMAStackPlannerRetreatTrain,
+)
 from stack_planner.history import (  # noqa: E402
     StackHistoryBuffer, flatten_observations,
 )
@@ -46,6 +49,8 @@ from stack_planner.reward import (  # noqa: E402
 from utils.config import get_args, load_cfg, set_np_formatting, set_seed  # noqa: E402
 
 task_registry.HumanoidMAStackPlannerTrain = HumanoidMAStackPlannerTrain
+task_registry.HumanoidMAStackPlannerRetreatTrain = \
+    HumanoidMAStackPlannerRetreatTrain
 
 
 def _env_int(name: str, default: int) -> int:
@@ -190,6 +195,9 @@ def _macro_step(player, before, valid, safe, low_steps, reward_config):
         "bottom_postplace_angular_motion": postplace_angular_motion,
         "bottom_postplace_seconds": postplace_steps * float(task.dt),
         "bottom_postplace_intervals": (postplace_steps > 0).float(),
+        "retreat_successes": after.stack_success,
+        "retreat_clearance_sum": after.clearance,
+        "retreat_clearance_samples": torch.ones_like(after.clearance),
     }
     for name in collision_names:
         diagnostics[f"collision_{name}_steps"] = collision_component_steps[name]
@@ -211,12 +219,22 @@ def _counterfactual_rollout(
     """Execute one candidate branch and return its complete macro reward."""
     task = player.env.task
     with torch.no_grad():
-        visit = ordered_box_goal_visit(
-            output["path_world"],
-            state.box_xyz[:, None, :, :2],
-            state.goal_xy[:, None],
-            tolerance=visit_tolerance,
-        )
+        if task.planner_route_visit_enabled():
+            visit = ordered_box_goal_visit(
+                output["path_world"],
+                state.box_xyz[:, None, :, :2],
+                state.goal_xy[:, None],
+                tolerance=visit_tolerance,
+            )
+        else:
+            zero = state.root_xy.new_zeros(
+                state.batch_size, output["path_world"].shape[1], 2,
+            )
+            visit = {
+                "penalty": zero,
+                "box_distance": zero,
+                "goal_distance": zero,
+            }
         turn = free_path_validity_details(
             output["path_world"], output["speed"], state.root_xy,
             task.planner_execution_rows(),
@@ -238,8 +256,12 @@ def _counterfactual_rollout(
     terms, done, macro_diag = _macro_step(
         player, before, scored_valid, scored_safe, low_steps, reward_config,
     )
+    remove_retreat_potential = (
+        retreat_decision if task.planner_remove_retreat_potential()
+        else torch.zeros_like(retreat_decision)
+    )
     terms["retreat_potential_delta_removed"] = torch.where(
-        retreat_decision, terms["potential_delta"],
+        remove_retreat_potential, terms["potential_delta"],
         torch.zeros_like(terms["potential_delta"]),
     )
     terms["total"] -= terms["retreat_potential_delta_removed"]
@@ -440,6 +462,7 @@ def main():
     requested_path_update_alpha = _env_float(
         "STACK_PLANNER_PATH_UPDATE_ALPHA", 0.25
     )
+    requested_retreat_only = bool(_env_int("STACK_PLANNER_RETREAT_ONLY", 0))
     if requested_candidates < 1:
         raise ValueError("STACK_PLANNER_CANDIDATES must be positive")
     if requested_delta_scale <= 0:
@@ -479,12 +502,17 @@ def main():
             raise ValueError(
                 "STACK_PLANNER_PATH_UPDATE_ALPHA must match init checkpoint"
             )
+        if planner.config.retreat_only != requested_retreat_only:
+            raise ValueError(
+                "STACK_PLANNER_RETREAT_ONLY must match init checkpoint"
+            )
     else:
         planner = StackTrajectoryPlanner(StackPlannerConfig(
             candidates=requested_candidates, history_steps=requested_history_steps,
             delta_scale=requested_delta_scale,
             retreat_delta_scale=requested_retreat_delta_scale,
             path_update_alpha=requested_path_update_alpha,
+            retreat_only=requested_retreat_only,
         )).to(device)
     history = StackHistoryBuffer(
         task.num_envs, planner.config.history_steps, device,
@@ -548,6 +576,12 @@ def main():
     reward_config = StackRewardConfig(
         bottom_disturbance_weight=bottom_disturbance_weight,
     )
+    task_retreat_only = not task.planner_route_visit_enabled()
+    if task_retreat_only != requested_retreat_only:
+        raise ValueError(
+            "task/model mismatch: retreat-only task and "
+            "STACK_PLANNER_RETREAT_ONLY must agree"
+        )
     output_dir = Path(os.environ.get(
         "STACK_PLANNER_OUTPUT", str(WORKSPACE / "runs/stack_planner/default")
     )).expanduser().resolve()
@@ -574,6 +608,7 @@ def main():
           f"delta_scale={planner.config.delta_scale:g} "
           f"retreat_delta_scale={planner.config.retreat_delta_scale:g} "
           f"path_update_alpha={planner.config.path_update_alpha:g} "
+          f"retreat_only={planner.config.retreat_only} "
           f"diversity={diversity_coef:g}/{diversity_margin:g}m "
           f"smoothness={smoothness_coef:g}/{speed_smoothness_coef:g} "
           f"evaluator_coef={evaluator_coef:g} "
@@ -853,6 +888,12 @@ def main():
             "bottom_postplace_angular_speed": ratio(
                 "bottom_postplace_angular_motion", "bottom_postplace_seconds"
             ),
+            "retreat_success_rate": ratio(
+                "retreat_successes", "macro_samples"
+            ),
+            "retreat_clearance": ratio(
+                "retreat_clearance_sum", "retreat_clearance_samples"
+            ),
             "bottom_postplace_motion_per_interval": ratio(
                 "bottom_postplace_motion", "bottom_postplace_intervals"
             ),
@@ -930,6 +971,7 @@ def main():
                        "retreat_box_endpoint_clearance",
                        "path_mae", "fall_ratio", "collision_ratio",
                        "bottom_postplace_linear_speed",
+                       "retreat_success_rate", "retreat_clearance",
                        "policy_loss", "value_loss",
                        "candidate_path_distance",
                        "path_smoothness_loss", "collision_cost",

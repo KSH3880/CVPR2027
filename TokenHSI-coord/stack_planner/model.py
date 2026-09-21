@@ -32,6 +32,7 @@ class StackPlannerConfig:
     retreat_delta_scale: float = 2.0
     path_update_alpha: float = 0.25
     history_steps: int = 1
+    retreat_only: bool = False
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -230,8 +231,13 @@ class StackPlannerHeads(nn.Module):
         offset_scale = absolute_offset.new_full(
             (1, 1, AGENTS, STACK_PATH_POINTS, 1), self.config.delta_scale,
         )
-        # Only A1's post-goal suffix needs a wide workspace for retreat.
-        offset_scale[..., 0, 22:, :] = self.config.retreat_delta_scale
+        if self.config.retreat_only:
+            # The isolated diagnostic path is entirely A1 retreat. A2 is
+            # masked below and remains a stationary part of the scene.
+            offset_scale[..., 0, 1:, :] = self.config.retreat_delta_scale
+        else:
+            # Only A1's post-goal suffix needs a wide workspace for retreat.
+            offset_scale[..., 0, 22:, :] = self.config.retreat_delta_scale
         absolute_offset = (
             absolute_offset * offset_scale
             * path_point_weight[:, None, :, :, None]
@@ -281,8 +287,13 @@ class StackPlannerHeads(nn.Module):
             "path_action_mask": path_point_weight[..., 1:, None].expand(
                 -1, -1, -1, 2
             ).reshape(batch, -1) > 0,
-            "speed_action_mask": torch.ones(
-                batch, STACK_SPEED_DIM, dtype=torch.bool, device=scene.device,
+            "speed_action_mask": (
+                path_point_weight.reshape(batch, STACK_SPEED_DIM) > 0
+                if self.config.retreat_only else
+                torch.ones(
+                    batch, STACK_SPEED_DIM, dtype=torch.bool,
+                    device=scene.device,
+                )
             ),
             "candidate_logits": self.candidate_evaluator(
                 evaluator_input
@@ -319,7 +330,12 @@ class StackTrajectoryPlanner(nn.Module):
     def _reference_path(self, state, previous_path_world, previous_path_valid,
                         base_path_world, base_path_valid, path_progress):
         _, frame = state_to_tokens(state)
-        geometric_local = self._geometric_reference_local(frame)
+        if self.config.retreat_only:
+            geometric_local = frame["root"][..., None, :].expand(
+                -1, -1, STACK_PATH_POINTS, -1,
+            ).clone()
+        else:
+            geometric_local = self._geometric_reference_local(frame)
         geometric_world = shared_to_world(
             geometric_local, frame["center"], frame["angle"],
         )
@@ -345,6 +361,9 @@ class StackTrajectoryPlanner(nn.Module):
             reference_world, frame["center"], frame["angle"],
         )
         point_weight = _future_point_weight(path_progress, previous_path_valid)
+        if self.config.retreat_only:
+            point_weight = point_weight.clone()
+            point_weight[:, 1] = 0.0
         return frame, base_local, reference_local, point_weight
 
     def raw_heads(self, observation):

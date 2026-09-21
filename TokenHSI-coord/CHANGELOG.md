@@ -2,6 +2,22 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-21
+
+### Full stack과 분리한 post-place A1 retreat 검증 task (V15)
+
+- Box1을 목표에 놓고 A1을 release 이후 0.45m 거리에서 시작시키는
+  `HumanoidMAStackPlannerRetreatTrain/View`를 추가했다. A2와 Box2는 3m 밖 hold 상태로 두고
+  planner 실행 및 PPO action gradient에서 완전히 mask한다.
+- retreat-only planner의 고정 base는 A1 departure root를 33점에 복제한 path다. carry-prefix
+  projection과 `box → goal` visit penalty를 건너뛰고 A1의 전체 32개 future point를 최대
+  2m/component bounded offset으로 직접 실행한다.
+- 방향을 지정하는 GT retreat target 없이 1.5m에서 포화되는 물리 root-box clearance potential,
+  box collision/disturbance, fall, time과 path geometry만 채점한다. 성공 시 episode를 종료한다.
+- 전용 `train_retreat_only.sh`, `view_retreat_only.sh`와 `retreat_success_rate`,
+  `retreat_clearance` metric을 추가하고 checkpoint schema를 V15로 올렸다.
+- GPU 실행 없이 CPU unit test 42개와 Python/shell 정적 검사를 수행했다.
+
 ## 2026-09-18
 
 ### Bounded absolute path target과 mean planning reference 분리 (V14)

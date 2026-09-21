@@ -30,6 +30,12 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._stack_planner_period = period
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
         self._stack_planner, payload = load_stack_checkpoint(checkpoint, self.device)
+        task_retreat_only = not self.planner_route_visit_enabled()
+        if self._stack_planner.config.retreat_only != task_retreat_only:
+            raise ValueError(
+                "planner/task mismatch: use view_retreat_only.sh for a "
+                "retreat-only checkpoint"
+            )
         self._stack_planner.eval().requires_grad_(False)
         self._stack_history = StackHistoryBuffer(
             self.num_envs, self._stack_planner.config.history_steps,

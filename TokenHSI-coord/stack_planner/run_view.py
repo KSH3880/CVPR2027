@@ -15,8 +15,13 @@ sys.path.insert(0, str(COORD_ROOT))
 
 import utils.parse_task as task_registry  # noqa: E402
 from stack_planner.view_env import HumanoidMAStackPlannerView  # noqa: E402
+from stack_planner.retreat_only_env import (  # noqa: E402
+    HumanoidMAStackPlannerRetreatView,
+)
 
 task_registry.HumanoidMAStackPlannerView = HumanoidMAStackPlannerView
+task_registry.HumanoidMAStackPlannerRetreatView = \
+    HumanoidMAStackPlannerRetreatView
 
 from run import main  # noqa: E402
 

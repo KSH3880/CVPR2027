@@ -16,6 +16,7 @@ POLICY=${2:?usage: view.sh <planner.pth> <frozen-agent.pth> [envs]}
 ENVS=${ENVS:-${3:-1}}
 GPU=${MA_GPU:-0}
 STAGE1=${MS_CKPT:-"$EXEC_REPO/output/ckpt_stage1.pth"}
+TASK_CLASS=${STACK_PLANNER_VIEW_TASK_CLASS:-HumanoidMAStackPlannerView}
 
 [[ "$ENVS" =~ ^[1-9][0-9]*$ ]] || { echo "envs must be positive" >&2; exit 2; }
 [[ "$GPU" =~ ^[0-9]+$ ]] || { echo "MA_GPU must be a non-negative integer" >&2; exit 2; }
@@ -84,7 +85,7 @@ echo "Graphics: Vulkan device $TOKENHSI_GRAPHICS_DEVICE_ID (override if Vulkan o
 echo "DISPLAY: $DISPLAY"
 cd "$COORD"
 python -u -m stack_planner.run_view \
-    --task HumanoidMAStackPlannerView \
+    --task "$TASK_CLASS" \
     --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id "$TOKENHSI_GRAPHICS_DEVICE_ID" --physx --pipeline gpu \
     --cfg_train "$EXEC_REPO/tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml" \
     --cfg_env "$CFG" \

@@ -36,6 +36,7 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "bounded_absolute_path_target": True,
         "path_update_alpha": config.path_update_alpha,
         "retreat_delta_scale": config.retreat_delta_scale,
+        "planner_task": "retreat_only" if config.retreat_only else "full_stack",
         "fixed_origin_reference": True,
         "future_action_mask": True,
         "projected_executor_resume": True,
