@@ -40,6 +40,11 @@ from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
 from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
 from env.tasks.multi_agent.edge_context_reward import scene_success
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
+from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_interaction_graph,
+    PRESETS as INTERACTION_PRESETS)
+from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
+    PRESETS as STAGE1_PRESETS, ground_standalone_interaction_targets,
+    max_stage1_stack_height)
 from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
 
 
@@ -56,18 +61,29 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._relation_cfg = cfg['env'].get('relationReward', {})
         validate_relation_config(self._relation_cfg)
-        self._edge_ontop = self._relation_cfg.get('mode') == ONTOP_CONTEXT_MODE
-        self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE, ONTOP_CONTEXT_MODE)
-        self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or ('at_ontop' if cfg['args'].test or cfg['args'].eval else 'random')
+        self._edge_stage1 = self._relation_cfg.get('mode') == STAGE1_CONTEXT_MODE
+        self._edge_interaction = self._relation_cfg.get('mode') in (INTERACTION_CONTEXT_MODE,
+                                                                    STAGE1_CONTEXT_MODE)
+        self._edge_ontop = self._relation_cfg.get('mode') in (ONTOP_CONTEXT_MODE,
+            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+        self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE,
+            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+        default_preset = 'holding_sit' if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
+        train_preset = 'random_stage1' if self._edge_stage1 else 'random'
+        self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
-        if self._edge_ontop and (self._task_graph_preset not in PRESETS or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
-            raise ValueError('Unknown OnTop graph preset or camera mode')
+        presets = STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
+        if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
+            raise ValueError('Unknown sampled-edge graph preset or camera mode')
         if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
-            if self._task_graph_preset != 'random' or (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2,3):
-                raise ValueError('OnTop training requires random graphs, 2 agents and 3 objects')
+            expected_random = 'random_stage1' if self._edge_stage1 else 'random'
+            if self._task_graph_preset != expected_random or (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2,3):
+                raise ValueError('Sampled-edge training requires random graphs, 2 agents and 3 objects')
         self._relation_graph_spec = cfg['env'].get('relationGraph', {'template': 'independent_carry'})
         self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
-        self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
+            ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
+            STAGE1_CONTEXT_MODE)
         if self._ontop_mixed:
             if (cfg['env'].get('numAgents'), cfg['env'].get('numObjects')) != (2, 3):
                 raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
@@ -89,7 +105,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             "numObjects ({}) must be >= numAgents ({})".format(self.num_objects, num_agents)
 
         if self._edge_context:
-            compiler = compile_ontop_graph if self._edge_ontop else compile_edge_context_graph
+            compiler = compile_stage1_graph if self._edge_stage1 else (compile_interaction_graph if self._edge_interaction else (compile_ontop_graph if self._edge_ontop else compile_edge_context_graph))
             graph = compiler(self._relation_graph_spec, num_agents, self.num_objects)
             self._context_suffix_width = (packet_size if self._edge_ontop else context_suffix_size)(len(graph.ids))
             self.REWARD_TERM_NAMES = ('edge_state', 'edge_progress', 'edge_success',
@@ -130,6 +146,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._reset_random_rot = box_cfg["reset"]["randomRot"]
         self._reset_random_height = box_cfg["reset"]["randomHeight"]
         self._reset_random_height_prob = box_cfg["reset"]["randomHeightProb"]
+        self._ground_standalone_sit_climb = box_cfg["reset"].get("groundStandaloneSitClimb", False)
+        if type(self._ground_standalone_sit_climb) is not bool or (
+                self._ground_standalone_sit_climb and not self._edge_stage1):
+            raise ValueError("groundStandaloneSitClimb is a Stage-1-only boolean reset option")
         self._reset_min_platform_height = box_cfg["reset"].get("minPlatformHeight", 0.0)
         self._reset_max_top_surface_height = box_cfg["reset"]["maxTopSurfaceHeight"]
         self._randomize_box_assignment = bool(box_cfg["reset"].get("randomAssignment", True))
@@ -393,8 +413,14 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._box_density = torch.full((num_boxes,), 100.0, dtype=torch.float32, device=self.device)
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale
 
-        if self._edge_ontop and (self._box_size.reshape(N, O, 3)[..., 2].sum(-1) > self._reset_max_top_surface_height + 1e-6).any():
-            raise ValueError('Actual box assets must fit the configured maximum 3-box stack height')
+        if self._edge_ontop:
+            heights = self._box_size.reshape(N, O, 3)[..., 2]
+            # Stage-1 permits only O_i -> O_X, so its tallest stack uses two boxes.
+            # Earlier sampled OnTop graphs can contain a three-box chain.
+            stack_height = (max_stage1_stack_height(self._box_size.reshape(N, O, 3))
+                            if self._edge_stage1 else heights.sum(-1))
+            if (stack_height > self._reset_max_top_surface_height + 1e-6).any():
+                raise ValueError('Actual box assets exceed the configured stack height limit')
 
         self._box_assets = []
         for i in range(num_boxes):
@@ -630,6 +656,15 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         top_surface_z = height + box_size[:, 2] / 2
         top_surface_z = torch.clamp_max(top_surface_z, self._reset_max_top_surface_height)
         return top_surface_z - box_size[:, 2] / 2
+
+    def _ground_stage1_standalone_targets(self, env_ids):
+        if not self._ground_standalone_sit_climb:
+            return
+        ground_standalone_interaction_targets(
+            self.relation_runtime.graph, env_ids, self._agent_box_assignment,
+            self._box_states, self._box_size,
+            self._platform_pos if self._reset_random_height else None,
+            self._platform_default_pos if self._reset_random_height else None)
 
     def _logical_box_values(self, values, env_ids=None):
         if env_ids is None:
@@ -1195,6 +1230,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         angle = torch.rand(K * O, device=self.device) * (2.0 * np.pi) * coeff
         self._box_states[env_ids, :, 3:7] = quat_from_angle_axis(angle, axis).view(K, O, 4)
         self._box_states[env_ids, :, 7:13] = 0.0
+        self._ground_stage1_standalone_targets(env_ids)
         return
 
     def _reset_unassigned_boxes_random_arena(self, env_ids):
@@ -1328,6 +1364,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 self._box_states[curr_env, curr_box, 2] += 0.05
 
         self._reset_unassigned_boxes_random_arena(env_ids)
+        self._ground_stage1_standalone_targets(env_ids)
 
         return
 

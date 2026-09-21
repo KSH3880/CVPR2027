@@ -75,7 +75,8 @@ _RELATION_TB_TAGS = {
 
 def relation_tensorboard_tag(key):
     """Presentation only; preserve unlisted metrics in a trailing debug group."""
-    if key.startswith(('edge/', 'agent/', 'goal/', 'penalty/', 'sampling/', 'sharing/', 'ontop/')):
+    if key.startswith(('edge/', 'agent/', 'goal/', 'penalty/', 'sampling/', 'sharing/',
+                       'ontop/', 'sit/', 'climb/')):
         return 'relation/' + key
     if key.startswith('scenario/'):
         return 'relation/06_scenarios/' + key[len('scenario/'):]

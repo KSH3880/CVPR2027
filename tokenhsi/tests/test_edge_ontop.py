@@ -11,6 +11,7 @@ from utils.edge_ontop_spec import *
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, validate_relation_config
 from env.tasks.multi_agent.edge_context_reward import *
 from env.tasks.multi_agent.edge_ontop_reward import *
+from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
 from learning.multi_agent.amp_network_builder_ma import RelationEncoder, AMPMultiAgentBuilder
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 
@@ -18,6 +19,42 @@ torch.set_num_threads(1)
 ROOT=Path(__file__).parents[1]
 CFG=yaml.safe_load((ROOT/'data/cfg/multi_agent/approach_distance_edge_context_ontop.yaml').read_text())['env']['relationReward']
 SPEC=copy.deepcopy(DEFAULT_GRAPH)
+
+
+def test_physical_reset_commits_complete_batch_once_after_scene_acceptance():
+    class FakeResetTask(SampledOnTopTaskMixin):
+        def __init__(self):
+            self.device='cpu';self.num_agents=2;self._mode='train'
+            self._sampling_retries=torch.zeros(());self._sampling_failures=torch.zeros(())
+            self.commits=[];self.amp=[];self.refreshes=0
+        def _sample_episode_graph(self,ids):pass
+        def _reset_actors(self,ids):
+            self._reset_default_slots=(ids,torch.zeros_like(ids))
+            self._reset_ref_slots={'loco':(ids,torch.ones_like(ids))}
+            self._reset_ref_motion_ids={'loco':ids+100}
+            self._reset_ref_motion_times={'loco':ids.float()+.5}
+        def _sample_box_assignments(self,ids):pass
+        def _reset_boxes(self,ids):pass
+        def _reset_task(self,ids):pass
+        def _configure_ontop_targets(self,ids):pass
+        def _ontop_scene_infeasible(self,ids):
+            rejected=torch.ones(len(ids),dtype=torch.bool);rejected[0]=False
+            return rejected
+        def _reset_env_tensors(self,ids):self.commits.append(ids.tolist())
+        def _refresh_sim_tensors(self):self.refreshes+=1
+        def _reset_relation_history(self,ids):pass
+        def _compute_observations(self,ids):pass
+        def _init_amp_obs(self,ids):
+            default=[] if self._reset_default_slots is None else self._reset_default_slots[0].tolist()
+            ref=self._reset_ref_slots['loco'][0].tolist()
+            motion=self._reset_ref_motion_ids['loco'].tolist()
+            times=self._reset_ref_motion_times['loco'].tolist()
+            self.amp.append((ids.tolist(),default,ref,motion,times))
+
+    task=FakeResetTask();task._reset_ontop_context_envs(torch.tensor([3,7,11]))
+    assert task.commits==[[3,7,11]] and task.refreshes==1
+    assert task.amp==[([3,7,11],[3,7,11],[3,7,11],[103,107,111],[3.5,7.5,11.5])]
+    assert task._sampling_retries.item()==3 and task._sampling_failures.item()==0
 
 
 def test_sampler_100000_resets_distribution_and_structure():

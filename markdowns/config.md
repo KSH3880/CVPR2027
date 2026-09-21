@@ -1,9 +1,9 @@
 # Multi-Agent Carry Config 가이드
 
-`tokenhsi/data/cfg/multi_agent`의 **실행 가능한 10개 config**와 각각의 학습·시각화 명령을 정리한다. 15번은 기존 carry checkpoint를 전이하는 OnTop 혼합학습이다. 모든 명령은 저장소 루트에서 실행한다.
+`tokenhsi/data/cfg/multi_agent`의 **실행 가능한 14개 config**와 각각의 학습·시각화 명령을 정리한다. 15번은 기존 carry checkpoint를 전이하는 OnTop 혼합학습이다. 모든 명령은 저장소 루트에서 실행한다.
 
 ```bash
-cd /home/hwanhee/ksh/approach_distance_success
+cd /home/cvlab/Desktop/CVPR2027/approach_clean_context
 ```
 
 - 학습 인자: `[num_agents] [num_envs] [num_objects]`
@@ -19,6 +19,10 @@ cd /home/hwanhee/ksh/approach_distance_success
 - 둘 다 현재 `At phi ≥ 0.9 AND |Z error| ≤ 1 mm`일 때 매 step `+0.2`; 포화 여부만 다르다.
 - Holding 계수 비교: **14번 `approach_distance_success_holding_k10`**은 12번에서 Holding `k`만 `5 → 10`으로 바꾼 실험이다. `0.9` 만족 기준과 gate 설정은 유지한다.
 - **17번 sampled OnTop:** [새 OnTop 학습·viewer](#sampled-ontop-edge-context-17번). reset별 랜덤 그래프, dynamic Ox, k=10, PRE/TERM context, 전체 그래프 task reward 0.9/0.1 공유, scratch.
+- **18번 SIT/CLIMB interaction:** [학습·viewer](#sitclimb-edge-context-18번). 17번 위에 SIT/CLIMB current success와 7개 local pattern sampler를 추가한 schema 4 scratch 실험.
+- **19번 Stage 1 relation skill:** [학습·viewer](#stage-1-relation-skill-19번). 현재 SIT/CLIMB 수식은 유지하고 dependency·sharing·END를 제거한 schema 5 scratch 실험.
+- **20번 Stage 1 바닥 SIT/CLIMB:** [학습·viewer](#stage-1-단독-sitclimb-바닥-20번). 19번의 단독 SIT/CLIMB 대상만 바닥에 두는 별도 scratch 실험.
+- **21번 Stage 1 공통 박스 크기:** [학습·viewer](#stage-1-공통-박스-크기-21번). 20번의 바닥 배치에 독립적인 X/Y/Z 크기 랜덤화와 box-top SIT 목표를 추가한 scratch 실험.
 - **16번 edge context:** [Holding·At 새 학습](#edge-context-성공-포화-16번). k=10, PRE/TERM scalar context, reward gate 제거, edge별 최대 0.6. 기존 checkpoint 전이 없이 scratch 학습.
 - **15번 OnTop 혼합학습:** [설정·구현 상태](#ontop-혼합학습-15번). carry/carry 512 + 독립 OnTop 768 + 의존 OnTop 768, Holding k=5, 지정 epoch 18000 checkpoint 전이. 전용 train/test/VNC 스크립트로 실행한다.
 - 11번 `approach_distance`는 과거 +10/latch 실험이다. 12·13번과 혼동하지 않는다.
@@ -48,8 +52,100 @@ cd /home/hwanhee/ksh/approach_distance_success
 | 15 | [approach_distance_success_ontop_mixed.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_success_ontop_mixed.yaml) | Holding k=5, carry/독립 OnTop/의존 OnTop 혼합, 기존 checkpoint 전이 | [학습](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_success_ontop_mixed_vnc.sh) |
 | 16 | [approach_distance_edge_context_success.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_success.yaml) | Holding·At k=10, PRE/TERM context, edge 성공/TERM 포화, scratch | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_vnc.sh) |
 | 17 | [approach_distance_edge_context_ontop.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_ontop.yaml) | 16번 + OnTop·reset별 그래프·0.9/0.1 task 공유, scratch | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_vnc.sh) |
+| 18 | [approach_distance_edge_context_interaction.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_interaction.yaml) | 17번 + SIT/CLIMB·고정 box·combined AMP, schema 4 scratch | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_vnc.sh) |
+| 19 | [approach_distance_edge_context_stage1.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_stage1.yaml) | 독립 relation skill, constant START/KEEP, own/OX binding, sharing·END 없음, schema 5 scratch | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_vnc.sh) |
+| 20 | [approach_distance_edge_context_stage1_ground_sit_climb.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb.yaml) | 19번에서 단독 SIT/CLIMB의 자기 상자만 바닥 배치; 다른 선반·reward·graph 유지 | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_vnc.sh) |
+| 21 | [approach_distance_edge_context_stage1_common_boxes.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_edge_context_stage1_common_boxes.yaml) | 20번 + X/Y 0.40~0.65m·Z 0.25~0.55m 독립 랜덤 크기, SIT box-top 목표 | [학습](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_train.sh) / [로컬 추론·평가](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_test.sh) / [서버 VNC](../tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_vnc.sh) |
 
 `..._test.sh`는 같은 행의 train script 이름에서 `_train.sh`를 `_test.sh`로 바꾼 전체 이름이다.
+
+## Stage 1 relation skill (19번)
+
+[그래프·수식·checkpoint 상세](edge_context_stage1.md). 18번에서 확정한 SIT/CLIMB geometry와 success는 그대로 두고 cross-agent target, dependency, downstream saturation, `.9/.1` sharing을 제거한다. active edge의 START/KEEP은 항상 `[1,1]`이고 auxiliary reward는 0이다. `O_i`는 자기 relation에만 쓰며 `OX`는 scene당 최대 한 agent가 사용한다.
+
+```bash
+# scratch 학습
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_train.sh 2 2048 3
+
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextStage1.pth'
+# 로컬 viewer
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=holding_sit \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_test.sh "$CKPT" 2 1 3 10
+# 화면 없는 랜덤 평가
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_stage1 \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_test.sh "$CKPT" 2 64 3 3
+# 서버 VNC
+TOKENHSI_GPU=0 TASK_GRAPH=holding_climb \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_vnc.sh "$CKPT"
+```
+
+Preset은 `holding|sit|climb|holding_at|holding_ontop|holding_sit|holding_climb|random_stage1`이다. 고정 preset의 기본 task agent는 A이고 `TASK_ROLE_SWAP=1`로 B와 바꾼다. Output은 `output/approach_distance_edge_context_stage1/`, 짧은 확인은 `output/approach_distance_edge_context_stage1_check/`로 분리한다.
+
+## Stage 1 단독 SIT/CLIMB 바닥 (20번)
+
+19번과 동일한 reward·graph·AMP·상자 크기·높이 확률을 사용한다. 매 reset에서 **단독** SIT/CLIMB의 자기 상자 `O_i`만 바닥(`center_z = box_height/2`)에 놓고 해당 출발 선반을 비활성화한다. HOLDING과 HOLDING+AT/ON_TOP/SIT/CLIMB의 자기 상자 높이 분포, AT 목표 선반, ON_TOP 받침 `OX`는 바꾸지 않는다. **사용자가 선택한 본학습은 19번 checkpoint를 로드하지 않는 scratch**다. 새 output으로 분리되며 기존 19번 학습은 자동으로 종료되지 않는다.
+
+```bash
+# 19번 checkpoint를 로드하지 않고 처음부터 학습한다.
+# 같은 GPU의 기존 2048환경 학습과 동시 실행은 피한다.
+unset RESUME_CHECKPOINT MAX_ITERATIONS OUTPUT_PATH
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_train.sh 2 2048 3
+
+# 새 실험 checkpoint로 로컬 viewer / 화면 없는 평가 / 서버 VNC
+NEW_CKPT='/absolute/path/to/ApproachDistanceEdgeContextStage1GroundSitClimb.pth'
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=sit \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_test.sh "$NEW_CKPT" 2 1 3 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_stage1 \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_test.sh "$NEW_CKPT" 2 64 3 3
+TOKENHSI_GPU=0 TASK_GRAPH=climb \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_vnc.sh "$NEW_CKPT"
+```
+
+Output은 `output/approach_distance_edge_context_stage1_ground_sit_climb/`, 짧은 확인은 `_check/`로 분리한다. 다른 viewer preset과 역할 반전은 19번과 같다.
+
+## Stage 1 공통 박스 크기 (21번)
+
+20번의 단독 SIT/CLIMB 바닥 배치·graph·AMP·reward 가중치를 유지한다. 물리 상자 3개의 X/Y는 각각 0.40~0.65m, Z는 0.25~0.55m에서 **독립적으로 0.05m 간격**으로 환경 생성 때 정한다(6×6×7=252개 크기 조합; 각 환경에서는 reset해도 실제 asset 크기가 유지됨). SIT의 root 목표는 박스 윗면보다 0.12m 위로 변경한다. CLIMB target·feet 조건은 그대로다. Stage 1의 ON_TOP은 두 상자만 쌓으므로 높이 검사도 가장 높은 두 상자 기준이며, 기존 17·18번의 3상자 검사는 유지한다. 샘플러는 크기별 행동 필터 없이 기존 분포를 유지한다. **범위 전체에서 실제 SIT/CLIMB/CARRY 성공은 아직 검증되지 않았다.** 20번 checkpoint와 reward config가 달라 별도 checkpoint로 scratch 시작한다.
+
+```bash
+unset RESUME_CHECKPOINT MAX_ITERATIONS OUTPUT_PATH
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_train.sh 2 2048 3
+
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextStage1CommonBoxes.pth'
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=sit \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_test.sh "$CKPT" 2 1 3 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_stage1 \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_test.sh "$CKPT" 2 64 3 3
+TOKENHSI_GPU=0 TASK_GRAPH=climb \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_vnc.sh "$CKPT"
+```
+
+Output은 `output/approach_distance_edge_context_stage1_common_boxes/`이고 viewer preset·역할 반전은 19번과 같다. 21번은 scratch이며 19·20번 학습을 자동 중단하지 않는다.
+
+## SIT/CLIMB edge context (18번)
+
+[수식·sampler·checkpoint 상세](edge_context_interaction.md). 학습은 2명/2048환경/3물체에서 매 reset `TASK_GRAPH=random`이며 7개 local pattern을 샘플한다. schema 4라 17번 checkpoint를 직접 불러오지 않고 scratch로 시작한다.
+
+```bash
+# 학습
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_train.sh 2 2048 3
+
+CKPT='/path/to/ApproachDistanceEdgeContextInteraction.pth'
+# 로컬 viewer: 먼저 고정 preset을 하나씩 확인
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=hold_sit \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_test.sh "$CKPT" 2 1 3 10
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=hold_climb \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_vnc.sh "$CKPT"
+# 전체 랜덤 분포의 화면 없는 평가
+TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=random \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_test.sh "$CKPT" 2 64 3 3
+# agent A의 HOLDING+CLIMB+ON_TOP 3-edge explicit graph
+TOKENHSI_GPU=5 HEADLESS=1 RELATION_GRAPH=tokenhsi/data/cfg/multi_agent/graphs/edge_interaction_three_edges.yaml \
+  bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_test.sh "$CKPT" 2 16 3 1
+```
+
+Viewer preset은 `sit_only|climb_only|hold_sit|hold_climb|at_then_sit|at_then_climb|ontop_then_climb|random`이다. 1환경 화면에서는 기본 `hold_sit`처럼 고정 preset이 해석하기 쉽다. 각 고정 동작을 확인한 뒤 `random`을 여러 환경의 수치 평가에 쓰는 순서를 권장한다. `TASK_ROLE_SWAP=1`로 A/B 역할을 뒤집는다.
 
 ## Sampled OnTop edge context (17번)
 
@@ -166,7 +262,7 @@ TOKENHSI_GPU=4 ONTOP_SCENARIO=carry_ontop_dependent \
 
 ## 새 학습 명령 — 전체
 
-현재 실행 가능한 1, 9~17번 중 원하는 **하나만** 실행한다. 15번은 지정 carry checkpoint를 자동 전이하며, **16·17번은 checkpoint 전이 없이 scratch 학습**한다. 이 서버에서는 GPU 5·6 중 빈 장치를 선택한다.
+현재 실행 가능한 1, 9~19번 중 원하는 **하나만** 실행한다. 15번은 지정 carry checkpoint를 자동 전이하며, **16~19번은 checkpoint 전이 없이 scratch 학습**한다. 실행 전 실제 GPU 점유를 확인한다.
 
 ```bash
 # 1. Original TokenHSI-style carry
@@ -198,9 +294,21 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_
 
 # 17. Sampled OnTop + PRE/TERM context + task 0.9/0.1 공유 (scratch)
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_train.sh 2 2048 3
+
+# 18. SIT/CLIMB interaction + combined motion prior (schema 4 scratch)
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_train.sh 2 2048 3
+
+# 19. Stage 1 independent relation skill
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_train.sh 2 2048 3
+
+# 20. Stage 1 scratch: only standalone SIT/CLIMB targets start on the floor
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_train.sh 2 2048 3
+
+# 21. Stage 1 scratch: independent common box sizes and box-top SIT target
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_train.sh 2 2048 3
 ```
 
-재현 가능한 seed가 필요하면 명령 앞에 `SEED=42`를 붙인다. 9~17번 relation 학습은 같은 config에서 만든 checkpoint로 재개할 수 있다. 15번 resume에는 OnTop checkpoint, 16·17번에는 각각 해당 실험의 새 edge-context checkpoint를 사용한다.
+재현 가능한 seed가 필요하면 명령 앞에 `SEED=42`를 붙인다. 20·21번은 이전 checkpoint를 로드하지 않고 scratch로 시작한다. 같은 실험의 후속 재개를 제외하고는 `RESUME_CHECKPOINT`를 설정하지 않는다.
 
 ```bash
 RESUME_CHECKPOINT='/absolute/path/checkpoint.pth' SEED=42 \
@@ -253,6 +361,21 @@ TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_ed
 # 17. 기본 at_ontop viewer
 CKPT='/path/to/ApproachDistanceEdgeContextOntop.pth'
 TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_ontop_test.sh "$CKPT" 2 1 3 10
+
+# 18. 기본 hold_sit viewer
+CKPT='/path/to/ApproachDistanceEdgeContextInteraction.pth'
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=hold_sit bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_test.sh "$CKPT" 2 1 3 10
+
+# 19. Stage 1 relation skill
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=holding_sit bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_test.sh "$CKPT" 2 1 3 10
+
+# 20. Grounded standalone SIT/CLIMB
+CKPT='/path/to/ApproachDistanceEdgeContextStage1GroundSitClimb.pth'
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=sit bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_test.sh "$CKPT" 2 1 3 10
+
+# 21. Common box sizes and box-top SIT target
+CKPT='/path/to/ApproachDistanceEdgeContextStage1CommonBoxes.pth'
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=sit bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_test.sh "$CKPT" 2 1 3 10
 ```
 
 화면 없이 평가하려면 `HEADLESS=1`로 바꾸고 필요하면 환경 수를 `1`에서 `64`로 늘린다. 결과 JSON은 각 output 폴더의 `metrics/`에 저장된다.
@@ -263,10 +386,10 @@ TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/approach_distance_ed
 
 ### 1. 서버에서 실행
 
-12·14·15·16·17번 실험은 각각 전용 VNC 스크립트로 GPU와 해당 실험의 checkpoint를 지정한다. 아래 명령 중 원하는 실험 하나만 실행한다. `TOKENHSI_GPU=5` 한 곳에서 GPU를 정하면 CUDA와 viewer 렌더링에 모두 적용된다.
+12·14·15·16·17·18·19·20·21번 실험은 각각 전용 VNC 스크립트로 GPU와 해당 실험의 checkpoint를 지정한다. 아래 명령 중 원하는 실험 하나만 실행한다. `TOKENHSI_GPU=0` 한 곳에서 GPU를 정하면 CUDA와 viewer 렌더링에 모두 적용된다.
 
 ```bash
-cd /home/hwanhee/ksh/approach_distance_success
+cd /home/cvlab/Desktop/CVPR2027/approach_clean_context
 
 # 해당 실험에서 저장된 실제 .pth 파일로 변경한다.
 CKPT='output/approach_distance_success/ApproachDistanceSuccess_18-14-22-43/nn/ApproachDistanceSuccess.pth'
@@ -304,6 +427,36 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_
 ```
 
 `TASK_GRAPH=ontop_chain|independent_ontop|random`으로 preset을 바꾼다. 기본은 `at_ontop`이며 `TASK_ROLE_SWAP=1`로 역할을 반전한다.
+
+18번 SIT/CLIMB interaction:
+
+```bash
+CKPT='/path/to/ApproachDistanceEdgeContextInteraction.pth'
+TOKENHSI_GPU=5 TASK_GRAPH=hold_sit bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_interaction_vnc.sh "$CKPT"
+```
+
+19번 Stage 1 relation skill:
+
+```bash
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextStage1.pth'
+TOKENHSI_GPU=0 TASK_GRAPH=holding_sit bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_vnc.sh "$CKPT"
+```
+
+20번 단독 SIT/CLIMB 바닥 실험:
+
+```bash
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextStage1GroundSitClimb.pth'
+TOKENHSI_GPU=0 TASK_GRAPH=climb bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_ground_sit_climb_vnc.sh "$CKPT"
+```
+
+21번 공통 박스 크기 실험:
+
+```bash
+CKPT='/absolute/path/to/ApproachDistanceEdgeContextStage1CommonBoxes.pth'
+TOKENHSI_GPU=0 TASK_GRAPH=climb bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_stage1_common_boxes_vnc.sh "$CKPT"
+```
+
+고정 preset으로 행동별 확인 후 16~18번은 `TASK_GRAPH=random`, 19~21번은 `TASK_GRAPH=random_stage1`으로 실제 학습 분포를 확인한다. 1환경 random viewer는 episode마다 과제가 바뀌어 원인 분석에는 덜 적합하다.
 
 
 conda `tokenhsi`, 서버 VNC 설치 경로, 포트 `6080`, 실험별 출력 `output/<실험명>_vnc`, 평가 인자 `2 1 3 10`을 기본으로 사용한다. 필요할 때만 `PORT=6081` 같은 환경변수나 checkpoint 뒤의 평가 인자를 덮어쓴다.

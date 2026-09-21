@@ -2,7 +2,41 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-09-21
+
+### 21번 Stage 1 공통 크기 박스 scratch 실험
+
+- 19·20번과 실행·checkpoint를 분리해 X/Y 각각 0.40~0.65m, Z 0.25~0.55m를 0.05m 간격으로 독립 샘플하는 schema 5 config와 train/test/VNC를 추가했다. 기존 graph·AMP·reward 가중치와 단독 SIT/CLIMB 대상 바닥 배치는 유지한다. 이 실험에서만 SIT root target을 평평한 박스의 실제 윗면 + 0.12m로 바꾸며 CLIMB 조건은 유지한다. Stage 1의 ON_TOP은 두 상자만 적층하므로 생성 시 높이 예산을 가장 높은 두 상자로 검사하고, 다른 OnTop 실험의 3상자 검사와 기존 checkpoint는 바꾸지 않는다. 크기별 행동 가능성 필터나 성능 보장은 아직 없다.
+- CPU 전체 **249개 통과**, 세 shell 문법과 diff 공백 확인. GPU 0의 기존 19·20번 본학습은 유지한 채 별도 `_check` output에서 **2048환경·1 epoch scratch**가 종료·checkpoint 저장됐고, 새 checkpoint로 1환경·32-step SIT headless 평가 경로도 정상 종료됐다. 평가 성공 0은 1 epoch 초기 정책 결과이며 수렴 검증이 아니다. 실행 명령·파일 위치 문서를 갱신했다.
+
+### 20번 Stage 1 단독 SIT/CLIMB 대상 바닥 배치 실험
+
+- 19번은 유지하고 별도 schema 5 config/output 및 train/test/VNC를 추가했다. 그래프를 먼저 샘플한 뒤 단독 SIT/CLIMB의 자기 `O_i`만 매 reset 바닥 중심 높이에 놓고 해당 선반을 비활성화한다. HOLDING·AT·ON_TOP 및 HOLDING+SIT/CLIMB의 자기 상자 선반, 공용 `OX`, reward·graph·AMP는 유지한다. 본학습은 사용자 선택에 따라 기존 checkpoint를 로드하지 않는 scratch로 문서화했다.
+- 관련 CPU 테스트 **27개 통과**, 세 shell 문법·diff 공백 확인. GPU 0에서 기존 19번 checkpoint는 평가 호환성 확인에만 사용했고, 1환경 SIT/CLIMB 진단에서 target `z=0.338m`·surface `z=0.400m`를 확인했다. 별도 `output/approach_distance_edge_context_stage1_ground_sit_climb_scratch_check`에서 **2048환경·1 epoch scratch** 실행·checkpoint 저장을 확인했다. 장기 수렴은 미검증이며 기존 19번 본학습은 종료하지 않았다.
+
+### 19번 Stage 1 독립 relation skill 학습 연결
+
+- 기존 OnTop/interaction 실험은 보존하고 `approach_distance_edge_context_stage1`을 별도 schema 5 scratch 실험으로 추가했다. SIT은 확정된 rotated local `tarSitPos` offset, CLIMB은 root-target state와 5cm feet current-success 검증을 그대로 사용하며 feet dense reward나 velocity reward를 추가하지 않았다.
+- agent별 HOLDING/SIT/CLIMB/HOLDING+AT/ON_TOP/SIT/CLIMB을 `.10/.10/.10/.25/.15/.15/.15`로 샘플한다. standalone SIT/CLIMB은 자기 `O_i`, composite support는 `OX`만 쓰며 상대 object binding을 금지했다. OX pattern을 두 agent 사이에서 anti-correlate해 각 agent marginal을 유지하면서 scene당 사용자를 최대 1명으로 제한한다.
+- active edge의 context packet을 constant `[START,KEEP]=[1,1]`로 분리하고 auxiliary reward·dependency·END saturation·teammate `.9/.1` sharing을 모두 끈다. 모든 active edge는 current required goal이며 자기 current success만 state/progress/success 각 `.2`를 포화한다. power/collision/box-speed와 combined AMP/PPO 경로는 유지한다.
+- 전용 YAML·train/test/VNC, 8개 viewer preset, schema/checkpoint metadata, sampler/reward/network/packet 테스트와 문서를 추가했다. CPU 전체 **246개 통과**, shell 문법과 diff를 확인했다.
+- GPU 0의 기존 학습을 변경하지 않고 별도 output에서 **2048환경·2 epoch** smoke를 완료해 checkpoint 저장과 total FPS **14,983~19,008**, scalar 167개 전부 finite, physical reset failure 0을 확인했다. 실제 sampling 비율은 설정값 근처였고 모든 relation의 q_start/q_keep=1, CSV 24행의 term_success=0·own-only saturation·sharing 0·reward 합을 확인했다. 저장 checkpoint로 `holding_sit` 1환경 headless 평가도 정상 종료했다. 확인용 output은 `output/approach_distance_edge_context_stage1_check`와 `_eval_check`이며 본학습 checkpoint로 사용하지 않는다.
+
 ## 2026-09-20
+
+### OnTop/interaction 물리 reset 단일 적용 수정
+
+- OnTop 계열의 충돌 없는 초기 배치 재시도 중 Isaac Gym state tensor setter를 여러 번 호출하던 문제를 수정했다. 각 재시도의 accepted 상태와 AMP reference metadata는 tensor에서 보존·취합하고, 모든 env의 배치가 확정된 뒤 전체 reset batch를 PhysX에 한 번만 적용한다. 보상·graph sampling·relation context·AMP motion pool은 변경하지 않았다.
+- accepted/rejected가 여러 번 나뉘는 부분 reset fixture를 추가해 전체 batch의 state commit·refresh·AMP 초기화가 각각 한 번이고, default/reference AMP slot과 motion id/time이 모두 보존되는지 확인했다. CPU 전체 **239개 통과**, diff whitespace와 전용 shell 문법을 확인했다.
+- GPU 0·2048환경 scratch 검증에서 interaction은 6개 집계의 total FPS **21,750~24,511**, 평균 episode 길이 **28.35~32.00**, box speed penalty 마지막 **-0.000064**, task reward 마지막 **+0.0640**, physical failure 0이었다. 기존 OnTop도 3개 집계 total FPS **25,982~28,625**, 평균 episode 길이 **31.09~32.00**, physical failure 0으로 회귀가 없음을 확인했다. 확인용 output은 각각 `output/approach_distance_edge_context_interaction_reset_check_v2`, `output/approach_distance_edge_context_ontop_reset_check`이며 본학습 checkpoint로 사용하지 않는다.
+
+### 18번 SIT/CLIMB edge-context schema 4 연결
+
+- 17번 OnTop 실험은 보존하고 `approach_distance_edge_context_interaction`을 별도 schema 4 / scratch 실험으로 추가했다. 기존 relation ID 6~8에 SIT=9, CLIMB=10을 추가하고 7-field packet, PRE/TERM scalar context, edge당 state/progress/success 각 0.2 포화, 전체 graph의 0.9/0.1 task 공유를 그대로 재사용한다.
+- SIT은 원본 object-local `tarSitPos` 좌표 규약을 사용한다. 연결된 TokenHSI train sit object 49개의 중앙값 `[0,0,0.1381430834425038]`을 config에 기록하고 world로 회전·이동한다. CLIMB은 원본 데이터 38개에서 `tarClimbPos.z - bbox_z/2` 중앙값이 0임을 확인해 회전 bbox top + `char_h`를 root target으로 사용한다. feet 높이는 dense reward가 아니라 5cm current-success 검증에만 사용한다.
+- agent별 7개 pattern의 config 확률을 marginal로 유지하면서 두 사람의 SIT/CLIMB support 사용은 충돌하지 않게 joint sample한다. HOLDING+SIT/CLIMB은 두 edge 모두 required이고 release TERM 없이 동시에 유지하며, HOLDING+AT/OnTop의 기존 release permission은 유지한다. 준비된 상대 object를 support로 쓰면 해당 AT/OnTop을 PRE에 자동 연결한다.
+- 고정 0.5×0.5×0.4m box, combined loco/sit/climb/carry AMP motion pool, relation embedding 11행, 전용 train/test/VNC, 7개 고정 viewer preset과 random, 3-edge explicit graph override, SIT/CLIMB 진단을 연결했다. 1환경 viewer 기본은 원인 확인이 쉬운 `hold_sit`이고 random은 선택 사항이다.
+- CPU 전체 **238개 통과**, 모든 multi-agent shell 문법, config/schema/checkpoint 분리, 136개 combined motion reference 존재, 문서 diff를 확인했다. GPU 0이 기존 두 학습으로 사용률 99%였으므로 시뮬레이터 smoke/학습은 실행하지 않았고 기존 프로세스는 변경하지 않았다.
 
 ### 17번 sampled OnTop edge context 연결
 

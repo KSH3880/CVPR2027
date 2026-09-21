@@ -1,0 +1,25 @@
+edges:
+  - id: hold_a
+    owner: 0
+    src: H_0
+    dst: O_0
+    relation: HOLDING
+    pre: []
+    term: ontop_a
+    required_goal: false
+  - id: climb_a
+    owner: 0
+    src: H_0
+    dst: O_1
+    relation: CLIMB
+    pre: [hold_a]
+    term: ontop_a
+    required_goal: false
+  - id: ontop_a
+    owner: 0
+    src: O_0
+    dst: O_1
+    relation: ON_TOP
+    pre: [hold_a, climb_a]
+    term: null
+    required_goal: true

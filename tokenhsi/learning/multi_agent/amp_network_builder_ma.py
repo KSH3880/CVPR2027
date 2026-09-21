@@ -132,6 +132,8 @@ from utils.ontop_task_spec import mixed_policy_graph
 from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
 from learning.multi_agent.edge_context_encoder import EdgeContextFusion, PackedEdgeContextFusion
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size
+from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, compile_interaction_graph
+from utils.edge_stage1_spec import STAGE1_CONTEXT_MODE, compile_stage1_graph
 
 
 class EdgeEncoder(nn.Module):
@@ -485,15 +487,23 @@ class RelationEncoder(nn.Module):
                  geometry_cfg=None, gta_cfg=None, diagnostics_name="encoder",
                  relation_reward_mode=LEGACY_MODE, diagnostics_interval=100, relation_graph_spec=None):
         super().__init__()
-        if relation_reward_mode not in (LEGACY_MODE, STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE):
+        if relation_reward_mode not in (LEGACY_MODE, STATE_MODE, ONTOP_MODE, CONTEXT_MODE,
+                                        ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
+                                        STAGE1_CONTEXT_MODE):
             raise ValueError('Unsupported relation reward mode')
-        self.packed_context = relation_reward_mode == ONTOP_CONTEXT_MODE
-        self.edge_context = relation_reward_mode in (CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        self.stage1_context = relation_reward_mode == STAGE1_CONTEXT_MODE
+        self.interaction_context = relation_reward_mode in (INTERACTION_CONTEXT_MODE,
+                                                             STAGE1_CONTEXT_MODE)
+        self.packed_context = relation_reward_mode in (ONTOP_CONTEXT_MODE,
+            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+        self.edge_context = relation_reward_mode in (CONTEXT_MODE, ONTOP_CONTEXT_MODE,
+            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
         self.ontop_mixed = relation_reward_mode == ONTOP_MODE
         if self.ontop_mixed and (num_agents, num_objects) != (2, 3):
             raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
-        self.state_relation = relation_reward_mode in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE)
+        self.state_relation = relation_reward_mode in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE,
+            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
         self.suffix_width = (9 * num_agents + (2 if self.ontop_mixed else 0)) if self.state_relation else 0
         self.diagnostics_interval = max(1, int(diagnostics_interval))
         self.last_diagnostics = {}
@@ -522,8 +532,8 @@ class RelationEncoder(nn.Module):
             # legacy checkpoints and clean-scene ablations.
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
         else:
-            self.edge_encoder = EdgeEncoder(num_layers, num_heads,
-                                            num_relation_types=9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES)
+            relation_types = 11 if self.interaction_context else 9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES
+            self.edge_encoder = EdgeEncoder(num_layers, num_heads, num_relation_types=relation_types)
 
         # non-persistent: derived from entity counts, so it must NOT end up in the
         # checkpoint -- otherwise loading M=2,O=2 into M=2,O=3 would fail on shape.
@@ -541,7 +551,7 @@ class RelationEncoder(nn.Module):
             self.dynamic_bias_projection = nn.Parameter(torch.zeros(num_layers, num_heads, 64))
 
         if self.edge_context:
-            compiler = compile_ontop_graph if self.packed_context else compile_edge_context_graph
+            compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
             self.context_fusion = PackedEdgeContextFusion() if self.packed_context else EdgeContextFusion(graph)
             self.suffix_width = (packet_size if self.packed_context else context_suffix_size)(len(graph.ids))
@@ -644,7 +654,7 @@ class RelationEncoder(nn.Module):
     def set_task_graph(self, spec):
         if not self.edge_context:
             raise ValueError('Explicit task graphs require edge-context mode')
-        compiler = compile_ontop_graph if self.packed_context else compile_edge_context_graph
+        compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
         graph = compiler(spec, self.num_agents, self.num_objects, self._relation_device())
         self.relation_graph_spec = spec
         if not self.packed_context:

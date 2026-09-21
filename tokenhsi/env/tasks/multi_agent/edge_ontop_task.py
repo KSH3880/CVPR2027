@@ -5,15 +5,46 @@ import torch
 from utils.edge_context_spec import AT
 from utils.edge_ontop_spec import (ON_TOP, compile_ontop_graph, sample_graph, expand_graph,
     select_graph, copy_graph_rows, batched)
+from utils.edge_interaction_spec import (SIT, CLIMB, compile_interaction_graph,
+    sample_graph as sample_interaction_graph)
+from utils.edge_stage1_spec import (compile_stage1_graph,
+    sample_graph as sample_stage1_graph)
 from env.tasks.multi_agent.edge_context_reward import owner_sum
 from env.tasks.multi_agent.edge_ontop_reward import OnTopContextRuntime, evaluate_ontop_edges
+from env.tasks.multi_agent.edge_interaction_reward import (InteractionContextRuntime,
+    evaluate_interaction_edges)
+from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
 
 
 class SampledOnTopTaskMixin:
+    def _keep_reset_slots_for_envs(self, env_ids):
+        """Restrict per-attempt AMP reset metadata to the accepted environments."""
+        def keep_mask(slot_env):
+            return (slot_env[:, None] == env_ids[None, :]).any(dim=1)
+
+        if self._reset_default_slots is not None:
+            slot_env, slot_agent = self._reset_default_slots
+            keep = keep_mask(slot_env)
+            self._reset_default_slots = (slot_env[keep], slot_agent[keep]) if keep.any() else None
+
+        for skill_name, slots in list(self._reset_ref_slots.items()):
+            slot_env, slot_agent = slots
+            keep = keep_mask(slot_env)
+            if keep.any():
+                self._reset_ref_slots[skill_name] = (slot_env[keep], slot_agent[keep])
+                self._reset_ref_motion_ids[skill_name] = self._reset_ref_motion_ids[skill_name][keep]
+                self._reset_ref_motion_times[skill_name] = self._reset_ref_motion_times[skill_name][keep]
+            else:
+                self._reset_ref_slots.pop(skill_name, None)
+                self._reset_ref_motion_ids.pop(skill_name, None)
+                self._reset_ref_motion_times.pop(skill_name, None)
+
     def _init_ontop_context_runtime(self):
-        prototype=compile_ontop_graph(self._relation_graph_spec,self.num_agents,self.num_objects,self.device)
+        compiler=compile_stage1_graph if getattr(self,'_edge_stage1',False) else (compile_interaction_graph if getattr(self,'_edge_interaction',False) else compile_ontop_graph)
+        prototype=compiler(self._relation_graph_spec,self.num_agents,self.num_objects,self.device)
         g=expand_graph(prototype,self.num_envs)
-        self.relation_runtime=OnTopContextRuntime(self.num_envs,g,self._relation_cfg,self.device)
+        runtime=Stage1ContextRuntime if getattr(self,'_edge_stage1',False) else (InteractionContextRuntime if getattr(self,'_edge_interaction',False) else OnTopContextRuntime)
+        self.relation_runtime=runtime(self.num_envs,g,self._relation_cfg,self.device)
         self._sampling_counts=torch.zeros(18,device=self.device)
         self._sampling_retries=torch.zeros((),device=self.device)
         self._sampling_failures=torch.zeros((),device=self.device)
@@ -29,21 +60,52 @@ class SampledOnTopTaskMixin:
         objects=self._logical_box_values(self._box_states,env_ids)
         sizes=self._logical_box_values(self._box_size,env_ids)
         graph=self.relation_runtime.graph if env_ids is None else select_graph(self.relation_runtime.graph,env_ids)
-        phi,diag=evaluate_ontop_edges(bodies[...,self._key_body_ids[[0,1]],:],bodies[...,0,:],objects,sizes,goals,graph,self._relation_cfg)
+        hands=bodies[...,self._key_body_ids[[0,1]],:]
+        if getattr(self,'_edge_interaction',False):
+            feet=bodies[...,self._key_body_ids[[2,3]],:]
+            phi,diag=evaluate_interaction_edges(hands,feet,bodies[...,0,:],objects,sizes,goals,
+                                                graph,self._relation_cfg,self._char_h)
+        else:
+            phi,diag=evaluate_ontop_edges(hands,bodies[...,0,:],objects,sizes,goals,graph,self._relation_cfg)
         if env_ids is None:
             self._ontop_last_diag=diag
         return phi,diag
 
     def _sample_episode_graph(self, ids):
         if self._relation_graph_spec.get('mode')=='edge_composition':
-            new=sample_graph(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
+            sampler=sample_stage1_graph if getattr(self,'_edge_stage1',False) else (sample_interaction_graph if getattr(self,'_edge_interaction',False) else sample_graph)
+            new=sampler(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
         else:
-            new=expand_graph(compile_ontop_graph(self._relation_graph_spec,self.num_agents,self.num_objects,self.device),len(ids))
+            compiler=compile_stage1_graph if getattr(self,'_edge_stage1',False) else (compile_interaction_graph if getattr(self,'_edge_interaction',False) else compile_ontop_graph)
+            new=expand_graph(compiler(self._relation_graph_spec,self.num_agents,self.num_objects,self.device),len(ids))
         copy_graph_rows(self.relation_runtime.graph,ids,new)
         self._edge_goal_owners[ids]=owner_sum((new.required_goal & new.edge_valid).float(),new)>0
         self._ontop_maintain_steps[ids]=0
         self._sampling_counts[0]+=len(ids)
-        if self.num_agents==2:
+        if self.num_agents==2 and getattr(self,'_edge_interaction',False):
+            for a in (0,1):
+                owner=(new.edge_owner==a)&new.edge_valid
+                has_hold=((new.edge_relation==6)&owner).any(-1)
+                relation=torch.where(((new.edge_relation==SIT)&owner).any(-1),SIT,
+                    torch.where(((new.edge_relation==CLIMB)&owner).any(-1),CLIMB,
+                    torch.where(((new.edge_relation==7)&owner).any(-1),7,
+                    torch.where(((new.edge_relation==ON_TOP)&owner).any(-1),ON_TOP,6))))
+                pattern=torch.where(~has_hold & (relation==SIT),1,
+                    torch.where(~has_hold & (relation==CLIMB),2,
+                    torch.where(has_hold & (relation==7),3,
+                    torch.where(has_hold & (relation==ON_TOP),4,
+                    torch.where(has_hold & (relation==(SIT if getattr(self,'_edge_stage1',False) else CLIMB)),5,
+                    torch.where(has_hold & (relation==(CLIMB if getattr(self,'_edge_stage1',False) else SIT)),6,0))))))
+                self._sampling_counts[1:8]+=torch.stack([(pattern==k).sum() for k in range(7)])
+            if getattr(self,'_edge_stage1',False):
+                ox=self.num_agents+2
+                uses_ox=(new.edge_dst==ox)&new.edge_valid
+                self._sampling_counts[8]+=uses_ox.any(-1).sum()
+                for a in (0,1):
+                    self._sampling_counts[9+a]+=((uses_ox&(new.edge_owner==a)).any(-1)).sum()
+                for offset,rel in enumerate((6,7,ON_TOP,SIT,CLIMB),11):
+                    self._sampling_counts[offset]+=((new.edge_relation==rel)&new.edge_valid).sum()
+        elif self.num_agents==2:
             second=owner_sum(((new.edge_relation==AT).long()+2*(new.edge_relation==ON_TOP).long())*new.edge_valid,new)
             self._sampling_counts[1:4]+=torch.stack([(second==k).sum() for k in range(3)])
             for e in (2,3,4):self._sampling_counts[4+e-2]+=(new.edge_valid.sum(-1)==e).sum()
@@ -63,6 +125,10 @@ class SampledOnTopTaskMixin:
     def _reset_ontop_context_envs(self, env_ids):
         if not len(env_ids):return
         self._sample_episode_graph(env_ids)
+        accepted_default=[]
+        accepted_ref_slots={}
+        accepted_ref_motion_ids={}
+        accepted_ref_motion_times={}
         pending=env_ids
         for attempt in range(16):
             self._reset_default_slots=None;self._reset_ref_slots={}
@@ -75,12 +141,18 @@ class SampledOnTopTaskMixin:
             rejected=self._ontop_scene_infeasible(pending)
             accepted=pending[~rejected]
             if len(accepted):
-                # AMP slots are those initialized this attempt; commit all pending together.
-                self._reset_env_tensors(pending)
-                self._refresh_sim_tensors()
-                self._reset_relation_history(accepted)
-                self._compute_observations(accepted)
-                self._init_amp_obs(pending)
+                # Isaac Gym tensor setters may be called only once between simulation steps.
+                # Keep accepted candidates in the shared tensors and aggregate their AMP
+                # metadata; commit the complete reset batch once after every scene is valid.
+                self._keep_reset_slots_for_envs(accepted)
+                if self._reset_default_slots is not None:
+                    accepted_default.append(self._reset_default_slots)
+                for skill_name, slots in self._reset_ref_slots.items():
+                    accepted_ref_slots.setdefault(skill_name, []).append(slots)
+                    accepted_ref_motion_ids.setdefault(skill_name, []).append(
+                        self._reset_ref_motion_ids[skill_name])
+                    accepted_ref_motion_times.setdefault(skill_name, []).append(
+                        self._reset_ref_motion_times[skill_name])
             self._sampling_retries+=rejected.sum()
             pending=pending[rejected]
             if not len(pending):break
@@ -88,6 +160,24 @@ class SampledOnTopTaskMixin:
             self._sampling_failures+=len(pending)
             print('[edge composition] physical reset failed; graph retained; envs=',pending[:16].tolist(),flush=True)
             raise RuntimeError('OnTop physical scene infeasible after 16 attempts (graph was not resampled)')
+
+        self._reset_default_slots = None if not accepted_default else tuple(
+            torch.cat([slots[i] for slots in accepted_default]) for i in (0, 1))
+        self._reset_ref_slots = {
+            skill_name: tuple(torch.cat([slots[i] for slots in chunks]) for i in (0, 1))
+            for skill_name, chunks in accepted_ref_slots.items()
+        }
+        self._reset_ref_motion_ids = {
+            skill_name: torch.cat(chunks) for skill_name, chunks in accepted_ref_motion_ids.items()
+        }
+        self._reset_ref_motion_times = {
+            skill_name: torch.cat(chunks) for skill_name, chunks in accepted_ref_motion_times.items()
+        }
+        self._reset_env_tensors(env_ids)
+        self._refresh_sim_tensors()
+        self._reset_relation_history(env_ids)
+        self._compute_observations(env_ids)
+        self._init_amp_obs(env_ids)
         if self._mode=='test' and (env_ids==0).any():
             bindings=json.dumps(self._ontop_trace_bindings(1,include_state=False)[0])
             signature=hashlib.sha256(bindings.encode()).hexdigest()[:12]
@@ -161,14 +251,48 @@ class SampledOnTopTaskMixin:
             self._edge_metric_denominators[name]=self._edge_metric_denominators.get(name,0)+mask.sum()
             self._edge_metric_sums[name]=self._edge_metric_sums.get(name,0)+value
         local=result['local_task_reward'];mixed=result['agent_task_reward']
+        self_part=local if getattr(self,'_edge_stage1',False) else .9*local
+        other_part=torch.zeros_like(local) if getattr(self,'_edge_stage1',False) else .1*local.flip(-1)
         for key,value in [('local_task',local.mean()),('mixed_task',mixed.mean()),
-                          ('self_contribution',(.9*local).mean()),('other_contribution',(.1*local.flip(-1)).mean())]:
+                          ('self_contribution',self_part.mean()),('other_contribution',other_part.mean())]:
             name='sharing/'+key;self._edge_metric_sums[name]=self._edge_metric_sums.get(name,0)+value
+        if getattr(self,'_edge_interaction',False):
+            self._record_interaction_diagnostics(result,diag)
+
+    def _record_interaction_diagnostics(self,result,diag):
+        graph=self.relation_runtime.graph
+        relation=graph.edge_relation
+        values={
+            'sit/distance_xyz':diag['distance'],
+            'sit/distance_xy':diag['distance_xy'],
+            'climb/root_target_distance_xyz':diag['distance'],
+            'climb/distance_xy':diag['distance_xy'],
+            'climb/z_feet':diag['z_feet'],
+            'climb/z_surface':diag['z_surface'],
+            'climb/feet_height_error':diag['feet_height_error'],
+        }
+        for name,value in values.items():
+            rel=SIT if name.startswith('sit/') else CLIMB
+            mask=graph.edge_valid&(relation==rel)
+            self._edge_metric_sums[name]=self._edge_metric_sums.get(name,0)+(value*mask).sum()
+            self._edge_metric_denominators[name]=self._edge_metric_denominators.get(name,0)+mask.sum()
 
     def _consume_sampling_diagnostics(self):
         c=self._sampling_counts;den=c[0].clamp_min(1)
         out={'sampling/resets':c[0].clone(),'sampling/physical_retries':self._sampling_retries.clone(),
              'sampling/physical_failures':self._sampling_failures.clone()}
+        if getattr(self,'_edge_interaction',False):
+            names=('holding','sit','climb','holding_at','holding_ontop','holding_sit','holding_climb') if getattr(self,'_edge_stage1',False) else ('holding','sit','climb','holding_at','holding_ontop','holding_climb','holding_sit')
+            for i,name in enumerate(names,1):
+                out['sampling/pattern_'+name]=c[i]/(2*den)
+            if getattr(self,'_edge_stage1',False):
+                out.update({'sampling/ox_user_count':c[8]/den,
+                            'sampling/ox_owner_a':c[9]/den,
+                            'sampling/ox_owner_b':c[10]/den})
+                for offset,name in enumerate(('holding','at','ontop','sit','climb'),11):
+                    out['sampling/relation_'+name]=c[offset]/(2*den)
+            c.zero_();self._sampling_retries.zero_();self._sampling_failures.zero_()
+            return out
         names=['second_none','second_at','second_ontop','edges_2','edges_3','edges_4',
                'holding_holding','holding_at','holding_ontop_free','at_at','at_ontop_free',
                'at_ontop_dependent','ontop_chain','dependent_a_at','dependent_b_at','chain_a_lower','chain_b_lower']
@@ -182,6 +306,8 @@ class SampledOnTopTaskMixin:
         assignment=self._logical_box_order[:n].cpu().tolist()
         keys=('signed_gap','source_bottom_z','support_top_z','support_speed','relative_speed',
               'source_tilt','support_tilt','maintain_seconds','source_net_contact','support_net_contact')
+        if getattr(self,'_edge_interaction',False):
+            keys+=('z_feet','z_surface','feet_height_error')
         diag=self._ontop_last_diag
         values=targets=local=None
         if include_state and diag is not None:
@@ -202,8 +328,10 @@ class SampledOnTopTaskMixin:
                 if values is not None:
                     row.update(zip(keys,values[b][e]))
                     row.update(zip(('target_x','target_y','target_z'),targets[b][e]))
-                    row.update(local_task_total=local[b][owner],self_task_contribution=.9*local[b][owner],
-                               other_task_contribution=.1*local[b][1-owner])
+                    stage1=getattr(self,'_edge_stage1',False)
+                    row.update(local_task_total=local[b][owner],
+                               self_task_contribution=local[b][owner] if stage1 else .9*local[b][owner],
+                               other_task_contribution=0. if stage1 else .1*local[b][1-owner])
                 rows.append(row)
             result.append(rows)
         return result
@@ -229,7 +357,10 @@ class SampledOnTopTaskMixin:
             return
         import numpy as np
         g=self.relation_runtime.graph
-        ids=(g.edge_valid[0]&(g.edge_relation[0]==ON_TOP)).nonzero(as_tuple=False).flatten()
+        visible=(g.edge_relation[0]==ON_TOP)
+        if getattr(self,'_edge_interaction',False):
+            visible|=(g.edge_relation[0]==SIT)|(g.edge_relation[0]==CLIMB)
+        ids=(g.edge_valid[0]&visible).nonzero(as_tuple=False).flatten()
         self.gym.clear_lines(self.viewer)
         for e in ids.tolist():
             target=self._ontop_last_diag['target'][0,e].cpu().numpy()

@@ -1,0 +1,156 @@
+# Independent Stage-1 HOLDING/AT/ON_TOP/SIT/CLIMB skill learning; schema 5 scratch.
+env:
+  numEnvs: 2048
+  envSpacing: 5
+  episodeLength: 600
+  isFlagrun: False
+  enableDebugVis: False
+  cameraFollow: True
+  video: {enable: false, focus: stack}
+  relationGraph:
+    mode: edge_composition
+    sampler: two_agent_three_object_stage1
+    max_edges_per_agent: 2
+    edge_capacity: 4
+    pattern_probabilities:
+      HOLDING: 0.10
+      SIT: 0.10
+      CLIMB: 0.10
+      HOLDING_AT: 0.25
+      HOLDING_ON_TOP: 0.15
+      HOLDING_SIT: 0.15
+      HOLDING_CLIMB: 0.15
+    target_binding:
+      standalone: own_object
+      composite_support: free_object
+      allow_teammate_object: false
+      max_free_object_users: 1
+    shuffle_edge_order: true
+  relationReward:
+    mode: state_relation_edge_stage1_v1
+    schema_version: 5
+    state_reward_weight: 0.2
+    progress_reward_weight: 0.2
+    success_reward_weight: 0.2
+    satisfaction_threshold: 0.9
+    holding: {hand_distance_scale: 10.0}
+    at: {state_definition: box_near, near_distance_scale: 10.0}
+    ontop: {state_definition: centered_stack_world_z, near_distance_scale: 10.0, z_tolerance: 0.001, vertical_extent: rotated_bbox}
+    # Keep the established interaction geometry/reward contract unchanged.
+    sit: {state_definition: tokenhsi_tar_sit_pos, near_distance_scale: 10.0, target_local_offset: [0.0, 0.0, 0.1381430834425038]}
+    climb: {state_definition: root_target, near_distance_scale: 10.0, target_height: rotated_bbox_top_plus_char_h, feet_height_tolerance: 0.05}
+    progress: {kind: distance, delta: 0.5, sigma: 1.0}
+    context: {kind: start_keep_constant}
+    contextReward: {start_weight: 0.0, keep_weight: 0.0}
+    success:
+      at_z_tolerance: 0.001
+      saturation: own_success
+      terminate_when_all_subgoals_done: false
+    observation:
+      edge_context_fields: [start, keep]
+      graph_packet_fields: [valid, src, dst, relation, owner, start, keep]
+    diagnostics: {enabled: true, sample_envs: 2, log_interval: 30}
+
+  numAgents: 2
+  numObjects: 3
+  agentSpawnRadius: 2.5
+  policyObsMode: "clean_scene"
+  obsFrame: "owner"
+
+  agentCollisionPenalty: True
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
+
+  pdControl: True
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+
+  localRootObs: True
+  localRootObsPolicy: False
+  rootHeightObs: False
+  rootHeightObsPolicy: False
+  cleanSceneLocalRootObsPolicy: True
+  cleanSceneRootHeightObsPolicy: True
+  keyBodies: ["right_hand", "left_hand", "right_foot", "left_foot"]
+  contactBodies: ["right_foot", "left_foot"]
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+  enableSelfCollisionDetection: True
+  enableTrackInitState: False
+
+  power_reward: True
+  power_coefficient: 0.0005
+
+  skill: ["loco", "sit", "climb", "omomo", "pickUp", "carryWith", "putDown"]
+  skillInitProb: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  skillDiscProb: [0.2, 0.2, 0.2, 0.1, 0.1, 0.1, 0.1]
+
+  enableTaskObs: True
+  onlyVelReward: True
+  onlyHeightHandHeldReward: False
+  box_vel_penalty: True
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.5
+  mode: "train"
+
+  box:
+    build:
+      baseSize: [0.5, 0.5, 0.4]
+      randomSize: False
+      randomModeEqualProportion: True
+      scaleRangeX: [1.0, 1.0]
+      scaleRangeY: [1.0, 1.0]
+      scaleRangeZ: [1.0, 1.0]
+      scaleSampleInterval: 0.125
+      randomDensity: False
+      testSizes: [[0.5, 0.5, 0.4]]
+    reset:
+      randomRot: True
+      randomAssignment: True
+      testRandomArenaSpawn: False
+      arenaSpawnRadius: 0.0
+      minAgentDistance: 1.0
+      minBoxDistance: 0.7
+      randomHeight: True
+      randomHeightProb: 0.5
+      minPlatformHeight: 0.05
+      maxTopSurfaceHeight: 1.2
+    obs:
+      enableBboxObs: True
+
+  debug:
+    vel: False
+    reward: True
+    rewardInterval: 30
+
+  eval:
+    successThreshold: 0.2
+    skill: ["loco"]
+    skillInitProb: [1.0]
+
+  asset:
+    assetRoot: "tokenhsi/data/assets"
+    assetFileName: "mjcf/phys_humanoid_v3.xml"
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

@@ -7,7 +7,9 @@ from env.tasks.multi_agent.edge_context_reward import (
     EdgeContextRuntime, evaluate_edge_geometry, edge_context, goal_success, scene_success, owner_sum)
 from env.tasks.multi_agent.relation_reward import box_speed_penalty
 from utils.edge_ontop_spec import batched, select_graph, ON_TOP
+from utils.edge_interaction_spec import SIT, CLIMB
 from env.tasks.multi_agent.edge_ontop_reward import mix_task_reward
+from env.tasks.multi_agent.edge_stage1_reward import stage1_context
 
 
 class EdgeContextTaskMixin:
@@ -46,7 +48,10 @@ class EdgeContextTaskMixin:
         if not self._edge_context:
             return super()._reset_relation_history(env_ids)
         phi, diag = self._evaluate_relations(env_ids)
-        self.relation_runtime.reset(env_ids, phi, diag['z_error'])
+        if getattr(self, '_edge_interaction', False):
+            self.relation_runtime.reset(env_ids, phi, diag['z_error'], diag['feet_height_error'])
+        else:
+            self.relation_runtime.reset(env_ids, phi, diag['z_error'])
         self._prev_root_pos[env_ids] = self._kinematic_humanoid_rigid_body_states[env_ids, :, 0, :3]
         self._prev_box_pos[env_ids] = self._assigned_box_values(self._box_states, env_ids)[..., :3]
         self._relation_episode_id[env_ids] += 1
@@ -59,7 +64,10 @@ class EdgeContextTaskMixin:
             return super()._compute_relation_reward(collision_fn)
         runtime = self.relation_runtime; graph = runtime.graph
         phi, diag = self._evaluate_relations()
-        result = runtime.step(phi, diag['progress'], diag['z_error'])
+        if getattr(self, '_edge_interaction', False):
+            result = runtime.step(phi, diag['progress'], diag['z_error'], diag['feet_height_error'])
+        else:
+            result = runtime.step(phi, diag['progress'], diag['z_error'])
         roots = self._humanoid_root_states[..., :3]
         objects = self._assigned_box_values(self._box_states)[..., :3]
         power = torch.zeros_like(result['agent_task_reward']); collision = torch.zeros_like(power); speed = torch.zeros_like(power)
@@ -86,14 +94,23 @@ class EdgeContextTaskMixin:
         dcfg = self._relation_cfg['diagnostics']; self._edge_steps += 1
         if not dcfg.get('enabled', True):
             return
-        context = edge_context(phi, graph)
-        fields = ['phi_raw', 'progress_raw', 'q_pre', 'q_term', 'own_success', 'term_success',
+        is_stage1 = getattr(self, '_edge_stage1', False)
+        context = stage1_context(phi, graph) if is_stage1 else edge_context(phi, graph)
+        context_fields = ['q_start', 'q_keep'] if is_stage1 else ['q_pre', 'q_term']
+        fields = ['phi_raw', 'progress_raw'] + context_fields + ['own_success', 'term_success',
                   'reward_saturated', 'state_component', 'progress_component', 'success_component', 'total',
                   'distance', 'distance_xy', 'z_error']
-        values = dict(result, q_pre=context[..., 0], q_term=context[..., 1],
-                      distance=diag['distance'], distance_xy=diag['distance_xy'], z_error=diag['z_error'])
+        values = dict(result, distance=diag['distance'], distance_xy=diag['distance_xy'],
+                      z_error=diag['z_error'])
+        values[context_fields[0]] = context[..., 0]
+        values[context_fields[1]] = context[..., 1]
         packed = torch.stack([values[k].float() for k in fields], -1)
-        for rel, name in [(HOLDING, 'holding'), (AT, 'at')] + ([(ON_TOP, 'ontop')] if getattr(self, '_edge_ontop', False) else []):
+        relations = [(HOLDING, 'holding'), (AT, 'at')]
+        if getattr(self, '_edge_ontop', False):
+            relations.append((ON_TOP, 'ontop'))
+        if getattr(self, '_edge_interaction', False):
+            relations.extend([(SIT, 'sit'), (CLIMB, 'climb')])
+        for rel, name in relations:
             mask = batched(graph.edge_valid & (graph.edge_relation == rel), self.num_envs)
             numerator = (packed * mask[..., None]).sum((0, 1))
             key = 'edge/' + name
@@ -142,7 +159,7 @@ class EdgeContextTaskMixin:
             return super().consume_relation_diagnostics()
         result = {}
         for key, sums in self._edge_metric_sums.items():
-            if key.startswith('ontop/') or key.startswith('sharing/'):
+            if key.startswith(('ontop/', 'sharing/', 'sit/', 'climb/')):
                 denominator = self._edge_metric_denominators.get(key, max(self._edge_metric_steps, 1))
                 if isinstance(denominator, torch.Tensor):
                     if denominator == 0:

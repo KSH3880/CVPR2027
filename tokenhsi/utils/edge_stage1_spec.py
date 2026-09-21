@@ -1,0 +1,258 @@
+"""Independent Stage-1 relation graphs with constant START/KEEP context."""
+import math
+
+import torch
+
+from utils.edge_context_spec import EdgeContextGraph, HOLDING, AT
+from utils.edge_ontop_spec import (ON_TOP, permute_graph, select_graph,
+    validate_graph as validate_ontop_graph)
+from utils.edge_interaction_spec import SIT, CLIMB
+
+
+STAGE1_CONTEXT_MODE = 'state_relation_edge_stage1_v1'
+STAGE1_PACKET_FIELDS = ('valid', 'src', 'dst', 'relation', 'owner', 'start', 'keep')
+PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
+            'HOLDING_SIT', 'HOLDING_CLIMB')
+PRESETS = ('random_stage1', 'holding', 'sit', 'climb', 'holding_at',
+           'holding_ontop', 'holding_sit', 'holding_climb')
+
+
+def standalone_interaction_owners(graph, env_ids):
+    """Return agents whose SIT/CLIMB edge targets their own box, not O_X."""
+    relation = graph.edge_relation[env_ids][:, None, :]
+    destination = graph.edge_dst[env_ids][:, None, :]
+    owner = graph.edge_owner[env_ids][:, None, :]
+    valid = graph.edge_valid[env_ids][:, None, :]
+    agents = torch.arange(graph.num_agents, device=relation.device)[None, :, None]
+    return (valid & ((relation == SIT) | (relation == CLIMB))
+            & (owner == agents) & (destination == graph.num_agents + agents)).any(-1)
+
+
+def ground_standalone_interaction_targets(graph, env_ids, assignments,
+                                          box_states, box_sizes,
+                                          platform_pos=None, platform_default_pos=None):
+    """Floor only standalone SIT/CLIMB targets and deactivate their source platforms."""
+    mask = standalone_interaction_owners(graph, env_ids)
+    local_env, agent = mask.nonzero(as_tuple=True)
+    if not len(local_env):
+        return
+    world_env = env_ids[local_env]
+    physical_box = assignments[world_env, agent]
+    box_states[world_env, physical_box, 2] = box_sizes[world_env, physical_box, 2] / 2
+    if platform_pos is not None:
+        platform_pos[world_env, agent] = platform_default_pos[world_env, agent]
+
+
+def max_stage1_stack_height(box_sizes):
+    """Upper bound for the Stage-1 O_i -> O_X two-box stack in each environment."""
+    return box_sizes[..., 2].topk(2, dim=-1).values.sum(-1)
+
+
+DEFAULT_GRAPH = dict(
+    mode='edge_composition', sampler='two_agent_three_object_stage1',
+    edge_capacity=4, max_edges_per_agent=2,
+    pattern_probabilities=dict(zip(PATTERNS, (.10, .10, .10, .25, .15, .15, .15))),
+    target_binding={'standalone': 'own_object', 'composite_support': 'free_object',
+                    'allow_teammate_object': False, 'max_free_object_users': 1},
+    shuffle_edge_order=True)
+
+
+def validate_stage1_context_config(config):
+    expected = {
+        'mode', 'schema_version', 'state_reward_weight', 'progress_reward_weight',
+        'success_reward_weight', 'satisfaction_threshold', 'holding', 'at', 'ontop',
+        'sit', 'climb', 'progress', 'context', 'contextReward', 'success',
+        'observation', 'diagnostics'}
+    if set(config) != expected:
+        raise ValueError('Unsupported Stage-1 relationReward fields')
+    if config['mode'] != STAGE1_CONTEXT_MODE or config['schema_version'] != 5:
+        raise ValueError('Expected Stage-1 START/KEEP schema 5')
+    if config['context'] != {'kind': 'start_keep_constant'}:
+        raise ValueError('Stage-1 requires constant START/KEEP context')
+    if config['contextReward'] != {'start_weight': 0., 'keep_weight': 0.}:
+        raise ValueError('Stage-1 START/KEEP auxiliary reward must be disabled')
+    if config['success'] != {'at_z_tolerance': .001, 'saturation': 'own_success',
+                             'terminate_when_all_subgoals_done': False}:
+        raise ValueError('Stage-1 permits own-success saturation only')
+    if config['observation'] != {
+            'edge_context_fields': ['start', 'keep'],
+            'graph_packet_fields': list(STAGE1_PACKET_FIELDS)}:
+        raise ValueError('Stage-1 requires the versioned START/KEEP graph packet')
+    if config['holding'] != {'hand_distance_scale': 10.}:
+        raise ValueError('Unsupported Stage-1 HOLDING geometry')
+    if config['at'] != {'state_definition': 'box_near', 'near_distance_scale': 10.}:
+        raise ValueError('Unsupported Stage-1 AT geometry')
+    if config['ontop'] != {'state_definition': 'centered_stack_world_z',
+            'near_distance_scale': 10., 'z_tolerance': .001,
+            'vertical_extent': 'rotated_bbox'}:
+        raise ValueError('Unsupported Stage-1 ON_TOP geometry')
+    original_sit = {'state_definition': 'tokenhsi_tar_sit_pos',
+                    'near_distance_scale': 10.,
+                    'target_local_offset': [0., 0., 0.1381430834425038]}
+    box_top_sit = config['sit'].get('state_definition') == 'box_top_plus_pelvis_clearance'
+    if box_top_sit:
+        sit = config['sit']
+        clearance = sit.get('pelvis_clearance')
+        if (set(sit) != {'state_definition', 'near_distance_scale', 'pelvis_clearance'}
+                or sit['near_distance_scale'] != 10.
+                or isinstance(clearance, bool) or not isinstance(clearance, (int, float))
+                or not math.isfinite(clearance) or clearance <= 0):
+            raise ValueError('Unsupported Stage-1 box-top SIT geometry')
+    elif config['sit'] != original_sit:
+        raise ValueError('Unsupported Stage-1 SIT geometry')
+    expected_climb = {'state_definition': 'root_target', 'near_distance_scale': 10.,
+                      'target_height': 'rotated_bbox_top_plus_char_h'}
+    climb = config['climb']
+    if (set(climb) != set(expected_climb) | {'feet_height_tolerance'}
+            or any(climb.get(k) != v for k, v in expected_climb.items())):
+        raise ValueError('Unsupported Stage-1 CLIMB geometry')
+    tolerance = climb['feet_height_tolerance']
+    if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+            or not math.isfinite(tolerance) or tolerance <= 0):
+        raise ValueError('Stage-1 CLIMB feet tolerance must be finite and positive')
+    if config['progress'] != {'kind': 'distance', 'delta': .5, 'sigma': 1.}:
+        raise ValueError('Unsupported Stage-1 distance progress')
+    for key in ('state_reward_weight', 'progress_reward_weight', 'success_reward_weight'):
+        if config[key] != .2:
+            raise ValueError('Stage-1 reward weights must all be 0.2')
+    if config['satisfaction_threshold'] != .9:
+        raise ValueError('Stage-1 satisfaction threshold must be 0.9')
+
+
+def validate_sampler(spec, m=2, o=3):
+    if (m, o) != (2, 3):
+        raise ValueError('Stage-1 sampler/presets require M=2, O=3')
+    if set(spec) != set(DEFAULT_GRAPH):
+        raise ValueError('Unsupported Stage-1 edge composition fields')
+    for key in ('mode', 'sampler', 'edge_capacity', 'max_edges_per_agent',
+                'target_binding'):
+        if spec[key] != DEFAULT_GRAPH[key]:
+            raise ValueError('Unsupported Stage-1 edge composition ' + key)
+    p = spec['pattern_probabilities']
+    if (tuple(p) != PATTERNS or any(isinstance(v, bool) or not isinstance(v, (int, float))
+            or not math.isfinite(v) or v < 0 for v in p.values())
+            or not math.isclose(sum(p.values()), 1., abs_tol=1e-8)):
+        raise ValueError('Stage-1 pattern probabilities must follow the contract and sum to one')
+    ox_mass = sum(p[k] for k in ('HOLDING_ON_TOP', 'HOLDING_SIT', 'HOLDING_CLIMB'))
+    if ox_mass > .5 + 1e-8:
+        raise ValueError('Stage-1 O_X pattern mass must be <=0.5')
+    if type(spec['shuffle_edge_order']) is not bool:
+        raise ValueError('shuffle_edge_order must be boolean')
+
+
+def _draw_patterns(n, probabilities, device, generator):
+    """Keep exact per-agent marginals while allowing at most one O_X user."""
+    p = torch.tensor([probabilities[k] for k in PATTERNS], device=device)
+    ox_ids = torch.tensor([4, 5, 6], device=device)
+    local_ids = torch.tensor([0, 1, 2, 3], device=device)
+    q = p[ox_ids].sum()
+    pattern = local_ids[torch.multinomial(
+        p[local_ids], n * 2, replacement=True, generator=generator)].reshape(n, 2)
+    joint = torch.rand(n, device=device, generator=generator)
+    for agent, mask in ((0, joint < q), (1, (joint >= q) & (joint < 2 * q))):
+        count = int(mask.sum())
+        if count:
+            choice = torch.multinomial(p[ox_ids], count, replacement=True,
+                                       generator=generator)
+            pattern[mask, agent] = ox_ids[choice]
+    return pattern
+
+
+def compose_graph(pattern, shuffle=False, generator=None):
+    n = pattern.shape[0]
+    if pattern.shape != (n, 2) or ((pattern < 0) | (pattern >= len(PATTERNS))).any():
+        raise ValueError('Expected Stage-1 pattern [N,2]')
+    device = pattern.device
+    agent = torch.arange(2, device=device)[None].expand(n, -1)
+    composite = pattern >= 3
+    rel0 = torch.where(pattern == 1, SIT,
+        torch.where(pattern == 2, CLIMB, HOLDING))
+    rel1_table = torch.tensor([0, 0, 0, AT, ON_TOP, SIT, CLIMB], device=device)
+    rel1 = rel1_table[pattern]
+    valid = torch.stack([torch.ones_like(pattern, dtype=torch.bool), composite], -1).flatten(1)
+    relation = torch.stack([rel0, rel1], -1).flatten(1)
+    owner = agent.repeat_interleave(2, -1)
+
+    # O_i is logical object M+i, O_X is logical object M+2, G_i is M+O+i.
+    src0 = agent
+    dst0 = 2 + agent
+    src1 = torch.where((rel1 == SIT) | (rel1 == CLIMB), agent, 2 + agent)
+    dst1 = torch.where(rel1 == AT, 5 + agent, torch.full_like(agent, 4))
+    src = torch.stack([src0, src1], -1).flatten(1)
+    dst = torch.stack([dst0, dst1], -1).flatten(1)
+    required = valid.clone()
+    pre = torch.zeros(n, 4, 4, dtype=torch.bool, device=device)
+    term = torch.full((n, 4), -1, dtype=torch.long, device=device)
+
+    src = src.masked_fill(~valid, 0)
+    dst = dst.masked_fill(~valid, 0)
+    relation = relation.masked_fill(~valid, 0)
+    owner = owner.masked_fill(~valid, 0)
+    graph = EdgeContextGraph(('slot0', 'slot1', 'slot2', 'slot3'), 2, 3,
+        src, dst, relation, owner, valid, required, pre, term)
+    validate_graph(graph)
+    if shuffle:
+        graph = permute_graph(graph, torch.rand(
+            n, 4, device=device, generator=generator).argsort(-1))
+    return graph
+
+
+def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
+                 generator=None):
+    validate_sampler(spec)
+    if preset not in PRESETS:
+        raise ValueError('Unknown Stage-1 TASK_GRAPH preset: ' + preset)
+    if preset == 'random_stage1':
+        pattern = _draw_patterns(n, spec['pattern_probabilities'], device, generator)
+    else:
+        selected = {'holding': 0, 'sit': 1, 'climb': 2, 'holding_at': 3,
+                    'holding_ontop': 4, 'holding_sit': 5,
+                    'holding_climb': 6}[preset]
+        pattern = torch.tensor((selected, 0), device=device).expand(n, -1).clone()
+        if role_swap:
+            pattern = pattern.flip(-1)
+    return compose_graph(pattern,
+        shuffle=spec['shuffle_edge_order'] if preset == 'random_stage1' else False,
+        generator=generator)
+
+
+def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get('mode') != 'edge_composition':
+        raise ValueError('Stage-1 accepts its conflict-free edge sampler only')
+    validate_sampler(spec, m, o)
+    return select_graph(sample_graph(1, spec, device=device or 'cpu', preset='holding'), 0)
+
+
+def validate_graph(graph):
+    validate_ontop_graph(graph)
+    if graph.edge_src.ndim != 1:
+        for i in range(graph.edge_src.shape[0]):
+            validate_graph(select_graph(graph, i))
+        return
+    active = graph.edge_valid.nonzero(as_tuple=False).flatten()
+    if graph.prereq_mask.any() or (graph.term_index >= 0).any():
+        raise ValueError('Stage-1 graph cannot contain dependency or END links')
+    if not torch.equal(graph.required_goal, graph.edge_valid):
+        raise ValueError('Every active Stage-1 edge must be a required current goal')
+    ox = graph.num_agents + 2
+    users = set()
+    for i in active.tolist():
+        owner = int(graph.edge_owner[i])
+        relation = int(graph.edge_relation[i])
+        src, dst = int(graph.edge_src[i]), int(graph.edge_dst[i])
+        own = graph.num_agents + owner
+        if relation == HOLDING and (src, dst) != (owner, own):
+            raise ValueError('Stage-1 HOLDING must bind H_i -> O_i')
+        if relation == AT and (src, dst) != (own, graph.num_agents + graph.num_objects + owner):
+            raise ValueError('Stage-1 AT must bind O_i -> G_i')
+        if relation == ON_TOP and (src, dst) != (own, ox):
+            raise ValueError('Stage-1 ON_TOP must bind O_i -> O_X')
+        if relation in (SIT, CLIMB):
+            expected = own if not any(int(graph.edge_relation[j]) == HOLDING and
+                int(graph.edge_owner[j]) == owner for j in active.tolist()) else ox
+            if (src, dst) != (owner, expected):
+                raise ValueError('Stage-1 SIT/CLIMB binding violates own/O_X contract')
+        if dst == ox:
+            users.add(owner)
+    if len(users) > 1:
+        raise ValueError('At most one Stage-1 agent may use O_X')

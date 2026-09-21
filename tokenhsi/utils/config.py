@@ -86,7 +86,7 @@ def load_cfg(args):
 
     graph_path = getattr(args, 'relation_graph', '')
     if graph_path:
-        if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1'):
+        if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1', 'state_relation_edge_interaction_v1', 'state_relation_edge_stage1_v1'):
             raise ValueError('--relation_graph is an edge-context evaluation override only')
         with open(graph_path) as f:
             cfg['env']['relationGraph'] = yaml.safe_load(f)
@@ -265,7 +265,7 @@ def parse_sim_params(args, cfg, cfg_train):
 def get_args(benchmark=False):
     custom_parameters = [
         {"name": "--task_camera", "type": str, "default": "stack", "help": "OnTop viewer camera: stack or agent"},
-        {"name": "--task_graph", "type": str, "default": "", "help": "OnTop viewer: at_ontop, ontop_chain, independent_ontop, random"},
+        {"name": "--task_graph", "type": str, "default": "", "help": "Edge viewer preset (OnTop or SIT/CLIMB); random re-samples each episode"},
         {"name": "--task_role_swap", "action": "store_true", "default": False, "help": "Swap A/B roles in fixed OnTop viewer presets"},
         {"name": "--relation_graph", "type": str, "default": "",
             "help": "Evaluation-only YAML explicit edges or independent_carry template"},
