@@ -317,8 +317,10 @@ def _make_player(args, cfg, cfg_train):
     player.model.eval()
     for parameter in player.model.parameters():
         parameter.requires_grad_(False)
-    if player.env.task.__class__.__name__ != "HumanoidMAStackPlannerTrain":
-        raise ValueError("--task must be HumanoidMAStackPlannerTrain")
+    if not isinstance(player.env.task, HumanoidMAStackPlannerTrain):
+        raise ValueError(
+            "--task must derive from HumanoidMAStackPlannerTrain"
+        )
     return player
 
 

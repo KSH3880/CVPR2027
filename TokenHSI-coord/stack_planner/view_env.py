@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 import numpy as np
 
-from .checkpoint import load_stack_checkpoint
+from .checkpoint import load_stack_checkpoint_for_view
 from .constraints import free_path_validity_details
 from .env_adapter import HumanoidMAStackPlannerTrain
 from .history import StackHistoryBuffer
@@ -29,7 +29,9 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
             raise ValueError("STACK_PLANNER_REPLAN_STEPS must be positive")
         self._stack_planner_period = period
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
-        self._stack_planner, payload = load_stack_checkpoint(checkpoint, self.device)
+        self._stack_planner, payload = load_stack_checkpoint_for_view(
+            checkpoint, self.device,
+        )
         task_retreat_only = not self.planner_route_visit_enabled()
         if self._stack_planner.config.retreat_only != task_retreat_only:
             raise ValueError(
@@ -102,7 +104,7 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._stack_history.commit_path(
             output["path_world"][:, 0],
             update_mask=valid & self._planner_policy_decision,
-            base_path_world=output["base_path_world"],
+            base_path_world=output.get("base_path_world"),
         )
         status = (phase.cpu().tolist(), selected.cpu().tolist(), valid.cpu().tolist(),
                   self._planner_plan_installed.cpu().tolist(),

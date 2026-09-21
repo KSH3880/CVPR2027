@@ -1725,3 +1725,20 @@ legacy/new profile, 최저속도 위치, 복귀 완료, checkpoint round-trip을
 - Added optional `dual_delay`: the product of both agents' speed-induced plan
   delays. It encourages the joint model to concentrate yielding on one agent
   selected from state, without a yielder label or Cross-specific rule.
+
+## 2026-09-21
+
+### stack planner V13 single-head viewer compatibility
+
+- `view.sh`와 interactive viewer에서만 V13 checkpoint의 당시
+  `previous_path + bounded delta` decoder를 복원한다. V15 기본값을 억지로 채워 path 의미가
+  달라지는 migration은 하지 않는다.
+- 학습 재개용 strict loader는 계속 V13을 거부한다. legacy contract와 state dict가 정확히
+  맞을 때만 read-only viewer loader가 허용한다.
+
+### retreat-only 학습 task subclass 허용
+
+- `train_retreat_only.sh`가 등록하는 `HumanoidMAStackPlannerRetreatTrain`은 정식
+  `HumanoidMAStackPlannerTrain` subclass인데도, closed-loop player가 클래스 이름의 완전
+  일치만 허용해 초기화 직후 중단됐다. 검사를 `isinstance`로 바꿔 retreat-only subclass를
+  허용하고, 이후의 environment mode와 checkpoint mode 일치 검증은 유지한다.

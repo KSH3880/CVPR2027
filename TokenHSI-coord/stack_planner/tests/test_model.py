@@ -9,7 +9,10 @@ from torch import nn
 
 from coordinator.schema import AGENTS, MAX_SPEED, MIN_SPEED, PATH_POINTS
 from coordinator.tests.common import make_state
-from stack_planner.checkpoint import load_stack_checkpoint, save_stack_checkpoint
+from stack_planner.checkpoint import (
+    load_stack_checkpoint, load_stack_checkpoint_for_view,
+    save_stack_checkpoint,
+)
 from stack_planner.consistency import (
     build_stack_consistency_target, stack_trajectory_consistency_loss,
 )
@@ -590,6 +593,44 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
             torch.save(payload, path)
             with self.assertRaisesRegex(ValueError, "checkpoint mismatch"):
                 load_stack_checkpoint(path)
+
+    def test_v13_single_head_is_viewable_but_not_train_loadable(self):
+        from stack_planner.checkpoint import _expected_v13_contract
+        from stack_planner.legacy_v13 import StackTrajectoryPlannerV13
+
+        torch.manual_seed(17)
+        old_values = {
+            "token_dim": 12, "d_model": 128, "nhead": 4,
+            "encoder_layers": 3, "feedforward": 256, "dropout": 0.0,
+            "candidates": 1, "delta_scale": 0.5, "history_steps": 1,
+        }
+        config = StackPlannerConfig(
+            **old_values, retreat_delta_scale=0.5, path_update_alpha=1.0,
+        )
+        original = StackTrajectoryPlannerV13(config).eval()
+        state = make_state(batch=1)
+        with torch.inference_mode():
+            before = original(state)
+        payload = {
+            **_expected_v13_contract(config),
+            "model_config": old_values,
+            "model_state": original.state_dict(),
+            "step": 5,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "single_head_v13.pth"
+            torch.save(payload, path)
+            with self.assertRaisesRegex(ValueError, "checkpoint mismatch"):
+                load_stack_checkpoint(path)
+            loaded, viewed = load_stack_checkpoint_for_view(path)
+            with torch.inference_mode():
+                after = loaded(state)
+        self.assertIsInstance(loaded, StackTrajectoryPlannerV13)
+        self.assertTrue(viewed["viewer_legacy_decoder"])
+        self.assertNotIn("base_path_world", after)
+        self.assertEqual(set(before), set(after))
+        for key in before:
+            self.assertTrue(torch.equal(before[key], after[key]), key)
 
     def test_checkpoint_records_path_and_speed_contract(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()

@@ -20,6 +20,12 @@ from .schema import (
     STEER_POINTS,
 )
 
+LEGACY_VIEW_SCHEMA_V13 = "tokenhsi-stack-planner-v13"
+LEGACY_V13_CONFIG_FIELDS = {
+    "token_dim", "d_model", "nhead", "encoder_layers", "feedforward",
+    "dropout", "candidates", "delta_scale", "history_steps",
+}
+
 
 def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
     return {
@@ -85,6 +91,13 @@ def load_stack_checkpoint(
     path: Union[str, Path],
     device: Union[str, torch.device] = "cpu",
 ) -> Tuple[StackTrajectoryPlanner, Dict[str, Any]]:
+    payload = _read_checkpoint_payload(path, device)
+    return _load_current_payload(payload, device)
+
+
+def _read_checkpoint_payload(
+    path: Union[str, Path], device: Union[str, torch.device],
+) -> Dict[str, Any]:
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"stack planner checkpoint not found: {path}")
@@ -94,6 +107,12 @@ def load_stack_checkpoint(
         payload = torch.load(path, map_location=device)
     if not isinstance(payload, dict):
         raise ValueError("stack planner checkpoint root must be a dict")
+    return payload
+
+
+def _load_current_payload(
+    payload: Dict[str, Any], device: Union[str, torch.device],
+) -> Tuple[StackTrajectoryPlanner, Dict[str, Any]]:
     for key in ("model_config", "model_state"):
         if key not in payload:
             raise ValueError(f"stack planner checkpoint missing {key}")
@@ -116,4 +135,82 @@ def load_stack_checkpoint(
     model = StackTrajectoryPlanner(config).to(device)
     model.load_state_dict(payload["model_state"], strict=True)
     model.eval()
+    return model, payload
+
+
+def _expected_v13_contract(config: StackPlannerConfig) -> Dict[str, Any]:
+    """Frozen V13 contract used only to reject ambiguous legacy files."""
+    return {
+        "schema_version": LEGACY_VIEW_SCHEMA_V13,
+        "model_kind": "stack_scene_token_multihead",
+        "agents": AGENTS,
+        "candidate_k": config.candidates,
+        "path_points": STACK_PATH_POINTS,
+        "path_only": False,
+        "pointwise_speed_profile": True,
+        "runtime_acceleration_limit": MAX_ACCEL,
+        "full_candidate_rollout": True,
+        "previous_trajectory_correction": True,
+        "fixed_origin_reference": True,
+        "future_action_mask": True,
+        "projected_executor_resume": True,
+        "joint_a2_preplan": True,
+        "deferred_a2_carry_goal": True,
+        "smooth_path_regularization": True,
+        "path_ds": PATH_DS,
+        "path_vertices": PATH_VERTICES,
+        "steer_points": STEER_POINTS,
+        "steer_horizon_seconds": STEER_HORIZON_SECONDS,
+    }
+
+
+def load_stack_checkpoint_for_view(
+    path: Union[str, Path],
+    device: Union[str, torch.device] = "cpu",
+) -> Tuple[StackTrajectoryPlanner, Dict[str, Any]]:
+    """Load current checkpoints or faithfully decode V13 for viewing only.
+
+    Training and resume continue to use :func:`load_stack_checkpoint`, which
+    deliberately rejects all old schemas.
+    """
+    payload = _read_checkpoint_payload(path, device)
+    if payload.get("schema_version") != LEGACY_VIEW_SCHEMA_V13:
+        return _load_current_payload(payload, device)
+    for key in ("model_config", "model_state"):
+        if key not in payload:
+            raise ValueError(f"stack planner checkpoint missing {key}")
+    config_values = payload["model_config"]
+    extra = sorted(set(config_values) - LEGACY_V13_CONFIG_FIELDS)
+    missing_config = sorted(LEGACY_V13_CONFIG_FIELDS - set(config_values))
+    if extra or missing_config:
+        raise ValueError(
+            "V13 viewer config mismatch: "
+            f"missing={missing_config}, unknown={extra}"
+        )
+    # These V15-only values are inert in the V13 implementation below.  They
+    # merely let the shared validated config describe the unchanged network.
+    config = StackPlannerConfig(
+        **config_values,
+        retreat_delta_scale=config_values["delta_scale"],
+        path_update_alpha=1.0,
+        retreat_only=False,
+    )
+    expected = _expected_v13_contract(config)
+    missing = sorted(set(expected) - set(payload))
+    mismatch = {
+        key: (payload.get(key), value)
+        for key, value in expected.items()
+        if key in payload and payload[key] != value
+    }
+    if missing or mismatch:
+        raise ValueError(
+            f"V13 viewer checkpoint mismatch: missing={missing}, "
+            f"mismatch={mismatch}"
+        )
+    from .legacy_v13 import StackTrajectoryPlannerV13
+    model = StackTrajectoryPlannerV13(config).to(device)
+    model.load_state_dict(payload["model_state"], strict=True)
+    model.eval()
+    payload = dict(payload)
+    payload["viewer_legacy_decoder"] = True
     return model, payload

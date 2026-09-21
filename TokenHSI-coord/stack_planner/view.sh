@@ -42,10 +42,11 @@ conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi118}"
 
 PYTHONPATH="$COORD" python - "$PLANNER" <<'PY'
 import sys
-from stack_planner.checkpoint import load_stack_checkpoint
-_, payload = load_stack_checkpoint(sys.argv[1])
-print("stack planner checkpoint: schema={} step={}".format(
-    payload["schema_version"], payload.get("step", 0)))
+from stack_planner.checkpoint import load_stack_checkpoint_for_view
+_, payload = load_stack_checkpoint_for_view(sys.argv[1])
+print("stack planner checkpoint: schema={} step={} legacy_decoder={}".format(
+    payload["schema_version"], payload.get("step", 0),
+    payload.get("viewer_legacy_decoder", False)))
 PY
 
 CFG=$(mktemp /tmp/stack_planner_view.XXXXXX.yaml)
