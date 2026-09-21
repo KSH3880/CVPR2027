@@ -207,7 +207,7 @@ def main():
 
     history_steps = _env_int("CARRY_PLANNER_HISTORY_STEPS", 4)
     delta_scale = _env_float("CARRY_PLANNER_DELTA_SCALE", 0.5)
-    path_update_alpha = _env_float("CARRY_PLANNER_PATH_UPDATE_ALPHA", 0.25)
+    path_update_alpha = _env_float("CARRY_PLANNER_PATH_UPDATE_ALPHA", 0.5)
     init = os.environ.get("CARRY_PLANNER_INIT", "")
     payload = None
     if init:
@@ -237,7 +237,7 @@ def main():
     history = StackHistoryBuffer(task.num_envs, history_steps, device)
     policy = StackPlannerActorCritic(
         planner,
-        point_std=_env_float("CARRY_PLANNER_DELTA_STD", 0.12),
+        point_std=_env_float("CARRY_PLANNER_DELTA_STD", 0.25),
         endpoint_std=_env_float("CARRY_PLANNER_ENDPOINT_STD", 0.03),
         anchor_std=_env_float("CARRY_PLANNER_ANCHOR_STD", 0.03),
         speed_std=_env_float("CARRY_PLANNER_SPEED_STD", 0.20),
@@ -279,6 +279,8 @@ def main():
     print(
         f"[carry-planner-train] envs={task.num_envs} horizon={horizon} "
         f"low_steps={low_steps} history={history_steps} delta={delta_scale:g} "
+        f"path_alpha={path_update_alpha:g} "
+        f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"collision_coef={collision_coef:g} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
@@ -308,6 +310,35 @@ def main():
                     "speed": output["speed"],
                 }
                 valid = task.install_external_plan(candidate_output)
+                sampled_path = output["path_world"][:, 0]
+                base_path = output["base_path_world"]
+                sampled_deviation = torch.linalg.vector_norm(
+                    sampled_path - base_path, dim=-1,
+                )
+                mean_deviation = torch.linalg.vector_norm(
+                    output["mean_path_world"][:, 0] - base_path, dim=-1,
+                )
+                diag["plan_valid"] = diag.get("plan_valid", 0.0) + float(
+                    valid.float().sum()
+                )
+                diag["plan_count"] = diag.get("plan_count", 0.0) + valid.numel()
+                diag["sample_path_deviation"] = diag.get(
+                    "sample_path_deviation", 0.0,
+                ) + float(sampled_deviation.sum())
+                diag["mean_path_deviation"] = diag.get(
+                    "mean_path_deviation", 0.0,
+                ) + float(mean_deviation.sum())
+                diag["path_point_count"] = diag.get(
+                    "path_point_count", 0.0,
+                ) + sampled_deviation.numel()
+                diag["sample_path_max_deviation"] = max(
+                    diag.get("sample_path_max_deviation", 0.0),
+                    float(sampled_deviation.max()),
+                )
+                diag["mean_path_max_deviation"] = max(
+                    diag.get("mean_path_max_deviation", 0.0),
+                    float(mean_deviation.max()),
+                )
                 reward, done, macro_diag = _macro_step(
                     player, low_steps, collision_coef,
                 )
@@ -371,6 +402,20 @@ def main():
             "collision_box_box_cost": ratio(
                 "collision_box_box_cost", "executed_steps",
             ),
+            "plan_valid_fraction": ratio("plan_valid", "plan_count"),
+            "sample_path_deviation": ratio(
+                "sample_path_deviation", "path_point_count",
+            ),
+            "sample_path_max_deviation": diag.get(
+                "sample_path_max_deviation", 0.0,
+            ),
+            "mean_path_deviation": ratio(
+                "mean_path_deviation", "path_point_count",
+            ),
+            "mean_path_max_deviation": diag.get(
+                "mean_path_max_deviation", 0.0,
+            ),
+            "path_delta_std": float(policy.action_log_std[0, 0].exp()),
             "converge_fraction": float(
                 task._carry_converge_layout.float().mean()
             ),

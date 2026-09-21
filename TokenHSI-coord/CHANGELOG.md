@@ -1776,6 +1776,16 @@ legacy/new profile, 최저속도 위치, 복귀 완료, checkpoint round-trip을
 
 ## 2026-09-21
 
+### carry planner spatial exploration 및 경로 학습 진단
+
+- 기존 기본값 `delta_std=0.12`, `path_update_alpha=0.25`에서는 smoothing과 point
+  ramp까지 거친 stochastic path가 직선 base에서 수 cm만 벗어나 collision reward가
+  사실상 속도 쪽으로만 흐를 수 있었다. fresh-run 기본값을 각각 0.25, 0.5로 올렸다.
+- 매 iteration에 sampled/deterministic path의 base 대비 평균·최대 이탈 거리(m),
+  proposal 유효 비율, 현재 path action std를 기록한다. 이제 "직선처럼 보임"이 작은
+  exploration인지, invalid proposal fallback인지, 아직 mean이 학습되지 않은 것인지
+  학습 로그에서 분리할 수 있다.
+
 ### stack planner V13 single-head viewer compatibility
 
 - `view.sh`와 interactive viewer에서만 V13 checkpoint의 당시

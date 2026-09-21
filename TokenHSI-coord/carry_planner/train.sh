@@ -51,7 +51,11 @@ export CARRY_PLANNER_GOAL_MARGIN=${CARRY_PLANNER_GOAL_MARGIN:-0.25}
 # Close-goal cases may require walking around an already placed box/agent;
 # 0.5 m corrections can make that physically impossible.
 export CARRY_PLANNER_DELTA_SCALE=${CARRY_PLANNER_DELTA_SCALE:-1.0}
-export CARRY_PLANNER_PATH_UPDATE_ALPHA=${CARRY_PLANNER_PATH_UPDATE_ALPHA:-0.25}
+# At 0.25 the two smoothing passes and the point ramp reduce fresh stochastic
+# path exploration to only a few centimetres, so collision reward mostly
+# trains speed. Keep temporal blending, but expose spatial alternatives.
+export CARRY_PLANNER_PATH_UPDATE_ALPHA=${CARRY_PLANNER_PATH_UPDATE_ALPHA:-0.5}
+export CARRY_PLANNER_DELTA_STD=${CARRY_PLANNER_DELTA_STD:-0.25}
 export CARRY_PLANNER_PPO_EPOCHS=${CARRY_PLANNER_PPO_EPOCHS:-3}
 DEFAULT_MINIBATCH=$((ENVS * CARRY_PLANNER_HORIZON / 4))
 [ "$DEFAULT_MINIBATCH" -gt 0 ] || DEFAULT_MINIBATCH=1

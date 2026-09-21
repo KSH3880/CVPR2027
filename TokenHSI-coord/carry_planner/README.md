@@ -15,6 +15,13 @@ sequential stack이 아닌 기존 simultaneous `HumanoidMASteerCarry` 계열이�
   가능하지만, 먼저 도착해 정지한 agent/box를 후발 agent가 공간적으로 돌아야 한다.
   비율과 여유는 `CARRY_PLANNER_CONVERGE_PROB`, `CARRY_PLANNER_GOAL_MARGIN`으로 바꾼다.
 
+학습 기본 spatial exploration은 `CARRY_PLANNER_DELTA_STD=0.25`, recurrent path
+blend는 `CARRY_PLANNER_PATH_UPDATE_ALPHA=0.5`다. 로그의
+`sample_path_deviation`은 실제 실행용 stochastic path가 직선 base에서 벗어난 평균
+거리(m), `mean_path_deviation`은 viewer/checkpoint에서 보이는 deterministic path의
+평균 거리다. `plan_valid_fraction`이 낮으면 곡률 검사에서 proposal이 거부되어 이전
+plan 또는 analytic fallback이 실행되고 있다는 뜻이다.
+
 Smoke 예시:
 
 ```bash
