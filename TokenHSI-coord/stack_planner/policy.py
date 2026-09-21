@@ -74,7 +74,7 @@ class StackPlannerActorCritic(nn.Module):
         candidate = raw["candidate_logits"].argmax(dim=-1)
         batch = torch.arange(candidate.shape[0], device=candidate.device)
         output = self.planner.decode_delta(
-            current, raw["reference_path_local"],
+            current, raw["base_path_local"], raw["reference_path_local"],
             raw["path_delta_raw"][batch, candidate][:, None],
             raw["speed_raw"][batch, candidate][:, None],
             raw["path_point_weight"],
@@ -86,7 +86,8 @@ class StackPlannerActorCritic(nn.Module):
     def all_mean_outputs(self, state: CoordinatorState):
         current, raw = self.planner.raw_heads(state)
         output = self.planner.decode_delta(
-            current, raw["reference_path_local"], raw["path_delta_raw"],
+            current, raw["base_path_local"], raw["reference_path_local"],
+            raw["path_delta_raw"],
             raw["speed_raw"],
             raw["path_point_weight"],
         )
@@ -116,7 +117,8 @@ class StackPlannerActorCritic(nn.Module):
         current = state.state if hasattr(state, "history_tokens") else state
         path_action, speed_action = self._split_action(delta_action)
         output = self.planner.decode_delta(
-            current, raw["reference_path_local"], path_action[:, None],
+            current, raw["base_path_local"], raw["reference_path_local"],
+            path_action[:, None],
             speed_action[:, None],
             raw["path_point_weight"],
         )
@@ -138,12 +140,13 @@ class StackPlannerActorCritic(nn.Module):
         current = state.state if hasattr(state, "history_tokens") else state
         path_action, speed_action = self._split_action(delta_action)
         output = self.planner.decode_delta(
-            current, raw["reference_path_local"], path_action, speed_action,
+            current, raw["base_path_local"], raw["reference_path_local"],
+            path_action, speed_action,
             raw["path_point_weight"],
         )
         mean_path_action, mean_speed_action = self._split_action(paths.loc)
         mean_output = self.planner.decode_delta(
-            current, raw["reference_path_local"],
+            current, raw["base_path_local"], raw["reference_path_local"],
             mean_path_action, mean_speed_action,
             raw["path_point_weight"],
         )
@@ -181,7 +184,8 @@ class StackPlannerActorCritic(nn.Module):
         current = state.state if hasattr(state, "history_tokens") else state
         path_action, speed_action = self._split_action(delta_action)
         decoded = self.planner.decode_delta(
-            current, raw["reference_path_local"], path_action[:, None],
+            current, raw["base_path_local"], raw["reference_path_local"],
+            path_action[:, None],
             speed_action[:, None],
             raw["path_point_weight"],
         )

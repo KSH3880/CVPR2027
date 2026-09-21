@@ -434,10 +434,22 @@ def main():
     requested_history_steps = _env_int("STACK_PLANNER_HISTORY_STEPS", 4)
     requested_candidates = _env_int("STACK_PLANNER_CANDIDATES", 1)
     requested_delta_scale = _env_float("STACK_PLANNER_DELTA_SCALE", 0.5)
+    requested_retreat_delta_scale = _env_float(
+        "STACK_PLANNER_RETREAT_DELTA_SCALE", 2.0
+    )
+    requested_path_update_alpha = _env_float(
+        "STACK_PLANNER_PATH_UPDATE_ALPHA", 0.25
+    )
     if requested_candidates < 1:
         raise ValueError("STACK_PLANNER_CANDIDATES must be positive")
     if requested_delta_scale <= 0:
         raise ValueError("STACK_PLANNER_DELTA_SCALE must be positive")
+    if requested_retreat_delta_scale < requested_delta_scale:
+        raise ValueError(
+            "STACK_PLANNER_RETREAT_DELTA_SCALE must be at least DELTA_SCALE"
+        )
+    if not 0.0 < requested_path_update_alpha <= 1.0:
+        raise ValueError("STACK_PLANNER_PATH_UPDATE_ALPHA must be in (0, 1]")
     payload = None
     if init:
         planner, payload = load_stack_checkpoint(init, device)
@@ -459,10 +471,20 @@ def main():
                 f"requested={requested_delta_scale} "
                 f"checkpoint={planner.config.delta_scale}"
             )
+        if planner.config.retreat_delta_scale != requested_retreat_delta_scale:
+            raise ValueError(
+                "STACK_PLANNER_RETREAT_DELTA_SCALE must match init checkpoint"
+            )
+        if planner.config.path_update_alpha != requested_path_update_alpha:
+            raise ValueError(
+                "STACK_PLANNER_PATH_UPDATE_ALPHA must match init checkpoint"
+            )
     else:
         planner = StackTrajectoryPlanner(StackPlannerConfig(
             candidates=requested_candidates, history_steps=requested_history_steps,
             delta_scale=requested_delta_scale,
+            retreat_delta_scale=requested_retreat_delta_scale,
+            path_update_alpha=requested_path_update_alpha,
         )).to(device)
     history = StackHistoryBuffer(
         task.num_envs, planner.config.history_steps, device,
@@ -550,6 +572,8 @@ def main():
           f"history_steps={planner.config.history_steps} "
           f"candidates={planner.config.candidates} "
           f"delta_scale={planner.config.delta_scale:g} "
+          f"retreat_delta_scale={planner.config.retreat_delta_scale:g} "
+          f"path_update_alpha={planner.config.path_update_alpha:g} "
           f"diversity={diversity_coef:g}/{diversity_margin:g}m "
           f"smoothness={smoothness_coef:g}/{speed_smoothness_coef:g} "
           f"evaluator_coef={evaluator_coef:g} "
@@ -652,10 +676,21 @@ def main():
                     next_plan_valid = (
                         observation.previous_path_valid | plan_update
                     )
+                    initialize_base = plan_update & ~observation.base_path_valid
+                    next_base_world = torch.where(
+                        initialize_base[:, None, None, None],
+                        outputs["base_path_world"],
+                        observation.base_path_world,
+                    )
+                    next_base_valid = (
+                        observation.base_path_valid | plan_update
+                    )
                     next_observation = history.observe(
                         next_state, reset_mask=done, commit=False,
                         previous_path_world=next_plan_world,
                         previous_path_valid=next_plan_valid,
+                        base_path_world=next_base_world,
+                        base_path_valid=next_base_valid,
                     )
                     next_value = policy.value(next_observation)
                     continuation = ~(done | invalid)
@@ -735,6 +770,7 @@ def main():
             history.commit_path(
                 selected_mean_path_world,
                 update_mask=commit_mask,
+                base_path_world=outputs["base_path_world"],
             )
             if consistency_coef > 0.0:
                 selected_mean_path = outputs["mean_path_world"][
@@ -859,6 +895,8 @@ def main():
                 planner.config.candidates > 1
             ),
             "delta_scale": planner.config.delta_scale,
+            "retreat_delta_scale": planner.config.retreat_delta_scale,
+            "path_update_alpha": planner.config.path_update_alpha,
             "diversity_coef": diversity_coef,
             "diversity_margin": diversity_margin,
             "smoothness_coef": smoothness_coef,
@@ -921,6 +959,8 @@ def main():
                         "history_steps": planner.config.history_steps,
                         "candidates": planner.config.candidates,
                         "delta_scale": planner.config.delta_scale,
+                        "retreat_delta_scale": planner.config.retreat_delta_scale,
+                        "path_update_alpha": planner.config.path_update_alpha,
                         "full_candidate_rollout": planner.config.candidates > 1,
                         "evaluator_coef": evaluator_coef,
                         "diversity_coef": diversity_coef,

@@ -96,6 +96,7 @@ class HumanoidMAStackPlannerView(HumanoidMAStackPlannerTrain):
         self._stack_history.commit_path(
             output["path_world"][:, 0],
             update_mask=valid & self._planner_policy_decision,
+            base_path_world=output["base_path_world"],
         )
         status = (phase.cpu().tolist(), selected.cpu().tolist(), valid.cpu().tolist(),
                   self._planner_plan_installed.cpu().tolist(),

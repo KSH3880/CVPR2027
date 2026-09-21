@@ -29,6 +29,8 @@ class StackPlannerConfig:
     dropout: float = 0.0
     candidates: int = STACK_CANDIDATES
     delta_scale: float = 0.5
+    retreat_delta_scale: float = 2.0
+    path_update_alpha: float = 0.25
     history_steps: int = 1
 
     def __post_init__(self) -> None:
@@ -44,6 +46,10 @@ class StackPlannerConfig:
             raise ValueError("feedforward and candidates must be positive")
         if self.delta_scale <= 0:
             raise ValueError("delta_scale must be positive")
+        if self.retreat_delta_scale < self.delta_scale:
+            raise ValueError("retreat_delta_scale must be at least delta_scale")
+        if not 0.0 < self.path_update_alpha <= 1.0:
+            raise ValueError("path_update_alpha must be in (0, 1]")
         if self.history_steps < 1:
             raise ValueError("history_steps must be positive")
 
@@ -205,8 +211,8 @@ class StackPlannerHeads(nn.Module):
             # retaining enough sigmoid gradient to learn slowdowns.
             nn.init.constant_(speed[-1].bias, 2.0)
 
-    def decode_delta(self, reference_path_local, path_delta_raw, speed_raw,
-                     path_point_weight):
+    def decode_delta(self, base_path_local, previous_path_local,
+                     path_delta_raw, speed_raw, path_point_weight):
         batch, candidates = path_delta_raw.shape[:2]
         expected = (batch, candidates, STACK_PATH_DELTA_DIM)
         if path_delta_raw.shape != expected:
@@ -214,30 +220,47 @@ class StackPlannerHeads(nn.Module):
         speed_expected = (batch, candidates, STACK_SPEED_DIM)
         if speed_raw.shape != speed_expected:
             raise ValueError(f"speed_raw must be {speed_expected}")
-        delta = self.config.delta_scale * torch.tanh(path_delta_raw)
-        delta = delta.reshape(
+        absolute_offset = torch.tanh(path_delta_raw).reshape(
             batch, candidates, AGENTS, STACK_PATH_POINTS - 1, 2,
         )
-        delta = torch.cat((
-            torch.zeros_like(delta[..., :1, :]), delta,
+        absolute_offset = torch.cat((
+            torch.zeros_like(absolute_offset[..., :1, :]), absolute_offset,
         ), dim=-2)
-        delta = _smooth_delta(delta)
-        delta = delta * path_point_weight[:, None, :, :, None]
-        path_local = reference_path_local[:, None] + delta
-        path_local[..., 0, :] = reference_path_local[:, None, :, 0, :]
+        absolute_offset = _smooth_delta(absolute_offset)
+        offset_scale = absolute_offset.new_full(
+            (1, 1, AGENTS, STACK_PATH_POINTS, 1), self.config.delta_scale,
+        )
+        # Only A1's post-goal suffix needs a wide workspace for retreat.
+        offset_scale[..., 0, 22:, :] = self.config.retreat_delta_scale
+        absolute_offset = (
+            absolute_offset * offset_scale
+            * path_point_weight[:, None, :, :, None]
+        )
+        target_local = base_path_local[:, None] + absolute_offset
+        blend = (
+            self.config.path_update_alpha
+            * path_point_weight[:, None, :, :, None]
+        )
+        path_local = previous_path_local[:, None] + blend * (
+            target_local - previous_path_local[:, None]
+        )
+        path_local[..., 0, :] = previous_path_local[:, None, :, 0, :]
+        update = path_local - previous_path_local[:, None]
         speed = speed_raw.reshape(
             batch, candidates, AGENTS, STACK_PATH_POINTS,
         )
         speed = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * torch.sigmoid(speed)
         speed = _smooth_speed(speed)
-        return path_local, delta, speed
+        return path_local, update, speed
 
-    def forward(self, scene, reference_path_local, path_point_weight):
+    def forward(self, scene, base_path_local, previous_path_local,
+                path_point_weight):
         batch = scene.shape[0]
         path_delta_raw = torch.stack([path(scene) for path in self.paths], dim=1)
         speed_raw = torch.stack([speed(scene) for speed in self.speeds], dim=1)
         path_local, path_delta_local, speed = self.decode_delta(
-            reference_path_local, path_delta_raw, speed_raw, path_point_weight,
+            base_path_local, previous_path_local, path_delta_raw, speed_raw,
+            path_point_weight,
         )
         expanded_scene = scene[:, None].expand(-1, path_local.shape[1], -1)
         evaluator_input = torch.cat((
@@ -252,7 +275,8 @@ class StackPlannerHeads(nn.Module):
             "speed_raw": speed_raw,
             "speed": speed,
             "path_delta_local": path_delta_local,
-            "reference_path_local": reference_path_local,
+            "base_path_local": base_path_local,
+            "reference_path_local": previous_path_local,
             "path_point_weight": path_point_weight,
             "path_action_mask": path_point_weight[..., 1:, None].expand(
                 -1, -1, -1, 2
@@ -293,7 +317,7 @@ class StackTrajectoryPlanner(nn.Module):
         ), dim=-2)
 
     def _reference_path(self, state, previous_path_world, previous_path_valid,
-                        path_progress):
+                        base_path_world, base_path_valid, path_progress):
         _, frame = state_to_tokens(state)
         geometric_local = self._geometric_reference_local(frame)
         geometric_world = shared_to_world(
@@ -304,19 +328,29 @@ class StackTrajectoryPlanner(nn.Module):
             previous_path_valid = torch.zeros(
                 state.batch_size, dtype=torch.bool, device=state.device,
             )
+            base_path_world = torch.zeros_like(geometric_world)
+            base_path_valid = torch.zeros_like(previous_path_valid)
+        base_world = torch.where(
+            base_path_valid[:, None, None, None],
+            base_path_world, geometric_world,
+        )
         reference_world = torch.where(
             previous_path_valid[:, None, None, None],
-            previous_path_world, geometric_world,
+            previous_path_world, base_world,
+        )
+        base_local = world_to_shared(
+            base_world, frame["center"], frame["angle"],
         )
         reference_local = world_to_shared(
             reference_world, frame["center"], frame["angle"],
         )
         point_weight = _future_point_weight(path_progress, previous_path_valid)
-        return frame, reference_local, point_weight
+        return frame, base_local, reference_local, point_weight
 
     def raw_heads(self, observation):
         history_valid = None
         previous_path_world = None
+        base_path_world = None
         if hasattr(observation, "history_tokens"):
             observation.validate(self.config.history_steps)
             state = observation.state
@@ -324,6 +358,8 @@ class StackTrajectoryPlanner(nn.Module):
             history_valid = observation.history_valid
             previous_path_world = observation.previous_path_world
             previous_path_valid = observation.previous_path_valid
+            base_path_world = observation.base_path_world
+            base_path_valid = observation.base_path_valid
             path_progress = observation.path_progress
         else:
             state = observation
@@ -337,33 +373,43 @@ class StackTrajectoryPlanner(nn.Module):
             previous_path_valid = torch.zeros(
                 state.batch_size, dtype=torch.bool, device=state.device,
             )
+            base_path_valid = torch.zeros_like(previous_path_valid)
             path_progress = torch.zeros(
                 state.batch_size, AGENTS, device=state.device,
                 dtype=state.root_xy.dtype,
             )
-        _, reference_local, point_weight = self._reference_path(
-            state, previous_path_world, previous_path_valid, path_progress,
+        _, base_local, reference_local, point_weight = self._reference_path(
+            state, previous_path_world, previous_path_valid,
+            base_path_world, base_path_valid, path_progress,
         )
         scene = self.scene_encoder(
             tokens, history_valid, reference_local, previous_path_valid,
             path_progress,
         )
-        return state, self.heads(scene, reference_local, point_weight)
+        return state, self.heads(
+            scene, base_local, reference_local, point_weight,
+        )
 
-    def decode_delta(self, state, reference_path_local, path_delta_raw,
-                     speed_raw, path_point_weight):
+    def decode_delta(self, state, base_path_local, reference_path_local,
+                     path_delta_raw, speed_raw, path_point_weight):
         _, frame = state_to_tokens(state)
         path_local, path_delta_local, speed = self.heads.decode_delta(
-            reference_path_local, path_delta_raw, speed_raw, path_point_weight,
+            base_path_local, reference_path_local, path_delta_raw, speed_raw,
+            path_point_weight,
         )
         path_world = shared_to_world(
             path_local, frame["center"][:, None], frame["angle"][:, None],
+        )
+        base_path_world = shared_to_world(
+            base_path_local, frame["center"], frame["angle"],
         )
         return {
             "path_local": path_local,
             "path_world": path_world,
             "speed": speed,
             "path_delta_local": path_delta_local,
+            "base_path_world": base_path_world,
+            "base_path_local": base_path_local,
             "reference_path_local": reference_path_local,
             "path_point_weight": path_point_weight,
         }
@@ -373,7 +419,7 @@ class StackTrajectoryPlanner(nn.Module):
         selected = raw["candidate_logits"].argmax(dim=-1)
         batch = torch.arange(current.batch_size, device=current.device)
         output = self.decode_delta(
-            current, raw["reference_path_local"],
+            current, raw["base_path_local"], raw["reference_path_local"],
             raw["path_delta_raw"][batch, selected][:, None],
             raw["speed_raw"][batch, selected][:, None],
             raw["path_point_weight"],
@@ -382,6 +428,7 @@ class StackTrajectoryPlanner(nn.Module):
         # Keep correction/reference tensors internal; path and speed are the
         # public execution contract.
         output.pop("path_delta_local")
+        output.pop("base_path_local")
         output.pop("reference_path_local")
         output.pop("path_point_weight")
         output["selected_candidate"] = selected

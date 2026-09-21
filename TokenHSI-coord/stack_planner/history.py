@@ -20,6 +20,8 @@ class StackPlannerObservation:
     history_valid: torch.Tensor   # [B,H]
     previous_path_world: torch.Tensor  # [B,2,33,2], last committed mean trajectory
     previous_path_valid: torch.Tensor  # [B]
+    base_path_world: torch.Tensor      # [B,2,33,2], fixed episode anchor
+    base_path_valid: torch.Tensor      # [B]
     path_progress: torch.Tensor        # [B,2], monotonic point-index progress
 
     def validate(self, history_steps=None):
@@ -44,6 +46,12 @@ class StackPlannerObservation:
         if (self.previous_path_valid.shape != (batch,)
                 or self.previous_path_valid.dtype != torch.bool):
             raise ValueError("previous_path_valid must be bool [B]")
+        if self.base_path_world.shape != (
+                batch, AGENTS, STACK_PATH_POINTS, 2):
+            raise ValueError("base_path_world must be [B,2,33,2]")
+        if (self.base_path_valid.shape != (batch,)
+                or self.base_path_valid.dtype != torch.bool):
+            raise ValueError("base_path_valid must be bool [B]")
         if self.path_progress.shape != (batch, AGENTS):
             raise ValueError("path_progress must be [B,2]")
 
@@ -55,14 +63,16 @@ class StackPlannerObservation:
         return StackPlannerObservation(
             self.state.index(index), self.history_tokens[index],
             self.history_valid[index], self.previous_path_world[index],
-            self.previous_path_valid[index], self.path_progress[index],
+            self.previous_path_valid[index], self.base_path_world[index],
+            self.base_path_valid[index], self.path_progress[index],
         )
 
     def clone(self):
         return StackPlannerObservation(
             self.state.clone(), self.history_tokens.clone(),
             self.history_valid.clone(), self.previous_path_world.clone(),
-            self.previous_path_valid.clone(), self.path_progress.clone(),
+            self.previous_path_valid.clone(), self.base_path_world.clone(),
+            self.base_path_valid.clone(), self.path_progress.clone(),
         )
 
 
@@ -119,6 +129,8 @@ class StackHistoryBuffer:
         self.previous_path_valid = torch.zeros(
             batch_size, device=device, dtype=torch.bool,
         )
+        self.base_path_world = torch.zeros_like(self.previous_path_world)
+        self.base_path_valid = torch.zeros_like(self.previous_path_valid)
         self.path_progress = torch.zeros(
             batch_size, AGENTS, device=device, dtype=dtype,
         )
@@ -133,9 +145,11 @@ class StackHistoryBuffer:
         self.valid[env_mask] = False
         self.previous_path_world[env_mask] = 0.0
         self.previous_path_valid[env_mask] = False
+        self.base_path_world[env_mask] = 0.0
+        self.base_path_valid[env_mask] = False
         self.path_progress[env_mask] = 0.0
 
-    def commit_path(self, path_world, update_mask=None):
+    def commit_path(self, path_world, update_mask=None, base_path_world=None):
         if path_world.shape != self.previous_path_world.shape:
             raise ValueError(
                 f"committed trajectory must be "
@@ -150,9 +164,19 @@ class StackHistoryBuffer:
             raise ValueError("path update_mask must be [B]")
         self.previous_path_world[update_mask] = path_world[update_mask].detach()
         self.previous_path_valid[update_mask] = True
+        if base_path_world is None:
+            base_path_world = path_world
+        if base_path_world.shape != self.base_path_world.shape:
+            raise ValueError("base trajectory must match committed trajectory")
+        initialize_base = update_mask & ~self.base_path_valid
+        self.base_path_world[initialize_base] = (
+            base_path_world[initialize_base].detach()
+        )
+        self.base_path_valid[initialize_base] = True
 
     def observe(self, state, reset_mask=None, commit=True,
-                previous_path_world=None, previous_path_valid=None):
+                previous_path_world=None, previous_path_valid=None,
+                base_path_world=None, base_path_valid=None):
         tokens_source = self.tokens
         valid_source = self.valid
         if reset_mask is not None:
@@ -182,13 +206,27 @@ class StackHistoryBuffer:
             self.previous_path_valid if previous_path_valid is None
             else previous_path_valid
         )
+        base_world = (
+            self.base_path_world if base_path_world is None
+            else base_path_world
+        )
+        base_valid_value = (
+            self.base_path_valid if base_path_valid is None
+            else base_path_valid
+        )
         plan_world = plan_world.detach().clone()
         plan_valid = torch.as_tensor(
             plan_valid, device=self.tokens.device, dtype=torch.bool,
         ).clone()
+        base_world = base_world.detach().clone()
+        base_valid_value = torch.as_tensor(
+            base_valid_value, device=self.tokens.device, dtype=torch.bool,
+        ).clone()
         if reset_mask is not None:
             plan_world[reset_mask] = 0.0
             plan_valid[reset_mask] = False
+            base_world[reset_mask] = 0.0
+            base_valid_value[reset_mask] = False
         progress = project_path_progress(
             plan_world, state.root_xy, self.path_progress,
         )
@@ -196,7 +234,8 @@ class StackHistoryBuffer:
             plan_valid[:, None], progress, torch.zeros_like(progress),
         )
         observation = StackPlannerObservation(
-            state, tokens, valid, plan_world, plan_valid, progress,
+            state, tokens, valid, plan_world, plan_valid,
+            base_world, base_valid_value, progress,
         )
         observation.validate(self.history_steps)
         if commit:
@@ -218,6 +257,8 @@ def flatten_observations(observations):
         torch.cat([item.history_valid for item in observations], dim=0),
         torch.cat([item.previous_path_world for item in observations], dim=0),
         torch.cat([item.previous_path_valid for item in observations], dim=0),
+        torch.cat([item.base_path_world for item in observations], dim=0),
+        torch.cat([item.base_path_valid for item in observations], dim=0),
         torch.cat([item.path_progress for item in observations], dim=0),
     )
 

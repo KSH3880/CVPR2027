@@ -52,6 +52,7 @@ def main():
                 history.commit_path(
                     output['path_world'][:, 0],
                     update_mask=valid & task._planner_policy_decision,
+                    base_path_world=output['base_path_world'],
                 )
                 endpoints = output['path_world'][:, 0, 0, -1].cpu().tolist()
                 for e in range(task.num_envs):

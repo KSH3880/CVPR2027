@@ -4,13 +4,16 @@
 
 ## 2026-09-18
 
-### Sampled execution과 mean planning reference 분리
+### Bounded absolute path target과 mean planning reference 분리 (V14)
 
-- PPO rollout은 기존처럼 `mean_delta + exploration noise`로 만든 sampled path를 frozen executor에
-  설치한다. 반면 다음 decision의 `previous_path`, bootstrap observation과 temporal consistency에는
-  동일 head의 noise-free mean path만 commit하도록 분리했다.
-- K=1에서 sampled delta가 매 replan마다 reference에 누적되어 route가 random walk로 밀리는 경로를
-  차단한다. deterministic view/eval은 원래부터 mean path를 실행하므로 동작 계약은 변하지 않는다.
+- episode 최초 geometric path를 고정 base로 저장하고 head 출력을 누적 increment가 아닌 base
+  기준 bounded absolute target으로 재정의했다. 일반 구간은 0.5m/component, A1 post-goal retreat
+  suffix는 2.0m/component 범위이며 직전 mean에서 target으로 기본 0.25 EMA update한다.
+- PPO rollout은 noise가 포함된 sampled target update를 frozen executor에 설치하지만 다음 decision의
+  `previous_path`, bootstrap observation과 temporal consistency에는 noise-free mean path만 commit한다.
+  mean delta와 exploration noise가 horizon마다 누적되던 두 random-walk 경로를 모두 차단했다.
+- base path와 previous mean path를 history/checkpoint 계약에서 분리하고 schema를 V14로 올렸다.
+  deterministic view/eval도 동일 EMA contract를 사용한다.
 
 ### Single-head baseline 및 정상 stack 접촉 제거
 

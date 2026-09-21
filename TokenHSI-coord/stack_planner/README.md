@@ -1,4 +1,4 @@
-# Stack path-and-speed planner V13
+# Stack path-and-speed planner V14
 
 Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 `trajectory_predictor/`의 코드 및 checkpoint namespace를 건드리지 않도록 별도 패키지로
@@ -15,7 +15,7 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 - 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path와 pointwise speed profile
 - hard anchor: 첫 decision의 `P0=departure root`; 이후 실행한 prefix는 고정
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
-- checkpoint schema: `tokenhsi-stack-planner-v13`
+- checkpoint schema: `tokenhsi-stack-planner-v14`
 
 planner 입력에는 virtual box를 넣지 않는다. 현재 Carry executor에만 필요한 virtual box는
 `env_adapter.py`가 learned retreat endpoint에서 만들어 관측 직전에 변환한다. 이후 steering과
@@ -45,10 +45,12 @@ monotonic point progress를 구하고, progress 이전 correction은 0으로 고
 명시적으로 들어간다. head는
 root를 제외한 `2 agents × 32 points × XY = 128D` correction과
 `2 agents × 33 points = 66D` speed profile을 함께 출력한다. path correction은 두 번 low-pass한
-`0.5*tanh(delta)`를 reference path에 직접 더한다. 학습 중 frozen executor에는
-`mean_delta + exploration_noise`를 적용한 sampled path를 설치하지만, 다음 decision의 reference에는
-noise 없는 `previous_mean_path + mean_delta`만 commit한다. 따라서 PPO action은 실제 sampled
-결과로 credit을 받되 exploration noise가 recurrent path에 random walk로 누적되지 않는다.
+모델 action은 누적 increment가 아니라 episode 시작 때 고정한 geometric base에 대한 bounded
+absolute offset이다. 일반 carry 구간은 `0.5*tanh(offset)`, A1의 post-goal retreat suffix는
+`2.0*tanh(offset)` 범위를 쓴다. 매 decision의 mean path는 absolute target 쪽으로 기본 0.25만큼
+EMA 이동한다. frozen executor에는 같은 update에 exploration noise를 넣은 sampled path를
+설치하지만, 다음 decision에는 noise-free mean path만 commit한다. 같은 출력을 반복해도 target에
+수렴할 뿐 계속 더해지지 않으므로 mean과 exploration 양쪽의 recurrent random walk를 막는다.
 speed는 sigmoid로 `[0.375, 1.5] m/s`에 제한하고 두 번 low-pass한다. 직전 mean trajectory
 자체를 shared frame으로 바꿔 plan token으로 Transformer 입력에도
 포함한다. 기본 K=1 학습은 evaluator 선택 없이 단일 proposal을 30 low-level step 실행한다.
@@ -149,8 +151,8 @@ env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recu
 transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
 `model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
 
-V13 이전 planner checkpoint는 speed action/output 및 executor 계약이 달라 load하지 않는다. V13 checkpoint도
-history 길이 또는 candidate 수가 다른 설정으로 resume하는 것은 거부한다.
+V14 이전 planner checkpoint는 absolute-target/base-path 계약이 달라 load하지 않는다. V14 checkpoint도
+history 길이, candidate 수, offset 범위 또는 update alpha가 다른 설정으로 resume하는 것은 거부한다.
 
 검증:
 
@@ -205,7 +207,7 @@ reset에 섞지 않는다.
 ```bash
 MA_GPU=7 STACK_PLANNER_ENVS=2048 STACK_PLANNER_ITERS=200 \
 STACK_PLANNER_SEED=0 STACK_PLANNER_CANDIDATES=1 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v14_s0
 ```
 
 로컬 physical GPU 1에서는 로컬 checkpoint 배치와 `tokenhsi118` 환경을 사용하는
@@ -244,7 +246,7 @@ iteration마다 기록한다.
 
 마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
 도달하지 못한 것인지 구분할 수 있다.
-같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 v13 설계의 서버 학습은 다음처럼
+같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 V14 설계의 서버 학습은 다음처럼
 실행할 수 있다.
 
 ```bash
@@ -254,7 +256,7 @@ STACK_PLANNER_DELTA_SCALE=0.5 \
 STACK_PLANNER_SMOOTHNESS_COEF=10.0 \
 STACK_PLANNER_SPEED_STD=0.20 \
 STACK_PLANNER_SPEED_SMOOTHNESS_COEF=1.0 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v14_s0
 ```
 
 launcher 기본값은 2,048 env와 후보 1개다. 200 iteration, 후보당 frozen executor 30 step이며
@@ -264,9 +266,9 @@ branch snapshot도 보존하므로 env 수를 후보 수에 맞춰 낮춘다. �
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
-STACK_PLANNER_INIT=runs/stack_planner/stack_path_speed_v13_s0/planner_000200.pth \
+STACK_PLANNER_INIT=runs/stack_planner/stack_path_speed_v14_s0/planner_000200.pth \
 STACK_PLANNER_ITERS=200 MA_GPU=7 \
-  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v13_s0_resume1
+  bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v14_s0_resume1
 ```
 
 ## Checkpoint viewer
