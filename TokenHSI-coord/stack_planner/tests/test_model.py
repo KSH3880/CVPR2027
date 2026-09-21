@@ -33,6 +33,34 @@ from stack_planner.schema import (
 
 
 class StackTrajectoryPlannerTest(unittest.TestCase):
+    def test_plain_carry_keeps_pickup_and_goal_hard_anchors(self):
+        state = make_state(batch=2)
+        model = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, plain_carry=True,
+            retreat_delta_scale=0.5,
+        )).eval()
+        with torch.no_grad():
+            model.heads.paths[0][-1].bias.fill_(2.0)
+            output = model(state)
+            _, raw = model.raw_heads(state)
+        path = output["path_world"][:, 0]
+        self.assertTrue(torch.allclose(
+            path[:, :, 0], state.root_xy, atol=1e-5,
+        ))
+        self.assertTrue(torch.allclose(
+            path[:, :, 16], state.box_xyz[..., :2], atol=1e-5,
+        ))
+        self.assertTrue(torch.allclose(
+            path[:, :, 32], state.goal_xy, atol=1e-5,
+        ))
+        mask = raw["path_action_mask"].reshape(2, AGENTS, 32, 2)
+        self.assertFalse(mask[:, :, 15].any())
+        self.assertFalse(mask[:, :, 31].any())
+
+    def test_plain_carry_and_retreat_only_are_exclusive(self):
+        with self.assertRaisesRegex(ValueError, "exclusive"):
+            StackPlannerConfig(plain_carry=True, retreat_only=True)
+
     def test_time_shifted_consistency_is_zero_for_same_constant_plan(self):
         state = make_state(batch=2)
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()

@@ -42,12 +42,15 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "bounded_absolute_path_target": True,
         "path_update_alpha": config.path_update_alpha,
         "retreat_delta_scale": config.retreat_delta_scale,
-        "planner_task": "retreat_only" if config.retreat_only else "full_stack",
+        "planner_task": (
+            "retreat_only" if config.retreat_only else
+            "plain_carry" if config.plain_carry else "full_stack"
+        ),
         "fixed_origin_reference": True,
         "future_action_mask": True,
         "projected_executor_resume": True,
-        "joint_a2_preplan": True,
-        "deferred_a2_carry_goal": True,
+        "joint_a2_preplan": not config.plain_carry,
+        "deferred_a2_carry_goal": not config.plain_carry,
         "smooth_path_regularization": True,
         "path_ds": PATH_DS,
         "path_vertices": PATH_VERTICES,

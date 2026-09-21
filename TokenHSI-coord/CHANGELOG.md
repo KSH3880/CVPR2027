@@ -4,6 +4,23 @@
 
 ## 2026-09-21
 
+### Sequential stack 대신 plain Carry collision-avoidance planner 추가
+
+- `carry_planner/`에 기존 simultaneous `HumanoidMACoordCarry` 실행 경로를 재사용하는
+  `HumanoidMACarryPlannerTrain` adapter와 전용 PPO/train wrapper를 추가했다.
+- 신경망은 최신 `stack_planner`의 scene-token Transformer, 33-point joint path/speed head,
+  decision history, actor-critic 및 checkpoint 형식을 그대로 사용한다. task만 두 agent가
+  각자 box를 동시에 운반하는 plain Carry이며 sequential phase, stacking, retreat 보상은 없다.
+- plain Carry reference는 17-point `root->box`와 17-point `box->goal`을 합친 33점이다.
+  pickup(index 16)과 goal(index 32)을 hard anchor 및 action mask로 고정해 frozen Carry가
+  실제 자기 box/goal을 잃지 않게 했다.
+- macro reward는 원래 Carry reward와 remaining-distance progress를 보존하고,
+  agent-agent / agent-other-box / box-box proximity cost를 감점한다. 기본 stress scene은
+  `MS_SCEN=cross`, 출력은 `runs/carry_planner/<tag>`에 분리한다.
+- 검증: `tokenhsi118`에서 stack planner 단위 테스트 45개 통과. GPU0에서
+  `4 env x 2 agent`, 1 iteration smoke를 실행해 reset, path 설치, frozen ms18 rollout,
+  PPO backward, checkpoint 저장까지 통과했다. `invalid=0`, fallback=0.
+
 ### Full stack과 분리한 post-place A1 retreat 검증 task (V15)
 
 - Box1을 목표에 놓고 A1을 release 이후 0.45m 거리에서 시작시키는

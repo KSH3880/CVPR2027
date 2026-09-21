@@ -33,6 +33,7 @@ class StackPlannerConfig:
     path_update_alpha: float = 0.25
     history_steps: int = 1
     retreat_only: bool = False
+    plain_carry: bool = False
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -53,6 +54,8 @@ class StackPlannerConfig:
             raise ValueError("path_update_alpha must be in (0, 1]")
         if self.history_steps < 1:
             raise ValueError("history_steps must be positive")
+        if self.retreat_only and self.plain_carry:
+            raise ValueError("retreat_only and plain_carry are exclusive")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -235,13 +238,19 @@ class StackPlannerHeads(nn.Module):
             # The isolated diagnostic path is entirely A1 retreat. A2 is
             # masked below and remains a stationary part of the scene.
             offset_scale[..., 0, 1:, :] = self.config.retreat_delta_scale
-        else:
+        elif not self.config.plain_carry:
             # Only A1's post-goal suffix needs a wide workspace for retreat.
             offset_scale[..., 0, 22:, :] = self.config.retreat_delta_scale
         absolute_offset = (
             absolute_offset * offset_scale
             * path_point_weight[:, None, :, :, None]
         )
+        if self.config.plain_carry:
+            # Plain Carry has no post-placement retreat suffix.  Preserve the
+            # physical pickup and placement anchors exactly while all other
+            # points retain the same learned correction head.
+            absolute_offset[..., 16, :] = 0.0
+            absolute_offset[..., 32, :] = 0.0
         target_local = base_path_local[:, None] + absolute_offset
         blend = (
             self.config.path_update_alpha
@@ -276,6 +285,17 @@ class StackPlannerHeads(nn.Module):
                 start_dim=2
             ),
         ), dim=-1)
+        path_action_mask = path_point_weight[..., 1:, None].expand(
+            -1, -1, -1, 2
+        ).reshape(batch, -1) > 0
+        if self.config.plain_carry:
+            anchor = torch.ones(
+                AGENTS, STACK_PATH_POINTS - 1, 2,
+                dtype=torch.bool, device=scene.device,
+            )
+            anchor[:, 15, :] = False  # full-path pickup index 16
+            anchor[:, 31, :] = False  # full-path goal index 32
+            path_action_mask &= anchor.reshape(1, -1)
         return {
             "path_delta_raw": path_delta_raw,
             "speed_raw": speed_raw,
@@ -284,9 +304,7 @@ class StackPlannerHeads(nn.Module):
             "base_path_local": base_path_local,
             "reference_path_local": previous_path_local,
             "path_point_weight": path_point_weight,
-            "path_action_mask": path_point_weight[..., 1:, None].expand(
-                -1, -1, -1, 2
-            ).reshape(batch, -1) > 0,
+            "path_action_mask": path_action_mask,
             "speed_action_mask": (
                 path_point_weight.reshape(batch, STACK_SPEED_DIM) > 0
                 if self.config.retreat_only else
@@ -327,6 +345,16 @@ class StackTrajectoryPlanner(nn.Module):
             first, second[..., 1:, :], suffix[..., 1:, :],
         ), dim=-2)
 
+    @staticmethod
+    def _plain_carry_reference_local(frame):
+        root, box, goal = frame["root"], frame["box"], frame["goal"]
+        t = torch.linspace(
+            0.0, 1.0, 17, device=root.device, dtype=root.dtype,
+        ).reshape(1, 1, 17, 1)
+        approach = root[..., None, :] + t * (box - root)[..., None, :]
+        carry = box[..., None, :] + t * (goal - box)[..., None, :]
+        return torch.cat((approach, carry[..., 1:, :]), dim=-2)
+
     def _reference_path(self, state, previous_path_world, previous_path_valid,
                         base_path_world, base_path_valid, path_progress):
         _, frame = state_to_tokens(state)
@@ -334,6 +362,8 @@ class StackTrajectoryPlanner(nn.Module):
             geometric_local = frame["root"][..., None, :].expand(
                 -1, -1, STACK_PATH_POINTS, -1,
             ).clone()
+        elif self.config.plain_carry:
+            geometric_local = self._plain_carry_reference_local(frame)
         else:
             geometric_local = self._geometric_reference_local(frame)
         geometric_world = shared_to_world(
