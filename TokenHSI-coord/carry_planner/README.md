@@ -26,8 +26,10 @@ plan 또는 analytic fallback이 실행되고 있다는 뜻이다.
 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
 최소화한다. 이 auxiliary loss의 speed는 timing 계산에만 사용하고 detach하므로
 gradient는 path에만 간다. 계수와 focus 수는
-`CARRY_PLANNER_ANALYTIC_COLLISION_COEF`(기본 10),
+`CARRY_PLANNER_ANALYTIC_COLLISION_COEF`(기본 1),
 `CARRY_PLANNER_ANALYTIC_FOCUS_STEPS`(기본 8)로 조절한다.
+46도 실행 곡률 제한은 `CARRY_PLANNER_ANALYTIC_CURVATURE_COEF`(기본 20)의
+cosine-space penalty로 함께 학습한다.
 
 Smoke 예시:
 

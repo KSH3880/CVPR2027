@@ -1797,6 +1797,10 @@ legacy/new profile, 최저속도 위치, 복귀 완료, checkpoint round-trip을
   replan에는 analytic loss를 적용하지 않고 physical PPO만 유지한다.
 - `analytic_collision_loss`, 적용 batch 비율, 예측 최소 agent 거리와 box margin을
   iteration 로그 및 checkpoint metadata에 기록한다.
+- invalid proposal이 commit되지 않은 것을 새 episode로 오인해 analytic loss를 반복
+  적용하던 feedback을 제거했다. 적용 mask는 이제 실제 reset transition에서만 만들며,
+  기본 collision 계수는 10에서 1로 낮추고 46도 초과 곡률에 직접 cosine penalty를
+  추가해 공간 우회와 실행 가능한 곡선을 함께 학습한다.
 
 ### carry planner 물리 GPU index 고정
 

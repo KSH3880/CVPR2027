@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict
 
+import math
+
 import torch
 
 from coordinator.planner import candidate_costs
@@ -46,6 +48,7 @@ def carry_analytic_collision_loss(
     if not bool(active.any()):
         return {
             "loss": zero,
+            "curvature_loss": zero,
             "active_fraction": active.float().mean(),
             "min_hh": zero.detach(),
             "min_bb_margin": zero.detach(),
@@ -71,8 +74,21 @@ def carry_analytic_collision_loss(
     focused = metrics["future_collision_steps"].topk(
         focus_steps, dim=-1
     ).values.mean()
+    segment = selected["path_world"][..., 1:, :] - selected["path_world"][..., :-1, :]
+    before, after = segment[..., :-1, :], segment[..., 1:, :]
+    cosine = (before * after).sum(dim=-1) / (
+        before.norm(dim=-1) * after.norm(dim=-1)
+    ).clamp(min=1e-7)
+    # Pickup is an intentional approach/carry corner and is exempt from the
+    # executor's curvature check as well.
+    cosine[..., 14:17] = 1.0
+    cosine_limit = math.cos(math.radians(46.0))
+    curvature = torch.relu(cosine_limit - cosine).square().flatten(
+        start_dim=2
+    ).amax(dim=-1).mean()
     return {
         "loss": focused,
+        "curvature_loss": curvature,
         "active_fraction": active.float().mean(),
         "min_hh": metrics["min_hh"].mean().detach(),
         "min_bb_margin": metrics["min_bb_margin"].mean().detach(),

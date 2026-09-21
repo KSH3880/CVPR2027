@@ -139,15 +139,16 @@ def _make_player(args, cfg, cfg_train):
 
 
 def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
-                returns, advantages, epochs, minibatch, clip_ratio,
+                returns, advantages, initial_plan_masks, epochs, minibatch, clip_ratio,
                 value_coef, entropy_coef, smoothness_coef,
                 speed_smoothness_coef, analytic_collision_coef,
-                analytic_focus_steps):
+                analytic_curvature_coef, analytic_focus_steps):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
         "path_smoothness_loss": 0.0, "speed_smoothness_loss": 0.0,
         "analytic_collision_loss": 0.0,
+        "analytic_curvature_loss": 0.0,
         "analytic_active_fraction": 0.0,
         "analytic_min_hh": 0.0,
         "analytic_min_bb_margin": 0.0,
@@ -175,7 +176,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             )
             analytic = carry_analytic_collision_loss(
                 mean_output, observation.state,
-                ~observation.previous_path_valid,
+                initial_plan_masks[index],
                 focus_steps=analytic_focus_steps,
             )
             loss = (
@@ -185,6 +186,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 + speed_smoothness_coef
                 * regularization["speed_smoothness_loss"]
                 + analytic_collision_coef * analytic["loss"]
+                + analytic_curvature_coef * analytic["curvature_loss"]
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -201,6 +203,9 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             )
             sums["analytic_collision_loss"] += float(
                 analytic["loss"].detach()
+            )
+            sums["analytic_curvature_loss"] += float(
+                analytic["curvature_loss"].detach()
             )
             sums["analytic_active_fraction"] += float(
                 analytic["active_fraction"].detach()
@@ -289,7 +294,10 @@ def main():
         "CARRY_PLANNER_SPEED_SMOOTHNESS_COEF", 1.0,
     )
     analytic_collision_coef = _env_float(
-        "CARRY_PLANNER_ANALYTIC_COLLISION_COEF", 10.0,
+        "CARRY_PLANNER_ANALYTIC_COLLISION_COEF", 1.0,
+    )
+    analytic_curvature_coef = _env_float(
+        "CARRY_PLANNER_ANALYTIC_CURVATURE_COEF", 20.0,
     )
     analytic_focus_steps = _env_int(
         "CARRY_PLANNER_ANALYTIC_FOCUS_STEPS", 8,
@@ -299,6 +307,8 @@ def main():
     if (collision_coef < 0 or smoothness_coef < 0
             or speed_smoothness_coef < 0 or analytic_collision_coef < 0):
         raise ValueError("reward and regularization coefficients must be non-negative")
+    if analytic_curvature_coef < 0:
+        raise ValueError("analytic curvature coefficient must be non-negative")
     if not 1 <= analytic_focus_steps <= 96:
         raise ValueError("CARRY_PLANNER_ANALYTIC_FOCUS_STEPS must be in [1, 96]")
 
@@ -316,6 +326,7 @@ def main():
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"collision_coef={collision_coef:g} "
         f"analytic_collision_coef={analytic_collision_coef:g} "
+        f"analytic_curvature_coef={analytic_curvature_coef:g} "
         f"analytic_focus_steps={analytic_focus_steps} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
@@ -332,8 +343,10 @@ def main():
         advantages: List[torch.Tensor] = []
         rewards: List[torch.Tensor] = []
         dones: List[torch.Tensor] = []
+        initial_plan_masks: List[torch.Tensor] = []
         diag: Dict[str, float] = {}
         for _ in range(horizon):
+            initial_plan = previous_done.detach().clone()
             state = task.planner_state()
             observation = history.observe(
                 state, reset_mask=previous_done, commit=True,
@@ -396,6 +409,7 @@ def main():
             advantages.append((target - value).detach())
             rewards.append(reward)
             dones.append(done)
+            initial_plan_masks.append(initial_plan)
             previous_done = done.detach().clone()
             for key, tensor in macro_diag.items():
                 diag[key] = diag.get(key, 0.0) + float(tensor)
@@ -408,12 +422,13 @@ def main():
         update = _ppo_update(
             policy, optimizer, flatten_observations(observations),
             torch.cat(actions), torch.cat(log_probs), torch.cat(returns),
-            flat_advantage, ppo_epochs, minibatch,
+            flat_advantage, torch.cat(initial_plan_masks), ppo_epochs, minibatch,
             _env_float("CARRY_PLANNER_CLIP", 0.2),
             _env_float("CARRY_PLANNER_VALUE_COEF", 0.5),
             _env_float("CARRY_PLANNER_ENTROPY_COEF", 1e-4),
             smoothness_coef, speed_smoothness_coef,
-            analytic_collision_coef, analytic_focus_steps,
+            analytic_collision_coef, analytic_curvature_coef,
+            analytic_focus_steps,
         )
 
         def ratio(numerator, denominator):
@@ -476,6 +491,7 @@ def main():
                     "planner_task": "plain_carry_collision_avoidance",
                     "collision_coef": collision_coef,
                     "analytic_collision_coef": analytic_collision_coef,
+                    "analytic_curvature_coef": analytic_curvature_coef,
                     "analytic_focus_steps": analytic_focus_steps,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,
