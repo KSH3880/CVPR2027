@@ -25,6 +25,41 @@ class HumanoidMACarryPlannerTrain(
 ):
     """Simultaneous Carry task controlled by an external joint planner."""
 
+    def create_sim(self):
+        """Keep CUDA compute logical while selecting Vulkan by physical id.
+
+        With one UUID in CUDA_VISIBLE_DEVICES, Torch and PhysX must both use
+        logical cuda:0. Isaac Gym's viewer graphics index is instead a Vulkan
+        physical ordinal and ignores CUDA visibility, so only that index is
+        replaced with the requested nvitop/NVML device.
+        """
+        raw = os.environ.get("CARRY_PLANNER_PHYSICAL_GPU")
+        if raw is None:
+            return super().create_sim()
+        try:
+            physical = int(raw)
+        except ValueError as error:
+            raise ValueError(
+                "CARRY_PLANNER_PHYSICAL_GPU must be a non-negative integer"
+            ) from error
+        if physical < 0:
+            raise ValueError(
+                "CARRY_PLANNER_PHYSICAL_GPU must be a non-negative integer"
+            )
+        graphics = self.graphics_device_id
+        if graphics >= 0:
+            self.graphics_device_id = physical
+        print(
+            f"[carry-planner-device] torch_physx=cuda:{self.device_id} "
+            f"visible_physical_gpu={physical} "
+            f"graphics_physical_gpu={physical if graphics >= 0 else -1}",
+            flush=True,
+        )
+        try:
+            return super().create_sim()
+        finally:
+            self.graphics_device_id = graphics
+
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         provider = os.environ.get("COORD_PROVIDER", "external").lower()
         if provider != "external":

@@ -16,6 +16,10 @@ OUT="$ROOT/runs/carry_planner/$TAG"
 case "$TAG" in ""|*[!A-Za-z0-9_.-]*) echo "invalid tag: $TAG" >&2; exit 2;; esac
 case "$ENVS:$GPU" in *[!0-9:]*) echo "ENVS/GPU must be non-negative integers" >&2; exit 2;; esac
 [ "$ENVS" -gt 0 ] || exit 2
+GPU_UUID=$(nvidia-smi -i "$GPU" --query-gpu=uuid --format=csv,noheader 2>/dev/null) || {
+    echo "NVML physical GPU index $GPU is not available" >&2; exit 2;
+}
+case "$GPU_UUID" in GPU-*|MIG-*) ;; *) echo "invalid GPU UUID: $GPU_UUID" >&2; exit 2;; esac
 for file in "$EXEC_CKPT" "$STAGE1"; do
     [ -f "$file" ] || { echo "checkpoint 없음: $file" >&2; exit 1; }
 done
@@ -38,7 +42,10 @@ fi
 . "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi_juan}"
 
-export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU"
+# MA_GPU is a nvitop/NVML physical index. CUDA numeric ordinals may have a
+# different order on multi-GPU servers, so select the exact device by UUID.
+export CARRY_PLANNER_PHYSICAL_GPU="$GPU"
+export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export COORD_PROVIDER=external COORD_MODEL=c1 COORD_DRAW_CANDIDATES=0
 export CARRY_PLANNER_OUTPUT="$OUT"
 export CARRY_PLANNER_ITERS=${CARRY_PLANNER_ITERS:-200}
@@ -68,6 +75,8 @@ export CARRY_PLANNER_VALUE_COEF=${CARRY_PLANNER_VALUE_COEF:-0.5}
 export CARRY_PLANNER_ENTROPY_COEF=${CARRY_PLANNER_ENTROPY_COEF:-0.0001}
 export CARRY_PLANNER_SMOOTHNESS_COEF=${CARRY_PLANNER_SMOOTHNESS_COEF:-10.0}
 export CARRY_PLANNER_SPEED_SMOOTHNESS_COEF=${CARRY_PLANNER_SPEED_SMOOTHNESS_COEF:-1.0}
+export CARRY_PLANNER_ANALYTIC_COLLISION_COEF=${CARRY_PLANNER_ANALYTIC_COLLISION_COEF:-10.0}
+export CARRY_PLANNER_ANALYTIC_FOCUS_STEPS=${CARRY_PLANNER_ANALYTIC_FOCUS_STEPS:-8}
 export CARRY_PLANNER_INIT=${CARRY_PLANNER_INIT:-}
 if [ -n "$CARRY_PLANNER_INIT" ]; then
     [ -f "$CARRY_PLANNER_INIT" ] || {
@@ -96,7 +105,7 @@ export COORD_PRESERVE_PICKUP_APPROACH=${COORD_PRESERVE_PICKUP_APPROACH:-1}
     env | LC_ALL=C sort | grep -E '^(CARRY_PLANNER_|COORD_|MA_|MS_|CUDA_VISIBLE_DEVICES=)'
 } > "$OUT/run.env"
 
-echo "carry planner: tag=$TAG envs=$ENVS gpu=$GPU scene=$MS_SCEN frozen=$EXEC_CKPT"
+echo "carry planner: tag=$TAG envs=$ENVS physical_gpu=$GPU uuid=$GPU_UUID logical_gpu=0 scene=$MS_SCEN frozen=$EXEC_CKPT"
 cd "$COORD"
 python -u -m carry_planner.train_closed_loop \
     --test --headless --task HumanoidMACarryPlannerTrain \

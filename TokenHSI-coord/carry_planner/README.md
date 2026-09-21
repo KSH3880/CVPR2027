@@ -22,6 +22,13 @@ blend는 `CARRY_PLANNER_PATH_UPDATE_ALPHA=0.5`다. 로그의
 평균 거리다. `plan_valid_fraction`이 낮으면 곡률 검사에서 proposal이 거부되어 이전
 plan 또는 analytic fallback이 실행되고 있다는 뜻이다.
 
+학습은 physical PPO에 더해 episode의 첫 full-plan을 96개 미래 시점으로 펼치고,
+충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
+최소화한다. 이 auxiliary loss의 speed는 timing 계산에만 사용하고 detach하므로
+gradient는 path에만 간다. 계수와 focus 수는
+`CARRY_PLANNER_ANALYTIC_COLLISION_COEF`(기본 10),
+`CARRY_PLANNER_ANALYTIC_FOCUS_STEPS`(기본 8)로 조절한다.
+
 Smoke 예시:
 
 ```bash

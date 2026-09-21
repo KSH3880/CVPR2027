@@ -24,6 +24,7 @@ if str(TOKENHSI_ROOT) not in sys.path:
 import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain  # noqa: E402
+from carry_planner.analytic_loss import carry_analytic_collision_loss  # noqa: E402
 from coordinator.schema import AGENTS  # noqa: E402
 from stack_planner.checkpoint import (  # noqa: E402
     load_stack_checkpoint, save_stack_checkpoint,
@@ -140,11 +141,17 @@ def _make_player(args, cfg, cfg_train):
 def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 returns, advantages, epochs, minibatch, clip_ratio,
                 value_coef, entropy_coef, smoothness_coef,
-                speed_smoothness_coef):
+                speed_smoothness_coef, analytic_collision_coef,
+                analytic_focus_steps):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
         "path_smoothness_loss": 0.0, "speed_smoothness_loss": 0.0,
+        "analytic_collision_loss": 0.0,
+        "analytic_active_fraction": 0.0,
+        "analytic_min_hh": 0.0,
+        "analytic_min_bb_margin": 0.0,
+        "analytic_min_hb_margin": 0.0,
     }
     updates = 0
     for _ in range(epochs):
@@ -163,12 +170,19 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             value_loss = F.mse_loss(value, returns[index])
             entropy_mean = entropy.mean()
             regularization = policy.diversity(observation)
+            mean_output = policy.all_mean_outputs(observation)
+            analytic = carry_analytic_collision_loss(
+                mean_output, observation.state,
+                ~observation.previous_path_valid,
+                focus_steps=analytic_focus_steps,
+            )
             loss = (
                 policy_loss + value_coef * value_loss
                 - entropy_coef * entropy_mean
                 + smoothness_coef * regularization["smoothness_loss"]
                 + speed_smoothness_coef
                 * regularization["speed_smoothness_loss"]
+                + analytic_collision_coef * analytic["loss"]
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -183,6 +197,14 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             sums["speed_smoothness_loss"] += float(
                 regularization["speed_smoothness_loss"].detach()
             )
+            sums["analytic_collision_loss"] += float(
+                analytic["loss"].detach()
+            )
+            sums["analytic_active_fraction"] += float(
+                analytic["active_fraction"].detach()
+            )
+            for name in ("min_hh", "min_bb_margin", "min_hb_margin"):
+                sums[f"analytic_{name}"] += float(analytic[name])
             updates += 1
     return {key: value / max(updates, 1) for key, value in sums.items()}
 
@@ -264,10 +286,19 @@ def main():
     speed_smoothness_coef = _env_float(
         "CARRY_PLANNER_SPEED_SMOOTHNESS_COEF", 1.0,
     )
+    analytic_collision_coef = _env_float(
+        "CARRY_PLANNER_ANALYTIC_COLLISION_COEF", 10.0,
+    )
+    analytic_focus_steps = _env_int(
+        "CARRY_PLANNER_ANALYTIC_FOCUS_STEPS", 8,
+    )
     if min(iterations, horizon, low_steps, ppo_epochs, minibatch) <= 0:
         raise ValueError("iteration/horizon/step/minibatch values must be positive")
-    if collision_coef < 0 or smoothness_coef < 0 or speed_smoothness_coef < 0:
+    if (collision_coef < 0 or smoothness_coef < 0
+            or speed_smoothness_coef < 0 or analytic_collision_coef < 0):
         raise ValueError("reward and regularization coefficients must be non-negative")
+    if not 1 <= analytic_focus_steps <= 96:
+        raise ValueError("CARRY_PLANNER_ANALYTIC_FOCUS_STEPS must be in [1, 96]")
 
     output_dir = Path(os.environ.get(
         "CARRY_PLANNER_OUTPUT", str(WORKSPACE / "runs/carry_planner/default"),
@@ -282,6 +313,8 @@ def main():
         f"path_alpha={path_update_alpha:g} "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"collision_coef={collision_coef:g} "
+        f"analytic_collision_coef={analytic_collision_coef:g} "
+        f"analytic_focus_steps={analytic_focus_steps} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
         flush=True,
@@ -378,6 +411,7 @@ def main():
             _env_float("CARRY_PLANNER_VALUE_COEF", 0.5),
             _env_float("CARRY_PLANNER_ENTROPY_COEF", 1e-4),
             smoothness_coef, speed_smoothness_coef,
+            analytic_collision_coef, analytic_focus_steps,
         )
 
         def ratio(numerator, denominator):
@@ -439,6 +473,8 @@ def main():
                     "frozen_executor": str(Path(args.checkpoint).resolve()),
                     "planner_task": "plain_carry_collision_avoidance",
                     "collision_coef": collision_coef,
+                    "analytic_collision_coef": analytic_collision_coef,
+                    "analytic_focus_steps": analytic_focus_steps,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,
                     "goal_margin": task._carry_goal_margin,

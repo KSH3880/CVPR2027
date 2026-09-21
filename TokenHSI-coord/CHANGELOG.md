@@ -1786,6 +1786,29 @@ legacy/new profile, 최저속도 위치, 복귀 완료, checkpoint round-trip을
   exploration인지, invalid proposal fallback인지, 아직 mean이 학습되지 않은 것인지
   학습 로그에서 분리할 수 있다.
 
+### carry planner 96-step analytic path collision supervision
+
+- 33-point 전체 action에 이후 6 physical step의 scalar PPO reward만 주던 긴-horizon
+  credit 희석을 보완했다. episode 첫 full-plan을 measured ms18 timing으로 96개 미래
+  시점에 펼치고, 충돌이 큰 top-8의 agent-agent/agent-box/box-box overlap을 직접
+  path head에 역전파한다.
+- 보조항의 speed profile은 도착 시간 계산에는 쓰되 detach하여 감속만으로 loss를
+  피하지 못하게 했다. 이미 지나간 fixed prefix를 미래로 오인하지 않도록 recurrent
+  replan에는 analytic loss를 적용하지 않고 physical PPO만 유지한다.
+- `analytic_collision_loss`, 적용 batch 비율, 예측 최소 agent 거리와 box margin을
+  iteration 로그 및 checkpoint metadata에 기록한다.
+
+### carry planner 물리 GPU index 고정
+
+- `MA_GPU` 숫자를 `CUDA_DEVICE_ORDER=PCI_BUS_ID`의 CUDA ordinal로 직접 넘기면 서버의
+  CUDA/NVML 열거 순서 차이 때문에 nvitop에서 다른 물리 GPU를 잡을 수 있었다.
+- train/view launcher가 `nvidia-smi -i <MA_GPU>`로 NVML index의 UUID를 해석한 뒤
+  `CUDA_VISIBLE_DEVICES`에 UUID를 넘긴다. 프로세스 내부 device는 계속 logical
+  `cuda:0`이지만 nvitop의 물리 GPU는 `MA_GPU`와 정확히 일치한다.
+- UUID 하나만 노출한 CUDA compute(Torch/PhysX)는 logical `cuda:0`을 유지한다. 반면
+  viewer의 Vulkan graphics index는 CUDA visibility와 무관한 물리 ordinal이므로,
+  non-headless carry viewer에서만 graphics id를 `MA_GPU`의 NVML index로 맞춘다.
+
 ### stack planner V13 single-head viewer compatibility
 
 - `view.sh`와 interactive viewer에서만 V13 checkpoint의 당시

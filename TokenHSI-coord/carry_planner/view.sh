@@ -12,6 +12,10 @@ GPU=${MA_GPU:-0}
 STAGE1=${MS_CKPT:-"$EXEC_REPO/output/ckpt_stage1.pth"}
 
 [[ "$GPU" =~ ^[0-9]+$ ]] || { echo "MA_GPU must be non-negative" >&2; exit 2; }
+GPU_UUID=$(nvidia-smi -i "$GPU" --query-gpu=uuid --format=csv,noheader 2>/dev/null) || {
+    echo "NVML physical GPU index $GPU is not available" >&2; exit 2;
+}
+case "$GPU_UUID" in GPU-*|MIG-*) ;; *) echo "invalid GPU UUID: $GPU_UUID" >&2; exit 2;; esac
 for file in "$PLANNER" "$POLICY" "$STAGE1"; do
     [ -f "$file" ] || { echo "checkpoint 없음: $file" >&2; exit 2; }
 done
@@ -19,7 +23,8 @@ PLANNER=$(realpath -- "$PLANNER")
 POLICY=$(realpath -- "$POLICY")
 STAGE1=$(realpath -- "$STAGE1")
 
-export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU"
+export CARRY_PLANNER_PHYSICAL_GPU="$GPU"
+export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export TOKENHSI_GRAPHICS_DEVICE_ID=${TOKENHSI_GRAPHICS_DEVICE_ID:-$GPU}
 export DISPLAY=${DISPLAY:-:0}
 
