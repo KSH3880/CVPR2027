@@ -4,17 +4,57 @@ import math
 import torch
 
 from utils.edge_context_spec import EdgeContextGraph, HOLDING, AT
-from utils.edge_ontop_spec import (ON_TOP, permute_graph, select_graph,
+from utils.edge_ontop_spec import (ON_TOP, batched, permute_graph, select_graph,
     validate_graph as validate_ontop_graph)
 from utils.edge_interaction_spec import SIT, CLIMB
 
 
 STAGE1_CONTEXT_MODE = 'state_relation_edge_stage1_v1'
 STAGE1_PACKET_FIELDS = ('valid', 'src', 'dst', 'relation', 'owner', 'start', 'keep')
+STAGE1_SEMANTIC_FIELDS = STAGE1_PACKET_FIELDS[:5]
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_SIT', 'HOLDING_CLIMB')
 PRESETS = ('random_stage1', 'holding', 'sit', 'climb', 'holding_at',
            'holding_ontop', 'holding_sit', 'holding_climb')
+PRIMITIVE_SAMPLER = 'two_agent_three_object_stage1_primitives'
+
+
+def semantic_packet_size(capacity):
+    return len(STAGE1_SEMANTIC_FIELDS) * capacity
+
+
+def semantic_graph_packet(graph, batch_size):
+    fields = [batched(getattr(graph, key), batch_size).float() for key in
+        ('edge_valid', 'edge_src', 'edge_dst', 'edge_relation', 'edge_owner')]
+    return (torch.stack(fields, -1) * fields[0][..., None]).flatten(1)
+
+
+def parse_semantic_packet(packet):
+    width = len(STAGE1_SEMANTIC_FIELDS)
+    if packet.ndim != 2 or packet.shape[-1] % width:
+        raise ValueError('Expected stored semantic graph packet [N,5*E]')
+    fields = packet.reshape(packet.shape[0], -1, width)
+    return (fields[..., 0].bool(), fields[..., 1].long(), fields[..., 2].long(),
+        fields[..., 3].long(), fields[..., 4].long())
+
+
+def validate_relation_rsi(spec, skills):
+    if set(spec) != {'HOLDING', 'SIT', 'CLIMB'}:
+        raise ValueError('relationRsi requires HOLDING/SIT/CLIMB rows')
+    allowed = {
+        'HOLDING': {'loco', 'pickUp', 'carryWith'},
+        'SIT': {'loco', 'sit'},
+        'CLIMB': {'loco', 'climb'},
+    }
+    for relation, values in spec.items():
+        if len(values) != len(skills) or any(isinstance(v, bool) or
+                not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0
+                for v in values) or not math.isclose(sum(values), 1., abs_tol=1e-8):
+            raise ValueError('Invalid relationRsi probability row')
+        if any(v and skill not in allowed[relation] for skill, v in zip(skills, values)):
+            raise ValueError('relationRsi skill does not match its relation')
+        if values[skills.index('loco')] <= 0:
+            raise ValueError('relationRsi must retain loco starts')
 
 
 def standalone_interaction_owners(graph, env_ids):
@@ -58,26 +98,36 @@ DEFAULT_GRAPH = dict(
 
 
 def validate_stage1_context_config(config):
+    semantic_only = config.get('schema_version') == 7
     expected = {
         'mode', 'schema_version', 'state_reward_weight', 'progress_reward_weight',
         'success_reward_weight', 'satisfaction_threshold', 'holding', 'at', 'ontop',
-        'sit', 'climb', 'progress', 'context', 'contextReward', 'success',
+        'sit', 'climb', 'progress', 'success',
         'observation', 'diagnostics'}
+    if not semantic_only:
+        expected.update(('context', 'contextReward'))
+    if config.get('schema_version') in (6, 7):
+        expected.add('stage1_variant')
     if set(config) != expected:
         raise ValueError('Unsupported Stage-1 relationReward fields')
-    if config['mode'] != STAGE1_CONTEXT_MODE or config['schema_version'] != 5:
-        raise ValueError('Expected Stage-1 START/KEEP schema 5')
-    if config['context'] != {'kind': 'start_keep_constant'}:
+    if config['mode'] != STAGE1_CONTEXT_MODE or config['schema_version'] not in (5, 6, 7):
+        raise ValueError('Expected Stage-1 schema 5, 6 or 7')
+    if config['schema_version'] == 6 and config['stage1_variant'] != 'primitive_relation_rsi':
+        raise ValueError('Unsupported Stage-1 schema 6 variant')
+    if semantic_only and config['stage1_variant'] != 'climb_only_rsi_no_context':
+        raise ValueError('Unsupported Stage-1 schema 7 variant')
+    if not semantic_only and config['context'] != {'kind': 'start_keep_constant'}:
         raise ValueError('Stage-1 requires constant START/KEEP context')
-    if config['contextReward'] != {'start_weight': 0., 'keep_weight': 0.}:
+    if not semantic_only and config['contextReward'] != {'start_weight': 0., 'keep_weight': 0.}:
         raise ValueError('Stage-1 START/KEEP auxiliary reward must be disabled')
     if config['success'] != {'at_z_tolerance': .001, 'saturation': 'own_success',
                              'terminate_when_all_subgoals_done': False}:
         raise ValueError('Stage-1 permits own-success saturation only')
-    if config['observation'] != {
-            'edge_context_fields': ['start', 'keep'],
-            'graph_packet_fields': list(STAGE1_PACKET_FIELDS)}:
-        raise ValueError('Stage-1 requires the versioned START/KEEP graph packet')
+    expected_observation = ({'graph_packet_fields': list(STAGE1_SEMANTIC_FIELDS)}
+        if semantic_only else {'edge_context_fields': ['start', 'keep'],
+            'graph_packet_fields': list(STAGE1_PACKET_FIELDS)})
+    if config['observation'] != expected_observation:
+        raise ValueError('Stage-1 observation packet does not match its schema')
     if config['holding'] != {'hand_distance_scale': 10.}:
         raise ValueError('Unsupported Stage-1 HOLDING geometry')
     if config['at'] != {'state_definition': 'box_near', 'near_distance_scale': 10.}:
@@ -103,14 +153,22 @@ def validate_stage1_context_config(config):
     expected_climb = {'state_definition': 'root_target', 'near_distance_scale': 10.,
                       'target_height': 'rotated_bbox_top_plus_char_h'}
     climb = config['climb']
-    if (set(climb) != set(expected_climb) | {'feet_height_tolerance'}
+    climb_fields = set(expected_climb) | {'feet_height_tolerance'}
+    if semantic_only:
+        climb_fields.add('success_phi_threshold')
+    if (set(climb) != climb_fields
             or any(climb.get(k) != v for k, v in expected_climb.items())):
         raise ValueError('Unsupported Stage-1 CLIMB geometry')
     tolerance = climb['feet_height_tolerance']
     if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
             or not math.isfinite(tolerance) or tolerance <= 0):
         raise ValueError('Stage-1 CLIMB feet tolerance must be finite and positive')
-    if config['progress'] != {'kind': 'distance', 'delta': .5, 'sigma': 1.}:
+    if semantic_only and (climb['success_phi_threshold'] != .6 or tolerance != .07):
+        raise ValueError('Stage-1 schema 7 CLIMB success must use phi=0.6 and feet=0.07m')
+    expected_progress = {'kind': 'distance', 'delta': .5, 'sigma': 1.}
+    if semantic_only:
+        expected_progress['climb_pinning'] = 'bbox_valid_radius'
+    if config['progress'] != expected_progress:
         raise ValueError('Unsupported Stage-1 distance progress')
     for key in ('state_reward_weight', 'progress_reward_weight', 'success_reward_weight'):
         if config[key] != .2:
@@ -122,18 +180,26 @@ def validate_stage1_context_config(config):
 def validate_sampler(spec, m=2, o=3):
     if (m, o) != (2, 3):
         raise ValueError('Stage-1 sampler/presets require M=2, O=3')
-    if set(spec) != set(DEFAULT_GRAPH):
+    semantic_only = spec.get('semantic_only', False)
+    if type(semantic_only) is not bool or set(spec) != set(DEFAULT_GRAPH) | ({'semantic_only'} if semantic_only else set()):
         raise ValueError('Unsupported Stage-1 edge composition fields')
-    for key in ('mode', 'sampler', 'edge_capacity', 'max_edges_per_agent',
-                'target_binding'):
-        if spec[key] != DEFAULT_GRAPH[key]:
+    primitive = spec.get('sampler') == PRIMITIVE_SAMPLER
+    contract = dict(DEFAULT_GRAPH)
+    if primitive:
+        contract.update(sampler=PRIMITIVE_SAMPLER, max_edges_per_agent=1)
+    if semantic_only and (not primitive or spec['pattern_probabilities'] !=
+            {'HOLDING': 0., 'SIT': 0., 'CLIMB': 1.}):
+        raise ValueError('Semantic-only Stage-1 requires CLIMB-only primitive sampling')
+    for key in ('mode', 'sampler', 'edge_capacity', 'max_edges_per_agent', 'target_binding'):
+        if spec[key] != contract[key]:
             raise ValueError('Unsupported Stage-1 edge composition ' + key)
     p = spec['pattern_probabilities']
-    if (tuple(p) != PATTERNS or any(isinstance(v, bool) or not isinstance(v, (int, float))
+    expected_patterns = PATTERNS[:3] if primitive else PATTERNS
+    if (tuple(p) != expected_patterns or any(isinstance(v, bool) or not isinstance(v, (int, float))
             or not math.isfinite(v) or v < 0 for v in p.values())
             or not math.isclose(sum(p.values()), 1., abs_tol=1e-8)):
         raise ValueError('Stage-1 pattern probabilities must follow the contract and sum to one')
-    ox_mass = sum(p[k] for k in ('HOLDING_ON_TOP', 'HOLDING_SIT', 'HOLDING_CLIMB'))
+    ox_mass = sum(p.get(k, 0.) for k in ('HOLDING_ON_TOP', 'HOLDING_SIT', 'HOLDING_CLIMB'))
     if ox_mass > .5 + 1e-8:
         raise ValueError('Stage-1 O_X pattern mass must be <=0.5')
     if type(spec['shuffle_edge_order']) is not bool:
@@ -156,6 +222,11 @@ def _draw_patterns(n, probabilities, device, generator):
                                        generator=generator)
             pattern[mask, agent] = ox_ids[choice]
     return pattern
+
+
+def _draw_primitive_patterns(n, probabilities, device, generator):
+    p = torch.tensor([probabilities[k] for k in PATTERNS[:3]], device=device)
+    return torch.multinomial(p, n * 2, replacement=True, generator=generator).reshape(n, 2)
 
 
 def compose_graph(pattern, shuffle=False, generator=None):
@@ -202,8 +273,14 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
     validate_sampler(spec)
     if preset not in PRESETS:
         raise ValueError('Unknown Stage-1 TASK_GRAPH preset: ' + preset)
+    primitive = spec['sampler'] == PRIMITIVE_SAMPLER
+    if primitive and preset not in PRESETS[:4]:
+        raise ValueError('Primitive Stage-1 permits holding/sit/climb presets only')
+    if spec.get('semantic_only', False) and preset not in ('random_stage1', 'climb'):
+        raise ValueError('CLIMB-only Stage-1 permits climb preset only')
     if preset == 'random_stage1':
-        pattern = _draw_patterns(n, spec['pattern_probabilities'], device, generator)
+        draw = _draw_primitive_patterns if primitive else _draw_patterns
+        pattern = draw(n, spec['pattern_probabilities'], device, generator)
     else:
         selected = {'holding': 0, 'sit': 1, 'climb': 2, 'holding_at': 3,
                     'holding_ontop': 4, 'holding_sit': 5,
@@ -220,7 +297,8 @@ def compile_stage1_graph(spec, m, o, device=None):
     if spec.get('mode') != 'edge_composition':
         raise ValueError('Stage-1 accepts its conflict-free edge sampler only')
     validate_sampler(spec, m, o)
-    return select_graph(sample_graph(1, spec, device=device or 'cpu', preset='holding'), 0)
+    preset = 'climb' if spec.get('semantic_only', False) else 'holding'
+    return select_graph(sample_graph(1, spec, device=device or 'cpu', preset=preset), 0)
 
 
 def validate_graph(graph):

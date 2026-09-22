@@ -79,7 +79,7 @@ class EdgeContextTaskMixin:
             speed = box_speed_penalty(self._prev_box_pos, objects, self.dt, self._box_vel_pen_coeff, self._box_vel_pen_thre)
         reward = result['agent_task_reward'] + power + collision + speed
         components = [owner_sum(result[k], graph) for k in ('state_component', 'progress_component', 'success_component')]
-        if getattr(self, '_edge_ontop', False):
+        if getattr(self, '_edge_ontop', False) and not getattr(self, '_edge_stage1', False):
             components = [mix_task_reward(c) for c in components]
         terms = torch.stack(components + [power, collision, speed, reward], -1).flatten(0, 1)
         self.rew_buf.copy_(reward.flatten())
@@ -95,15 +95,18 @@ class EdgeContextTaskMixin:
         if not dcfg.get('enabled', True):
             return
         is_stage1 = getattr(self, '_edge_stage1', False)
-        context = stage1_context(phi, graph) if is_stage1 else edge_context(phi, graph)
-        context_fields = ['q_start', 'q_keep'] if is_stage1 else ['q_pre', 'q_term']
+        semantic_only = getattr(self, '_semantic_only_stage1', False)
+        context_fields = ([] if semantic_only else
+            ['q_start', 'q_keep'] if is_stage1 else ['q_pre', 'q_term'])
         fields = ['phi_raw', 'progress_raw'] + context_fields + ['own_success', 'term_success',
                   'reward_saturated', 'state_component', 'progress_component', 'success_component', 'total',
                   'distance', 'distance_xy', 'z_error']
         values = dict(result, distance=diag['distance'], distance_xy=diag['distance_xy'],
                       z_error=diag['z_error'])
-        values[context_fields[0]] = context[..., 0]
-        values[context_fields[1]] = context[..., 1]
+        if not semantic_only:
+            context = stage1_context(phi, graph) if is_stage1 else edge_context(phi, graph)
+            values[context_fields[0]] = context[..., 0]
+            values[context_fields[1]] = context[..., 1]
         packed = torch.stack([values[k].float() for k in fields], -1)
         relations = [(HOLDING, 'holding'), (AT, 'at')]
         if getattr(self, '_edge_ontop', False):

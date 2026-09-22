@@ -2,7 +2,27 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-09-22
+
+### 24번 CLIMB 전용 context-free Stage 1 scratch 실험
+
+- 기존 23번 학습을 보존하고, 양 agent가 CLIMB 한 edge씩 자기 바닥 상자에 수행하는 schema 7 config·전용 train/test/VNC·output을 추가했다. 23번의 가변 박스와 loco/climb .5/.5 RSI를 유지하고, AMP는 원본 CLIMB의 loco/climb/climbNoRSI `.3/.4/.3` 시연 분포로 분리했다.
+- CLIMB progress pinning만 실제 상자 XY 대각선 반경/2+0.3m로 바꾸고, root state `exp(-10d²)` 및 가중치 .2/.2/.2는 유지했다. current success는 CLIMB 전용 `phi>=0.6 AND 평균 발 높이 오차<=0.07m`; 발 dense reward는 없다. START/KEEP packet·context encoder·context auxiliary reward를 제외하고 5-field semantic graph만 정책에 입력한다. root/발/동시/엄격 기준 통과율과 양발 개별 최대 오차 진단을 추가했다. Stage 1 항별 reward 로그의 기존 `.9/.1` 혼합 표시만 own-only 실제 보상과 일치하도록 수정했다.
+- 관련 CPU 테스트 **16개**, 전체 **255개 통과**. 신규 YAML/relation RSI/schema·semantic-only network forward/backward·CLIMB reward/packet 및 별도 checkpoint 계약을 확인했다. GPU 0에서 기존 23번 학습이 사용률 95%로 실행 중이라 학습·시뮬레이터 smoke는 실행하지 않았고 프로세스도 건드리지 않았다. CLIMB 수렴·양발 접촉은 아직 미검증이다.
+
 ## 2026-09-21
+
+### 23번 Stage 1 단일 edge + relation RSI scratch 실험
+
+- 21번 가변 박스·box-top SIT 목표·CLIMB success·combined AMP·own-only reward를 유지하면서 agent별 `HOLDING/SIT/CLIMB` 단일 edge를 각 1/3 샘플하는 별도 schema 6 config/output/train/test/VNC를 추가했다. 4-slot graph packet은 유지하며 복합 edge·AT/ON_TOP·PRE/TERM은 이 실험에 넣지 않는다. 원본 TokenHSI 모션 ID/time을 재사용하는 graph-conditioned RSI를 HOLDING(loco .5/pickUp .5), SIT(loco .5/sit .5), CLIMB(loco .5/climb .5)로 연결했다. `carryWith`는 AMP에는 남기고 RSI에서는 끈다. SIT/CLIMB 원본 object XY/yaw를 동적 박스에 적용하고 Z는 실제 박스의 바닥 중심으로 맞춘다. 모션-body 중심의 박스 내부 침투·발의 지면 아래 위치는 state commit 전 재시도하며 RSI 시도·거부율·시작 거리 diagnostics를 추가했다. 기존 19~22번 실행·checkpoint 경로는 변경하지 않는다.
+- CPU 전체 **253개 통과**, 신규 3개 shell 문법·diff 공백 확인. GPU 0의 기존 본학습을 유지한 채 `2048환경·1 epoch scratch`를 별도 `_check_v2` 출력에서 완료·checkpoint 저장했다. 최근 집계: H/S/C 샘플 비율 **.329/.332/.339**, SIT/CLIMB RSI 시도 **660/654**, 추가 침투/지면 검사 거부 **0/0**, 물리 reset 재시도 **23/1938**, 실패 **0**, 평균 에피소드 길이 **31.82 step**. SIT/CLIMB RSI 시작 목표 거리는 평균 **1.68/1.03m**로 원본 모션에서 목표 바로 앞 프레임만 쓰는 것은 아니다. 첫 `_check` checkpoint로 1환경·32-step loco-only SIT headless 평가도 완료했다. 이는 충돌 휴리스틱과 단기 실행 검증이며 장기 학습 수렴 또는 모든 크기의 물리 무충돌 증명은 아니다.
+- 같은 seed 42 / 2048환경 / 1 epoch 분리 대조의 상자 속도 페널티는 loco-only **-0.00026**, HOLDING의 pickUp만 **-0.00564**, carryWith만 **-0.03506**, SIT RSI만 **-0.00055**, CLIMB RSI만 **-0.00006**이었다. carryWith의 박스를 0.4m 고정해도 **-0.01760**이 남아 크기 범위만의 문제가 아니었다. 따라서 23번 본 config의 HOLDING RSI에서 carryWith를 제외했고, SIT/CLIMB 박스 범위는 유지했다. 이 수치는 첫 epoch의 물리·보상 신호이며 장기 성능 비교는 아니다.
+- 최종 config(loco/pickUp + loco/sit + loco/climb)를 seed 42·2048환경·1 epoch로 다시 실행해 checkpoint 저장, 141개 scalar 전부 finite, box-speed **-0.00411**, 물리 재시도 **16회**·실패 **0회**, SIT/CLIMB RSI 시도 **716/701**·기하학 검사 거부 **0/0**을 확인했다. 비교용 임시 YAML은 제거하고 `_check` output의 로그·checkpoint는 남겼다.
+
+### 22번 Stage 1 고정 박스 SIT 목표 수정 실험
+
+- 실행 중인 20번을 보존하고 고정 0.5×0.5×0.4m 상자·단독 SIT/CLIMB 바닥 reset·graph/AMP/CLIMB을 동일하게 유지한 별도 config/output/train/test/VNC를 추가했다. SIT root 목표만 원본 의자 offset에서 실제 박스 윗면 + 0.12m로 바꿨다. 20번 checkpoint와 reward 정의가 달라 scratch로 시작하며, 21번과 reward 정의는 같아도 크기 분포가 달라 checkpoint를 섞지 않도록 문서화했다.
+- CPU 전체 **251개 통과**, 세 shell 문법·diff 공백 확인. GPU 0의 기존 20번 본학습을 유지한 채 별도 `_check`에서 **2048환경·1 epoch scratch** 종료·checkpoint 저장, 별도 `_eval_check`에서 1환경·32-step SIT 평가 경로 종료를 확인했다. 학습 CSV의 SIT target Z≈0.52m를 확인했다. 1 epoch로 SIT/CLIMB 수렴은 검증하지 않았다.
 
 ### 21번 Stage 1 공통 크기 박스 scratch 실험
 

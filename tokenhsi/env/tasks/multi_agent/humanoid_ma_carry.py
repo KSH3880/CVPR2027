@@ -41,10 +41,10 @@ from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, co
 from env.tasks.multi_agent.edge_context_reward import scene_success
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
 from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_interaction_graph,
-    PRESETS as INTERACTION_PRESETS)
+    PRESETS as INTERACTION_PRESETS, SIT, CLIMB)
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     PRESETS as STAGE1_PRESETS, ground_standalone_interaction_targets,
-    max_stage1_stack_height)
+    max_stage1_stack_height, PRIMITIVE_SAMPLER, semantic_packet_size)
 from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
 
 
@@ -68,7 +68,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
         self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE,
             ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
-        default_preset = 'holding_sit' if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
+        primitive_config = (self._edge_stage1 and cfg['env'].get('relationGraph', {}).get('sampler') == PRIMITIVE_SAMPLER)
+        semantic_only_config = bool(cfg['env'].get('relationGraph', {}).get('semantic_only', False))
+        default_preset = ('climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
         train_preset = 'random_stage1' if self._edge_stage1 else 'random'
         self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
@@ -80,6 +82,19 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             if self._task_graph_preset != expected_random or (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2,3):
                 raise ValueError('Sampled-edge training requires random graphs, 2 agents and 3 objects')
         self._relation_graph_spec = cfg['env'].get('relationGraph', {'template': 'independent_carry'})
+        self._primitive_stage1 = (self._edge_stage1 and
+            self._relation_graph_spec.get('sampler') == PRIMITIVE_SAMPLER)
+        self._semantic_only_stage1 = self._edge_stage1 and bool(
+            self._relation_graph_spec.get('semantic_only', False))
+        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') == 7):
+            raise ValueError('Semantic-only graph and Stage-1 schema 7 must be paired')
+        self._relation_rsi = cfg['env'].get('relationRsi')
+        if self._relation_rsi is not None and not self._primitive_stage1:
+            raise ValueError('relationRsi requires the primitive Stage-1 sampler')
+        if self._primitive_stage1 and self._relation_rsi is None:
+            raise ValueError('Primitive Stage-1 requires relationRsi')
+        if self._primitive_stage1 != (self._relation_cfg.get('schema_version') in (6, 7)):
+            raise ValueError('Primitive sampler and Stage-1 schema 6/7 must be paired')
         self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
         self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
             ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
@@ -107,7 +122,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._edge_context:
             compiler = compile_stage1_graph if self._edge_stage1 else (compile_interaction_graph if self._edge_interaction else (compile_ontop_graph if self._edge_ontop else compile_edge_context_graph))
             graph = compiler(self._relation_graph_spec, num_agents, self.num_objects)
-            self._context_suffix_width = (packet_size if self._edge_ontop else context_suffix_size)(len(graph.ids))
+            size_fn = (semantic_packet_size if self._semantic_only_stage1 else
+                packet_size if self._edge_ontop else context_suffix_size)
+            self._context_suffix_width = size_fn(len(graph.ids))
             self.REWARD_TERM_NAMES = ('edge_state', 'edge_progress', 'edge_success',
                                       'power', 'collision', 'box_speed', 'total')
 
@@ -186,6 +203,12 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._skill = cfg["env"]["skill"]
         self._skill_init_prob = torch.tensor(cfg["env"]["skillInitProb"], device=self.device, dtype=torch.float)
         self._skill_disc_prob = torch.tensor(cfg["env"]["skillDiscProb"], device=self.device, dtype=torch.float)
+        if self._relation_rsi is not None:
+            from utils.edge_stage1_spec import validate_relation_rsi
+            validate_relation_rsi(self._relation_rsi, self._skill)
+            self._relation_rsi_weights = torch.tensor(
+                [self._relation_rsi[k] for k in ('HOLDING', 'SIT', 'CLIMB')],
+                device=self.device, dtype=torch.float)
 
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
@@ -1091,7 +1114,14 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
     def _reset_ref_state_init(self, slot_env, slot_agent):
         num_slots = slot_env.shape[0]
-        sk_ids = torch.multinomial(self._skill_init_prob, num_samples=num_slots, replacement=True)
+        if self._relation_rsi is not None and not self._is_eval:
+            graph = self.relation_runtime.graph
+            owned = graph.edge_valid[slot_env] & (graph.edge_owner[slot_env] == slot_agent[:, None])
+            relation = graph.edge_relation[slot_env].masked_fill(~owned, 0).max(-1).values
+            index = torch.where(relation == SIT, 1, torch.where(relation == CLIMB, 2, 0))
+            sk_ids = torch.multinomial(self._relation_rsi_weights[index], 1).flatten()
+        else:
+            sk_ids = torch.multinomial(self._skill_init_prob, num_samples=num_slots, replacement=True)
 
         for uid, sk_name in enumerate(self._skill):
             curr_motion_lib = self._motion_lib[sk_name]
@@ -1294,22 +1324,32 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._platform_pos[env_ids] = self._platform_default_pos[env_ids]
 
         # boxes that come from a reference motion
-        for sk_name in ["pickUp", "carryWith", "putDown"]:
+        reference_object_skills = ["pickUp", "carryWith", "putDown"]
+        if self._primitive_stage1:
+            reference_object_skills += ["sit", "climb"]
+        for sk_name in reference_object_skills:
             if self._reset_ref_slots.get(sk_name) is None:
                 continue
 
             curr_env, curr_agent = self._reset_ref_slots[sk_name]
             offset = self._agent_spawn_offsets[curr_agent] + self._env_origins[curr_env]
 
-            root_pos, root_rot = self._motion_lib[sk_name].get_obj_motion_state(
-                motion_ids=self._reset_ref_motion_ids[sk_name],
-                motion_times=self._reset_ref_motion_times[sk_name])
+            if sk_name in ("sit", "climb"):
+                root_pos, root_rot = self._motion_lib[sk_name].get_obj_motion_state_single_frame(
+                    self._reset_ref_motion_ids[sk_name])
+            else:
+                root_pos, root_rot = self._motion_lib[sk_name].get_obj_motion_state(
+                    motion_ids=self._reset_ref_motion_ids[sk_name],
+                    motion_times=self._reset_ref_motion_times[sk_name])
             root_pos = root_pos + offset
 
             curr_box = self._agent_box_assignment[curr_env, curr_agent]
             box_size = self._box_size[curr_env, curr_box]
-            on_ground = (box_size[:, 2] / 2 > root_pos[:, 2])
-            root_pos[on_ground, 2] = box_size[on_ground, 2] / 2
+            if sk_name in ("sit", "climb"):
+                root_pos[:, 2] = box_size[:, 2] / 2
+            else:
+                on_ground = (box_size[:, 2] / 2 > root_pos[:, 2])
+                root_pos[on_ground, 2] = box_size[on_ground, 2] / 2
 
             self._box_states[curr_env, curr_box, 0:3] = root_pos
             self._box_states[curr_env, curr_box, 3:7] = root_rot

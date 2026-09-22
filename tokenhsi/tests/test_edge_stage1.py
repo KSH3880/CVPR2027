@@ -24,6 +24,123 @@ ENV = yaml.safe_load((ROOT / 'data/cfg/multi_agent/approach_distance_edge_contex
 CFG, SPEC = ENV['relationReward'], ENV['relationGraph']
 COMMON_ENV = yaml.safe_load((ROOT / 'data/cfg/multi_agent/'
     'approach_distance_edge_context_stage1_common_boxes.yaml').read_text())['env']
+FIXED_ENV = yaml.safe_load((ROOT / 'data/cfg/multi_agent/'
+    'approach_distance_edge_context_stage1_fixed_boxes_sit_fix.yaml').read_text())['env']
+PRIMITIVE_ENV = yaml.safe_load((ROOT / 'data/cfg/multi_agent/'
+    'approach_distance_edge_context_stage1_primitives_rsi.yaml').read_text())['env']
+CLIMB_ENV = yaml.safe_load((ROOT / 'data/cfg/multi_agent/'
+    'approach_distance_stage1_climb_rsi.yaml').read_text())['env']
+
+
+def test_climb_only_semantic_packet_and_reward_contract():
+    cfg, spec = CLIMB_ENV['relationReward'], CLIMB_ENV['relationGraph']
+    validate_relation_config(cfg)
+    validate_sampler(spec)
+    validate_relation_rsi(CLIMB_ENV['relationRsi'], CLIMB_ENV['skill'])
+    assert 'context' not in cfg and 'contextReward' not in cfg
+    assert cfg['observation']['graph_packet_fields'] == list(STAGE1_SEMANTIC_FIELDS)
+    assert CLIMB_ENV['box'] == PRIMITIVE_ENV['box']
+    graph = sample_graph(20, spec, generator=torch.Generator().manual_seed(17))
+    assert (graph.edge_relation[graph.edge_valid] == CLIMB).all()
+    assert (graph.edge_valid.sum(-1) == 2).all()
+    with pytest.raises(ValueError, match='CLIMB-only'):
+        sample_graph(1, spec, preset='holding')
+    packet = semantic_graph_packet(graph, 20)
+    assert packet.shape == (20, 20)
+    valid, src, dst, relation, owner = parse_semantic_packet(packet)
+    assert torch.equal(valid, graph.edge_valid)
+    assert torch.equal(relation[valid], graph.edge_relation[valid])
+    meta = checkpoint_metadata(cfg)
+    assert meta['graph_record_width'] == 5 and meta['context_dim_per_edge'] == 0
+    with pytest.raises(ValueError):
+        check_checkpoint_metadata(
+            {'relation_metadata': checkpoint_metadata(PRIMITIVE_ENV['relationReward'])}, meta)
+
+
+def test_climb_only_progress_pinning_success_and_no_context_network():
+    cfg, spec = CLIMB_ENV['relationReward'], CLIMB_ENV['relationGraph']
+    graph = sample_graph(1, spec, preset='climb')
+    climb = ((graph.edge_relation == CLIMB) & graph.edge_valid).nonzero(as_tuple=False)[0, 1]
+    hands, feet, roots, objects, sizes, goals = _scene()
+    roots[0, 0] = torch.tensor([.6, 0., 1.34])
+    feet[0, 0, :, 2] = .46
+    phi, diag = evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals,
+        graph, cfg, .94)
+    assert diag['progress'][0, climb] == pytest.approx(1.)
+    assert phi[0, climb] < .6
+    roots[0, 0, 0] = .2
+    phi, diag = evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals,
+        graph, cfg, .94)
+    runtime = Stage1ContextRuntime(1, graph, cfg, 'cpu')
+    result = runtime.step(phi, diag['progress'], diag['z_error'], diag['feet_height_error'])
+    assert result['own_success'][0, climb] and result['total'][0, climb] == pytest.approx(.6)
+    assert diag['feet_individual_max_error'][0, climb] == pytest.approx(.06)
+    assert runtime.suffix().shape == (1, 20)
+    feet[0, 0, :, 2] = .471
+    phi, diag = evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals,
+        graph, cfg, .94)
+    assert not runtime.step(phi, diag['progress'], diag['z_error'],
+        diag['feet_height_error'])['own_success'][0, climb]
+
+    net = RelationEncoder([223, 30, 1], 2, 3, 16, 2, 2, 32,
+        lambda size: nn.Sequential(nn.Linear(size, 16), nn.ReLU()),
+        observation_mode='clean_scene', kinematic_size=7,
+        relation_bias_mode='edge_mlp', gta_cfg={'enable': True},
+        relation_reward_mode=STAGE1_CONTEXT_MODE, relation_graph_spec=spec)
+    with torch.no_grad():
+        net.edge_encoder.bias_projection.normal_(std=.1)
+    assert net.suffix_width == 20
+    assert not any('context_encoder' in name for name, _ in net.named_parameters())
+    width = 224 * 2 + 30 * 3
+    obs = torch.randn(1, width + 7 * 7 + 20)
+    obs[:, width:width + 49].reshape(1, 7, 7)[..., 3:7] = torch.tensor([0., 0., 0., 1.])
+    obs[:, -20:] = runtime.suffix()
+    out = net(obs)
+    assert out.shape == (1, 2, 16) and torch.isfinite(out).all()
+    out.square().sum().backward()
+    assert net.edge_encoder.relation_embed.weight.grad[CLIMB].abs().sum() > 0
+
+
+def test_primitive_relation_rsi_graph_and_checkpoint_contract():
+    env = PRIMITIVE_ENV
+    validate_relation_config(env['relationReward'])
+    validate_sampler(env['relationGraph'])
+    validate_relation_rsi(env['relationRsi'], env['skill'])
+    assert env['relationRsi']['HOLDING'] == [.5, 0, 0, 0, .5, 0, 0]
+    assert env['relationRsi']['SIT'] == [.5, .5, 0, 0, 0, 0, 0]
+    assert env['relationRsi']['CLIMB'] == [.5, 0, .5, 0, 0, 0, 0]
+    assert env['box'] == COMMON_ENV['box']
+    assert env['skillDiscProb'] == COMMON_ENV['skillDiscProb']
+    assert env['relationReward']['schema_version'] == 6
+    with pytest.raises(ValueError, match='schema mismatch'):
+        check_checkpoint_metadata(
+            {'relation_metadata': checkpoint_metadata(COMMON_ENV['relationReward'])},
+            checkpoint_metadata(env['relationReward']))
+    graph = sample_graph(30000, env['relationGraph'],
+                         generator=torch.Generator().manual_seed(15))
+    assert (graph.edge_valid.sum(-1) == 2).all()
+    assert (graph.edge_relation[graph.edge_valid].unique().sort().values ==
+            torch.tensor([HOLDING, SIT, CLIMB])).all()
+    assert not (graph.edge_dst[graph.edge_valid] == 4).any()
+    assert not graph.prereq_mask.any()
+    assert not (graph.term_index >= 0).any()
+    for a in (0, 1):
+        owned = graph.edge_valid & (graph.edge_owner == a)
+        assert (owned.sum(-1) == 1).all()
+        assert (graph.edge_dst[owned] == 2 + a).all()
+        counts = torch.stack([((graph.edge_relation == relation) & owned).any(-1).float().mean()
+                              for relation in (HOLDING, SIT, CLIMB)])
+        torch.testing.assert_close(counts, torch.full((3,), 1 / 3), atol=.01, rtol=0)
+    for preset in ('holding_at', 'holding_sit'):
+        with pytest.raises(ValueError, match='Primitive'):
+            sample_graph(1, env['relationGraph'], preset=preset)
+
+
+def test_primitive_relation_rsi_rejects_mismatched_skill():
+    rows = deepcopy(PRIMITIVE_ENV['relationRsi'])
+    rows['SIT'] = [0.5, 0, 0, 0, 0, .5, 0]
+    with pytest.raises(ValueError, match='does not match'):
+        validate_relation_rsi(rows, PRIMITIVE_ENV['skill'])
 
 
 def _scene(n=1):
@@ -161,8 +278,27 @@ def test_common_boxes_variant_has_independent_full_range_and_pair_stack_limit():
     assert box_sizes[..., 2].sum().item() > variant['box']['reset']['maxTopSurfaceHeight']
 
 
-def test_common_boxes_sit_target_tracks_actual_top_and_success():
-    cfg = COMMON_ENV['relationReward']
+def test_fixed_box_sit_fix_changes_only_sit_geometry_from_grounded_variant():
+    old = yaml.safe_load((ROOT / 'data/cfg/multi_agent/'
+        'approach_distance_edge_context_stage1_ground_sit_climb.yaml').read_text())['env']
+    fixed = deepcopy(FIXED_ENV)
+    validate_relation_config(fixed['relationReward'])
+    validate_sampler(fixed['relationGraph'])
+    assert fixed['box']['build']['baseSize'] == [.5, .5, .4]
+    assert fixed['box']['build']['randomSize'] is False
+    assert fixed['box']['reset']['groundStandaloneSitClimb'] is True
+    assert fixed['relationReward']['sit'] == COMMON_ENV['relationReward']['sit']
+    assert checkpoint_metadata(fixed['relationReward']) == checkpoint_metadata(COMMON_ENV['relationReward'])
+    with pytest.raises(ValueError, match='reward config differs'):
+        check_checkpoint_metadata({'relation_metadata': checkpoint_metadata(old['relationReward'])},
+                                  checkpoint_metadata(fixed['relationReward']))
+    fixed['relationReward'] = old['relationReward']
+    assert fixed == old
+
+
+@pytest.mark.parametrize('env', [COMMON_ENV, FIXED_ENV], ids=['variable', 'fixed'])
+def test_box_top_sit_target_tracks_actual_top_and_success(env):
+    cfg = env['relationReward']
     sit_graph = sample_graph(1, SPEC, preset='sit')
     sit = ((sit_graph.edge_relation == SIT) & sit_graph.edge_valid).nonzero(as_tuple=False)[0, 1]
     for height in (.25, .4, .55):

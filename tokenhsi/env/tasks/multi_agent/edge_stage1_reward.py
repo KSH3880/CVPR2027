@@ -5,6 +5,7 @@ from utils.edge_ontop_spec import graph_packet, select_graph
 from env.tasks.multi_agent.edge_context_reward import edge_context_reward, goal_success
 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
 from env.tasks.multi_agent.edge_ontop_reward import OnTopContextRuntime
+from utils.edge_stage1_spec import semantic_graph_packet
 
 
 def stage1_context(phi, graph):
@@ -43,4 +44,6 @@ class Stage1ContextRuntime(OnTopContextRuntime):
     def suffix(self, ids=None):
         graph = self.graph if ids is None else select_graph(self.graph, ids)
         phi = self.phi if ids is None else self.phi[ids]
+        if self.config['schema_version'] == 7:
+            return semantic_graph_packet(graph, phi.shape[0]).to(phi.device)
         return graph_packet(graph, stage1_context(phi, graph))

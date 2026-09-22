@@ -50,7 +50,11 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     progress_target_xy = torch.where(sit[..., None], sit_target[..., :2], support[..., :2])
     distance_xy = (human[..., :2] - progress_target_xy).norm(dim=-1)
     p = config['progress']
-    progress = 1 / (1 + (distance_xy - p['delta']).clamp_min(0) / p['sigma'])
+    pinning_radius = torch.full_like(distance_xy, float(p['delta']))
+    if p.get('climb_pinning') == 'bbox_valid_radius':
+        climb_radius = support_size[..., :2].norm(dim=-1) / 2 + 0.3
+        pinning_radius = torch.where(climb, climb_radius, pinning_radius)
+    progress = 1 / (1 + (distance_xy - pinning_radius).clamp_min(0) / p['sigma'])
     mask = sit | climb
     phi = torch.where(mask, interaction_phi, phi)
     diag['progress'] = torch.where(mask, progress, diag['progress'])
@@ -61,9 +65,12 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
 
     feet_z = feet.mean(-2)[..., 2]
     feet_z = feet_z[batch, src.clamp(0, m - 1)]
+    individual_feet_z = feet[batch, src.clamp(0, m - 1), :, 2]
     diag['z_feet'] = feet_z * climb
     diag['z_surface'] = top_z * climb
     diag['feet_height_error'] = (feet_z - top_z).abs() * climb
+    diag['feet_individual_max_error'] = (
+        individual_feet_z - top_z[..., None]).abs().amax(-1) * climb
     return phi, diag
 
 
@@ -74,8 +81,9 @@ def interaction_own_success(phi, z_error, feet_error, graph, config):
     success = (phi >= threshold) & ((relation == HOLDING) |
         (z_error.abs() <= config['success']['at_z_tolerance']))
     success = torch.where(relation == SIT, phi >= threshold, success)
+    climb_threshold = config['climb'].get('success_phi_threshold', threshold)
     success = torch.where(relation == CLIMB,
-        (phi >= threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
+        (phi >= climb_threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
     return success & valid
 
 

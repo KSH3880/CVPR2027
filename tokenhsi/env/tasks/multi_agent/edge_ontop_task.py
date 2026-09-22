@@ -48,6 +48,9 @@ class SampledOnTopTaskMixin:
         self._sampling_counts=torch.zeros(18,device=self.device)
         self._sampling_retries=torch.zeros((),device=self.device)
         self._sampling_failures=torch.zeros((),device=self.device)
+        self._rsi_attempts=torch.zeros(2,device=self.device)
+        self._rsi_rejected=torch.zeros(2,device=self.device)
+        self._rsi_start_distance=torch.zeros(2,device=self.device)
         self._ontop_maintain_steps=torch.zeros(self.num_envs,len(g.ids),device=self.device)
         self._ontop_last_diag=None
         from isaacgym import gymtorch
@@ -234,6 +237,43 @@ class SampledOnTopTaskMixin:
                 bad|=at[:,a]&((goal[:,:2]-boxes[:,b,:2]).norm(dim=-1)<radius[:,a]+radius[:,b]+.25)
             for b in range(a):
                 bad|=at[:,a]&at[:,b]&((goal[:,:2]-self._tar_pos[ids,b,:2]).norm(dim=-1)<radius[:,a]+radius[:,b]+.35)
+        if getattr(self, '_primitive_stage1', False):
+            # Reference SIT/CLIMB objects are static meshes; our boxes are dynamic
+            # and size-randomized. Reject frames with the pelvis inside the new box
+            # or feet below the floor before the single Isaac Gym state commit.
+            for skill_index, skill_name in enumerate(('sit', 'climb')):
+                slots = self._reset_ref_slots.get(skill_name)
+                if slots is None:
+                    continue
+                slot_env, slot_agent = slots
+                row = torch.searchsorted(ids, slot_env)
+                physical = self._agent_box_assignment[slot_env, slot_agent]
+                box = self._box_states[slot_env, physical]
+                size = self._box_size[slot_env, physical]
+                root = self._humanoid_root_states[slot_env, slot_agent, :3]
+                feet = self._kinematic_humanoid_rigid_body_states[
+                    slot_env, slot_agent][:, self._key_body_ids[[2, 3]], :3]
+                body = self._kinematic_humanoid_rigid_body_states[
+                    slot_env, slot_agent, :, :3]
+                rotation = box[:, None, 3:7].expand(-1, body.shape[1], -1)
+                relative = body - box[:, None, :3]
+                cross = 2 * torch.cross(rotation[..., :3], relative, dim=-1)
+                local_body = (relative - rotation[..., 3:4] * cross +
+                              torch.cross(rotation[..., :3], cross, dim=-1))
+                inner_xy = (local_body[..., :2].abs() <
+                    (size[:, None, :2] / 2 - .06)).all(-1)
+                inner_z = ((local_body[..., 2] > -size[:, None, 2] / 2 + .06) &
+                           (local_body[..., 2] < size[:, None, 2] / 2 - .06))
+                penetration = (inner_xy & inner_z).any(-1)
+                invalid = penetration | (feet[..., 2].amin(-1) < -.02)
+                bad[row] |= invalid
+                self._rsi_attempts[skill_index] += len(slot_env)
+                self._rsi_rejected[skill_index] += invalid.sum()
+                target_z = box[:, 2] + size[:, 2] / 2 + (
+                    self._relation_cfg['sit']['pelvis_clearance'] if skill_name == 'sit'
+                    else self._char_h)
+                target = torch.cat((box[:, :2], target_z[:, None]), -1)
+                self._rsi_start_distance[skill_index] += (root - target).norm(dim=-1).sum()
         return bad
 
     def _record_ontop_diagnostics(self,result,diag):
@@ -271,6 +311,18 @@ class SampledOnTopTaskMixin:
             'climb/z_surface':diag['z_surface'],
             'climb/feet_height_error':diag['feet_height_error'],
         }
+        if getattr(self, '_semantic_only_stage1', False):
+            climb_cfg = self._relation_cfg['climb']
+            root_pass = result['phi_raw'] >= climb_cfg['success_phi_threshold']
+            feet_pass = diag['feet_height_error'] <= climb_cfg['feet_height_tolerance']
+            values.update({
+                'climb/root_phi_pass': root_pass.float(),
+                'climb/feet_pass': feet_pass.float(),
+                'climb/joint_pass': (root_pass & feet_pass).float(),
+                'climb/strict_phi_0_7_feet_0_05': ((result['phi_raw'] >= .7) &
+                    (diag['feet_height_error'] <= .05)).float(),
+                'climb/feet_individual_max_error': diag['feet_individual_max_error'],
+            })
         for name,value in values.items():
             rel=SIT if name.startswith('sit/') else CLIMB
             mask=graph.edge_valid&(relation==rel)
@@ -291,6 +343,12 @@ class SampledOnTopTaskMixin:
                             'sampling/ox_owner_b':c[10]/den})
                 for offset,name in enumerate(('holding','at','ontop','sit','climb'),11):
                     out['sampling/relation_'+name]=c[offset]/(2*den)
+                if getattr(self, '_primitive_stage1', False):
+                    for i, skill in enumerate(('sit', 'climb')):
+                        out['sampling/rsi_'+skill+'_attempts'] = self._rsi_attempts[i].clone()
+                        out['sampling/rsi_'+skill+'_rejection_rate'] = self._rsi_rejected[i] / self._rsi_attempts[i].clamp_min(1)
+                        out['sampling/rsi_'+skill+'_start_target_distance'] = self._rsi_start_distance[i] / self._rsi_attempts[i].clamp_min(1)
+                    self._rsi_attempts.zero_(); self._rsi_rejected.zero_(); self._rsi_start_distance.zero_()
             c.zero_();self._sampling_retries.zero_();self._sampling_failures.zero_()
             return out
         names=['second_none','second_at','second_ontop','edges_2','edges_3','edges_4',

@@ -130,10 +130,12 @@ from utils.ontop_task_spec import mixed_policy_graph
 
 
 from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
-from learning.multi_agent.edge_context_encoder import EdgeContextFusion, PackedEdgeContextFusion
+from learning.multi_agent.edge_context_encoder import (EdgeContextFusion,
+    PackedEdgeContextFusion, PackedEdgeSemanticFusion)
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size
 from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, compile_interaction_graph
-from utils.edge_stage1_spec import STAGE1_CONTEXT_MODE, compile_stage1_graph
+from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
+    semantic_packet_size)
 
 
 class EdgeEncoder(nn.Module):
@@ -499,6 +501,8 @@ class RelationEncoder(nn.Module):
         self.edge_context = relation_reward_mode in (CONTEXT_MODE, ONTOP_CONTEXT_MODE,
             INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
+        self.semantic_only = self.stage1_context and bool(
+            self.relation_graph_spec.get('semantic_only', False))
         self.ontop_mixed = relation_reward_mode == ONTOP_MODE
         if self.ontop_mixed and (num_agents, num_objects) != (2, 3):
             raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
@@ -553,8 +557,11 @@ class RelationEncoder(nn.Module):
         if self.edge_context:
             compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
-            self.context_fusion = PackedEdgeContextFusion() if self.packed_context else EdgeContextFusion(graph)
-            self.suffix_width = (packet_size if self.packed_context else context_suffix_size)(len(graph.ids))
+            self.context_fusion = (PackedEdgeSemanticFusion() if self.semantic_only else
+                PackedEdgeContextFusion() if self.packed_context else EdgeContextFusion(graph))
+            size_fn = (semantic_packet_size if self.semantic_only else
+                packet_size if self.packed_context else context_suffix_size)
+            self.suffix_width = size_fn(len(graph.ids))
             self._set_context_background()
 
         self.layers = nn.ModuleList([
@@ -654,12 +661,16 @@ class RelationEncoder(nn.Module):
     def set_task_graph(self, spec):
         if not self.edge_context:
             raise ValueError('Explicit task graphs require edge-context mode')
+        if self.semantic_only != bool(spec.get('semantic_only', False)):
+            raise ValueError('Cannot change semantic-only packet architecture')
         compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
         graph = compiler(spec, self.num_agents, self.num_objects, self._relation_device())
         self.relation_graph_spec = spec
         if not self.packed_context:
             self.context_fusion.set_graph(graph)
-        self.suffix_width = (packet_size if self.packed_context else context_suffix_size)(len(graph.ids))
+        size_fn = (semantic_packet_size if self.semantic_only else
+            packet_size if self.packed_context else context_suffix_size)
+        self.suffix_width = size_fn(len(graph.ids))
         self._set_context_background()
 
     def set_num_agents(self, num_agents):

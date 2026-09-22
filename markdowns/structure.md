@@ -9,8 +9,8 @@ TokenHSI의 multi-agent carry 실험 저장소. 현재 비교는 distance progre
 | `mps/` | GPU별 MPS 단축 함수·운영 안내. 이 서버의 개인 설치본은 `~/.local/share/gpu-mps/shell.sh`, 새 Bash에서 자동 로드 |
 | `tokenhsi/scripts/multi_agent/mps_auto_env.sh` | runtime에서 지정 GPU의 내 MPS를 검증·자동 연결. 데몬 시작·종료는 하지 않음 |
 | `tokenhsi/run.py` | 학습·평가 진입점, 환경·알고리즘 등록 |
-| `tokenhsi/scripts/multi_agent/` | 실험별 train/test/VNC, 19~21번 Stage 1 전용 스크립트, `runtime_env.sh`, 공통 `run-gui.sh`·`gui_gpu_env.sh` |
-| `tokenhsi/data/cfg/multi_agent/` | 실행 가능 환경·reward YAML 14개(ID 1, 9~21); 21번은 공통 크기 박스와 box-top SIT target의 schema 5 scratch 실험 |
+| `tokenhsi/scripts/multi_agent/` | 실험별 train/test/VNC, 19~24번 Stage 1 전용 스크립트, `runtime_env.sh`, 공통 `run-gui.sh`·`gui_gpu_env.sh` |
+| `tokenhsi/data/cfg/multi_agent/` | 실행 가능 환경·reward YAML 17개(ID 1, 9~24); 24번은 CLIMB 전용 semantic-only schema 7 scratch 실험 |
 | `tokenhsi/data/cfg/train/rlg/` | PPO/AMP/Transformer 학습 설정. 현재 relation 학습은 `amp_ma_carry_relation.yaml` |
 | `tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py` | 박스 배정·reset·물리 환경·관측 통합 |
 | `tokenhsi/env/tasks/multi_agent/relation_task.py` | 환경 상태를 relation reward/diagnostics에 연결 |
@@ -22,7 +22,7 @@ TokenHSI의 multi-agent carry 실험 저장소. 현재 비교는 distance progre
 | `tokenhsi/env/tasks/multi_agent/edge_ontop_task.py` | dynamic Ox·AT-only 플랫폼·물리 reset 제약·sampling/기하학 진단·viewer |
 | `tokenhsi/utils/edge_interaction_spec.py` | 18번 7-pattern sampler·SIT/CLIMB relation·preset·schema 4 graph 검증 |
 | `tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py` | SIT tarSitPos target, CLIMB root target·feet success 검증 |
-| `tokenhsi/utils/edge_stage1_spec.py` | 19~21번 own/OX binding·OX 단독 사용자·START/KEEP constant 7-pattern sampler·schema 5 검증·Stage 1 두 상자 높이 검사 |
+| `tokenhsi/utils/edge_stage1_spec.py` | 19~22번 7-pattern sampler, 23번 단일 H/S/C, 24번 CLIMB-only sampler·5-field semantic packet·relation RSI 검증 |
 | `tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py` | 19번 own-success-only 포화·sharing 없는 task 합·constant START/KEEP packet |
 | `tokenhsi/utils/edge_context_spec.py` | 새 schema 검증, explicit graph compile, PRE/TERM 참조, resume task 계약 |
 | `tokenhsi/env/tasks/multi_agent/edge_context_reward.py` | Holding·At binding 기반 평가, raw context, edge-local live 성공·포화 |
@@ -45,7 +45,7 @@ TokenHSI의 multi-agent carry 실험 저장소. 현재 비교는 distance progre
 ## 작업별 최소 탐색
 
 - **18번 SIT/CLIMB interaction:** [edge_context_interaction.md](edge_context_interaction.md), `approach_distance_edge_context_interaction_{train,test,vnc}.sh`, CPU `test_edge_interaction.py`.
-- **19~21번 Stage 1 relation skill:** [edge_context_stage1.md](edge_context_stage1.md), `approach_distance_edge_context_stage1_{train,test,vnc}.sh`, `_ground_sit_climb_{train,test,vnc}.sh`, `_common_boxes_{train,test,vnc}.sh`, CPU `test_edge_stage1.py`.
+- **19~24번 Stage 1 relation skill:** [edge_context_stage1.md](edge_context_stage1.md), `approach_distance_edge_context_stage1_{train,test,vnc}.sh`, `_ground_sit_climb_{train,test,vnc}.sh`, `_common_boxes_{train,test,vnc}.sh`, `_fixed_boxes_sit_fix_{train,test,vnc}.sh`, `_primitives_rsi_{train,test,vnc}.sh`, `approach_distance_stage1_climb_rsi_{train,test,vnc}.sh`, CPU `test_edge_stage1.py`.
 
 - **17번 sampled OnTop:** [edge_context_ontop.md](edge_context_ontop.md), `approach_distance_edge_context_ontop_{train,test,vnc}.sh`. CPU `test_edge_ontop.py`, 실제 PPO/GAE 저장 경로 `smoke_edge_ontop_train.py`, 물리 접촉·preset·replay `smoke_edge_ontop_sim.py`.
 

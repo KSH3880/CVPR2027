@@ -60,3 +60,25 @@ class PackedEdgeContextFusion(nn.Module):
         occupied=torch.zeros(n,l*l,dtype=torch.long,device=src.device).scatter_add(1,indices,valid.long()).bool().reshape(n,l,l)
         background=background_bias[:,None].masked_fill(occupied[None,:,None],0.)
         return dense.reshape(*dense.shape[:-1],l,l)+background
+
+
+class PackedEdgeSemanticFusion(nn.Module):
+    """Five-field graph bindings only; no context input or context parameters."""
+    def forward(self, suffix, semantic_encoder, entity_types, background_bias):
+        from utils.edge_stage1_spec import parse_semantic_packet
+        valid, src, dst, relation, owner = parse_semantic_packet(suffix)
+        n, e = src.shape
+        l = entity_types.numel()
+        sem = semantic_encoder.edge_mlp(torch.cat([
+            semantic_encoder.source_type_embed(entity_types[src]),
+            semantic_encoder.relation_embed(relation),
+            semantic_encoder.target_type_embed(entity_types[dst])], -1))
+        values = torch.einsum('bed,lhd->lbhe', sem,
+            semantic_encoder.bias_projection) * valid[None, :, None]
+        indices = src * l + dst
+        dense = values.new_zeros(*values.shape[:-1], l * l).scatter_add(
+            -1, indices[None, :, None].expand_as(values), values)
+        occupied = torch.zeros(n, l * l, dtype=torch.long, device=src.device).scatter_add(
+            1, indices, valid.long()).bool().reshape(n, l, l)
+        background = background_bias[:, None].masked_fill(occupied[None, :, None], 0.)
+        return dense.reshape(*dense.shape[:-1], l, l) + background

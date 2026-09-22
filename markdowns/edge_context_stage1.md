@@ -31,7 +31,7 @@ P(d_xy) = 1 / (1 + max(d_xy - .5, 0) / 1.0)
 
 own success이면 세 항을 모두 1로 포화해 최대 `.6`이다. agent task reward는 자기 edge 합이며 teammate `.9/.1` sharing을 사용하지 않는다. 기존 power/collision/box-speed penalty와 PPO의 `.5 task + .5 AMP`는 유지한다.
 
-19·20번의 SIT/CLIMB은 interaction에서 확정한 정의를 그대로 쓴다. 21번의 box-top SIT 변경은 아래 별도 절을 따른다.
+19·20번의 SIT/CLIMB은 interaction에서 확정한 정의를 그대로 쓴다. 21·22번의 box-top SIT 변경은 아래 별도 절을 따른다.
 
 ```text
 SIT target = object position + rotated [0,0,0.1381430834425038]
@@ -86,3 +86,29 @@ success_sit = phi_sit >= 0.9
 ```
 
 SIT의 XY progress, reward 가중치·포화와 CLIMB의 목표·feet 성공 조건은 그대로다. 기존 sampler 확률과 물체 무작위 할당은 유지하며 크기별 가능성 필터는 없다. 제안 크기 전 구간에서 행동 성공은 미검증이다. reward config가 다른 19·20번 checkpoint와는 호환하지 않고 scratch로 시작한다. 실행은 [config.md의 21번](config.md#stage-1-공통-박스-크기-21번)을 따른다.
+
+## 22번 고정 박스 SIT 목표 수정
+
+`approach_distance_edge_context_stage1_fixed_boxes_sit_fix.yaml`은 20번과 같은 고정 0.5×0.5×0.4m 박스·단독 SIT/CLIMB 바닥 reset·Stage 1 그래프·AMP·CLIMB reward를 쓰고, **SIT 목표만** 21번의 박스 윗면 + 0.12m로 변경한다. 바닥 상자의 SIT target Z는 0.52m다. 20번 checkpoint는 reward 정의가 달라 사용할 수 없다. 21번과 reward 정의는 같지만 크기 분포가 다르므로 checkpoint를 섞지 않고 별도 output에서 scratch로 학습한다. 실행은 [config.md의 22번](config.md#stage-1-고정-박스-sit-수정-22번)을 따른다.
+
+## 23번 단일 edge + relation RSI
+
+21번의 가변 크기 박스·box-top SIT target·CLIMB target/success·combined AMP·own-only reward를 유지하면서, agent마다 `HOLDING`, `SIT`, `CLIMB` 중 정확히 **하나**만 독립적으로 1/3 확률로 샘플한다. 모두 자기 `O_i`를 목표로 하고 `OX`는 방해물이다. graph packet은 기존 4-slot/7-field이므로 active 2개와 padding 2개다. PRE/TERM·AT/ON_TOP은 이 단계에 없다.
+
+초기 모션 분포는 graph relation을 먼저 뽑고 그에 맞춰 `HOLDING: loco .5 + pickUp .5`, `SIT: loco .5 + sit .5`, `CLIMB: loco .5 + climb .5`를 선택한다. `carryWith`는 AMP에는 포함하되 RSI에서는 우선 끈다. 같은 seed 2048환경 단기 대조에서 `carryWith` 시작의 상자 속도 페널티가 커졌고, 박스를 원본에 가까운 0.4m 고정으로 해도 남았기 때문이다. 원본 TokenHSI motion ID/time sampling과 SIT/CLIMB 물체 pose의 XY/yaw를 재사용한다. 다만 원본 정적 chair/climb 물체를 그대로 만드는 게 아니라 21번 동적 박스를 해당 pose에 놓고 높이는 실제 박스의 바닥 중심으로 맞춘다. 초기 모션과 박스가 겹치거나 발이 지면 아래인 후보는 물리 reset 경로에서 재시도한다. 재시도 중 다른 RSI clip 또는 loco가 선택될 수 있다. 이 필터는 기하학적 휴리스틱이며 장기 물리 안정성 보증은 아니다.
+
+schema 6으로 checkpoint를 21/22번과 분리한다. `relation/sampling/rsi_sit|climb_attempts`, `...rejection_rate`, `...start_target_distance`, `sampling/physical_retries|failures`를 보고 크기별 부적합 여부를 판단한다. viewer/eval은 기본 loco-only 출발이므로 RSI 도움과 별개로 처음부터 배운 행동을 확인한다. 명령은 [config.md의 23번](config.md#stage-1-단일-edge와-relation-rsi-23번)을 따른다.
+
+## 24번 CLIMB-only, context 없는 RSI
+
+23번의 박스 크기·바닥 reset·CLIMB root target·own-only edge reward 구조를 유지한다. 그래프 sampler의 CLIMB 확률을 1로 고정해 두 agent가 각자 자기 상자만 오른다. 정책에는 5-field `[valid,src,dst,relation,owner]` semantic packet만 넣으며 START/KEEP 필드·context 인코더·context reward는 없다. schema 7과 별도 checkpoint/output을 사용한다. AMP 시연 분포는 원본 CLIMB 설정에 가까운 loco/climb/climbNoRSI `.3/.4/.3`이고 RSI는 loco/climb `.5/.5`다.
+
+```text
+r_valid = sqrt(box_x² + box_y²)/2 + 0.3 m
+P = 1/(1 + max(d_xy - r_valid, 0)/1.0)
+phi = exp(-10 ||root - [box_xy, box_top_z + char_h]||²)
+success = (phi >= 0.6) AND (|mean(feet_z) - box_top_z| <= 0.07 m)
+R_edge = 0.2 P + 0.2 phi before success; 0.6 while current success
+```
+
+feet dense 보상은 추가하지 않는다. 0.6/7cm 성공과 0.7/5cm 엄격한 진단을 함께 기록하고, 양발 개별 높이 오차 최대값도 기록한다. 발 평균만으로 착지·양발 접촉을 보증하지 않는다. 명령은 [config.md의 24번](config.md#stage-1-climb-전용-무context-24번)을 따른다.

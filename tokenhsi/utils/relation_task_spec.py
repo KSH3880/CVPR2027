@@ -7,6 +7,7 @@ from utils.edge_context_spec import CONTEXT_MODE, validate_edge_context_config
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, PACKET_FIELDS, validate_ontop_context_config
 from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, SIT, CLIMB, validate_interaction_context_config
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, STAGE1_PACKET_FIELDS,
+    STAGE1_SEMANTIC_FIELDS,
     validate_stage1_context_config)
 
 LEGACY_MODE = 'legacy_tokenhsi'
@@ -194,7 +195,15 @@ def validate_relation_config(config):
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
     if mode == STAGE1_CONTEXT_MODE:
-        return {'reward_mode': mode, 'schema_version': 5,
+        if config['schema_version'] == 7:
+            return {'reward_mode': mode, 'schema_version': 7,
+                    'relation_taxonomy': {'holding': 6, 'at': 7, 'ontop': 8,
+                                          'sit': SIT, 'climb': CLIMB},
+                    'suffix_fields': list(STAGE1_SEMANTIC_FIELDS), 'packet_version': 3,
+                    'graph_record_width': 5, 'context_dim_per_edge': 0,
+                    'context_fusion': 'semantic_only',
+                    'relation_reward_config': config}
+        return {'reward_mode': mode, 'schema_version': config['schema_version'],
                 'relation_taxonomy': {'holding': 6, 'at': 7, 'ontop': 8,
                                       'sit': SIT, 'climb': CLIMB},
                 'suffix_fields': list(STAGE1_PACKET_FIELDS), 'packet_version': 2,
