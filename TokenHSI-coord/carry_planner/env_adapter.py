@@ -94,12 +94,17 @@ class HumanoidMACarryPlannerTrain(
         ids = env_ids[selected]
         rows = self.agent_rows(ids)
         initial = self.agent_axis(self._initial_humanoid_root_states)
-        center = initial[ids, :, :2].mean(dim=1)
+        crossing = initial[ids, :, :2].mean(dim=1)
+        box_xy = self.agent_axis(self._box_states)[ids, :, :2]
         size = self._box_lib._box_size[rows, :2].reshape(-1, AGENTS, 2)
-        angle = torch.rand(len(ids), device=self.device) * (2.0 * torch.pi)
-        targets = converging_goal_xy(
-            center, size, self._carry_goal_margin, angle,
+        targets, feasible = converging_goal_xy(
+            box_xy, crossing, size, self._carry_goal_margin,
         )
+        if not bool(feasible.any()):
+            return
+        ids = ids[feasible]
+        targets = targets[feasible]
+        rows = self.agent_rows(ids)
         self._box_tar_pos[rows, :2] = targets.reshape(-1, 2)
         if self._carry_reset_random_height:
             self.agent_axis(self._tar_platform_states)[ids, :, :2] = targets

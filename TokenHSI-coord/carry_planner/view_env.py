@@ -31,9 +31,6 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         super().__init__(
             cfg, sim_params, physics_engine, device_type, device_id, headless,
         )
-        if self.num_envs != 1:
-            raise ValueError("carry planner viewer currently requires exactly one env")
-
         self._carry_planner, payload = load_stack_checkpoint(
             checkpoint, self.device,
         )
@@ -83,32 +80,51 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             >= self._carry_planner_period
         )
         phase_changed = (state.phase != self._carry_planner_phase).any(dim=1)
-        if not bool((due | phase_changed).any()):
+        selected = due | phase_changed | restarted
+        if not bool(selected.any()):
             return
 
-        observation = self._carry_planner_history.observe(state, commit=True)
+        # Evaluation envs terminate asynchronously. A reset in one env must
+        # not shift every other env's history or turn their 6-step period into
+        # effectively every-step replanning.
+        old_tokens = self._carry_planner_history.tokens.clone()
+        old_valid = self._carry_planner_history.valid.clone()
+        observation_all = self._carry_planner_history.observe(state, commit=True)
+        self._carry_planner_history.tokens[~selected] = old_tokens[~selected]
+        self._carry_planner_history.valid[~selected] = old_valid[~selected]
+        observation = observation_all.index(selected)
         output = self._carry_planner(observation)
-        valid = self.install_external_plan(output)
-        self._carry_planner_history.commit_path(
-            output["path_world"][:, 0], update_mask=valid,
-            base_path_world=output["base_path_world"],
+        env_ids = torch.nonzero(selected, as_tuple=False).squeeze(-1)
+        valid = self.install_external_plan(output, env_ids=env_ids)
+        committed = self._carry_planner_history.previous_path_world.clone()
+        committed[selected] = output["path_world"][:, 0]
+        base = self._carry_planner_history.base_path_world.clone()
+        base[selected] = output["base_path_world"]
+        update = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device,
         )
-        self._carry_planner_tick.copy_(self.progress_buf)
-        self._carry_planner_phase.copy_(state.phase)
-        self._carry_planner_replans += self.num_envs
+        update[selected] = valid
+        self._carry_planner_history.commit_path(
+            committed, update_mask=update, base_path_world=base,
+        )
+        self._carry_planner_tick[selected] = self.progress_buf[selected]
+        self._carry_planner_phase[selected] = state.phase[selected]
+        self._carry_planner_replans += len(env_ids)
         self._carry_planner_invalid += int((~valid).sum())
         if int(os.environ.get("CARRY_PLANNER_DEBUG", "1")):
+            shown = int(env_ids[0])
+            shown_local = 0
             print(
-                "[carry-planner-view] step={} phase={} valid={} "
+                "[carry-planner-view] env={} step={} phase={} valid={} "
                 "cursor={} root={} box={} goal={}".format(
-                    int(self.progress_buf[0]),
-                    state.phase[0].detach().cpu().tolist(),
-                    bool(valid[0]),
-                    self._arc_root.reshape(self.num_envs, 2)[0]
+                    shown, int(self.progress_buf[shown]),
+                    state.phase[shown].detach().cpu().tolist(),
+                    bool(valid[shown_local]),
+                    self._arc_root.reshape(self.num_envs, 2)[shown]
                     .detach().cpu().tolist(),
-                    state.root_xy[0].detach().cpu().tolist(),
-                    state.box_xyz[0, :, :2].detach().cpu().tolist(),
-                    state.goal_xy[0].detach().cpu().tolist(),
+                    state.root_xy[shown].detach().cpu().tolist(),
+                    state.box_xyz[shown, :, :2].detach().cpu().tolist(),
+                    state.goal_xy[shown].detach().cpu().tolist(),
                 ),
                 flush=True,
             )

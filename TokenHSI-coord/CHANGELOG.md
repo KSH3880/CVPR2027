@@ -2,7 +2,25 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
-## 2026-09-21
+## 2026-09-22
+
+### close-goal Carry layout의 carry segment 교차 보장
+
+- 기존 hard layout은 goal 두 개를 공통 중심 가까이에 두기만 해 `box->goal` 선분이
+  실제로 만나지 않는 배치가 포함됐다. 각 현재 box에서 공통 crossing으로 향하는 ray를
+  그대로 연장한 지점에 goal을 두어 두 carry segment가 반드시 같은 점을 지나게 했다.
+- 두 ray의 동일한 post-crossing 거리로 goal 간격을 box circumscribed radius 합+margin에
+  정확히 맞춘다. 거의 평행하거나 crossing과 box가 겹친 퇴화 샘플은 원래 Cross를
+  유지하며 hard-case로 집계하지 않는다.
+
+### carry planner viewer 연속 randomized episode
+
+- interactive `view.sh`가 `--eval`로 들어가 1 env × 2 agents × 3 repeats, 총 6 trial
+  뒤 종료되던 것을 일반 deterministic player로 바꿨다. 기본 games 상한은 10억이라
+  사용자가 창을 닫을 때까지 reset마다 계속 실행한다.
+- 기본 timed-cross 강제를 제거하고 학습과 같은 75% close-goal/25% 일반 Cross를
+  episode마다 다시 뽑는다. timed-cross는 `MS_VIEW_TIMED_CROSS=1`인 명시적 stress
+  viewer에서만 사용한다.
 
 ### Sequential stack 대신 plain Carry collision-avoidance planner 추가
 
@@ -1801,6 +1819,17 @@ legacy/new profile, 최저속도 위치, 복귀 완료, checkpoint round-trip을
   적용하던 feedback을 제거했다. 적용 mask는 이제 실제 reset transition에서만 만들며,
   기본 collision 계수는 10에서 1로 낮추고 46도 초과 곡률에 직접 cosine penalty를
   추가해 공간 우회와 실행 가능한 곡선을 함께 학습한다.
+
+### carry planner multi-distribution evaluation
+
+- single-env timed-cross viewer와 별도로 deterministic multi-env evaluator를 추가했다.
+  `mixed`(학습과 같은 75% close-goal), `converge`, 일반 `cross`, `free`를 seed별로
+  평가하고 기존 MA episode metrics와 coord summarizer를 그대로 사용한다.
+- suite 기본은 64 env × evaluator 3회 × 4 profiles × seeds 0/1/2이며, raw npy/log와
+  JSON summary를 `runs/results/carry_planner/<run>/`에 분리 보존한다.
+- multi-env 평가의 비동기 reset에서 한 env의 due event가 전체 batch history를
+  shift/replan하던 viewer 전제를 제거했다. 선택된 env의 history/path/tick만 갱신해
+  학습과 동일한 env별 6-step replan 주기를 유지한다.
 
 ### carry planner 물리 GPU index 고정
 

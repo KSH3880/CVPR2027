@@ -10,9 +10,10 @@ sequential stack이 아닌 기존 simultaneous `HumanoidMASteerCarry` 계열이�
 - reward는 frozen ms18의 원래 Carry reward와 task progress를 유지하면서
   agent-agent, agent-other-box, box-box proximity cost를 감점한다.
 - 기본 stress distribution은 `MS_SCEN=cross`다.
-- reset의 기본 75%는 두 goal이 공통 중심 주위로 수렴하는 hard case, 25%는 일반
-  Cross다. goal 간격은 두 box의 circumscribed radius 합 + 0.25 m라 최종 배치는
-  가능하지만, 먼저 도착해 정지한 agent/box를 후발 agent가 공간적으로 돌아야 한다.
+- reset의 기본 75%는 각 `box -> goal` 선분이 동일한 crossing을 지나도록 goal을
+  crossing 너머에 두는 hard case, 25%는 일반 Cross다. goal 간격은 두 box의
+  circumscribed radius 합 + 0.25 m라 최종 배치는 가능하지만, 먼저 도착해 정지한
+  agent/box를 후발 agent가 공간적으로 돌아야 한다.
   비율과 여유는 `CARRY_PLANNER_CONVERGE_PROB`, `CARRY_PLANNER_GOAL_MARGIN`으로 바꾼다.
 
 학습 기본 spatial exploration은 `CARRY_PLANNER_DELTA_STD=0.25`, recurrent path
@@ -51,12 +52,30 @@ MA_GPU=0 bash TokenHSI-coord/carry_planner/view.sh \
   TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth
 ```
 
-기본은 `MS_SCEN=cross`와 viewer-only timed-cross 배치다. 두 agent-box 묶음의
-직선·정속 기준 교차점 도착 시각을 맞추고, 각 goal을 같은 교차점 너머에 두므로
-회피하지 않으면 실제로 동시에 부딪치는 stress scene이 된다. 로그의
+기본 viewer는 평가 6회 후 종료하지 않고 창을 닫을 때까지 계속 실행하며, reset마다
+학습과 같은 randomized `mixed` 분포(기본 75% close-goal, 25% 일반 Cross)를 새로
+뽑는다. 실행 episode 상한은 사실상 무한대인 `CARRY_PLANNER_VIEW_GAMES=1000000000`이며
+필요하면 덮어쓸 수 있다.
+
+고정된 collision stress test가 필요할 때만 `MS_VIEW_TIMED_CROSS=1`을 지정한다. 이
+모드에서는 두 agent-box 묶음의 직선·정속 기준 교차점 도착 시각을 맞추며, 로그의
 `[coord-view timed-cross]`에서 예상 도착시간 차이를 확인할 수 있다.
 
-6 action-step마다 deterministic mean path를 다시 계획한다. 일반 Cross로 되돌리려면
-`MS_VIEW_TIMED_CROSS=0`, free 배치는 `MS_SCEN=free`를 사용한다. 충돌 지점 전후 길이는
+6 action-step마다 deterministic mean path를 다시 계획한다. free 배치는
+`MS_SCEN=free CARRY_PLANNER_CONVERGE_PROB=0`을 사용한다. 충돌 지점 전후 길이는
 `MS_VIEW_TIMED_CROSS_PRE`(기본 2 m), `MS_VIEW_TIMED_CROSS_POST`(기본 4 m)로 조절한다.
 `CARRY_PLANNER_REPLAN_STEPS=<N>`으로 replan 주기도 바꿀 수 있다.
+
+다양한 episode 정량 평가:
+
+```bash
+MA_GPU=1 bash TokenHSI-coord/carry_planner/eval_suite.sh \
+  runs/carry_planner/<tag>/planner_000200.pth \
+  TokenHSI-masteer/output/masteer/<executor>.pth 64 0 1 2
+```
+
+각 seed에서 학습 분포 `mixed`(75% close-goal), `converge` 100%, 일반 `cross`,
+비정형 `free`를 각각 기존 evaluator의 3회 반복으로 측정한다. 원시 log/npy와 JSON은
+`runs/results/carry_planner/<tag>/`에 저장되며 `both_place`, pair collision,
+minimum distance, command-speed 사용률, invalid/curve rate를 함께 보고한다. 한 분포만
+보려면 `eval_one.sh <planner> <executor> <profile> [envs] [seed]`를 사용한다.

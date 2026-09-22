@@ -60,21 +60,18 @@ export COORD_PROVIDER=external COORD_MODEL=c1 COORD_DRAW_CANDIDATES=0
 export CARRY_PLANNER_CKPT="$PLANNER"
 export CARRY_PLANNER_REPLAN_STEPS=${CARRY_PLANNER_REPLAN_STEPS:-6}
 export CARRY_PLANNER_DEBUG=${CARRY_PLANNER_DEBUG:-1}
+export CARRY_PLANNER_VIEW_GAMES=${CARRY_PLANNER_VIEW_GAMES:-1000000000}
 export CARRY_PLANNER_CONVERGE_PROB=${CARRY_PLANNER_CONVERGE_PROB:-0.75}
 export CARRY_PLANNER_GOAL_MARGIN=${CARRY_PLANNER_GOAL_MARGIN:-0.25}
 export MA_TOKEN=mask MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_SEP=${MA_SEP:-0} MA_SPAWN_GAP=${MA_SPAWN_GAP:-1.0}
 export MS_MRAND=${MS_MRAND:-4} MS_M_LO=${MS_M_LO:-0.25}
 export MS_CLIP=1 MS_ZERO=0 MS_SCEN=${MS_SCEN:-cross}
-# The ordinary Cross layout only guarantees intersecting routes.  For the
-# viewer, align the two nominal arrival times as well so a straight/full-speed
-# execution is a genuine collision case.  Keep free/other layouts usable by
-# disabling this default outside Cross, and allow an explicit caller override.
+# The default viewer follows the randomized training distribution on every
+# reset. Timed-cross remains available as an explicit stress-test override.
 export COORD_VIEWER=1
 if [ -z "${MS_VIEW_TIMED_CROSS+x}" ]; then
-    if [ "$MS_SCEN" = cross ]; then MS_VIEW_TIMED_CROSS=1
-    else MS_VIEW_TIMED_CROSS=0
-    fi
+    MS_VIEW_TIMED_CROSS=0
 fi
 export MS_VIEW_TIMED_CROSS
 export MS_VIEW_TIMED_CROSS_PROB=${MS_VIEW_TIMED_CROSS_PROB:-1.0}
@@ -108,4 +105,4 @@ python -u -m carry_planner.run_view \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint "$STAGE1" --checkpoint "$POLICY" \
     --num_envs 1 --seed "${CARRY_PLANNER_VIEW_SEED:-0}" \
-    --test --eval --eval_task carry
+    --test
