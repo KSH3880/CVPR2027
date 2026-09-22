@@ -1,5 +1,14 @@
 # TokenHSI-ma — 변경 기록
 
+## 2026-09-22
+
+### STACK 이후 base carry-box observation 차단 ablation
+
+- `STACK_CARRY_OBS_ZERO_ON_STACK=1`을 opt-in으로 추가해 CLEAR의 기존 fade는 유지하면서 STACK/SUCCESS의 base carry-box 두 window를 계속 0으로 둔다.
+- `train_ms79_nobaseboxobs_local.sh`는 MS79의 face-parallel 조건을 유지하고 `STACK_TOP_WAIT_XY_ZERO=0`으로 MS75 wait 동작을 재현한다.
+- 기존 MS75/MS79 sidecar 재생은 기본값 0이라 바뀌지 않는다.
+
+
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-09-21

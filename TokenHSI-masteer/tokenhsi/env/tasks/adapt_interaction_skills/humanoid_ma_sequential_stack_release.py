@@ -338,6 +338,9 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
         self._ss_carry_obs_zero_fade_steps = _i(
             "STACK_CARRY_OBS_ZERO_FADE_STEPS", 0
         )
+        self._ss_carry_obs_zero_on_stack = bool(
+            _i("STACK_CARRY_OBS_ZERO_ON_STACK", 0)
+        )
         self._ss_carry_obs_keep_goal = bool(
             _i("STACK_CARRY_OBS_KEEP_GOAL", 0)
         )
@@ -613,6 +616,11 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             )
         if self._ss_carry_obs_zero_fade_steps < 0:
             raise ValueError("STACK_CARRY_OBS_ZERO_FADE_STEPS must be non-negative")
+        if self._ss_carry_obs_zero_on_stack and not self._ss_carry_obs_zero_fade:
+            raise ValueError(
+                "STACK_CARRY_OBS_ZERO_ON_STACK requires "
+                "STACK_CARRY_OBS_ZERO_FADE=1"
+            )
         if self._ss_carry_obs_keep_goal and not self._ss_carry_obs_zero_fade:
             raise ValueError(
                 "STACK_CARRY_OBS_KEEP_GOAL requires "
@@ -1042,6 +1050,7 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
             f"dynamic_carry_mask={int(self._ss_dynamic_carry_mask)} "
             f"carry_obs_zero_fade={int(self._ss_carry_obs_zero_fade)} "
             f"carry_obs_zero_fade_steps={self._ss_carry_obs_zero_fade_steps} "
+            f"carry_obs_zero_on_stack={int(self._ss_carry_obs_zero_on_stack)} "
             f"carry_obs_keep_goal={int(self._ss_carry_obs_keep_goal)} "
             f"clear_goal={self._ss_clear_goal_progress_w:.2f}/"
             f"{self._ss_clear_goal_arrive_w:.2f}/k{self._ss_clear_goal_k:.1f} "
@@ -3646,6 +3655,12 @@ class HumanoidMASequentialStackRelease(HumanoidMASteerCarry):
                     1.0 - self._arc_root[fade_rows] / self._ss_clear_arc_dist,
                     0.0,
                     1.0,
+                )
+            if self._ss_carry_obs_zero_on_stack:
+                fade = torch.where(
+                    self._ss_phase[env[retreat]] >= self.STACK,
+                    torch.zeros_like(fade),
+                    fade,
                 )
             out[retreat, carry_start:carry_start + 2 * carry_dim] *= fade[:, None]
             if self._ss_carry_obs_keep_goal:
