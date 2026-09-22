@@ -1,12 +1,17 @@
 # Carry collision-avoidance planner
 
-`stack_planner`의 Transformer, 33-point joint path/speed head, decision
-history, PPO action distribution, checkpoint format을 그대로 사용한다. 실행 task만
+`stack_planner`의 Transformer, decision history, PPO action distribution과 33-point
+실행 ABI를 사용한다. 모델은 agent별 고정 `start/box/goal`과 학습된 중간점 4개를
+두 cubic Hermite spline으로 펼치고, speed knot 7개도 monotone spline으로 펼친다.
+따라서 실행 task만
 sequential stack이 아닌 기존 simultaneous `HumanoidMASteerCarry` 계열이다.
 
 - 두 agent 모두 `root -> own box -> own goal`을 동시에 수행한다.
 - sequential phase, A1 retreat, A2 handoff, stacking reward는 없다.
 - pickup(index 16)과 placement(index 32)는 정확한 hard anchor다.
+- 위치 action은 agent당 중간점 4개의 XY(8D), speed action은 7개 knot이며 최종
+  path/speed는 기존과 같은 33 point다. 중간점은 직선의 dense residual이 아니고
+  `CARRY_PLANNER_CONTROL_SCALE`(기본 4m) 범위에서 독립적으로 움직인다.
 - reward는 frozen ms18의 원래 Carry reward와 task progress를 유지하면서
   agent-agent, agent-other-box, box-box proximity cost를 감점한다.
 - 기본 stress distribution은 `MS_SCEN=cross`다.
@@ -16,12 +21,17 @@ sequential stack이 아닌 기존 simultaneous `HumanoidMASteerCarry` 계열이�
   agent/box를 후발 agent가 공간적으로 돌아야 한다.
   비율과 여유는 `CARRY_PLANNER_CONVERGE_PROB`, `CARRY_PLANNER_GOAL_MARGIN`으로 바꾼다.
 
-학습 기본 spatial exploration은 `CARRY_PLANNER_DELTA_STD=0.25`, recurrent path
-blend는 `CARRY_PLANNER_PATH_UPDATE_ALPHA=0.5`다. 로그의
+학습 기본 sparse-point exploration은 `CARRY_PLANNER_DELTA_STD=0.25`다. replan에서는
+이미 실행한 prefix만 보존하고 아직 실행하지 않은 suffix는 새 spline으로 교체한다. 로그의
 `sample_path_deviation`은 실제 실행용 stochastic path가 직선 base에서 벗어난 평균
 거리(m), `mean_path_deviation`은 viewer/checkpoint에서 보이는 deterministic path의
 평균 거리다. `plan_valid_fraction`이 낮으면 곡률 검사에서 proposal이 거부되어 이전
 plan 또는 analytic fallback이 실행되고 있다는 뜻이다.
+
+`CARRY_PLANNER_SMOOTHNESS_COEF`(기본 10)는 직선 이탈이나 일정한 곡률을 벌점으로
+주지 않고, pickup에서 분리한 두 spline 각각의 **curvature 변화량**을 줄인다. 따라서
+넓게 한 방향으로 우회하는 path는 유지하면서 좌우로 흔들리는 S-curve/noise를 억제한다.
+46도 초과 급회전은 아래 analytic curvature term이 별도로 처리한다.
 
 학습은 physical PPO에 더해 episode의 첫 full-plan을 96개 미래 시점으로 펼치고,
 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
@@ -50,6 +60,22 @@ Viewer:
 MA_GPU=0 bash TokenHSI-coord/carry_planner/view.sh \
   runs/carry_planner/<tag>/planner_000200.pth \
   TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth
+```
+
+학습 없이 sparse spline과 frozen executor 연결만 확인하려면 제공된 V16 sanity
+checkpoint를 사용한다. A1은 +Y, A2는 -X로 약 1m 우회하고 pickup/crossing 근처에서
+서로 다른 speed dip을 사용하므로 path ribbon과 speed color를 함께 확인할 수 있다.
+
+```bash
+MA_GPU=0 bash TokenHSI-coord/carry_planner/view_sanity.sh
+```
+
+checkpoint를 다시 만들 때는 기존 파일을 자동으로 덮어쓰지 않는다.
+
+```bash
+PYTHONPATH=TokenHSI-coord python \
+  TokenHSI-coord/carry_planner/make_sanity_checkpoint.py \
+  runs/carry_planner/sanity_sparse_v16/planner_detour_slow.pth
 ```
 
 기본 viewer는 평가 6회 후 종료하지 않고 창을 닫을 때까지 계속 실행하며, reset마다

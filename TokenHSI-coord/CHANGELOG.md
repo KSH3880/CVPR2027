@@ -4,6 +4,40 @@
 
 ## 2026-09-22
 
+### Plain Carry sparse waypoint/speed spline head (V16)
+
+- plain Carry의 agent별 33-point 위치 residual과 33-point speed 직접 출력을
+  `start / learned approach / box / learned carry x3 / goal` 7-knot 표현으로 교체했다.
+  위치는 box에서 분리한 cubic Hermite spline, 속도는 같은 knot의 monotone cubic
+  spline으로 만든 뒤 arc-length 기준 33점으로 재샘플링한다.
+- 위치 action을 128D에서 16D, speed action을 66D에서 14D로 줄이면서 frozen executor,
+  collision evaluator와 analytic loss가 받는 dense ABI는 유지했다. start, pickup(index
+  16), placement(index 32)는 exact anchor이고 실행된 prefix만 기존 path에서 보존한다.
+- sparse control point는 직선에 작은 dense residual을 더하지 않고 기본 4m workspace에서
+  독립적으로 움직인다. checkpoint/action 계약 변경을 명시하기 위해 schema를 V16으로
+  올렸다.
+- 기존 dense residual second-difference smoothness는 곡선 자체를 직선으로 당기는 문제가
+  있어 plain Carry에서 제거했다. pickup을 경계로 두 spline을 나누고 단위 접선의 변화량
+  차이(curvature variation)를 penalize해 일정한 곡률의 우회는 허용하면서 S-curve noise만
+  억제한다. 기존 46도 초과 curvature penalty는 급회전 제한으로 함께 유지한다.
+- 학습 없이 실제 frozen ms18 bridge를 확인할 수 있도록 고정 opposite-detour와 speed-dip
+  bias를 넣는 `make_sanity_checkpoint.py`, 생성된 V16 checkpoint, one-command
+  `view_sanity.sh`를 추가했다. 생성 checkpoint의 33점 shape, speed 범위와 세 hard anchor를
+  viewer 실행 전 CPU에서 검증했다.
+
+### C2/simple MLP convergence-task viewer
+
+- 기존 C2/C13 MLP coordinator checkpoint를 frozen ms18 위에서 직접 로드하고,
+  현재 Carry planner와 같은 box→공통 crossing→close-goal reset을 적용하는 전용
+  launcher를 추가했다. checkpoint metadata에서 C2/simple/C1 loader도 자동 선택한다.
+- viewer 전용 환경변수로 일반 Cross 혼합 비율과 goal margin을 조절하며 기존 학습과
+  batch evaluation의 reset geometry에는 영향을 주지 않는다.
+- 공용 coordinator viewer가 `MA_GPU`를 읽기만 하고 실제 CUDA/PhysX 인자로 전달하지
+  않던 문제를 고쳤다. 추가로 Isaac Gym native PhysX가 `CUDA_VISIBLE_DEVICES` remap과
+  달리 `compute_device_id=0`을 물리 GPU 0으로 잡아 Torch는 GPU 1, PhysX는 GPU 0에
+  갈라지던 것을 확인했다. viewer에서는 remap을 제거하고 Torch/PhysX/Vulkan 모두
+  동일한 명시적 물리 ordinal(`cuda:$MA_GPU`)을 사용한다.
+
 ### close-goal Carry layout의 carry segment 교차 보장
 
 - 기존 hard layout은 goal 두 개를 공통 중심 가까이에 두기만 해 `box->goal` 선분이

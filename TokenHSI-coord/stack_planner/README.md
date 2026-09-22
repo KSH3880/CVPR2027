@@ -1,4 +1,4 @@
-# Stack path-and-speed planner V15
+# Stack path-and-speed planner V16
 
 Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 `trajectory_predictor/`의 코드 및 checkpoint namespace를 건드리지 않도록 별도 패키지로
@@ -15,7 +15,8 @@ Stack task 전용 Transformer planner다. 기존 `coordinator/`와
 - 실행 출력: 선택된 하나의 두-agent end-to-end joint XY path와 pointwise speed profile
 - hard anchor: 첫 decision의 `P0=departure root`; 이후 실행한 prefix는 고정
 - route constraint: 연속 선분 투영 거리로 `box → stack goal` ordered visit를 학습
-- checkpoint schema: `tokenhsi-stack-planner-v15`
+- checkpoint schema: `tokenhsi-stack-planner-v16` (full-stack head는 유지,
+  `plain_carry`만 sparse waypoint/speed spline head 사용)
 
 ## 최소 A1 retreat 검증
 
@@ -189,7 +190,7 @@ env의 history만 비우고 현재 state 한 칸부터 다시 시작한다. recu
 transition을 섞어 minibatch로 학습해도 당시 observation을 정확히 재현한다. checkpoint의
 `model_config.history_steps`에 길이를 저장하며 train/view/eval 모두 이를 사용한다.
 
-V15 이전 planner checkpoint는 retreat-only action-mask 계약이 달라 load하지 않는다. V15 checkpoint도
+V16 이전 planner checkpoint는 action 계약이 달라 load하지 않는다. V16 checkpoint도
 history 길이, candidate 수, offset 범위 또는 update alpha가 다른 설정으로 resume하는 것은 거부한다.
 
 검증:
@@ -284,7 +285,7 @@ iteration마다 기록한다.
 
 마지막 exposure를 함께 봐야 흔들림 metric의 0이 안정적인 box인지, 아직 placement phase에
 도달하지 못한 것인지 구분할 수 있다.
-같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 V15 설계의 서버 학습은 다음처럼
+같은 tag의 디렉터리가 이미 있으면 덮어쓰지 않고 종료한다. 현재 V16 설계의 서버 학습은 다음처럼
 실행할 수 있다.
 
 ```bash

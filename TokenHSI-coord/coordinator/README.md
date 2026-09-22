@@ -154,6 +154,16 @@ bash scripts/coord/view_local.sh ms18_maskteam_origscale_c06_s0
 기본값은 모든 viewer reset에 적용(`MS_VIEW_TIMED_CROSS_PROB=1.0`)한다. 로그의
 `[coord-view timed-cross]` 행에서 예상 교차 도착시간 차이를 확인할 수 있다.
 
+현재 Carry planner의 box→공통 crossing→close-goal 배치를 기존 C2/simple MLP에
+그대로 적용하려면 전용 launcher를 사용한다.
+
+```bash
+MA_GPU=1 MS_VIEW_CONVERGE_PROB=1 \
+bash scripts/coord/view_converge.sh \
+  TokenHSI-coord/output/c13.pth \
+  TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth
+```
+
 B2는 같은 MLP/loss에서 carry lateral bow만 현재 box→goal 거리 이하로 제한한다. 급곡선
 invalid가 거의 없어 실제 bridge 기본 추천이다.
 

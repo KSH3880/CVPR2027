@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from carry_planner.layout import converging_goal_xy
 from coordinator.checkpoint import load_checkpoint
 from coordinator.c2_checkpoint import C2_CANDIDATES, load_c2_checkpoint
 from coordinator.simple_checkpoint import load_simple_checkpoint
@@ -60,6 +61,30 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
             os.environ.get("MS_VIEW_TIMED_CROSS_MAX_SHIFT", "8.0")
         )
         self._view_timed_cross_reset = 0
+        self._view_converge = bool(int(
+            os.environ.get("MS_VIEW_CONVERGE", "0")
+        ))
+        self._view_converge_prob = float(
+            os.environ.get("MS_VIEW_CONVERGE_PROB", "1.0")
+        )
+        self._view_converge_margin = float(
+            os.environ.get("MS_VIEW_CONVERGE_MARGIN", "0.25")
+        )
+        self._view_converge_resets = 0
+        self._view_converge_cases = 0
+        if self._view_converge:
+            if not bool(int(os.environ.get("COORD_VIEWER", "0"))):
+                raise ValueError(
+                    "MS_VIEW_CONVERGE is viewer-only; use scripts/coord/view_converge.sh"
+                )
+            if os.environ.get("MS_SCEN", "free") != "cross":
+                raise ValueError("MS_VIEW_CONVERGE requires MS_SCEN=cross")
+            if self._view_timed_cross:
+                raise ValueError("MS_VIEW_CONVERGE and MS_VIEW_TIMED_CROSS are exclusive")
+            if not 0.0 <= self._view_converge_prob <= 1.0:
+                raise ValueError("MS_VIEW_CONVERGE_PROB must be in [0, 1]")
+            if self._view_converge_margin < 0.0:
+                raise ValueError("MS_VIEW_CONVERGE_MARGIN must be non-negative")
         if self._view_timed_cross:
             if not bool(int(os.environ.get("COORD_VIEWER", "0"))):
                 raise ValueError(
@@ -248,6 +273,44 @@ class HumanoidMACoordCarry(HumanoidMASteerCarry):
         super().apply_layout(env_ids)
         if self._view_timed_cross and len(env_ids) > 0:
             self._apply_view_timed_cross(env_ids)
+        if self._view_converge and len(env_ids) > 0:
+            self._apply_view_converge(env_ids)
+
+    def _apply_view_converge(self, env_ids):
+        """Apply the Carry-planner box→crossing→close-goal stress layout."""
+        self._view_converge_resets += len(env_ids)
+        selected = (
+            torch.rand(len(env_ids), device=self.device)
+            < self._view_converge_prob
+        )
+        if not bool(selected.any()):
+            return
+        ids = env_ids[selected]
+        rows = self.agent_rows(ids)
+        initial = self.agent_axis(self._initial_humanoid_root_states)
+        crossing = initial[ids, :, :2].mean(dim=1)
+        box_xy = self.agent_axis(self._box_states)[ids, :, :2]
+        size_xy = self._box_lib._box_size[rows, :2].reshape(-1, AGENTS, 2)
+        targets, feasible = converging_goal_xy(
+            box_xy, crossing, size_xy, self._view_converge_margin,
+        )
+        if not bool(feasible.any()):
+            return
+
+        ids = ids[feasible]
+        targets = targets[feasible]
+        rows = self.agent_rows(ids)
+        self._box_tar_pos[rows, :2] = targets.reshape(-1, 2)
+        if self._carry_reset_random_height:
+            self.agent_axis(self._tar_platform_states)[ids, :, :2] = targets
+        self._view_converge_cases += len(ids)
+        print(
+            "[coord-view converge] cases={}/{} total={}/{} margin={:.2f}m".format(
+                len(ids), len(env_ids), self._view_converge_cases,
+                self._view_converge_resets, self._view_converge_margin,
+            ),
+            flush=True,
+        )
 
     def _view_cross_arrival(self, env_ids, crossing):
         """Estimate nominal ms18 arrival at a common crossing in seconds."""

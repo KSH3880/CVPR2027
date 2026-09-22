@@ -36,6 +36,8 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "path_points": STACK_PATH_POINTS,
         "path_only": False,
         "pointwise_speed_profile": True,
+        "sparse_carry_spline": config.plain_carry,
+        "carry_control_scale": config.carry_control_scale,
         "runtime_acceleration_limit": MAX_ACCEL,
         "full_candidate_rollout": True,
         "previous_trajectory_correction": True,
@@ -190,7 +192,7 @@ def load_stack_checkpoint_for_view(
             "V13 viewer config mismatch: "
             f"missing={missing_config}, unknown={extra}"
         )
-    # These V15-only values are inert in the V13 implementation below.  They
+    # These current-schema values are inert in the V13 implementation below. They
     # merely let the shared validated config describe the unchanged network.
     config = StackPlannerConfig(
         **config_values,

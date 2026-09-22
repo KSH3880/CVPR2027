@@ -236,6 +236,7 @@ def main():
 
     history_steps = _env_int("CARRY_PLANNER_HISTORY_STEPS", 4)
     delta_scale = _env_float("CARRY_PLANNER_DELTA_SCALE", 0.5)
+    control_scale = _env_float("CARRY_PLANNER_CONTROL_SCALE", 4.0)
     path_update_alpha = _env_float("CARRY_PLANNER_PATH_UPDATE_ALPHA", 0.5)
     init = os.environ.get("CARRY_PLANNER_INIT", "")
     payload = None
@@ -243,12 +244,13 @@ def main():
         planner, payload = load_stack_checkpoint(init, device)
         expected = (
             history_steps, delta_scale, delta_scale,
-            path_update_alpha, True,
+            path_update_alpha, True, control_scale,
         )
         actual = (
             planner.config.history_steps, planner.config.delta_scale,
             planner.config.retreat_delta_scale,
             planner.config.path_update_alpha, planner.config.plain_carry,
+            planner.config.carry_control_scale,
         )
         if actual != expected or planner.config.candidates != 1:
             raise ValueError(
@@ -262,6 +264,7 @@ def main():
             retreat_delta_scale=delta_scale,
             path_update_alpha=path_update_alpha,
             plain_carry=True,
+            carry_control_scale=control_scale,
         )).to(device)
     history = StackHistoryBuffer(task.num_envs, history_steps, device)
     policy = StackPlannerActorCritic(
@@ -322,6 +325,7 @@ def main():
     print(
         f"[carry-planner-train] envs={task.num_envs} horizon={horizon} "
         f"low_steps={low_steps} history={history_steps} delta={delta_scale:g} "
+        f"control_scale={control_scale:g} "
         f"path_alpha={path_update_alpha:g} "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"collision_coef={collision_coef:g} "

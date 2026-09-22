@@ -11,11 +11,7 @@ from torch.distributions import Normal
 from coordinator.schema import AGENTS, CoordinatorState
 
 from .model import StackTrajectoryPlanner
-from .schema import STACK_PATH_DELTA_DIM, STACK_PATH_POINTS, STACK_SPEED_DIM
-
-
-def _path_dim() -> int:
-    return STACK_PATH_DELTA_DIM + STACK_SPEED_DIM
+from .schema import STACK_PATH_POINTS
 
 
 class StackPlannerActorCritic(nn.Module):
@@ -28,19 +24,29 @@ class StackPlannerActorCritic(nn.Module):
         if min(point_std, endpoint_std, anchor_std, speed_std) <= 0.0:
             raise ValueError("planner exploration stds must be positive")
         self.planner = planner
-        self.continuous_action_dim = _path_dim()
+        self.path_action_dim = planner.heads.path_action_dim
+        self.speed_action_dim = planner.heads.speed_action_dim
+        self.continuous_action_dim = (
+            self.path_action_dim + self.speed_action_dim
+        )
         # The leading index identifies which independent head produced the
         # path. It is supervised by full rollout comparison, not sampled as a
         # PPO categorical action.
         self.action_dim = self.continuous_action_dim + 1
-        std = torch.full((AGENTS, STACK_PATH_POINTS - 1, 2), float(point_std))
-        # Keep the points nearest the geometric box/goal anchors precise while
-        # allowing the final retreat end to explore more broadly.
-        std[:, 9, :] = float(anchor_std)   # full-path index 10
-        std[:, 20, :] = float(anchor_std)  # full-path index 21
-        std[:, -1, :] = float(endpoint_std)
+        if planner.config.plain_carry:
+            std = torch.full(
+                (self.path_action_dim,), float(point_std),
+            )
+        else:
+            std = torch.full((AGENTS, STACK_PATH_POINTS - 1, 2), float(point_std))
+            # Keep the points nearest the geometric box/goal anchors precise while
+            # allowing the final retreat end to explore more broadly.
+            std[:, 9, :] = float(anchor_std)   # full-path index 10
+            std[:, 20, :] = float(anchor_std)  # full-path index 21
+            std[:, -1, :] = float(endpoint_std)
+            std = std.reshape(-1)
         std = torch.cat((
-            std.reshape(-1), torch.full((STACK_SPEED_DIM,), float(speed_std)),
+            std, torch.full((self.speed_action_dim,), float(speed_std)),
         ))
         # Exploration can specialize per independent full-path head.
         self.action_log_std = nn.Parameter(
@@ -55,9 +61,11 @@ class StackPlannerActorCritic(nn.Module):
         actions = Normal(mean, std)
         return actions, raw["value"], raw
 
-    @staticmethod
-    def _split_action(action):
-        return action[..., :STACK_PATH_DELTA_DIM], action[..., STACK_PATH_DELTA_DIM:]
+    def _split_action(self, action):
+        return (
+            action[..., :self.path_action_dim],
+            action[..., self.path_action_dim:],
+        )
 
     @staticmethod
     def _action_mask(raw, dtype):
@@ -209,21 +217,39 @@ class StackPlannerActorCritic(nn.Module):
                 coarse[..., 1:, :], coarse[..., -1:, :],
             ), dim=-2)
         coarse = coarse[..., ::4, :]
-        correction = output["path_delta_local"]
-        second = (
-            correction[..., 2:, :]
-            - 2.0 * correction[..., 1:-1, :]
-            + correction[..., :-2, :]
-        )
-        future_second = output["path_point_weight"][..., 2:]
-        smoothness_numerator = (
-            second.square().sum(dim=-1)
-            * future_second[:, None]
-        ).sum()
-        smoothness_denominator = (
-            future_second.sum() * correction.new_tensor(correction.shape[1])
-        ).clamp(min=1.0)
-        smoothness = smoothness_numerator / smoothness_denominator
+        if self.planner.config.plain_carry:
+            # Penalize curvature *changes*, not curvature itself. A broad,
+            # consistently curved avoidance route should be free; alternating
+            # turns/noisy S-curves should not. Split at pickup so the intended
+            # approach-to-carry corner is not charged.
+            full_path = output["path_world"]
+            variations = []
+            for leg in (full_path[..., :17, :], full_path[..., 16:, :]):
+                segment = leg[..., 1:, :] - leg[..., :-1, :]
+                direction = segment / segment.norm(dim=-1, keepdim=True).clamp(
+                    min=1e-6,
+                )
+                turn = direction[..., 1:, :] - direction[..., :-1, :]
+                variation = turn[..., 1:, :] - turn[..., :-1, :]
+                variations.append(variation.square().sum(dim=-1).mean())
+            smoothness = torch.stack(variations).mean()
+        else:
+            correction = output["path_delta_local"]
+            second = (
+                correction[..., 2:, :]
+                - 2.0 * correction[..., 1:-1, :]
+                + correction[..., :-2, :]
+            )
+            future_second = output["path_point_weight"][..., 2:]
+            smoothness_numerator = (
+                second.square().sum(dim=-1)
+                * future_second[:, None]
+            ).sum()
+            smoothness_denominator = (
+                future_second.sum()
+                * correction.new_tensor(correction.shape[1])
+            ).clamp(min=1.0)
+            smoothness = smoothness_numerator / smoothness_denominator
         speed_difference = output["speed"][..., 1:] - output["speed"][..., :-1]
         speed_smoothness = speed_difference.square().mean()
         candidates = path.shape[1]

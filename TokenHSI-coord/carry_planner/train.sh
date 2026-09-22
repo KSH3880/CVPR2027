@@ -55,12 +55,11 @@ export CARRY_PLANNER_HISTORY_STEPS=${CARRY_PLANNER_HISTORY_STEPS:-4}
 export CARRY_PLANNER_COLLISION_COEF=${CARRY_PLANNER_COLLISION_COEF:-5.0}
 export CARRY_PLANNER_CONVERGE_PROB=${CARRY_PLANNER_CONVERGE_PROB:-0.75}
 export CARRY_PLANNER_GOAL_MARGIN=${CARRY_PLANNER_GOAL_MARGIN:-0.25}
-# Close-goal cases may require walking around an already placed box/agent;
-# 0.5 m corrections can make that physically impossible.
+# Kept in the checkpoint config for shared stack-planner compatibility. Plain
+# Carry uses the sparse control-point scale below instead of dense deltas.
 export CARRY_PLANNER_DELTA_SCALE=${CARRY_PLANNER_DELTA_SCALE:-1.0}
-# At 0.25 the two smoothing passes and the point ramp reduce fresh stochastic
-# path exploration to only a few centimetres, so collision reward mostly
-# trains speed. Keep temporal blending, but expose spatial alternatives.
+export CARRY_PLANNER_CONTROL_SCALE=${CARRY_PLANNER_CONTROL_SCALE:-4.0}
+# Exploration is applied to four sparse point logits per agent.
 export CARRY_PLANNER_PATH_UPDATE_ALPHA=${CARRY_PLANNER_PATH_UPDATE_ALPHA:-0.5}
 export CARRY_PLANNER_DELTA_STD=${CARRY_PLANNER_DELTA_STD:-0.25}
 export CARRY_PLANNER_PPO_EPOCHS=${CARRY_PLANNER_PPO_EPOCHS:-3}

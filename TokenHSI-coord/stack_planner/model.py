@@ -14,8 +14,10 @@ from coordinator.geometry import (
 )
 
 from .schema import (
-    AGENTS, MAX_SPEED, MIN_SPEED, STACK_CANDIDATES, STACK_PATH_DELTA_DIM,
-    STACK_PATH_INPUT_DIM, STACK_PATH_POINTS, STACK_SPEED_DIM, CoordinatorState,
+    AGENTS, CARRY_LEARNED_PATH_POINTS, CARRY_PATH_DIM, CARRY_PATH_KNOTS,
+    CARRY_SPEED_DIM, MAX_SPEED, MIN_SPEED, STACK_CANDIDATES,
+    STACK_PATH_DELTA_DIM, STACK_PATH_INPUT_DIM, STACK_PATH_POINTS,
+    STACK_SPEED_DIM, CoordinatorState,
 )
 
 
@@ -34,6 +36,7 @@ class StackPlannerConfig:
     history_steps: int = 1
     retreat_only: bool = False
     plain_carry: bool = False
+    carry_control_scale: float = 4.0
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -56,6 +59,8 @@ class StackPlannerConfig:
             raise ValueError("history_steps must be positive")
         if self.retreat_only and self.plain_carry:
             raise ValueError("retreat_only and plain_carry are exclusive")
+        if self.carry_control_scale <= 0.0:
+            raise ValueError("carry_control_scale must be positive")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -166,6 +171,124 @@ def _smooth_speed(speed: torch.Tensor, passes: int = 2) -> torch.Tensor:
     return speed
 
 
+def _hermite_curve(knots: torch.Tensor, subdivisions: int) -> torch.Tensor:
+    """Interpolate position knots with a differentiable cubic Hermite curve."""
+    if knots.shape[-2] < 2 or subdivisions < 1:
+        raise ValueError("Hermite curves need at least two knots and one subdivision")
+    tangent = torch.empty_like(knots)
+    tangent[..., 0, :] = knots[..., 1, :] - knots[..., 0, :]
+    tangent[..., -1, :] = knots[..., -1, :] - knots[..., -2, :]
+    if knots.shape[-2] > 2:
+        tangent[..., 1:-1, :] = 0.5 * (
+            knots[..., 2:, :] - knots[..., :-2, :]
+        )
+    t = torch.linspace(
+        0.0, 1.0, subdivisions + 1,
+        device=knots.device, dtype=knots.dtype,
+    )
+    shape = (1,) * (knots.ndim - 2) + (1, subdivisions + 1, 1)
+    t = t.reshape(shape)
+    t2, t3 = t.square(), t.square() * t
+    p0, p1 = knots[..., :-1, None, :], knots[..., 1:, None, :]
+    m0, m1 = tangent[..., :-1, None, :], tangent[..., 1:, None, :]
+    segments = (
+        (2.0 * t3 - 3.0 * t2 + 1.0) * p0
+        + (t3 - 2.0 * t2 + t) * m0
+        + (-2.0 * t3 + 3.0 * t2) * p1
+        + (t3 - t2) * m1
+    )
+    prefix = segments[..., :-1, :].flatten(start_dim=-3, end_dim=-2)
+    return torch.cat((prefix, segments[..., -1, -1:, :]), dim=-2)
+
+
+def _monotone_hermite_curve(knots: torch.Tensor, subdivisions: int) -> torch.Tensor:
+    """Shape-preserving scalar Hermite interpolation for speed knots."""
+    if knots.shape[-1] < 2 or subdivisions < 1:
+        raise ValueError("speed splines need at least two knots and one subdivision")
+    slope = knots[..., 1:] - knots[..., :-1]
+    tangent = torch.empty_like(knots)
+    tangent[..., 0] = slope[..., 0]
+    tangent[..., -1] = slope[..., -1]
+    if knots.shape[-1] > 2:
+        left, right = slope[..., :-1], slope[..., 1:]
+        same_direction = left * right > 0.0
+        denominator = left + right
+        safe_denominator = torch.where(
+            denominator.abs() > 1e-7, denominator,
+            torch.ones_like(denominator),
+        )
+        harmonic = 2.0 * left * right / safe_denominator
+        tangent[..., 1:-1] = torch.where(
+            same_direction, harmonic, torch.zeros_like(harmonic),
+        )
+    t = torch.linspace(
+        0.0, 1.0, subdivisions + 1,
+        device=knots.device, dtype=knots.dtype,
+    )
+    shape = (1,) * (knots.ndim - 1) + (1, subdivisions + 1)
+    t = t.reshape(shape)
+    t2, t3 = t.square(), t.square() * t
+    p0, p1 = knots[..., :-1, None], knots[..., 1:, None]
+    m0, m1 = tangent[..., :-1, None], tangent[..., 1:, None]
+    segments = (
+        (2.0 * t3 - 3.0 * t2 + 1.0) * p0
+        + (t3 - 2.0 * t2 + t) * m0
+        + (-2.0 * t3 + 3.0 * t2) * p1
+        + (t3 - t2) * m1
+    )
+    prefix = segments[..., :-1].flatten(start_dim=-2, end_dim=-1)
+    return torch.cat((prefix, segments[..., -1, -1:]), dim=-1)
+
+
+def _arc_length_resample(curve: torch.Tensor, value: torch.Tensor,
+                         count: int):
+    """Sample a curve and aligned scalar profile at uniform arc positions."""
+    if curve.shape[:-1] != value.shape or count < 2:
+        raise ValueError("curve/value shape mismatch or invalid sample count")
+    length = (curve[..., 1:, :] - curve[..., :-1, :]).norm(dim=-1)
+    arc = torch.cat((torch.zeros_like(length[..., :1]), length.cumsum(-1)), -1)
+    fraction = torch.linspace(
+        0.0, 1.0, count, device=curve.device, dtype=curve.dtype,
+    )
+    target = arc[..., -1:] * fraction
+    upper = torch.searchsorted(arc.contiguous(), target.contiguous(), right=True)
+    upper = upper.clamp(1, curve.shape[-2] - 1)
+    lower = upper - 1
+    arc0, arc1 = arc.gather(-1, lower), arc.gather(-1, upper)
+    blend = ((target - arc0) / (arc1 - arc0).clamp(min=1e-7)).clamp(0.0, 1.0)
+    gather_index = lower[..., None].expand(*lower.shape, curve.shape[-1])
+    curve0 = curve.gather(-2, gather_index)
+    gather_index = upper[..., None].expand(*upper.shape, curve.shape[-1])
+    curve1 = curve.gather(-2, gather_index)
+    sampled_curve = curve0 + blend[..., None] * (curve1 - curve0)
+    value0, value1 = value.gather(-1, lower), value.gather(-1, upper)
+    sampled_value = value0 + blend * (value1 - value0)
+    sampled_curve[..., 0, :] = curve[..., 0, :]
+    sampled_curve[..., -1, :] = curve[..., -1, :]
+    sampled_value[..., 0] = value[..., 0]
+    sampled_value[..., -1] = value[..., -1]
+    return sampled_curve, sampled_value
+
+
+def _carry_spline(control: torch.Tensor, speed_knots: torch.Tensor):
+    """Decode start/mid/box/mid/mid/mid/goal knots to the 33-point ABI."""
+    if control.shape[-2:] != (CARRY_PATH_KNOTS, 2):
+        raise ValueError("carry control points must end in [7,2]")
+    if speed_knots.shape != control.shape[:-1]:
+        raise ValueError("carry speed knots must match control points")
+    approach_curve = _hermite_curve(control[..., :3, :], 32)
+    approach_speed = _monotone_hermite_curve(speed_knots[..., :3], 32)
+    approach, approach_v = _arc_length_resample(
+        approach_curve, approach_speed, 17,
+    )
+    carry_curve = _hermite_curve(control[..., 2:, :], 16)
+    carry_speed = _monotone_hermite_curve(speed_knots[..., 2:], 16)
+    carry, carry_v = _arc_length_resample(carry_curve, carry_speed, 17)
+    path = torch.cat((approach, carry[..., 1:, :]), dim=-2)
+    speed = torch.cat((approach_v, carry_v[..., 1:]), dim=-1)
+    return path, speed
+
+
 def _future_point_weight(path_progress: torch.Tensor,
                          previous_path_valid: torch.Tensor) -> torch.Tensor:
     """Continuous future mask with a two-point correction ramp at the root."""
@@ -185,6 +308,12 @@ class StackPlannerHeads(nn.Module):
     def __init__(self, config: StackPlannerConfig):
         super().__init__()
         self.config = config
+        self.path_action_dim = (
+            CARRY_PATH_DIM if config.plain_carry else STACK_PATH_DELTA_DIM
+        )
+        self.speed_action_dim = (
+            CARRY_SPEED_DIM if config.plain_carry else STACK_SPEED_DIM
+        )
         hidden = 2 * config.d_model
 
         def head(size):
@@ -194,10 +323,10 @@ class StackPlannerHeads(nn.Module):
             )
 
         self.paths = nn.ModuleList([
-            head(STACK_PATH_DELTA_DIM) for _ in range(config.candidates)
+            head(self.path_action_dim) for _ in range(config.candidates)
         ])
         self.speeds = nn.ModuleList([
-            head(STACK_SPEED_DIM) for _ in range(config.candidates)
+            head(self.speed_action_dim) for _ in range(config.candidates)
         ])
         self.candidate_evaluator = nn.Sequential(
             nn.Linear(
@@ -218,12 +347,48 @@ class StackPlannerHeads(nn.Module):
     def decode_delta(self, base_path_local, previous_path_local,
                      path_delta_raw, speed_raw, path_point_weight):
         batch, candidates = path_delta_raw.shape[:2]
-        expected = (batch, candidates, STACK_PATH_DELTA_DIM)
+        expected = (batch, candidates, self.path_action_dim)
         if path_delta_raw.shape != expected:
             raise ValueError(f"path_delta_raw must be {expected}")
-        speed_expected = (batch, candidates, STACK_SPEED_DIM)
+        speed_expected = (batch, candidates, self.speed_action_dim)
         if speed_raw.shape != speed_expected:
             raise ValueError(f"speed_raw must be {speed_expected}")
+        if self.config.plain_carry:
+            learned = path_delta_raw.reshape(
+                batch, candidates, AGENTS, CARRY_LEARNED_PATH_POINTS, 2,
+            )
+            # A straight layout is only the zero-action initialization.  Each
+            # sparse point has a broad independent workspace and the dense
+            # path is generated solely by the spline below.
+            learned_base = base_path_local[:, None, :, (8, 20, 24, 28), :]
+            learned = learned_base + self.config.carry_control_scale * torch.tanh(
+                learned
+            )
+            fixed = base_path_local[:, None].expand(
+                -1, candidates, -1, -1, -1,
+            )
+            control = torch.stack((
+                fixed[..., 0, :], learned[..., 0, :], fixed[..., 16, :],
+                learned[..., 1, :], learned[..., 2, :], learned[..., 3, :],
+                fixed[..., 32, :],
+            ), dim=-2)
+            speed_knots = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * torch.sigmoid(
+                speed_raw.reshape(
+                    batch, candidates, AGENTS, CARRY_PATH_KNOTS,
+                )
+            )
+            target_local, speed = _carry_spline(control, speed_knots)
+            # Preserve the executed prefix, but do not EMA the future back
+            # toward the old dense straight-line representation.
+            blend = path_point_weight[:, None, :, :, None]
+            path_local = previous_path_local[:, None] + blend * (
+                target_local - previous_path_local[:, None]
+            )
+            path_local[..., 0, :] = previous_path_local[:, None, :, 0, :]
+            path_local[..., 16, :] = fixed[..., 16, :]
+            path_local[..., 32, :] = fixed[..., 32, :]
+            return path_local, path_local - previous_path_local[:, None], speed
+
         absolute_offset = torch.tanh(path_delta_raw).reshape(
             batch, candidates, AGENTS, STACK_PATH_POINTS - 1, 2,
         )
@@ -245,12 +410,6 @@ class StackPlannerHeads(nn.Module):
             absolute_offset * offset_scale
             * path_point_weight[:, None, :, :, None]
         )
-        if self.config.plain_carry:
-            # Plain Carry has no post-placement retreat suffix.  Preserve the
-            # physical pickup and placement anchors exactly while all other
-            # points retain the same learned correction head.
-            absolute_offset[..., 16, :] = 0.0
-            absolute_offset[..., 32, :] = 0.0
         target_local = base_path_local[:, None] + absolute_offset
         blend = (
             self.config.path_update_alpha
@@ -285,17 +444,25 @@ class StackPlannerHeads(nn.Module):
                 start_dim=2
             ),
         ), dim=-1)
-        path_action_mask = path_point_weight[..., 1:, None].expand(
-            -1, -1, -1, 2
-        ).reshape(batch, -1) > 0
         if self.config.plain_carry:
-            anchor = torch.ones(
-                AGENTS, STACK_PATH_POINTS - 1, 2,
-                dtype=torch.bool, device=scene.device,
+            path_action_mask = path_point_weight[..., (8, 20, 24, 28), None].expand(
+                -1, -1, -1, 2,
+            ).reshape(batch, CARRY_PATH_DIM) > 0
+            speed_action_mask = torch.ones(
+                batch, CARRY_SPEED_DIM, dtype=torch.bool, device=scene.device,
             )
-            anchor[:, 15, :] = False  # full-path pickup index 16
-            anchor[:, 31, :] = False  # full-path goal index 32
-            path_action_mask &= anchor.reshape(1, -1)
+        else:
+            path_action_mask = path_point_weight[..., 1:, None].expand(
+                -1, -1, -1, 2
+            ).reshape(batch, -1) > 0
+            speed_action_mask = (
+                path_point_weight.reshape(batch, STACK_SPEED_DIM) > 0
+                if self.config.retreat_only else
+                torch.ones(
+                    batch, STACK_SPEED_DIM, dtype=torch.bool,
+                    device=scene.device,
+                )
+            )
         return {
             "path_delta_raw": path_delta_raw,
             "speed_raw": speed_raw,
@@ -305,14 +472,7 @@ class StackPlannerHeads(nn.Module):
             "reference_path_local": previous_path_local,
             "path_point_weight": path_point_weight,
             "path_action_mask": path_action_mask,
-            "speed_action_mask": (
-                path_point_weight.reshape(batch, STACK_SPEED_DIM) > 0
-                if self.config.retreat_only else
-                torch.ones(
-                    batch, STACK_SPEED_DIM, dtype=torch.bool,
-                    device=scene.device,
-                )
-            ),
+            "speed_action_mask": speed_action_mask,
             "candidate_logits": self.candidate_evaluator(
                 evaluator_input
             ).squeeze(-1),

@@ -10,11 +10,32 @@ REPO="$ROOT/TokenHSI-coord"
 EXEC_REPO=${COORD_EXEC_REPO:-$ROOT/TokenHSI-masteer}
 INPUT=${1:?사용법: view_local.sh <ms18 tag 또는 PTH> [env수]}
 ENVS=${ENVS:-${2:-1}}
+GPU=${MA_GPU:-0}
 
 if ! [[ "$ENVS" =~ ^[1-9][0-9]*$ ]]; then
     echo "ENVS는 양의 정수여야 한다: $ENVS" >&2
     exit 2
 fi
+if ! [[ "$GPU" =~ ^[0-9]+$ ]]; then
+    echo "MA_GPU는 0 이상의 물리 GPU 번호여야 한다: $GPU" >&2
+    exit 2
+fi
+GPU_UUID=$(nvidia-smi -i "$GPU" --query-gpu=uuid --format=csv,noheader 2>/dev/null) || {
+    echo "NVML physical GPU index $GPU is not available" >&2
+    exit 2
+}
+case "$GPU_UUID" in
+    GPU-*|MIG-*) ;;
+    *) echo "invalid GPU UUID: $GPU_UUID" >&2; exit 2 ;;
+esac
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+# Isaac Gym's native PhysX backend treats compute_device_id as a physical
+# ordinal even when PyTorch remaps CUDA_VISIBLE_DEVICES.  Remapping GPU 1 to
+# logical cuda:0 therefore split one process across physical GPU 0 (PhysX) and
+# GPU 1 (Torch).  Keep the full physical namespace and pass the same explicit
+# ordinal to Torch, PhysX, and Vulkan.
+unset CUDA_VISIBLE_DEVICES
+export TOKENHSI_GRAPHICS_DEVICE_ID=${TOKENHSI_GRAPHICS_DEVICE_ID:-$GPU}
 
 resolve_file() {
     local value=$1 candidate
@@ -175,9 +196,20 @@ export MS_SEED=${MS_SEED:-0}
 export MS_VIEW_TIMED_CROSS=${MS_VIEW_TIMED_CROSS:-0}
 export MS_VIEW_TIMED_CROSS_PROB=${MS_VIEW_TIMED_CROSS_PROB:-1.0}
 export MS_VIEW_TIMED_CROSS_TOL=${MS_VIEW_TIMED_CROSS_TOL:-0.25}
+export MS_VIEW_CONVERGE=${MS_VIEW_CONVERGE:-0}
+export MS_VIEW_CONVERGE_PROB=${MS_VIEW_CONVERGE_PROB:-1.0}
+export MS_VIEW_CONVERGE_MARGIN=${MS_VIEW_CONVERGE_MARGIN:-0.25}
 
 if [ "$MS_VIEW_TIMED_CROSS" != 0 ] && [ "$MS_SCEN" != cross ]; then
     echo "MS_VIEW_TIMED_CROSS=1은 MS_SCEN=cross와 함께 사용한다." >&2
+    exit 2
+fi
+if [ "$MS_VIEW_CONVERGE" != 0 ] && [ "$MS_SCEN" != cross ]; then
+    echo "MS_VIEW_CONVERGE=1은 MS_SCEN=cross와 함께 사용한다." >&2
+    exit 2
+fi
+if [ "$MS_VIEW_CONVERGE" != 0 ] && [ "$MS_VIEW_TIMED_CROSS" != 0 ]; then
+    echo "MS_VIEW_CONVERGE와 MS_VIEW_TIMED_CROSS는 동시에 사용할 수 없다." >&2
     exit 2
 fi
 
@@ -222,11 +254,15 @@ echo " coordinator  $COORD_CKPT"
 echo " provider     $COORD_PROVIDER  model=$COORD_MODEL  replan=$COORD_REPLAN_STEPS"
 echo " env          $ENVS x 2명  CLIP=$MS_CLIP  camera=$MS_CAM"
 echo " timed cross  $MS_VIEW_TIMED_CROSS  prob=$MS_VIEW_TIMED_CROSS_PROB tol=${MS_VIEW_TIMED_CROSS_TOL}s"
+echo " convergence  $MS_VIEW_CONVERGE  prob=$MS_VIEW_CONVERGE_PROB margin=${MS_VIEW_CONVERGE_MARGIN}m"
+echo " GPU          torch/PhysX cuda:$GPU, Vulkan physical $TOKENHSI_GRAPHICS_DEVICE_ID"
 echo "=============================================================="
 
 cd "$REPO"
 python -u ./tokenhsi/run.py \
     --task "$MS_TASK" \
+    --sim_device "cuda:$GPU" --rl_device "cuda:$GPU" \
+    --graphics_device_id "$TOKENHSI_GRAPHICS_DEVICE_ID" --physx --pipeline gpu \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \

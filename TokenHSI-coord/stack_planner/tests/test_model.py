@@ -27,8 +27,8 @@ from stack_planner.model import (
 )
 from stack_planner.policy import StackPlannerActorCritic
 from stack_planner.schema import (
-    STACK_PATH_DELTA_DIM, STACK_PATH_POINTS, STACK_SCHEMA_VERSION,
-    STACK_SPEED_DIM,
+    CARRY_PATH_DIM, CARRY_SPEED_DIM, STACK_PATH_DELTA_DIM,
+    STACK_PATH_POINTS, STACK_SCHEMA_VERSION, STACK_SPEED_DIM,
 )
 
 
@@ -53,9 +53,88 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(torch.allclose(
             path[:, :, 32], state.goal_xy, atol=1e-5,
         ))
-        mask = raw["path_action_mask"].reshape(2, AGENTS, 32, 2)
-        self.assertFalse(mask[:, :, 15].any())
-        self.assertFalse(mask[:, :, 31].any())
+        self.assertEqual(raw["path_delta_raw"].shape, (2, 1, CARRY_PATH_DIM))
+        self.assertEqual(raw["speed_raw"].shape, (2, 1, CARRY_SPEED_DIM))
+        self.assertEqual(raw["path_action_mask"].shape, (2, CARRY_PATH_DIM))
+
+    def test_plain_carry_sparse_knots_make_smooth_dense_path_and_speed(self):
+        state = make_state(batch=1)
+        model = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, plain_carry=True, retreat_delta_scale=0.5,
+            path_update_alpha=0.5,
+        )).eval()
+        with torch.no_grad():
+            final = model.heads.paths[0][-1]
+            final.weight.zero_()
+            final.bias.zero_()
+            # Move A1's single approach knot and middle carry knot off the
+            # straight reference; no dense waypoint corrections are emitted.
+            final.bias[1] = 0.35
+            final.bias[2 * 2 + 1] = -0.45
+            output = model(state)
+        path = output["path_world"][0, 0, 0]
+        self.assertGreater(float(path[:16, 1].abs().max()), 0.1)
+        self.assertGreater(float(path[17:, 1].abs().max()), 0.1)
+        self.assertTrue(torch.isfinite(path).all())
+        self.assertTrue(torch.allclose(path[0], state.root_xy[0, 0], atol=1e-5))
+        self.assertTrue(torch.allclose(path[16], state.box_xyz[0, 0, :2], atol=1e-5))
+        self.assertTrue(torch.allclose(path[32], state.goal_xy[0, 0], atol=1e-5))
+        self.assertTrue(((output["speed"] >= MIN_SPEED) &
+                         (output["speed"] <= MAX_SPEED)).all())
+
+    def test_plain_carry_policy_uses_sparse_action_contract(self):
+        policy = StackPlannerActorCritic(StackTrajectoryPlanner(
+            StackPlannerConfig(
+                candidates=1, plain_carry=True, retreat_delta_scale=0.5,
+            )
+        ))
+        output, action, _, _ = policy.act(make_state(batch=2))
+        self.assertEqual(policy.action_dim, CARRY_PATH_DIM + CARRY_SPEED_DIM + 1)
+        self.assertEqual(action.shape, (2, policy.action_dim))
+        self.assertEqual(output["path_world"].shape, (2, 1, 2, 33, 2))
+        self.assertEqual(output["speed"].shape, (2, 1, 2, 33))
+
+    def test_plain_carry_spline_gradient_reaches_sparse_heads(self):
+        model = StackTrajectoryPlanner(StackPlannerConfig(
+            candidates=1, plain_carry=True, retreat_delta_scale=0.5,
+        ))
+        output = model(make_state(batch=1))
+        loss = output["path_world"][..., 5:28, :].square().mean()
+        loss = loss + output["speed"][..., 5:28].square().mean()
+        loss.backward()
+        path_grad = model.heads.paths[0][-1].weight.grad
+        speed_grad = model.heads.speeds[0][-1].weight.grad
+        self.assertIsNotNone(path_grad)
+        self.assertIsNotNone(speed_grad)
+        self.assertGreater(float(path_grad.abs().sum()), 0.0)
+        self.assertGreater(float(speed_grad.abs().sum()), 0.0)
+
+    def test_plain_carry_smoothness_targets_path_wiggle(self):
+        state = make_state(batch=1)
+        policy = StackPlannerActorCritic(StackTrajectoryPlanner(
+            StackPlannerConfig(
+                candidates=1, plain_carry=True, retreat_delta_scale=0.5,
+            )
+        ))
+        x = torch.linspace(0.0, 4.0, STACK_PATH_POINTS)
+        smooth = torch.stack((x, torch.zeros_like(x)), dim=-1)
+        noisy = smooth.clone()
+        noisy[:, 1] = 0.2 * torch.where(
+            torch.arange(STACK_PATH_POINTS) % 2 == 0, 1.0, -1.0,
+        )
+
+        def regularity(path):
+            path = path.reshape(1, 1, 1, STACK_PATH_POINTS, 2).repeat(
+                1, 1, AGENTS, 1, 1,
+            )
+            return policy.diversity(state, output={
+                "path_world": path,
+                "speed": torch.ones(path.shape[:-1]),
+                "path_point_weight": torch.ones(1, AGENTS, STACK_PATH_POINTS),
+            })["smoothness_loss"]
+
+        self.assertLess(float(regularity(smooth)), 1e-8)
+        self.assertGreater(float(regularity(noisy)), 0.1)
 
     def test_plain_carry_and_retreat_only_are_exclusive(self):
         with self.assertRaisesRegex(ValueError, "exclusive"):
@@ -600,7 +679,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         with torch.inference_mode():
             before = model(state)
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v15.pth"
+            path = Path(directory) / "stack_v16.pth"
             save_stack_checkpoint(path, model, step=7)
             loaded, payload = load_stack_checkpoint(path)
             with torch.inference_mode():
@@ -663,7 +742,7 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
     def test_checkpoint_records_path_and_speed_contract(self):
         model = StackTrajectoryPlanner(StackPlannerConfig(candidates=1)).eval()
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "stack_v15.pth"
+            path = Path(directory) / "stack_v16.pth"
             save_stack_checkpoint(path, model)
             payload = torch.load(path, map_location="cpu", weights_only=False)
             loaded, migrated = load_stack_checkpoint(path)
