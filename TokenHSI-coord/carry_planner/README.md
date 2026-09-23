@@ -39,12 +39,17 @@ hard gate에서 거절된 sampled proposal에는
 fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit penalty다. 로그의
 `invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
 
-학습은 physical PPO에 더해 episode의 첫 full-plan을 96개 미래 시점으로 펼치고,
-충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
-최소화한다. 이 auxiliary loss의 speed는 timing 계산에만 사용하고 detach하므로
-gradient는 path에만 간다. 계수와 focus 수는
+학습은 physical PPO에 더해 매 replan의 아직 실행하지 않은 suffix를 현재 root부터
+96개 미래 시점으로 펼치고, 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box,
+box-box overlap을 직접 최소화한다. 지나간 prefix는 현재 root로 접어 미래 motion으로
+재평가하지 않는다. executor 도착시간 오차에도 우회하도록 기본 ±1.5초 구간을 7개
+상대 timing offset으로 검사한다. 이는 96×96 모든 시간쌍을 만들지 않아 minibatch
+메모리는 미래 시점 수에 선형이다. auxiliary loss의 speed는 timing 계산에만 사용하고
+detach하므로 gradient는 path에만 간다. 계수와 관련 손잡이는
 `CARRY_PLANNER_ANALYTIC_COLLISION_COEF`(기본 1),
-`CARRY_PLANNER_ANALYTIC_FOCUS_STEPS`(기본 8)로 조절한다.
+`CARRY_PLANNER_ANALYTIC_FOCUS_STEPS`(기본 8),
+`CARRY_PLANNER_ANALYTIC_TIME_UNCERTAINTY`(기본 1.5초),
+`CARRY_PLANNER_ANALYTIC_TIME_SAMPLES`(기본 7)로 조절한다.
 46도 실행 곡률 제한은 `CARRY_PLANNER_ANALYTIC_CURVATURE_COEF`(기본 20)의
 cosine-space penalty로 함께 학습한다.
 

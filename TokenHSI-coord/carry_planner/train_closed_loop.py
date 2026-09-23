@@ -140,10 +140,11 @@ def _make_player(args, cfg, cfg_train):
 
 
 def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
-                returns, advantages, initial_plan_masks, epochs, minibatch, clip_ratio,
+                returns, advantages, epochs, minibatch, clip_ratio,
                 value_coef, entropy_coef, smoothness_coef,
                 speed_smoothness_coef, analytic_collision_coef,
-                analytic_curvature_coef, analytic_focus_steps):
+                analytic_curvature_coef, analytic_focus_steps,
+                analytic_time_uncertainty, analytic_time_samples):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
@@ -177,8 +178,10 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             )
             analytic = carry_analytic_collision_loss(
                 mean_output, observation.state,
-                initial_plan_masks[index],
+                observation.path_progress,
                 focus_steps=analytic_focus_steps,
+                time_uncertainty=analytic_time_uncertainty,
+                time_samples=analytic_time_samples,
             )
             loss = (
                 policy_loss + value_coef * value_loss
@@ -309,6 +312,12 @@ def main():
     analytic_focus_steps = _env_int(
         "CARRY_PLANNER_ANALYTIC_FOCUS_STEPS", 8,
     )
+    analytic_time_uncertainty = _env_float(
+        "CARRY_PLANNER_ANALYTIC_TIME_UNCERTAINTY", 1.5,
+    )
+    analytic_time_samples = _env_int(
+        "CARRY_PLANNER_ANALYTIC_TIME_SAMPLES", 7,
+    )
     if min(iterations, horizon, low_steps, ppo_epochs, minibatch) <= 0:
         raise ValueError("iteration/horizon/step/minibatch values must be positive")
     if (collision_coef < 0 or smoothness_coef < 0
@@ -319,6 +328,11 @@ def main():
         raise ValueError("analytic curvature coefficient must be non-negative")
     if not 1 <= analytic_focus_steps <= 96:
         raise ValueError("CARRY_PLANNER_ANALYTIC_FOCUS_STEPS must be in [1, 96]")
+    if analytic_time_uncertainty < 0:
+        raise ValueError("analytic time uncertainty must be non-negative")
+    if (analytic_time_samples < 1
+            or (analytic_time_samples > 1 and analytic_time_samples % 2 == 0)):
+        raise ValueError("analytic time samples must be one or an odd integer")
 
     output_dir = Path(os.environ.get(
         "CARRY_PLANNER_OUTPUT", str(WORKSPACE / "runs/carry_planner/default"),
@@ -338,6 +352,8 @@ def main():
         f"analytic_curvature_coef={analytic_curvature_coef:g} "
         f"invalid_plan_coef={invalid_plan_coef:g} "
         f"analytic_focus_steps={analytic_focus_steps} "
+        f"analytic_time_uncertainty={analytic_time_uncertainty:g} "
+        f"analytic_time_samples={analytic_time_samples} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
         flush=True,
@@ -353,10 +369,8 @@ def main():
         advantages: List[torch.Tensor] = []
         rewards: List[torch.Tensor] = []
         dones: List[torch.Tensor] = []
-        initial_plan_masks: List[torch.Tensor] = []
         diag: Dict[str, float] = {}
         for _ in range(horizon):
-            initial_plan = previous_done.detach().clone()
             state = task.planner_state()
             observation = history.observe(
                 state, reset_mask=previous_done, commit=True,
@@ -428,7 +442,6 @@ def main():
             advantages.append((target - value).detach())
             rewards.append(reward)
             dones.append(done)
-            initial_plan_masks.append(initial_plan)
             previous_done = done.detach().clone()
             for key, tensor in macro_diag.items():
                 diag[key] = diag.get(key, 0.0) + float(tensor)
@@ -441,13 +454,14 @@ def main():
         update = _ppo_update(
             policy, optimizer, flatten_observations(observations),
             torch.cat(actions), torch.cat(log_probs), torch.cat(returns),
-            flat_advantage, torch.cat(initial_plan_masks), ppo_epochs, minibatch,
+            flat_advantage, ppo_epochs, minibatch,
             _env_float("CARRY_PLANNER_CLIP", 0.2),
             _env_float("CARRY_PLANNER_VALUE_COEF", 0.5),
             _env_float("CARRY_PLANNER_ENTROPY_COEF", 1e-4),
             smoothness_coef, speed_smoothness_coef,
             analytic_collision_coef, analytic_curvature_coef,
-            analytic_focus_steps,
+            analytic_focus_steps, analytic_time_uncertainty,
+            analytic_time_samples,
         )
 
         def ratio(numerator, denominator):
@@ -516,6 +530,8 @@ def main():
                     "analytic_curvature_coef": analytic_curvature_coef,
                     "invalid_plan_coef": invalid_plan_coef,
                     "analytic_focus_steps": analytic_focus_steps,
+                    "analytic_time_uncertainty": analytic_time_uncertainty,
+                    "analytic_time_samples": analytic_time_samples,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,
                     "goal_margin": task._carry_goal_margin,

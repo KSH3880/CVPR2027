@@ -2,6 +2,20 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-23
+
+### carry planner recurrent robust collision supervision
+
+- episode 첫 plan에만 걸리던 analytic collision loss를 매 replan의 실제 미래 suffix에
+  적용한다. 고정된 과거 prefix는 현재 measured root로 접고, held agent는 pickup anchor를
+  이미 지난 것으로 처리해 지나온 길을 미래 motion으로 다시 계산하지 않는다.
+- frozen executor의 tracking/timing 오차 때문에 exact-time rollout은 안전하지만 실제로
+  충돌하던 불일치를 줄이기 위해 기본 ±1.5초의 상대 timing offset 7개에서 worst collision을
+  사용한다. 96×96 pairwise 행렬 대신 offset 수에 선형인 계산으로 큰 PPO minibatch의
+  메모리 사용을 제한한다.
+- 과거 prefix에는 collision/curvature gradient가 생기지 않는지, replan suffix에는
+  gradient가 도달하는지, robust timing loss가 exact-time loss 이상인지 단위 테스트했다.
+
 ## 2026-09-22
 
 ### Plain Carry sparse waypoint/speed spline head (V16)

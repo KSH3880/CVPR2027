@@ -44,7 +44,7 @@ class CarryAnalyticLossTest(unittest.TestCase):
         speed = torch.full(path.shape[:-1], 1.36, requires_grad=True)
         result = carry_analytic_collision_loss(
             {"path_world": path, "speed": speed},
-            state, torch.ones(1, dtype=torch.bool), focus_steps=8,
+            state, torch.zeros(1, 2), focus_steps=8,
         )
         self.assertGreater(float(result["loss"]), 0.0)
         result["loss"].backward()
@@ -52,18 +52,34 @@ class CarryAnalyticLossTest(unittest.TestCase):
         self.assertGreater(float(path.grad.abs().sum()), 0.0)
         self.assertIsNone(speed.grad)
 
-    def test_noninitial_plan_has_exact_zero_loss(self):
+    def test_replan_collapses_executed_prefix_and_keeps_gradient(self):
         state = crossing_state()
         path = crossing_path(state).requires_grad_(True)
         speed = torch.full(path.shape[:-1], 1.36, requires_grad=True)
         result = carry_analytic_collision_loss(
             {"path_world": path, "speed": speed},
-            state, torch.zeros(1, dtype=torch.bool), focus_steps=8,
+            state, torch.full((1, 2), 8.0), focus_steps=8,
         )
-        self.assertEqual(float(result["loss"]), 0.0)
+        self.assertGreater(float(result["loss"]), 0.0)
         result["loss"].backward()
-        self.assertEqual(float(path.grad.abs().sum()), 0.0)
+        self.assertEqual(float(path.grad[..., :9, :].abs().sum()), 0.0)
+        self.assertGreater(float(path.grad[..., 9:, :].abs().sum()), 0.0)
         self.assertIsNone(speed.grad)
+
+    def test_timing_uncertainty_catches_nearby_arrival(self):
+        state = crossing_state()
+        path = crossing_path(state)
+        speed = torch.full(path.shape[:-1], 1.36)
+        speed[:, :, 1] = 0.95
+        exact = carry_analytic_collision_loss(
+            {"path_world": path, "speed": speed}, state,
+            torch.zeros(1, 2), time_uncertainty=0.0, time_samples=1,
+        )
+        robust = carry_analytic_collision_loss(
+            {"path_world": path, "speed": speed}, state,
+            torch.zeros(1, 2), time_uncertainty=1.5, time_samples=7,
+        )
+        self.assertGreater(float(robust["loss"]), float(exact["loss"]))
 
 
 if __name__ == "__main__":
