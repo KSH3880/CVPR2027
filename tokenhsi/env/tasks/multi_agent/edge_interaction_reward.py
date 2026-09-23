@@ -42,8 +42,10 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     climb_target[..., 2] = top_z + float(char_h)
     target = torch.where(sit[..., None], sit_target, climb_target)
     delta = human - target
+    climb_scale = config.get('climb', {}).get('near_distance_scale',
+                                               config['sit']['near_distance_scale'])
     scale = torch.where(sit, float(config['sit']['near_distance_scale']),
-                        float(config['climb']['near_distance_scale']))
+                        float(climb_scale))
     interaction_phi = torch.exp(-scale * delta.square().sum(-1))
 
     # SIT approaches the transformed tarSitPos; CLIMB approaches the object XY.
@@ -81,9 +83,12 @@ def interaction_own_success(phi, z_error, feet_error, graph, config):
     success = (phi >= threshold) & ((relation == HOLDING) |
         (z_error.abs() <= config['success']['at_z_tolerance']))
     success = torch.where(relation == SIT, phi >= threshold, success)
-    climb_threshold = config['climb'].get('success_phi_threshold', threshold)
-    success = torch.where(relation == CLIMB,
-        (phi >= climb_threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
+    if 'climb' in config:
+        climb_threshold = config['climb'].get('success_phi_threshold', threshold)
+        success = torch.where(relation == CLIMB,
+            (phi >= climb_threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
+    elif ((relation == CLIMB) & valid).any():
+        raise ValueError('CLIMB graph rejected by no-CLIMB reward runtime')
     return success & valid
 
 

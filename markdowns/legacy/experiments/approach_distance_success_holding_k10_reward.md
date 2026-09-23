@@ -169,12 +169,12 @@ task_reward
 
 ## 파일과 실행
 
-- 새 config: [approach_distance_success_holding_k10.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_success_holding_k10.yaml)
-- 학습: [approach_distance_success_holding_k10_train.sh](../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_train.sh)
-- 평가: [approach_distance_success_holding_k10_test.sh](../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_test.sh)
-- 수식 구현: [relation_reward.py](../tokenhsi/env/tasks/multi_agent/relation_reward.py)
-- 입력 좌표 구성: [relation_task.py](../tokenhsi/env/tasks/multi_agent/relation_task.py)
-- 실행·checkpoint 규칙: [config.md](config.md#비교-실험-holding-k10)
+- 새 config: [approach_distance_success_holding_k10.yaml](../../../tokenhsi/data/cfg/multi_agent/approach_distance_success_holding_k10.yaml)
+- 학습: [approach_distance_success_holding_k10_train.sh](../../../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_train.sh)
+- 평가: [approach_distance_success_holding_k10_test.sh](../../../tokenhsi/scripts/multi_agent/approach_distance_success_holding_k10_test.sh)
+- 수식 구현: [relation_reward.py](../../../tokenhsi/env/tasks/multi_agent/relation_reward.py)
+- 입력 좌표 구성: [relation_task.py](../../../tokenhsi/env/tasks/multi_agent/relation_task.py)
+- 실행·checkpoint 규칙: [config.md](../../config.md)
 
 ```bash
 cd /home/hwanhee/ksh/approach_distance_success

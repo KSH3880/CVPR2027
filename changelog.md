@@ -2,7 +2,38 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-09-23
+
+### 26번 context-free scenario + standalone CLIMB
+
+- 수정된 25번을 베이스로 `HOLDING/SIT/CLIMB/HOLDING_AT/HOLDING_ON_TOP`을 각각 0.2로 샘플하는 schema 9 scratch config와 전용 train/test/VNC를 추가했다. CLIMB은 24번의 bbox progress 반경, root phi 0.6, 평균 발 높이 7cm 성공을 재사용한다. RSI는 loco/climb .5/.5이고 `climbNoRSI`는 AMP에만 쓴다.
+- top occupancy invalid rule과 shared-object RSI write conflict를 확장했다. 기존 no-climb GTA 수정처럼 미사용 goal은 env-local 원점으로 초기화하며 standalone SIT/CLIMB 상자는 바닥에 둔다. AMP 분포는 기존 scenario 80%와 원본 CLIMB 분포 20%를 혼합했다.
+- GPU 4·2048환경·1 epoch scratch에서 GTA position p95 **4.3912m**, template 비율 **.197~.207**, physical reset failure 0, 172개 scalar 전부 finite, checkpoint 저장을 확인했다. 저장 checkpoint의 1환경·32-step CLIMB 평가와 JSON 저장도 정상 종료했다.
+
+### 25번 미사용 goal의 GTA 좌표 오염 수정
+
+- `HOLDING_AT`에 binding되지 않은 goal이 world `(0,0,0)`에 남아, GTA env-local 변환 뒤 최대 수백 m 좌표가 되던 문제를 수정했다. reset마다 모든 goal을 해당 env 원점으로 먼저 초기화하고 active AT goal만 실제 위치로 덮어쓴다. standalone SIT 바닥 배치 의도도 config에 명시했다.
+- 수정 전 본학습의 첫 GTA position p95는 **430.8132m**였고, GPU 4·2048환경·1 epoch scratch 확인에서는 **4.4120m**로 정상화됐다. 물리 reset 실패 0, TensorBoard 145개 scalar 전부 finite, CPU 전체 **263개 통과**. 수정 전 25번 checkpoint는 이어 학습하지 않고 scratch로 다시 시작해야 한다.
+
+### 25번 장기 reset 크래시 수정
+
+- 25번에서 세 물체 모두 graph binding 대상인데도 기존 Stage 1 검사가 논리 O2를 항상 미사용 free object로 간주해, O2 reference가 사람 가까이에 있는 정상 RSI 배치를 반복 거부하던 문제를 수정했다. scenario에서는 이 legacy 검사를 적용하지 않고 전체 box-box·AT goal·SIT reference 기하 검사는 유지한다.
+- 대규모 reset의 희귀 연속 rejection이 학습 전체를 중단하지 않도록 25번 물리 배치 재시도 한도를 16회에서 64회로 늘렸다. 기존 17~24번의 16회 계약은 유지한다.
+- 실패 당시와 같은 seed 5479·GPU 5·2048환경으로 10 iteration 실제 학습 경로를 확인했다. 물리 reset은 최근 집계 2042회 중 재시도 82회·실패 0회였고 checkpoint가 정상 저장됐다. CPU 전체 **262개 통과**, diff 공백 오류 없음.
+
 ## 2026-09-22
+
+### 25번 context-free scenario, no CLIMB scratch 실험
+
+- 사용자 요청에 따라 25번 최종 task reward를 `0.9 × 자기 local + 0.1 × 상대 local`로 변경하고 YAML 계약과 회귀 테스트에 고정했다. edge별 raw success·paired placement 포화와 local reward는 그대로 분리한다. 실제 보상과 달리 Stage 1 기준으로 자기 100%·상대 0%를 표시하던 TensorBoard contribution 진단도 config 비율을 따르도록 수정했다. GPU 5의 2048환경 1 epoch 학습과 복원된 MPS 자동 연결을 통한 1환경·32-step 평가가 정상 종료됐다.
+- `HOLDING/SIT/HOLDING_AT/HOLDING_ON_TOP`을 agent별 0.25로 샘플하고 세 물체·두 goal을 무작위 binding하는 schema 8 config를 추가했다. 중복 source/goal/top, holding-only support, 2-cycle을 제외하며 semantic 5-field만 정책에 넣는다. placement 성공은 paired HOLDING reward만 현재 포화하고 raw success와 required goal은 분리한다.
+- template-conditioned RSI와 loco/sit/omomo/pickUp/carryWith/putDown 6종 전용 motion pool, 공유 물체 reference 충돌 재샘플, graph-bound object/goal reset, 전용 train/test/VNC 및 sampling/RSI 진단을 연결했다.
+- 관련 CPU 테스트 **22개**, 전체 **261개 통과**. GPU 5의 기존 프로세스는 유지한 채 **2048환경·1 epoch scratch** 실행과 checkpoint 저장을 확인했고, 같은 checkpoint의 1환경·32-step headless 평가와 JSON 저장도 정상 종료했다. 148개 TensorBoard scalar는 모두 유한값이었다. 장기 학습·수렴은 실행하지 않았다.
+
+### 실행 문서와 legacy 정리
+
+- `config.md`의 config별 중복 설명과 흩어진 명령을 정리해 공통 규칙, config 목록, 학습, 로컬 시각화, 서버 VNC, 공통 옵션 순서로 재구성했다. 실행 가능한 17개 config의 명령은 유지했다. 문서 정리 중 함께 제거됐던 `mps/` 운영 파일 7개는 다른 ksh repo의 동일 해시 사본으로 복원했다.
+- 완료된 14~18번 실험 설명과 구현 전 CODEX 명세를 `markdowns/legacy/`로 이동하고 색인·내부 링크·structure의 진입점을 갱신했다. Markdown 링크와 실행 스크립트 경로를 검증했다.
 
 ### 24번 CLIMB 전용 context-free Stage 1 scratch 실험
 

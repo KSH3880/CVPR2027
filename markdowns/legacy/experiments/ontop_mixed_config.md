@@ -1,6 +1,6 @@
 # OnTop 혼합학습 config
 
-[설정 파일](../tokenhsi/data/cfg/multi_agent/approach_distance_success_ontop_mixed.yaml)은 `state_relation_ontop_mixed_v1` 혼합학습에 연결되어 있다. 전용 train/test/VNC 스크립트와 복사 가능한 실행 명령은 [config.md의 15번](config.md#ontop-혼합학습-15번)에 모았다.
+[설정 파일](../../../tokenhsi/data/cfg/multi_agent/approach_distance_success_ontop_mixed.yaml)은 `state_relation_ontop_mixed_v1` 혼합학습에 연결되어 있다. 전용 train/test/VNC 스크립트와 복사 가능한 실행 명령은 [config.md](../../config.md)에 모았다.
 
 ## 확정 설정
 

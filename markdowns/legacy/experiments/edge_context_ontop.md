@@ -151,4 +151,4 @@ Ox는 다른 상자와 같은 밀도 100의 dynamic rigid body다. 중력·물�
 - source/support net contact는 각 상자 전체 접촉력의 크기이며 **두 상자 사이의 pair contact를 특정하지는 않는다**. reward 조건에 넣지 않는다.
 - `diagnostics/edge_context_steps.csv`: 기본 2환경·30step 간격. raw/context/S/T/F, 지급 항, owner·logical/physical binding·PRE/TERM·목표 중심·기하학·접촉력·penalty를 기록한다.
 
-검증 결과와 실제 실행 산출물은 [changelog](../changelog.md)와 `output/approach_distance_edge_context_ontop_check/`에 기록한다. 짧은 smoke의 통과는 자연스러운 적층·release·비켜주기 학습 성공을 의미하지 않는다.
+검증 결과와 실제 실행 산출물은 [changelog](../../../changelog.md)와 `output/approach_distance_edge_context_ontop_check/`에 기록한다. 짧은 smoke의 통과는 자연스러운 적층·release·비켜주기 학습 성공을 의미하지 않는다.

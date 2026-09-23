@@ -51,7 +51,7 @@ agent별 최종 확률은 `HOLDING .10 / SIT .10 / CLIMB .10 / HOLDING_AT .25 / 
 
 relation embedding은 11행이고 schema 4 metadata를 요구한다. schema 3 OnTop checkpoint는 embedding 크기와 계약이 다르므로 직접 resume/evaluate하지 않는다.
 
-학습 sampler는 agent당 2 edge지만 [3-edge explicit graph](../tokenhsi/data/cfg/multi_agent/graphs/edge_interaction_three_edges.yaml)는 평가 override로 컴파일된다.
+학습 sampler는 agent당 2 edge지만 [3-edge explicit graph](../../../tokenhsi/data/cfg/multi_agent/graphs/edge_interaction_three_edges.yaml)는 평가 override로 컴파일된다.
 
 ## Viewer
 

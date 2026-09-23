@@ -85,7 +85,28 @@ class SampledOnTopTaskMixin:
         self._edge_goal_owners[ids]=owner_sum((new.required_goal & new.edge_valid).float(),new)>0
         self._ontop_maintain_steps[ids]=0
         self._sampling_counts[0]+=len(ids)
-        if self.num_agents==2 and getattr(self,'_edge_interaction',False):
+        if self.num_agents==2 and getattr(self, '_scenario_no_climb', False):
+            from utils.edge_scenario_spec import classify_templates, scenario_templates
+            templates = scenario_templates(self._relation_graph_spec)
+            with_climb = getattr(self, '_scenario_with_climb', False)
+            objects=[]
+            for a in (0, 1):
+                owned=(new.edge_owner==a)&new.edge_valid
+                env = torch.arange(len(ids), device=self.device)
+                agent = torch.full_like(env, a)
+                template = classify_templates(new, env, agent, with_climb)
+                self._sampling_counts[1:1+len(templates)]+=torch.stack(
+                    [(template==k).sum() for k in range(len(templates))])
+                interaction = (new.edge_relation==SIT)|(new.edge_relation==CLIMB)
+                primary=((new.edge_dst-self.num_agents).clamp_min(0)*
+                    (owned&((new.edge_relation==6)|interaction))).amax(-1)
+                objects.append(primary)
+            shared_index = 1 + len(templates)
+            self._sampling_counts[shared_index]+=(objects[0]==objects[1]).sum()
+            relations = (6,AT,ON_TOP,SIT,CLIMB) if with_climb else (6,AT,ON_TOP,SIT)
+            for offset,rel in enumerate(relations,shared_index+1):
+                self._sampling_counts[offset]+=((new.edge_relation==rel)&new.edge_valid).sum()
+        elif self.num_agents==2 and getattr(self,'_edge_interaction',False):
             for a in (0,1):
                 owner=(new.edge_owner==a)&new.edge_valid
                 has_hold=((new.edge_relation==6)&owner).any(-1)
@@ -133,7 +154,8 @@ class SampledOnTopTaskMixin:
         accepted_ref_motion_ids={}
         accepted_ref_motion_times={}
         pending=env_ids
-        for attempt in range(16):
+        max_attempts = 64 if getattr(self, '_scenario_no_climb', False) else 16
+        for attempt in range(max_attempts):
             self._reset_default_slots=None;self._reset_ref_slots={}
             self._reset_ref_motion_ids={};self._reset_ref_motion_times={}
             self._reset_actors(pending)
@@ -162,7 +184,8 @@ class SampledOnTopTaskMixin:
         if len(pending):
             self._sampling_failures+=len(pending)
             print('[edge composition] physical reset failed; graph retained; envs=',pending[:16].tolist(),flush=True)
-            raise RuntimeError('OnTop physical scene infeasible after 16 attempts (graph was not resampled)')
+            raise RuntimeError('OnTop physical scene infeasible after {} attempts '
+                               '(graph was not resampled)'.format(max_attempts))
 
         self._reset_default_slots = None if not accepted_default else tuple(
             torch.cat([slots[i] for slots in accepted_default]) for i in (0, 1))
@@ -189,6 +212,8 @@ class SampledOnTopTaskMixin:
                 int(self._relation_episode_id[0]),signature,bindings),flush=True)
 
     def _configure_ontop_targets(self, ids):
+        if getattr(self, '_scenario_no_climb', False):
+            return
         g=select_graph(self.relation_runtime.graph,ids)
         at=owner_sum(((g.edge_relation==AT)&g.edge_valid).long(),g).bool()
         sizes=self._assigned_box_values(self._box_size,ids)
@@ -227,27 +252,44 @@ class SampledOnTopTaskMixin:
                 xy=(boxes[:,a,:2]-boxes[:,b,:2]).norm(dim=-1)
                 z=(boxes[:,a,2]-boxes[:,b,2]).abs()
                 bad|=(xy<radius[:,a]+radius[:,b]+.05)&(z<(sizes[:,a,2]+sizes[:,b,2])/2+.02)
-        if self.num_objects>self.num_agents:
+        if self.num_objects>self.num_agents and not getattr(self, '_scenario_no_climb', False):
             free=boxes[:,self.num_agents:,:2]
             bad|=((free[:,:,None]-roots[:,None,:,:2]).norm(dim=-1)<self._box_min_agent_dist).any(-1).any(-1)
-        for a in range(self.num_agents):
-            goal=self._tar_pos[ids,a]
-            for b in range(self.num_objects):
-                if b==a:continue  # initially successful AT is valid
-                bad|=at[:,a]&((goal[:,:2]-boxes[:,b,:2]).norm(dim=-1)<radius[:,a]+radius[:,b]+.25)
-            for b in range(a):
-                bad|=at[:,a]&at[:,b]&((goal[:,:2]-self._tar_pos[ids,b,:2]).norm(dim=-1)<radius[:,a]+radius[:,b]+.35)
-        if getattr(self, '_primitive_stage1', False):
+        if getattr(self, '_scenario_no_climb', False):
+            batch=torch.arange(len(ids),device=self.device)[:,None]
+            at_edges=(g.edge_relation==AT)&g.edge_valid
+            src=(g.edge_src-self.num_agents).clamp(0,self.num_objects-1)
+            goal=(g.edge_dst-self.num_agents-self.num_objects).clamp(0,self.num_agents-1)
+            source_radius=radius.gather(1,src)
+            goal_pos=self._tar_pos[ids][batch,goal]
+            for logical in range(self.num_objects):
+                other=(logical!=src)&at_edges
+                distance=(goal_pos[...,:2]-boxes[:,logical,:2][:,None,:]).norm(dim=-1)
+                bad|=(other&(distance<source_radius+radius[:,logical,None]+.25)).any(-1)
+        else:
+            for a in range(self.num_agents):
+                goal=self._tar_pos[ids,a]
+                for b in range(self.num_objects):
+                    if b==a:continue  # initially successful AT is valid
+                    bad|=at[:,a]&((goal[:,:2]-boxes[:,b,:2]).norm(dim=-1)<radius[:,a]+radius[:,b]+.25)
+                for b in range(a):
+                    bad|=at[:,a]&at[:,b]&((goal[:,:2]-self._tar_pos[ids,b,:2]).norm(dim=-1)<radius[:,a]+radius[:,b]+.35)
+        if getattr(self, '_primitive_stage1', False) or getattr(self, '_scenario_no_climb', False):
             # Reference SIT/CLIMB objects are static meshes; our boxes are dynamic
             # and size-randomized. Reject frames with the pelvis inside the new box
             # or feet below the floor before the single Isaac Gym state commit.
-            for skill_index, skill_name in enumerate(('sit', 'climb')):
+            skills = (('sit', 'climb') if getattr(self, '_scenario_with_climb', False)
+                      else ('sit',)) if getattr(self, '_scenario_no_climb', False) \
+                      else ('sit', 'climb')
+            for skill_index, skill_name in enumerate(skills):
                 slots = self._reset_ref_slots.get(skill_name)
                 if slots is None:
                     continue
                 slot_env, slot_agent = slots
                 row = torch.searchsorted(ids, slot_env)
-                physical = self._agent_box_assignment[slot_env, slot_agent]
+                physical = (self._scenario_physical_object(slot_env, slot_agent)
+                            if getattr(self, '_scenario_no_climb', False) else
+                            self._agent_box_assignment[slot_env, slot_agent])
                 box = self._box_states[slot_env, physical]
                 size = self._box_size[slot_env, physical]
                 root = self._humanoid_root_states[slot_env, slot_agent, :3]
@@ -291,8 +333,13 @@ class SampledOnTopTaskMixin:
             self._edge_metric_denominators[name]=self._edge_metric_denominators.get(name,0)+mask.sum()
             self._edge_metric_sums[name]=self._edge_metric_sums.get(name,0)+value
         local=result['local_task_reward'];mixed=result['agent_task_reward']
-        self_part=local if getattr(self,'_edge_stage1',False) else .9*local
-        other_part=torch.zeros_like(local) if getattr(self,'_edge_stage1',False) else .1*local.flip(-1)
+        sharing=self._relation_cfg.get('task_sharing')
+        if sharing is not None:
+            self_part=sharing['self']*local
+            other_part=sharing['teammate']*local.flip(-1)
+        else:
+            self_part=local if getattr(self,'_edge_stage1',False) else .9*local
+            other_part=torch.zeros_like(local) if getattr(self,'_edge_stage1',False) else .1*local.flip(-1)
         for key,value in [('local_task',local.mean()),('mixed_task',mixed.mean()),
                           ('self_contribution',self_part.mean()),('other_contribution',other_part.mean())]:
             name='sharing/'+key;self._edge_metric_sums[name]=self._edge_metric_sums.get(name,0)+value
@@ -311,7 +358,7 @@ class SampledOnTopTaskMixin:
             'climb/z_surface':diag['z_surface'],
             'climb/feet_height_error':diag['feet_height_error'],
         }
-        if getattr(self, '_semantic_only_stage1', False):
+        if getattr(self, '_semantic_only_stage1', False) and 'climb' in self._relation_cfg:
             climb_cfg = self._relation_cfg['climb']
             root_pass = result['phi_raw'] >= climb_cfg['success_phi_threshold']
             feet_pass = diag['feet_height_error'] <= climb_cfg['feet_height_tolerance']
@@ -333,6 +380,28 @@ class SampledOnTopTaskMixin:
         c=self._sampling_counts;den=c[0].clamp_min(1)
         out={'sampling/resets':c[0].clone(),'sampling/physical_retries':self._sampling_retries.clone(),
              'sampling/physical_failures':self._sampling_failures.clone()}
+        if getattr(self, '_scenario_no_climb', False):
+            names = (('holding','sit','climb','holding_at','holding_ontop')
+                     if getattr(self, '_scenario_with_climb', False)
+                     else ('holding','sit','holding_at','holding_ontop'))
+            for i,name in enumerate(names,1):
+                out['sampling/template_'+name]=c[i]/(2*den)
+            shared_index = 1 + len(names)
+            out['sampling/shared_primary_object']=c[shared_index]/den
+            relations = ('holding','at','ontop','sit','climb') if \
+                getattr(self, '_scenario_with_climb', False) else ('holding','at','ontop','sit')
+            for offset,name in enumerate(relations,shared_index+1):
+                out['sampling/relation_'+name]=c[offset]/(2*den)
+            out['sampling/rsi_sit_attempts']=self._rsi_attempts[0].clone()
+            out['sampling/rsi_sit_rejection_rate']=self._rsi_rejected[0]/self._rsi_attempts[0].clamp_min(1)
+            out['sampling/rsi_sit_start_target_distance']=self._rsi_start_distance[0]/self._rsi_attempts[0].clamp_min(1)
+            if getattr(self, '_scenario_with_climb', False):
+                out['sampling/rsi_climb_attempts']=self._rsi_attempts[1].clone()
+                out['sampling/rsi_climb_rejection_rate']=self._rsi_rejected[1]/self._rsi_attempts[1].clamp_min(1)
+                out['sampling/rsi_climb_start_target_distance']=self._rsi_start_distance[1]/self._rsi_attempts[1].clamp_min(1)
+            c.zero_();self._sampling_retries.zero_();self._sampling_failures.zero_()
+            self._rsi_attempts.zero_();self._rsi_rejected.zero_();self._rsi_start_distance.zero_()
+            return out
         if getattr(self,'_edge_interaction',False):
             names=('holding','sit','climb','holding_at','holding_ontop','holding_sit','holding_climb') if getattr(self,'_edge_stage1',False) else ('holding','sit','climb','holding_at','holding_ontop','holding_climb','holding_sit')
             for i,name in enumerate(names,1):

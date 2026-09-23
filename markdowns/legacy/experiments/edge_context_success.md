@@ -1,6 +1,6 @@
 # Holding·At scalar context / edge 성공 포화
 
-실험 `approach_distance_edge_context_success`는 Holding·At만 사용하는 **새 학습**이다. 기존 k=5/k=10/OnTop 실험을 보존하고 별도 mode `state_relation_v1` / schema 2로 실행한다. [설계 명세](../CODEX_approach_clean_edge_context_success_spec.md), [전체 실행 가이드](config.md).
+실험 `approach_distance_edge_context_success`는 Holding·At만 사용하는 **새 학습**이다. 기존 k=5/k=10/OnTop 실험을 보존하고 별도 mode `state_relation_v1` / schema 2로 실행한다. [설계 명세](../specs/CODEX_approach_clean_edge_context_success_spec.md), [전체 실행 가이드](../../config.md).
 
 ## 보상과 입력
 
@@ -88,7 +88,7 @@ TOKENHSI_GPU=6 HEADLESS=1 \
   bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_test.sh "$CKPT" 2 16 3 1
 ```
 
-[3-edge 예제](../tokenhsi/data/cfg/multi_agent/graphs/edge_context_three_edges.yaml)는 A에 Holding/At, B에 At만 준다. 입력 크기 변경과 가중치 호환을 확인하는 예제이며, 해당 task 성능이 학습·검증됐다는 뜻은 아니다. `RELATION_GRAPH`는 VNC에도 전달된다. 한 rollout의 graph는 모든 환경에서 공유·고정한다.
+[3-edge 예제](../../../tokenhsi/data/cfg/multi_agent/graphs/edge_context_three_edges.yaml)는 A에 Holding/At, B에 At만 준다. 입력 크기 변경과 가중치 호환을 확인하는 예제이며, 해당 task 성능이 학습·검증됐다는 뜻은 아니다. `RELATION_GRAPH`는 VNC에도 전달된다. 한 rollout의 graph는 모든 환경에서 공유·고정한다.
 
 H/O/G 인덱스는 **논리적 slot**이며 object reset 시 실제 box assignment/reordering을 따른다. Owner는 reward 수령자로 별도 지정한다. Goal 성공은 `required_goal`인 edge의 현재 own success로 집계한다. TERM은 edge당 최대 하나, PRE는 여러 개를 허용한다. 동일 pair에 여러 edge를 둘 수 있으나 sum bias만으로 모든 sequence를 구별한다고 보장하지 않는다.
 
@@ -107,4 +107,4 @@ TensorBoard `relation/edge/holding/*`, `relation/edge/at/*`에 relation별 유�
 PYTHONPATH=tokenhsi python -m pytest -q tokenhsi/tests/test_edge_context_success.py
 ```
 
-새 kernel/graph/network/normalizer/strict load/penalty 테스트와 기존 회귀 테스트를 제공한다. 실제 실행 검증 범위와 결과는 [changelog](../changelog.md)에 기록한다. Scratch의 짧은 smoke는 학습 수렴이나 자연스러운 접근→잡기→운반→배치→release 성공을 입증하지 않는다.
+새 kernel/graph/network/normalizer/strict load/penalty 테스트와 기존 회귀 테스트를 제공한다. 실제 실행 검증 범위와 결과는 [changelog](../../../changelog.md)에 기록한다. Scratch의 짧은 smoke는 학습 수렴이나 자연스러운 접근→잡기→운반→배치→release 성공을 입증하지 않는다.

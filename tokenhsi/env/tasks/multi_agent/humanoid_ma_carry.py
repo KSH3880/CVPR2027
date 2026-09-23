@@ -14,6 +14,7 @@
 #
 # Actor layout per env: [humanoids, boxes, (source/target platform pairs), (markers)]
 
+import math
 import os
 import yaml
 from enum import Enum
@@ -24,7 +25,7 @@ from isaacgym import gymapi
 from isaacgym import gymtorch
 
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
-from env.tasks.multi_agent.scene_features import build_gta_pose_records
+from env.tasks.multi_agent.scene_features import build_gta_pose_records, scenario_neutral_targets
 from env.tasks.multi_agent.relation_task import CarryRelationMixin
 from utils.relation_task_spec import STATE_MODE, ONTOP_MODE, LEGACY_MODE, validate_relation_config
 from utils.ontop_task_spec import scenario_ids
@@ -45,6 +46,9 @@ from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_inter
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     PRESETS as STAGE1_PRESETS, ground_standalone_interaction_targets,
     max_stage1_stack_height, PRIMITIVE_SAMPLER, semantic_packet_size)
+from utils.edge_scenario_spec import (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
+    PRESETS as SCENARIO_PRESETS, classify_templates, agent_object_indices,
+    agent_goal_indices, scenario_templates)
 from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
 
 
@@ -68,17 +72,21 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
         self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE,
             ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
-        primitive_config = (self._edge_stage1 and cfg['env'].get('relationGraph', {}).get('sampler') == PRIMITIVE_SAMPLER)
+        sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
+        primitive_config = self._edge_stage1 and sampler_name == PRIMITIVE_SAMPLER
+        self._scenario_no_climb = self._edge_stage1 and sampler_name in (
+            SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER)
+        self._scenario_with_climb = sampler_name == SCENARIO_CLIMB_SAMPLER
         semantic_only_config = bool(cfg['env'].get('relationGraph', {}).get('semantic_only', False))
-        default_preset = ('climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
-        train_preset = 'random_stage1' if self._edge_stage1 else 'random'
+        default_preset = ('holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
+        train_preset = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
         self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
-        presets = STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
+        presets = SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
         if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
             raise ValueError('Unknown sampled-edge graph preset or camera mode')
         if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
-            expected_random = 'random_stage1' if self._edge_stage1 else 'random'
+            expected_random = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
             if self._task_graph_preset != expected_random or (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2,3):
                 raise ValueError('Sampled-edge training requires random graphs, 2 agents and 3 objects')
         self._relation_graph_spec = cfg['env'].get('relationGraph', {'template': 'independent_carry'})
@@ -86,15 +94,22 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._relation_graph_spec.get('sampler') == PRIMITIVE_SAMPLER)
         self._semantic_only_stage1 = self._edge_stage1 and bool(
             self._relation_graph_spec.get('semantic_only', False))
-        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') == 7):
-            raise ValueError('Semantic-only graph and Stage-1 schema 7 must be paired')
+        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9)):
+            raise ValueError('Semantic-only graph and Stage-1 schema 7/8/9 must be paired')
         self._relation_rsi = cfg['env'].get('relationRsi')
+        self._template_rsi = cfg['env'].get('templateRsi')
         if self._relation_rsi is not None and not self._primitive_stage1:
             raise ValueError('relationRsi requires the primitive Stage-1 sampler')
+        if self._scenario_no_climb != (self._template_rsi is not None):
+            raise ValueError('No-CLIMB scenario sampler requires templateRsi exclusively')
         if self._primitive_stage1 and self._relation_rsi is None:
             raise ValueError('Primitive Stage-1 requires relationRsi')
         if self._primitive_stage1 != (self._relation_cfg.get('schema_version') in (6, 7)):
             raise ValueError('Primitive sampler and Stage-1 schema 6/7 must be paired')
+        schema = self._relation_cfg.get('schema_version')
+        if self._scenario_no_climb != (schema in (8, 9)) or \
+                self._scenario_with_climb != (schema == 9):
+            raise ValueError('Scenario sampler and Stage-1 schema 8/9 must be paired')
         self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
         self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
             ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
@@ -209,6 +224,25 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._relation_rsi_weights = torch.tensor(
                 [self._relation_rsi[k] for k in ('HOLDING', 'SIT', 'CLIMB')],
                 device=self.device, dtype=torch.float)
+        if self._template_rsi is not None:
+            expected = {
+                'HOLDING': {'loco', 'pickUp'}, 'SIT': {'loco', 'sit'},
+                'CLIMB': {'loco', 'climb'},
+                'HOLDING_AT': {'loco', 'pickUp', 'carryWith', 'putDown'},
+                'HOLDING_ON_TOP': {'loco', 'pickUp', 'carryWith'}}
+            templates = scenario_templates(self._relation_graph_spec)
+            if tuple(self._template_rsi) != templates:
+                raise ValueError('templateRsi rows must follow the scenario templates')
+            for name, values in self._template_rsi.items():
+                if len(values) != len(self._skill) or any(isinstance(value, bool) or
+                        not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+                        for value in values) or abs(sum(values) - 1.) > 1e-8 or any(
+                        value and skill not in expected[name]
+                        for skill, value in zip(self._skill, values)):
+                    raise ValueError('Invalid templateRsi row: ' + name)
+            self._template_rsi_weights = torch.tensor(
+                [self._template_rsi[k] for k in templates], device=self.device,
+                dtype=torch.float)
 
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
@@ -1112,9 +1146,39 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._every_env_init_dof_pos[slot_env, slot_agent] = self._initial_dof_pos[slot_env, slot_agent]
         return
 
+    def _scenario_physical_object(self, slot_env, slot_agent):
+        logical = agent_object_indices(
+            self.relation_runtime.graph, slot_env, slot_agent)
+        return self._logical_box_order[slot_env, logical]
+
+    def _scenario_goal(self, slot_env, slot_agent):
+        return agent_goal_indices(self.relation_runtime.graph, slot_env, slot_agent)
+
     def _reset_ref_state_init(self, slot_env, slot_agent):
         num_slots = slot_env.shape[0]
-        if self._relation_rsi is not None and not self._is_eval:
+        if self._template_rsi is not None and not self._is_eval:
+            graph = self.relation_runtime.graph
+            template = classify_templates(
+                graph, slot_env, slot_agent, self._scenario_with_climb)
+            weights = self._template_rsi_weights[template]
+            sk_ids = torch.multinomial(weights, 1).flatten()
+            logical = agent_object_indices(graph, slot_env, slot_agent)
+            advanced = torch.tensor([name != 'loco' for name in self._skill],
+                                    device=self.device)[sk_ids]
+            for _ in range(16):
+                conflict = (slot_env[:, None] == slot_env[None, :]) & \
+                    (logical[:, None] == logical[None, :]) & advanced[:, None] & \
+                    advanced[None, :] & ~torch.eye(num_slots, dtype=torch.bool,
+                                                   device=self.device)
+                retry = conflict.any(-1)
+                if not retry.any():
+                    break
+                sk_ids[retry] = torch.multinomial(weights[retry], 1).flatten()
+                advanced = torch.tensor([name != 'loco' for name in self._skill],
+                                        device=self.device)[sk_ids]
+            if retry.any():
+                raise RuntimeError('No valid template RSI combination after 16 attempts')
+        elif self._relation_rsi is not None and not self._is_eval:
             graph = self.relation_runtime.graph
             owned = graph.edge_valid[slot_env] & (graph.edge_owner[slot_env] == slot_agent[:, None])
             relation = graph.edge_relation[slot_env].masked_fill(~owned, 0).max(-1).values
@@ -1320,6 +1384,11 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._reset_all_boxes_random_arena(env_ids)
             return
 
+        if self._scenario_no_climb:
+            # Establish each shared physical object exactly once before reference
+            # writers replace their bound targets.
+            self._reset_all_boxes_random_arena(env_ids)
+
         if self._reset_random_height:
             self._platform_pos[env_ids] = self._platform_default_pos[env_ids]
 
@@ -1327,6 +1396,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         reference_object_skills = ["pickUp", "carryWith", "putDown"]
         if self._primitive_stage1:
             reference_object_skills += ["sit", "climb"]
+        elif self._scenario_no_climb:
+            reference_object_skills += ["sit"]
+            if self._scenario_with_climb:
+                reference_object_skills += ["climb"]
         for sk_name in reference_object_skills:
             if self._reset_ref_slots.get(sk_name) is None:
                 continue
@@ -1343,7 +1416,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                     motion_times=self._reset_ref_motion_times[sk_name])
             root_pos = root_pos + offset
 
-            curr_box = self._agent_box_assignment[curr_env, curr_agent]
+            curr_box = (self._scenario_physical_object(curr_env, curr_agent)
+                        if self._scenario_no_climb else
+                        self._agent_box_assignment[curr_env, curr_agent])
             box_size = self._box_size[curr_env, curr_box]
             if sk_name in ("sit", "climb"):
                 root_pos[:, 2] = box_size[:, 2] / 2
@@ -1360,7 +1435,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                     self._platform_default_pos[curr_env, curr_agent]
 
         # boxes that are randomly placed around their owner
-        random_slots = self._collect_random_slots(["loco"])
+        random_slots = None if self._scenario_no_climb else self._collect_random_slots(["loco"])
         if random_slots is not None:
             curr_env, curr_agent = random_slots
             K = curr_env.shape[0]
@@ -1403,12 +1478,19 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                         - self._platform_height / 2
                 self._box_states[curr_env, curr_box, 2] += 0.05
 
-        self._reset_unassigned_boxes_random_arena(env_ids)
-        self._ground_stage1_standalone_targets(env_ids)
+        if not self._scenario_no_climb:
+            self._reset_unassigned_boxes_random_arena(env_ids)
+            self._ground_stage1_standalone_targets(env_ids)
 
         return
 
     def _reset_task(self, env_ids):
+        if self._scenario_no_climb:
+            # Only AT-bound goals are overwritten below. Keep every inactive goal
+            # env-local so GTA never sees the global origin of another Isaac env.
+            self._tar_pos[env_ids] = scenario_neutral_targets(
+                self._env_origins, env_ids, self.num_agents)
+
         if self._reset_random_height:
             self._tar_platform_pos[env_ids] = self._tar_platform_default_pos[env_ids]
 
@@ -1418,7 +1500,11 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 continue
 
             curr_env, curr_agent = self._reset_ref_slots[sk_name]
-            curr_box = self._agent_box_assignment[curr_env, curr_agent]
+            curr_box = (self._scenario_physical_object(curr_env, curr_agent)
+                        if self._scenario_no_climb else
+                        self._agent_box_assignment[curr_env, curr_agent])
+            goal_index = (self._scenario_goal(curr_env, curr_agent)
+                          if self._scenario_no_climb else curr_agent)
             offset = self._agent_spawn_offsets[curr_agent] + self._env_origins[curr_env]
 
             root_pos, root_rot = self._motion_lib[sk_name].get_obj_motion_state(
@@ -1427,7 +1513,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             root_pos = root_pos + offset
             root_pos[:, 2] = self._box_size[curr_env, curr_box, 2] / 2
 
-            self._tar_pos[curr_env, curr_agent] = root_pos
+            self._tar_pos[curr_env, goal_index] = root_pos
             if self._reset_random_height:
                 self._tar_platform_pos[curr_env, curr_agent] = \
                     self._tar_platform_default_pos[curr_env, curr_agent]
@@ -1436,8 +1522,19 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         random_slots = self._collect_random_slots(["loco", "pickUp", "carryWith"])
         if random_slots is not None:
             curr_env, curr_agent = random_slots
+            if self._scenario_no_climb:
+                template = classify_templates(self.relation_runtime.graph,
+                    curr_env, curr_agent, self._scenario_with_climb)
+                keep = template == (3 if self._scenario_with_climb else 2)
+                curr_env, curr_agent = curr_env[keep], curr_agent[keep]
+                if not len(curr_env):
+                    return
             K = curr_env.shape[0]
-            curr_box = self._agent_box_assignment[curr_env, curr_agent]
+            curr_box = (self._scenario_physical_object(curr_env, curr_agent)
+                        if self._scenario_no_climb else
+                        self._agent_box_assignment[curr_env, curr_agent])
+            goal_index = (self._scenario_goal(curr_env, curr_agent)
+                          if self._scenario_no_climb else curr_agent)
             center = self._agent_spawn_offsets[curr_agent][:, :2] + self._env_origins[curr_env, :2]
             min_dist = 1.0
 
@@ -1473,7 +1570,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                         new_target_pos[height_mask, 2],
                         self._box_size[curr_env[height_mask], curr_box[height_mask]])
 
-            self._tar_pos[curr_env, curr_agent] = new_target_pos
+            self._tar_pos[curr_env, goal_index] = new_target_pos
             if self._reset_random_height:
                 if height_mask.sum() > 0:
                     active_env = curr_env[height_mask]

@@ -3,6 +3,11 @@
 import torch
 
 
+def scenario_neutral_targets(env_origins, env_ids, num_targets):
+    """Place inactive scenario targets at each environment's local origin."""
+    return env_origins[env_ids].unsqueeze(1).expand(-1, num_targets, -1)
+
+
 def build_env_local_position_features(world_positions, env_origins, arena_scale):
     """Return shared scene positions with deterministic XY scaling.
 

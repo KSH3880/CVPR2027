@@ -98,31 +98,44 @@ DEFAULT_GRAPH = dict(
 
 
 def validate_stage1_context_config(config):
-    semantic_only = config.get('schema_version') == 7
+    schema = config.get('schema_version')
+    semantic_only = schema in (7, 8, 9)
+    scenario = schema in (8, 9)
     expected = {
         'mode', 'schema_version', 'state_reward_weight', 'progress_reward_weight',
         'success_reward_weight', 'satisfaction_threshold', 'holding', 'at', 'ontop',
-        'sit', 'climb', 'progress', 'success',
+        'sit', 'progress', 'success',
         'observation', 'diagnostics'}
+    if schema != 8:
+        expected.add('climb')
     if not semantic_only:
         expected.update(('context', 'contextReward'))
-    if config.get('schema_version') in (6, 7):
+    if schema in (6, 7, 8, 9):
         expected.add('stage1_variant')
+    if scenario:
+        expected.add('task_sharing')
     if set(config) != expected:
         raise ValueError('Unsupported Stage-1 relationReward fields')
-    if config['mode'] != STAGE1_CONTEXT_MODE or config['schema_version'] not in (5, 6, 7):
-        raise ValueError('Expected Stage-1 schema 5, 6 or 7')
+    if config['mode'] != STAGE1_CONTEXT_MODE or schema not in (5, 6, 7, 8, 9):
+        raise ValueError('Expected Stage-1 schema 5 through 9')
     if config['schema_version'] == 6 and config['stage1_variant'] != 'primitive_relation_rsi':
         raise ValueError('Unsupported Stage-1 schema 6 variant')
-    if semantic_only and config['stage1_variant'] != 'climb_only_rsi_no_context':
+    if schema == 7 and config['stage1_variant'] != 'climb_only_rsi_no_context':
         raise ValueError('Unsupported Stage-1 schema 7 variant')
+    expected_variant = 'scenario_no_climb' if schema == 8 else 'scenario_with_climb'
+    if scenario and config['stage1_variant'] != expected_variant:
+        raise ValueError('Unsupported Stage-1 scenario variant')
     if not semantic_only and config['context'] != {'kind': 'start_keep_constant'}:
         raise ValueError('Stage-1 requires constant START/KEEP context')
     if not semantic_only and config['contextReward'] != {'start_weight': 0., 'keep_weight': 0.}:
         raise ValueError('Stage-1 START/KEEP auxiliary reward must be disabled')
-    if config['success'] != {'at_z_tolerance': .001, 'saturation': 'own_success',
-                             'terminate_when_all_subgoals_done': False}:
-        raise ValueError('Stage-1 permits own-success saturation only')
+    expected_success = {'at_z_tolerance': .001,
+        'saturation': 'paired_placement_current_success' if scenario else 'own_success',
+        'terminate_when_all_subgoals_done': False}
+    if config['success'] != expected_success:
+        raise ValueError('Unsupported Stage-1 saturation contract')
+    if scenario and config['task_sharing'] != {'self': .9, 'teammate': .1}:
+        raise ValueError('Scenario task sharing must be 0.9 self + 0.1 teammate')
     expected_observation = ({'graph_packet_fields': list(STAGE1_SEMANTIC_FIELDS)}
         if semantic_only else {'edge_context_fields': ['start', 'keep'],
             'graph_packet_fields': list(STAGE1_PACKET_FIELDS)})
@@ -150,23 +163,24 @@ def validate_stage1_context_config(config):
             raise ValueError('Unsupported Stage-1 box-top SIT geometry')
     elif config['sit'] != original_sit:
         raise ValueError('Unsupported Stage-1 SIT geometry')
-    expected_climb = {'state_definition': 'root_target', 'near_distance_scale': 10.,
-                      'target_height': 'rotated_bbox_top_plus_char_h'}
-    climb = config['climb']
-    climb_fields = set(expected_climb) | {'feet_height_tolerance'}
-    if semantic_only:
-        climb_fields.add('success_phi_threshold')
-    if (set(climb) != climb_fields
-            or any(climb.get(k) != v for k, v in expected_climb.items())):
-        raise ValueError('Unsupported Stage-1 CLIMB geometry')
-    tolerance = climb['feet_height_tolerance']
-    if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
-            or not math.isfinite(tolerance) or tolerance <= 0):
-        raise ValueError('Stage-1 CLIMB feet tolerance must be finite and positive')
-    if semantic_only and (climb['success_phi_threshold'] != .6 or tolerance != .07):
-        raise ValueError('Stage-1 schema 7 CLIMB success must use phi=0.6 and feet=0.07m')
+    if schema != 8:
+        expected_climb = {'state_definition': 'root_target', 'near_distance_scale': 10.,
+                          'target_height': 'rotated_bbox_top_plus_char_h'}
+        climb = config['climb']
+        climb_fields = set(expected_climb) | {'feet_height_tolerance'}
+        if schema in (7, 9):
+            climb_fields.add('success_phi_threshold')
+        if (set(climb) != climb_fields
+                or any(climb.get(k) != v for k, v in expected_climb.items())):
+            raise ValueError('Unsupported Stage-1 CLIMB geometry')
+        tolerance = climb['feet_height_tolerance']
+        if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+                or not math.isfinite(tolerance) or tolerance <= 0):
+            raise ValueError('Stage-1 CLIMB feet tolerance must be finite and positive')
+        if schema in (7, 9) and (climb['success_phi_threshold'] != .6 or tolerance != .07):
+            raise ValueError('CLIMB success must use phi=0.6 and feet=0.07m')
     expected_progress = {'kind': 'distance', 'delta': .5, 'sigma': 1.}
-    if semantic_only:
+    if schema in (7, 9):
         expected_progress['climb_pinning'] = 'bbox_valid_radius'
     if config['progress'] != expected_progress:
         raise ValueError('Unsupported Stage-1 distance progress')
@@ -178,6 +192,10 @@ def validate_stage1_context_config(config):
 
 
 def validate_sampler(spec, m=2, o=3):
+    from utils.edge_scenario_spec import (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
+        validate_sampler as validate_scenario)
+    if spec.get('sampler') in (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER):
+        return validate_scenario(spec, m, o)
     if (m, o) != (2, 3):
         raise ValueError('Stage-1 sampler/presets require M=2, O=3')
     semantic_only = spec.get('semantic_only', False)
@@ -270,6 +288,10 @@ def compose_graph(pattern, shuffle=False, generator=None):
 
 def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
                  generator=None):
+    from utils.edge_scenario_spec import (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
+        sample_graph as sample_scenario)
+    if spec.get('sampler') in (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER):
+        return sample_scenario(n, spec, device, preset, role_swap, generator)
     validate_sampler(spec)
     if preset not in PRESETS:
         raise ValueError('Unknown Stage-1 TASK_GRAPH preset: ' + preset)
@@ -294,6 +316,10 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    from utils.edge_scenario_spec import (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
+        compile_graph)
+    if spec.get('sampler') in (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER):
+        return compile_graph(spec, m, o, device)
     if spec.get('mode') != 'edge_composition':
         raise ValueError('Stage-1 accepts its conflict-free edge sampler only')
     validate_sampler(spec, m, o)
@@ -302,6 +328,12 @@ def compile_stage1_graph(spec, m, o, device=None):
 
 
 def validate_graph(graph):
+    try:
+        from utils.edge_scenario_spec import validate_graph as validate_scenario
+        validate_scenario(graph)
+        return
+    except ValueError:
+        pass
     validate_ontop_graph(graph)
     if graph.edge_src.ndim != 1:
         for i in range(graph.edge_src.shape[0]):
