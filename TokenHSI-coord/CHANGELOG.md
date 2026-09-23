@@ -24,6 +24,10 @@
   bias를 넣는 `make_sanity_checkpoint.py`, 생성된 V16 checkpoint, one-command
   `view_sanity.sh`를 추가했다. 생성 checkpoint의 33점 shape, speed 범위와 세 hard anchor를
   viewer 실행 전 CPU에서 검증했다.
+- 거절된 sampled plan이 fallback/이전 path의 물리 reward를 그대로 받아 PPO credit이
+  뒤집히던 문제를 막기 위해 `CARRY_PLANNER_INVALID_PLAN_COEF`(기본 0.25)를 직접
+  macro reward에서 차감한다. 평균 실제 감점은 `invalid_plan_penalty`로 기록하고 checkpoint
+  extras에도 계수를 저장한다.
 
 ### C2/simple MLP convergence-task viewer
 

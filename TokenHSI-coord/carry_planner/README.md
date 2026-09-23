@@ -33,6 +33,12 @@ plan 또는 analytic fallback이 실행되고 있다는 뜻이다.
 넓게 한 방향으로 우회하는 path는 유지하면서 좌우로 흔들리는 S-curve/noise를 억제한다.
 46도 초과 급회전은 아래 analytic curvature term이 별도로 처리한다.
 
+hard gate에서 거절된 sampled proposal에는
+`CARRY_PLANNER_INVALID_PLAN_COEF`(기본 0.25)를 macro reward에서 직접 감점한다.
+최초 거절 시 analytic fallback, 이후 거절 시 이전 valid path가 실행되더라도 거절 action이
+fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit penalty다. 로그의
+`invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
+
 학습은 physical PPO에 더해 episode의 첫 full-plan을 96개 미래 시점으로 펼치고,
 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
 최소화한다. 이 auxiliary loss의 speed는 timing 계산에만 사용하고 detach하므로

@@ -25,6 +25,7 @@ import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain  # noqa: E402
 from carry_planner.analytic_loss import carry_analytic_collision_loss  # noqa: E402
+from carry_planner.reward import apply_invalid_plan_penalty  # noqa: E402
 from coordinator.schema import AGENTS  # noqa: E402
 from stack_planner.checkpoint import (  # noqa: E402
     load_stack_checkpoint, save_stack_checkpoint,
@@ -302,13 +303,17 @@ def main():
     analytic_curvature_coef = _env_float(
         "CARRY_PLANNER_ANALYTIC_CURVATURE_COEF", 20.0,
     )
+    invalid_plan_coef = _env_float(
+        "CARRY_PLANNER_INVALID_PLAN_COEF", 0.25,
+    )
     analytic_focus_steps = _env_int(
         "CARRY_PLANNER_ANALYTIC_FOCUS_STEPS", 8,
     )
     if min(iterations, horizon, low_steps, ppo_epochs, minibatch) <= 0:
         raise ValueError("iteration/horizon/step/minibatch values must be positive")
     if (collision_coef < 0 or smoothness_coef < 0
-            or speed_smoothness_coef < 0 or analytic_collision_coef < 0):
+            or speed_smoothness_coef < 0 or analytic_collision_coef < 0
+            or invalid_plan_coef < 0):
         raise ValueError("reward and regularization coefficients must be non-negative")
     if analytic_curvature_coef < 0:
         raise ValueError("analytic curvature coefficient must be non-negative")
@@ -331,6 +336,7 @@ def main():
         f"collision_coef={collision_coef:g} "
         f"analytic_collision_coef={analytic_collision_coef:g} "
         f"analytic_curvature_coef={analytic_curvature_coef:g} "
+        f"invalid_plan_coef={invalid_plan_coef:g} "
         f"analytic_focus_steps={analytic_focus_steps} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
@@ -394,6 +400,15 @@ def main():
                 reward, done, macro_diag = _macro_step(
                     player, low_steps, collision_coef,
                 )
+                reward, invalid_penalty = apply_invalid_plan_penalty(
+                    reward, valid, invalid_plan_coef,
+                )
+                diag["invalid_plan_penalty"] = diag.get(
+                    "invalid_plan_penalty", 0.0,
+                ) + float(invalid_penalty.sum())
+                diag["invalid_plan_samples"] = diag.get(
+                    "invalid_plan_samples", 0.0,
+                ) + invalid_penalty.numel()
                 mean_path = output["mean_path_world"][:, 0]
                 commit = valid & ~done
                 history.commit_path(
@@ -458,6 +473,9 @@ def main():
                 "collision_box_box_cost", "executed_steps",
             ),
             "plan_valid_fraction": ratio("plan_valid", "plan_count"),
+            "invalid_plan_penalty": ratio(
+                "invalid_plan_penalty", "invalid_plan_samples",
+            ),
             "sample_path_deviation": ratio(
                 "sample_path_deviation", "path_point_count",
             ),
@@ -496,6 +514,7 @@ def main():
                     "collision_coef": collision_coef,
                     "analytic_collision_coef": analytic_collision_coef,
                     "analytic_curvature_coef": analytic_curvature_coef,
+                    "invalid_plan_coef": invalid_plan_coef,
                     "analytic_focus_steps": analytic_focus_steps,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,
