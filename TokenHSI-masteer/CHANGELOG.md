@@ -1,6 +1,24 @@
 # TokenHSI-ma — 변경 기록
 
+## 2026-09-23
+
+### MS81 기반 carry/steering-only 50:50 학습 시나리오
+
+- 별도 task에서 기존 두 에이전트 carry를 절반 유지하고, 나머지 절반은 박스를 치운 두 에이전트가 각자 3 m 경로를 따른다. steering-only의 두 carry window는 박스 상태 39D를 시작부터 0으로 두고 root-local goal 3D를 유지한다.
+- MS81의 방향 정렬/yaw 진행 보상을 현재 경로 접선 기준으로 적용하고 종점 0.4 m에서 속도 명령을 감속한다. launcher는 MS18 epoch 9000에서 시작하며 carry tokenizer 동결, adapter 학습을 유지한다.
+- 두 에이전트가 goal에 10 step 정지하면 steering-only 에피소드를 끝내며, 기존 지표 끝에 시나리오 구분 열을 덧붙여 carry 회귀를 분리해 볼 수 있다.
+- Python compile, shell syntax, 실제 tokenhsi 환경의 task import와 39D zero/3D goal·carry 보존 tensor smoke를 확인했다. 물리 학습·평가는 아직 실행하지 않았다.
+
 ## 2026-09-22
+
+### 독립 C5 V2 48D codec 및 non-stop CEM teacher 구현
+
+- 기존 `coordinator_v2`와 WM 경로를 수정하지 않고 `coordinator_c5_v2/`를 추가했다. 8 knots x 2 agents x `(dx, dy, speed)`의 48D action을 기존 33-point bridge 계약으로 decode하며 속도는 executor 범위 0.375--1.5 m/s로 제한한다.
+- actual-state history GRU에 A/B priority role과 straight/left/right/slow maneuver를 명시적으로 conditioning한다. 기존 `apply_fixed_priority` 사후 경로 덮어쓰기는 사용하지 않는다.
+- 기존 analytic candidate cost와 measured executor timing을 재사용하는 CEM teacher를 추가했다. priority 유지와 mode 일관성을 soft cost로 부여하고, oracle 결과는 safe, valid-but-unsafe, no-valid-plan, unresolved-nonstop으로 분리한다.
+- codec canonical action 테스트 3개와 Teacher CEM/oracle 집계 테스트 2개를 CPU에서 통과했다. imitation 학습과 physics 검증은 아직 실행하지 않았다.
+- 동기화된 carried-box crossing 64개를 A/B role로 복제한 128 state-role pair에서 population 128, elite 8, 4 iterations CEM oracle을 측정했다. `Any-safe=128/128`, unresolved-nonstop=0, no-valid-plan=0이었다. elite 안전률은 left 0.8662, right 0.8857, slow 0.8643이며 결과와 mode-labeled elite는 `runs/coord/c5_v2/teacher_oracle_64_s0.pth`에 저장했다.
+
 
 ### STACK 이후 base carry-box observation 차단 ablation
 
