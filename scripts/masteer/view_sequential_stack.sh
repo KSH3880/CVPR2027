@@ -13,7 +13,7 @@
 set -eo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-LOCAL_VIEW="$ROOT/scripts/masteer/view_sequential_stack_local.sh"
+LOCAL_VIEW=${NOVNC_LOCAL_VIEW:-"$ROOT/scripts/masteer/view_sequential_stack_local.sh"}
 RUNTIME=${NOVNC_RUNTIME:-"$ROOT/runs/tools/novnc-runtime"}
 
 PORT=${PORT:-6100}

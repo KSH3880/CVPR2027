@@ -25,6 +25,7 @@ import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain  # noqa: E402
 from carry_planner.analytic_loss import carry_analytic_collision_loss  # noqa: E402
+from carry_planner.regularization import carry_path_regularization  # noqa: E402
 from carry_planner.reward import apply_invalid_plan_penalty  # noqa: E402
 from coordinator.schema import AGENTS  # noqa: E402
 from stack_planner.checkpoint import (  # noqa: E402
@@ -144,7 +145,9 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 value_coef, entropy_coef, smoothness_coef,
                 speed_smoothness_coef, analytic_collision_coef,
                 analytic_curvature_coef, analytic_focus_steps,
-                analytic_time_uncertainty, analytic_time_samples):
+                analytic_time_uncertainty, analytic_time_samples,
+                consistency_coef, excess_length_coef, free_detour_ratio,
+                regularization_scale):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
@@ -155,6 +158,13 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
         "analytic_min_hh": 0.0,
         "analytic_min_bb_margin": 0.0,
         "analytic_min_hb_margin": 0.0,
+        "replan_consistency_loss": 0.0,
+        "excess_length_loss": 0.0,
+        "weighted_consistency_loss": 0.0,
+        "weighted_excess_length_loss": 0.0,
+        "path_regularization_safe_weight": 0.0,
+        "mean_replan_displacement": 0.0,
+        "mean_future_length_ratio": 0.0,
     }
     updates = 0
     for _ in range(epochs):
@@ -183,6 +193,19 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 time_uncertainty=analytic_time_uncertainty,
                 time_samples=analytic_time_samples,
             )
+            path_regularization = carry_path_regularization(
+                mean_output, observation,
+                analytic["per_sample_loss"],
+                free_detour_ratio=free_detour_ratio,
+            )
+            weighted_consistency = (
+                regularization_scale * consistency_coef
+                * path_regularization["consistency_loss"]
+            )
+            weighted_excess_length = (
+                regularization_scale * excess_length_coef
+                * path_regularization["excess_length_loss"]
+            )
             loss = (
                 policy_loss + value_coef * value_loss
                 - entropy_coef * entropy_mean
@@ -191,6 +214,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 * regularization["speed_smoothness_loss"]
                 + analytic_collision_coef * analytic["loss"]
                 + analytic_curvature_coef * analytic["curvature_loss"]
+                + weighted_consistency + weighted_excess_length
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -214,6 +238,26 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             sums["analytic_active_fraction"] += float(
                 analytic["active_fraction"].detach()
             )
+            sums["replan_consistency_loss"] += float(
+                path_regularization["consistency_loss"].detach()
+            )
+            sums["excess_length_loss"] += float(
+                path_regularization["excess_length_loss"].detach()
+            )
+            sums["weighted_consistency_loss"] += float(
+                weighted_consistency.detach()
+            )
+            sums["weighted_excess_length_loss"] += float(
+                weighted_excess_length.detach()
+            )
+            for name in (
+                "safe_weight", "mean_replan_displacement",
+                "mean_future_length_ratio",
+            ):
+                sums[
+                    "path_regularization_safe_weight"
+                    if name == "safe_weight" else name
+                ] += float(path_regularization[name])
             for name in ("min_hh", "min_bb_margin", "min_hb_margin"):
                 sums[f"analytic_{name}"] += float(analytic[name])
             updates += 1
@@ -318,11 +362,24 @@ def main():
     analytic_time_samples = _env_int(
         "CARRY_PLANNER_ANALYTIC_TIME_SAMPLES", 7,
     )
+    consistency_coef = _env_float(
+        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.01,
+    )
+    excess_length_coef = _env_float(
+        "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.02,
+    )
+    free_detour_ratio = _env_float(
+        "CARRY_PLANNER_FREE_DETOUR_RATIO", 1.20,
+    )
+    regularization_warmup = _env_int(
+        "CARRY_PLANNER_PATH_REGULARIZATION_WARMUP", 20,
+    )
     if min(iterations, horizon, low_steps, ppo_epochs, minibatch) <= 0:
         raise ValueError("iteration/horizon/step/minibatch values must be positive")
     if (collision_coef < 0 or smoothness_coef < 0
             or speed_smoothness_coef < 0 or analytic_collision_coef < 0
-            or invalid_plan_coef < 0):
+            or invalid_plan_coef < 0 or consistency_coef < 0
+            or excess_length_coef < 0):
         raise ValueError("reward and regularization coefficients must be non-negative")
     if analytic_curvature_coef < 0:
         raise ValueError("analytic curvature coefficient must be non-negative")
@@ -333,6 +390,10 @@ def main():
     if (analytic_time_samples < 1
             or (analytic_time_samples > 1 and analytic_time_samples % 2 == 0)):
         raise ValueError("analytic time samples must be one or an odd integer")
+    if free_detour_ratio < 1.0:
+        raise ValueError("free detour ratio must be at least one")
+    if regularization_warmup < 0:
+        raise ValueError("path regularization warmup must be non-negative")
 
     output_dir = Path(os.environ.get(
         "CARRY_PLANNER_OUTPUT", str(WORKSPACE / "runs/carry_planner/default"),
@@ -354,6 +415,10 @@ def main():
         f"analytic_focus_steps={analytic_focus_steps} "
         f"analytic_time_uncertainty={analytic_time_uncertainty:g} "
         f"analytic_time_samples={analytic_time_samples} "
+        f"consistency_coef={consistency_coef:g} "
+        f"excess_length_coef={excess_length_coef:g} "
+        f"free_detour_ratio={free_detour_ratio:g} "
+        f"path_regularization_warmup={regularization_warmup} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
         flush=True,
@@ -451,6 +516,10 @@ def main():
             (flat_advantage - flat_advantage.mean())
             / flat_advantage.std().clamp(min=1e-6)
         )
+        regularization_scale = (
+            1.0 if regularization_warmup == 0 else
+            min(float(iteration) / float(regularization_warmup), 1.0)
+        )
         update = _ppo_update(
             policy, optimizer, flatten_observations(observations),
             torch.cat(actions), torch.cat(log_probs), torch.cat(returns),
@@ -461,7 +530,9 @@ def main():
             smoothness_coef, speed_smoothness_coef,
             analytic_collision_coef, analytic_curvature_coef,
             analytic_focus_steps, analytic_time_uncertainty,
-            analytic_time_samples,
+            analytic_time_samples, consistency_coef,
+            excess_length_coef, free_detour_ratio,
+            regularization_scale,
         )
 
         def ratio(numerator, denominator):
@@ -506,6 +577,7 @@ def main():
             "converge_fraction": float(
                 task._carry_converge_layout.float().mean()
             ),
+            "path_regularization_scale": regularization_scale,
             **update,
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
@@ -532,6 +604,10 @@ def main():
                     "analytic_focus_steps": analytic_focus_steps,
                     "analytic_time_uncertainty": analytic_time_uncertainty,
                     "analytic_time_samples": analytic_time_samples,
+                    "replan_consistency_coef": consistency_coef,
+                    "excess_length_coef": excess_length_coef,
+                    "free_detour_ratio": free_detour_ratio,
+                    "path_regularization_warmup": regularization_warmup,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,
                     "goal_margin": task._carry_goal_margin,

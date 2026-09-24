@@ -145,7 +145,10 @@ def carry_analytic_collision_loss(
             ),
         )
 
-    focused = robust_steps.topk(focus_steps, dim=-1).values.mean()
+    per_sample_loss = robust_steps.topk(
+        focus_steps, dim=-1,
+    ).values.mean(dim=-1).mean(dim=1)
+    focused = per_sample_loss.mean()
     segment = future_path[..., 1:, :] - future_path[..., :-1, :]
     before, after = segment[..., :-1, :], segment[..., 1:, :]
     cosine = (before * after).sum(dim=-1) / (
@@ -166,6 +169,7 @@ def carry_analytic_collision_loss(
     curvature = curvature_violation.flatten(start_dim=2).amax(dim=-1).mean()
     return {
         "loss": focused,
+        "per_sample_loss": per_sample_loss,
         "curvature_loss": curvature,
         "active_fraction": path.new_ones(()),
         "min_hh": min_hh.mean().detach(),

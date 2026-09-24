@@ -2,6 +2,32 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-24
+
+### Carry replan 안정성 및 bounded excess-length loss
+
+- 매 6-step replan에서 deterministic mean suffix가 이전 valid path로부터 급격히 바뀌는
+  현상을 줄이기 위해 실행된 prefix를 제외한 near-future Smooth-L1 consistency를
+  추가했다. 가까운 point일수록 큰 가중치를 주고 첫 plan과 invalid 미commit plan은
+  비교 대상에서 제외한다.
+- 현재 상태 기준 남은 polyline 길이가 direct remaining distance의 1.2배를 넘을 때만
+  excess-length loss를 적용한다. pickup 전은 `root→box→goal`, held 이후는
+  `root→goal`을 기준으로 해 이미 이동한 길이를 다시 벌주지 않는다.
+- 두 항은 기본 계수 0.01/0.02, 20-iteration warm-up, raw contribution 0.25 미만의
+  비영점-gradient 포화를 사용한다. analytic collision risk를 detach한 지수 gate로
+  위험한 proposal에서는 두 항을 꺼 collision 회피보다 앞서지 않게 했다. raw/weighted
+  loss, safe gate, replan displacement, future length ratio를 iteration metric과 checkpoint
+  설정에 기록한다.
+
+### plain Carry noVNC viewer wrapper
+
+- 외부 SSH 접속에서도 `PORT=<web-port>`로 V16 Carry planner viewer를 열 수 있도록
+  기존 loopback-only Xvfb/x11vnc/websockify 런타임을 재사용하는 `view_vnc.sh`를
+  추가했다. 브라우저 포트와 내부 display/VNC 포트의 충돌 검사는 기존 wrapper가
+  그대로 담당한다.
+- 공용 noVNC wrapper가 local viewer entrypoint를 환경변수로 받을 수 있게 해 기존
+  sequential-stack 기본 동작은 유지하면서 Carry viewer도 같은 터널 방식을 사용한다.
+
 ## 2026-09-23
 
 ### carry planner recurrent robust collision supervision

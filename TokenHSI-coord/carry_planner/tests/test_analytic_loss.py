@@ -47,6 +47,7 @@ class CarryAnalyticLossTest(unittest.TestCase):
             state, torch.zeros(1, 2), focus_steps=8,
         )
         self.assertGreater(float(result["loss"]), 0.0)
+        self.assertEqual(tuple(result["per_sample_loss"].shape), (1,))
         result["loss"].backward()
         self.assertIsNotNone(path.grad)
         self.assertGreater(float(path.grad.abs().sum()), 0.0)
