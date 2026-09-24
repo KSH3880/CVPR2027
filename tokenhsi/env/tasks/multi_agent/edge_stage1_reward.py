@@ -16,22 +16,22 @@ def stage1_context(phi, graph):
 
 
 class Stage1ContextRuntime(OnTopContextRuntime):
-    def reset(self, ids, phi, z_error, feet_error=None):
+    def reset(self, ids, phi, z_error, feet_error=None, region_error=None):
         if feet_error is None:
             feet_error = torch.zeros_like(phi)
         graph = select_graph(self.graph, ids)
         self.phi[ids] = phi
         self.own_success[ids] = interaction_own_success(
-            phi, z_error, feet_error, graph, self.config)
+            phi, z_error, feet_error, graph, self.config, region_error)
         self.achieved[ids] = self.own_success[ids]
         self.done[ids] = goal_success(self.own_success[ids], graph)
 
-    def step(self, phi, progress, z_error, feet_error=None):
+    def step(self, phi, progress, z_error, feet_error=None, region_error=None):
         if feet_error is None:
             feet_error = torch.zeros_like(phi)
         success = interaction_own_success(
-            phi, z_error, feet_error, self.graph, self.config)
-        if self.config['schema_version'] in (8, 9):
+            phi, z_error, feet_error, self.graph, self.config, region_error)
+        if self.config['schema_version'] in (8, 9, 10):
             from utils.edge_scenario_spec import paired_placement_success
             paired = paired_placement_success(success, self.graph)
             saturated = (success | paired) & self.graph.edge_valid
@@ -49,7 +49,7 @@ class Stage1ContextRuntime(OnTopContextRuntime):
                     sharing['teammate'] * local.flip(-1))
         else:
             result = edge_context_reward(phi, progress, success, self.graph, self.config)
-        result['local_task_reward'] = (local if self.config['schema_version'] in (8, 9)
+        result['local_task_reward'] = (local if self.config['schema_version'] in (8, 9, 10)
                                        else result['agent_task_reward'])
         self.phi.copy_(phi)
         self.own_success.copy_(success)
@@ -61,6 +61,6 @@ class Stage1ContextRuntime(OnTopContextRuntime):
     def suffix(self, ids=None):
         graph = self.graph if ids is None else select_graph(self.graph, ids)
         phi = self.phi if ids is None else self.phi[ids]
-        if self.config['schema_version'] in (7, 8, 9):
+        if self.config['schema_version'] in (7, 8, 9, 10):
             return semantic_graph_packet(graph, phi.shape[0]).to(phi.device)
         return graph_packet(graph, stage1_context(phi, graph))

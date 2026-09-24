@@ -13,6 +13,19 @@ def vertical_extent(quaternion, half_size):
     return (row.abs() * half_size).sum(-1)
 
 
+def inner_xy_region_error(point_xy, support, support_size, margin_fraction):
+    """Distance outside the yaw-aligned inner top rectangle (metres)."""
+    q = support[..., 3:7]
+    q = q / q.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    x, y, z, w = q.unbind(-1)
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+    dx, dy = (point_xy - support[..., :2]).unbind(-1)
+    local = torch.stack((torch.cos(yaw) * dx + torch.sin(yaw) * dy,
+                         -torch.sin(yaw) * dx + torch.cos(yaw) * dy), -1)
+    half_width = support_size[..., :2] * (0.5 - margin_fraction)
+    return (local.abs() - half_width).clamp_min(0).norm(dim=-1)
+
+
 def ontop_geometry(source, support, source_size, support_size):
     hs = vertical_extent(source[...,3:7], source_size/2)
     ht = vertical_extent(support[...,3:7], support_size/2)
@@ -58,6 +71,10 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     diag['relative_speed']=(src_box[...,7:10]-dst_box[...,7:10]).norm(dim=-1)*top
     diag['source_tilt']=torch.acos((1-2*(src_box[...,3].square()+src_box[...,4].square())).clamp(-1,1))*top
     diag['support_tilt']=torch.acos((1-2*(dst_box[...,3].square()+dst_box[...,4].square())).clamp(-1,1))*top
+    if 'success_inner_margin_fraction' in config.get('ontop', {}):
+        diag['region_error'] = inner_xy_region_error(
+            src_box[..., :2], dst_box, dst_size,
+            config['ontop']['success_inner_margin_fraction']) * top
     return phi,diag
 
 

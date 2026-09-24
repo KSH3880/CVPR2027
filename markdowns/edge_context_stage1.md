@@ -142,7 +142,27 @@ standalone CLIMB target은 바닥 상자다. shared object에서는 loco RSI가 
 schema 9와 별도 output을 쓰므로 24·25번 checkpoint를 resume하지 않는다. 실행은 [config.md](config.md)의 26번 명령을 따른다.
 
 ```bash
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_scenario_no_climb_train.sh 2 2048 3
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/approach_scenario_with_climb_train.sh 2 2048 3
 ```
 
 나머지 로컬·VNC 명령과 preset은 [config.md](config.md)를 따른다.
+
+## 27번 독립 CLIMB·배치 안전영역
+
+CLIMB(C), HOLDING_AT(A), HOLDING_ON_TOP(T)를 agent마다 1/3 빈도로 뽑는다. `T+T`는 제외한다. C/A만 있는 네 순서쌍은 각각 1/12, T가 하나 있는 네 순서쌍은 각각 1/6이다. 두 agent의 task 물체는 서로 다르고, T의 support는 남은 중립 물체다. 세 물체의 논리 슬롯과 물리 asset 매핑을 reset마다 함께 무작위화한다. AT+AT의 goal도 서로 다르다.
+
+state와 progress는 26번의 중앙점 수식 그대로 둔다. 아래 성공 조건이 맞으면 해당 edge의 state/progress/success를 각각 0.2로 포화한다. 이때 placement의 HOLDING edge도 현재 성공 동안 같이 포화한다.
+
+```text
+inner_xy(p, box, m): box yaw로 p를 local XY에 옮겼을 때
+                     |local_x| <= (0.5-m) box_x, |local_y| <= (0.5-m) box_y
+
+ONTOP 성공 = inner_xy(source_box_center, support_box, 0.10)
+             AND |source_bottom_z - support_top_z| <= 0.001 m
+
+CLIMB 성공 = inner_xy(humanoid_root, target_box, 0.05)
+             AND |root_z - (target_box_top_z + char_h)| <= 0.20 m
+             AND |mean(feet_z) - target_box_top_z| <= 0.07 m
+```
+
+task reward는 자기 local 100%, 상대 0%다. RSI는 26번의 C/A/T 행을 그대로 사용한다. 발 높이는 두 발 평균이므로 한 발씩 윗면에 닿았는지까지 성공 조건으로 보증하지 않는다. schema 10과 전용 output에서 scratch로 시작한다. 학습·로컬 추론·서버 VNC 명령은 [config.md의 27번](config.md#27번-독립-climb배치-실험)을 따른다.

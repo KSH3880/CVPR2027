@@ -6,7 +6,7 @@ from utils.edge_ontop_spec import batched, graph_packet, select_graph
 from utils.edge_interaction_spec import SIT, CLIMB
 from env.tasks.multi_agent.edge_context_reward import edge_context, edge_context_reward, goal_success
 from env.tasks.multi_agent.edge_ontop_reward import (OnTopContextRuntime, evaluate_ontop_edges,
-    mix_task_reward, vertical_extent)
+    mix_task_reward, vertical_extent, inner_xy_region_error)
 
 
 def quat_rotate(q, v):
@@ -73,10 +73,15 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     diag['feet_height_error'] = (feet_z - top_z).abs() * climb
     diag['feet_individual_max_error'] = (
         individual_feet_z - top_z[..., None]).abs().amax(-1) * climb
+    if 'success_inner_margin_fraction' in config.get('climb', {}):
+        region = inner_xy_region_error(
+            human[..., :2], support, support_size,
+            config['climb']['success_inner_margin_fraction'])
+        diag['region_error'] = torch.where(climb, region, diag['region_error'])
     return phi, diag
 
 
-def interaction_own_success(phi, z_error, feet_error, graph, config):
+def interaction_own_success(phi, z_error, feet_error, graph, config, region_error=None):
     relation = batched(graph.edge_relation, phi.shape[0])
     valid = batched(graph.edge_valid, phi.shape[0])
     threshold = config['satisfaction_threshold']
@@ -89,6 +94,17 @@ def interaction_own_success(phi, z_error, feet_error, graph, config):
             (phi >= climb_threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
     elif ((relation == CLIMB) & valid).any():
         raise ValueError('CLIMB graph rejected by no-CLIMB reward runtime')
+    if config.get('schema_version') == 10:
+        if region_error is None:
+            raise ValueError('Independent region success requires region_error')
+        from utils.edge_ontop_spec import ON_TOP
+        success = torch.where(relation == ON_TOP,
+            (region_error <= 0) & (z_error.abs() <= config['success']['at_z_tolerance']),
+            success)
+        success = torch.where(relation == CLIMB,
+            (region_error <= 0) &
+            (z_error.abs() <= config['climb']['root_height_tolerance']) &
+            (feet_error <= config['climb']['feet_height_tolerance']), success)
     return success & valid
 
 

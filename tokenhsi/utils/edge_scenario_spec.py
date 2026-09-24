@@ -11,13 +11,17 @@ from utils.edge_interaction_spec import SIT, CLIMB
 
 SCENARIO_SAMPLER = 'two_agent_three_object_scenario_no_climb'
 SCENARIO_CLIMB_SAMPLER = 'two_agent_three_object_scenario_with_climb'
+SCENARIO_INDEPENDENT_SAMPLER = 'two_agent_three_object_independent_climb_placement'
 TEMPLATES = ('HOLDING', 'SIT', 'HOLDING_AT', 'HOLDING_ON_TOP')
 CLIMB_TEMPLATES = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')
 PRESETS = ('random_scenario', 'holding', 'sit', 'climb', 'holding_at', 'holding_ontop')
+INDEPENDENT_PRESETS = ('random_scenario', 'climb', 'holding_at', 'holding_ontop',
+                       'climb_ontop', 'at_ontop')
 
 
 def scenario_templates(spec):
-    return CLIMB_TEMPLATES if spec.get('sampler') == SCENARIO_CLIMB_SAMPLER else TEMPLATES
+    return (CLIMB_TEMPLATES if spec.get('sampler') in
+            (SCENARIO_CLIMB_SAMPLER, SCENARIO_INDEPENDENT_SAMPLER) else TEMPLATES)
 
 
 def _options(template):
@@ -74,8 +78,11 @@ def validate_sampler(spec, m=2, o=3):
     expected = {'mode', 'sampler', 'semantic_only', 'edge_capacity',
                 'max_edges_per_agent', 'template_probabilities',
                 'random_binding', 'shuffle_edge_order'}
-    if set(spec) != expected or spec.get('mode') != 'edge_composition' or \
-            spec.get('sampler') not in (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER):
+    independent = spec.get('sampler') == SCENARIO_INDEPENDENT_SAMPLER
+    if set(spec) != (expected | ({'pair_sampling'} if independent else set())) or \
+            spec.get('mode') != 'edge_composition' or \
+            spec.get('sampler') not in (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
+                                        SCENARIO_INDEPENDENT_SAMPLER):
         raise ValueError('Unsupported scenario sampler')
     if (m, o) != (2, 3) or spec['edge_capacity'] != 4 or \
             spec['max_edges_per_agent'] != 2 or spec['semantic_only'] is not True or \
@@ -88,6 +95,35 @@ def validate_sampler(spec, m=2, o=3):
             or not math.isfinite(v) or v < 0 for v in p.values()) or \
             not math.isclose(sum(p.values()), 1., abs_tol=1e-8):
         raise ValueError('Scenario template probabilities must follow the contract')
+    if independent and (spec['pair_sampling'] != 'balanced_without_double_ontop' or
+            p != {'HOLDING': 0., 'SIT': 0., 'CLIMB': 1/3,
+                  'HOLDING_AT': 1/3, 'HOLDING_ON_TOP': 1/3}):
+        raise ValueError('Independent scenario requires balanced CLIMB/AT/ONTOP pairs')
+
+
+INDEPENDENT_PAIRS = (
+    ('CLIMB', 'CLIMB'), ('CLIMB', 'HOLDING_AT'),
+    ('HOLDING_AT', 'CLIMB'), ('HOLDING_AT', 'HOLDING_AT'),
+    ('CLIMB', 'HOLDING_ON_TOP'), ('HOLDING_ON_TOP', 'CLIMB'),
+    ('HOLDING_AT', 'HOLDING_ON_TOP'), ('HOLDING_ON_TOP', 'HOLDING_AT'))
+INDEPENDENT_PAIR_WEIGHTS = (1/12, 1/12, 1/12, 1/12, 1/6, 1/6, 1/6, 1/6)
+
+
+def _independent_binding(templates, device, generator):
+    roles = torch.rand(3, device=device, generator=generator).argsort().tolist()
+    source = roles[:2]
+    support = roles[2]
+    at_agents = [a for a, template in enumerate(templates) if template == 'HOLDING_AT']
+    goals = torch.rand(2, device=device, generator=generator).argsort().tolist()
+    bindings = []
+    for agent, template in enumerate(templates):
+        if template == 'CLIMB':
+            bindings.append((source[agent],))
+        elif template == 'HOLDING_AT':
+            bindings.append((source[agent], goals[at_agents.index(agent)]))
+        else:
+            bindings.append((source[agent], support))
+    return tuple(bindings)
 
 
 def _rows(agent, template, binding, m=2, o=3):
@@ -138,18 +174,36 @@ def compose_graph(templates, bindings, shuffle=False, generator=None, device='cp
 def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=False,
                  generator=None):
     validate_sampler(spec)
-    if preset not in PRESETS:
+    independent = spec['sampler'] == SCENARIO_INDEPENDENT_SAMPLER
+    if preset not in (INDEPENDENT_PRESETS if independent else PRESETS):
         raise ValueError('Unknown no-CLIMB TASK_GRAPH preset: ' + preset)
     if spec['sampler'] == SCENARIO_SAMPLER and preset == 'climb':
         raise ValueError('CLIMB preset requires the with-CLIMB scenario sampler')
     templates_available = scenario_templates(spec)
     probs = torch.tensor([spec['template_probabilities'][k] for k in templates_available],
                          device=device)
+    joint_probs = (torch.tensor(INDEPENDENT_PAIR_WEIGHTS, device=device)
+                   if independent else None)
     template_rows, binding_rows = [], []
     fixed = {'holding': 'HOLDING', 'sit': 'SIT', 'climb': 'CLIMB',
              'holding_at': 'HOLDING_AT',
              'holding_ontop': 'HOLDING_ON_TOP'}
     for _ in range(n):
+        if independent:
+            if preset == 'random_scenario':
+                pair = int(torch.multinomial(joint_probs, 1, generator=generator))
+                templates = INDEPENDENT_PAIRS[pair]
+            else:
+                templates = {'climb': ('CLIMB', 'CLIMB'),
+                    'holding_at': ('HOLDING_AT', 'CLIMB'),
+                    'holding_ontop': ('HOLDING_ON_TOP', 'CLIMB'),
+                    'climb_ontop': ('CLIMB', 'HOLDING_ON_TOP'),
+                    'at_ontop': ('HOLDING_AT', 'HOLDING_ON_TOP')}[preset]
+                if role_swap:
+                    templates = templates[::-1]
+            binding = _independent_binding(templates, device, generator)
+            template_rows.append(templates); binding_rows.append(binding)
+            continue
         if preset == 'random_scenario':
             ids = torch.multinomial(probs, 2, replacement=True, generator=generator).tolist()
             templates = (templates_available[ids[0]], templates_available[ids[1]])
@@ -167,7 +221,8 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
 
 def compile_graph(spec, m, o, device=None):
     validate_sampler(spec, m, o)
-    return select_graph(sample_graph(1, spec, device or 'cpu', preset='holding'), 0)
+    preset = 'climb' if spec['sampler'] == SCENARIO_INDEPENDENT_SAMPLER else 'holding'
+    return select_graph(sample_graph(1, spec, device or 'cpu', preset=preset), 0)
 
 
 def validate_graph(graph):
@@ -216,6 +271,26 @@ def agent_object_indices(graph, slot_env, slot_agent):
     target = torch.where((rel == HOLDING) | (rel == SIT) | (rel == CLIMB),
                          graph.edge_dst[slot_env], 0)
     return target.masked_fill(~owned, 0).amax(-1) - graph.num_agents
+
+
+def independent_logical_box_order(graph, env_ids, assignment):
+    """Map randomized logical source slots to each owner's physical box."""
+    if assignment.shape != (len(env_ids), 2):
+        raise ValueError('Independent scenario requires two physical owner boxes')
+    slot_env = env_ids.repeat_interleave(2)
+    slot_agent = torch.arange(2, device=env_ids.device).repeat(len(env_ids))
+    source = agent_object_indices(graph, slot_env, slot_agent).view(-1, 2)
+    if (source < 0).any() or (source >= 3).any() or (source[:, 0] == source[:, 1]).any():
+        raise ValueError('Independent scenario source object binding is invalid')
+    order = torch.full((len(env_ids), 3), -1, device=env_ids.device, dtype=torch.long)
+    order.scatter_(1, source, assignment)
+    free_logical = (order < 0).nonzero(as_tuple=True)
+    all_physical = torch.arange(3, device=env_ids.device)[None].expand(len(env_ids), -1)
+    assigned = torch.zeros_like(order, dtype=torch.bool)
+    assigned.scatter_(1, assignment, True)
+    free_physical = all_physical[~assigned]
+    order[free_logical] = free_physical
+    return order
 
 
 def agent_goal_indices(graph, slot_env, slot_agent):

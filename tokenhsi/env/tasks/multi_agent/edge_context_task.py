@@ -49,7 +49,10 @@ class EdgeContextTaskMixin:
             return super()._reset_relation_history(env_ids)
         phi, diag = self._evaluate_relations(env_ids)
         if getattr(self, '_edge_interaction', False):
-            self.relation_runtime.reset(env_ids, phi, diag['z_error'], diag['feet_height_error'])
+            self.relation_runtime.reset(env_ids, phi, diag['z_error'],
+                diag['feet_height_error'],
+                **({'region_error': diag['region_error']} if
+                   self._relation_cfg.get('schema_version') == 10 else {}))
         else:
             self.relation_runtime.reset(env_ids, phi, diag['z_error'])
         self._prev_root_pos[env_ids] = self._kinematic_humanoid_rigid_body_states[env_ids, :, 0, :3]
@@ -65,7 +68,10 @@ class EdgeContextTaskMixin:
         runtime = self.relation_runtime; graph = runtime.graph
         phi, diag = self._evaluate_relations()
         if getattr(self, '_edge_interaction', False):
-            result = runtime.step(phi, diag['progress'], diag['z_error'], diag['feet_height_error'])
+            result = runtime.step(phi, diag['progress'], diag['z_error'],
+                diag['feet_height_error'],
+                **({'region_error': diag['region_error']} if
+                   self._relation_cfg.get('schema_version') == 10 else {}))
         else:
             result = runtime.step(phi, diag['progress'], diag['z_error'])
         roots = self._humanoid_root_states[..., :3]
@@ -103,6 +109,9 @@ class EdgeContextTaskMixin:
                   'distance', 'distance_xy', 'z_error']
         values = dict(result, distance=diag['distance'], distance_xy=diag['distance_xy'],
                       z_error=diag['z_error'])
+        if self._relation_cfg.get('schema_version') == 10:
+            fields.append('region_error')
+            values['region_error'] = diag['region_error']
         if not semantic_only:
             context = stage1_context(phi, graph) if is_stage1 else edge_context(phi, graph)
             values[context_fields[0]] = context[..., 0]

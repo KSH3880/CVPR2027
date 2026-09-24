@@ -360,10 +360,15 @@ class SampledOnTopTaskMixin:
         }
         if getattr(self, '_semantic_only_stage1', False) and 'climb' in self._relation_cfg:
             climb_cfg = self._relation_cfg['climb']
-            root_pass = result['phi_raw'] >= climb_cfg['success_phi_threshold']
+            if self._relation_cfg.get('schema_version') == 10:
+                root_pass = ((diag['region_error'] <= 0) &
+                    (diag['z_error'].abs() <= climb_cfg['root_height_tolerance']))
+            else:
+                root_pass = result['phi_raw'] >= climb_cfg['success_phi_threshold']
             feet_pass = diag['feet_height_error'] <= climb_cfg['feet_height_tolerance']
             values.update({
-                'climb/root_phi_pass': root_pass.float(),
+                ('climb/root_region_height_pass' if self._relation_cfg.get('schema_version') == 10
+                 else 'climb/root_phi_pass'): root_pass.float(),
                 'climb/feet_pass': feet_pass.float(),
                 'climb/joint_pass': (root_pass & feet_pass).float(),
                 'climb/strict_phi_0_7_feet_0_05': ((result['phi_raw'] >= .7) &

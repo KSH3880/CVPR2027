@@ -1,9 +1,9 @@
 # Multi-Agent Carry 실행 가이드
 
-실행 가능한 19개 config의 용도와 명령을 한곳에 정리한다. 모든 명령은 저장소 루트에서 실행한다.
+실행 가능한 20개 config의 용도와 명령을 한곳에 정리한다. 모든 명령은 저장소 루트에서 실행한다.
 
 ```bash
-cd /home/hwanhee/ksh/approach_clean_scenario
+cd /home/cvlab/Desktop/CVPR2027/approach_clean_scenario_ontopclimb_plane
 ```
 
 ## 공통 규칙
@@ -41,12 +41,23 @@ cd /home/hwanhee/ksh/approach_clean_scenario
 | 24 | [approach_distance_stage1_climb_rsi.yaml](../tokenhsi/data/cfg/multi_agent/approach_distance_stage1_climb_rsi.yaml) | CLIMB 전용 semantic graph + RSI, schema 7 scratch |
 | 25 | [approach_scenario_no_climb.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_no_climb.yaml) | 4-template 무작위 object/goal binding, CLIMB 없는 schema 8 scratch |
 | 26 | [approach_scenario_with_climb.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_with_climb.yaml) | 25번 + standalone CLIMB, schema 9 scratch |
+| 27 | [approach_independent_climb_placement_region.yaml](../tokenhsi/data/cfg/multi_agent/approach_independent_climb_placement_region.yaml) | CLIMB·AT·ONTOP 독립 과제, 안전영역 성공, schema 10 scratch |
 
 25번의 `ApproachScenarioNoClimb_23-08-13-26` 및 그 이전 checkpoint는 미사용 goal의 GTA 좌표가 오염된 상태로 학습됐다. resume하지 말고 현재 코드로 scratch 재학습한다.
 
+### 27번 독립 CLIMB·배치 실험
+
+- 26번의 중앙점 기준 state와 progress를 유지한다. ONTOP 성공은 source 상자 중심이 support 상자 윗면의 안쪽 영역(각 변 전체 길이의 10% 제외)에 있고, source bottom과 support top의 높이 오차가 1mm 이하다. CLIMB 성공은 root XY가 대상 상자 안쪽 영역(각 변 5% 제외)에 있고, 목표 root Z 오차가 20cm 이하이며, 평균 발 높이와 윗면 높이 오차가 7cm 이하다. 성공 시 해당 edge의 세 보상 항을 각각 0.2로 포화한다.
+- 각 agent는 CLIMB·HOLDING_AT·HOLDING_ON_TOP을 각각 1/3 빈도로 받는다. ONTOP+ONTOP은 제외한다. CLIMB/AT끼리의 4개 순서쌍은 각각 1/12, ONTOP이 포함된 4개 순서쌍은 각각 1/6이다. 에이전트마다 별도의 task 물체를 쓰고, ONTOP의 받침은 남은 중립 물체만 쓴다. 물체의 논리 슬롯과 물리 배정은 매 리셋 섞이며, AT+AT의 두 goal도 분리된다.
+- 과제별 RSI 분포는 26번의 CLIMB/HOLDING_AT/HOLDING_ON_TOP 행을 그대로 쓴다. task reward는 자기 몫 100%, 상대 몫 0%다. 기존 checkpoint와 보상·샘플러 계약이 달라 scratch로 시작한다.
+- 학습: `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/approach_independent_climb_placement_region_train.sh 2 2048 3`
+- 로컬 추론: `TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=climb_ontop bash tokenhsi/scripts/multi_agent/approach_independent_climb_placement_region_test.sh "$CKPT" 2 1 3 10`
+- 서버 VNC: `TOKENHSI_GPU=0 TASK_GRAPH=climb_ontop bash tokenhsi/scripts/multi_agent/approach_independent_climb_placement_region_vnc.sh "$CKPT"`
+- 화면 없는 평가: 로컬 추론 명령의 `HEADLESS=1`로 변경한다. `TASK_GRAPH=random_scenario`는 학습 분포, `climb|holding_at|holding_ontop|climb_ontop|at_ontop`은 고정 조합이다. `TASK_ROLE_SWAP=1`로 고정 조합의 agent 역할을 바꿀 수 있다.
+
 ## 학습
 
-아래에서 원하는 실험 하나만 실행한다. `GPU`는 실제 빈 장치로 바꾼다. 16~25번은 scratch이며, 15번만 스크립트에 지정된 기존 carry checkpoint를 전이한다.
+아래에서 원하는 실험 하나만 실행한다. `GPU`는 실제 빈 장치로 바꾼다. 16~27번은 scratch이며, 15번만 스크립트에 지정된 기존 carry checkpoint를 전이한다.
 
 ```bash
 GPU=5
@@ -89,6 +100,8 @@ TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_distance_stage1_c
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_no_climb_train.sh 2 2048 3
 # 26
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_with_climb_train.sh 2 2048 3
+# 27
+TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_independent_climb_placement_region_train.sh 2 2048 3
 ```
 
 짧은 확인과 resume은 본학습 output과 분리한다.
@@ -168,13 +181,16 @@ TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=holding_at bash tokenhsi/scripts/multi
 # 26
 CKPT='/path/to/ApproachScenarioWithClimb.pth'
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=climb bash tokenhsi/scripts/multi_agent/approach_scenario_with_climb_test.sh "$CKPT" 2 1 3 10
+# 27
+CKPT='/path/to/ApproachIndependentClimbPlacementRegion.pth'
+TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=climb_ontop bash tokenhsi/scripts/multi_agent/approach_independent_climb_placement_region_test.sh "$CKPT" 2 1 3 10
 ```
 
-화면 없는 평가는 같은 명령에서 `HEADLESS=1`로 바꾸고 환경 수를 `1`에서 `64`로 늘린다. 16~18번은 `TASK_GRAPH=random`, 19~23번은 `TASK_GRAPH=random_stage1`, 25·26번은 `TASK_GRAPH=random_scenario`로 학습 분포를 평가한다. 결과 JSON은 해당 output의 `metrics/`에 저장된다.
+화면 없는 평가는 같은 명령에서 `HEADLESS=1`로 바꾸고 환경 수를 `1`에서 `64`로 늘린다. 16~18번은 `TASK_GRAPH=random`, 19~23번은 `TASK_GRAPH=random_stage1`, 25~27번은 `TASK_GRAPH=random_scenario`로 학습 분포를 평가한다. 결과 JSON은 해당 output의 `metrics/`에 저장된다.
 
 ## 서버 VNC 시각화
 
-12번과 14~26번은 전용 wrapper가 있다. `CKPT`와 `GPU`만 바꾸고 원하는 명령 하나를 실행한다.
+12번과 14~27번은 전용 wrapper가 있다. `CKPT`와 `GPU`만 바꾸고 원하는 명령 하나를 실행한다.
 
 ```bash
 GPU=5
@@ -221,6 +237,9 @@ TOKENHSI_GPU="$GPU" TASK_GRAPH=holding_at bash tokenhsi/scripts/multi_agent/appr
 # 26
 CKPT='/path/to/ApproachScenarioWithClimb.pth'
 TOKENHSI_GPU="$GPU" TASK_GRAPH=climb bash tokenhsi/scripts/multi_agent/approach_scenario_with_climb_vnc.sh "$CKPT"
+# 27
+CKPT='/path/to/ApproachIndependentClimbPlacementRegion.pth'
+TOKENHSI_GPU="$GPU" TASK_GRAPH=climb_ontop bash tokenhsi/scripts/multi_agent/approach_independent_climb_placement_region_vnc.sh "$CKPT"
 ```
 
 전용 wrapper가 없는 1·9·10·11·13번은 해당 test script를 공통 GUI wrapper로 감싼다.
@@ -261,7 +280,7 @@ ssh -N -L 6080:127.0.0.1:6080 hwanhee@SERVER_HOST
 - 역할 반전: 지원하는 viewer에서 `TASK_ROLE_SWAP=1`
 - checkpoint 검색: `find output/<실험명> -type f -name '*.pth'`
 
-19~22번 preset은 `holding|sit|climb|holding_at|holding_ontop|holding_sit|holding_climb|random_stage1`, 23번은 `holding|sit|climb|random_stage1`, 25번은 `holding|sit|holding_at|holding_ontop|random_scenario`, 26번은 여기에 `climb`이 추가된다. 17번은 `at_ontop|ontop_chain|independent_ontop|random`, 18번은 `sit_only|climb_only|hold_sit|hold_climb|at_then_sit|at_then_climb|ontop_then_climb|random`을 사용한다.
+19~22번 preset은 `holding|sit|climb|holding_at|holding_ontop|holding_sit|holding_climb|random_stage1`, 23번은 `holding|sit|climb|random_stage1`, 25번은 `holding|sit|holding_at|holding_ontop|random_scenario`, 26번은 여기에 `climb`이 추가된다. 27번은 `climb|holding_at|holding_ontop|climb_ontop|at_ontop|random_scenario`를 사용한다. 17번은 `at_ontop|ontop_chain|independent_ontop|random`, 18번은 `sit_only|climb_only|hold_sit|hold_climb|at_then_sit|at_then_climb|ontop_then_climb|random`을 사용한다.
 
 TensorBoard는 다음처럼 실행한다. 지표 정의는 [relation_diagnostics.md](../tokenhsi/docs/relation_diagnostics.md)를 참고한다.
 

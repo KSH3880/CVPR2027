@@ -47,8 +47,9 @@ from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     PRESETS as STAGE1_PRESETS, ground_standalone_interaction_targets,
     max_stage1_stack_height, PRIMITIVE_SAMPLER, semantic_packet_size)
 from utils.edge_scenario_spec import (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
-    PRESETS as SCENARIO_PRESETS, classify_templates, agent_object_indices,
-    agent_goal_indices, scenario_templates)
+    SCENARIO_INDEPENDENT_SAMPLER, PRESETS as SCENARIO_PRESETS,
+    INDEPENDENT_PRESETS, classify_templates, agent_object_indices,
+    agent_goal_indices, scenario_templates, independent_logical_box_order)
 from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
 
 
@@ -75,14 +76,18 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
         primitive_config = self._edge_stage1 and sampler_name == PRIMITIVE_SAMPLER
         self._scenario_no_climb = self._edge_stage1 and sampler_name in (
-            SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER)
-        self._scenario_with_climb = sampler_name == SCENARIO_CLIMB_SAMPLER
+            SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER, SCENARIO_INDEPENDENT_SAMPLER)
+        self._independent_scenario = sampler_name == SCENARIO_INDEPENDENT_SAMPLER
+        self._scenario_with_climb = sampler_name in (SCENARIO_CLIMB_SAMPLER,
+                                                      SCENARIO_INDEPENDENT_SAMPLER)
         semantic_only_config = bool(cfg['env'].get('relationGraph', {}).get('semantic_only', False))
         default_preset = ('holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
         train_preset = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
         self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
-        presets = SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
+        presets = (INDEPENDENT_PRESETS if self._independent_scenario else
+            SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else
+            (INTERACTION_PRESETS if self._edge_interaction else PRESETS))
         if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
             raise ValueError('Unknown sampled-edge graph preset or camera mode')
         if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
@@ -94,8 +99,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._relation_graph_spec.get('sampler') == PRIMITIVE_SAMPLER)
         self._semantic_only_stage1 = self._edge_stage1 and bool(
             self._relation_graph_spec.get('semantic_only', False))
-        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9)):
-            raise ValueError('Semantic-only graph and Stage-1 schema 7/8/9 must be paired')
+        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9, 10)):
+            raise ValueError('Semantic-only graph and Stage-1 schema 7/8/9/10 must be paired')
         self._relation_rsi = cfg['env'].get('relationRsi')
         self._template_rsi = cfg['env'].get('templateRsi')
         if self._relation_rsi is not None and not self._primitive_stage1:
@@ -107,9 +112,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._primitive_stage1 != (self._relation_cfg.get('schema_version') in (6, 7)):
             raise ValueError('Primitive sampler and Stage-1 schema 6/7 must be paired')
         schema = self._relation_cfg.get('schema_version')
-        if self._scenario_no_climb != (schema in (8, 9)) or \
-                self._scenario_with_climb != (schema == 9):
-            raise ValueError('Scenario sampler and Stage-1 schema 8/9 must be paired')
+        if self._scenario_no_climb != (schema in (8, 9, 10)) or \
+                self._scenario_with_climb != (schema in (9, 10)) or \
+                self._independent_scenario != (schema == 10):
+            raise ValueError('Scenario sampler and Stage-1 schema 8/9/10 must be paired')
         self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
         self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
             ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
@@ -669,7 +675,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         unassigned = all_ids.masked_select(~assigned_mask).view(K, O - M)
 
         self._agent_box_assignment[env_ids] = assignment
-        self._logical_box_order[env_ids] = torch.cat([assignment, unassigned], dim=-1)
+        self._logical_box_order[env_ids] = (independent_logical_box_order(
+            self.relation_runtime.graph, env_ids, assignment)
+            if self._independent_scenario else torch.cat([assignment, unassigned], dim=-1))
         self._update_box_assignment_colors(env_ids)
         return
 
@@ -721,7 +729,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self.relation_runtime.graph, env_ids, self._agent_box_assignment,
             self._box_states, self._box_size,
             self._platform_pos if self._reset_random_height else None,
-            self._platform_default_pos if self._reset_random_height else None)
+            self._platform_default_pos if self._reset_random_height else None,
+            any_owned_object=self._independent_scenario)
 
     def _logical_box_values(self, values, env_ids=None):
         if env_ids is None:

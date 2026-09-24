@@ -2,6 +2,14 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-09-24
+
+### 27번 독립 CLIMB·배치 안전영역 실험
+
+- 26번을 기반으로 CLIMB/HOLDING_AT/HOLDING_ON_TOP만 각 agent 1/3로 샘플하는 schema 10 scratch config와 전용 train/test/VNC를 추가했다. ONTOP+ONTOP은 제외하고, agent별 task 물체와 ONTOP 중립 받침을 분리한다. graph 물체 슬롯·물리 배정을 리셋마다 함께 섞고 AT+AT의 goal도 분리한다.
+- 중앙점 기준 state·progress는 유지하면서 ONTOP은 받침 윗면 각 변 10% 여백·Z 1mm, CLIMB은 각 변 5% 여백·root Z 20cm·평균 발 Z 7cm로 current success를 판정한다. task 보상은 자기 100%·상대 0%로 둔다. 과제별 RSI는 26번의 해당 행을 유지한다.
+- 관련 CPU 테스트 **33개 통과**, 새 스크립트 Bash 문법 및 diff 공백 검사 통과. GPU 0·2048환경·1 epoch scratch에서 checkpoint 저장, template 비율 CLIMB **.3331**/AT **.3320**/ONTOP **.3349**, 물리 reset 실패 0, TensorBoard scalar 162개 모두 finite 확인. 저장 checkpoint의 1환경·32-step `climb_ontop` headless 평가가 정상 종료됐다. 이는 실행 경로 검증이며 수렴·성공률은 검증하지 않았다.
+
 ## 2026-09-23
 
 ### 26번 context-free scenario + standalone CLIMB

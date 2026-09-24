@@ -195,9 +195,9 @@ def validate_relation_config(config):
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
     if mode == STAGE1_CONTEXT_MODE:
-        if config['schema_version'] in (7, 8, 9):
+        if config['schema_version'] in (7, 8, 9, 10):
             taxonomy = {'holding': 6, 'at': 7, 'ontop': 8, 'sit': SIT}
-            if config['schema_version'] in (7, 9):
+            if config['schema_version'] in (7, 9, 10):
                 taxonomy['climb'] = CLIMB
             return {'reward_mode': mode, 'schema_version': config['schema_version'],
                     'relation_taxonomy': taxonomy,
