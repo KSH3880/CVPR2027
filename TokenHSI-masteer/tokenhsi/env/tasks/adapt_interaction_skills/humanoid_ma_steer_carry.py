@@ -467,12 +467,13 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         ar = torch.arange(arc.shape[0], device=self.device)
         return self._gt_path[ar, lo] + frac * (self._gt_path[ar, lo + 1] - self._gt_path[ar, lo])
 
-    def _steer_obs(self, rows):
-        """등간격 K 점. **길이 M 이 곧 속도 명령**이고 형태는 원본과 같다."""
+    def _steer_world_points(self, rows):
+        """정책에 들어갈 K개 steering point를 world 좌표로 만든다.
+
+        기본 구현은 기존 등간격 창과 완전히 같다. 하위 task는 관측 차원을 바꾸지
+        않고 이 지점들만 변형할 수 있다.
+        """
         n = len(rows)
-        if self.steer_zero:
-            return torch.zeros(n, self.steer_dim(), device=self.device)
-        h = self.humanoid_rows(self._humanoid_root_states)[rows]
         arc = self._arc_root[rows]
         M = self._m_at(arc, rows)
         off = torch.arange(1, self.steer_k + 1, device=self.device)[None, :] / self.steer_k
@@ -483,8 +484,16 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         q = (pts_arc / sp.DS).clamp(0, sp.V - 2)
         lo = q.floor().long(); frac = (q - lo.float())[..., None]
         ar = torch.arange(n, device=self.device)[:, None]
-        pts = self._gt_path[rows][ar, lo] + frac * (
+        return self._gt_path[rows][ar, lo] + frac * (
             self._gt_path[rows][ar, lo + 1] - self._gt_path[rows][ar, lo])
+
+    def _steer_obs(self, rows):
+        """등간격 K 점. **길이 M 이 곧 속도 명령**이고 형태는 원본과 같다."""
+        n = len(rows)
+        if self.steer_zero:
+            return torch.zeros(n, self.steer_dim(), device=self.device)
+        h = self.humanoid_rows(self._humanoid_root_states)[rows]
+        pts = self._steer_world_points(rows)
         root_xy = h[:, 0:2]
         heading = torch.atan2(
             2.0 * (h[:, 6] * h[:, 5] + h[:, 3] * h[:, 4]),
@@ -773,12 +782,9 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         h = self.humanoid_rows(self._humanoid_root_states)
         arc = self._arc_root
         M = self._m_at(arc)
-        # 창: 등간격 K 점. 길이 M 이 속도 명령이다
-        off = torch.arange(1, self.steer_k + 1, device=self.device)[None, :] / self.steer_k
-        q = ((arc[:, None] + M[:, None] * off) / sp.DS).clamp(0, sp.V - 2)
-        lo = q.floor().long(); frac = (q - lo.float())[..., None]
-        ar = torch.arange(len(rows), device=self.device)[:, None]
-        win = self._gt_path[ar, lo] + frac * (self._gt_path[ar, lo + 1] - self._gt_path[ar, lo])
+        # 관측과 같은 창을 그린다. 하위 task가 고정 anchor로 수축시키면 영상도
+        # 실제 정책 입력과 똑같이 보여야 한다.
+        win = self._steer_world_points(rows)
         aim = self._aim_pt(arc, M * 0.5)
 
         gt_all = self._gt_path.cpu().numpy()
