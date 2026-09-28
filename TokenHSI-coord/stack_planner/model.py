@@ -13,6 +13,7 @@ from coordinator.geometry import (
     world_to_shared,
 )
 
+from .carry_suffix import decode_carry_suffix
 from .schema import (
     AGENTS, CARRY_LEARNED_PATH_POINTS, CARRY_PATH_DIM, CARRY_PATH_KNOTS,
     CARRY_SPEED_DIM, MAX_SPEED, MIN_SPEED, STACK_CANDIDATES,
@@ -37,6 +38,7 @@ class StackPlannerConfig:
     retreat_only: bool = False
     plain_carry: bool = False
     carry_control_scale: float = 4.0
+    carry_suffix_replan: bool = False
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -61,6 +63,8 @@ class StackPlannerConfig:
             raise ValueError("retreat_only and plain_carry are exclusive")
         if self.carry_control_scale <= 0.0:
             raise ValueError("carry_control_scale must be positive")
+        if self.carry_suffix_replan and not self.plain_carry:
+            raise ValueError("carry_suffix_replan requires plain_carry")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -345,7 +349,8 @@ class StackPlannerHeads(nn.Module):
             nn.init.constant_(speed[-1].bias, 2.0)
 
     def decode_delta(self, base_path_local, previous_path_local,
-                     path_delta_raw, speed_raw, path_point_weight):
+                     path_delta_raw, speed_raw, path_point_weight,
+                     carry_frame=None, carry_held=None):
         batch, candidates = path_delta_raw.shape[:2]
         expected = (batch, candidates, self.path_action_dim)
         if path_delta_raw.shape != expected:
@@ -353,6 +358,30 @@ class StackPlannerHeads(nn.Module):
         speed_expected = (batch, candidates, self.speed_action_dim)
         if speed_raw.shape != speed_expected:
             raise ValueError(f"speed_raw must be {speed_expected}")
+        if self.config.plain_carry and self.config.carry_suffix_replan:
+            if carry_frame is None or carry_held is None:
+                raise ValueError("suffix Carry decoding requires current frame and held")
+            learned = path_delta_raw.reshape(
+                batch, candidates, AGENTS, CARRY_LEARNED_PATH_POINTS, 2,
+            )
+            speed_logits = speed_raw.reshape(
+                batch, candidates, AGENTS, CARRY_PATH_KNOTS,
+            )
+            root, box, goal = (
+                value[:, None].expand(-1, candidates, -1, -1)
+                for value in carry_frame
+            )
+            held = carry_held[:, None].expand(-1, candidates, -1)
+            path_local, speed, box_index = decode_carry_suffix(
+                root, box, goal, held, learned, speed_logits,
+                self.config.carry_control_scale,
+            )
+            return (
+                path_local,
+                path_local - base_path_local[:, None],
+                speed,
+                box_index,
+            )
         if self.config.plain_carry:
             learned = path_delta_raw.reshape(
                 batch, candidates, AGENTS, CARRY_LEARNED_PATH_POINTS, 2,
@@ -428,14 +457,16 @@ class StackPlannerHeads(nn.Module):
         return path_local, update, speed
 
     def forward(self, scene, base_path_local, previous_path_local,
-                path_point_weight):
+                path_point_weight, carry_frame=None, carry_held=None):
         batch = scene.shape[0]
         path_delta_raw = torch.stack([path(scene) for path in self.paths], dim=1)
         speed_raw = torch.stack([speed(scene) for speed in self.speeds], dim=1)
-        path_local, path_delta_local, speed = self.decode_delta(
+        decoded = self.decode_delta(
             base_path_local, previous_path_local, path_delta_raw, speed_raw,
-            path_point_weight,
+            path_point_weight, carry_frame=carry_frame, carry_held=carry_held,
         )
+        path_local, path_delta_local, speed = decoded[:3]
+        box_index = decoded[3] if len(decoded) == 4 else None
         expanded_scene = scene[:, None].expand(-1, path_local.shape[1], -1)
         evaluator_input = torch.cat((
             expanded_scene,
@@ -444,7 +475,17 @@ class StackPlannerHeads(nn.Module):
                 start_dim=2
             ),
         ), dim=-1)
-        if self.config.plain_carry:
+        if self.config.plain_carry and self.config.carry_suffix_replan:
+            path_action_mask = torch.ones(
+                batch, CARRY_PATH_DIM, dtype=torch.bool, device=scene.device,
+            )
+            speed_action_mask = torch.ones(
+                batch, AGENTS, CARRY_PATH_KNOTS,
+                dtype=torch.bool, device=scene.device,
+            )
+            speed_action_mask[..., 2] = carry_held < 0.5
+            speed_action_mask = speed_action_mask.reshape(batch, CARRY_SPEED_DIM)
+        elif self.config.plain_carry:
             path_action_mask = path_point_weight[..., (8, 20, 24, 28), None].expand(
                 -1, -1, -1, 2,
             ).reshape(batch, CARRY_PATH_DIM) > 0
@@ -463,7 +504,7 @@ class StackPlannerHeads(nn.Module):
                     device=scene.device,
                 )
             )
-        return {
+        output = {
             "path_delta_raw": path_delta_raw,
             "speed_raw": speed_raw,
             "speed": speed,
@@ -478,6 +519,9 @@ class StackPlannerHeads(nn.Module):
             ).squeeze(-1),
             "value": self.value(scene).squeeze(-1),
         }
+        if self.config.carry_suffix_replan:
+            output["box_index"] = box_index
+        return output
 
 
 class StackTrajectoryPlanner(nn.Module):
@@ -506,14 +550,22 @@ class StackTrajectoryPlanner(nn.Module):
         ), dim=-2)
 
     @staticmethod
-    def _plain_carry_reference_local(frame):
+    def _plain_carry_reference_local(frame, held=None):
         root, box, goal = frame["root"], frame["box"], frame["goal"]
         t = torch.linspace(
             0.0, 1.0, 17, device=root.device, dtype=root.dtype,
         ).reshape(1, 1, 17, 1)
         approach = root[..., None, :] + t * (box - root)[..., None, :]
         carry = box[..., None, :] + t * (goal - box)[..., None, :]
-        return torch.cat((approach, carry[..., 1:, :]), dim=-2)
+        two_leg = torch.cat((approach, carry[..., 1:, :]), dim=-2)
+        if held is None:
+            return two_leg
+        direct_t = torch.linspace(
+            0.0, 1.0, STACK_PATH_POINTS,
+            device=root.device, dtype=root.dtype,
+        ).reshape(1, 1, STACK_PATH_POINTS, 1)
+        direct = root[..., None, :] + direct_t * (goal - root)[..., None, :]
+        return torch.where((held >= 0.5)[..., None, None], direct, two_leg)
 
     def _reference_path(self, state, previous_path_world, previous_path_valid,
                         base_path_world, base_path_valid, path_progress):
@@ -523,7 +575,9 @@ class StackTrajectoryPlanner(nn.Module):
                 -1, -1, STACK_PATH_POINTS, -1,
             ).clone()
         elif self.config.plain_carry:
-            geometric_local = self._plain_carry_reference_local(frame)
+            geometric_local = self._plain_carry_reference_local(
+                frame, state.held if self.config.carry_suffix_replan else None,
+            )
         else:
             geometric_local = self._geometric_reference_local(frame)
         geometric_world = shared_to_world(
@@ -536,9 +590,12 @@ class StackTrajectoryPlanner(nn.Module):
             )
             base_path_world = torch.zeros_like(geometric_world)
             base_path_valid = torch.zeros_like(previous_path_valid)
-        base_world = torch.where(
-            base_path_valid[:, None, None, None],
-            base_path_world, geometric_world,
+        base_world = (
+            geometric_world if self.config.carry_suffix_replan
+            else torch.where(
+                base_path_valid[:, None, None, None],
+                base_path_world, geometric_world,
+            )
         )
         reference_world = torch.where(
             previous_path_valid[:, None, None, None],
@@ -550,7 +607,11 @@ class StackTrajectoryPlanner(nn.Module):
         reference_local = world_to_shared(
             reference_world, frame["center"], frame["angle"],
         )
-        point_weight = _future_point_weight(path_progress, previous_path_valid)
+        point_weight = (
+            torch.ones_like(geometric_local[..., 0])
+            if self.config.carry_suffix_replan else
+            _future_point_weight(path_progress, previous_path_valid)
+        )
         if self.config.retreat_only:
             point_weight = point_weight.clone()
             point_weight[:, 1] = 0.0
@@ -595,24 +656,34 @@ class StackTrajectoryPlanner(nn.Module):
             tokens, history_valid, reference_local, previous_path_valid,
             path_progress,
         )
+        carry_frame = None
+        if self.config.carry_suffix_replan:
+            _, frame = state_to_tokens(state)
+            carry_frame = (frame["root"], frame["box"], frame["goal"])
         return state, self.heads(
             scene, base_local, reference_local, point_weight,
+            carry_frame=carry_frame, carry_held=state.held,
         )
 
     def decode_delta(self, state, base_path_local, reference_path_local,
                      path_delta_raw, speed_raw, path_point_weight):
         _, frame = state_to_tokens(state)
-        path_local, path_delta_local, speed = self.heads.decode_delta(
+        carry_frame = None
+        if self.config.carry_suffix_replan:
+            carry_frame = (frame["root"], frame["box"], frame["goal"])
+        decoded = self.heads.decode_delta(
             base_path_local, reference_path_local, path_delta_raw, speed_raw,
-            path_point_weight,
+            path_point_weight, carry_frame=carry_frame, carry_held=state.held,
         )
+        path_local, path_delta_local, speed = decoded[:3]
+        box_index = decoded[3] if len(decoded) == 4 else None
         path_world = shared_to_world(
             path_local, frame["center"][:, None], frame["angle"][:, None],
         )
         base_path_world = shared_to_world(
             base_path_local, frame["center"], frame["angle"],
         )
-        return {
+        output = {
             "path_local": path_local,
             "path_world": path_world,
             "speed": speed,
@@ -622,6 +693,10 @@ class StackTrajectoryPlanner(nn.Module):
             "reference_path_local": reference_path_local,
             "path_point_weight": path_point_weight,
         }
+        if self.config.carry_suffix_replan:
+            output["box_index"] = box_index
+            output["suffix_replan"] = True
+        return output
 
     def forward(self, state: Union[CoordinatorState, Mapping[str, torch.Tensor]]):
         current, raw = self.raw_heads(state)

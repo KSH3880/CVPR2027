@@ -28,7 +28,7 @@ LEGACY_V13_CONFIG_FIELDS = {
 
 
 def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
-    return {
+    contract = {
         "schema_version": STACK_SCHEMA_VERSION,
         "model_kind": "stack_scene_token_multihead",
         "agents": AGENTS,
@@ -59,6 +59,15 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         "steer_points": STEER_POINTS,
         "steer_horizon_seconds": STEER_HORIZON_SECONDS,
     }
+    if config.carry_suffix_replan:
+        contract.update({
+            "remaining_suffix_replan": True,
+            "dynamic_box_anchor": True,
+            "fixed_origin_reference": False,
+            "previous_trajectory_correction": False,
+            "projected_executor_resume": False,
+        })
+    return contract
 
 
 def save_stack_checkpoint(

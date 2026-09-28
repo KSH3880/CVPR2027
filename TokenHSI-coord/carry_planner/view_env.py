@@ -1,15 +1,18 @@
-"""Deterministic online viewer for a trained plain-Carry planner."""
+"""Online viewer for deterministic or sampled plain-Carry proposals."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain
+from carry_planner.view_debug import rejected_path_vertices, rejection_reason
 from stack_planner.checkpoint import load_stack_checkpoint
 from stack_planner.history import StackHistoryBuffer
+from stack_planner.policy import StackPlannerActorCritic
 
 
 class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
@@ -24,10 +27,16 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             raise FileNotFoundError(
                 "CARRY_PLANNER_CKPT must point to a planner checkpoint"
             )
-        period = int(os.environ.get("CARRY_PLANNER_REPLAN_STEPS", "6"))
+        period = int(os.environ.get("CARRY_PLANNER_REPLAN_STEPS", "12"))
         if period < 1:
             raise ValueError("CARRY_PLANNER_REPLAN_STEPS must be positive")
         self._carry_planner_period = period
+        self._carry_planner_stochastic = bool(int(os.environ.get(
+            "CARRY_PLANNER_VIEW_STOCHASTIC", "0",
+        )))
+        self._carry_planner_draw_rejected = bool(int(os.environ.get(
+            "CARRY_PLANNER_DRAW_REJECTED", "1",
+        )))
         super().__init__(
             cfg, sim_params, physics_engine, device_type, device_id, headless,
         )
@@ -39,6 +48,29 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         if self._carry_planner.config.candidates != 1:
             raise ValueError("plain-carry viewer currently requires candidates=1")
         self._carry_planner.eval().requires_grad_(False)
+        self._carry_planner_policy = None
+        self._carry_planner_std_source = "none"
+        if self._carry_planner_stochastic:
+            self._carry_planner_policy = StackPlannerActorCritic(
+                self._carry_planner,
+                point_std=float(os.environ.get(
+                    "CARRY_PLANNER_VIEW_DELTA_STD", "0.25",
+                )),
+                endpoint_std=0.03,
+                anchor_std=0.03,
+                speed_std=float(os.environ.get(
+                    "CARRY_PLANNER_VIEW_SPEED_STD", "0.20",
+                )),
+            ).to(self.device)
+            stored_std = payload.get("extras", {}).get("action_log_std")
+            if stored_std is not None:
+                self._carry_planner_policy.action_log_std.data.copy_(
+                    stored_std.to(self.device)
+                )
+                self._carry_planner_std_source = "checkpoint"
+            else:
+                self._carry_planner_std_source = "viewer_env"
+            self._carry_planner_policy.eval().requires_grad_(False)
         self._carry_planner_history = StackHistoryBuffer(
             self.num_envs, self._carry_planner.config.history_steps,
             self.device,
@@ -51,19 +83,34 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         )
         self._carry_planner_replans = 0
         self._carry_planner_invalid = 0
+        self._carry_planner_raw_path = None
+        self._carry_planner_raw_ready = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device,
+        )
+        self._carry_planner_raw_valid = torch.ones_like(
+            self._carry_planner_raw_ready,
+        )
         self._carry_planner_view_ready = True
         self._compute_observations()
+        mode = "stochastic" if self._carry_planner_stochastic else "deterministic"
+        std = (
+            float(self._carry_planner_policy.action_log_std[0, 0].exp())
+            if self._carry_planner_policy is not None else 0.0
+        )
         print(
             "[carry-planner-view] checkpoint={} schema={} step={} "
-            "replan={} deterministic=True frozen_agent=True".format(
+            "replan={} proposal_mode={} delta_std={} std_source={} "
+            "frozen_agent=True".format(
                 checkpoint.resolve(), payload["schema_version"],
-                payload.get("step", 0), period,
+                payload.get("step", 0), period, mode, std,
+                self._carry_planner_std_source,
             ),
             flush=True,
         )
         print(
             "[carry-planner-view] inherited ribbons show installed paths; "
-            "speed colors follow the commands sent to ms18",
+            "rejected raw proposals are red; speed colors follow the "
+            "commands sent to ms18",
             flush=True,
         )
 
@@ -93,11 +140,27 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         self._carry_planner_history.tokens[~selected] = old_tokens[~selected]
         self._carry_planner_history.valid[~selected] = old_valid[~selected]
         observation = observation_all.index(selected)
-        output = self._carry_planner(observation)
+        if self._carry_planner_policy is None:
+            output = self._carry_planner(observation)
+            history_path = output["path_world"][:, 0]
+        else:
+            output, _, _, _ = self._carry_planner_policy.sample_all(observation)
+            # Match training: execute the sampled proposal, but keep exploration
+            # noise out of the recurrent path reference.
+            history_path = output["mean_path_world"][:, 0]
         env_ids = torch.nonzero(selected, as_tuple=False).squeeze(-1)
         valid = self.install_external_plan(output, env_ids=env_ids)
+        proposed = output["path_world"][:, 0]
+        if self._carry_planner_raw_path is None:
+            self._carry_planner_raw_path = torch.zeros(
+                (self.num_envs,) + tuple(proposed.shape[1:]),
+                dtype=proposed.dtype, device=proposed.device,
+            )
+        self._carry_planner_raw_path[env_ids] = proposed
+        self._carry_planner_raw_ready[env_ids] = True
+        self._carry_planner_raw_valid[env_ids] = valid
         committed = self._carry_planner_history.previous_path_world.clone()
-        committed[selected] = output["path_world"][:, 0]
+        committed[selected] = history_path
         base = self._carry_planner_history.base_path_world.clone()
         base[selected] = output["base_path_world"]
         update = torch.zeros(
@@ -114,12 +177,19 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         if int(os.environ.get("CARRY_PLANNER_DEBUG", "1")):
             shown = int(env_ids[0])
             shown_local = 0
+            diagnostics = self.last_plan_validity_debug()
+            reason = (
+                "accepted" if bool(valid[shown_local])
+                else rejection_reason(diagnostics, shown_local)
+            )
             print(
                 "[carry-planner-view] env={} step={} phase={} valid={} "
-                "cursor={} root={} box={} goal={}".format(
+                "reason={} max_turn_deg={:.2f} cursor={} root={} box={} "
+                "goal={}".format(
                     shown, int(self.progress_buf[shown]),
                     state.phase[shown].detach().cpu().tolist(),
                     bool(valid[shown_local]),
+                    reason, float(diagnostics["max_turn_deg"][shown_local]),
                     self._arc_root.reshape(self.num_envs, 2)[shown]
                     .detach().cpu().tolist(),
                     state.root_xy[shown].detach().cpu().tolist(),
@@ -127,6 +197,32 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                     state.goal_xy[shown].detach().cpu().tolist(),
                 ),
                 flush=True,
+            )
+
+    def _draw_task(self):
+        super()._draw_task()
+        if (
+            not getattr(self, "_carry_planner_view_ready", False)
+            or not self._carry_planner_draw_rejected
+            or self.viewer is None
+            or self._carry_planner_raw_path is None
+            or not bool(self._carry_planner_raw_ready[0])
+            or bool(self._carry_planner_raw_valid[0])
+        ):
+            return
+        path = self._carry_planner_raw_path[0].detach().cpu().numpy()
+        vertices = rejected_path_vertices(path)
+        colors = np.asarray(
+            ((1.0, 0.05, 0.05), (1.0, 0.30, 0.05)), dtype=np.float32,
+        )
+        for agent in range(vertices.shape[0]):
+            segment_count = vertices.shape[1]
+            line_colors = np.repeat(
+                colors[agent:agent + 1], segment_count, axis=0,
+            )
+            self.gym.add_lines(
+                self.viewer, self.envs[0], segment_count,
+                vertices[agent], line_colors,
             )
 
     def _reset_envs(self, env_ids):
@@ -144,6 +240,7 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             self._carry_planner_history.reset(mask)
             self._carry_planner_tick[env_ids] = -self._carry_planner_period
             self._carry_planner_phase[env_ids] = -99.0
+            self._carry_planner_raw_ready[env_ids] = False
             self._compute_observations(env_ids)
 
     def report_metrics(self):

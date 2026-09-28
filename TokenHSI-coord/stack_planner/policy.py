@@ -218,21 +218,39 @@ class StackPlannerActorCritic(nn.Module):
             ), dim=-2)
         coarse = coarse[..., ::4, :]
         if self.planner.config.plain_carry:
-            # Penalize curvature *changes*, not curvature itself. A broad,
-            # consistently curved avoidance route should be free; alternating
-            # turns/noisy S-curves should not. Split at pickup so the intended
-            # approach-to-carry corner is not charged.
+            # Penalize curvature changes, not a broad consistent turn. Dynamic
+            # suffix plans mask the pickup neighborhood at its actual index.
             full_path = output["path_world"]
-            variations = []
-            for leg in (full_path[..., :17, :], full_path[..., 16:, :]):
-                segment = leg[..., 1:, :] - leg[..., :-1, :]
-                direction = segment / segment.norm(dim=-1, keepdim=True).clamp(
-                    min=1e-6,
+            segment = full_path[..., 1:, :] - full_path[..., :-1, :]
+            direction = segment / segment.norm(dim=-1, keepdim=True).clamp(
+                min=1e-6,
+            )
+            turn = direction[..., 1:, :] - direction[..., :-1, :]
+            variation = turn[..., 1:, :] - turn[..., :-1, :]
+            variation_cost = variation.square().sum(dim=-1)
+            if self.planner.config.carry_suffix_replan:
+                box_index = output["box_index"]
+                variation_index = torch.arange(
+                    variation.shape[-2], device=variation.device,
+                    dtype=torch.long,
                 )
-                turn = direction[..., 1:, :] - direction[..., :-1, :]
-                variation = turn[..., 1:, :] - turn[..., :-1, :]
-                variations.append(variation.square().sum(dim=-1).mean())
-            smoothness = torch.stack(variations).mean()
+                pickup_center = box_index[..., None] - 2
+                weight = (
+                    (box_index[..., None] < 0)
+                    | ((variation_index - pickup_center).abs() > 2)
+                ).to(variation.dtype)
+                smoothness = (
+                    (variation_cost * weight).sum()
+                    / weight.sum().clamp(min=1.0)
+                )
+            else:
+                # Legacy fixed-origin paths always use pickup index 16.
+                weight = torch.ones_like(variation_cost)
+                weight[..., 12:17] = 0.0
+                smoothness = (
+                    (variation_cost * weight).sum()
+                    / weight.sum().clamp(min=1.0)
+                )
         else:
             correction = output["path_delta_local"]
             second = (

@@ -29,6 +29,7 @@ def build_sanity_planner(control_scale: float = 4.0) -> StackTrajectoryPlanner:
         path_update_alpha=0.5,
         plain_carry=True,
         carry_control_scale=control_scale,
+        carry_suffix_replan=True,
     ))
 
     # Default Cross layout: A1 travels mostly along +X and bends toward +Y;

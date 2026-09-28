@@ -48,19 +48,24 @@ def carry_analytic_collision_loss(
     if time_samples < 1 or (time_samples > 1 and time_samples % 2 == 0):
         raise ValueError("time_samples must be one or an odd positive integer")
 
-    # A held agent has necessarily passed the pickup anchor even if projection
-    # noise leaves its progress slightly below point 16.
-    progress = torch.where(
-        state.held >= 0.5,
-        torch.maximum(path_progress, path_progress.new_full((), 16.0)),
-        path_progress,
-    )
+    suffix_replan = bool(output.get("suffix_replan", False))
     point_index = torch.arange(
         path.shape[-2], device=path.device, dtype=path.dtype,
     )
-    past = point_index.reshape(1, 1, 1, -1) <= progress[:, None, :, None]
-    root = state.root_xy[:, None, :, None, :]
-    future_path = torch.where(past[..., None], root, path)
+    if suffix_replan:
+        # The decoded trajectory already starts at the measured current root.
+        progress = torch.full_like(path_progress, -1.0)
+        future_path = path
+    else:
+        # Legacy fixed-origin plans contain an executed prefix.
+        progress = torch.where(
+            state.held >= 0.5,
+            torch.maximum(path_progress, path_progress.new_full((), 16.0)),
+            path_progress,
+        )
+        past = point_index.reshape(1, 1, 1, -1) <= progress[:, None, :, None]
+        root = state.root_xy[:, None, :, None, :]
+        future_path = torch.where(past[..., None], root, path)
 
     # Timing stays faithful to the policy, but collision gradient cannot take
     # the easier speed-only escape route.
@@ -85,7 +90,15 @@ def carry_analytic_collision_loss(
     bb_limit = box_radius.sum(dim=-1)[:, None, None] + box_margin
     hb01_limit = 0.35 + box_radius[:, 1, None, None]
     hb10_limit = 0.35 + box_radius[:, 0, None, None]
-    pickup_time = arrival[..., 17]
+    if suffix_replan:
+        box_index = output.get("box_index")
+        if box_index is None or box_index.shape != arrival.shape[:-1]:
+            raise ValueError("suffix analytic loss requires box_index [B,C,A]")
+        pickup_time = arrival.gather(
+            -1, box_index.clamp(0, path.shape[-2] - 1)[..., None],
+        ).squeeze(-1)
+    else:
+        pickup_time = arrival[..., 17]
     robust_steps = path.new_zeros(path.shape[0], path.shape[1], 96)
     min_hh = path.new_full(path.shape[:2], float("inf"))
     min_bb_margin = path.new_full(path.shape[:2], float("inf"))
@@ -156,12 +169,27 @@ def carry_analytic_collision_loss(
     ).clamp(min=1e-7)
     # Pickup is an intentional approach/carry corner and is exempt from the
     # executor's curvature check as well.
-    cosine[..., 14:17] = 1.0
-    cosine_limit = math.cos(math.radians(46.0))
     turn_index = torch.arange(
-        1, path.shape[-2] - 1, device=path.device, dtype=path.dtype,
+        cosine.shape[-1], device=path.device, dtype=torch.long,
     )
-    future_turn = turn_index.reshape(1, 1, 1, -1) > progress[:, None, :, None]
+    if suffix_replan:
+        box_index = output["box_index"]
+        ignored = (
+            (box_index[..., None] >= 0)
+            & ((turn_index - (box_index[..., None] - 1)).abs() <= 1)
+        )
+        cosine = torch.where(ignored, torch.ones_like(cosine), cosine)
+        future_turn = torch.ones_like(cosine, dtype=torch.bool)
+    else:
+        cosine[..., 14:17] = 1.0
+        vertex_index = torch.arange(
+            1, path.shape[-2] - 1, device=path.device, dtype=path.dtype,
+        )
+        future_turn = (
+            vertex_index.reshape(1, 1, 1, -1)
+            > progress[:, None, :, None]
+        )
+    cosine_limit = math.cos(math.radians(46.0))
     curvature_violation = torch.relu(cosine_limit - cosine).square()
     curvature_violation = torch.where(
         future_turn, curvature_violation, torch.zeros_like(curvature_violation),

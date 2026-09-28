@@ -4,6 +4,32 @@
 
 ## 2026-09-28
 
+### Carry current-root remaining-suffix replanner
+
+- fixed-origin 전체 trajectory를 매번 재생성한 뒤 과거 dense prefix를 접합하던 방식을
+  제거했다. pickup 전에는 current→box와 box→goal, pickup 후에는 current→goal의
+  remaining spline만 생성하고 accepted install마다 executor cursor를 시작점으로 reset한다.
+- box를 고정 index 16에서 분리했다. 두 leg의 실제 arc length 비율로 dynamic box index를
+  정하고 33-point resampling target에 box를 정확히 삽입한다. validator, analytic pickup
+  timing, curvature/smoothness 예외도 동일한 dynamic index를 사용한다.
+- control offset은 각 remaining leg 길이와 4m cap 중 작은 값으로 제한해 close-goal
+  구간에서 독립 point가 과도하게 튀는 구조를 제거했다.
+- 새 suffix config만 checkpoint contract에 명시되며 기존 fixed-origin V16 checkpoint는
+  기존 decoder로 계속 load된다. 기본 replan 주기는 학습/view/eval 모두 6에서 12 step으로
+  늦췄고 index-wise consistency는 suffix 간 대응점이 없어 기본 0으로 비활성화했다.
+- unequal leg, held phase, dynamic pickup validator, sparse-head gradient, PPO/analytic/
+  regularization metadata 통합 회귀 테스트를 추가했다.
+
+### Carry rejected-proposal viewer overlay
+
+- stochastic viewer가 checkpoint의 exploration std로 학습과 같은 sampled proposal을
+  생성하며 recurrent history에는 학습과 동일한 noise-free mean path를 commit한다.
+- hard validator에서 거절된 raw proposal은 실제 설치된 ribbon과 별도로 A1 빨강/A2
+  주황 선으로 다음 replan까지 표시한다.
+- 기본 deterministic viewer 동작은 유지하고 콘솔에 rejection reason과 최대 turn
+  각도를 함께 출력한다. 별도 helper의 line geometry와 reason formatting을 테스트했다.
+
+
 ### Carry hard-validity reason instrumentation
 
 - 낮은 `plan_valid_fraction`이 policy 탐색 문제인지 validator 오거절인지 구분하도록

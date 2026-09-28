@@ -112,15 +112,18 @@ def carry_path_regularization(
             or not 0.0 <= pickup_fallback_weight <= 1.0):
         raise ValueError("pickup fallback weight must be in [0, 1]")
 
+    suffix_replan = bool(output.get("suffix_replan", False))
     progress = observation.path_progress
     if progress.shape != (batch, agents):
         raise ValueError("path_progress must be [B,2]")
     # A held agent has completed the pickup leg even if projection noise leaves
     # the previous-path cursor just before the fixed box anchor.
-    effective_progress = torch.where(
-        observation.state.held >= 0.5,
-        torch.maximum(progress, progress.new_full((), 16.0)),
-        progress,
+    effective_progress = (
+        progress if suffix_replan else torch.where(
+            observation.state.held >= 0.5,
+            torch.maximum(progress, progress.new_full((), 16.0)),
+            progress,
+        )
     )
     safe_weight = torch.exp(
         -collision_risk.detach().clamp(min=0.0) / safety_gate_scale
@@ -151,6 +154,11 @@ def carry_path_regularization(
     consistency_eligible = (
         observation.previous_path_valid.to(path.dtype) * safe_weight
     )
+    if suffix_replan:
+        # Old and new suffixes have different measured-root origins and are not
+        # point-index aligned. Continuity is imposed by the current root and
+        # direction anchor instead of the legacy dense-point consistency term.
+        consistency_eligible = torch.zeros_like(consistency_eligible)
     consistency_loss = _bounded_weighted_mean(
         per_sample_consistency, consistency_eligible, loss_cap,
     )
@@ -161,8 +169,10 @@ def carry_path_regularization(
     # future-point connection. Collapse the executed prefix onto the current
     # root, as the analytic rollout does, and measure the complete suffix.
     past = point_index.reshape(1, 1, points) <= effective_progress[..., None]
-    future_path = torch.where(
-        past[..., None], state.root_xy[..., None, :], path,
+    future_path = (
+        path if suffix_replan else torch.where(
+            past[..., None], state.root_xy[..., None, :], path,
+        )
     )
     segment_length = (
         future_path[..., 1:, :] - future_path[..., :-1, :]
@@ -263,11 +273,13 @@ def carry_path_regularization(
         "excess_length_loss": excess_length_loss,
         "direction_loss": direction_loss,
         "safe_weight": safe_weight.mean().detach(),
-        "mean_replan_displacement": _bounded_weighted_mean(
-            displacement.mean(dim=(1, 2)),
-            observation.previous_path_valid.to(path.dtype),
-            float("inf"),
-        ).detach(),
+        "mean_replan_displacement": (
+            path.new_zeros(()) if suffix_replan else _bounded_weighted_mean(
+                displacement.mean(dim=(1, 2)),
+                observation.previous_path_valid.to(path.dtype),
+                float("inf"),
+            ).detach()
+        ),
         "mean_future_length_ratio": (
             (length_ratio * active_agent.to(path.dtype)).sum()
             / active_agent.to(path.dtype).sum().clamp(min=1.0)

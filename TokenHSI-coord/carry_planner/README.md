@@ -1,17 +1,21 @@
 # Carry collision-avoidance planner
 
-`stack_planner`의 Transformer, decision history, PPO action distribution과 33-point
-실행 ABI를 사용한다. 모델은 agent별 고정 `start/box/goal`과 학습된 중간점 4개를
-두 cubic Hermite spline으로 펼치고, speed knot 7개도 monotone spline으로 펼친다.
-따라서 실행 task만
-sequential stack이 아닌 기존 simultaneous `HumanoidMASteerCarry` 계열이다.
+stack_planner의 Transformer, decision history, PPO action distribution과 33-point
+실행 ABI를 사용한다. 새 Carry decoder는 episode-fixed 전체 경로를 다시 만들지 않고
+매 decision마다 현재 측정 위치부터 남은 task suffix를 생성한다.
 
-- 두 agent 모두 `root -> own box -> own goal`을 동시에 수행한다.
+- 두 agent 모두 root → own box → own goal을 동시에 수행한다.
+- pickup 전에는 current→box와 box→goal spline을 합치고, pickup 후에는
+  current→goal spline만 생성한다.
+- box는 고정 index가 아니다. 두 leg의 실제 arc length로 정한 dynamic index에 정확히
+  삽입하며 goal은 항상 마지막 point다.
+- 위치 action은 agent당 중간점 4개의 XY(8D), speed action은 7개 knot이고 최종
+  path/speed ABI는 기존과 같은 33 point다.
+- point offset 범위는 해당 remaining leg 길이와 CONTROL_SCALE 중 작은 값으로 제한되어
+  짧은 box→goal 구간에서 수 m짜리 독립 변위가 생기지 않는다.
+- accepted replan은 executor cursor를 새 current-root path의 시작으로 reset하며,
+  지나온 prefix를 새 spline에 접합하지 않는다.
 - sequential phase, A1 retreat, A2 handoff, stacking reward는 없다.
-- pickup(index 16)과 placement(index 32)는 정확한 hard anchor다.
-- 위치 action은 agent당 중간점 4개의 XY(8D), speed action은 7개 knot이며 최종
-  path/speed는 기존과 같은 33 point다. 중간점은 직선의 dense residual이 아니고
-  `CARRY_PLANNER_CONTROL_SCALE`(기본 4m) 범위에서 독립적으로 움직인다.
 - reward는 frozen ms18의 원래 Carry reward와 task progress를 유지하면서
   agent-agent, agent-other-box, box-box proximity cost를 감점한다.
 - 기본 stress distribution은 `MS_SCEN=cross`다.
@@ -21,12 +25,12 @@ sequential stack이 아닌 기존 simultaneous `HumanoidMASteerCarry` 계열이�
   agent/box를 후발 agent가 공간적으로 돌아야 한다.
   비율과 여유는 `CARRY_PLANNER_CONVERGE_PROB`, `CARRY_PLANNER_GOAL_MARGIN`으로 바꾼다.
 
-학습 기본 sparse-point exploration은 `CARRY_PLANNER_DELTA_STD=0.25`다. replan에서는
-이미 실행한 prefix만 보존하고 아직 실행하지 않은 suffix는 새 spline으로 교체한다. 로그의
-`sample_path_deviation`은 실제 실행용 stochastic path가 직선 base에서 벗어난 평균
-거리(m), `mean_path_deviation`은 viewer/checkpoint에서 보이는 deterministic path의
-평균 거리다. `plan_valid_fraction`이 낮으면 곡률 검사에서 proposal이 거부되어 이전
-plan 또는 analytic fallback이 실행되고 있다는 뜻이다.
+학습 기본 sparse-point exploration은 CARRY_PLANNER_DELTA_STD=0.25다.
+매 proposal은 current-root anchored remaining suffix이며, 이전 path는 Transformer
+context로만 입력된다. sample_path_deviation과 mean_path_deviation은 각각 stochastic
+path와 deterministic mean path가 현재의 직선 two-leg/direct reference에서 벗어난
+평균 거리다. proposal이 hard validator에서 거절되면 이전 valid path 또는 analytic
+fallback이 계속 실행된다.
 
 `CARRY_PLANNER_SMOOTHNESS_COEF`(기본 10)는 직선 이탈이나 일정한 곡률을 벌점으로
 주지 않고, pickup에서 분리한 두 spline 각각의 **curvature 변화량**을 줄인다. 따라서
@@ -46,10 +50,10 @@ validator처럼 turn 검사에서 제외했을 때만 살아나는 proposal 비�
 Carry validator의 degenerate-segment 오거절 가능성을 뜻한다. 진단 단계에서는 실제
 수락/거절 동작을 바꾸지 않는다.
 
-학습은 physical PPO에 더해 매 replan의 아직 실행하지 않은 suffix를 현재 root부터
-96개 미래 시점으로 펼치고, 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box,
-box-box overlap을 직접 최소화한다. 지나간 prefix는 현재 root로 접어 미래 motion으로
-재평가하지 않는다. executor 도착시간 오차에도 우회하도록 기본 ±1.5초 구간을 7개
+학습은 physical PPO에 더해 current-root anchored suffix를 96개 미래 시점으로
+펼치고, 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
+최소화한다. suffix에는 지나온 prefix가 존재하지 않으며 dynamic box index의 도착시간을
+pickup 시점으로 사용한다. executor 도착시간 오차에도 우회하도록 기본 ±1.5초 구간을 7개
 상대 timing offset으로 검사한다. 이는 96×96 모든 시간쌍을 만들지 않아 minibatch
 메모리는 미래 시점 수에 선형이다. auxiliary loss의 speed는 timing 계산에만 사용하고
 detach하므로 gradient는 path에만 간다. 계수와 관련 손잡이는
@@ -60,22 +64,12 @@ detach하므로 gradient는 path에만 간다. 계수와 관련 손잡이는
 46도 실행 곡률 제한은 `CARRY_PLANNER_ANALYTIC_CURVATURE_COEF`(기본 20)의
 cosine-space penalty로 함께 학습한다.
 
-replan 사이의 급격한 path 변경과 collision만 피한 과도한 우회는 별도 소형 geometry
-term으로 제한한다. `CARRY_PLANNER_REPLAN_CONSISTENCY_COEF`(기본 0.03)는 이미 지난
-prefix를 제외하고 이전 valid path의 가까운 미래를 Smooth-L1로 유지한다.
-`CARRY_PLANNER_EXCESS_LENGTH_COEF`(기본 0.05)는 현재 상태에서 남은 polyline 길이가
-직접 `root→box→goal`(held 이후 `root→goal`) 거리의 1.15배에 0.25m를 더한 허용
-길이를 넘을 때만 벌점으로 준다. 초과거리는 기본 0.5m까지 quadratic, 그 이후 linear인
-Huber loss이므로 큰 우회에서도 gradient가 사라지지 않는다. 비율/절대 여유와 Huber
-전환점은 `CARRY_PLANNER_FREE_DETOUR_RATIO`,
-`CARRY_PLANNER_ABSOLUTE_LENGTH_SLACK`, `CARRY_PLANNER_LENGTH_HUBER_BETA`로 조절한다.
-남은 길이는 이전 path에서 얻은 progress index를 새 spline segment에 곱하지 않고,
-실행된 prefix를 현재 measured root로 접은 뒤 완전한 future suffix에서 다시 계산한다.
-consistency loss만 0.25 미만으로 부드럽게 포화하며, 현재 analytic collision risk가 높으면
-두 geometry term을 지수 gate로 꺼 회피 동작과 경쟁하지 않는다. 첫 5 iteration에는 0에서
-설정 계수까지 선형 warm-up한다. 로그의 `weighted_consistency_loss`,
-`weighted_excess_length_loss`, `mean_future_excess_m`, `max_future_excess_m`로
-실제 기여량과 거리 초과를 확인한다.
+suffix path는 replan마다 시작점 자체가 달라 point index가 서로 대응하지 않으므로,
+legacy dense-point consistency loss는 기본 0으로 비활성화한다. 대신 시작점은 현재
+measured root로 hard anchor되고 진행 방향 constraint가 첫 suffix tangent를 제한한다.
+CARRY_PLANNER_EXCESS_LENGTH_COEF(기본 0.05)는 현재 suffix 길이가 직접
+root→box→goal(held 이후 root→goal) 거리의 1.15배에 0.25m를 더한 허용 길이를 넘을
+때만 적용한다. 초과거리는 0.5m Huber transition 뒤에도 선형 gradient를 유지한다.
 
 replan 순간 실제 이동 방향과 새 path 접선이 불연속이 되지 않도록
 `CARRY_PLANNER_DIRECTION_COEF`(기본 0.10)를 별도로 적용한다. 현재 root에서 새 future
@@ -97,7 +91,7 @@ Smoke 예시:
 
 ```bash
 CARRY_PLANNER_ENVS=8 CARRY_PLANNER_ITERS=1 \
-CARRY_PLANNER_HORIZON=4 CARRY_PLANNER_LOW_STEPS=6 \
+CARRY_PLANNER_HORIZON=4 CARRY_PLANNER_LOW_STEPS=12 \
 MA_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi118 \
   bash TokenHSI-coord/carry_planner/train.sh carry_smoke \
   /path/to/ms18/Humanoid.pth
@@ -113,7 +107,7 @@ MA_GPU=0 bash TokenHSI-coord/carry_planner/view.sh \
   TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth
 ```
 
-학습 없이 sparse spline과 frozen executor 연결만 확인하려면 제공된 V16 sanity
+학습 없이 suffix spline과 frozen executor 연결만 확인하려면 제공된 sanity
 checkpoint를 사용한다. A1은 +Y, A2는 -X로 약 1m 우회하고 pickup/crossing 근처에서
 서로 다른 speed dip을 사용하므로 path ribbon과 speed color를 함께 확인할 수 있다.
 
@@ -138,10 +132,26 @@ PYTHONPATH=TokenHSI-coord python \
 모드에서는 두 agent-box 묶음의 직선·정속 기준 교차점 도착 시각을 맞추며, 로그의
 `[coord-view timed-cross]`에서 예상 도착시간 차이를 확인할 수 있다.
 
-6 action-step마다 deterministic mean path를 다시 계획한다. free 배치는
+기본 12 action-step마다 deterministic mean suffix를 다시 계획한다. free 배치는
 `MS_SCEN=free CARRY_PLANNER_CONVERGE_PROB=0`을 사용한다. 충돌 지점 전후 길이는
 `MS_VIEW_TIMED_CROSS_PRE`(기본 2 m), `MS_VIEW_TIMED_CROSS_POST`(기본 4 m)로 조절한다.
 `CARRY_PLANNER_REPLAN_STEPS=<N>`으로 replan 주기도 바꿀 수 있다.
+
+학습 중 hard rejection을 그대로 재현하려면 stochastic proposal을 켠다. 거절된
+raw proposal은 다음 replan까지 A1 빨강/A2 주황 선으로 표시되고, 기존 밝은 ribbon은
+실제로 설치되어 executor가 따라가는 path로 남는다. checkpoint에 저장된
+action_log_std를 우선 사용하므로 학습 exploration 분포를 그대로 확인할 수 있다.
+
+~~~bash
+CARRY_PLANNER_VIEW_STOCHASTIC=1 CARRY_PLANNER_VIEW_SEED=0 \
+MA_GPU=0 bash TokenHSI-coord/carry_planner/view.sh \
+  runs/carry_planner/<tag>/planner_000200.pth \
+  TokenHSI-masteer/output/masteer/<executor>.pth
+~~~
+
+CARRY_PLANNER_DRAW_REJECTED=0으로 overlay만 끌 수 있다. 콘솔에는 각 replan의
+valid, reason, max_turn_deg가 같이 출력된다.
+
 
 다양한 episode 정량 평가:
 

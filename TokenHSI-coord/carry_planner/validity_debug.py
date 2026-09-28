@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
@@ -12,18 +12,44 @@ from coordinator.schema import (
 
 
 def carry_plan_validity_debug(
-    state: CoordinatorState, path: torch.Tensor, speed: torch.Tensor,
+    state: CoordinatorState,
+    path: torch.Tensor,
+    speed: torch.Tensor,
+    *,
+    box_index: Optional[torch.Tensor] = None,
+    suffix_replan: bool = False,
 ) -> Dict[str, torch.Tensor]:
-    """Mirror Carry curvature checks and expose degenerate-segment rejects."""
+    """Mirror Carry validation, including dynamic suffix pickup anchors."""
     if path.ndim != 4 or path.shape[-2:] != (33, 2):
         raise ValueError("path must be [B,2,33,2]")
     if speed.shape != path.shape[:-1]:
         raise ValueError("speed must be [B,2,33]")
     if state.root_xy.shape != path.shape[:2] + (2,):
         raise ValueError("state/path batch or agent shape mismatch")
+    if suffix_replan:
+        if box_index is None or box_index.shape != path.shape[:2]:
+            raise ValueError("suffix box_index must be [B,2]")
+        box_index = box_index.to(device=path.device, dtype=torch.long)
 
     finite = torch.isfinite(path).flatten(start_dim=1).all(dim=-1)
     finite &= torch.isfinite(speed).flatten(start_dim=1).all(dim=-1)
+    root_anchor = (path[..., 0, :] - state.root_xy).norm(dim=-1) <= 0.01
+    goal_anchor = (path[..., -1, :] - state.goal_xy).norm(dim=-1) <= 0.01
+    if suffix_replan:
+        gather = box_index.clamp(0, path.shape[-2] - 1)[..., None, None].expand(
+            -1, -1, 1, 2,
+        )
+        sampled_box = path.gather(-2, gather).squeeze(-2)
+        box_anchor = (
+            (state.held >= 0.5)
+            | ((sampled_box - state.box_xyz[..., :2]).norm(dim=-1) <= 0.01)
+        )
+    else:
+        box_anchor = (
+            (path[..., 16, :] - state.box_xyz[..., :2]).norm(dim=-1) <= 0.01
+        )
+    anchors = (root_anchor & box_anchor & goal_anchor).all(dim=1)
+
     segment = path[..., 1:, :] - path[..., :-1, :]
     segment_length = segment.norm(dim=-1)
     buffer_ok = (
@@ -37,9 +63,19 @@ def carry_plan_validity_debug(
     product = v0.norm(dim=-1) * v1.norm(dim=-1)
     cosine = (v0 * v1).sum(dim=-1) / product.clamp(min=1e-7)
     turn = torch.rad2deg(torch.acos(cosine.clamp(-1.0, 1.0)))
-    ignored = torch.zeros_like(turn, dtype=torch.bool)
-    ignored[..., 14:17] = True
-    ignored[..., :16] |= state.held[..., None] >= 0.5
+    turn_index = torch.arange(
+        turn.shape[-1], device=turn.device, dtype=torch.long,
+    )
+    if suffix_replan:
+        center = box_index[..., None] - 1
+        ignored = (
+            (box_index[..., None] >= 0)
+            & ((turn_index - center).abs() <= 1)
+        )
+    else:
+        ignored = torch.zeros_like(turn, dtype=torch.bool)
+        ignored[..., 14:17] = True
+        ignored[..., :16] |= state.held[..., None] >= 0.5
     evaluated_turn = torch.where(ignored, torch.zeros_like(turn), turn)
     curve_ok = evaluated_turn.flatten(start_dim=1).amax(dim=-1) <= 46.0
 
@@ -53,6 +89,7 @@ def carry_plan_validity_debug(
     relevant_degenerate = (degenerate & ~ignored).flatten(start_dim=1).any(dim=-1)
     return {
         "finite": finite,
+        "anchors": anchors,
         "buffer": buffer_ok,
         "speed": speed_ok,
         "curve": curve_ok,

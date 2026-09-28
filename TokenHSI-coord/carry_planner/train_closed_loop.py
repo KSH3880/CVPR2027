@@ -330,13 +330,14 @@ def main():
         planner, payload = load_stack_checkpoint(init, device)
         expected = (
             history_steps, delta_scale, delta_scale,
-            path_update_alpha, True, control_scale,
+            path_update_alpha, True, control_scale, True,
         )
         actual = (
             planner.config.history_steps, planner.config.delta_scale,
             planner.config.retreat_delta_scale,
             planner.config.path_update_alpha, planner.config.plain_carry,
             planner.config.carry_control_scale,
+            planner.config.carry_suffix_replan,
         )
         if actual != expected or planner.config.candidates != 1:
             raise ValueError(
@@ -351,6 +352,7 @@ def main():
             path_update_alpha=path_update_alpha,
             plain_carry=True,
             carry_control_scale=control_scale,
+            carry_suffix_replan=True,
         )).to(device)
     history = StackHistoryBuffer(task.num_envs, history_steps, device)
     policy = StackPlannerActorCritic(
@@ -373,7 +375,7 @@ def main():
 
     iterations = _env_int("CARRY_PLANNER_ITERS", 200)
     horizon = _env_int("CARRY_PLANNER_HORIZON", 32)
-    low_steps = _env_int("CARRY_PLANNER_LOW_STEPS", 6)
+    low_steps = _env_int("CARRY_PLANNER_LOW_STEPS", 12)
     gamma = _env_float("CARRY_PLANNER_GAMMA", 0.99)
     collision_coef = _env_float("CARRY_PLANNER_COLLISION_COEF", 5.0)
     ppo_epochs = _env_int("CARRY_PLANNER_PPO_EPOCHS", 3)
@@ -401,7 +403,7 @@ def main():
         "CARRY_PLANNER_ANALYTIC_TIME_SAMPLES", 7,
     )
     consistency_coef = _env_float(
-        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.03,
+        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.0,
     )
     excess_length_coef = _env_float(
         "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.05,
@@ -480,7 +482,7 @@ def main():
         f"[carry-planner-train] envs={task.num_envs} horizon={horizon} "
         f"low_steps={low_steps} history={history_steps} delta={delta_scale:g} "
         f"control_scale={control_scale:g} "
-        f"path_alpha={path_update_alpha:g} "
+        f"path_alpha={path_update_alpha:g} suffix_replan=True dynamic_box=True "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"collision_coef={collision_coef:g} "
         f"analytic_collision_coef={analytic_collision_coef:g} "
@@ -526,11 +528,13 @@ def main():
                 candidate_output = {
                     "path_world": output["path_world"],
                     "speed": output["speed"],
+                    "box_index": output.get("box_index"),
+                    "suffix_replan": output.get("suffix_replan", False),
                 }
                 valid = task.install_external_plan(candidate_output)
                 validity_debug = task.last_plan_validity_debug()
                 for name in (
-                    "finite", "buffer", "speed", "curve",
+                    "finite", "anchors", "buffer", "speed", "curve",
                     "zero_safe_curve", "zero_turn_false_reject",
                     "relevant_degenerate_turn",
                 ):
@@ -662,6 +666,9 @@ def main():
             "plan_valid_fraction": ratio("plan_valid", "plan_count"),
             "plan_finite_fraction": ratio(
                 "plan_debug_finite", "plan_debug_count",
+            ),
+            "plan_anchor_fraction": ratio(
+                "plan_debug_anchors", "plan_debug_count",
             ),
             "plan_buffer_fraction": ratio(
                 "plan_debug_buffer", "plan_debug_count",

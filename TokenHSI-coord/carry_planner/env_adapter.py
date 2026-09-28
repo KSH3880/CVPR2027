@@ -127,6 +127,10 @@ class HumanoidMACarryPlannerTrain(
         after the first accepted plan; only the trajectory and speed profile
         are replaced by the parent installer.
         """
+        if getattr(self, "_carry_reset_cursor_on_install", False):
+            super()._install_plan(env_ids, path, speed)
+            return
+
         had_plan = self._coord_has_valid[env_ids].clone()
         previous_root = self._arc_root[self.agent_rows(env_ids)].clone()
         previous_box = self._arc_box[self.agent_rows(env_ids)].clone()
@@ -167,26 +171,40 @@ class HumanoidMACarryPlannerTrain(
             raise ValueError("carry planner expects one [B,1,2,33] proposal")
         path = path[:, 0]
         speed = speed[:, 0]
+        suffix_replan = bool(output.get("suffix_replan", False))
+        box_index = output.get("box_index")
+        if box_index is not None and box_index.ndim == 3:
+            box_index = box_index[:, 0]
         state = self._coord_state(env_ids)
-        checks = self._plan_validity_checks(state, path, speed)
-        # The shared stack planner has a fixed-origin recurrent trajectory:
-        # executed prefix points remain where they were first committed while
-        # the current root (and a held box) advances along that trajectory.
-        # The older coordinator instead regenerates root/box anchors on every
-        # replan. Its dynamic equality check is therefore inapplicable here.
-        # Initial pickup/goal anchors are still hard-coded and action-masked by
-        # StackTrajectoryPlanner; retain finite/buffer/speed/curvature checks.
-        checks[:, 1] = True
+        diagnostics = carry_plan_validity_debug(
+            state, path, speed, box_index=box_index,
+            suffix_replan=suffix_replan,
+        )
+        if suffix_replan:
+            checks = torch.stack((
+                diagnostics["finite"], diagnostics["anchors"],
+                diagnostics["buffer"], diagnostics["speed"],
+                diagnostics["curve"],
+            ), dim=-1)
+        else:
+            checks = self._plan_validity_checks(state, path, speed)
+            # Fixed-origin legacy Carry retains its episode-start point, so the
+            # older dynamic anchor equality check is inapplicable.
+            checks[:, 1] = True
         self._carry_last_plan_validity_debug = {
-            key: value.detach()
-            for key, value in carry_plan_validity_debug(
-                state, path, speed,
-            ).items()
+            key: value.detach() for key, value in diagnostics.items()
         }
         valid = checks.all(dim=-1)
+        self._carry_reset_cursor_on_install = suffix_replan
         self._coord_replans[env_ids] += 1
         self._coord_invalid[env_ids] += (~valid).long()
         self._coord_invalid_reasons += (~checks).sum(dim=0)
+        curve_invalid = ~checks[:, 4]
+        held_count = (state.held >= 0.5).sum(dim=-1).long()
+        for count in range(3):
+            self._coord_curve_invalid_by_held[count] += (
+                curve_invalid & (held_count == count)
+            ).sum()
         self._coord_selected[env_ids] = 0
 
         if valid.any():
