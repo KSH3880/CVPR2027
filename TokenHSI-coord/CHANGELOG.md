@@ -4,6 +4,28 @@
 
 ## 2026-09-28
 
+### Carry velocity-aligned replan tangent
+
+- history token에 이미 포함된 실제 `root_vel_xy`가 spline 접선에 강제되지 않아,
+  replan마다 agent 관성과 무관하게 path가 급회전할 수 있던 문제를 보완했다.
+- 현재 root에서 새 future path의 arc-length 0.5m 앞 방향을 실제 이동 방향과 비교한다.
+  15도 dead zone과 0.2→0.8m/s speed weighting을 사용해 정지 상태의 회전 자유도는
+  보존하면서 이동 중 순간적인 방향 전환만 penalize한다.
+- 충돌 중에도 물리적으로 불가능한 순간 회전은 허용하지 않도록 collision-risk gate와
+  독립적으로 적용한다. raw/weighted direction loss, 평균 방향 오차와 활성 비율을
+  metric 및 checkpoint 설정에 기록하고 gradient/gating 회귀 테스트를 추가했다.
+
+### Carry excess-length 발산 방지
+
+- future/direct ratio 제곱을 0.25에 포화하던 기존 loss가 큰 우회에서 gradient를 거의
+  잃는 문제를 수정했다. 허용 길이를 `1.15 * direct + 0.25m`로 두고, 초과거리(m)에
+  0.5m Huber loss를 적용해 작은 편차는 부드럽게, 큰 detour는 선형으로 계속 교정한다.
+- 상한 제거에 맞춰 기본 excess-length 계수를 0.10에서 0.05로 낮췄다. collision-risk
+  gate와 bounded replan-consistency는 유지하므로 충돌 회피 중 경로를 직선으로 강제하지
+  않는다.
+- ratio가 작은 direct distance에서 튀는 경우와 실제 경로 발산을 구분할 수 있도록
+  `mean_future_excess_m`, `max_future_excess_m` metric 및 회귀 테스트를 추가했다.
+
 ### Carry future-length rebase 및 조기 regularization
 
 - 이전 committed path의 progress index를 새 spline segment에 직접 곱해 remaining path가

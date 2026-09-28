@@ -56,14 +56,30 @@ cosine-space penalty로 함께 학습한다.
 replan 사이의 급격한 path 변경과 collision만 피한 과도한 우회는 별도 소형 geometry
 term으로 제한한다. `CARRY_PLANNER_REPLAN_CONSISTENCY_COEF`(기본 0.03)는 이미 지난
 prefix를 제외하고 이전 valid path의 가까운 미래를 Smooth-L1로 유지한다.
-`CARRY_PLANNER_EXCESS_LENGTH_COEF`(기본 0.10)는 현재 상태에서 남은 polyline 길이가
-직접 `root→box→goal`(held 이후 `root→goal`) 거리의 1.15배를 넘는 부분만 벌점으로 준다.
+`CARRY_PLANNER_EXCESS_LENGTH_COEF`(기본 0.05)는 현재 상태에서 남은 polyline 길이가
+직접 `root→box→goal`(held 이후 `root→goal`) 거리의 1.15배에 0.25m를 더한 허용
+길이를 넘을 때만 벌점으로 준다. 초과거리는 기본 0.5m까지 quadratic, 그 이후 linear인
+Huber loss이므로 큰 우회에서도 gradient가 사라지지 않는다. 비율/절대 여유와 Huber
+전환점은 `CARRY_PLANNER_FREE_DETOUR_RATIO`,
+`CARRY_PLANNER_ABSOLUTE_LENGTH_SLACK`, `CARRY_PLANNER_LENGTH_HUBER_BETA`로 조절한다.
 남은 길이는 이전 path에서 얻은 progress index를 새 spline segment에 곱하지 않고,
 실행된 prefix를 현재 measured root로 접은 뒤 완전한 future suffix에서 다시 계산한다.
-두 raw loss는 각각 0.25 미만으로 부드럽게 포화되고, 현재 analytic collision risk가
-높으면 지수 gate로 꺼져 회피 동작과 경쟁하지 않는다. 첫 5 iteration에는 0에서 설정
-계수까지 선형 warm-up하며, 로그의 `weighted_consistency_loss`,
-`weighted_excess_length_loss`, `path_regularization_safe_weight`로 실제 기여량을 확인한다.
+consistency loss만 0.25 미만으로 부드럽게 포화하며, 현재 analytic collision risk가 높으면
+두 geometry term을 지수 gate로 꺼 회피 동작과 경쟁하지 않는다. 첫 5 iteration에는 0에서
+설정 계수까지 선형 warm-up한다. 로그의 `weighted_consistency_loss`,
+`weighted_excess_length_loss`, `mean_future_excess_m`, `max_future_excess_m`로
+실제 기여량과 거리 초과를 확인한다.
+
+replan 순간 실제 이동 방향과 새 path 접선이 불연속이 되지 않도록
+`CARRY_PLANNER_DIRECTION_COEF`(기본 0.10)를 별도로 적용한다. 현재 root에서 새 future
+path를 arc-length 0.5m 진행한 방향과 실제 `root_vel_xy` 방향을 비교하며 15도까지는
+무료다. 0.2m/s 이하에서는 꺼지고 0.8m/s까지 선형으로 강해진다. 이는 물리적 실행
+가능성 제약이라 collision-risk gate로 끄지 않지만, 다른 geometry term과 같이 첫 5
+iteration에 warm-up한다. lookahead, free angle, 속도 범위는 각각
+`CARRY_PLANNER_DIRECTION_LOOKAHEAD`, `CARRY_PLANNER_DIRECTION_FREE_ANGLE_DEG`,
+`CARRY_PLANNER_DIRECTION_MIN_SPEED`, `CARRY_PLANNER_DIRECTION_FULL_SPEED`로
+조절한다. 로그의 `direction_loss`, `weighted_direction_loss`,
+`mean_direction_error_deg`, `direction_active_fraction`으로 동작을 확인한다.
 시간/makespan loss는 speed 최대화와 collision timing 악용을 피하기 위해 넣지 않는다.
 
 Smoke 예시:

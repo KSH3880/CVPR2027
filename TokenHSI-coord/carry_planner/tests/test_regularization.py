@@ -32,7 +32,7 @@ class CarryPathRegularizationTest(unittest.TestCase):
         self.assertEqual(float(result["consistency_loss"]), 0.0)
         self.assertEqual(float(result["excess_length_loss"]), 0.0)
 
-    def test_safe_large_detour_is_bounded_and_penalized(self):
+    def test_safe_large_detour_has_unbounded_linear_penalty(self):
         state = crossing_state()
         base = crossing_path(state)
         detour = base.clone()
@@ -45,9 +45,67 @@ class CarryPathRegularizationTest(unittest.TestCase):
         self.assertGreater(float(result["consistency_loss"]), 0.0)
         self.assertGreater(float(result["excess_length_loss"]), 0.0)
         self.assertLessEqual(float(result["consistency_loss"]), 0.25)
-        self.assertLessEqual(float(result["excess_length_loss"]), 0.25)
+        self.assertGreater(float(result["excess_length_loss"]), 0.25)
+        self.assertGreater(float(result["mean_future_excess_m"]), 0.0)
         (result["consistency_loss"] + result["excess_length_loss"]).backward()
         self.assertGreater(float(detour.grad.abs().sum()), 0.0)
+
+    def test_absolute_slack_avoids_near_goal_ratio_explosion(self):
+        state = crossing_state()
+        state.held.fill_(1.0)
+        state.root_xy.copy_(state.goal_xy)
+        state.root_xy[..., 0] -= 0.20
+        alpha = torch.linspace(0.0, 1.0, 33).reshape(1, 1, 33, 1)
+        direct = (
+            state.root_xy[..., None, :] * (1.0 - alpha)
+            + state.goal_xy[..., None, :] * alpha
+        )
+        path = direct[:, None].clone()
+        path[:, :, :, 24, 1] += 0.10
+        result = carry_path_regularization(
+            {"path_world": path}, observation(state, path[:, 0]),
+            torch.zeros(1),
+        )
+        self.assertGreater(float(result["mean_future_length_ratio"]), 1.15)
+        self.assertEqual(float(result["excess_length_loss"]), 0.0)
+
+    def test_direction_alignment_uses_velocity_and_survives_risk_gate(self):
+        state = crossing_state()
+        state.root_vel_xy[0, 0] = torch.tensor([1.0, 0.0])
+        state.root_vel_xy[0, 1] = torch.tensor([0.0, 1.0])
+        base = crossing_path(state)
+        aligned = carry_path_regularization(
+            {"path_world": base}, observation(state, base[:, 0]),
+            torch.zeros(1),
+        )
+        self.assertEqual(float(aligned["direction_loss"]), 0.0)
+
+        turned = base.clone()
+        distance = torch.linspace(0.0, 0.8, 9)
+        turned[0, 0, 0, :9, 0] = state.root_xy[0, 0, 0]
+        turned[0, 0, 0, :9, 1] = state.root_xy[0, 0, 1] + distance
+        turned.requires_grad_(True)
+        result = carry_path_regularization(
+            {"path_world": turned}, observation(state, base[:, 0]),
+            torch.full((1,), 100.0),
+        )
+        self.assertGreater(float(result["direction_loss"]), 0.0)
+        self.assertEqual(float(result["consistency_loss"]), 0.0)
+        self.assertEqual(float(result["excess_length_loss"]), 0.0)
+        result["direction_loss"].backward()
+        self.assertGreater(float(turned.grad.abs().sum()), 0.0)
+
+    def test_stationary_agent_has_no_direction_constraint(self):
+        state = crossing_state()
+        base = crossing_path(state)
+        turned = base.clone()
+        turned[..., 1:9, :] = torch.flip(turned[..., 1:9, :], dims=(-2,))
+        result = carry_path_regularization(
+            {"path_world": turned}, observation(state, base[:, 0]),
+            torch.zeros(1),
+        )
+        self.assertEqual(float(result["direction_loss"]), 0.0)
+        self.assertEqual(float(result["direction_active_fraction"]), 0.0)
 
     def test_collision_risk_releases_both_geometry_terms(self):
         state = crossing_state()

@@ -147,6 +147,9 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 analytic_curvature_coef, analytic_focus_steps,
                 analytic_time_uncertainty, analytic_time_samples,
                 consistency_coef, excess_length_coef, free_detour_ratio,
+                absolute_length_slack, length_huber_beta, direction_coef,
+                direction_lookahead, direction_free_angle_deg,
+                direction_min_speed, direction_full_speed,
                 regularization_scale):
     total = actions.shape[0]
     sums = {
@@ -160,11 +163,17 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
         "analytic_min_hb_margin": 0.0,
         "replan_consistency_loss": 0.0,
         "excess_length_loss": 0.0,
+        "direction_loss": 0.0,
         "weighted_consistency_loss": 0.0,
         "weighted_excess_length_loss": 0.0,
+        "weighted_direction_loss": 0.0,
         "path_regularization_safe_weight": 0.0,
         "mean_replan_displacement": 0.0,
         "mean_future_length_ratio": 0.0,
+        "mean_future_excess_m": 0.0,
+        "max_future_excess_m": 0.0,
+        "mean_direction_error_deg": 0.0,
+        "direction_active_fraction": 0.0,
     }
     updates = 0
     for _ in range(epochs):
@@ -197,6 +206,12 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 mean_output, observation,
                 analytic["per_sample_loss"],
                 free_detour_ratio=free_detour_ratio,
+                absolute_length_slack=absolute_length_slack,
+                length_huber_beta=length_huber_beta,
+                direction_lookahead=direction_lookahead,
+                direction_free_angle_deg=direction_free_angle_deg,
+                direction_min_speed=direction_min_speed,
+                direction_full_speed=direction_full_speed,
             )
             weighted_consistency = (
                 regularization_scale * consistency_coef
@@ -205,6 +220,10 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             weighted_excess_length = (
                 regularization_scale * excess_length_coef
                 * path_regularization["excess_length_loss"]
+            )
+            weighted_direction = (
+                regularization_scale * direction_coef
+                * path_regularization["direction_loss"]
             )
             loss = (
                 policy_loss + value_coef * value_loss
@@ -215,6 +234,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 + analytic_collision_coef * analytic["loss"]
                 + analytic_curvature_coef * analytic["curvature_loss"]
                 + weighted_consistency + weighted_excess_length
+                + weighted_direction
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -244,24 +264,39 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             sums["excess_length_loss"] += float(
                 path_regularization["excess_length_loss"].detach()
             )
+            sums["direction_loss"] += float(
+                path_regularization["direction_loss"].detach()
+            )
             sums["weighted_consistency_loss"] += float(
                 weighted_consistency.detach()
             )
             sums["weighted_excess_length_loss"] += float(
                 weighted_excess_length.detach()
             )
+            sums["weighted_direction_loss"] += float(
+                weighted_direction.detach()
+            )
             for name in (
                 "safe_weight", "mean_replan_displacement",
-                "mean_future_length_ratio",
+                "mean_future_length_ratio", "mean_future_excess_m",
+                "mean_direction_error_deg", "direction_active_fraction",
             ):
                 sums[
                     "path_regularization_safe_weight"
                     if name == "safe_weight" else name
                 ] += float(path_regularization[name])
+            sums["max_future_excess_m"] = max(
+                sums["max_future_excess_m"],
+                float(path_regularization["max_future_excess_m"]),
+            )
             for name in ("min_hh", "min_bb_margin", "min_hb_margin"):
                 sums[f"analytic_{name}"] += float(analytic[name])
             updates += 1
-    return {key: value / max(updates, 1) for key, value in sums.items()}
+    averaged = {
+        key: value / max(updates, 1) for key, value in sums.items()
+    }
+    averaged["max_future_excess_m"] = sums["max_future_excess_m"]
+    return averaged
 
 
 def main():
@@ -366,10 +401,31 @@ def main():
         "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.03,
     )
     excess_length_coef = _env_float(
-        "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.10,
+        "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.05,
     )
     free_detour_ratio = _env_float(
         "CARRY_PLANNER_FREE_DETOUR_RATIO", 1.15,
+    )
+    absolute_length_slack = _env_float(
+        "CARRY_PLANNER_ABSOLUTE_LENGTH_SLACK", 0.25,
+    )
+    length_huber_beta = _env_float(
+        "CARRY_PLANNER_LENGTH_HUBER_BETA", 0.50,
+    )
+    direction_coef = _env_float(
+        "CARRY_PLANNER_DIRECTION_COEF", 0.10,
+    )
+    direction_lookahead = _env_float(
+        "CARRY_PLANNER_DIRECTION_LOOKAHEAD", 0.50,
+    )
+    direction_free_angle_deg = _env_float(
+        "CARRY_PLANNER_DIRECTION_FREE_ANGLE_DEG", 15.0,
+    )
+    direction_min_speed = _env_float(
+        "CARRY_PLANNER_DIRECTION_MIN_SPEED", 0.20,
+    )
+    direction_full_speed = _env_float(
+        "CARRY_PLANNER_DIRECTION_FULL_SPEED", 0.80,
     )
     regularization_warmup = _env_int(
         "CARRY_PLANNER_PATH_REGULARIZATION_WARMUP", 5,
@@ -379,7 +435,7 @@ def main():
     if (collision_coef < 0 or smoothness_coef < 0
             or speed_smoothness_coef < 0 or analytic_collision_coef < 0
             or invalid_plan_coef < 0 or consistency_coef < 0
-            or excess_length_coef < 0):
+            or excess_length_coef < 0 or direction_coef < 0):
         raise ValueError("reward and regularization coefficients must be non-negative")
     if analytic_curvature_coef < 0:
         raise ValueError("analytic curvature coefficient must be non-negative")
@@ -392,6 +448,16 @@ def main():
         raise ValueError("analytic time samples must be one or an odd integer")
     if free_detour_ratio < 1.0:
         raise ValueError("free detour ratio must be at least one")
+    if absolute_length_slack < 0:
+        raise ValueError("absolute length slack must be non-negative")
+    if length_huber_beta <= 0:
+        raise ValueError("length Huber beta must be positive")
+    if direction_lookahead <= 0:
+        raise ValueError("direction lookahead must be positive")
+    if not 0 <= direction_free_angle_deg < 180:
+        raise ValueError("direction free angle must be in [0, 180)")
+    if direction_min_speed < 0 or direction_full_speed <= direction_min_speed:
+        raise ValueError("direction speed range must be increasing")
     if regularization_warmup < 0:
         raise ValueError("path regularization warmup must be non-negative")
 
@@ -418,6 +484,12 @@ def main():
         f"consistency_coef={consistency_coef:g} "
         f"excess_length_coef={excess_length_coef:g} "
         f"free_detour_ratio={free_detour_ratio:g} "
+        f"absolute_length_slack={absolute_length_slack:g} "
+        f"length_huber_beta={length_huber_beta:g} "
+        f"direction_coef={direction_coef:g} "
+        f"direction_lookahead={direction_lookahead:g} "
+        f"direction_free_angle_deg={direction_free_angle_deg:g} "
+        f"direction_speed_range={direction_min_speed:g}:{direction_full_speed:g} "
         f"path_regularization_warmup={regularization_warmup} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
@@ -532,6 +604,9 @@ def main():
             analytic_focus_steps, analytic_time_uncertainty,
             analytic_time_samples, consistency_coef,
             excess_length_coef, free_detour_ratio,
+            absolute_length_slack, length_huber_beta, direction_coef,
+            direction_lookahead, direction_free_angle_deg,
+            direction_min_speed, direction_full_speed,
             regularization_scale,
         )
 
@@ -607,6 +682,13 @@ def main():
                     "replan_consistency_coef": consistency_coef,
                     "excess_length_coef": excess_length_coef,
                     "free_detour_ratio": free_detour_ratio,
+                    "absolute_length_slack": absolute_length_slack,
+                    "length_huber_beta": length_huber_beta,
+                    "direction_coef": direction_coef,
+                    "direction_lookahead": direction_lookahead,
+                    "direction_free_angle_deg": direction_free_angle_deg,
+                    "direction_min_speed": direction_min_speed,
+                    "direction_full_speed": direction_full_speed,
                     "path_regularization_warmup": regularization_warmup,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,
