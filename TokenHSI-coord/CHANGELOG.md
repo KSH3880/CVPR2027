@@ -4,6 +4,12 @@
 
 ## 2026-09-28
 
+### Carry 학습 콘솔 로그 축약
+
+- iteration console에는 reward/progress, collision/validity, path 길이·replan·진행방향
+  진단만 출력한다. 전체 metric은 기존처럼 `metrics.jsonl`과 checkpoint에 보존해
+  후속 분석 가능성은 유지한다.
+
 ### Carry velocity-aligned replan tangent
 
 - history token에 이미 포함된 실제 `root_vel_xy`가 spline 접선에 강제되지 않아,

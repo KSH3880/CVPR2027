@@ -657,9 +657,17 @@ def main():
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(metrics, sort_keys=True) + "\n")
+        console_keys = (
+            "iteration", "reward", "done_rate", "progress",
+            "collision_ratio", "plan_valid_fraction",
+            "invalid_plan_penalty", "analytic_collision_loss",
+            "mean_path_deviation", "mean_future_excess_m",
+            "mean_replan_displacement", "mean_direction_error_deg",
+            "path_regularization_safe_weight",
+        )
         print(
             "[carry-planner-train] " + " ".join(
-                f"{key}={value:.5g}" for key, value in metrics.items()
+                f"{key}={metrics[key]:.5g}" for key in console_keys
             ),
             flush=True,
         )
