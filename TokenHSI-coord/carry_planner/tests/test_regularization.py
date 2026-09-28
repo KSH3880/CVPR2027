@@ -95,6 +95,26 @@ class CarryPathRegularizationTest(unittest.TestCase):
         result["direction_loss"].backward()
         self.assertGreater(float(turned.grad.abs().sum()), 0.0)
 
+    def test_pickup_uses_previous_carry_direction_when_stationary(self):
+        state = crossing_state()
+        state.root_xy.copy_(state.box_xyz[..., :2])
+        state.held.fill_(1.0)
+        base = crossing_path(state)
+        turned = base.clone()
+        distance = torch.linspace(0.0, 0.8, 9)
+        turned[0, 0, 0, 16:25, 0] = state.root_xy[0, 0, 0]
+        turned[0, 0, 0, 16:25, 1] = state.root_xy[0, 0, 1] + distance
+        turned.requires_grad_(True)
+        result = carry_path_regularization(
+            {"path_world": turned},
+            observation(state, base[:, 0], progress=16.0),
+            torch.full((1,), 100.0),
+        )
+        self.assertGreater(float(result["direction_loss"]), 0.0)
+        self.assertGreater(float(result["direction_fallback_fraction"]), 0.0)
+        result["direction_loss"].backward()
+        self.assertGreater(float(turned.grad.abs().sum()), 0.0)
+
     def test_stationary_agent_has_no_direction_constraint(self):
         state = crossing_state()
         base = crossing_path(state)

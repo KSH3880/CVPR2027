@@ -12,6 +12,13 @@
 
 ### Carry velocity-aligned replan tangent
 
+- pickup 순간 executor가 정지해 velocity direction constraint가 꺼지고 독립된 carry
+  spline 접선이 replan마다 요동하던 경계를 보완했다. `held=1`, previous path valid,
+  goal까지 lookahead 이상 남은 저속 상태에서는 직전 committed carry 방향을 fallback으로
+  사용하고, 가속하면서 실제 velocity reference로 연속적으로 전환한다.
+- fallback은 collision-risk gate와 독립적인 soft direction constraint이며 기본 상대
+  강도 0.5를 환경변수와 checkpoint에 기록한다. 정지 pickup에서도 fallback loss와 path
+  gradient가 유지되는 회귀 테스트를 추가했다.
 - history token에 이미 포함된 실제 `root_vel_xy`가 spline 접선에 강제되지 않아,
   replan마다 agent 관성과 무관하게 path가 급회전할 수 있던 문제를 보완했다.
 - 현재 root에서 새 future path의 arc-length 0.5m 앞 방향을 실제 이동 방향과 비교한다.

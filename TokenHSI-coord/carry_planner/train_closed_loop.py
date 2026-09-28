@@ -150,7 +150,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 absolute_length_slack, length_huber_beta, direction_coef,
                 direction_lookahead, direction_free_angle_deg,
                 direction_min_speed, direction_full_speed,
-                regularization_scale):
+                pickup_fallback_weight, regularization_scale):
     total = actions.shape[0]
     sums = {
         "policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
@@ -174,6 +174,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
         "max_future_excess_m": 0.0,
         "mean_direction_error_deg": 0.0,
         "direction_active_fraction": 0.0,
+        "direction_fallback_fraction": 0.0,
     }
     updates = 0
     for _ in range(epochs):
@@ -212,6 +213,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 direction_free_angle_deg=direction_free_angle_deg,
                 direction_min_speed=direction_min_speed,
                 direction_full_speed=direction_full_speed,
+                pickup_fallback_weight=pickup_fallback_weight,
             )
             weighted_consistency = (
                 regularization_scale * consistency_coef
@@ -280,6 +282,7 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
                 "safe_weight", "mean_replan_displacement",
                 "mean_future_length_ratio", "mean_future_excess_m",
                 "mean_direction_error_deg", "direction_active_fraction",
+                "direction_fallback_fraction",
             ):
                 sums[
                     "path_regularization_safe_weight"
@@ -427,6 +430,9 @@ def main():
     direction_full_speed = _env_float(
         "CARRY_PLANNER_DIRECTION_FULL_SPEED", 0.80,
     )
+    pickup_fallback_weight = _env_float(
+        "CARRY_PLANNER_PICKUP_DIRECTION_FALLBACK_WEIGHT", 0.50,
+    )
     regularization_warmup = _env_int(
         "CARRY_PLANNER_PATH_REGULARIZATION_WARMUP", 5,
     )
@@ -458,6 +464,8 @@ def main():
         raise ValueError("direction free angle must be in [0, 180)")
     if direction_min_speed < 0 or direction_full_speed <= direction_min_speed:
         raise ValueError("direction speed range must be increasing")
+    if not 0 <= pickup_fallback_weight <= 1:
+        raise ValueError("pickup direction fallback weight must be in [0, 1]")
     if regularization_warmup < 0:
         raise ValueError("path regularization warmup must be non-negative")
 
@@ -490,6 +498,7 @@ def main():
         f"direction_lookahead={direction_lookahead:g} "
         f"direction_free_angle_deg={direction_free_angle_deg:g} "
         f"direction_speed_range={direction_min_speed:g}:{direction_full_speed:g} "
+        f"pickup_direction_fallback_weight={pickup_fallback_weight:g} "
         f"path_regularization_warmup={regularization_warmup} "
         f"converge_prob={task._carry_converge_prob:g} "
         f"goal_margin={task._carry_goal_margin:g} frozen={args.checkpoint}",
@@ -607,7 +616,7 @@ def main():
             absolute_length_slack, length_huber_beta, direction_coef,
             direction_lookahead, direction_free_angle_deg,
             direction_min_speed, direction_full_speed,
-            regularization_scale,
+            pickup_fallback_weight, regularization_scale,
         )
 
         def ratio(numerator, denominator):
@@ -697,6 +706,7 @@ def main():
                     "direction_free_angle_deg": direction_free_angle_deg,
                     "direction_min_speed": direction_min_speed,
                     "direction_full_speed": direction_full_speed,
+                    "pickup_direction_fallback_weight": pickup_fallback_weight,
                     "path_regularization_warmup": regularization_warmup,
                     "commit_steps": low_steps,
                     "converge_probability": task._carry_converge_prob,

@@ -78,8 +78,12 @@ path를 arc-length 0.5m 진행한 방향과 실제 `root_vel_xy` 방향을 비�
 iteration에 warm-up한다. lookahead, free angle, 속도 범위는 각각
 `CARRY_PLANNER_DIRECTION_LOOKAHEAD`, `CARRY_PLANNER_DIRECTION_FREE_ANGLE_DEG`,
 `CARRY_PLANNER_DIRECTION_MIN_SPEED`, `CARRY_PLANNER_DIRECTION_FULL_SPEED`로
-조절한다. 로그의 `direction_loss`, `weighted_direction_loss`,
-`mean_direction_error_deg`, `direction_active_fraction`으로 동작을 확인한다.
+조절한다. pickup 직후처럼 `held=1`인데 실제 속도가 낮으면 직전 committed path의
+carry 방향을 fallback reference로 사용하고, 가속하면서 실제 velocity 방향으로 부드럽게
+전환한다. fallback은 goal까지 lookahead 이상 남았을 때만 켜며 기본 상대 강도 0.5는
+`CARRY_PLANNER_PICKUP_DIRECTION_FALLBACK_WEIGHT`로 조절한다. 로그의
+`direction_loss`, `weighted_direction_loss`, `mean_direction_error_deg`,
+`direction_active_fraction`, `direction_fallback_fraction`으로 동작을 확인한다.
 시간/makespan loss는 speed 최대화와 collision timing 악용을 피하기 위해 넣지 않는다.
 
 Smoke 예시:

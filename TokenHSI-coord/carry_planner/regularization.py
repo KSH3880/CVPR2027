@@ -23,6 +23,38 @@ def _bounded_weighted_mean(
     return cap * mean / (cap + mean)
 
 
+def _arc_lookahead_delta(
+    path: torch.Tensor, root_xy: torch.Tensor, distance: float,
+) -> torch.Tensor:
+    # Return root-to-path vectors at a fixed detached arc-length lookup.
+    batch, agents, points, coordinates = path.shape
+    if coordinates != 2 or root_xy.shape != (batch, agents, 2):
+        raise ValueError("lookahead path/root shape mismatch")
+    segment_length = (path[..., 1:, :] - path[..., :-1, :]).norm(dim=-1)
+    arc = torch.cat((
+        torch.zeros_like(segment_length[..., :1]),
+        segment_length.cumsum(dim=-1),
+    ), dim=-1)
+    arc_lookup = arc.detach().reshape(-1, points).contiguous()
+    target_arc = torch.minimum(
+        arc[..., -1].detach(), arc.new_full((), distance),
+    ).reshape(-1, 1)
+    upper = torch.searchsorted(arc_lookup, target_arc, right=False).squeeze(-1)
+    upper = upper.clamp(1, points - 1).reshape(batch, agents)
+    lower = upper - 1
+    arc0 = arc_lookup.gather(1, lower.reshape(-1, 1)).reshape(batch, agents)
+    arc1 = arc_lookup.gather(1, upper.reshape(-1, 1)).reshape(batch, agents)
+    blend = (
+        (target_arc.reshape(batch, agents) - arc0)
+        / (arc1 - arc0).clamp(min=1e-7)
+    ).clamp(0.0, 1.0)
+    gather = lower[..., None, None].expand(-1, -1, 1, 2)
+    point0 = path.gather(2, gather).squeeze(2)
+    gather = upper[..., None, None].expand(-1, -1, 1, 2)
+    point1 = path.gather(2, gather).squeeze(2)
+    return point0 + blend[..., None] * (point1 - point0) - root_xy
+
+
 def carry_path_regularization(
     output: Dict[str, torch.Tensor],
     observation: StackPlannerObservation,
@@ -35,6 +67,7 @@ def carry_path_regularization(
     direction_free_angle_deg: float = 15.0,
     direction_min_speed: float = 0.20,
     direction_full_speed: float = 0.80,
+    pickup_fallback_weight: float = 0.50,
     consistency_beta: float = 0.25,
     near_future_decay: float = 6.0,
     safety_gate_scale: float = 0.05,
@@ -75,6 +108,9 @@ def carry_path_regularization(
     if (not math.isfinite(direction_free_angle_deg)
             or not 0.0 <= direction_free_angle_deg < 180.0):
         raise ValueError("direction free angle must be in [0, 180)")
+    if (not math.isfinite(pickup_fallback_weight)
+            or not 0.0 <= pickup_fallback_weight <= 1.0):
+        raise ValueError("pickup fallback weight must be in [0, 1]")
 
     progress = observation.path_progress
     if progress.shape != (batch, agents):
@@ -133,56 +169,65 @@ def carry_path_regularization(
     ).norm(dim=-1)
     future_length = segment_length.sum(dim=-1)
 
-    # Measure the outgoing path direction at a fixed arc-length lookahead.
-    # Lookup distances are detached so length changes cannot game selection;
-    # gradients still reach the selected/interpolated path points.
-    arc = torch.cat((
-        torch.zeros_like(segment_length[..., :1]),
-        segment_length.cumsum(dim=-1),
-    ), dim=-1)
-    arc_lookup = arc.detach().reshape(-1, points).contiguous()
-    target_arc = torch.minimum(
-        future_length.detach(),
-        future_length.new_full((), direction_lookahead),
-    ).reshape(-1, 1)
-    upper = torch.searchsorted(arc_lookup, target_arc, right=False).squeeze(-1)
-    upper = upper.clamp(1, points - 1).reshape(batch, agents)
-    lower = upper - 1
-    arc0 = arc_lookup.gather(1, lower.reshape(-1, 1)).reshape(batch, agents)
-    arc1 = arc_lookup.gather(1, upper.reshape(-1, 1)).reshape(batch, agents)
-    blend = (
-        (target_arc.reshape(batch, agents) - arc0)
-        / (arc1 - arc0).clamp(min=1e-7)
-    ).clamp(0.0, 1.0)
-    gather = lower[..., None, None].expand(-1, -1, 1, 2)
-    point0 = future_path.gather(2, gather).squeeze(2)
-    gather = upper[..., None, None].expand(-1, -1, 1, 2)
-    point1 = future_path.gather(2, gather).squeeze(2)
-    lookahead_point = point0 + blend[..., None] * (point1 - point0)
-
-    planned_delta = lookahead_point - state.root_xy
+    planned_delta = _arc_lookahead_delta(
+        future_path, state.root_xy, direction_lookahead,
+    )
     planned_norm = planned_delta.norm(dim=-1)
     planned_direction = (
         planned_delta / planned_norm[..., None].clamp(min=1e-7)
     )
     root_speed = state.root_vel_xy.norm(dim=-1)
-    actual_direction = (
+    velocity_direction = (
         state.root_vel_xy / root_speed[..., None].clamp(min=1e-7)
     )
-    direction_cosine = (
-        planned_direction * actual_direction
-    ).sum(dim=-1).clamp(-1.0, 1.0)
     speed_weight = (
         (root_speed - direction_min_speed)
         / (direction_full_speed - direction_min_speed)
     ).clamp(0.0, 1.0)
-    direction_active = (
-        (root_speed > direction_min_speed) & (planned_norm > 0.10)
+
+    # At pickup the executor nearly stops, so velocity alone provides no
+    # tangent reference. Reuse the previously committed carry direction and
+    # blend smoothly back to physical velocity as the agent accelerates.
+    previous_future_path = torch.where(
+        past[..., None], state.root_xy[..., None, :],
+        observation.previous_path_world.detach(),
     )
+    previous_delta = _arc_lookahead_delta(
+        previous_future_path, state.root_xy, direction_lookahead,
+    )
+    previous_norm = previous_delta.norm(dim=-1)
+    previous_direction = (
+        previous_delta / previous_norm[..., None].clamp(min=1e-7)
+    )
+    goal_remaining = (state.root_xy - state.goal_xy).norm(dim=-1)
+    fallback_available = (
+        (state.held >= 0.5)
+        & observation.previous_path_valid[:, None]
+        & (goal_remaining > direction_lookahead)
+        & (previous_norm > 0.10)
+    )
+    fallback_strength = (
+        pickup_fallback_weight * (1.0 - speed_weight)
+        * fallback_available.to(path.dtype)
+    )
+    reference_vector = (
+        speed_weight[..., None] * velocity_direction
+        + fallback_strength[..., None] * previous_direction
+    )
+    reference_norm = reference_vector.norm(dim=-1)
+    reference_direction = (
+        reference_vector / reference_norm[..., None].clamp(min=1e-7)
+    )
+    direction_cosine = (
+        planned_direction * reference_direction
+    ).sum(dim=-1).clamp(-1.0, 1.0)
+    direction_active = (reference_norm > 1e-6) & (planned_norm > 0.10)
+    direction_weight = (speed_weight + fallback_strength).clamp(max=1.0)
     free_cosine = math.cos(math.radians(direction_free_angle_deg))
     direction_error = torch.relu(free_cosine - direction_cosine).square()
     direction_loss = (
-        (direction_error * speed_weight * direction_active.to(path.dtype)).sum()
+        (direction_error * direction_weight
+         * direction_active.to(path.dtype)).sum()
         / direction_active.to(path.dtype).sum().clamp(min=1.0)
     )
 
@@ -239,6 +284,7 @@ def carry_path_regularization(
             * direction_active.to(path.dtype)
         ).sum() / direction_active.to(path.dtype).sum().clamp(min=1.0),
         "direction_active_fraction": direction_active.float().mean().detach(),
+        "direction_fallback_fraction": fallback_available.float().mean().detach(),
     }
 
 
