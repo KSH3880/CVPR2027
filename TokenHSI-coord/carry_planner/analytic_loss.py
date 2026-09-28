@@ -12,6 +12,14 @@ from coordinator.planner import _arrival_times, _sample_at_time
 from coordinator.schema import CoordinatorState
 
 
+def _soft_worst_case(value: torch.Tensor, dim: int = 0) -> torch.Tensor:
+    """Keep worst-case values while distributing gradient over every sample."""
+    weight = torch.softmax(value, dim=dim).detach()
+    soft = (weight * value).sum(dim=dim)
+    hard = value.amax(dim=dim)
+    return hard.detach() + soft - soft.detach()
+
+
 def carry_analytic_collision_loss(
     output: Dict[str, torch.Tensor],
     state: CoordinatorState,
@@ -99,7 +107,7 @@ def carry_analytic_collision_loss(
         ).squeeze(-1)
     else:
         pickup_time = arrival[..., 17]
-    robust_steps = path.new_zeros(path.shape[0], path.shape[1], 96)
+    timing_collisions = []
     min_hh = path.new_full(path.shape[:2], float("inf"))
     min_bb_margin = path.new_full(path.shape[:2], float("inf"))
     min_hb_margin = path.new_full(path.shape[:2], float("inf"))
@@ -137,7 +145,7 @@ def carry_analytic_collision_loss(
         # Negative shifted time refers to motion before the current replan.
         valid_time = time1 >= 0.0
         collision = collision * valid_time.to(path.dtype)
-        robust_steps = torch.maximum(robust_steps, collision)
+        timing_collisions.append(collision)
         inf = torch.full_like(hh, float("inf"))
         min_hh = torch.minimum(
             min_hh, torch.where(valid_time, hh, inf).amin(dim=-1),
@@ -158,6 +166,13 @@ def carry_analytic_collision_loss(
             ),
         )
 
+    timing_collisions = torch.stack(timing_collisions, dim=0)
+    # A hard maximum can select the exact-overlap sample, whose distance norm
+    # has no useful escape direction. Preserve that worst-case forward value,
+    # but use every nearby timing sample for its surrogate backward gradient.
+    # Detached softmax weights keep all coefficients non-negative and prescribe
+    # no passing side. The detach identity changes gradients, not loss scale.
+    robust_steps = _soft_worst_case(timing_collisions, dim=0)
     per_sample_loss = robust_steps.topk(
         focus_steps, dim=-1,
     ).values.mean(dim=-1).mean(dim=1)

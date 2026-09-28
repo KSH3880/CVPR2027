@@ -37,14 +37,12 @@ fallback이 계속 실행된다.
 넓게 한 방향으로 우회하는 path는 유지하면서 좌우로 흔들리는 S-curve/noise를 억제한다.
 46도 초과 급회전은 아래 analytic curvature term이 별도로 처리한다.
 
-hard gate에서 거절된 sampled proposal에는
+hard gate에서 거절된 sampled proposal에는 거절 원인이나 turn 크기와 무관하게
 `CARRY_PLANNER_INVALID_PLAN_COEF`(기본 0.25)를 macro reward에서 직접 감점한다.
-이 값은 모든 거절의 최소 penalty다. 최대 turn이 실행 한계 46도를 넘으면 초과 비율에
-따라 선형으로 증가하고 92도 이상에서 기본값의 2배로 포화한다. 따라서 46도 근처와 심한
-zigzag를 동일하게 취급하지 않으면서, curve 외 원인으로 거절된 proposal도 기존 최소
-penalty를 유지한다. 최초 거절 시 analytic fallback, 이후 거절 시 이전 valid path가
-실행되더라도 거절 action이 fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit
-penalty다. 로그의 `invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
+최초 거절 시 analytic fallback, 이후 거절 시 이전 valid path가 실행되더라도 거절 action이
+fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit penalty다. curve 초과량에
+따라 penalty를 키우면 직선 선호가 강해지므로 hard gate와 학습 신호의 역할을 분리한다.
+로그의 `invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
 
 거절 원인 디버깅을 위해 전체 metric에는 finite/buffer/speed/curve predicate 통과율,
 평균 최대 turn과 path 길이를 기록한다. 콘솔의 `plan_curve_fraction`은 실제 46도 gate
@@ -58,8 +56,11 @@ mean decoder 문제를 구분할 수 있다. 진단 단계에서는 실제 수�
 펼치고, 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접
 최소화한다. suffix에는 지나온 prefix가 존재하지 않으며 dynamic box index의 도착시간을
 pickup 시점으로 사용한다. executor 도착시간 오차에도 우회하도록 기본 ±1.5초 구간을 7개
-상대 timing offset으로 검사한다. 이는 96×96 모든 시간쌍을 만들지 않아 minibatch
-메모리는 미래 시점 수에 선형이다. auxiliary loss의 speed는 timing 계산에만 사용하고
+상대 timing offset으로 검사한다. forward loss 값은 기존처럼 offset 중 worst case를
+유지하지만, backward는 detached-softmax weight로 모든 offset의 gradient를 합친다. 따라서
+정확한 overlap 한 점의 무방향 gradient에 갇히지 않으면서 좌/우 회피 방향은 지정하지
+않는다. 이는 96×96 모든 시간쌍을 만들지 않아 minibatch 메모리는 미래 시점 수에 선형이다.
+auxiliary loss의 speed는 timing 계산에만 사용하고
 detach하므로 gradient는 path에만 간다. 계수와 관련 손잡이는
 `CARRY_PLANNER_ANALYTIC_COLLISION_COEF`(기본 1),
 `CARRY_PLANNER_ANALYTIC_FOCUS_STEPS`(기본 8),

@@ -2,7 +2,9 @@ import unittest
 
 import torch
 
-from carry_planner.analytic_loss import carry_analytic_collision_loss
+from carry_planner.analytic_loss import (
+    _soft_worst_case, carry_analytic_collision_loss,
+)
 from coordinator.schema import CoordinatorState
 
 
@@ -38,6 +40,14 @@ def crossing_path(state):
 
 
 class CarryAnalyticLossTest(unittest.TestCase):
+    def test_soft_worst_case_preserves_value_and_spreads_gradient(self):
+        value = torch.tensor([0.2, 1.0, 0.4], requires_grad=True)
+        result = _soft_worst_case(value)
+        self.assertAlmostEqual(float(result), 1.0, places=6)
+        result.backward()
+        self.assertTrue(bool((value.grad > 0.0).all()))
+        self.assertGreater(float(value.grad[1]), float(value.grad[0]))
+
     def test_collision_gradient_reaches_path_but_not_speed(self):
         state = crossing_state()
         path = crossing_path(state).requires_grad_(True)

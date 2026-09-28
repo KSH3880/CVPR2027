@@ -611,7 +611,6 @@ def main():
                 )
                 reward, invalid_penalty = apply_invalid_plan_penalty(
                     reward, valid, invalid_plan_coef,
-                    max_turn_deg=validity_debug["max_turn_deg"],
                 )
                 diag["invalid_plan_penalty"] = diag.get(
                     "invalid_plan_penalty", 0.0,

@@ -4,18 +4,20 @@
 
 ## 2026-09-28
 
-### Carry graded invalid-plan penalty와 mean/sample 진단 분리
+### Carry direction-free soft timing gradient와 mean/sample 진단 분리
 
-- 거절 plan의 기본 0.25 penalty는 유지하면서 최대 turn이 46도를 넘는 정도에 따라
-  선형으로 증가하고 92도 이상에서 2배로 포화하도록 바꿨다. 거의-valid curve와 심한
-  zigzag가 같은 binary reward를 받던 문제를 줄인다.
+- timing uncertainty의 forward collision loss는 기존 worst case를 그대로 유지하되,
+  backward는 detached-softmax weight로 모든 timing offset의 gradient를 합치도록 바꿨다.
+  정확한 overlap의 무방향 gradient에만 의존하지 않으며 좌/우 passing side는 지정하지 않는다.
+- turn 초과량에 따라 invalid penalty를 최대 2배로 키우던 변경은 직선 선호를 강화하므로
+  철회했다. hard gate의 모든 거절은 다시 원인과 무관하게 기본 0.25만 감점한다.
 - sampled proposal과 deterministic mean path의 valid/curve fraction 및 평균 최대 turn을
   별도로 기록한다. 콘솔에서는 suffix에서 항상 0인 replan displacement를 제거하고 두
   path의 curve·turn·deviation과 현재 exploration std를 직접 비교한다.
 - 독립 sparse-point exploration 기본 std를 0.25에서 0.10으로 낮춰 4m leg의 초기 샘플
   변위 규모를 약 1m에서 0.4m로 줄였다. 출력 자유도와 환경변수 override는 유지한다.
-- graded penalty 경계값과 mean dynamic-box metadata 회귀를 포함해 Carry 27개, 공용
-  stack planner 49개 테스트를 통과했다.
+- worst-case forward 값 보존, 전체 timing gradient, mean dynamic-box metadata를 포함해
+  Carry 회귀 테스트를 추가했다.
 
 ### Carry current-root remaining-suffix replanner
 
