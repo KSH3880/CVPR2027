@@ -79,9 +79,14 @@ def carry_analytic_collision_loss(
     # the easier speed-only escape route.
     detached_speed = speed.detach()
     dwell = speed.new_zeros(path.shape[:3])
+    box_index = output.get("box_index") if suffix_replan else None
+    if suffix_replan and (
+        box_index is None or box_index.shape != path.shape[:3]
+    ):
+        raise ValueError("suffix analytic loss requires box_index [B,C,A]")
     points, arrival = _arrival_times(
         future_path, detached_speed, dwell, state=state,
-        measured_executor_timing=True,
+        measured_executor_timing=True, pickup_index=box_index,
     )
     duration = arrival[..., -1]
     tmax = duration.amax(dim=-1)
@@ -99,11 +104,8 @@ def carry_analytic_collision_loss(
     hb01_limit = 0.35 + box_radius[:, 1, None, None]
     hb10_limit = 0.35 + box_radius[:, 0, None, None]
     if suffix_replan:
-        box_index = output.get("box_index")
-        if box_index is None or box_index.shape != arrival.shape[:-1]:
-            raise ValueError("suffix analytic loss requires box_index [B,C,A]")
         pickup_time = arrival.gather(
-            -1, box_index.clamp(0, path.shape[-2] - 1)[..., None],
+            -1, (box_index + 1).clamp(0, path.shape[-2])[..., None],
         ).squeeze(-1)
     else:
         pickup_time = arrival[..., 17]

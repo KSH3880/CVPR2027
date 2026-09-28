@@ -140,21 +140,58 @@ def _arrival_times(
     *,
     state: CoordinatorState | None = None,
     measured_executor_timing: bool = False,
+    pickup_index: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     ds = (path[..., 1:, :] - path[..., :-1, :]).norm(dim=-1)
     avg_speed = 0.5 * (speed[..., 1:] + speed[..., :-1]).clamp(min=1e-4)
+    if pickup_index is not None:
+        if pickup_index.shape != path.shape[:3]:
+            raise ValueError("pickup_index must be [B,C,A]")
+        if pickup_index.is_floating_point() or pickup_index.dtype == torch.bool:
+            raise TypeError("pickup_index must have an integer dtype")
+        if ((pickup_index < -1) | (pickup_index >= path.shape[-2])).any():
+            raise ValueError("pickup_index is outside the path")
     if measured_executor_timing:
         if state is None:
             raise ValueError("state is required for measured executor timing")
-        approach = _piecewise_actual_speed(
-            avg_speed[..., :16], MS18_TIMING_APPROACH_SPEEDS
-        )
-        carry = _piecewise_actual_speed(
-            avg_speed[..., 16:], MS18_TIMING_CARRY_SPEEDS
-        )
-        avg_speed = torch.cat((approach, carry), dim=-1)
+        if pickup_index is None:
+            approach = _piecewise_actual_speed(
+                avg_speed[..., :16], MS18_TIMING_APPROACH_SPEEDS
+            )
+            carry = _piecewise_actual_speed(
+                avg_speed[..., 16:], MS18_TIMING_CARRY_SPEEDS
+            )
+            avg_speed = torch.cat((approach, carry), dim=-1)
+        else:
+            segment_index = torch.arange(
+                avg_speed.shape[-1], device=path.device,
+            )
+            approach = _piecewise_actual_speed(
+                avg_speed, MS18_TIMING_APPROACH_SPEEDS,
+            )
+            carry = _piecewise_actual_speed(
+                avg_speed, MS18_TIMING_CARRY_SPEEDS,
+            )
+            avg_speed = torch.where(
+                segment_index < pickup_index[..., None], approach, carry,
+            )
         dwell = _measured_pickup_dwell(state, path.shape[1])
     base = torch.cat((torch.zeros_like(ds[..., :1]), (ds / avg_speed).cumsum(dim=-1)), dim=-1)
+    if pickup_index is not None:
+        # Every agent may reach its box at a different waypoint. The extra
+        # sample represents the pickup dwell at that agent's own box index.
+        time_index = torch.arange(
+            path.shape[-2] + 1, device=path.device,
+        )
+        after_pickup = time_index > pickup_index[..., None]
+        path_index = torch.where(
+            after_pickup, time_index - 1, time_index,
+        ).clamp(0, path.shape[-2] - 1)
+        times = base.gather(-1, path_index) + dwell[..., None] * after_pickup
+        points = path.gather(
+            -2, path_index[..., None].expand(*path_index.shape, 2),
+        )
+        return points, times
     # Insert a duplicate box waypoint at the end of the pickup dwell. This
     # represents waiting in time without asking ms18 for an unseen zero-speed gait.
     before = base[..., :17]

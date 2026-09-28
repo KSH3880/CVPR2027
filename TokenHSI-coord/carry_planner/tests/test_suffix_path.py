@@ -5,6 +5,11 @@ import torch
 from carry_planner.analytic_loss import carry_analytic_collision_loss
 from carry_planner.regularization import carry_path_regularization
 from carry_planner.validity_debug import carry_plan_validity_debug
+from coordinator.executor_calibration import (
+    MS18_TIMING_APPROACH_SPEEDS, MS18_TIMING_CARRY_SPEEDS,
+    MS18_TIMING_PICKUP_DWELL_S,
+)
+from coordinator.planner import _arrival_times
 from coordinator.tests.common import make_state
 from stack_planner.history import StackHistoryBuffer
 from stack_planner.model import StackPlannerConfig, StackTrajectoryPlanner
@@ -42,6 +47,70 @@ class CarrySuffixPathTest(unittest.TestCase):
         ))
         self.assertTrue(torch.allclose(path[..., 0, :], state.root_xy, atol=1e-5))
         self.assertTrue(torch.allclose(path[..., -1, :], state.goal_xy, atol=1e-5))
+
+    def test_dynamic_pickup_timing_uses_each_agents_actual_box_index(self):
+        state = make_state(batch=1)
+        state.root_xy[:] = torch.tensor([[[0.0, 0.0], [0.0, 1.0]]])
+        state.box_xyz[..., :2] = torch.tensor([[[8.0, 0.0], [2.0, 1.0]]])
+        state.goal_xy[:] = torch.tensor([[[9.0, 0.0], [8.0, 1.0]]])
+        output = suffix_model()(state)
+        path = output["path_world"]
+        index = output["box_index"]
+        speed = torch.full_like(output["speed"], 1.5)
+        points, arrival = _arrival_times(
+            path, speed, torch.zeros_like(index, dtype=path.dtype),
+            state=state, measured_executor_timing=True,
+            pickup_index=index,
+        )
+        for agent in range(2):
+            box_index = int(index[0, 0, agent])
+            route = path[0, 0, agent]
+            segment = (route[1:] - route[:-1]).norm(dim=-1)
+            before = segment[:box_index].sum()
+            after = segment[box_index:].sum()
+            self.assertTrue(torch.allclose(
+                arrival[0, 0, agent, box_index],
+                before / MS18_TIMING_APPROACH_SPEEDS[-1],
+                atol=1e-5,
+            ))
+            self.assertTrue(torch.allclose(
+                arrival[0, 0, agent, box_index + 1]
+                - arrival[0, 0, agent, box_index],
+                torch.tensor(MS18_TIMING_PICKUP_DWELL_S),
+                atol=1e-5,
+            ))
+            self.assertTrue(torch.allclose(
+                arrival[0, 0, agent, -1]
+                - arrival[0, 0, agent, box_index + 1],
+                after / MS18_TIMING_CARRY_SPEEDS[-1],
+                atol=1e-5,
+            ))
+            self.assertTrue(torch.allclose(
+                points[0, 0, agent, box_index],
+                state.box_xyz[0, agent, :2],
+                atol=1e-5,
+            ))
+            self.assertTrue(torch.allclose(
+                points[0, 0, agent, box_index + 1],
+                state.box_xyz[0, agent, :2],
+                atol=1e-5,
+            ))
+
+    def test_held_suffix_uses_carry_timing_from_first_segment(self):
+        state = make_state(batch=1, held=True)
+        output = suffix_model()(state)
+        path = output["path_world"]
+        speed = torch.full_like(output["speed"], 1.5)
+        _, arrival = _arrival_times(
+            path, speed, torch.zeros_like(output["box_index"], dtype=path.dtype),
+            state=state, measured_executor_timing=True,
+            pickup_index=output["box_index"],
+        )
+        length = (path[..., 1:, :] - path[..., :-1, :]).norm(dim=-1).sum(-1)
+        self.assertTrue(torch.allclose(
+            arrival[..., -1], length / MS18_TIMING_CARRY_SPEEDS[-1],
+            atol=1e-5,
+        ))
 
     def test_held_agent_generates_only_current_to_goal_suffix(self):
         state = make_state(batch=1)
