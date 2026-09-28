@@ -4,6 +4,7 @@ import torch
 
 from tokenhsi.utils.steer_stop import (
     blend_goal_to_anchor,
+    command_speed_reward,
     contract_to_anchor,
     cosine_transition,
     stop_aware_speed_reward,
@@ -47,6 +48,34 @@ class SteerStopCommandTest(unittest.TestCase):
         velocity = torch.zeros(2, 2)
         reward = stop_aware_speed_reward(command, progress, velocity)
         torch.testing.assert_close(reward, torch.tensor([1.0, 0.0]))
+
+    def test_dense_overspeed_tail_preserves_exact_tracking_peak(self):
+        command = torch.tensor([0.375, 0.375, 0.375])
+        progress = torch.tensor([0.375, 1.0, 1.2])
+        velocity = torch.stack((progress, torch.zeros_like(progress)), dim=-1)
+        reward = command_speed_reward(
+            command, progress, velocity,
+            overspeed_weight=1.0,
+            overspeed_tolerance=0.05,
+            overspeed_beta=0.2,
+        )
+        self.assertEqual(reward[0].item(), 1.0)
+        self.assertGreater(reward[0].item(), reward[1].item())
+        self.assertGreater(reward[1].item(), reward[2].item())
+
+    def test_direct_stop_penalizes_physical_speed_symmetrically(self):
+        command = torch.zeros(3)
+        progress = torch.zeros(3)
+        velocity = torch.tensor([[0.0, 0.0], [0.8, 0.0], [-0.8, 0.0]])
+        reward = command_speed_reward(
+            command, progress, velocity,
+            overspeed_weight=1.0,
+            overspeed_tolerance=0.05,
+            overspeed_beta=0.2,
+        )
+        self.assertEqual(reward[0].item(), 1.0)
+        self.assertLess(reward[1].item(), 0.0)
+        torch.testing.assert_close(reward[1], reward[2])
 
     def test_goal_blends_smoothly_to_the_stop_anchor(self):
         final_goal = torch.tensor([[4.0, 2.0, 9.0], [4.0, 2.0, 9.0]])

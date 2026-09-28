@@ -23,8 +23,10 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import (
 from tokenhsi.utils import steer_path as sp
 from tokenhsi.utils.steer_stop import (
     blend_goal_to_anchor,
+    command_speed_reward,
     contract_to_anchor,
     cosine_transition,
+    positive_smooth_l1,
 )
 from utils import torch_utils
 
@@ -48,10 +50,13 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
         self.stop_post_box = _f("MS_STOP_POST_BOX", 0.8)
         self.stop_brake_dist = _f("MS_STOP_BRAKE_DIST", 0.6)
         self.stop_reward_w = _f("MS_STOP_REWARD_W", 1.0)
+        self.stop_direct_speed = int(os.environ.get("MS_STOP_DIRECT_SPEED", "0"))
         self.stop_anchor_goal = int(os.environ.get("MS_STOP_ANCHOR_GOAL", "0"))
         self.stop_tb = int(os.environ.get("MS_STOP_TB", "0"))
         if self.stop_anchor_goal not in (0, 1):
             raise ValueError("MS_STOP_ANCHOR_GOAL must be 0 or 1")
+        if self.stop_direct_speed not in (0, 1):
+            raise ValueError("MS_STOP_DIRECT_SPEED must be 0 or 1")
         if self.stop_tb not in (0, 1):
             raise ValueError("MS_STOP_TB must be 0 or 1")
         if not 0.0 <= self.stop_prob <= 1.0:
@@ -205,9 +210,16 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
         )
         if start.any():
             rr = rows[start]
-            self._stop_phase[rr] = self.BRAKE
             self._stop_start_step[rr] = step[start]
             self._stop_root_height[rr] = roots[rr, 2]
+            if self.stop_direct_speed:
+                self._stop_phase[rr] = self.HOLD
+                self._stop_blend[rr] = 1.0
+                hand_fwd, hand_z = self._hand_pose_local(rr)
+                self._stop_hand_ref_fwd[rr] = hand_fwd
+                self._stop_hand_ref_z[rr] = hand_z
+            else:
+                self._stop_phase[rr] = self.BRAKE
 
         phase = self._stop_phase[rows]
         brake = phase == self.BRAKE
@@ -228,12 +240,17 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
         hold_mask = phase == self.HOLD
         if hold_mask.any():
             rr = rows[hold_mask]
-            elapsed = step[hold_mask] - self._stop_start_step[rr] - self.stop_brake_steps
+            lead_steps = 0 if self.stop_direct_speed else self.stop_brake_steps
+            elapsed = step[hold_mask] - self._stop_start_step[rr] - lead_steps
             done = elapsed >= self._stop_hold_steps[rr]
             if done.any():
                 rd = rr[done]
-                self._stop_phase[rd] = self.RESUME
-                self._stop_start_step[rd] = step[hold_mask][done]
+                if self.stop_direct_speed:
+                    self._stop_phase[rd] = self.DONE
+                    self._stop_blend[rd] = 0.0
+                else:
+                    self._stop_phase[rd] = self.RESUME
+                    self._stop_start_step[rd] = step[hold_mask][done]
 
         phase = self._stop_phase[rows]
         resume = phase == self.RESUME
@@ -359,6 +376,8 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
             "height_error": height_err,
             "hand_error": hand_err,
             "held": held,
+            "root_velocity_xy": h[:, 7:9],
+            "box_velocity_xy": b[:, 7:9],
             "root_linear_score": root_linear_score,
             "root_linear_term": root_linear_term,
             "root_angular_term": root_angular_term,
@@ -372,6 +391,8 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
 
     def _compute_reward(self, actions):
         super()._compute_reward(actions)
+        if self.stop_direct_speed:
+            return
         blend = self._stop_blend
         active = blend > 0
         if not active.any():
@@ -402,12 +423,52 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
             emit(prefix, "anchor_error", terms["anchor_error"], mask)
             emit(prefix, "height_error", terms["height_error"], mask)
             emit(prefix, "task_reward", self.rew_buf[rows], mask)
-            emit(
-                prefix, "stop_bonus",
-                self.stop_reward_w * self._stop_blend[rows] * quality, mask,
-            )
-            for name in common_terms:
-                emit(prefix, f"term/{name[:-5]}", terms[name], mask)
+            if self.stop_direct_speed:
+                zeros = torch.zeros_like(quality)
+                gain = 4.0 if prefix == "solo" else self.steer_vel_k
+                root_net = command_speed_reward(
+                    zeros, zeros, terms["root_velocity_xy"], gain=gain,
+                    overspeed_weight=self.speed_over_w,
+                    overspeed_tolerance=self.speed_over_tol,
+                    overspeed_beta=self.speed_over_beta,
+                )
+                root_over = positive_smooth_l1(
+                    (terms["root_speed"] - self.speed_over_tol).clamp(min=0.0),
+                    self.speed_over_beta,
+                )
+                emit(prefix, "stop_bonus", zeros, mask)
+                emit(prefix, "speed/root_net", root_net, mask)
+                emit(prefix, "speed/root_overspeed_penalty", root_over, mask)
+                emit(
+                    prefix, "speed/root_task_term",
+                    0.4 * self.steer_vel_w * root_net, mask,
+                )
+                if prefix == "carry":
+                    box_net = command_speed_reward(
+                        zeros, zeros, terms["box_velocity_xy"],
+                        gain=self.steer_vel_k,
+                        overspeed_weight=self.speed_over_w,
+                        overspeed_tolerance=self.speed_over_tol,
+                        overspeed_beta=self.speed_over_beta,
+                    )
+                    box_planar = terms["box_velocity_xy"].norm(dim=-1)
+                    box_over = positive_smooth_l1(
+                        (box_planar - self.speed_over_tol).clamp(min=0.0),
+                        self.speed_over_beta,
+                    )
+                    emit(prefix, "speed/box_net", box_net, mask)
+                    emit(prefix, "speed/box_overspeed_penalty", box_over, mask)
+                    emit(
+                        prefix, "speed/box_task_term",
+                        0.4 * self.steer_vel_w * box_net, mask,
+                    )
+            else:
+                emit(
+                    prefix, "stop_bonus",
+                    self.stop_reward_w * self._stop_blend[rows] * quality, mask,
+                )
+                for name in common_terms:
+                    emit(prefix, f"term/{name[:-5]}", terms[name], mask)
             stable = (
                 (terms["root_speed"] < 0.1)
                 & (terms["root_angular_speed"] < 0.5)
@@ -415,18 +476,20 @@ class HumanoidMACarrySteerStopMix(HumanoidMACarrySteerMix):
                 & (terms["height_error"] < 0.1)
             )
             if prefix == "solo":
-                emit(
-                    prefix, "base_stop_reward",
-                    0.4 * self.steer_vel_w * terms["root_linear_score"], mask,
-                )
+                if not self.stop_direct_speed:
+                    emit(
+                        prefix, "base_stop_reward",
+                        0.4 * self.steer_vel_w * terms["root_linear_score"], mask,
+                    )
             else:
                 emit(prefix, "box_speed", terms["box_speed"], mask)
                 emit(prefix, "box_angular_speed", terms["box_angular_speed"], mask)
                 emit(prefix, "hand_error", terms["hand_error"], mask)
                 emit(prefix, "held_rate", terms["held"], mask)
-                emit(prefix, "term/box_linear", terms["box_linear_term"], mask)
-                emit(prefix, "term/box_angular", terms["box_angular_term"], mask)
-                emit(prefix, "term/hand", terms["hand_term"], mask)
+                if not self.stop_direct_speed:
+                    emit(prefix, "term/box_linear", terms["box_linear_term"], mask)
+                    emit(prefix, "term/box_angular", terms["box_angular_term"], mask)
+                    emit(prefix, "term/hand", terms["hand_term"], mask)
                 stable = (
                     stable
                     & (terms["box_speed"] < 0.1)

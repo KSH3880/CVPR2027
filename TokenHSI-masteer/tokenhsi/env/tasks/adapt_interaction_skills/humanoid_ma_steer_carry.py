@@ -28,6 +28,7 @@ from env.tasks.adapt_interaction_skills.humanoid_ma_carry import (
     HumanoidMACarry, CARRY_LO, CARRY_HI, TEAMMATE_DIM,
 )
 from tokenhsi.utils import steer_path as sp
+from tokenhsi.utils.steer_stop import command_speed_reward, positive_smooth_l1
 from isaacgym.torch_utils import *
 
 
@@ -127,6 +128,14 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         # exp(-k*dv^2) 의 k. 기본 5 면 sigma=0.32 m/s 라, 명령 1.5 에 실제 0.58 이면
         # 2.9 sigma 밖이고 보상이 0.0145 -- 올라갈 언덕이 안 느껴지는 평지다.
         self.steer_vel_k = _f("MS_VEL_K", 5.0)
+        self.speed_over_w = _f("MS_SPEED_OVER_W", 0.0)
+        self.speed_over_tol = _f("MS_SPEED_OVER_TOL", 0.05)
+        self.speed_over_beta = _f("MS_SPEED_OVER_BETA", 0.2)
+        self.speed_tb = int(os.environ.get("MS_SPEED_TB", "0"))
+        if min(self.speed_over_w, self.speed_over_tol) < 0 or self.speed_over_beta <= 0:
+            raise ValueError("invalid MS_SPEED_OVER_W/TOL/BETA")
+        if self.speed_tb not in (0, 1):
+            raise ValueError("MS_SPEED_TB must be 0 or 1")
         # 목표 도달 뒤에도 창은 계속 전진을 명령하는데 정답은 정지다 (maxIETSteps=60).
         # 매 성공 에피소드마다 "명령을 무시하라" 를 60 스텝씩 가르치는 셈이라,
         # 경로 끝 이후의 M 을 0(=정지 명령)으로 만드는 대조군을 둔다.
@@ -555,14 +564,18 @@ class HumanoidMASteerCarry(HumanoidMACarry):
 
         def vel_term(vel_xy, direction, pin, v_tar):
             along = (direction * vel_xy).sum(dim=-1)
-            r = torch.exp(-self.steer_vel_k * (v_tar - along) ** 2)
-            r = torch.where(along <= 0, torch.zeros_like(r), r)
-            # v_tar=0 이면 along-track 투영이 의미를 잃는다. "아무 방향으로도
-            # 움직이지 마라" 가 곧 정지다.
-            stopped = v_tar < 0.05
-            r = torch.where(stopped,
-                            torch.exp(-self.steer_vel_k * vel_xy.pow(2).sum(dim=-1)), r)
-            return torch.where(pin, torch.ones_like(r), r)
+            r = command_speed_reward(
+                v_tar, along, vel_xy,
+                gain=self.steer_vel_k,
+                overspeed_weight=self.speed_over_w,
+                overspeed_tolerance=self.speed_over_tol,
+                overspeed_beta=self.speed_over_beta,
+            )
+            # Native carry pins the walk term once the humanoid reaches the
+            # box.  Keep that replay behavior, except for an opt-in zero-speed
+            # command: direct stop must still penalize root motion while held.
+            pinned = pin & ~((v_tar < 0.05) & (self.speed_over_w > 0.0))
+            return torch.where(pinned, torch.ones_like(r), r)
 
         def latpen(lat, pin):
             r = torch.exp(-0.5 * lat ** 2) - 1.0
@@ -619,6 +632,67 @@ class HumanoidMASteerCarry(HumanoidMACarry):
         arc0 = self._arc_root
         v_real0 = ((arc0 - self._prev_arc) / self.dt).clamp(min=0.0)
         v_cmd0 = self._m_at(arc0) / 1.6
+        if self.speed_tb:
+            nan = torch.full_like(v_cmd0, float("nan"))
+            roots = self.humanoid_rows(self._humanoid_root_states)
+            stopped = v_cmd0 < 0.05
+            root_actual = torch.where(
+                stopped, roots[:, 7:9].norm(dim=-1), v_real0,
+            )
+            root_over = positive_smooth_l1(
+                (root_actual - v_cmd0 - self.speed_over_tol).clamp(min=0.0),
+                self.speed_over_beta,
+            )
+            solo = getattr(
+                self, "_solo_rows",
+                torch.zeros_like(stopped, dtype=torch.bool),
+            )
+
+            def emit(prefix, name, value, mask):
+                self.extras[f"tb/speed/{prefix}/{name}"] = torch.where(mask, value, nan)
+
+            for prefix, scenario in (("solo", solo), ("carry", ~solo)):
+                emit(prefix, "command", v_cmd0, scenario)
+                emit(prefix, "root_actual", root_actual, scenario)
+                emit(prefix, "root_abs_error", (root_actual - v_cmd0).abs(), scenario)
+                emit(prefix, "root_overspeed_penalty", root_over, scenario)
+                emit(prefix, "stop_root_actual", root_actual, scenario & stopped)
+                for label, target in (
+                    ("0375", 0.375), ("0750", 0.750),
+                    ("1125", 1.125), ("1500", 1.500),
+                ):
+                    mask = scenario & ~stopped & ((v_cmd0 - target).abs() < 0.1)
+                    emit(prefix, f"v{label}_root_actual", root_actual, mask)
+
+            boxes = self.humanoid_rows(self._box_states)
+            box_vel = (boxes[:, :3] - self._prev_box_pos) / self.dt
+            m_box = self._m_at(self._arc_box)
+            v_cmd_box = m_box / 1.6
+            look_box = m_box * 0.5
+            u_box = torch.nn.functional.normalize(
+                self._aim_pt(self._arc_box, look_box) - boxes[:, :2], dim=-1,
+            )
+            box_along = (u_box * box_vel[:, :2]).sum(dim=-1).clamp(min=0.0)
+            box_stopped = v_cmd_box < 0.05
+            box_actual = torch.where(
+                box_stopped, box_vel[:, :2].norm(dim=-1), box_along,
+            )
+            box_over = positive_smooth_l1(
+                (box_actual - v_cmd_box - self.speed_over_tol).clamp(min=0.0),
+                self.speed_over_beta,
+            )
+            carry = ~solo
+            emit("carry", "box_command", v_cmd_box, carry)
+            emit("carry", "box_actual", box_actual, carry)
+            emit("carry", "box_abs_error", (box_actual - v_cmd_box).abs(), carry)
+            emit("carry", "box_overspeed_penalty", box_over, carry)
+            emit("carry", "stop_box_actual", box_actual, carry & box_stopped)
+            for label, target in (
+                ("0375", 0.375), ("0750", 0.750),
+                ("1125", 1.125), ("1500", 1.500),
+            ):
+                mask = carry & ~box_stopped & ((v_cmd_box - target).abs() < 0.1)
+                emit("carry", f"v{label}_box_actual", box_actual, mask)
         self._ep_latr += self._lat_root.abs()
         self._ep_latb += self._lat_box.abs()
         self._ep_spd += (v_real0 - v_cmd0).abs()

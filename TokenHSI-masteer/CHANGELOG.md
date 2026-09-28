@@ -2,6 +2,24 @@
 
 ## 2026-09-28
 
+### MS84 direct-speed stop 및 dense overspeed shaping
+
+- 기존 MS82/MS83 replay는 기본값으로 보존하고, `MS_STOP_DIRECT_SPEED=1`에서만
+  cosine BRAKE/RESUME 없이 steering window를 즉시 `M->0`, HOLD 종료 때 즉시
+  `0->M`으로 바꾼다. 재출발 타이머 외의 단계별 stop controller는 사용하지 않는다.
+- direct 모드에서는 additive anchor/height/upright/hand/box stop quality를 reward에
+  더하지 않는다. 기존 SOLO/CARRY 속도 추종 peak는 유지하고
+  `MS_SPEED_OVER_W/TOL/BETA`의 positive smooth-L1 overspeed penalty를 추가해 큰 저속
+  명령 오차에서도 보상 차이가 남게 했다. 새 shaping의 `M=0`에서는 carry pickup의
+  root-speed pin도 해제해 box뿐 아니라 humanoid 이동도 직접 감점한다. 기본 weight 0은
+  과거 replay와 수치적으로 같다.
+- `train_ms84_direct_speed_local.sh`는 MS18 epoch 12000에서 steering tokenizer만
+  fine-tune하며 task/AMP 0.5:0.5, `MS_VEL_W=1`을 유지한다. 새 노브는 학습 sidecar에
+  저장되며 direct HOLD의 root/box net speed reward와 overspeed penalty를 TensorBoard에
+  기록한다. `MS_SPEED_TB=1`은 정지뿐 아니라 0.375/0.75/1.125/1.5 m/s별 solo root와
+  carry root/box 실제 속도·오차를 함께 기록한다.
+- 관련 Python compile, shell syntax, `tests.test_steer_stop` 8개를 통과했다.
+
 ### Stopmix 정지·경로·box-free 손동작 평가 복구
 
 - `HumanoidMACarrySteerMix._metric_extra_cols()`의 누락된 반환을 복구해 MS18/MS83

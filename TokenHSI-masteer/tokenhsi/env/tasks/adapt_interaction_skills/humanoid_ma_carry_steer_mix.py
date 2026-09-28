@@ -10,7 +10,7 @@ from isaacgym.torch_utils import quat_rotate
 from env.tasks.adapt_interaction_skills.humanoid_ma_carry import CARRY_HI, CARRY_LO, TEAMMATE_DIM
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
 from tokenhsi.utils import steer_path as sp
-from tokenhsi.utils.steer_stop import stop_aware_speed_reward
+from tokenhsi.utils.steer_stop import command_speed_reward
 from utils import torch_utils
 
 
@@ -142,8 +142,11 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
         moving = remaining > 0.4
         if self._stop_fix_solo_reward:
             stopped_command = command < 0.05
-            speed_reward = stop_aware_speed_reward(
-                command, speed, roots[:, 7:9], gain=4.0
+            speed_reward = command_speed_reward(
+                command, speed, roots[:, 7:9], gain=4.0,
+                overspeed_weight=self.speed_over_w,
+                overspeed_tolerance=self.speed_over_tol,
+                overspeed_beta=self.speed_over_beta,
             )
         else:
             stopped_command = torch.zeros_like(command, dtype=torch.bool)
