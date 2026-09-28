@@ -2,6 +2,7 @@
 import torch
 from utils.edge_context_spec import HOLDING, AT
 from utils.edge_ontop_spec import ON_TOP, batched, select_graph, graph_packet
+from utils.edge_stage1_spec import CURRICULUM_VARIANT
 from env.tasks.multi_agent.edge_context_reward import EdgeContextRuntime, edge_context
 
 
@@ -11,6 +12,18 @@ def vertical_extent(quaternion, half_size):
     x,y,z,w = q.unbind(-1)
     row = torch.stack([2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y)], -1)
     return (row.abs() * half_size).sum(-1)
+
+
+def inner_xy_region_error(point_xy, support, support_size, margin_fraction):
+    q = support[..., 3:7]
+    q = q / q.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    x, y, z, w = q.unbind(-1)
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+    dx, dy = (point_xy - support[..., :2]).unbind(-1)
+    local = torch.stack((torch.cos(yaw) * dx + torch.sin(yaw) * dy,
+                         -torch.sin(yaw) * dx + torch.cos(yaw) * dy), -1)
+    half_width = support_size[..., :2] * (0.5 - margin_fraction)
+    return (local.abs() - half_width).clamp_min(0).norm(dim=-1)
 
 
 def ontop_geometry(source, support, source_size, support_size):
@@ -50,6 +63,10 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     xy=progress_delta[...,:2].norm(dim=-1)
     phi=torch.exp(-10*delta.square().sum(-1))*valid
     p=config['progress'];progress=1/(1+(xy-p['delta']).clamp_min(0)/p['sigma'])
+    if config.get('stage1_variant') == CURRICULUM_VARIANT:
+        max_distance = config['hard_skill_training']['progress']['max_distance']
+        linear = (1 - (xy - p['delta']).clamp_min(0) / max_distance).clamp_min(0)
+        progress = torch.where((at | top) & valid, linear, progress)
     diag['target']=torch.where(hold[...,None],dst_box[...,:3],torch.where(at[...,None],goal,diag['target']))
     for key in ('signed_gap','source_bottom_z','support_top_z','source_extent','support_extent'):
         diag[key]=diag[key]*top*valid
@@ -58,6 +75,10 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     diag['relative_speed']=(src_box[...,7:10]-dst_box[...,7:10]).norm(dim=-1)*top
     diag['source_tilt']=torch.acos((1-2*(src_box[...,3].square()+src_box[...,4].square())).clamp(-1,1))*top
     diag['support_tilt']=torch.acos((1-2*(dst_box[...,3].square()+dst_box[...,4].square())).clamp(-1,1))*top
+    if 'success_inner_margin_fraction' in config.get('ontop', {}):
+        diag['region_error'] = inner_xy_region_error(
+            src_box[..., :2], dst_box, dst_size,
+            config['ontop']['success_inner_margin_fraction']) * top
     return phi,diag
 
 

@@ -86,7 +86,7 @@ def load_cfg(args):
 
     graph_path = getattr(args, 'relation_graph', '')
     if graph_path:
-        if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1', 'state_relation_edge_interaction_v1', 'state_relation_edge_stage1_v1'):
+        if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1', 'state_relation_edge_interaction_v1', 'state_relation_edge_stage1_v1', 'state_relation_edge_stage2_v1'):
             raise ValueError('--relation_graph is an edge-context evaluation override only')
         with open(graph_path) as f:
             cfg['env']['relationGraph'] = yaml.safe_load(f)

@@ -9,6 +9,7 @@ from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, SIT, CLIMB, va
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, STAGE1_PACKET_FIELDS,
     STAGE1_SEMANTIC_FIELDS,
     validate_stage1_context_config)
+from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE, validate_stage2_config
 
 LEGACY_MODE = 'legacy_tokenhsi'
 STATE_MODE = 'state_relation_v0'
@@ -56,6 +57,9 @@ def build_state_relation_matrix(num_agents, num_objects, device=None):
 
 def validate_relation_config(config):
     mode = config.get('mode', LEGACY_MODE)
+    if mode == STAGE2_CONTEXT_MODE:
+        validate_stage2_config(config)
+        return
     if mode == STAGE1_CONTEXT_MODE:
         validate_stage1_context_config(config)
         return
@@ -194,10 +198,10 @@ def validate_relation_config(config):
 
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
-    if mode == STAGE1_CONTEXT_MODE:
-        if config['schema_version'] in (7, 8, 9):
+    if mode in (STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
+        if config['schema_version'] in (7, 8, 9, 10):
             taxonomy = {'holding': 6, 'at': 7, 'ontop': 8, 'sit': SIT}
-            if config['schema_version'] in (7, 9):
+            if config['schema_version'] in (7, 9, 10):
                 taxonomy['climb'] = CLIMB
             return {'reward_mode': mode, 'schema_version': config['schema_version'],
                     'relation_taxonomy': taxonomy,
@@ -254,12 +258,12 @@ def check_checkpoint_metadata(weights, expected):
         if saved.get(key) != expected[key]:
             raise ValueError('Checkpoint relation schema mismatch: ' + key)
     if expected['reward_mode'] in (CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
-                                   STAGE1_CONTEXT_MODE):
+                                   STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
         for key in ('context_dim_per_edge', 'context_fusion'):
             if saved.get(key) != expected[key]:
                 raise ValueError('Checkpoint context architecture mismatch: ' + key)
     if expected['reward_mode'] in (ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
-                                   STAGE1_CONTEXT_MODE):
+                                   STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
         for key in ('packet_version', 'graph_record_width'):
             if saved.get(key) != expected[key]:
                 raise ValueError('Checkpoint graph packet mismatch: ' + key)
@@ -267,5 +271,6 @@ def check_checkpoint_metadata(weights, expected):
     def objective(c):
         return {k: v for k, v in c.items() if k != 'diagnostics'}
     if expected['reward_mode'] in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE,
-                                   INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE) and objective(saved.get('relation_reward_config', {})) != objective(expected['relation_reward_config']):
+                                   INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE,
+                                   STAGE2_CONTEXT_MODE) and objective(saved.get('relation_reward_config', {})) != objective(expected['relation_reward_config']):
         raise ValueError('Checkpoint relation reward config differs (diagnostics-only overrides allowed)')

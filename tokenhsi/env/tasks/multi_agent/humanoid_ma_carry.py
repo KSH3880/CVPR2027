@@ -45,10 +45,12 @@ from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_inter
     PRESETS as INTERACTION_PRESETS, SIT, CLIMB)
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     PRESETS as STAGE1_PRESETS, ground_standalone_interaction_targets,
-    max_stage1_stack_height, PRIMITIVE_SAMPLER, semantic_packet_size)
-from utils.edge_scenario_spec import (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER,
+    max_stage1_stack_height, PRIMITIVE_SAMPLER, semantic_packet_size,
+    SIT_PLANE_VARIANTS, CURRICULUM_VARIANTS, mix_late_climb_rsi_times)
+from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER,
     PRESETS as SCENARIO_PRESETS, classify_templates, agent_object_indices,
     agent_goal_indices, scenario_templates)
+from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE, STAGE2_SAMPLER, STAGE2_PRESETS
 from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
 
 
@@ -65,24 +67,29 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._relation_cfg = cfg['env'].get('relationReward', {})
         validate_relation_config(self._relation_cfg)
-        self._edge_stage1 = self._relation_cfg.get('mode') == STAGE1_CONTEXT_MODE
+        self._stage2 = self._relation_cfg.get('mode') == STAGE2_CONTEXT_MODE
+        self._edge_stage1 = self._relation_cfg.get('mode') in (STAGE1_CONTEXT_MODE,
+                                                               STAGE2_CONTEXT_MODE)
         self._edge_interaction = self._relation_cfg.get('mode') in (INTERACTION_CONTEXT_MODE,
-                                                                    STAGE1_CONTEXT_MODE)
+                                                                    STAGE1_CONTEXT_MODE,
+                                                                    STAGE2_CONTEXT_MODE)
         self._edge_ontop = self._relation_cfg.get('mode') in (ONTOP_CONTEXT_MODE,
-            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
         self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE,
-            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE,
+            STAGE2_CONTEXT_MODE)
         sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
         primitive_config = self._edge_stage1 and sampler_name == PRIMITIVE_SAMPLER
-        self._scenario_no_climb = self._edge_stage1 and sampler_name in (
-            SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER)
-        self._scenario_with_climb = sampler_name == SCENARIO_CLIMB_SAMPLER
+        self._scenario_no_climb = self._stage2 or self._edge_stage1 and sampler_name in (
+            INDEPENDENT_CLIMB_SAMPLER, STAGE2_SAMPLER)
+        self._scenario_with_climb = self._stage2 or sampler_name in (
+            INDEPENDENT_CLIMB_SAMPLER, STAGE2_SAMPLER)
         semantic_only_config = bool(cfg['env'].get('relationGraph', {}).get('semantic_only', False))
-        default_preset = ('holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
+        default_preset = ('place_climb' if self._stage2 else 'holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
         train_preset = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
         self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
-        presets = SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
+        presets = STAGE2_PRESETS if self._stage2 else SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
         if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
             raise ValueError('Unknown sampled-edge graph preset or camera mode')
         if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
@@ -94,8 +101,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._relation_graph_spec.get('sampler') == PRIMITIVE_SAMPLER)
         self._semantic_only_stage1 = self._edge_stage1 and bool(
             self._relation_graph_spec.get('semantic_only', False))
-        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9)):
-            raise ValueError('Semantic-only graph and Stage-1 schema 7/8/9 must be paired')
+        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9, 10)):
+            raise ValueError('Semantic-only graph and Stage-1/2 schema 7/8/9/10 must be paired')
         self._relation_rsi = cfg['env'].get('relationRsi')
         self._template_rsi = cfg['env'].get('templateRsi')
         if self._relation_rsi is not None and not self._primitive_stage1:
@@ -107,13 +114,19 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._primitive_stage1 != (self._relation_cfg.get('schema_version') in (6, 7)):
             raise ValueError('Primitive sampler and Stage-1 schema 6/7 must be paired')
         schema = self._relation_cfg.get('schema_version')
-        if self._scenario_no_climb != (schema in (8, 9)) or \
-                self._scenario_with_climb != (schema == 9):
-            raise ValueError('Scenario sampler and Stage-1 schema 8/9 must be paired')
+        if self._scenario_no_climb != (schema in (8, 9, 10)) or \
+                self._scenario_with_climb != (schema in (9, 10)) or \
+                self._stage2 != (schema == 10):
+            raise ValueError('Scenario sampler and Stage-1/2 schema must be paired')
+        if not self._stage2 and (sampler_name == INDEPENDENT_CLIMB_SAMPLER) != (
+                self._relation_cfg.get('stage1_variant') in (
+                    'scenario_independent_with_climb', 'scenario_independent_stage1_plane',
+                    *SIT_PLANE_VARIANTS)):
+            raise ValueError('Independent scenario sampler and reward variant must be paired')
         self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
         self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
             ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
-            STAGE1_CONTEXT_MODE)
+            STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
         if self._ontop_mixed:
             if (cfg['env'].get('numAgents'), cfg['env'].get('numObjects')) != (2, 3):
                 raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
@@ -218,6 +231,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._skill = cfg["env"]["skill"]
         self._skill_init_prob = torch.tensor(cfg["env"]["skillInitProb"], device=self.device, dtype=torch.float)
         self._skill_disc_prob = torch.tensor(cfg["env"]["skillDiscProb"], device=self.device, dtype=torch.float)
+        self._independent_template_rsi = cfg['env'].get('independentTemplateRsi')
+        if (self._relation_cfg.get('stage1_variant') == 'scenario_stage2_sit_plane_self_sum') != \
+                (self._independent_template_rsi is not None):
+            raise ValueError('Stage-2 SIT plane requires independentTemplateRsi')
         if self._relation_rsi is not None:
             from utils.edge_stage1_spec import validate_relation_rsi
             validate_relation_rsi(self._relation_rsi, self._skill)
@@ -231,18 +248,25 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 'HOLDING_AT': {'loco', 'pickUp', 'carryWith', 'putDown'},
                 'HOLDING_ON_TOP': {'loco', 'pickUp', 'carryWith'}}
             templates = scenario_templates(self._relation_graph_spec)
-            if tuple(self._template_rsi) != templates:
-                raise ValueError('templateRsi rows must follow the scenario templates')
-            for name, values in self._template_rsi.items():
-                if len(values) != len(self._skill) or any(isinstance(value, bool) or
-                        not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
-                        for value in values) or abs(sum(values) - 1.) > 1e-8 or any(
-                        value and skill not in expected[name]
-                        for skill, value in zip(self._skill, values)):
-                    raise ValueError('Invalid templateRsi row: ' + name)
+            for rows in (self._template_rsi, self._independent_template_rsi):
+                if rows is None:
+                    continue
+                if tuple(rows) != templates:
+                    raise ValueError('templateRsi rows must follow the scenario templates')
+                for name, values in rows.items():
+                    if len(values) != len(self._skill) or any(isinstance(value, bool) or
+                            not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0
+                            for value in values) or abs(sum(values) - 1.) > 1e-8 or any(
+                            value and skill not in expected[name]
+                            for skill, value in zip(self._skill, values)):
+                        raise ValueError('Invalid templateRsi row: ' + name)
             self._template_rsi_weights = torch.tensor(
                 [self._template_rsi[k] for k in templates], device=self.device,
                 dtype=torch.float)
+            if self._independent_template_rsi is not None:
+                self._independent_template_rsi_weights = torch.tensor(
+                    [self._independent_template_rsi[k] for k in templates],
+                    device=self.device, dtype=torch.float)
 
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
@@ -674,7 +698,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         return
 
     def _update_box_assignment_colors(self, env_ids):
-        """Match assigned boxes to owner colors; render unassigned boxes in grey."""
+        """Color each task object by its agents; shared objects use yellow."""
         rendered_envs = []
         if self.viewer is not None:
             rendered_envs = env_ids.detach().cpu().tolist()
@@ -684,16 +708,26 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             rendered_envs = [0]
 
         unassigned_color = gymapi.Vec3(0.45, 0.45, 0.45)
+        shared_color = gymapi.Vec3(1.0, 0.85, 0.15)
         for env_id in rendered_envs:
             env_ptr = self.envs[env_id]
-            assignment = self._agent_box_assignment[env_id].detach().cpu().tolist()
-            owner_by_box = {physical_box: agent_id
-                            for agent_id, physical_box in enumerate(assignment)}
+            if self._scenario_no_climb:
+                slot_env = torch.full((self.num_agents,), env_id, device=self.device,
+                                      dtype=torch.long)
+                slot_agent = torch.arange(self.num_agents, device=self.device)
+                logical = agent_object_indices(self.relation_runtime.graph, slot_env, slot_agent)
+                assignment = self._logical_box_order[env_id, logical].detach().cpu().tolist()
+            else:
+                assignment = self._agent_box_assignment[env_id].detach().cpu().tolist()
+            owners_by_box = {}
+            for agent_id, physical_box in enumerate(assignment):
+                owners_by_box.setdefault(physical_box, []).append(agent_id)
 
             for physical_box in range(self.num_objects):
                 box_handle = self._box_handles[env_id * self.num_objects + physical_box]
-                agent_id = owner_by_box.get(physical_box)
-                color = unassigned_color if agent_id is None else self._agent_color(agent_id)
+                owners = owners_by_box.get(physical_box, [])
+                color = (shared_color if len(owners) > 1 else
+                         self._agent_color(owners[0]) if owners else unassigned_color)
                 self.gym.set_rigid_body_color(
                     env_ptr, box_handle, 0, gymapi.MESH_VISUAL, color)
         return
@@ -1161,6 +1195,22 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             template = classify_templates(
                 graph, slot_env, slot_agent, self._scenario_with_climb)
             weights = self._template_rsi_weights[template]
+            if self._independent_template_rsi is not None:
+                from utils.edge_stage2_spec import classify_family
+                independent = classify_family(graph)[slot_env] == 0
+                weights = torch.where(independent[:, None],
+                    self._independent_template_rsi_weights[template], weights)
+            if self._stage2:
+                logical = agent_object_indices(graph, slot_env, slot_agent) + self.num_agents
+                held_by_other = (graph.edge_valid[slot_env] &
+                    (graph.edge_relation[slot_env] == 6) &
+                    (graph.edge_dst[slot_env] == logical[:, None]) &
+                    (graph.edge_owner[slot_env] != slot_agent[:, None])).any(-1)
+                support_user = ((template == 1) | (template == 2)) & held_by_other
+                if support_user.any():
+                    weights = weights.clone()
+                    weights[support_user] = 0.
+                    weights[support_user, self._skill.index('loco')] = 1.
             sk_ids = torch.multinomial(weights, 1).flatten()
             logical = agent_object_indices(graph, slot_env, slot_agent)
             advanced = torch.tensor([name != 'loco' for name in self._skill],
@@ -1206,6 +1256,19 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 motion_times = torch.zeros(len(sel), device=self.device)
             else:
                 assert (False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
+
+            if (sk_name == 'climb' and not self._is_eval and
+                    self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS):
+                motion_times = mix_late_climb_rsi_times(
+                    curr_motion_lib, motion_ids, motion_times,
+                    self._relation_cfg['hard_skill_training']['climb_rsi'])
+            elif sk_name == 'climb' and self._independent_template_rsi is not None and not self._is_eval:
+                from utils.edge_stage2_spec import classify_family
+                independent = classify_family(self.relation_runtime.graph)[curr_env] == 0
+                if independent.any():
+                    motion_times[independent] = mix_late_climb_rsi_times(
+                        curr_motion_lib, motion_ids[independent], motion_times[independent],
+                        self._relation_cfg['independent_training']['climb_rsi'])
 
             root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
                 = curr_motion_lib.get_motion_state(motion_ids, motion_times)

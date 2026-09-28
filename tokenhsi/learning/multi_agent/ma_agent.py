@@ -23,6 +23,7 @@ import learning.amp_agent as amp_agent
 import learning.amp_datasets as amp_datasets
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
+from utils.edge_stage1_spec import CURRICULUM_VARIANTS
 from utils.rsi_curriculum import SkillInitCurriculum
 from env.tasks.multi_agent.relation_diagnostics import relation_tensorboard_tag
 
@@ -139,7 +140,49 @@ class MAAgent(amp_agent.AMPAgent):
                 json.dump(report, f, indent=2)
             print('[OnTop transfer] epoch {}, {} tensors copied, {} embeddings extended; no extra freeze'.format(
                 report['source_epoch'], len(report['copied_tensors']), len(report['expanded_embeddings'])), flush=True)
+        self._stage2_policy = getattr(task, '_stage2', False)
+        if self._stage2_policy:
+            from learning.multi_agent.stage2_transfer import (
+                freeze_stage2_encoder, transfer_stage1_weights)
+            self._stage2_checkpoint_info = None
+            if args.resume <= 0 and not (args.test or args.eval):
+                path = task.cfg['experiment']['transfer']['checkpoint']
+                checkpoint = torch.load(path, map_location=self.ppo_device, weights_only=False)
+                report = transfer_stage1_weights(self.model, checkpoint)
+                if not self.normalize_input or 'running_mean_std' not in checkpoint:
+                    raise ValueError('Stage-2 transfer requires Stage-1 actor observation RMS')
+                self.running_mean_std.load_state_dict(checkpoint['running_mean_std'])
+                if self._normalize_amp_input:
+                    self._amp_input_mean_std.load_state_dict(checkpoint['amp_input_mean_std'])
+                report['checkpoint'] = path
+                report['normalizers'] = ['running_mean_std'] + (
+                    ['amp_input_mean_std'] if self._normalize_amp_input else [])
+                report['reward_normalizer'] = 'reset_for_stage2'
+                report['source_config_available'] = 'relation_experiment_config' in checkpoint
+                report['source_commit'] = checkpoint.get('git_commit')
+                self._stage2_checkpoint_info = {
+                    'stage': 2, 'coordination': 'grounded_edge_cross_attention',
+                    'edge_width': 64, 'context_width': 64,
+                    'source_checkpoint': path,
+                    'source_config': checkpoint.get('relation_experiment_config'),
+                    'source_reward_config': checkpoint['relation_metadata']['relation_reward_config'],
+                    'source_experiment': checkpoint.get('relation_experiment_config', {}).get('experiment'),
+                    'source_commit': checkpoint.get('git_commit'),
+                    'freeze': 'actor_encoder_and_actor_observation_rms',
+                    'rsi': 'template_with_shared_interaction_loco',
+                }
+                with open(os.path.join(self.experiment_dir, 'stage2_transfer_report.json'), 'w') as f:
+                    json.dump(report, f, indent=2)
+            freeze_stage2_encoder(self.model, self.optimizer)
+            self.model.a2c_network.actor_encoder.eval()
+            self.running_mean_std.eval()
         return
+
+    def set_train(self):
+        super().set_train()
+        if getattr(self, '_stage2_policy', False):
+            self.model.a2c_network.actor_encoder.eval()
+            self.running_mean_std.eval()
 
     def init_tensors(self):
         super().init_tensors()
@@ -176,14 +219,20 @@ class MAAgent(amp_agent.AMPAgent):
             weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)
         if task._state_relation:
             weights['relation_experiment_config'] = self._relation_experiment_config
+        if getattr(task, '_stage2', False):
+            weights['stage2_checkpoint_info'] = self._stage2_checkpoint_info
         return weights
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
-        if getattr(task, '_edge_context', False):
+        stage2_evaluation = getattr(task, '_stage2', False) and (
+            task.cfg['args'].test or task.cfg['args'].eval)
+        if getattr(task, '_edge_context', False) and not stage2_evaluation:
             from utils.edge_context_spec import check_task_resume
             check_task_resume(weights, task._relation_graph_spec, task.num_agents, task.num_objects)
         check_checkpoint_metadata(weights, checkpoint_metadata(self.vec_env.env.task._relation_cfg))
+        if getattr(task, '_stage2', False) and not stage2_evaluation:
+            self._stage2_checkpoint_info = weights.get('stage2_checkpoint_info')
         return super().set_weights(weights)
 
     def _build_net_config(self):
@@ -370,6 +419,10 @@ class MAAgent(amp_agent.AMPAgent):
         return
 
     def train_epoch(self):
+        task = self.vec_env.env.task
+        if (task._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS or
+                'independent_training' in task._relation_cfg):
+            task._hard_skill_training_step = self.epoch_num * self.horizon_length
         if not self._scene_policy:
             return super().train_epoch()
 

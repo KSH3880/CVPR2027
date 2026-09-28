@@ -136,6 +136,8 @@ from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packe
 from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, compile_interaction_graph
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     semantic_packet_size)
+from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE
+from learning.multi_agent.coordination_head import GroundedEdgeCoordination
 
 
 class EdgeEncoder(nn.Module):
@@ -491,15 +493,17 @@ class RelationEncoder(nn.Module):
         super().__init__()
         if relation_reward_mode not in (LEGACY_MODE, STATE_MODE, ONTOP_MODE, CONTEXT_MODE,
                                         ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
-                                        STAGE1_CONTEXT_MODE):
+                                        STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
             raise ValueError('Unsupported relation reward mode')
-        self.stage1_context = relation_reward_mode == STAGE1_CONTEXT_MODE
+        self.stage1_context = relation_reward_mode in (STAGE1_CONTEXT_MODE,
+                                                       STAGE2_CONTEXT_MODE)
         self.interaction_context = relation_reward_mode in (INTERACTION_CONTEXT_MODE,
-                                                             STAGE1_CONTEXT_MODE)
+                                                             STAGE1_CONTEXT_MODE,
+                                                             STAGE2_CONTEXT_MODE)
         self.packed_context = relation_reward_mode in (ONTOP_CONTEXT_MODE,
-            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
         self.edge_context = relation_reward_mode in (CONTEXT_MODE, ONTOP_CONTEXT_MODE,
-            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
         self.semantic_only = self.stage1_context and bool(
             self.relation_graph_spec.get('semantic_only', False))
@@ -507,7 +511,8 @@ class RelationEncoder(nn.Module):
         if self.ontop_mixed and (num_agents, num_objects) != (2, 3):
             raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
         self.state_relation = relation_reward_mode in (STATE_MODE, ONTOP_MODE, CONTEXT_MODE,
-            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE)
+            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE,
+            STAGE2_CONTEXT_MODE)
         self.suffix_width = (9 * num_agents + (2 if self.ontop_mixed else 0)) if self.state_relation else 0
         self.diagnostics_interval = max(1, int(diagnostics_interval))
         self.last_diagnostics = {}
@@ -722,7 +727,7 @@ class RelationEncoder(nn.Module):
             dense = dense.index_copy(-1, self.state_edge_src * L + self.state_edge_dst, values)
         return dense.reshape(*values.shape[:-1], L, L)
 
-    def forward(self, obs):
+    def forward(self, obs, return_all=False):
         self.forward_calls += 1
         B = obs.shape[0]
 
@@ -832,7 +837,7 @@ class RelationEncoder(nn.Module):
 
         if self.observation_mode == "clean_scene":
             # Read out only after every H/O/T token has been updated by every layer.
-            return x[:, :self.num_agents]
+            return (x[:, :self.num_agents], x) if return_all else x[:, :self.num_agents]
 
         # Legacy rows remain ego-first and preserve the exact A1 baseline.
         return x[:, 0]
@@ -861,6 +866,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                      kwargs["goal_obs_size"]]
             self.scene_kinematic_size = kwargs.get("scene_kinematic_size", 13)
             self.relation_reward_mode = kwargs.get('relation_reward_mode', LEGACY_MODE)
+            self.stage2 = self.relation_reward_mode == STAGE2_CONTEXT_MODE
             self.relation_graph_spec = kwargs.get('relation_graph_spec')
             self.scene_arena_scale = float(kwargs.get("scene_arena_scale", 1.0))
             assert self.scene_arena_scale > 0.0
@@ -878,6 +884,12 @@ class AMPMultiAgentBuilder(AMPBuilder):
         def _build_transformer(self, params, **kwargs):
             tp = params["transformer"]
             d_model = tp["num_features"]
+            coordination_cfg = params.get('coordination', {})
+            if self.stage2 and (coordination_cfg.get('enabled') is not True or
+                                d_model != 64):
+                raise ValueError('Stage 2 requires enabled 64-D coordination')
+            if not self.stage2 and coordination_cfg.get('enabled', False):
+                raise ValueError('Coordination requires the Stage-2 task mode')
             num_heads = tp["layer_num_heads"]
             num_layers = tp["num_layers"]
             dim_ff = tp["layer_dim_feedforward"]
@@ -942,18 +954,27 @@ class AMPMultiAgentBuilder(AMPBuilder):
             self.actor_encoder = encoder("actor")
             self.critic_encoder = encoder("critic")
 
-            def head(output_size, units):
+            def head(output_size, units, input_size=d_model):
                 return nn.Sequential(
-                    self._build_mlp(input_size=d_model, units=units,
+                    self._build_mlp(input_size=input_size, units=units,
                                     activation=self.activation, dense_func=torch.nn.Linear),
                     torch.nn.Linear(units[-1], output_size),
                 )
 
-            self.action_head = head(kwargs['actions_num'], tp["extra_mlp_units"])
+            if self.stage2:
+                self.coordination = GroundedEdgeCoordination(
+                    d_model, coordination_cfg.get('grounding_hidden', 128),
+                    coordination_cfg.get('num_heads', 2))
+            self.action_head = head(kwargs['actions_num'], tp["extra_mlp_units"],
+                                    2 * d_model if self.stage2 else d_model)
             self.value_head = head(self.value_size, tp["extra_mlp_units"])
 
             mlp_init = self.init_factory.create(**{"name": "default"})
-            for net in [self.actor_encoder, self.critic_encoder, self.action_head, self.value_head]:
+            modules = [self.actor_encoder, self.critic_encoder,
+                       self.action_head, self.value_head]
+            if self.stage2:
+                modules.append(self.coordination)
+            for net in modules:
                 for m in net.modules():
                     if isinstance(m, nn.Linear):
                         mlp_init(m.weight)
@@ -982,7 +1003,15 @@ class AMPMultiAgentBuilder(AMPBuilder):
 
         def eval_actor(self, obs):
             if self.is_continuous and self.space_config['fixed_sigma']:
-                encoded = self.actor_encoder(obs)
+                if self.stage2:
+                    with torch.no_grad():
+                        humans, nodes = self.actor_encoder(obs, return_all=True)
+                    context = self.coordination(
+                        humans, nodes, obs[:, -self.actor_encoder.suffix_width:],
+                        self.actor_encoder.edge_encoder, self.actor_encoder.entity_types)
+                    encoded = torch.cat((humans, context), -1)
+                else:
+                    encoded = self.actor_encoder(obs)
                 mu = self.action_head(encoded)
                 if self.observation_mode == "clean_scene":
                     mu = mu.reshape(obs.shape[0] * self.num_agents, -1)

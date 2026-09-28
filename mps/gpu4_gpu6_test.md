@@ -42,7 +42,7 @@ done
 ## 2. 터미널 A: GPU 4 연산 시작
 
 ```bash
-cd /home/hwanhee/ksh/approach_distance_success
+cd /home/hwanhee/ksh/approach_clean_scenario_stage1
 TOKENHSI_CONDA_ENV=tokenhsi source tokenhsi/scripts/multi_agent/runtime_env.sh
 
 CUDA_VISIBLE_DEVICES="$(nvidia-smi -i 4 --query-gpu=uuid --format=csv,noheader)" \
@@ -53,7 +53,7 @@ CUDA_MPS_PIPE_DIRECTORY="/tmp/mps-test-${UID}/gpu4/pipe" \
 ## 3. 터미널 B: GPU 6 연산 시작
 
 ```bash
-cd /home/hwanhee/ksh/approach_distance_success
+cd /home/hwanhee/ksh/approach_clean_scenario_stage1
 TOKENHSI_CONDA_ENV=tokenhsi source tokenhsi/scripts/multi_agent/runtime_env.sh
 
 CUDA_VISIBLE_DEVICES="$(nvidia-smi -i 6 --query-gpu=uuid --format=csv,noheader)" \

@@ -20,7 +20,7 @@ source "$HOME/.local/share/gpu-mps/shell.sh"
 
 ```bash
 mps_start 6
-TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_distance_edge_context_success_train.sh
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh 2 2048 3
 ```
 
 다른 프로젝트의 일반 프로그램은 그 프로그램의 실행 환경에 MPS 경로가 전달돼야 한다. 같은 터미널에서 `mps_start`/`mps_use` 후 실행하거나 `mps_run 6 <command>`를 쓴다. 이 레포의 자동 연결은 `runtime_env.sh` → `mps_auto_env.sh`에서 수행한다.
@@ -66,7 +66,7 @@ nvidia-cuda-mps-control -d
 아래는 **2048환경·2회 학습 확인용**이다. 결과는 `mps/output/` 아래에 저장한다.
 
 ```bash
-cd /home/hwanhee/ksh/approach_distance_success
+cd /home/hwanhee/ksh/approach_clean_scenario_stage1
 nvidia-smi -i 6
 MPS_UUID=$(nvidia-smi -i 6 --query-gpu=uuid --format=csv,noheader)
 
@@ -76,7 +76,7 @@ TOKENHSI_CONDA_ENV=tokenhsi \
 RESUME_CHECKPOINT= \
 MAX_ITERATIONS=2 \
 OUTPUT_PATH="mps/output/gpu6_$(date +%Y%m%d_%H%M%S)_check" \
-bash tokenhsi/scripts/multi_agent/approach_distance_success_train.sh 2 2048 3
+bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh 2 2048 3
 ```
 
 같은 GPU에서 여러 학습을 공유하려면 각 터미널에서 동일한 GPU UUID와 접속 경로를 사용한다. 작업마다 출력 폴더는 다르게 지정한다. SSH 연결 종료에도 학습을 유지하려면 학습을 `tmux` 안에서 실행한다.

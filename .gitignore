@@ -73,6 +73,7 @@ desktop.ini
 # Training artifacts (checkpoints, logs, renders)
 # ---------------------------------------------------------------------------
 /output/
+/output_etc/
 runs/
 wandb/
 tensorboard/

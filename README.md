@@ -33,7 +33,7 @@ Start with the short current references (mostly in Korean):
 - [`AGENTS.md`](AGENTS.md) — Codex reading order and repository conventions
 - [`changelog.md`](changelog.md) — recent changes and validation results
 - [`structure.md`](markdowns/structure.md) — code map and task entry points
-- [`config.md`](markdowns/config.md) — all experiment configs, training, evaluation, and remote VNC
+- [`config.md`](markdowns/config.md) — current experiment configs, training, evaluation, and remote VNC
 
 Read detailed references as needed:
 
@@ -87,9 +87,9 @@ sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 2048 3
 # Test / evaluate a checkpoint
 sh tokenhsi/scripts/multi_agent/ma_carry_test.sh output/ma_carry/nn/xxx.pth 2 16 3
 
-# View a saved checkpoint through noVNC on GPU 6
-TOKENHSI_GPU=6 VNC_DIR="$HOME/opt/vnc" sh tokenhsi/scripts/multi_agent/run-gui.sh \
-  sh tokenhsi/scripts/multi_agent/approach_distance_success_test.sh /path/to/checkpoint.pth 2 1 3
+# View a Stage 1 checkpoint through noVNC on GPU 6
+TOKENHSI_GPU=6 VNC_DIR="$HOME/opt/vnc" \
+  bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_vnc.sh /path/to/checkpoint.pth
 ```
 
 Or invoke the runner directly:

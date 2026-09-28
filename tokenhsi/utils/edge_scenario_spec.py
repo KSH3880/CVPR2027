@@ -1,5 +1,4 @@
 """Context-free joint scenarios with random object and goal bindings."""
-import itertools
 import math
 
 import torch
@@ -9,26 +8,13 @@ from utils.edge_ontop_spec import ON_TOP, permute_graph, select_graph, validate_
 from utils.edge_interaction_spec import SIT, CLIMB
 
 
-SCENARIO_SAMPLER = 'two_agent_three_object_scenario_no_climb'
-SCENARIO_CLIMB_SAMPLER = 'two_agent_three_object_scenario_with_climb'
-TEMPLATES = ('HOLDING', 'SIT', 'HOLDING_AT', 'HOLDING_ON_TOP')
+INDEPENDENT_CLIMB_SAMPLER = 'two_agent_three_object_independent_with_climb'
 CLIMB_TEMPLATES = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')
 PRESETS = ('random_scenario', 'holding', 'sit', 'climb', 'holding_at', 'holding_ontop')
 
 
 def scenario_templates(spec):
-    return CLIMB_TEMPLATES if spec.get('sampler') == SCENARIO_CLIMB_SAMPLER else TEMPLATES
-
-
-def _options(template):
-    if template in ('HOLDING', 'SIT', 'CLIMB'):
-        return [(o,) for o in range(3)]
-    if template == 'HOLDING_AT':
-        return list(itertools.product(range(3), range(2)))
-    if template == 'HOLDING_ON_TOP':
-        return [(source, support) for source in range(3) for support in range(3)
-                if source != support]
-    raise ValueError('Unknown scenario template: ' + template)
+    return CLIMB_TEMPLATES
 
 
 def _description(template, binding):
@@ -65,21 +51,17 @@ def valid_binding_pair(templates, bindings):
     return True
 
 
-def valid_bindings(templates):
-    return [(a, b) for a in _options(templates[0]) for b in _options(templates[1])
-            if valid_binding_pair(templates, (a, b))]
-
-
 def validate_sampler(spec, m=2, o=3):
     expected = {'mode', 'sampler', 'semantic_only', 'edge_capacity',
                 'max_edges_per_agent', 'template_probabilities',
                 'random_binding', 'shuffle_edge_order'}
     if set(spec) != expected or spec.get('mode') != 'edge_composition' or \
-            spec.get('sampler') not in (SCENARIO_SAMPLER, SCENARIO_CLIMB_SAMPLER):
+            spec.get('sampler') != INDEPENDENT_CLIMB_SAMPLER:
         raise ValueError('Unsupported scenario sampler')
+    binding = {'objects': 'disjoint', 'goals': 'disjoint'}
     if (m, o) != (2, 3) or spec['edge_capacity'] != 4 or \
             spec['max_edges_per_agent'] != 2 or spec['semantic_only'] is not True or \
-            spec['random_binding'] != {'objects': 'all', 'goals': 'all'} or \
+            spec['random_binding'] != binding or \
             type(spec['shuffle_edge_order']) is not bool:
         raise ValueError('Scenario requires 2 humans, 3 objects and semantic capacity 4')
     p = spec['template_probabilities']
@@ -88,6 +70,8 @@ def validate_sampler(spec, m=2, o=3):
             or not math.isfinite(v) or v < 0 for v in p.values()) or \
             not math.isclose(sum(p.values()), 1., abs_tol=1e-8):
         raise ValueError('Scenario template probabilities must follow the contract')
+    if p['HOLDING_ON_TOP'] > .5:
+        raise ValueError('Independent ON_TOP probability cannot exceed 0.5')
 
 
 def _rows(agent, template, binding, m=2, o=3):
@@ -139,9 +123,7 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
                  generator=None):
     validate_sampler(spec)
     if preset not in PRESETS:
-        raise ValueError('Unknown no-CLIMB TASK_GRAPH preset: ' + preset)
-    if spec['sampler'] == SCENARIO_SAMPLER and preset == 'climb':
-        raise ValueError('CLIMB preset requires the with-CLIMB scenario sampler')
+        raise ValueError('Unknown scenario TASK_GRAPH preset: ' + preset)
     templates_available = scenario_templates(spec)
     probs = torch.tensor([spec['template_probabilities'][k] for k in templates_available],
                          device=device)
@@ -149,17 +131,29 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
     fixed = {'holding': 'HOLDING', 'sit': 'SIT', 'climb': 'CLIMB',
              'holding_at': 'HOLDING_AT',
              'holding_ontop': 'HOLDING_ON_TOP'}
-    for _ in range(n):
+    if preset == 'random_scenario':
+        top = probs[-1]
+        pair_probs = torch.outer(probs, probs)
+        pair_probs[-1, -1] = 0
+        pair_probs[-1, :-1] /= 1 - top
+        pair_probs[:-1, -1] /= 1 - top
+        pair_probs[:-1, :-1] *= (1 - 2 * top) / (1 - top) ** 2
+        pair_ids = torch.multinomial(pair_probs.flatten(), n, replacement=True,
+                                     generator=generator).tolist()
+    for row in range(n):
         if preset == 'random_scenario':
-            ids = torch.multinomial(probs, 2, replacement=True, generator=generator).tolist()
+            ids = divmod(pair_ids[row], len(templates_available))
             templates = (templates_available[ids[0]], templates_available[ids[1]])
         else:
             templates = (fixed[preset], 'HOLDING')
             if role_swap:
                 templates = templates[::-1]
-        choices = valid_bindings(templates)
-        choice = int(torch.randint(len(choices), (), device=device, generator=generator))
-        template_rows.append(templates); binding_rows.append(choices[choice])
+        objects = torch.randperm(3, device=device, generator=generator).tolist()
+        goals = torch.randperm(2, device=device, generator=generator).tolist()
+        bindings = tuple((objects[agent], goals[agent]) if template == 'HOLDING_AT'
+            else (objects[agent], objects[2]) if template == 'HOLDING_ON_TOP'
+            else (objects[agent],) for agent, template in enumerate(templates))
+        template_rows.append(templates); binding_rows.append(bindings)
     return compose_graph(template_rows, binding_rows,
         shuffle=spec['shuffle_edge_order'] if preset == 'random_scenario' else False,
         generator=generator, device=device)
@@ -177,7 +171,7 @@ def validate_graph(graph):
             validate_graph(select_graph(graph, i))
         return
     if graph.prereq_mask.any() or (graph.term_index >= 0).any():
-        raise ValueError('No-CLIMB scenarios cannot contain temporal context')
+        raise ValueError('Independent scenarios cannot contain temporal context')
     for agent in range(2):
         ids = (graph.edge_valid & (graph.edge_owner == agent)).nonzero().flatten()
         if not 1 <= len(ids) <= 2:
@@ -222,7 +216,7 @@ def agent_goal_indices(graph, slot_env, slot_agent):
     owned = graph.edge_valid[slot_env] & (graph.edge_owner[slot_env] == slot_agent[:, None])
     target = torch.where((graph.edge_relation[slot_env] == AT) & owned,
                          graph.edge_dst[slot_env], graph.num_agents + graph.num_objects)
-    return target.amin(-1) - graph.num_agents - graph.num_objects
+    return target.amax(-1) - graph.num_agents - graph.num_objects
 
 
 def paired_placement_success(success, graph):

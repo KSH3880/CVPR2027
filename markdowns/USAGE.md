@@ -7,7 +7,7 @@
 
 | 항목 | 현재 서버 |
 | --- | --- |
-| 저장소 | `/home/hwanhee/ksh/approach_distance_success` |
+| 저장소 | `/home/hwanhee/ksh/approach_clean_scenario_stage1` |
 | conda 환경 | `tokenhsi`, Python 3.8 |
 | PyTorch / CUDA build | `2.4.0a0+gitee1b680` / `12.8` (현재 설치본 확인) |
 | Isaac Gym | `/home/hwanhee/CVPR2027/isaacgym` |
@@ -19,7 +19,7 @@
 새 서버로 이관할 때는 [PORTING_GUIDE.md](PORTING_GUIDE.md)의 경로·의존성 확인 절차를 따른다.
 
 ```bash
-cd /home/hwanhee/ksh/approach_distance_success
+cd /home/hwanhee/ksh/approach_clean_scenario_stage1
 conda activate tokenhsi
 nvidia-smi
 ```
@@ -31,15 +31,15 @@ GPU는 명령마다 `TOKENHSI_GPU`로 명시한다.
 
 ```bash
 TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi \
-    bash tokenhsi/scripts/multi_agent/approach_distance_success_no_sat_train.sh 2 2048 3
+    bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh 2 2048 3
 ```
 
 짧은 검증도 2048 환경과 본학습 설정을 사용하고 반복 횟수만 제한한다.
 
 ```bash
 TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi MAX_ITERATIONS=1 \
-RESUME_CHECKPOINT= OUTPUT_PATH=output/approach_distance_success_no_sat_check \
-    bash tokenhsi/scripts/multi_agent/approach_distance_success_no_sat_train.sh 2 2048 3
+RESUME_CHECKPOINT= OUTPUT_PATH=output/approach_scenario_stage1_skill_curriculum_reward_preserved_check \
+    bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh 2 2048 3
 ```
 
 `SMOKE`에 따른 환경 수·학습 설정 자동 축소는 제거했다. 본학습 전에 `MAX_ITERATIONS`,

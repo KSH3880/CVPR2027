@@ -10,6 +10,7 @@ from utils.edge_ontop_spec import batched, select_graph, ON_TOP
 from utils.edge_interaction_spec import SIT, CLIMB
 from env.tasks.multi_agent.edge_ontop_reward import mix_task_reward
 from env.tasks.multi_agent.edge_stage1_reward import stage1_context
+from utils.edge_stage1_spec import PLANE_VARIANTS
 
 
 class EdgeContextTaskMixin:
@@ -49,7 +50,10 @@ class EdgeContextTaskMixin:
             return super()._reset_relation_history(env_ids)
         phi, diag = self._evaluate_relations(env_ids)
         if getattr(self, '_edge_interaction', False):
-            self.relation_runtime.reset(env_ids, phi, diag['z_error'], diag['feet_height_error'])
+            self.relation_runtime.reset(env_ids, phi, diag['z_error'], diag['feet_height_error'],
+                **({'region_error': diag['region_error']} if
+                   self._relation_cfg.get('stage1_variant') in PLANE_VARIANTS
+                   else {}))
         else:
             self.relation_runtime.reset(env_ids, phi, diag['z_error'])
         self._prev_root_pos[env_ids] = self._kinematic_humanoid_rigid_body_states[env_ids, :, 0, :3]
@@ -65,7 +69,10 @@ class EdgeContextTaskMixin:
         runtime = self.relation_runtime; graph = runtime.graph
         phi, diag = self._evaluate_relations()
         if getattr(self, '_edge_interaction', False):
-            result = runtime.step(phi, diag['progress'], diag['z_error'], diag['feet_height_error'])
+            result = runtime.step(phi, diag['progress'], diag['z_error'], diag['feet_height_error'],
+                **({'region_error': diag['region_error']} if
+                   self._relation_cfg.get('stage1_variant') in PLANE_VARIANTS
+                   else {}))
         else:
             result = runtime.step(phi, diag['progress'], diag['z_error'])
         roots = self._humanoid_root_states[..., :3]
@@ -79,6 +86,11 @@ class EdgeContextTaskMixin:
             speed = box_speed_penalty(self._prev_box_pos, objects, self.dt, self._box_vel_pen_coeff, self._box_vel_pen_thre)
         reward = result['agent_task_reward'] + power + collision + speed
         components = [owner_sum(result[k], graph) for k in ('state_component', 'progress_component', 'success_component')]
+        if self._relation_cfg.get('edge_aggregation') == 'mean_active':
+            count = owner_sum(batched(graph.edge_valid, self.num_envs).float(), graph).clamp_min(1)
+            sharing = self._relation_cfg['task_sharing']
+            components = [sharing['self'] * (c / count) +
+                          sharing['teammate'] * (c / count).flip(-1) for c in components]
         if getattr(self, '_edge_ontop', False) and not getattr(self, '_edge_stage1', False):
             components = [mix_task_reward(c) for c in components]
         terms = torch.stack(components + [power, collision, speed, reward], -1).flatten(0, 1)
