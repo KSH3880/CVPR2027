@@ -73,6 +73,19 @@ class CarryPathRegularizationTest(unittest.TestCase):
         )
         self.assertEqual(float(result["consistency_loss"]), 0.0)
 
+    def test_rebased_future_length_cannot_undercut_direct_distance(self):
+        state = crossing_state()
+        path = crossing_path(state)
+        state.root_xy.copy_(path[:, 0, :, 8])
+        result = carry_path_regularization(
+            {"path_world": path},
+            observation(state, path[:, 0], progress=8.0),
+            torch.zeros(1),
+        )
+        self.assertGreaterEqual(
+            float(result["mean_future_length_ratio"]), 1.0 - 1e-6,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

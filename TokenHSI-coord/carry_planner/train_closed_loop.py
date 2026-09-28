@@ -363,16 +363,16 @@ def main():
         "CARRY_PLANNER_ANALYTIC_TIME_SAMPLES", 7,
     )
     consistency_coef = _env_float(
-        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.01,
+        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.03,
     )
     excess_length_coef = _env_float(
-        "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.02,
+        "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.10,
     )
     free_detour_ratio = _env_float(
-        "CARRY_PLANNER_FREE_DETOUR_RATIO", 1.20,
+        "CARRY_PLANNER_FREE_DETOUR_RATIO", 1.15,
     )
     regularization_warmup = _env_int(
-        "CARRY_PLANNER_PATH_REGULARIZATION_WARMUP", 20,
+        "CARRY_PLANNER_PATH_REGULARIZATION_WARMUP", 5,
     )
     if min(iterations, horizon, low_steps, ppo_epochs, minibatch) <= 0:
         raise ValueError("iteration/horizon/step/minibatch values must be positive")

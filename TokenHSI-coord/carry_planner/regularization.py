@@ -28,7 +28,7 @@ def carry_path_regularization(
     observation: StackPlannerObservation,
     collision_risk: torch.Tensor,
     *,
-    free_detour_ratio: float = 1.20,
+    free_detour_ratio: float = 1.15,
     consistency_beta: float = 0.25,
     near_future_decay: float = 6.0,
     safety_gate_scale: float = 0.05,
@@ -62,6 +62,13 @@ def carry_path_regularization(
     progress = observation.path_progress
     if progress.shape != (batch, agents):
         raise ValueError("path_progress must be [B,2]")
+    # A held agent has completed the pickup leg even if projection noise leaves
+    # the previous-path cursor just before the fixed box anchor.
+    effective_progress = torch.where(
+        observation.state.held >= 0.5,
+        torch.maximum(progress, progress.new_full((), 16.0)),
+        progress,
+    )
     safe_weight = torch.exp(
         -collision_risk.detach().clamp(min=0.0) / safety_gate_scale
     )
@@ -69,7 +76,7 @@ def carry_path_regularization(
     point_index = torch.arange(
         points, device=path.device, dtype=path.dtype,
     )
-    ahead = point_index.reshape(1, 1, points) - progress[..., None]
+    ahead = point_index.reshape(1, 1, points) - effective_progress[..., None]
     future_weight = torch.exp(
         -ahead.clamp(min=0.0) / near_future_decay
     ) * (ahead > 0.0).to(path.dtype)
@@ -95,16 +102,18 @@ def carry_path_regularization(
         per_sample_consistency, consistency_eligible, loss_cap,
     )
 
-    segment_length = (path[..., 1:, :] - path[..., :-1, :]).norm(dim=-1)
-    segment_index = torch.arange(
-        points - 1, device=path.device, dtype=path.dtype,
-    )
-    remaining_fraction = (
-        segment_index.reshape(1, 1, points - 1) + 1.0
-        - progress[..., None]
-    ).clamp(0.0, 1.0)
-    future_length = (segment_length * remaining_fraction).sum(dim=-1)
     state = observation.state
+    # Progress is measured on the previous path. Weighting a newly changed
+    # spline by that old fractional index can omit the measured-root to first
+    # future-point connection. Collapse the executed prefix onto the current
+    # root, as the analytic rollout does, and measure the complete suffix.
+    past = point_index.reshape(1, 1, points) <= effective_progress[..., None]
+    future_path = torch.where(
+        past[..., None], state.root_xy[..., None, :], path,
+    )
+    future_length = (
+        future_path[..., 1:, :] - future_path[..., :-1, :]
+    ).norm(dim=-1).sum(dim=-1)
     box_xy = state.box_xyz[..., :2]
     direct_approach = (
         (state.root_xy - box_xy).norm(dim=-1)

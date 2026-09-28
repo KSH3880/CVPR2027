@@ -54,12 +54,14 @@ detach하므로 gradient는 path에만 간다. 계수와 관련 손잡이는
 cosine-space penalty로 함께 학습한다.
 
 replan 사이의 급격한 path 변경과 collision만 피한 과도한 우회는 별도 소형 geometry
-term으로 제한한다. `CARRY_PLANNER_REPLAN_CONSISTENCY_COEF`(기본 0.01)는 이미 지난
+term으로 제한한다. `CARRY_PLANNER_REPLAN_CONSISTENCY_COEF`(기본 0.03)는 이미 지난
 prefix를 제외하고 이전 valid path의 가까운 미래를 Smooth-L1로 유지한다.
-`CARRY_PLANNER_EXCESS_LENGTH_COEF`(기본 0.02)는 현재 상태에서 남은 polyline 길이가
-직접 `root→box→goal`(held 이후 `root→goal`) 거리의 1.2배를 넘는 부분만 벌점으로 준다.
+`CARRY_PLANNER_EXCESS_LENGTH_COEF`(기본 0.10)는 현재 상태에서 남은 polyline 길이가
+직접 `root→box→goal`(held 이후 `root→goal`) 거리의 1.15배를 넘는 부분만 벌점으로 준다.
+남은 길이는 이전 path에서 얻은 progress index를 새 spline segment에 곱하지 않고,
+실행된 prefix를 현재 measured root로 접은 뒤 완전한 future suffix에서 다시 계산한다.
 두 raw loss는 각각 0.25 미만으로 부드럽게 포화되고, 현재 analytic collision risk가
-높으면 지수 gate로 꺼져 회피 동작과 경쟁하지 않는다. 첫 20 iteration에는 0에서 설정
+높으면 지수 gate로 꺼져 회피 동작과 경쟁하지 않는다. 첫 5 iteration에는 0에서 설정
 계수까지 선형 warm-up하며, 로그의 `weighted_consistency_loss`,
 `weighted_excess_length_loss`, `path_regularization_safe_weight`로 실제 기여량을 확인한다.
 시간/makespan loss는 speed 최대화와 collision timing 악용을 피하기 위해 넣지 않는다.

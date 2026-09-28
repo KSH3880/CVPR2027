@@ -72,6 +72,8 @@ nohup.out
 /runs/queue/dashboard_fingerprint.json
 /runs/queue/_legacy_*
 /runs/stack_planner/
+/runs/metrics/
+/runs/gen_cfgs/
 
 # Datasets and model assets
 **/tokenhsi/data/dataset_*

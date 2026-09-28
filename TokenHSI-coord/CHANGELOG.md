@@ -2,6 +2,18 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-28
+
+### Carry future-length rebase 및 조기 regularization
+
+- 이전 committed path의 progress index를 새 spline segment에 직접 곱해 remaining path가
+  direct distance보다 짧게 측정되던 오류를 수정했다. analytic rollout과 동일하게 실행된
+  prefix를 현재 measured root로 접은 뒤 완전한 future suffix 길이를 계산한다.
+- held agent는 progress projection 오차와 무관하게 pickup anchor까지 실행된 것으로
+  처리하며, remaining/direct ratio가 1 미만으로 내려가지 않는 회귀 테스트를 추가했다.
+- path가 iteration 8 전에 포화된 로그에 맞춰 warm-up을 20에서 5 iteration으로 줄이고,
+  기본 consistency/excess-length/free-detour를 0.03/0.10/1.15로 조정했다.
+
 ## 2026-09-24
 
 ### Carry replan 안정성 및 bounded excess-length loss
