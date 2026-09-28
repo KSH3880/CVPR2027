@@ -2,7 +2,12 @@ import unittest
 
 import torch
 
-from tokenhsi.utils.steer_stop import contract_to_anchor, cosine_transition
+from tokenhsi.utils.steer_stop import (
+    blend_goal_to_anchor,
+    contract_to_anchor,
+    cosine_transition,
+    stop_aware_speed_reward,
+)
 
 
 class SteerStopCommandTest(unittest.TestCase):
@@ -26,6 +31,31 @@ class SteerStopCommandTest(unittest.TestCase):
         out = contract_to_anchor(points, anchor, torch.tensor([0.5]))
         self.assertEqual(out.shape, points.shape)
         torch.testing.assert_close(out, 0.5 * points + 0.5 * anchor[:, None, :])
+
+    def test_stop_reward_is_continuous_and_maximal_at_physical_stillness(self):
+        command = torch.zeros(3)
+        progress = torch.tensor([0.0, 1.0e-3, -1.0e-3])
+        velocity = torch.tensor([[0.0, 0.0], [1.0e-3, 0.0], [-1.0e-3, 0.0]])
+        reward = stop_aware_speed_reward(command, progress, velocity)
+        self.assertEqual(reward[0].item(), 1.0)
+        self.assertGreater(reward[0].item(), reward[1].item())
+        torch.testing.assert_close(reward[1], reward[2])
+
+    def test_move_reward_keeps_the_positive_progress_gate(self):
+        command = torch.full((2,), 0.5)
+        progress = torch.tensor([0.5, 0.0])
+        velocity = torch.zeros(2, 2)
+        reward = stop_aware_speed_reward(command, progress, velocity)
+        torch.testing.assert_close(reward, torch.tensor([1.0, 0.0]))
+
+    def test_goal_blends_smoothly_to_the_stop_anchor(self):
+        final_goal = torch.tensor([[4.0, 2.0, 9.0], [4.0, 2.0, 9.0]])
+        anchor = torch.tensor([[1.0, -1.0], [1.0, -1.0]])
+        height = torch.tensor([0.9, 1.1])
+        blend = torch.tensor([0.0, 1.0])
+        out = blend_goal_to_anchor(final_goal, anchor, height, blend)
+        torch.testing.assert_close(out[0], torch.tensor([4.0, 2.0, 0.9]))
+        torch.testing.assert_close(out[1], torch.tensor([1.0, -1.0, 1.1]))
 
 
 if __name__ == "__main__":

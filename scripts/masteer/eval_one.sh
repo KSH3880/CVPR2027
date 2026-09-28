@@ -135,11 +135,13 @@ if [ "$rc" -ne 0 ] || [ ! -f "$METRICS" ]; then
     exit 5
 fi
 
-python3 - "$TAG_OUT" "$LOG" "$METRICS" "${MS_AGENTS:-2}" >> "$LOG" 2>&1 <<'PY'
+python3 - "$TAG_OUT" "$LOG" "$METRICS" "${MS_AGENTS:-2}" "${MS_TASK:-}" >> "$LOG" 2>&1 <<'PY'
 import re, sys
 import numpy as np
 
-tag, log_path, metrics_path, agents = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+tag, log_path, metrics_path, agents, task = (
+    sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5]
+)
 text = open(log_path, errors="ignore").read()
 rates = [float(value) for value in re.findall(r"'success_rate': ([0-9.]+)", text)]
 stable = rates[1:] if len(rates) > 1 else rates
@@ -167,14 +169,40 @@ if m.shape[1] >= 31:                       # 경로 추종 -- free 기준선의 
     _lat, _spd, _vr = m[:, 26] / _n, m[:, 28] / _n, m[:, 29] / _n
     head += (f" lat={_med(_lat):.3f} spd_err={_med(_spd):.3f} v_real={_med(_vr):.3f} "
              f"off50={float((_lat > 0.5).mean()):.3f}")
+    if task in ("HumanoidMACarrySteerMix", "HumanoidMACarrySteerStopMix") and m.shape[1] >= 41:
+        _solo = m[:, 40] > 0.5
+        for _name, _mask in (("solo", _solo), ("carry", ~_solo)):
+            head += (
+                f" {_name}Lat={_med(_lat[_mask]):.3f}"
+                f" {_name}Off50={float((_lat[_mask] > 0.5).mean()):.3f}"
+            )
     # **v_real 은 정지 스텝까지 분모에 넣어 보행속도를 심하게 낮춘다** (실측 0.58 대 1.02).
     # 그 값으로 "정책이 참조 모션보다 느리다" 고 잘못 판단했다. 이동 스텝만으로 다시 잰다.
     _mv = np.maximum(m[:, 30] - m[:, 4], 1)
     head += f" gait={_med(m[:, 5] / (_mv / 30.0)):.3f}"
 
-# 열 40~49: 집기/운반 생애주기. grasp는 손-박스 거리 proxy이고 carry/place는
-# 그 proxy 상태에서 박스를 0.5 m 이상 실제로 옮긴 뒤 목표에 닿았는지로 판정한다.
-if m.shape[1] >= 50:
+# CarrySteerStopMix의 열 40~49는 solo/stop 지표다. 일반 carry 생애주기로
+# 해석하면 root velocity를 grasp 성공률로 오보하게 된다.
+is_stop_mix = task == "HumanoidMACarrySteerStopMix"
+if is_stop_mix and m.shape[1] >= 50:
+    _solo = m[:, 40] > 0.5
+    _enabled = m[:, 41] > 0.5
+    _hold_n = m[:, 43]
+    _reached = _enabled & (_hold_n > 0)
+    _den = np.maximum(_hold_n, 1)
+    _carry_reached = _reached & ~_solo
+    _solo_reached = _reached & _solo
+    _rate = lambda mask, base: float(mask.sum() / max(base.sum(), 1))
+    head += (
+        f" stopReach={_rate(_reached, _enabled):.3f}"
+        f" stopResume={_med(m[_enabled, 49]):.3f}"
+        f" soloHoldV={_med((m[:, 44] / _den)[_solo_reached]):.3f}"
+        f" carryHoldV={_med((m[:, 44] / _den)[_carry_reached]):.3f}"
+        f" carryBoxV={_med((m[:, 45] / _den)[_carry_reached]):.3f}"
+        f" carryHeld={_med((m[:, 48] / _den)[_carry_reached]):.3f}"
+    )
+# 다른 태스크의 열 40~49: 집기/운반 생애주기.
+elif m.shape[1] >= 50:
     _steps = np.maximum(m[:, 30], 1)
     head += (
         f" graspEp={(m[:, 44] >= 0).mean():.4f}"
@@ -235,6 +263,46 @@ if m.shape[1] >= 26 and int(m[0, 25]) != 0:   # 시나리오일 때만
     _ed = m[:, 15]
     head += f" encd={_med(_ed[_ed < 98]):.3f}"
 print(head)
+
+if is_stop_mix and m.shape[1] >= 50:
+    solo = m[:, 40] > 0.5
+    enabled = m[:, 41] > 0.5
+    hold_n = m[:, 43]
+    reached = enabled & (hold_n > 0)
+    den = np.maximum(hold_n, 1)
+    med = lambda v: np.median(v) if len(v) else float("nan")
+    rate = lambda mask, base: float(mask.sum() / max(base.sum(), 1))
+    parts = [
+        f"MS_STOP_SUMMARY tag={tag}",
+        f"enabled={enabled.mean():.3f}",
+        f"reached={rate(reached, enabled):.3f}",
+        f"resumed={med(m[enabled, 49]):.3f}",
+    ]
+    for name, group in (("solo", solo), ("carry", ~solo)):
+        use = reached & group
+        parts += [
+            f"{name}N={int(use.sum())}",
+            f"{name}RootV={med((m[:, 44] / den)[use]):.3f}",
+            f"{name}Anchor={med((m[:, 46] / den)[use]):.3f}",
+        ]
+        if name == "carry":
+            parts += [
+                f"carryBoxV={med((m[:, 45] / den)[use]):.3f}",
+                f"carryHeld={med((m[:, 48] / den)[use]):.3f}",
+            ]
+    if m.shape[1] >= 58:
+        use = reached & solo
+        parts += [
+            f"soloHandZR={med((m[:, 50] / den)[use]):.3f}",
+            f"soloHandZL={med((m[:, 51] / den)[use]):.3f}",
+            f"soloHandFwdR={med((m[:, 52] / den)[use]):.3f}",
+            f"soloHandFwdL={med((m[:, 53] / den)[use]):.3f}",
+            f"soloDropR={med(m[use, 54]):.3f}",
+            f"soloDropL={med(m[use, 55]):.3f}",
+            f"soloReachR={med(m[use, 56]):.3f}",
+            f"soloReachL={med(m[use, 57]):.3f}",
+        ]
+    print(" ".join(parts))
 
 # 늘 재는 것: 경로 이탈과 속도 추종. **free 기준선이야말로 이게 있어야 한다** --
 # 성공률만으로는 "경로를 따라간 것" 과 "목표로 직진한 것" 을 구분할 수 없다.
@@ -320,5 +388,6 @@ if m.shape[1] >= 26:
 PY
 
 grep '^MS_EVAL_SUMMARY ' "$LOG" | tail -1
+grep '^MS_STOP_SUMMARY ' "$LOG" | tail -1
 grep '^MS_SCEN_SUMMARY ' "$LOG" | tail -1
 grep '^MS_TRACK_SUMMARY ' "$LOG" | tail -1

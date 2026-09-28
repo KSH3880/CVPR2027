@@ -10,6 +10,7 @@ from isaacgym.torch_utils import quat_rotate
 from env.tasks.adapt_interaction_skills.humanoid_ma_carry import CARRY_HI, CARRY_LO, TEAMMATE_DIM
 from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
 from tokenhsi.utils import steer_path as sp
+from tokenhsi.utils.steer_stop import stop_aware_speed_reward
 from utils import torch_utils
 
 
@@ -18,6 +19,15 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         if int(cfg["env"].get("numAgents", 1)) != 2:
             raise ValueError("HumanoidMACarrySteerMix requires two agents")
+        self._agent_mix_view = os.environ.get("MS_VIEW_AGENT_MIX", "0") == "1"
+        self._stop_fix_solo_reward = (
+            os.environ.get("MS_STOP_FIX_SOLO_REWARD", "0") == "1"
+        )
+        if self._agent_mix_view:
+            if headless:
+                raise ValueError("MS_VIEW_AGENT_MIX=1 is viewer-only")
+            if int(cfg["env"].get("numEnvs", 1)) != 1:
+                raise ValueError("MS_VIEW_AGENT_MIX=1 requires exactly one environment")
         self._solo_dist = float(os.environ.get("MS_STEER_ONLY_DIST", "3.0"))
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
 
@@ -27,20 +37,39 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
         solo = np.zeros(num_envs, dtype=np.bool_)
         solo[order[:num_envs // 2]] = True
         self._solo_env = torch.as_tensor(solo, device=self.device)
+        self._solo_rows = self._solo_env.repeat_interleave(self.num_agents)
+        if self._agent_mix_view:
+            # One environment, two agents: row 0 keeps native carry while row 1
+            # receives the box-free steering observation/path used in training.
+            self._solo_env.zero_()
+            self._solo_rows.zero_()
+            self._solo_rows[1] = True
+            print(
+                "[agent-mix-view] env0 agent0=carry, agent1=box-free steering",
+                flush=True,
+            )
         self._solo_goal = torch.zeros(self._rows, 3, device=self.device)
         self._solo_prev_yaw = torch.zeros(self._rows, device=self.device)
         self._solo_stop_count = torch.zeros(num_envs, dtype=torch.long, device=self.device)
 
     def _post_object_reset(self, env_ids):
         super()._post_object_reset(env_ids)
-        solo_envs = env_ids[self._solo_env[env_ids]]
-        if len(solo_envs) == 0:
+        candidate_rows = self.agent_rows(env_ids)
+        rows = candidate_rows[self._solo_rows[candidate_rows]]
+        if len(rows) == 0:
             return
-        rows = self.agent_rows(solo_envs)
+        solo_envs = torch.unique(
+            torch.div(rows, self.num_agents, rounding_mode="floor")
+        )
         self._solo_stop_count[solo_envs] = 0
-        roots = self.humanoid_rows(self._humanoid_root_states)[rows]
+        all_roots = self.humanoid_rows(self._humanoid_root_states)
+        roots = all_roots[rows]
         xy = roots[:, :2]
-        other_xy = xy.reshape(-1, 2, 2).flip(1).reshape(-1, 2)
+        other_rows = (
+            torch.div(rows, self.num_agents, rounding_mode="floor") * self.num_agents
+            + (1 - torch.remainder(rows, self.num_agents))
+        )
+        other_xy = all_roots[other_rows, :2]
         direction = torch.nn.functional.normalize(xy - other_xy, dim=-1)
         goal = xy + self._solo_dist * direction
         waypoint = xy + 0.15 * direction
@@ -81,7 +110,7 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
     def _compute_task_obs(self, env_ids=None):
         obs = super()._compute_task_obs(env_ids)
         rows = self.all_rows() if env_ids is None else self.agent_rows(env_ids)
-        solo = self._solo_env[torch.div(rows, self.num_agents, rounding_mode="floor")]
+        solo = self._solo_rows[rows]
         if not bool(solo.any()):
             return obs
         obs = obs.clone()
@@ -102,7 +131,7 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
 
     def _compute_reward(self, actions):
         super()._compute_reward(actions)
-        rows = self.all_rows()[self._solo_env.repeat_interleave(self.num_agents)]
+        rows = self.all_rows()[self._solo_rows]
         if len(rows) == 0:
             return
         roots = self.humanoid_rows(self._humanoid_root_states)[rows]
@@ -111,10 +140,20 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
         speed = (arc - self._prev_arc[rows]) / self.dt
         command = self._m_at(arc, rows) / 1.6
         moving = remaining > 0.4
-        speed_reward = torch.exp(-4.0 * (command - speed).square())
-        speed_reward = torch.where(speed > 0.0, speed_reward, 0.0)
+        if self._stop_fix_solo_reward:
+            stopped_command = command < 0.05
+            speed_reward = stop_aware_speed_reward(
+                command, speed, roots[:, 7:9], gain=4.0
+            )
+        else:
+            stopped_command = torch.zeros_like(command, dtype=torch.bool)
+            speed_reward = torch.exp(-4.0 * (command - speed).square())
+            speed_reward = torch.where(speed > 0.0, speed_reward, 0.0)
         path_penalty = self.steer_pos_c * (
             torch.exp(-0.5 * self._lat_root[rows].square()) - 1.0
+        )
+        path_penalty = torch.where(
+            stopped_command, torch.zeros_like(path_penalty), path_penalty
         )
         index = (arc / sp.DS).long().clamp(0, sp.V - 2)
         tangent = torch.nn.functional.normalize(
@@ -131,6 +170,9 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
         self._solo_prev_yaw[rows] = yaw
         cosine_gain = alignment.clamp(0.0, 1.0)
         heading_reward = (2.0 * cosine_gain + 1.5) * yaw_progress
+        heading_reward = torch.where(
+            stopped_command, torch.zeros_like(heading_reward), heading_reward
+        )
         stop = torch.exp(-4.0 * roots[:, 7:9].square().sum(dim=-1))
         reward = torch.where(
             moving,
@@ -147,16 +189,21 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
 
     def _compute_reset(self):
         super()._compute_reset()
-        env_ids = torch.where(self._solo_env)[0]
-        if len(env_ids) == 0:
+        rows = self.all_rows()[self._solo_rows]
+        if len(rows) == 0:
             return
-        rows = self.agent_rows(env_ids)
+        env = torch.div(rows, self.num_agents, rounding_mode="floor")
+        env_ids = torch.unique(env)
         roots = self.humanoid_rows(self._humanoid_root_states)[rows]
         close = (
             (roots[:, :2] - self._solo_goal[rows, :2]).norm(dim=-1) < 0.18
         )
         still = roots[:, 7:9].norm(dim=-1) < 0.2
-        ready = (close & still).view(-1, self.num_agents).all(dim=1)
+        solo_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        ready_count = torch.zeros_like(solo_count)
+        solo_count.scatter_add_(0, env, torch.ones_like(env))
+        ready_count.scatter_add_(0, env, (close & still).long())
+        ready = ready_count[env_ids] == solo_count[env_ids]
         self._solo_stop_count[env_ids] = torch.where(
             ready, self._solo_stop_count[env_ids] + 1,
             torch.zeros_like(self._solo_stop_count[env_ids]),
@@ -165,5 +212,5 @@ class HumanoidMACarrySteerMix(HumanoidMASteerCarry):
 
     def _metric_extra_cols(self, rows):
         cols = super()._metric_extra_cols(rows)
-        env = torch.div(rows, self.num_agents, rounding_mode="floor")
-        cols.append(self._solo_env[env].float())
+        cols.append(self._solo_rows[rows].float())
+        return cols

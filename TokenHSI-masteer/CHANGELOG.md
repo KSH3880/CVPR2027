@@ -1,5 +1,47 @@
 # TokenHSI-ma — 변경 기록
 
+## 2026-09-28
+
+### Stopmix 정지·경로·box-free 손동작 평가 복구
+
+- `HumanoidMACarrySteerMix._metric_extra_cols()`의 누락된 반환을 복구해 MS18/MS83
+  평가가 solo 구분 열을 정상 저장하도록 했다.
+- stopmix의 40~49열을 carry 생애주기로 잘못 표시하던 `eval_one.sh`를 태스크별로
+  분기하고, 정지 도달·재출발, solo/carry HOLD root 속도, carry box 속도·보유율을
+  `MS_STOP_SUMMARY`로 출력한다. MS18/MS83의 경로 추종 비교에는 `soloLat`,
+  `soloOff50`, `carryLat`, `carryOff50`을 분리해 함께 출력한다.
+- box-free HOLD에서 양손의 root-heading-local 높이·전방 위치 평균과 HOLD 시작 대비
+  최대 하강·전방 이동을 50~57열에 append해 없는 박스를 내려놓는 유사 모션을 진단한다.
+  정책 관측·보상·체크포인트 ABI는 변경하지 않는다.
+- `bash -n`, 관련 Python `py_compile`, `tests.test_steer_stop` 6개를 통과했다.
+
+## 2026-09-24
+
+### MS82 flag-free stop reward/goal/carry 회귀 수정
+
+- 기존 MS82 재생은 보존하고 `MS_STOP_FIX_SOLO_REWARD=1`에서 중간 stop의
+  `speed>0` 불연속을 물리 planar-speed 정지 보상으로 교체했다. 정지 명령 동안
+  path/yaw 진행 보상도 0으로 만들어 미세 전진·제자리 steering 유인을 제거했다.
+- `MS_STOP_ANCHOR_GOAL=1`은 box-free carry-window의 goal 3D를 brake/hold/resume
+  blend와 동일하게 최종점에서 stop anchor로 왕복시켜 steering과 goal 관측을
+  일치시킨다. carry agent의 box target은 변경하지 않는다.
+- `train_ms83_stopfix_local.sh`는 두 수정 노브를 켜고
+  `MA_FINETUNE_STEER_ONLY=1`로 steering tokenizer만 학습해 MS18 carry tokenizer,
+  backbone, shared adapter/action residual을 고정한다. 새 노브는 sidecar에 기록한다.
+- `MS_STOP_TB=1`은 HOLD 프레임만 NaN-mask 집계해 solo/carry별 root·box 속도,
+  각속도, anchor·height·hand 오차, held/stable rate, stop reward 항·bonus와 실제
+  task reward를 `stop/...` TensorBoard scalar로 기록한다.
+- pure Torch 회귀 테스트에 정지점 연속성·이동 gate·goal blend endpoint를 추가했다.
+
+### 1-env carry/box-free steering stop 혼합 뷰어
+
+- `MS_VIEW_AGENT_MIX=1`을 `HumanoidMACarrySteerMix` 계열의 GUI 전용 opt-in으로
+  추가했다. 정확히 1 env·2 agents에서 agent 0은 기존 carry 경로·박스를
+  유지하고 agent 1은 학습에 쓴 box-free steering 경로·관측을 받는다.
+- 기본값은 0이고 headless 또는 복수 env에서는 즉시 거부하므로 기존 학습·평가의
+  env 단위 50:50 분포는 변하지 않는다. stopmix의 stop 선택·보상·지표는
+  row 단위 solo mask를 사용해 두 agent 모두 각자 조건에서 정지를 재생한다.
+
 ## 2026-09-23
 
 ### MS81 기반 carry/steering-only 50:50 학습 시나리오
