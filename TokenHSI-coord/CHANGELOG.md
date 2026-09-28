@@ -4,6 +4,19 @@
 
 ## 2026-09-28
 
+### Carry graded invalid-plan penalty와 mean/sample 진단 분리
+
+- 거절 plan의 기본 0.25 penalty는 유지하면서 최대 turn이 46도를 넘는 정도에 따라
+  선형으로 증가하고 92도 이상에서 2배로 포화하도록 바꿨다. 거의-valid curve와 심한
+  zigzag가 같은 binary reward를 받던 문제를 줄인다.
+- sampled proposal과 deterministic mean path의 valid/curve fraction 및 평균 최대 turn을
+  별도로 기록한다. 콘솔에서는 suffix에서 항상 0인 replan displacement를 제거하고 두
+  path의 curve·turn·deviation과 현재 exploration std를 직접 비교한다.
+- 독립 sparse-point exploration 기본 std를 0.25에서 0.10으로 낮춰 4m leg의 초기 샘플
+  변위 규모를 약 1m에서 0.4m로 줄였다. 출력 자유도와 환경변수 override는 유지한다.
+- graded penalty 경계값과 mean dynamic-box metadata 회귀를 포함해 Carry 27개, 공용
+  stack planner 49개 테스트를 통과했다.
+
 ### Carry current-root remaining-suffix replanner
 
 - fixed-origin 전체 trajectory를 매번 재생성한 뒤 과거 dense prefix를 접합하던 방식을

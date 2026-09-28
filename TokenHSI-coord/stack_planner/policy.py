@@ -164,6 +164,8 @@ class StackPlannerActorCritic(nn.Module):
         output["mean_path_local"] = mean_output["path_local"]
         output["mean_path_world"] = mean_output["path_world"]
         output["mean_speed"] = mean_output["speed"]
+        if "box_index" in mean_output:
+            output["mean_box_index"] = mean_output["box_index"]
         output["candidate_logits"] = raw["candidate_logits"]
         return output, packed_action, log_prob, value
 

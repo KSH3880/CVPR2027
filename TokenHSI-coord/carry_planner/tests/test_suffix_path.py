@@ -81,6 +81,7 @@ class CarrySuffixPathTest(unittest.TestCase):
         output, _, _, _ = policy.sample_all(observation)
         self.assertTrue(output["suffix_replan"])
         self.assertEqual(output["box_index"].shape, (2, 1, 2))
+        self.assertEqual(output["mean_box_index"].shape, (2, 1, 2))
         analytic = carry_analytic_collision_loss(
             output, state, observation.path_progress,
         )

@@ -25,7 +25,7 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
   agent/box를 후발 agent가 공간적으로 돌아야 한다.
   비율과 여유는 `CARRY_PLANNER_CONVERGE_PROB`, `CARRY_PLANNER_GOAL_MARGIN`으로 바꾼다.
 
-학습 기본 sparse-point exploration은 CARRY_PLANNER_DELTA_STD=0.25다.
+학습 기본 sparse-point exploration은 CARRY_PLANNER_DELTA_STD=0.10이다.
 매 proposal은 current-root anchored remaining suffix이며, 이전 path는 Transformer
 context로만 입력된다. sample_path_deviation과 mean_path_deviation은 각각 stochastic
 path와 deterministic mean path가 현재의 직선 two-leg/direct reference에서 벗어난
@@ -39,16 +39,20 @@ fallback이 계속 실행된다.
 
 hard gate에서 거절된 sampled proposal에는
 `CARRY_PLANNER_INVALID_PLAN_COEF`(기본 0.25)를 macro reward에서 직접 감점한다.
-최초 거절 시 analytic fallback, 이후 거절 시 이전 valid path가 실행되더라도 거절 action이
-fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit penalty다. 로그의
-`invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
+이 값은 모든 거절의 최소 penalty다. 최대 turn이 실행 한계 46도를 넘으면 초과 비율에
+따라 선형으로 증가하고 92도 이상에서 기본값의 2배로 포화한다. 따라서 46도 근처와 심한
+zigzag를 동일하게 취급하지 않으면서, curve 외 원인으로 거절된 proposal도 기존 최소
+penalty를 유지한다. 최초 거절 시 analytic fallback, 이후 거절 시 이전 valid path가
+실행되더라도 거절 action이 fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit
+penalty다. 로그의 `invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
 
 거절 원인 디버깅을 위해 전체 metric에는 finite/buffer/speed/curve predicate 통과율,
 평균 최대 turn과 path 길이를 기록한다. 콘솔의 `plan_curve_fraction`은 실제 46도 gate
 통과율이다. `plan_zero_turn_false_reject_fraction`은 길이 0인 인접 segment를 공통
 validator처럼 turn 검사에서 제외했을 때만 살아나는 proposal 비율이며, 0보다 크면
-Carry validator의 degenerate-segment 오거절 가능성을 뜻한다. 진단 단계에서는 실제
-수락/거절 동작을 바꾸지 않는다.
+Carry validator의 degenerate-segment 오거절 가능성을 뜻한다. 콘솔은 sampled proposal과
+noise-free mean path의 curve 통과율·평균 최대 turn을 따로 출력하므로 exploration noise와
+mean decoder 문제를 구분할 수 있다. 진단 단계에서는 실제 수락/거절 동작을 바꾸지 않는다.
 
 학습은 physical PPO에 더해 current-root anchored suffix를 96개 미래 시점으로
 펼치고, 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box, box-box overlap을 직접

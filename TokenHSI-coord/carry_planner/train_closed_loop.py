@@ -27,6 +27,7 @@ from carry_planner.env_adapter import HumanoidMACarryPlannerTrain  # noqa: E402
 from carry_planner.analytic_loss import carry_analytic_collision_loss  # noqa: E402
 from carry_planner.regularization import carry_path_regularization  # noqa: E402
 from carry_planner.reward import apply_invalid_plan_penalty  # noqa: E402
+from carry_planner.validity_debug import carry_plan_validity_debug  # noqa: E402
 from coordinator.schema import AGENTS  # noqa: E402
 from stack_planner.checkpoint import (  # noqa: E402
     load_stack_checkpoint, save_stack_checkpoint,
@@ -357,7 +358,7 @@ def main():
     history = StackHistoryBuffer(task.num_envs, history_steps, device)
     policy = StackPlannerActorCritic(
         planner,
-        point_std=_env_float("CARRY_PLANNER_DELTA_STD", 0.25),
+        point_std=_env_float("CARRY_PLANNER_DELTA_STD", 0.10),
         endpoint_std=_env_float("CARRY_PLANNER_ENDPOINT_STD", 0.03),
         anchor_std=_env_float("CARRY_PLANNER_ANCHOR_STD", 0.03),
         speed_std=_env_float("CARRY_PLANNER_SPEED_STD", 0.20),
@@ -547,6 +548,32 @@ def main():
                     diag[key] = diag.get(key, 0.0) + float(
                         validity_debug[name].sum()
                     )
+                mean_validity_debug = carry_plan_validity_debug(
+                    state,
+                    output["mean_path_world"][:, 0],
+                    output["mean_speed"][:, 0],
+                    box_index=output["mean_box_index"][:, 0],
+                    suffix_replan=True,
+                )
+                mean_checks = torch.stack((
+                    mean_validity_debug["finite"],
+                    mean_validity_debug["anchors"],
+                    mean_validity_debug["buffer"],
+                    mean_validity_debug["speed"],
+                    mean_validity_debug["curve"],
+                ), dim=-1)
+                diag["mean_plan_valid"] = diag.get(
+                    "mean_plan_valid", 0.0,
+                ) + float(mean_checks.all(dim=-1).float().sum())
+                diag["mean_plan_curve"] = diag.get(
+                    "mean_plan_curve", 0.0,
+                ) + float(mean_validity_debug["curve"].float().sum())
+                diag["mean_plan_max_turn_deg"] = diag.get(
+                    "mean_plan_max_turn_deg", 0.0,
+                ) + float(mean_validity_debug["max_turn_deg"].sum())
+                diag["mean_plan_count"] = diag.get(
+                    "mean_plan_count", 0.0,
+                ) + mean_validity_debug["curve"].numel()
                 diag["plan_debug_count"] = diag.get(
                     "plan_debug_count", 0.0,
                 ) + valid.numel()
@@ -584,6 +611,7 @@ def main():
                 )
                 reward, invalid_penalty = apply_invalid_plan_penalty(
                     reward, valid, invalid_plan_coef,
+                    max_turn_deg=validity_debug["max_turn_deg"],
                 )
                 diag["invalid_plan_penalty"] = diag.get(
                     "invalid_plan_penalty", 0.0,
@@ -664,6 +692,7 @@ def main():
                 "collision_box_box_cost", "executed_steps",
             ),
             "plan_valid_fraction": ratio("plan_valid", "plan_count"),
+            "sample_plan_valid_fraction": ratio("plan_valid", "plan_count"),
             "plan_finite_fraction": ratio(
                 "plan_debug_finite", "plan_debug_count",
             ),
@@ -679,6 +708,15 @@ def main():
             "plan_curve_fraction": ratio(
                 "plan_debug_curve", "plan_debug_count",
             ),
+            "sample_plan_curve_fraction": ratio(
+                "plan_debug_curve", "plan_debug_count",
+            ),
+            "mean_plan_valid_fraction": ratio(
+                "mean_plan_valid", "mean_plan_count",
+            ),
+            "mean_plan_curve_fraction": ratio(
+                "mean_plan_curve", "mean_plan_count",
+            ),
             "plan_zero_safe_curve_fraction": ratio(
                 "plan_debug_zero_safe_curve", "plan_debug_count",
             ),
@@ -690,6 +728,12 @@ def main():
             ),
             "plan_mean_max_turn_deg": ratio(
                 "plan_debug_max_turn_deg", "plan_debug_count",
+            ),
+            "sample_plan_max_turn_deg": ratio(
+                "plan_debug_max_turn_deg", "plan_debug_count",
+            ),
+            "mean_plan_max_turn_deg": ratio(
+                "mean_plan_max_turn_deg", "mean_plan_count",
             ),
             "plan_mean_length_m": ratio(
                 "plan_debug_path_length_m", "plan_debug_count",
@@ -720,12 +764,13 @@ def main():
             stream.write(json.dumps(metrics, sort_keys=True) + "\n")
         console_keys = (
             "iteration", "reward", "done_rate", "progress",
-            "collision_ratio", "plan_valid_fraction",
-            "plan_curve_fraction", "plan_zero_turn_false_reject_fraction",
-            "invalid_plan_penalty", "analytic_collision_loss",
-            "mean_path_deviation", "mean_future_excess_m",
-            "mean_replan_displacement", "mean_direction_error_deg",
-            "path_regularization_safe_weight",
+            "collision_ratio", "sample_plan_valid_fraction",
+            "sample_plan_curve_fraction", "mean_plan_curve_fraction",
+            "sample_plan_max_turn_deg", "mean_plan_max_turn_deg",
+            "invalid_plan_penalty", "path_delta_std",
+            "sample_path_deviation", "mean_path_deviation",
+            "analytic_collision_loss", "mean_future_excess_m",
+            "mean_direction_error_deg",
         )
         print(
             "[carry-planner-train] " + " ".join(

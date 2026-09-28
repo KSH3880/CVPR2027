@@ -54,7 +54,7 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             self._carry_planner_policy = StackPlannerActorCritic(
                 self._carry_planner,
                 point_std=float(os.environ.get(
-                    "CARRY_PLANNER_VIEW_DELTA_STD", "0.25",
+                    "CARRY_PLANNER_VIEW_DELTA_STD", "0.10",
                 )),
                 endpoint_std=0.03,
                 anchor_std=0.03,
