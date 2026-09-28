@@ -528,6 +528,24 @@ def main():
                     "speed": output["speed"],
                 }
                 valid = task.install_external_plan(candidate_output)
+                validity_debug = task.last_plan_validity_debug()
+                for name in (
+                    "finite", "buffer", "speed", "curve",
+                    "zero_safe_curve", "zero_turn_false_reject",
+                    "relevant_degenerate_turn",
+                ):
+                    key = f"plan_debug_{name}"
+                    diag[key] = diag.get(key, 0.0) + float(
+                        validity_debug[name].float().sum()
+                    )
+                for name in ("max_turn_deg", "path_length_m"):
+                    key = f"plan_debug_{name}"
+                    diag[key] = diag.get(key, 0.0) + float(
+                        validity_debug[name].sum()
+                    )
+                diag["plan_debug_count"] = diag.get(
+                    "plan_debug_count", 0.0,
+                ) + valid.numel()
                 sampled_path = output["path_world"][:, 0]
                 base_path = output["base_path_world"]
                 sampled_deviation = torch.linalg.vector_norm(
@@ -642,6 +660,33 @@ def main():
                 "collision_box_box_cost", "executed_steps",
             ),
             "plan_valid_fraction": ratio("plan_valid", "plan_count"),
+            "plan_finite_fraction": ratio(
+                "plan_debug_finite", "plan_debug_count",
+            ),
+            "plan_buffer_fraction": ratio(
+                "plan_debug_buffer", "plan_debug_count",
+            ),
+            "plan_speed_fraction": ratio(
+                "plan_debug_speed", "plan_debug_count",
+            ),
+            "plan_curve_fraction": ratio(
+                "plan_debug_curve", "plan_debug_count",
+            ),
+            "plan_zero_safe_curve_fraction": ratio(
+                "plan_debug_zero_safe_curve", "plan_debug_count",
+            ),
+            "plan_zero_turn_false_reject_fraction": ratio(
+                "plan_debug_zero_turn_false_reject", "plan_debug_count",
+            ),
+            "plan_degenerate_turn_fraction": ratio(
+                "plan_debug_relevant_degenerate_turn", "plan_debug_count",
+            ),
+            "plan_mean_max_turn_deg": ratio(
+                "plan_debug_max_turn_deg", "plan_debug_count",
+            ),
+            "plan_mean_length_m": ratio(
+                "plan_debug_path_length_m", "plan_debug_count",
+            ),
             "invalid_plan_penalty": ratio(
                 "invalid_plan_penalty", "invalid_plan_samples",
             ),
@@ -669,6 +714,7 @@ def main():
         console_keys = (
             "iteration", "reward", "done_rate", "progress",
             "collision_ratio", "plan_valid_fraction",
+            "plan_curve_fraction", "plan_zero_turn_false_reject_fraction",
             "invalid_plan_penalty", "analytic_collision_loss",
             "mean_path_deviation", "mean_future_excess_m",
             "mean_replan_displacement", "mean_direction_error_deg",

@@ -4,6 +4,17 @@
 
 ## 2026-09-28
 
+### Carry hard-validity reason instrumentation
+
+- 낮은 `plan_valid_fraction`이 policy 탐색 문제인지 validator 오거절인지 구분하도록
+  finite/buffer/speed/curve 통과율, 평균 최대 turn/path 길이와 degenerate-turn 비율을
+  iteration metric에 추가했다.
+- 공통 sequential validator와 달리 Carry validator는 zero-length 인접 segment를
+  제외하지 않아 90도 turn으로 처리할 수 있다. 현재 수락 동작은 유지하고, 그 mask만
+  적용하면 살아나는 비율을 `plan_zero_turn_false_reject_fraction`으로 별도 기록한다.
+- 합성 duplicate point가 기존 검사에서는 curve-invalid, zero-safe 검사에서는 valid가
+  되는 회귀 테스트를 추가했다.
+
 ### Carry 학습 콘솔 로그 축약
 
 - iteration console에는 reward/progress, collision/validity, path 길이·replan·진행방향

@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from carry_planner.layout import converging_goal_xy
+from carry_planner.validity_debug import carry_plan_validity_debug
 from coordinator.schema import AGENTS
 from env.tasks.adapt_interaction_skills.humanoid_ma_coord_carry import (
     HumanoidMACoordCarry,
@@ -176,6 +177,12 @@ class HumanoidMACarryPlannerTrain(
         # Initial pickup/goal anchors are still hard-coded and action-masked by
         # StackTrajectoryPlanner; retain finite/buffer/speed/curvature checks.
         checks[:, 1] = True
+        self._carry_last_plan_validity_debug = {
+            key: value.detach()
+            for key, value in carry_plan_validity_debug(
+                state, path, speed,
+            ).items()
+        }
         valid = checks.all(dim=-1)
         self._coord_replans[env_ids] += 1
         self._coord_invalid[env_ids] += (~valid).long()
@@ -198,6 +205,12 @@ class HumanoidMACarryPlannerTrain(
         self._coord_last_replan[env_ids] = self.progress_buf[env_ids]
         self._coord_phase[env_ids] = state.phase
         return valid
+
+    def last_plan_validity_debug(self):
+        # Diagnostics for the proposal checked most recently.
+        if not hasattr(self, "_carry_last_plan_validity_debug"):
+            raise RuntimeError("no Carry proposal has been checked yet")
+        return self._carry_last_plan_validity_debug
 
     def planner_task_distance(self, state=None):
         """Mean remaining approach/carry distance for dense progress reward."""

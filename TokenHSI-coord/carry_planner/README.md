@@ -39,6 +39,13 @@ hard gate에서 거절된 sampled proposal에는
 fallback 실행 reward를 그대로 받지 않도록 하는 PPO credit penalty다. 로그의
 `invalid_plan_penalty`는 전체 proposal당 실제 평균 감점값이다.
 
+거절 원인 디버깅을 위해 전체 metric에는 finite/buffer/speed/curve predicate 통과율,
+평균 최대 turn과 path 길이를 기록한다. 콘솔의 `plan_curve_fraction`은 실제 46도 gate
+통과율이다. `plan_zero_turn_false_reject_fraction`은 길이 0인 인접 segment를 공통
+validator처럼 turn 검사에서 제외했을 때만 살아나는 proposal 비율이며, 0보다 크면
+Carry validator의 degenerate-segment 오거절 가능성을 뜻한다. 진단 단계에서는 실제
+수락/거절 동작을 바꾸지 않는다.
+
 학습은 physical PPO에 더해 매 replan의 아직 실행하지 않은 suffix를 현재 root부터
 96개 미래 시점으로 펼치고, 충돌 위험이 큰 top-8 시점의 agent-agent, agent-box,
 box-box overlap을 직접 최소화한다. 지나간 prefix는 현재 root로 접어 미래 motion으로
