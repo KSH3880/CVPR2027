@@ -6,6 +6,27 @@ import math
 
 import torch
 
+from coordinator.schema import CoordinatorState
+
+
+def carry_remaining_distance(state: CoordinatorState) -> torch.Tensor:
+    """Mean remaining root-to-box-to-goal distance across both agents.
+
+    Keep the goal leg in the potential before pickup so lifting the box does
+    not create an artificial negative progress spike. Phase 3 is a grounded
+    box at its goal, so its remaining distance is zero after placement.
+    """
+    box_xy = state.box_xyz[..., :2]
+    approach = (state.root_xy - box_xy).norm(dim=-1)
+    carry = (box_xy - state.goal_xy).norm(dim=-1)
+    remaining = carry + torch.where(
+        state.held >= 0.5, torch.zeros_like(approach), approach,
+    )
+    remaining = torch.where(
+        state.phase >= 2.5, torch.zeros_like(remaining), remaining,
+    )
+    return remaining.mean(dim=1)
+
 
 def apply_invalid_plan_penalty(
     reward: torch.Tensor, valid: torch.Tensor, coefficient: float,
@@ -19,4 +40,4 @@ def apply_invalid_plan_penalty(
     return reward - penalty, penalty
 
 
-__all__ = ["apply_invalid_plan_penalty"]
+__all__ = ["carry_remaining_distance", "apply_invalid_plan_penalty"]

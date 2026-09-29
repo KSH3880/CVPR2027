@@ -4,6 +4,14 @@
 
 ## 2026-09-29
 
+### Carry pickup/putdown progress potential 연속화
+
+- 기존 progress는 pickup 전 root→box, pickup 후 box→goal만 재서 box를
+  집는 순간 남은 거리가 갑자기 늘고 성공한 pickup에 큰 음수 reward를 줄 수 있었다.
+- pickup 전에도 box→goal leg를 합치고, box를 목표에 내려놓은 phase 3에서는
+  남은 거리를 0으로 만든다. 중간에 box를 놓치면 root→box 거리가 다시 추가된다.
+- pickup, goal putdown, 중간 drop 경계의 거리 변화를 순수 함수 테스트로 검증했다.
+
 ### Carry progress reward 계수 실험 옵션
 
 - macro reward의 고정 `2.0 * progress`를 `CARRY_PLANNER_PROGRESS_COEF`로 노출했다.

@@ -18,6 +18,9 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
 - sequential phase, A1 retreat, A2 handoff, stacking reward는 없다.
 - reward는 frozen ms18 실행에 대한 환경 Carry reward와 task progress를 유지하면서
   agent-agent, agent-other-box, box-box proximity cost를 감점한다.
+  progress는 12개 low-level step 전후의 남은 task 거리 감소량이다. pickup 전에는
+  root→box + box→goal, pickup 후에는 box→goal, 목표에 내려놓으면 0으로 계산해
+  pickup/putdown 전환에서 거리가 인위적으로 뛰지 않게 한다.
   `CARRY_PLANNER_PROGRESS_COEF`(기본 2.0)으로 progress reward의 배율만
   바꿀 수 있다. 작은 우회가 직선 진척을 일시적으로 줄이는지 확인할 때 사용한다.
 - 기본 stress distribution은 `MS_SCEN=cross`다.

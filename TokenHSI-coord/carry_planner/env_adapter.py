@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from carry_planner.layout import converging_goal_xy
+from carry_planner.reward import carry_remaining_distance
 from carry_planner.validity_debug import carry_plan_validity_debug
 from coordinator.schema import AGENTS
 from env.tasks.adapt_interaction_skills.humanoid_ma_coord_carry import (
@@ -231,16 +232,9 @@ class HumanoidMACarryPlannerTrain(
         return self._carry_last_plan_validity_debug
 
     def planner_task_distance(self, state=None):
-        """Mean remaining approach/carry distance for dense progress reward."""
+        """Continuous task distance for dense progress reward."""
         state = self.planner_state() if state is None else state
-        carrying = state.held >= 0.5
-        source = torch.where(
-            carrying[..., None], state.box_xyz[..., :2], state.root_xy,
-        )
-        target = torch.where(
-            carrying[..., None], state.goal_xy, state.box_xyz[..., :2],
-        )
-        return (source - target).norm(dim=-1).mean(dim=1)
+        return carry_remaining_distance(state)
 
     def planner_collision_terms(self, state=None):
         """Differentiation-free physical proximity costs used after rollout."""
