@@ -4,6 +4,15 @@
 
 ## 2026-09-29
 
+### Carry 첫 에피소드 타임아웃 분산
+
+- 동시에 시작한 대규모 env가 600-step timeout에서 함께 리셋되면서
+  horizon=32 학습 로그에 약 3-iteration 주기가 생기는 현상을 줄였다.
+- 첫 에피소드의 타임아웃만 env별로 3~600 step에 분산하고, 이후에는
+  원래의 전체 길이로 되돌린다. progress_buf는 조작하지 않으며 초기 중복
+  reset에서도 분산값을 보존한다.
+- 일반 종료 보상과 에피소드 통계의 집계를 유지하고 분산 범위 회귀 테스트를 추가했다.
+
 ### Carry pickup/putdown progress potential 연속화
 
 - 기존 progress는 pickup 전 root→box, pickup 후 box→goal만 재서 box를

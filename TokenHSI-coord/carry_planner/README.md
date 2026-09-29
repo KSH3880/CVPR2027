@@ -29,6 +29,10 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
   circumscribed radius 합 + 0.25 m라 최종 배치는 가능하지만, 먼저 도착해 정지한
   agent/box를 후발 agent가 공간적으로 돌아야 한다.
   비율과 여유는 `CARRY_PLANNER_CONVERGE_PROB`, `CARRY_PLANNER_GOAL_MARGIN`으로 바꾼다.
+- 학습 시작 시 모든 env가 같은 age=0에서 시작해 600-step timeout이 주기적으로
+  몰리지 않도록 첫 에피소드의 종료 시점만 env별 3~600 step에 균등하게 분산한다.
+  실제 `progress_buf`는 조작하지 않으며, 그 다음 에피소드부터는 원래 600-step
+  제한을 그대로 쓴다. 초기 중복 reset은 첫 deadline을 다시 뽑지 않는다.
 
 학습 기본 sparse-point exploration은 CARRY_PLANNER_DELTA_STD=0.10이다.
 매 proposal은 current-root anchored remaining suffix이며, 이전 path는 Transformer

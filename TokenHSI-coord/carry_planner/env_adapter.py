@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 
 from carry_planner.layout import converging_goal_xy
+from carry_planner.episode import initial_timeout_deadlines
 from carry_planner.reward import carry_remaining_distance
 from carry_planner.validity_debug import carry_plan_validity_debug
 from coordinator.schema import AGENTS
@@ -79,6 +80,41 @@ class HumanoidMACarryPlannerTrain(
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
         if self.num_agents != AGENTS:
             raise ValueError(f"carry planner requires exactly {AGENTS} agents")
+        # Stagger only the first timeout. Later episodes retain their normal
+        # full length, and the task's progress counter always stays truthful.
+        self._carry_timeout_deadline = initial_timeout_deadlines(
+            self.num_envs, self.max_episode_length, self.device,
+        )
+
+    def _reset_envs(self, env_ids):
+        # The player may call reset twice before the first simulated step.
+        # Preserve the sampled first deadline across those empty resets.
+        live = None
+        if hasattr(self, "_carry_timeout_deadline") and len(env_ids) > 0:
+            live = env_ids[self.progress_buf[env_ids] > 0]
+        super()._reset_envs(env_ids)
+        if live is not None and len(live) > 0:
+            self._carry_timeout_deadline[env_ids] = self.max_episode_length
+
+    def _compute_reset(self):
+        super()._compute_reset()
+        if not hasattr(self, "_carry_timeout_deadline"):
+            return
+        forced = (
+            (self.progress_buf >= self._carry_timeout_deadline - 1)
+            & ~self.reset_buf.bool()
+        )
+        if not bool(forced.any()):
+            return
+        # The parent has already booked ordinary terminal rewards. Apply the
+        # makespan bonus only to these newly timed-out environments.
+        original = self.reset_buf.clone()
+        self.reset_buf[:] = forced.long()
+        rows = self.agent_rows(torch.nonzero(forced, as_tuple=False).squeeze(-1))
+        before = self.rew_buf[rows].clone()
+        self._apply_makespan_reward()
+        self._ep_task_r[rows] += self.rew_buf[rows] - before
+        self.reset_buf[:] = original | forced.long()
 
     def apply_layout(self, env_ids):
         """Mix ordinary Cross with feasible close-goal convergence cases."""
