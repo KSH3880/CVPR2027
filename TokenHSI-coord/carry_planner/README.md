@@ -16,8 +16,10 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
 - accepted replan은 executor cursor를 새 current-root path의 시작으로 reset하며,
   지나온 prefix를 새 spline에 접합하지 않는다.
 - sequential phase, A1 retreat, A2 handoff, stacking reward는 없다.
-- reward는 frozen ms18의 원래 Carry reward와 task progress를 유지하면서
+- reward는 frozen ms18 실행에 대한 환경 Carry reward와 task progress를 유지하면서
   agent-agent, agent-other-box, box-box proximity cost를 감점한다.
+  `CARRY_PLANNER_PROGRESS_COEF`(기본 2.0)으로 progress reward의 배율만
+  바꿀 수 있다. 작은 우회가 직선 진척을 일시적으로 줄이는지 확인할 때 사용한다.
 - 기본 stress distribution은 `MS_SCEN=cross`다.
 - reset의 기본 75%는 각 `box -> goal` 선분이 동일한 crossing을 지나도록 goal을
   crossing 너머에 두는 hard case, 25%는 일반 Cross다. goal 간격은 두 box의

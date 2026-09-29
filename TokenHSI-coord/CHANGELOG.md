@@ -2,7 +2,25 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-29
+
+### Carry progress reward 계수 실험 옵션
+
+- macro reward의 고정 `2.0 * progress`를 `CARRY_PLANNER_PROGRESS_COEF`로 노출했다.
+  기본값 2.0은 유지하며 1.5처럼 소폭 낮춘 새 run을 같은 구조로 비교할 수 있다.
+- 선택한 계수는 시작 로그, iteration metrics, checkpoint extras에 기록한다.
+
 ## 2026-09-28
+
+### Carry suffix 동적 pickup timing 정합성 수정
+
+- suffix spline의 box index가 16번에서 움직여도 analytic collision rollout은
+  16번 지점에 pickup dwell을 넣고 approach/carry 속도 모델을 나누던 불일치를 수정했다.
+- agent별 동적 box index에 dwell과 속도 전환을 적용하고, pickup 완료 시각은
+  삽입된 대기 구간의 끝에서 읽는다. 이미 든 agent는 처음부터 carry 속도를 사용한다.
+- 기존 fixed-index coordinator 경로는 이전 timing 동작을 유지한다.
+- box index가 16 앞뒤로 갈리는 두 agent와 held suffix의 회귀 테스트를 추가했다.
+  관련 16개 테스트 통과.
 
 ### Carry direction-free soft timing gradient와 mean/sample 진단 분리
 

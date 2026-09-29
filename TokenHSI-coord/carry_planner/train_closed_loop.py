@@ -58,7 +58,8 @@ def _refresh_obs(player):
 
 
 @torch.no_grad()
-def _macro_step(player, low_steps: int, collision_coef: float):
+def _macro_step(player, low_steps: int, collision_coef: float,
+                progress_coef: float):
     task = player.env.task
     n = task.num_envs
     start_distance = task.planner_task_distance()
@@ -105,7 +106,7 @@ def _macro_step(player, low_steps: int, collision_coef: float):
     progress = start_distance - end_distance
     collision_mean = collision_sum / denom
     reward = (
-        reward_sum / denom + 2.0 * progress
+        reward_sum / denom + progress_coef * progress
         - collision_coef * collision_mean - 0.01
     )
     diagnostics = {
@@ -379,6 +380,7 @@ def main():
     low_steps = _env_int("CARRY_PLANNER_LOW_STEPS", 12)
     gamma = _env_float("CARRY_PLANNER_GAMMA", 0.99)
     collision_coef = _env_float("CARRY_PLANNER_COLLISION_COEF", 5.0)
+    progress_coef = _env_float("CARRY_PLANNER_PROGRESS_COEF", 2.0)
     ppo_epochs = _env_int("CARRY_PLANNER_PPO_EPOCHS", 3)
     minibatch = _env_int("CARRY_PLANNER_MINIBATCH", 512)
     smoothness_coef = _env_float("CARRY_PLANNER_SMOOTHNESS_COEF", 10.0)
@@ -441,7 +443,8 @@ def main():
     )
     if min(iterations, horizon, low_steps, ppo_epochs, minibatch) <= 0:
         raise ValueError("iteration/horizon/step/minibatch values must be positive")
-    if (collision_coef < 0 or smoothness_coef < 0
+    if (not math.isfinite(progress_coef) or progress_coef < 0
+            or collision_coef < 0 or smoothness_coef < 0
             or speed_smoothness_coef < 0 or analytic_collision_coef < 0
             or invalid_plan_coef < 0 or consistency_coef < 0
             or excess_length_coef < 0 or direction_coef < 0):
@@ -485,6 +488,7 @@ def main():
         f"control_scale={control_scale:g} "
         f"path_alpha={path_update_alpha:g} suffix_replan=True dynamic_box=True "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
+        f"progress_coef={progress_coef:g} "
         f"collision_coef={collision_coef:g} "
         f"analytic_collision_coef={analytic_collision_coef:g} "
         f"analytic_curvature_coef={analytic_curvature_coef:g} "
@@ -607,7 +611,7 @@ def main():
                     float(mean_deviation.max()),
                 )
                 reward, done, macro_diag = _macro_step(
-                    player, low_steps, collision_coef,
+                    player, low_steps, collision_coef, progress_coef,
                 )
                 reward, invalid_penalty = apply_invalid_plan_penalty(
                     reward, valid, invalid_plan_coef,
@@ -675,6 +679,7 @@ def main():
 
         metrics = {
             "iteration": iteration,
+            "progress_coef": progress_coef,
             "reward": float(torch.stack(rewards).mean()),
             "done_rate": float(torch.stack(dones).float().mean()),
             "progress": ratio("progress", "samples"),
@@ -786,6 +791,7 @@ def main():
                     "action_log_std": policy.action_log_std.detach().cpu(),
                     "frozen_executor": str(Path(args.checkpoint).resolve()),
                     "planner_task": "plain_carry_collision_avoidance",
+                    "progress_coef": progress_coef,
                     "collision_coef": collision_coef,
                     "analytic_collision_coef": analytic_collision_coef,
                     "analytic_curvature_coef": analytic_curvature_coef,
