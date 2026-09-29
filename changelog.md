@@ -2,7 +2,23 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-09-29
+
+### 기존 noVNC 서비스로 VNC wrapper 연결
+
+- 이 서버에는 `Xvfb`가 없고 `tokenhsi-gui.service`가 이미 화면 `:2`와 noVNC `5802`를 제공한다. `run-gui.sh`가 GPU 0에서 해당 서비스를 재사용하도록 연결해 34 distill VNC 명령의 `Xvfb not found` 실패를 해결했다. 12,500 epoch checkpoint로 VNC wrapper 평가를 종료했고, Isaac Gym 1600×900 창과 실제 캐릭터·상자 렌더링 캡처를 확인했다.
+
 ## 2026-09-28
+
+### 34번 원본 통합 teacher distillation
+
+- 34번의 graph·보상·PPO·AMP를 유지한 별도 distillation config/train/test/VNC/output을 추가했다. 원본 TokenHSI Stage 1 checkpoint를 동결하고 agent별 graph template에 따라 Carry(HOLDING·AT·ON_TOP), Sit, Climb 관찰과 목표를 만든 뒤 학생 rollout의 `KL(teacher || student)`를 actor loss에 더한다. 원본 34번 및 Stage 2 실행 경로는 유지한다.
+- CPU 집중 테스트 29개 통과. `tokenhsi` 환경은 CUDA 없는 PyTorch라 GPU 검증은 `tokenhsi_sm120`에서 했다. GPU 0·2048환경·`MAX_ITERATIONS=1` 확인은 2 epoch와 checkpoint 저장까지 종료했고, 첫 업데이트에서 KL/PPO actor gradient norm 비율 0.036, KL critic gradient 없음, actor 파라미터 변경, teacher 동결을 확인했다. TensorBoard scalar 196종 모두 유한값이었다. 저장 checkpoint의 1환경·32-step teacher 없는 평가와 Stage 2 SIT plane 2048환경·1 iteration 전이 학습도 종료했다. Stage 2는 모델 tensor 169개를 복사하고 협력 tensor 8개를 새로 만들었다.
+- Teacher 직접 제어 16환경·599-step 첫 episode에서 agent 0의 목표를 한 번 이상 달성한 수는 HOLDING 7, SIT 13, CLIMB 16, HOLDING_AT 4, HOLDING_ON_TOP 6이었다. 이는 teacher label 적합성의 작은 표본이며 학생 정책 수렴·장기 성공률 증거는 아니다.
+
+### 학습 데이터 심링크 복구
+
+- 기존 데이터 디렉터리 심링크 12개가 없는 `CVPR2027/TokenHSI`를 가리켜, 현재 서버의 `/home/user/jhh/Projects/TokenHSI`로 다시 연결했다. 35번 학습의 motion 목록에서 참조하는 파일 136개와 모든 심링크 대상을 확인했다. 학습 실행은 하지 않았다.
 
 ### 뷰어 상자 색을 과제 배정에 연결
 

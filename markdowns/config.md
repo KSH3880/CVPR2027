@@ -1,6 +1,6 @@
 # Multi-Agent Carry 실행 가이드
 
-현재 실행 가능한 실험은 원본 1번과 Stage 1 **27·28·30·31·32·33·34·35번**, Stage 2 **29번 및 SIT plane 변형**이다. 과거 9~26번 config와 전용 실행 스크립트는 정리했다. 모든 명령은 저장소 루트에서 실행한다.
+현재 실행 가능한 실험은 원본 1번과 Stage 1 **27·28·30·31·32·33·34·35번 및 34번 distillation**, Stage 2 **29번 및 SIT plane 변형**이다. 과거 9~26번 config와 전용 실행 스크립트는 정리했다. 모든 명령은 저장소 루트에서 실행한다.
 
 ## 공통 규칙
 
@@ -10,7 +10,7 @@
 - 학습은 기본적으로 scratch다. 기존 실험의 reward/checkpoint 계약을 섞지 않는다. Stage 2 전이는 아래의 `STAGE1_CHECKPOINT`를 사용한다.
 - 평가·VNC 인자는 `<checkpoint.pth> [agents] [envs] [objects] [repeats]`다. `HEADLESS=0`은 로컬 viewer, `HEADLESS=1`은 화면 없는 평가다.
 - 로컬 viewer와 서버 VNC의 상자 색은 매 reset의 과제 배정을 따른다. 단독 대상은 해당 에이전트 색, 공동 대상은 노란색, 나머지는 회색이다. 실행 중인 뷰어는 다시 시작해야 반영된다.
-- 데이터 원본 `/home/hwanhee/CVPR2027/TokenHSI`는 읽기 전용이며, 이 저장소는 심링크로 사용한다.
+- 데이터 원본 `/home/user/jhh/Projects/TokenHSI`는 읽기 전용이며, 이 저장소는 심링크로 사용한다.
 
 ## 현재 실험
 
@@ -26,6 +26,7 @@
 | 32 | [approach_scenario_stage1_skill_curriculum_reward_preserved.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved.yaml) | 31번의 시작 상태·RSI·샘플링을 유지하고 state/progress는 30번 식 |
 | 33 | [approach_scenario_stage1_at_goal_fix.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_at_goal_fix.yaml) | 32번 + AT 목표 slot reset 오류 수정 |
 | 34 | [approach_scenario_stage1_self_sum.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_self_sum.yaml) | 33번 + 자기 edge 보상 합계·동료 edge 평균, 과제 비율 10/10/10/35/35 |
+| 34 distill | [approach_scenario_stage1_self_sum_distill.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_self_sum_distill.yaml) | 34번의 graph·보상 유지, 동결한 원본 통합 Stage 1 teacher 행동 분포 KL 추가 |
 | 35 | [approach_scenario_stage1_slow_near_start.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_slow_near_start.yaml) | 34번 + 가까운 시작 80%를 60만 step 유지하고 120만 step까지 30%로 감소 |
 
 27~35번 Stage 1은 2-agent/3-object 독립 graph와 schema 9 semantic 관찰을 쓴다. ON_TOP 두 개를 동시에 샘플하지 않는다. 28~35번의 팀 보상은 자기 0.9, 동료 0.1이다. 30~33번은 유효 edge를 agent별로 평균 내어 단일 edge와 두 edge의 최대 task 보상을 0.6으로 맞춘다. 34·35번은 자기 edge를 합산하고 동료 edge만 평균 내며 state·progress·성공 식은 33번과 같다.
@@ -56,6 +57,41 @@ TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_s
 ```
 
 정기 checkpoint 저장 간격은 학습 설정에서 500 epoch다. `.pth`는 각 run의 `nn/`, TensorBoard는 `summaries/`, edge 진단은 `diagnostics/`에 저장된다.
+
+### 34번 distillation
+
+34번과 같은 graph·보상·AMP·PPO를 유지한다. 원본 통합 Stage 1 checkpoint를 동결하고, 학생 rollout의 각 상태에서 teacher 분포를 계산해 `KL(teacher || student)`를 PPO loss에 더한다. SIT은 Sit, CLIMB은 Climb, HOLDING/HOLDING_AT/HOLDING_ON_TOP은 Carry teacher를 쓴다. AT 목표는 graph의 goal, ON_TOP 목표는 받침 상자 상판 위의 source 중심이다. 목표가 없는 단독 HOLDING은 현재 source 상자 중심을 Carry 목표로 준다. SIT의 상자 방향은 상자 로컬 +X를 사용한다. 이 두 proxy의 행동 적합성과 장기 성공률은 별도 평가가 필요하다.
+
+이 서버의 `tokenhsi` 환경은 CPU 전용 PyTorch여서 GPU 실행에는 `tokenhsi_sm120`을 사용한다. 아래 명령은 한 GPU만 지정하며, 실행 전 `nvidia-smi`로 점유를 확인한다. Teacher 기본 경로는 `../TokenHSI/output/tokenhsi/ckpt_stage1.pth`이며 `TEACHER_CHECKPOINT`로 바꿀 수 있다.
+
+```bash
+GPU=0
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU="$GPU" \
+  bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_distill_train.sh 2 2048 3
+```
+
+`TEACHER_KL_COEF` 기본값은 `0.001`, `TEACHER_GRAD_CHECKS` 기본값은 `0`이다. `RESUME_CHECKPOINT`는 **같은 distillation 실험**의 checkpoint를 이어갈 때 지정한다. 확인 실행은 별도 output으로 분리한다.
+
+```bash
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU="$GPU" \
+MAX_ITERATIONS=1 TEACHER_GRAD_CHECKS=1 \
+OUTPUT_PATH=output/approach_scenario_stage1_self_sum_distill_check \
+  bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_distill_train.sh 2 2048 3
+```
+
+`MAX_ITERATIONS=1`은 현재 rl_games 종료 조건에서 2 epoch를 실행한다. 학생 checkpoint만으로 평가하며 teacher checkpoint는 필요하지 않다. 아래 `CKPT`에는 이 실험의 실제 `.pth` 경로를 넣는다.
+
+```bash
+CKPT='/absolute/path/to/ApproachScenarioStage1SelfSumDistill.pth'
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=holding_at \
+  bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_distill_test.sh "$CKPT" 2 1 3 10
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU="$GPU" TASK_GRAPH=holding_ontop \
+  bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_distill_vnc.sh "$CKPT"
+```
+
+이 서버의 VNC wrapper는 실행 중인 `tokenhsi-gui.service`의 화면을 사용한다. VS Code **PORTS**에서 원격 포트 `5802`를 포워딩하고 `http://127.0.0.1:5802/`를 연다. 기존 `tokenhsi` 셸에서 실행해도 명령 앞의 `TOKENHSI_CONDA_ENV=tokenhsi_sm120`을 유지한다.
+
+화면 없는 분포 평가는 test 명령에 `HEADLESS=1 TASK_GRAPH=random_scenario`와 평가 환경 수 `64`를 지정한다. TensorBoard `distill/`에는 KL, 행동 평균 오차, actor/critic loss, PPO clip 비율과 다섯 template label 수가 기록된다. Stage 2 SIT plane 전이에는 이 실험의 schema-9 checkpoint를 `STAGE1_CHECKPOINT`로 지정한다. 기존 34번 및 실행 중인 Stage 2 output은 별도다.
 
 ## 로컬 평가와 서버 VNC
 

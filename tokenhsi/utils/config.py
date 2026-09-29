@@ -174,6 +174,13 @@ def load_cfg(args):
     if args.checkpoint != "Base":
         cfg_train["params"]["load_path"] = args.checkpoint
         cfg["env"]["checkpoint"] = args.checkpoint
+
+    if args.teacher_checkpoint:
+        if args.task != 'HumanoidMACarry' or args.test or args.eval:
+            raise ValueError('--teacher_checkpoint is for HumanoidMACarry training only')
+        cfg_train['params']['config']['teacher_distillation'] = dict(
+            checkpoint=args.teacher_checkpoint, kl_coef=args.teacher_kl_coef,
+            grad_checks=args.teacher_grad_checks)
         
     if args.llc_checkpoint != "":
         cfg_train["params"]["config"]["llc_checkpoint"] = args.llc_checkpoint
@@ -322,6 +329,12 @@ def get_args(benchmark=False):
         {"name": "--seed", "type": int, "help": "Random seed"},
         {"name": "--max_iterations", "type": int, "default": 0,
             "help": "Set a maximum number of training iterations"},
+        {"name": "--teacher_checkpoint", "type": str, "default": "",
+            "help": "Frozen TokenHSI Stage-1 checkpoint for graph-routed distillation"},
+        {"name": "--teacher_kl_coef", "type": float, "default": 1e-3,
+            "help": "Coefficient of joint-action KL(teacher || student)"},
+        {"name": "--teacher_grad_checks", "type": int, "default": 0,
+            "help": "Number of initial optimizer updates to check distillation gradients"},
         {"name": "--horizon_length", "type": int, "default": -1,
             "help": "Set number of simulation steps per 1 PPO iteration. Supported only by rl_games. If not -1 overrides the config settings."},
         {"name": "--minibatch_size", "type": int, "default": -1,
