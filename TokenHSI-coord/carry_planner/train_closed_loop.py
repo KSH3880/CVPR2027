@@ -29,6 +29,7 @@ from carry_planner.regularization import carry_path_regularization  # noqa: E402
 from carry_planner.reward import apply_invalid_plan_penalty  # noqa: E402
 from carry_planner.validity_debug import carry_plan_validity_debug  # noqa: E402
 from coordinator.schema import AGENTS  # noqa: E402
+from carry_planner.tensorboard_metrics import make_writer, write_scalars  # noqa: E402
 from stack_planner.checkpoint import (  # noqa: E402
     load_stack_checkpoint, save_stack_checkpoint,
 )
@@ -486,6 +487,21 @@ def main():
     )).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = output_dir / "metrics.jsonl"
+    tensorboard_enabled = _env_int("CARRY_PLANNER_TENSORBOARD", 1)
+    if tensorboard_enabled not in (0, 1):
+        raise ValueError("CARRY_PLANNER_TENSORBOARD must be 0 or 1")
+    tensorboard_writer = None
+    if tensorboard_enabled:
+        try:
+            tensorboard_writer = make_writer(output_dir / "tensorboard")
+        except RuntimeError as exc:
+            print(f"[carry-planner-train] TensorBoard disabled: {exc}", flush=True)
+        else:
+            print(
+                f"[carry-planner-train] TensorBoard: {output_dir / 'tensorboard'}",
+                flush=True,
+            )
+
     save_every = _env_int("CARRY_PLANNER_SAVE_EVERY", 5)
     _refresh_obs(player)
     print(
@@ -774,6 +790,9 @@ def main():
         }
         with metrics_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(metrics, sort_keys=True) + "\n")
+        if tensorboard_writer is not None:
+            write_scalars(tensorboard_writer, metrics)
+            tensorboard_writer.flush()
         console_keys = (
             "iteration", "reward", "done_rate", "progress",
             "collision_ratio", "sample_plan_valid_fraction",
@@ -826,6 +845,8 @@ def main():
                 },
             )
 
+    if tensorboard_writer is not None:
+        tensorboard_writer.close()
 
 if __name__ == "__main__":
     main()

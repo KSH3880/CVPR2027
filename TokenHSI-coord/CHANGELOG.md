@@ -3,6 +3,14 @@
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-09-29
+### Carry TensorBoard 핵심 지표 대시보드
+
+- reward, 실제 충돌률, analytic loss, sampled/mean plan 유효율, 경로 우회·진행,
+  PPO 손실만 TensorBoard scalar로 매 iteration 기록한다. 원본 metrics.jsonl은 유지한다.
+- 서버 브라우저 접속은 localhost 바인딩과 SSH 포트 포워딩으로 안내한다.
+  구 실행의 JSONL을 event 파일로 옮기고 새 iteration을 따라가는 변환기를 추가했다.
+- 변환기의 metric 선택·불완전한 마지막 줄·실제 event 파일 회귀 테스트를 추가했다.
+
 ### Carry 연속-query 곡선 decoder
 
 - 고정된 4개 제어점을 1:3으로 구간에 배분하던 방식 대신, agent별 8D 위치 latent와

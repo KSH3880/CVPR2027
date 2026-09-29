@@ -116,6 +116,38 @@ MA_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi118 \
 
 출력은 `runs/carry_planner/<tag>/`에 저장한다. 동일 tag는 덮어쓰지 않는다.
 
+TensorBoard는 기본으로 켜져 있으며, 매 iteration의 핵심 지표를
+`runs/carry_planner/<tag>/tensorboard/`에 기록한다. 전체 원시 지표는 기존
+`metrics.jsonl`에 그대로 남는다. `Reward/`는 보상·진척,
+`Collision/`은 실제 충돌률과 analytic loss, `Plan/`은 sampled/mean 제안의
+유효율·곡률 통과율, `Path/`는 우회 거리·replan 변화, `Loss/`는 학습 손실이다.
+`done_rate`는 성공률이 아니라 episode 종료율이므로 성공률로 해석하지 않는다.
+`CARRY_PLANNER_TENSORBOARD=0`으로 기록을 끌 수 있다. TensorBoard 패키지가
+없으면 학습은 계속되며 경고가 출력된다.
+
+서버에서 별도 터미널로 다음을 실행하고, 접속 중인 로컬 PC에서 SSH 터널을 연다.
+포트 6006이 사용 중이면 양쪽의 포트 번호를 함께 바꾼다.
+
+```bash
+# 서버
+python -m tensorboard.main --logdir runs/carry_planner/<tag>/tensorboard --host 127.0.0.1 --port 6006
+# 로컬 PC의 새 터미널
+ssh -N -L 6006:127.0.0.1:6006 hwanhee@<server-host>
+```
+
+로컬 브라우저에서 `http://127.0.0.1:6006`을 열어 Scalars 탭을 본다.
+서버에 패키지가 없다면 학습 conda 환경에서 `python -m pip install tensorboard`로
+설치한다. 이 기능을 적용하기 전에 시작된 학습은 자동 event 파일이 없으므로
+기존 `metrics.jsonl`을 다음처럼 별도 터미널에서 읽어 그래프를 만든다
+(`--follow`는 이후 iteration도 계속 반영한다).
+
+```bash
+PYTHONPATH=TokenHSI-coord python -m carry_planner.tensorboard_metrics \
+  runs/carry_planner/<tag> --follow
+python -m tensorboard.main --logdir runs/carry_planner/<tag>/tensorboard_imported \
+  --host 127.0.0.1 --port 6006
+```
+
 Viewer:
 
 ```bash
