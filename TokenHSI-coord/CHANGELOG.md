@@ -3,6 +3,18 @@
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-09-29
+### Carry 연속-query 곡선 decoder
+
+- 고정된 4개 제어점을 1:3으로 구간에 배분하던 방식 대신, agent별 8D 위치 latent와
+  7D 속도 latent를 공유 네트워크의 연속 곡선 계수로 변환한다.
+- 현재 root/box/goal을 정확히 고정하고 각 구간을 연속 진행률에서 평가한 뒤 전체
+  실제 arc length로 33개 실행 point를 재샘플링한다. box index는 거리 비율에 따라
+  동적으로 정한다. held 이후에는 root→goal 한 구간만 평가한다.
+- 새 학습은 `CARRY_PLANNER_IMPLICIT_CURVE=1`이 기본이다. 기존 sparse checkpoint는
+  그대로 열 수 있지만, 두 decoder 사이에 학습 재개는 허용하지 않는다.
+- 무작위 초기 모델의 급회전 거절을 줄이도록 계수 head를 작게 초기화하고,
+  anchor/gradient/checkpoint 호환성 회귀 테스트를 추가했다.
+
 
 ### Carry 첫 에피소드 타임아웃 분산
 

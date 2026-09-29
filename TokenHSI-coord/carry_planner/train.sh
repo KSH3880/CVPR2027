@@ -56,10 +56,11 @@ export CARRY_PLANNER_COLLISION_COEF=${CARRY_PLANNER_COLLISION_COEF:-5.0}
 export CARRY_PLANNER_CONVERGE_PROB=${CARRY_PLANNER_CONVERGE_PROB:-0.75}
 export CARRY_PLANNER_GOAL_MARGIN=${CARRY_PLANNER_GOAL_MARGIN:-0.25}
 # Kept in the checkpoint config for shared stack-planner compatibility. Plain
-# Carry uses the sparse control-point scale below instead of dense deltas.
+# Carry uses this curve-displacement scale instead of dense deltas.
 export CARRY_PLANNER_DELTA_SCALE=${CARRY_PLANNER_DELTA_SCALE:-1.0}
 export CARRY_PLANNER_CONTROL_SCALE=${CARRY_PLANNER_CONTROL_SCALE:-4.0}
-# Exploration is applied to four sparse point logits per agent.
+export CARRY_PLANNER_IMPLICIT_CURVE=${CARRY_PLANNER_IMPLICIT_CURVE:-1}
+# Exploration is applied to the path action (implicit latent by default; sparse points in legacy mode).
 export CARRY_PLANNER_PATH_UPDATE_ALPHA=${CARRY_PLANNER_PATH_UPDATE_ALPHA:-0.5}
 export CARRY_PLANNER_DELTA_STD=${CARRY_PLANNER_DELTA_STD:-0.10}
 export CARRY_PLANNER_PPO_EPOCHS=${CARRY_PLANNER_PPO_EPOCHS:-3}

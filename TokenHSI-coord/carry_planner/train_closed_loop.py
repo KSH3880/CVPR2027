@@ -326,6 +326,9 @@ def main():
     delta_scale = _env_float("CARRY_PLANNER_DELTA_SCALE", 0.5)
     control_scale = _env_float("CARRY_PLANNER_CONTROL_SCALE", 4.0)
     path_update_alpha = _env_float("CARRY_PLANNER_PATH_UPDATE_ALPHA", 0.5)
+    implicit_curve = _env_int("CARRY_PLANNER_IMPLICIT_CURVE", 1)
+    if implicit_curve not in (0, 1):
+        raise ValueError("CARRY_PLANNER_IMPLICIT_CURVE must be 0 or 1")
     init = os.environ.get("CARRY_PLANNER_INIT", "")
     payload = None
     if init:
@@ -333,6 +336,7 @@ def main():
         expected = (
             history_steps, delta_scale, delta_scale,
             path_update_alpha, True, control_scale, True,
+            bool(implicit_curve),
         )
         actual = (
             planner.config.history_steps, planner.config.delta_scale,
@@ -340,6 +344,7 @@ def main():
             planner.config.path_update_alpha, planner.config.plain_carry,
             planner.config.carry_control_scale,
             planner.config.carry_suffix_replan,
+            planner.config.carry_implicit_curve,
         )
         if actual != expected or planner.config.candidates != 1:
             raise ValueError(
@@ -355,6 +360,7 @@ def main():
             plain_carry=True,
             carry_control_scale=control_scale,
             carry_suffix_replan=True,
+            carry_implicit_curve=bool(implicit_curve),
         )).to(device)
     history = StackHistoryBuffer(task.num_envs, history_steps, device)
     policy = StackPlannerActorCritic(
@@ -487,6 +493,7 @@ def main():
         f"low_steps={low_steps} history={history_steps} delta={delta_scale:g} "
         f"control_scale={control_scale:g} "
         f"path_alpha={path_update_alpha:g} suffix_replan=True dynamic_box=True "
+        f"implicit_curve={implicit_curve} "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"progress_coef={progress_coef:g} "
         f"collision_coef={collision_coef:g} "
@@ -679,6 +686,7 @@ def main():
 
         metrics = {
             "iteration": iteration,
+            "implicit_curve": implicit_curve,
             "progress_coef": progress_coef,
             "reward": float(torch.stack(rewards).mean()),
             "done_rate": float(torch.stack(dones).float().mean()),
@@ -791,6 +799,7 @@ def main():
                     "action_log_std": policy.action_log_std.detach().cpu(),
                     "frozen_executor": str(Path(args.checkpoint).resolve()),
                     "planner_task": "plain_carry_collision_avoidance",
+                    "implicit_curve": bool(implicit_curve),
                     "progress_coef": progress_coef,
                     "collision_coef": collision_coef,
                     "analytic_collision_coef": analytic_collision_coef,

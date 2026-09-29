@@ -13,6 +13,9 @@ from coordinator.geometry import (
     world_to_shared,
 )
 
+from .carry_implicit import (
+    IMPLICIT_COEFFICIENTS, IMPLICIT_FEATURES, decode_carry_implicit_suffix,
+)
 from .carry_suffix import decode_carry_suffix
 from .schema import (
     AGENTS, CARRY_LEARNED_PATH_POINTS, CARRY_PATH_DIM, CARRY_PATH_KNOTS,
@@ -39,6 +42,7 @@ class StackPlannerConfig:
     plain_carry: bool = False
     carry_control_scale: float = 4.0
     carry_suffix_replan: bool = False
+    carry_implicit_curve: bool = False
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -65,6 +69,8 @@ class StackPlannerConfig:
             raise ValueError("carry_control_scale must be positive")
         if self.carry_suffix_replan and not self.plain_carry:
             raise ValueError("carry_suffix_replan requires plain_carry")
+        if self.carry_implicit_curve and not self.carry_suffix_replan:
+            raise ValueError("carry_implicit_curve requires carry_suffix_replan")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -332,6 +338,13 @@ class StackPlannerHeads(nn.Module):
         self.speeds = nn.ModuleList([
             head(self.speed_action_dim) for _ in range(config.candidates)
         ])
+        if config.carry_implicit_curve:
+            self.implicit_coefficients = nn.Sequential(
+                nn.Linear(IMPLICIT_FEATURES, 64), nn.GELU(),
+                nn.Linear(64, IMPLICIT_COEFFICIENTS),
+            )
+            nn.init.normal_(self.implicit_coefficients[-1].weight, std=0.002)
+            nn.init.zeros_(self.implicit_coefficients[-1].bias)
         self.candidate_evaluator = nn.Sequential(
             nn.Linear(
                 config.d_model + STACK_PATH_INPUT_DIM + STACK_SPEED_DIM, hidden,
@@ -347,6 +360,8 @@ class StackPlannerHeads(nn.Module):
             # Start close to the old MAX_SPEED execution behavior, while
             # retaining enough sigmoid gradient to learn slowdowns.
             nn.init.constant_(speed[-1].bias, 2.0)
+            if config.carry_implicit_curve:
+                speed[-1].bias.data.reshape(AGENTS, CARRY_PATH_KNOTS)[:, 1:] = 0.0
 
     def decode_delta(self, base_path_local, previous_path_local,
                      path_delta_raw, speed_raw, path_point_weight,
@@ -372,10 +387,16 @@ class StackPlannerHeads(nn.Module):
                 for value in carry_frame
             )
             held = carry_held[:, None].expand(-1, candidates, -1)
-            path_local, speed, box_index = decode_carry_suffix(
-                root, box, goal, held, learned, speed_logits,
-                self.config.carry_control_scale,
-            )
+            if self.config.carry_implicit_curve:
+                path_local, speed, box_index = decode_carry_implicit_suffix(
+                    root, box, goal, held, learned, speed_logits,
+                    self.config.carry_control_scale, self.implicit_coefficients,
+                )
+            else:
+                path_local, speed, box_index = decode_carry_suffix(
+                    root, box, goal, held, learned, speed_logits,
+                    self.config.carry_control_scale,
+                )
             return (
                 path_local,
                 path_local - base_path_local[:, None],

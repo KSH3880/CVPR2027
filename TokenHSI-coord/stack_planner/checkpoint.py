@@ -67,6 +67,8 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
             "previous_trajectory_correction": False,
             "projected_executor_resume": False,
         })
+    if config.carry_implicit_curve:
+        contract["carry_implicit_curve"] = True
     return contract
 
 

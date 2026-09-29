@@ -9,10 +9,13 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
   current→goal spline만 생성한다.
 - box는 고정 index가 아니다. 두 leg의 실제 arc length로 정한 dynamic index에 정확히
   삽입하며 goal은 항상 마지막 point다.
-- 위치 action은 agent당 중간점 4개의 XY(8D), speed action은 7개 knot이고 최종
-  path/speed ABI는 기존과 같은 33 point다.
-- point offset 범위는 해당 remaining leg 길이와 CONTROL_SCALE 중 작은 값으로 제한되어
-  짧은 box→goal 구간에서 수 m짜리 독립 변위가 생기지 않는다.
+- 기본 implicit decoder는 agent당 위치 latent 8D와 속도 latent 7D를 출력한다.
+  공유 네트워크가 진행률에 따른 연속 XY/속도 곡선을 생성하고, 접근·운반 구간을
+  실제 arc length로 재샘플링해 기존 33-point executor ABI에 맞춘다.
+  root/box/goal은 정확한 anchor이며 학습 제어점의 1:3 배분은 없다.
+- 연속 곡선의 각 XY축 변위 상한은 CONTROL_SCALE이고 남은 직선거리로 축소되지 않는다.
+  `CARRY_PLANNER_IMPLICIT_CURVE=0`은 기존 4-point sparse decoder를 재현한다.
+  두 decoder의 checkpoint는 config가 구별하며 서로 resume할 수 없다.
 - accepted replan은 executor cursor를 새 current-root path의 시작으로 reset하며,
   지나온 prefix를 새 spline에 접합하지 않는다.
 - sequential phase, A1 retreat, A2 handoff, stacking reward는 없다.
@@ -34,7 +37,7 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
   실제 `progress_buf`는 조작하지 않으며, 그 다음 에피소드부터는 원래 600-step
   제한을 그대로 쓴다. 초기 중복 reset은 첫 deadline을 다시 뽑지 않는다.
 
-학습 기본 sparse-point exploration은 CARRY_PLANNER_DELTA_STD=0.10이다.
+학습 기본 latent exploration은 CARRY_PLANNER_DELTA_STD=0.10이다.
 매 proposal은 current-root anchored remaining suffix이며, 이전 path는 Transformer
 context로만 입력된다. sample_path_deviation과 mean_path_deviation은 각각 stochastic
 path와 deterministic mean path가 현재의 직선 two-leg/direct reference에서 벗어난
