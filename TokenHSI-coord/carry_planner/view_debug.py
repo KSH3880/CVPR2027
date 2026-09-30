@@ -17,6 +17,13 @@ _VALIDITY_LABELS = (
 )
 
 
+def viewer_cross_slots(start: int, count: int, device) -> torch.Tensor:
+    """Reserve one in four viewer episodes for a timed Cross stress test."""
+    if start < 0 or count < 0:
+        raise ValueError("start and count must be nonnegative")
+    return (torch.arange(count, device=device) + start) % 4 == 0
+
+
 def rejected_path_vertices(path_xy, height: float = 0.08) -> np.ndarray:
     """Convert [agents, points, 2] paths to Isaac Gym line vertices."""
     path = np.asarray(path_xy, dtype=np.float32)
@@ -38,4 +45,4 @@ def rejection_reason(
     return "+".join(failed) if failed else "unknown"
 
 
-__all__ = ["rejected_path_vertices", "rejection_reason"]
+__all__ = ["rejected_path_vertices", "rejection_reason", "viewer_cross_slots"]

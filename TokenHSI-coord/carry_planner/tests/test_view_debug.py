@@ -3,7 +3,9 @@ import unittest
 import numpy as np
 import torch
 
-from carry_planner.view_debug import rejected_path_vertices, rejection_reason
+from carry_planner.view_debug import (
+    rejected_path_vertices, rejection_reason, viewer_cross_slots,
+)
 
 
 class CarryViewDebugTest(unittest.TestCase):
@@ -26,6 +28,12 @@ class CarryViewDebugTest(unittest.TestCase):
             "curve": torch.tensor((False,)),
         }
         self.assertEqual(rejection_reason(diagnostics, 0), "buffer+curve")
+
+    def test_cross_slot_schedule_is_one_in_four_across_batches(self):
+        first = viewer_cross_slots(0, 3, "cpu")
+        second = viewer_cross_slots(3, 5, "cpu")
+        self.assertEqual(first.tolist(), [True, False, False])
+        self.assertEqual(second.tolist(), [False, True, False, False, False])
 
 
 if __name__ == "__main__":

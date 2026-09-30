@@ -18,7 +18,8 @@ IMPLICIT_COEFFICIENTS = 2 * CARRY_LEARNED_PATH_POINTS + CARRY_PATH_KNOTS
 
 
 def decode_carry_implicit_suffix(root, box, goal, held, path_raw, speed_raw,
-                                 control_scale: float, coefficient_net):
+                                 control_scale: float, coefficient_net,
+                                 scale_by_leg_length: bool = False):
     """Query one learned continuous curve per task leg, then resample to 33.
 
     The policy's four XY action pairs are latent variables, not points tied to
@@ -66,7 +67,11 @@ def decode_carry_implicit_suffix(root, box, goal, held, path_raw, speed_raw,
         )
         displacement = torch.einsum("...ck,kn->...nc", xy_coefficients, sine)
         baseline = start[..., None, :] + unit[None, None, None, :, None] * delta[..., None, :]
-        curve = baseline + control_scale * torch.tanh(displacement)
+        displacement_scale = (
+            length.clamp(max=control_scale)[..., None, :]
+            if scale_by_leg_length else control_scale
+        )
+        curve = baseline + displacement_scale * torch.tanh(displacement)
         curve[..., 0, :] = start
         curve[..., -1, :] = end
         speed_coefficients = coefficients[..., 8:]

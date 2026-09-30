@@ -9,7 +9,9 @@ import numpy as np
 import torch
 
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain
-from carry_planner.view_debug import rejected_path_vertices, rejection_reason
+from carry_planner.view_debug import (
+    rejected_path_vertices, rejection_reason, viewer_cross_slots,
+)
 from stack_planner.checkpoint import load_stack_checkpoint
 from stack_planner.history import StackHistoryBuffer
 from stack_planner.policy import StackPlannerActorCritic
@@ -20,6 +22,17 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._carry_planner_view_ready = False
+        self._carry_view_mixed_layout = bool(int(os.environ.get(
+            "CARRY_PLANNER_VIEW_MIXED_LAYOUT", "0",
+        )))
+        self._carry_view_layout_count = 0
+        self._carry_view_layout_jitter_m = float(os.environ.get(
+            "CARRY_PLANNER_VIEW_LAYOUT_JITTER_M", "0",
+        ))
+        if not 0 <= self._carry_view_layout_jitter_m < float("inf"):
+            raise ValueError(
+                "CARRY_PLANNER_VIEW_LAYOUT_JITTER_M must be finite and nonnegative"
+            )
         checkpoint = Path(
             os.environ.get("CARRY_PLANNER_CKPT", "")
         ).expanduser()
@@ -127,6 +140,55 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             "commands sent to ms18",
             flush=True,
         )
+
+    def _jitter_view_packages(self, env_ids):
+        """Move each root, box and support together without breaking grasp pose."""
+        if len(env_ids) == 0 or self._carry_view_layout_jitter_m == 0:
+            return
+        offset = (
+            2.0 * torch.rand(len(env_ids), 2, 2, device=self.device) - 1.0
+        ) * self._carry_view_layout_jitter_m
+        self.agent_axis(self._humanoid_root_states)[env_ids, :, :2] += offset
+        self.agent_axis(self._box_states)[env_ids, :, :2] += offset
+        if self._carry_reset_random_height:
+            self.agent_axis(self._platform_states)[env_ids, :, :2] += offset
+
+    def apply_layout(self, env_ids):
+        """Three randomized convergence scenes, then one timed Cross scene."""
+        if (
+            not self._carry_view_mixed_layout
+            or getattr(self, "_view_timed_cross", False)
+            or os.environ.get("MS_SCEN", "cross") != "cross"
+            or self._carry_converge_prob != 0.75
+        ):
+            super().apply_layout(env_ids)
+            if not getattr(self, "_view_timed_cross", False):
+                self._jitter_view_packages(env_ids)
+            return
+        if len(env_ids) == 0:
+            return
+        cross = viewer_cross_slots(
+            self._carry_view_layout_count, len(env_ids), env_ids.device,
+        )
+        self._carry_view_layout_count += len(env_ids)
+        old_prob = self._carry_converge_prob
+        try:
+            self._carry_converge_prob = 0.0
+            if bool(cross.any()):
+                super().apply_layout(env_ids[cross])
+            self._carry_converge_prob = 1.0
+            if bool((~cross).any()):
+                super().apply_layout(env_ids[~cross])
+        finally:
+            self._carry_converge_prob = old_prob
+        self._jitter_view_packages(env_ids)
+        if bool(cross.any()):
+            old_cross_prob = self._view_timed_cross_prob
+            try:
+                self._view_timed_cross_prob = 1.0
+                self._apply_view_timed_cross(env_ids[cross])
+            finally:
+                self._view_timed_cross_prob = old_cross_prob
 
     def _install_plan(self, env_ids, path, speed):
         """Keep the installed dense path for agents frozen by the viewer."""

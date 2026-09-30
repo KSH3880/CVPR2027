@@ -27,13 +27,15 @@ class CarryTensorBoardMetricsTest(unittest.TestCase):
             "iteration": 17,
             "reward": 0.25,
             "collision_ratio": 0.1,
+            "collision_episode_fraction": 0.8,
             "analytic_collision_loss": float("nan"),
             "unrelated": 123.0,
         })
-        self.assertEqual(count, 2)
+        self.assertEqual(count, 3)
         self.assertEqual(writer.scalars, [
             ("Reward/total", 0.25, 17),
-            ("Collision/actual_ratio", 0.1, 17),
+            ("Collision/proxy_step_fraction", 0.1, 17),
+            ("Collision/proxy_episode_fraction", 0.8, 17),
         ])
 
     def test_import_ignores_incomplete_last_line(self):

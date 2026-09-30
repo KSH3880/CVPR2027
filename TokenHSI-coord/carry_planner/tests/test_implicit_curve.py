@@ -16,7 +16,8 @@ from stack_planner.policy import StackPlannerActorCritic
 def implicit_model():
     return StackTrajectoryPlanner(StackPlannerConfig(
         candidates=1, plain_carry=True, carry_suffix_replan=True,
-        carry_implicit_curve=True, retreat_delta_scale=0.5,
+        carry_implicit_curve=True, carry_implicit_leg_scale=True,
+        retreat_delta_scale=0.5,
     ))
 
 
@@ -66,7 +67,7 @@ class CarryImplicitCurveTest(unittest.TestCase):
         self.assertTrue(bool(debug["anchors"].all()))
         self.assertTrue(bool(torch.isfinite(path).all()))
 
-    def test_held_curve_can_bend_more_than_short_direct_distance(self):
+    def test_held_curve_bend_scales_with_direct_distance(self):
         root = torch.zeros(1, 1, 2, 2)
         goal = torch.tensor([[[[0.4, 0.0], [0.4, 0.0]]]])
         held = torch.ones(1, 1, 2)
@@ -79,12 +80,26 @@ class CarryImplicitCurveTest(unittest.TestCase):
             return coefficients
 
         path, speed, box_index = decode_carry_implicit_suffix(
+            root, root, goal, held, path_raw, speed_raw, 4.0, wide_bend, True,
+        )
+        short_bend = float(path[..., 1:-1, 1].max())
+        self.assertGreater(short_bend, 0.2)
+        self.assertLessEqual(short_bend, 0.4)
+        legacy_path, _, _ = decode_carry_implicit_suffix(
             root, root, goal, held, path_raw, speed_raw, 4.0, wide_bend,
         )
-        self.assertGreater(float(path[..., 1:-1, 1].max()), 1.0)
+        self.assertGreater(float(legacy_path[..., 1:-1, 1].max()), 1.0)
         self.assertTrue(torch.equal(box_index, torch.full_like(box_index, -1)))
         self.assertEqual(path.shape, (1, 1, 2, 33, 2))
         self.assertEqual(speed.shape, (1, 1, 2, 33))
+
+        long_goal = goal.clone()
+        long_goal[..., 0] = 8.0
+        long_path, _, _ = decode_carry_implicit_suffix(
+            root, root, long_goal, held, path_raw, speed_raw, 4.0, wide_bend, True,
+        )
+        self.assertGreater(float(long_path[..., 1:-1, 1].max()), 1.0)
+        self.assertLessEqual(float(long_path[..., 1:-1, 1].max()), 4.0)
 
     def test_policy_and_analytic_path_gradients_reach_latent_head(self):
         state = make_state(batch=2)
@@ -119,7 +134,9 @@ class CarryImplicitCurveTest(unittest.TestCase):
             save_stack_checkpoint(path, model)
             loaded, payload = load_stack_checkpoint(path)
             self.assertTrue(payload["carry_implicit_curve"])
+            self.assertTrue(payload["carry_implicit_leg_scale"])
             self.assertTrue(loaded.config.carry_implicit_curve)
+            self.assertTrue(loaded.config.carry_implicit_leg_scale)
             with torch.inference_mode():
                 after = loaded(state)
             self.assertTrue(torch.equal(
@@ -135,9 +152,26 @@ class CarryImplicitCurveTest(unittest.TestCase):
             loaded_legacy, _ = load_stack_checkpoint(path)
             self.assertFalse(loaded_legacy.config.carry_implicit_curve)
 
+            old_implicit = StackTrajectoryPlanner(StackPlannerConfig(
+                candidates=1, plain_carry=True, carry_suffix_replan=True,
+                carry_implicit_curve=True, retreat_delta_scale=0.5,
+            )).eval()
+            old_before = old_implicit(state)["path_world"]
+            save_stack_checkpoint(path, old_implicit)
+            old_payload = torch.load(path, weights_only=False)
+            del old_payload["model_config"]["carry_implicit_leg_scale"]
+            torch.save(old_payload, path)
+            loaded_old_implicit, _ = load_stack_checkpoint(path)
+            self.assertFalse(loaded_old_implicit.config.carry_implicit_leg_scale)
+            self.assertTrue(torch.equal(
+                old_before, loaded_old_implicit(state)["path_world"],
+            ))
+
     def test_invalid_configuration(self):
         with self.assertRaisesRegex(ValueError, "requires"):
             StackPlannerConfig(carry_implicit_curve=True)
+        with self.assertRaisesRegex(ValueError, "requires"):
+            StackPlannerConfig(carry_implicit_leg_scale=True)
 
 
 if __name__ == "__main__":

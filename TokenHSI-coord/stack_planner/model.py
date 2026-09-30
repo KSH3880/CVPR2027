@@ -43,6 +43,7 @@ class StackPlannerConfig:
     carry_control_scale: float = 4.0
     carry_suffix_replan: bool = False
     carry_implicit_curve: bool = False
+    carry_implicit_leg_scale: bool = False
 
     def __post_init__(self) -> None:
         if self.token_dim != TOKEN_DIM:
@@ -71,6 +72,8 @@ class StackPlannerConfig:
             raise ValueError("carry_suffix_replan requires plain_carry")
         if self.carry_implicit_curve and not self.carry_suffix_replan:
             raise ValueError("carry_implicit_curve requires carry_suffix_replan")
+        if self.carry_implicit_leg_scale and not self.carry_implicit_curve:
+            raise ValueError("carry_implicit_leg_scale requires carry_implicit_curve")
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -391,6 +394,7 @@ class StackPlannerHeads(nn.Module):
                 path_local, speed, box_index = decode_carry_implicit_suffix(
                     root, box, goal, held, learned, speed_logits,
                     self.config.carry_control_scale, self.implicit_coefficients,
+                    self.config.carry_implicit_leg_scale,
                 )
             else:
                 path_local, speed, box_index = decode_carry_suffix(

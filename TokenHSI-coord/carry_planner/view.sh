@@ -47,6 +47,14 @@ print("carry planner checkpoint: schema={} step={} history={}".format(
     model.config.history_steps))
 PY
 
+if [ -n "${CARRY_PLANNER_VIEW_SEED:-}" ]; then
+    VIEW_SEED=$CARRY_PLANNER_VIEW_SEED
+else
+    VIEW_SEED=$(od -An -N4 -tu4 /dev/urandom)
+    VIEW_SEED=$((VIEW_SEED % 2147483647))
+fi
+[[ "$VIEW_SEED" =~ ^[0-9]+$ ]] || { echo "CARRY_PLANNER_VIEW_SEED must be non-negative" >&2; exit 2; }
+export MS_SEED=${MS_SEED:-$VIEW_SEED}
 CFG=$(mktemp /tmp/carry_planner_view.XXXXXX.yaml)
 cleanup() { rm -f -- "$CFG"; }
 trap cleanup EXIT INT TERM
@@ -61,6 +69,8 @@ export CARRY_PLANNER_CKPT="$PLANNER"
 export CARRY_PLANNER_REPLAN_STEPS=${CARRY_PLANNER_REPLAN_STEPS:-12}
 export CARRY_PLANNER_DEBUG=${CARRY_PLANNER_DEBUG:-1}
 export CARRY_PLANNER_VIEW_GAMES=${CARRY_PLANNER_VIEW_GAMES:-1000000000}
+export CARRY_PLANNER_VIEW_LAYOUT_JITTER_M=${CARRY_PLANNER_VIEW_LAYOUT_JITTER_M:-0.75}
+export CARRY_PLANNER_VIEW_MIXED_LAYOUT=${CARRY_PLANNER_VIEW_MIXED_LAYOUT:-1}
 export CARRY_PLANNER_CONVERGE_PROB=${CARRY_PLANNER_CONVERGE_PROB:-0.75}
 export CARRY_PLANNER_GOAL_MARGIN=${CARRY_PLANNER_GOAL_MARGIN:-0.25}
 export CARRY_PLANNER_VIEW_GOAL_FREEZE_M=${CARRY_PLANNER_VIEW_GOAL_FREEZE_M:-0.75}
@@ -68,8 +78,8 @@ export MA_TOKEN=mask MA_TOKENIZER_ZERO=${MA_TOKENIZER_ZERO:-1}
 export MA_SEP=${MA_SEP:-0} MA_SPAWN_GAP=${MA_SPAWN_GAP:-1.0}
 export MS_MRAND=${MS_MRAND:-4} MS_M_LO=${MS_M_LO:-0.25}
 export MS_CLIP=1 MS_ZERO=0 MS_SCEN=${MS_SCEN:-cross}
-# The default viewer follows the randomized training distribution on every
-# reset. Timed-cross remains available as an explicit stress-test override.
+# The viewer rotates three converging scenes with one timed-Cross scene.
+# MS_VIEW_TIMED_CROSS=1 remains an explicit all-Cross stress-test override.
 export COORD_VIEWER=1
 if [ -z "${MS_VIEW_TIMED_CROSS+x}" ]; then
     MS_VIEW_TIMED_CROSS=0
@@ -90,6 +100,7 @@ export COORD_PRESERVE_PICKUP_APPROACH=${COORD_PRESERVE_PICKUP_APPROACH:-1}
 
 . "$COORD/stack_planner/physx_cuda_compat.sh"
 
+echo "view seed: $VIEW_SEED  mixed_layout=$CARRY_PLANNER_VIEW_MIXED_LAYOUT  layout_jitter_m=$CARRY_PLANNER_VIEW_LAYOUT_JITTER_M"
 echo "planner:  $PLANNER"
 echo "executor: $POLICY"
 echo "scene:    $MS_SCEN  timed_cross=$MS_VIEW_TIMED_CROSS  replan=$CARRY_PLANNER_REPLAN_STEPS  goal_freeze_m=$CARRY_PLANNER_VIEW_GOAL_FREEZE_M"
@@ -105,5 +116,5 @@ python -u -m carry_planner.run_view \
     --cfg_env "$CFG" \
     --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
     --hrl_checkpoint "$STAGE1" --checkpoint "$POLICY" \
-    --num_envs 1 --seed "${CARRY_PLANNER_VIEW_SEED:-0}" \
+    --num_envs 1 --seed "$VIEW_SEED" \
     --test

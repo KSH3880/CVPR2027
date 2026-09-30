@@ -1,5 +1,39 @@
 # TokenHSI-coord — 변경 기록
 
+> 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
+
+## 2026-09-30
+
+### Carry implicit 곡선 변위를 구간 길이로 제한
+
+- 새 implicit 학습에서 접근·운반·보유 후 직행 구간의 각 XY축 곡선 변위 상한을
+  `min(control_scale, 현재 구간 직선거리)`로 바꿨다. 짧은 목표 구간에서도 4m
+  변위가 가능하던 구조를 줄이기 위한 변경이며, 목표 근처 원형 경로의 실제
+  개선 여부는 새 학습·평가에서 확인해야 한다.
+- `carry_implicit_leg_scale`을 checkpoint 계약에 기록한다. 구 checkpoint는
+  기존 고정 4m decoder로 열고, 서로 다른 decoder 간 학습 재개는 거부한다.
+- 짧은/긴 구간 변위와 구 implicit checkpoint 호환성 회귀 테스트를 추가했다.
+
+### Carry 학습 충돌 로그에 에피소드 기준 지표 추가
+
+- 기존 `collision_ratio`는 에피소드 실패율이 아니라 실행 스텝 중 근접도 proxy가
+  발생한 비율이었다. 호환성을 위해 원시 키는 유지하고 콘솔에는
+  `collision_step_fraction`으로 명시한다.
+- 환경별 충돌 여부를 iteration 경계 너머로 누적해, 종료된 에피소드 중 한 번이라도
+  proxy 충돌이 있었던 비율과 완료 에피소드 수를 로그·TensorBoard에 추가한다.
+- 추적기의 에피소드 경계 및 TensorBoard 기록 테스트를 통과했다.
+
+### Carry viewer 실행마다 새 배치 및 25% Cross 충돌 시험
+
+- `view.sh`의 고정 seed 0을 제거하고 매 실행 새 seed를 생성한다. 재현이
+  필요하면 `CARRY_PLANNER_VIEW_SEED`를 지정하며 실제 seed를 출력한다.
+- Cross의 기본 시작 좌표 자체는 고정이므로, viewer에서만 각 에이전트·상자·
+  받침대를 함께 최대 ±0.75m 평행이동시켜 배치를 다양화한다. 0으로 끌 수 있다.
+- viewer 기본 배치는 3개 converge + 1개 timed-Cross를 순환해 단일 env에서도
+  25% 충돌 시험이 정기적으로 나온다. episode 내부 위치는 기존 RNG로 계속
+  랜덤화된다. `CARRY_PLANNER_VIEW_MIXED_LAYOUT=0`이면 기존 랜덤 혼합이다.
+- 정량 평가의 mixed viewer 배치는 강제로 꺼서 기존 평가 분포를 유지한다.
+
 ### Carry planner viewer-only goal freeze
 
 - `view.sh`는 기본적으로 carry 중인 에이전트가 goal 0.75m 안에 들어오면
@@ -10,10 +44,6 @@
 - 경로 유효성 검사에 고정 에이전트 무시 마스크를 추가하되 기본 동작은 그대로
   유지한다.
 
-
-> 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
-
-## 2026-09-30
 ### Carry planner의 높은 미접촉 박스 보유 오인 수정
 
 - 학습·평가·viewer 공통 planner state에서 높이만으로 held를 판정하지 않고,

@@ -24,6 +24,7 @@ if str(TOKENHSI_ROOT) not in sys.path:
 import run as tokenhsi_run  # noqa: E402
 import utils.parse_task as task_registry  # noqa: E402
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain  # noqa: E402
+from carry_planner.episode_collision import EpisodeCollisionTracker  # noqa: E402
 from carry_planner.analytic_loss import carry_analytic_collision_loss  # noqa: E402
 from carry_planner.regularization import carry_path_regularization  # noqa: E402
 from carry_planner.reward import apply_invalid_plan_penalty  # noqa: E402
@@ -60,13 +61,15 @@ def _refresh_obs(player):
 
 @torch.no_grad()
 def _macro_step(player, low_steps: int, collision_coef: float,
-                progress_coef: float):
+                progress_coef: float, episode_collisions: EpisodeCollisionTracker):
     task = player.env.task
     n = task.num_envs
     start_distance = task.planner_task_distance()
     reward_sum = torch.zeros(n, device=task.device)
     collision_sum = torch.zeros(n, device=task.device)
     collision_steps = torch.zeros(n, device=task.device)
+    collided_episodes = torch.zeros((), device=task.device)
+    completed_episodes = torch.zeros((), device=task.device)
     component_sum = {
         name: torch.zeros(n, device=task.device)
         for name in ("agent_agent", "agent_box", "box_box")
@@ -88,7 +91,8 @@ def _macro_step(player, low_steps: int, collision_coef: float,
         collision_sum += torch.where(
             active, collision["total"], torch.zeros_like(collision["total"]),
         )
-        collision_steps += active.float() * (collision["total"] > 0).float()
+        collision_hit = (collision["total"] > 0) & active
+        collision_steps += collision_hit.float()
         for name in component_sum:
             component_sum[name] += torch.where(
                 active, collision[name], torch.zeros_like(collision[name]),
@@ -96,6 +100,11 @@ def _macro_step(player, low_steps: int, collision_coef: float,
         executed += active.float()
         end_distance = torch.where(active, distance, end_distance)
         just_done = done_rows.reshape(n, AGENTS).any(dim=1) & active
+        collided_now, completed_now = episode_collisions.update(
+            collision_hit, just_done,
+        )
+        collided_episodes += collided_now
+        completed_episodes += completed_now
         if just_done.any():
             done_env |= just_done
             active &= ~just_done
@@ -116,6 +125,8 @@ def _macro_step(player, low_steps: int, collision_coef: float,
         "collision_cost": collision_sum.sum(),
         "collision_steps": collision_steps.sum(),
         "executed_steps": executed.sum(),
+        "collision_episodes": collided_episodes,
+        "completed_episodes": completed_episodes,
         "samples": executed.gt(0).float().sum(),
     }
     for name, value in component_sum.items():
@@ -330,6 +341,11 @@ def main():
     implicit_curve = _env_int("CARRY_PLANNER_IMPLICIT_CURVE", 1)
     if implicit_curve not in (0, 1):
         raise ValueError("CARRY_PLANNER_IMPLICIT_CURVE must be 0 or 1")
+    implicit_leg_scale = _env_int("CARRY_PLANNER_IMPLICIT_LEG_SCALE", implicit_curve)
+    if implicit_leg_scale not in (0, 1):
+        raise ValueError("CARRY_PLANNER_IMPLICIT_LEG_SCALE must be 0 or 1")
+    if implicit_leg_scale and not implicit_curve:
+        raise ValueError("implicit leg scale requires implicit curve")
     init = os.environ.get("CARRY_PLANNER_INIT", "")
     payload = None
     if init:
@@ -337,7 +353,7 @@ def main():
         expected = (
             history_steps, delta_scale, delta_scale,
             path_update_alpha, True, control_scale, True,
-            bool(implicit_curve),
+            bool(implicit_curve), bool(implicit_leg_scale),
         )
         actual = (
             planner.config.history_steps, planner.config.delta_scale,
@@ -346,6 +362,7 @@ def main():
             planner.config.carry_control_scale,
             planner.config.carry_suffix_replan,
             planner.config.carry_implicit_curve,
+            planner.config.carry_implicit_leg_scale,
         )
         if actual != expected or planner.config.candidates != 1:
             raise ValueError(
@@ -362,6 +379,7 @@ def main():
             carry_control_scale=control_scale,
             carry_suffix_replan=True,
             carry_implicit_curve=bool(implicit_curve),
+            carry_implicit_leg_scale=bool(implicit_leg_scale),
         )).to(device)
     history = StackHistoryBuffer(task.num_envs, history_steps, device)
     policy = StackPlannerActorCritic(
@@ -509,7 +527,7 @@ def main():
         f"low_steps={low_steps} history={history_steps} delta={delta_scale:g} "
         f"control_scale={control_scale:g} "
         f"path_alpha={path_update_alpha:g} suffix_replan=True dynamic_box=True "
-        f"implicit_curve={implicit_curve} "
+        f"implicit_curve={implicit_curve} implicit_leg_scale={implicit_leg_scale} "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"progress_coef={progress_coef:g} "
         f"collision_coef={collision_coef:g} "
@@ -537,6 +555,7 @@ def main():
 
     first = 1 if payload is None else int(payload.get("step", 0)) + 1
     previous_done = torch.ones(task.num_envs, dtype=torch.bool, device=device)
+    episode_collisions = EpisodeCollisionTracker(task.num_envs, device)
     for iteration in range(first, first + iterations):
         observations = []
         actions: List[torch.Tensor] = []
@@ -635,6 +654,7 @@ def main():
                 )
                 reward, done, macro_diag = _macro_step(
                     player, low_steps, collision_coef, progress_coef,
+                    episode_collisions,
                 )
                 reward, invalid_penalty = apply_invalid_plan_penalty(
                     reward, valid, invalid_plan_coef,
@@ -703,6 +723,7 @@ def main():
         metrics = {
             "iteration": iteration,
             "implicit_curve": implicit_curve,
+            "implicit_leg_scale": implicit_leg_scale,
             "progress_coef": progress_coef,
             "reward": float(torch.stack(rewards).mean()),
             "done_rate": float(torch.stack(dones).float().mean()),
@@ -710,6 +731,12 @@ def main():
             "base_reward": ratio("base_reward", "executed_steps"),
             "collision_cost": ratio("collision_cost", "executed_steps"),
             "collision_ratio": ratio("collision_steps", "executed_steps"),
+            "collision_step_fraction": ratio("collision_steps", "executed_steps"),
+            "collision_episode_fraction": (
+                ratio("collision_episodes", "completed_episodes")
+                if diag.get("completed_episodes", 0) > 0 else float("nan")
+            ),
+            "completed_episodes": int(diag.get("completed_episodes", 0)),
             "collision_agent_agent_cost": ratio(
                 "collision_agent_agent_cost", "executed_steps",
             ),
@@ -795,7 +822,8 @@ def main():
             tensorboard_writer.flush()
         console_keys = (
             "iteration", "reward", "done_rate", "progress",
-            "collision_ratio", "sample_plan_valid_fraction",
+            "collision_episode_fraction", "completed_episodes",
+            "collision_step_fraction", "sample_plan_valid_fraction",
             "sample_plan_curve_fraction", "mean_plan_curve_fraction",
             "sample_plan_max_turn_deg", "mean_plan_max_turn_deg",
             "invalid_plan_penalty", "path_delta_std",
@@ -819,6 +847,7 @@ def main():
                     "frozen_executor": str(Path(args.checkpoint).resolve()),
                     "planner_task": "plain_carry_collision_avoidance",
                     "implicit_curve": bool(implicit_curve),
+                    "implicit_leg_scale": bool(implicit_leg_scale),
                     "progress_coef": progress_coef,
                     "collision_coef": collision_coef,
                     "analytic_collision_coef": analytic_collision_coef,

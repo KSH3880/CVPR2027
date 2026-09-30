@@ -13,9 +13,13 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
   공유 네트워크가 진행률에 따른 연속 XY/속도 곡선을 생성하고, 접근·운반 구간을
   실제 arc length로 재샘플링해 기존 33-point executor ABI에 맞춘다.
   root/box/goal은 정확한 anchor이며 학습 제어점의 1:3 배분은 없다.
-- 연속 곡선의 각 XY축 변위 상한은 CONTROL_SCALE이고 남은 직선거리로 축소되지 않는다.
+- 새 implicit 학습은 각 구간의 XY축 변위 상한을
+  `min(CARRY_PLANNER_CONTROL_SCALE, 해당 구간 직선거리)`로 둔다. 짧은
+  current→goal 구간에서 4m 변위가 그대로 남지 않도록 한다.
+  `CARRY_PLANNER_IMPLICIT_LEG_SCALE=0`은 종전의 고정 CONTROL_SCALE decoder다.
+  기존 implicit checkpoint는 새 config 필드가 없으므로 종전 decoder로 열린다.
   `CARRY_PLANNER_IMPLICIT_CURVE=0`은 기존 4-point sparse decoder를 재현한다.
-  두 decoder의 checkpoint는 config가 구별하며 서로 resume할 수 없다.
+  checkpoint config가 decoder 선택을 구별하며 서로 다른 방식으로 resume할 수 없다.
 - accepted replan은 executor cursor를 새 current-root path의 시작으로 reset하며,
   지나온 prefix를 새 spline에 접합하지 않는다.
 - sequential phase, A1 retreat, A2 handoff, stacking reward는 없다.

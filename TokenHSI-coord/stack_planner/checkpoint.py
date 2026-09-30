@@ -69,6 +69,8 @@ def expected_contract(config: StackPlannerConfig) -> Dict[str, Any]:
         })
     if config.carry_implicit_curve:
         contract["carry_implicit_curve"] = True
+    if config.carry_implicit_leg_scale:
+        contract["carry_implicit_leg_scale"] = True
     return contract
 
 
