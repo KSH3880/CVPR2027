@@ -180,6 +180,12 @@ PYTHONPATH=TokenHSI-coord python \
   runs/carry_planner/sanity_sparse_v16/planner_detour_slow.pth
 ```
 
+viewer에서는 집기 전 `loco_carry` 시작의 자기 상자가 캐릭터에서 3m보다
+멀면 같은 방향으로 3m 위치까지 당긴다. 높은 받침대도 함께 이동한다.
+`CARRY_PLANNER_VIEW_BOX_DISTANCE_MAX_M=0`이면 기존 1~10m 무작위 시작을
+그대로 보며, 양수로 최대 거리를 조절할 수 있다. 이 설정은 학습과 정량 평가에
+적용되지 않는다. 집기·보유·내려놓기 모션에서 시작한 상자도 옮기지 않는다.
+
 기본 viewer는 평가 6회 후 종료하지 않고 창을 닫을 때까지 계속 실행하며, reset마다
 학습과 같은 randomized `mixed` 분포(기본 75% close-goal, 25% 일반 Cross)를 새로
 뽑는다. 실행 episode 상한은 사실상 무한대인 `CARRY_PLANNER_VIEW_GAMES=1000000000`이며

@@ -24,6 +24,33 @@ def viewer_cross_slots(start: int, count: int, device) -> torch.Tensor:
     return (torch.arange(count, device=device) + start) % 4 == 0
 
 
+def cap_box_approach_distance(root_xy: torch.Tensor, box_xy: torch.Tensor,
+                              max_distance: float) -> torch.Tensor:
+    """Limit a walk-start box's XY distance while preserving its direction."""
+    if max_distance <= 0:
+        raise ValueError("max_distance must be positive")
+    delta = box_xy - root_xy
+    distance = delta.norm(dim=-1, keepdim=True)
+    scale = (max_distance / distance.clamp(min=1e-7)).clamp(max=1.0)
+    return root_xy + scale * delta
+
+
+def viewer_walk_box_shift(reset_rows, root_rows: torch.Tensor,
+                          box_by_agent: torch.Tensor, num_agents: int,
+                          max_distance: float):
+    """Return selected agent rows and XY shifts, or None before ref init."""
+    walk_rows = (reset_rows or {}).get("carry", {}).get("loco_carry")
+    if walk_rows is None or len(walk_rows) == 0:
+        return None
+    env = torch.div(walk_rows, num_agents, rounding_mode="floor")
+    agent = walk_rows % num_agents
+    old_xy = box_by_agent[env, agent, :2]
+    new_xy = cap_box_approach_distance(
+        root_rows[walk_rows, :2], old_xy, max_distance,
+    )
+    return env, agent, new_xy - old_xy
+
+
 def rejected_path_vertices(path_xy, height: float = 0.08) -> np.ndarray:
     """Convert [agents, points, 2] paths to Isaac Gym line vertices."""
     path = np.asarray(path_xy, dtype=np.float32)
@@ -45,4 +72,7 @@ def rejection_reason(
     return "+".join(failed) if failed else "unknown"
 
 
-__all__ = ["rejected_path_vertices", "rejection_reason", "viewer_cross_slots"]
+__all__ = [
+    "cap_box_approach_distance", "rejected_path_vertices", "rejection_reason",
+    "viewer_cross_slots", "viewer_walk_box_shift",
+]

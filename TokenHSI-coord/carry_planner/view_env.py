@@ -11,6 +11,7 @@ import torch
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain
 from carry_planner.view_debug import (
     rejected_path_vertices, rejection_reason, viewer_cross_slots,
+    viewer_walk_box_shift,
 )
 from stack_planner.checkpoint import load_stack_checkpoint
 from stack_planner.history import StackHistoryBuffer
@@ -26,6 +27,13 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             "CARRY_PLANNER_VIEW_MIXED_LAYOUT", "0",
         )))
         self._carry_view_layout_count = 0
+        self._carry_view_box_distance_max_m = float(os.environ.get(
+            "CARRY_PLANNER_VIEW_BOX_DISTANCE_MAX_M", "0",
+        ))
+        if not 0 <= self._carry_view_box_distance_max_m < float("inf"):
+            raise ValueError(
+                "CARRY_PLANNER_VIEW_BOX_DISTANCE_MAX_M must be finite and nonnegative"
+            )
         self._carry_view_layout_jitter_m = float(os.environ.get(
             "CARRY_PLANNER_VIEW_LAYOUT_JITTER_M", "0",
         ))
@@ -140,6 +148,25 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             "commands sent to ms18",
             flush=True,
         )
+
+    def _reset_task_carry(self, env_ids):
+        super()._reset_task_carry(env_ids)
+        if self._carry_view_box_distance_max_m == 0:
+            return
+        # Only loco_carry generates a distant, unheld box. Reference-motion
+        # pickUp/carryWith/putDown starts must keep their hand-to-box pose.
+        boxes = self.agent_axis(self._box_states)
+        adjustment = viewer_walk_box_shift(
+            getattr(self, "_reset_ref_rows", None),
+            self.humanoid_rows(self._humanoid_root_states), boxes,
+            self.num_agents, self._carry_view_box_distance_max_m,
+        )
+        if adjustment is None:
+            return
+        env, agent, shift = adjustment
+        boxes[env, agent, :2] += shift
+        if self._carry_reset_random_height:
+            self.agent_axis(self._platform_states)[env, agent, :2] += shift
 
     def _jitter_view_packages(self, env_ids):
         """Move each root, box and support together without breaking grasp pose."""
@@ -299,8 +326,12 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             self.num_envs, dtype=torch.bool, device=self.device,
         )
         update[selected] = valid
+        reset_progress = torch.zeros_like(self._carry_planner_history.path_progress,
+                                          dtype=torch.bool)
+        reset_progress[selected] = ~frozen
         self._carry_planner_history.commit_path(
             committed, update_mask=update, base_path_world=base,
+            reset_progress_mask=reset_progress,
         )
         self._carry_planner_tick[selected] = self.progress_buf[selected]
         self._carry_planner_phase[selected] = state.phase[selected]

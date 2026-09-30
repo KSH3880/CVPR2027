@@ -643,6 +643,26 @@ class StackTrajectoryPlannerTest(unittest.TestCase):
         self.assertTrue(speed_mask[:, 0, 1:].all())
         self.assertFalse(speed_mask[:, 1].any())
 
+    def test_suffix_commit_resets_only_replaced_agents_progress(self):
+        state = make_state(batch=1)
+        state.root_xy[..., 0] = 8.0
+        state.root_xy[..., 1] = 0.0
+        previous = torch.zeros(1, AGENTS, STACK_PATH_POINTS, 2)
+        previous[..., 0] = torch.arange(STACK_PATH_POINTS)
+        buffer = StackHistoryBuffer(1, 1, state.device)
+        buffer.commit_path(previous)
+        first = buffer.observe(state)
+        self.assertTrue(torch.equal(first.path_progress, torch.full((1, 2), 8.0)))
+
+        replacement = previous.clone()
+        replacement[:, 0, :, 0] += 8.0
+        buffer.commit_path(
+            replacement, reset_progress_mask=torch.tensor([[True, False]]),
+        )
+        second = buffer.observe(state)
+        self.assertEqual(float(second.path_progress[0, 0]), 0.0)
+        self.assertEqual(float(second.path_progress[0, 1]), 8.0)
+
     def test_previous_path_keeps_origin_and_masks_executed_prefix(self):
         previous = torch.zeros(1, AGENTS, STACK_PATH_POINTS, 2)
         previous[..., 0] = torch.arange(STACK_PATH_POINTS)

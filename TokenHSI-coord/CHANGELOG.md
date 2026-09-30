@@ -4,6 +4,27 @@
 
 ## 2026-09-30
 
+### Carry suffix replan history cursor 재설정
+
+- 새 suffix를 수락해 설치할 때 이전 경로의 `path_progress`를 그대로 들고 가던
+  문제를 수정했다. 이 값이 32에 가까워지면 consistency 비교에서 미실행
+  구간을 과도하게 잘라내거나 비활성화할 수 있었다.
+- 학습은 유효한 새 plan의 두 agent cursor를 0으로 재설정한다. viewer는
+  실제 교체된 agent만 재설정하고 goal-freeze 중인 agent의 cursor는 유지한다.
+  고정 원점 경로의 기존 단조 progress 규칙은 유지한다.
+- 두 agent 중 한쪽 suffix만 교체한 경우를 포함한 history 회귀 테스트를 추가했다.
+
+### Carry viewer의 집기 전 상자 거리 축소
+
+- viewer의 `loco_carry` 시작에서 자기 상자가 3m보다 멀면 방향을 유지하며
+  3m로 당긴다. 높은 받침대도 같은 양만큼 옮긴다. 모션 포즈와 상자 위치가
+  결합된 pickUp/carryWith/putDown 시작은 건드리지 않는다.
+- `CARRY_PLANNER_VIEW_BOX_DISTANCE_MAX_M=0`으로 기존 viewer 배치를 복원할
+  수 있다. 학습의 1~10m box reset과 정량 평가 분포는 그대로 둔다.
+- viewer 첫 reset에서 참조 row 표가 아직 없을 수 있어 안전하게 건너뛰고,
+  실제 coord 환경의 `_reset_ref_rows`를 agent row로 해석하도록 수정했다.
+- 거리 제한 helper의 근거리/원거리/영거리 회귀 테스트를 추가했다.
+
 ### Carry implicit 곡선 변위를 구간 길이로 제한
 
 - 새 implicit 학습에서 접근·운반·보유 후 직행 구간의 각 XY축 곡선 변위 상한을

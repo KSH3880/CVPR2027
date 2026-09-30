@@ -149,7 +149,8 @@ class StackHistoryBuffer:
         self.base_path_valid[env_mask] = False
         self.path_progress[env_mask] = 0.0
 
-    def commit_path(self, path_world, update_mask=None, base_path_world=None):
+    def commit_path(self, path_world, update_mask=None, base_path_world=None,
+                    reset_progress_mask=None):
         if path_world.shape != self.previous_path_world.shape:
             raise ValueError(
                 f"committed trajectory must be "
@@ -164,6 +165,13 @@ class StackHistoryBuffer:
             raise ValueError("path update_mask must be [B]")
         self.previous_path_world[update_mask] = path_world[update_mask].detach()
         self.previous_path_valid[update_mask] = True
+        if reset_progress_mask is not None:
+            reset_progress_mask = torch.as_tensor(
+                reset_progress_mask, device=self.tokens.device, dtype=torch.bool,
+            )
+            if reset_progress_mask.shape != self.path_progress.shape:
+                raise ValueError("reset_progress_mask must be [B,2]")
+            self.path_progress[reset_progress_mask & update_mask[:, None]] = 0.0
         if base_path_world is None:
             base_path_world = path_world
         if base_path_world.shape != self.base_path_world.shape:

@@ -670,6 +670,7 @@ def main():
                 history.commit_path(
                     mean_path, update_mask=commit,
                     base_path_world=output["base_path_world"],
+                    reset_progress_mask=commit[:, None].expand(-1, AGENTS),
                 )
                 next_state = task.planner_state()
                 next_observation = history.observe(
