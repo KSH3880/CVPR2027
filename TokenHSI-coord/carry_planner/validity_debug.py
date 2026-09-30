@@ -18,6 +18,7 @@ def carry_plan_validity_debug(
     *,
     box_index: Optional[torch.Tensor] = None,
     suffix_replan: bool = False,
+    ignored_agents: Optional[torch.Tensor] = None,
 ) -> Dict[str, torch.Tensor]:
     """Mirror Carry validation, including dynamic suffix pickup anchors."""
     if path.ndim != 4 or path.shape[-2:] != (33, 2):
@@ -31,8 +32,16 @@ def carry_plan_validity_debug(
             raise ValueError("suffix box_index must be [B,2]")
         box_index = box_index.to(device=path.device, dtype=torch.long)
 
-    finite = torch.isfinite(path).flatten(start_dim=1).all(dim=-1)
-    finite &= torch.isfinite(speed).flatten(start_dim=1).all(dim=-1)
+    if ignored_agents is None:
+        ignored_agents = torch.zeros(path.shape[:2], dtype=torch.bool, device=path.device)
+    elif ignored_agents.shape != path.shape[:2]:
+        raise ValueError("ignored_agents must be [B,2]")
+    ignored_agents = ignored_agents.to(device=path.device, dtype=torch.bool)
+    finite = (
+        torch.isfinite(path).flatten(start_dim=2).all(dim=-1)
+        & torch.isfinite(speed).all(dim=-1)
+    )
+    finite = (finite | ignored_agents).all(dim=1)
     root_anchor = (path[..., 0, :] - state.root_xy).norm(dim=-1) <= 0.01
     goal_anchor = (path[..., -1, :] - state.goal_xy).norm(dim=-1) <= 0.01
     if suffix_replan:
@@ -48,16 +57,16 @@ def carry_plan_validity_debug(
         box_anchor = (
             (path[..., 16, :] - state.box_xyz[..., :2]).norm(dim=-1) <= 0.01
         )
-    anchors = (root_anchor & box_anchor & goal_anchor).all(dim=1)
+    anchors = ((root_anchor & box_anchor & goal_anchor) | ignored_agents).all(dim=1)
 
     segment = path[..., 1:, :] - path[..., :-1, :]
     segment_length = segment.norm(dim=-1)
     buffer_ok = (
-        segment_length.sum(dim=-1) < (PATH_VERTICES - 2) * PATH_DS
+        (segment_length.sum(dim=-1) < (PATH_VERTICES - 2) * PATH_DS) | ignored_agents
     ).all(dim=1)
-    speed_ok = (
+    speed_ok = ((
         (speed >= MIN_SPEED - 1e-5) & (speed <= MAX_SPEED + 1e-5)
-    ).flatten(start_dim=1).all(dim=-1)
+    ).all(dim=-1) | ignored_agents).all(dim=1)
 
     v0, v1 = segment[..., :-1, :], segment[..., 1:, :]
     product = v0.norm(dim=-1) * v1.norm(dim=-1)
@@ -77,12 +86,14 @@ def carry_plan_validity_debug(
         ignored[..., 14:17] = True
         ignored[..., :16] |= state.held[..., None] >= 0.5
     evaluated_turn = torch.where(ignored, torch.zeros_like(turn), turn)
+    evaluated_turn = evaluated_turn.masked_fill(ignored_agents[..., None], 0.0)
     curve_ok = evaluated_turn.flatten(start_dim=1).amax(dim=-1) <= 46.0
 
     degenerate = product <= 1e-10
     zero_safe_turn = torch.where(
         ignored | degenerate, torch.zeros_like(turn), turn,
     )
+    zero_safe_turn = zero_safe_turn.masked_fill(ignored_agents[..., None], 0.0)
     zero_safe_curve_ok = (
         zero_safe_turn.flatten(start_dim=1).amax(dim=-1) <= 46.0
     )

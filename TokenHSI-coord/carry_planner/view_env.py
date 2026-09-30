@@ -34,6 +34,13 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         self._carry_planner_stochastic = bool(int(os.environ.get(
             "CARRY_PLANNER_VIEW_STOCHASTIC", "0",
         )))
+        self._carry_planner_goal_freeze_m = float(os.environ.get(
+            "CARRY_PLANNER_VIEW_GOAL_FREEZE_M", "0",
+        ))
+        if not 0 <= self._carry_planner_goal_freeze_m < float("inf"):
+            raise ValueError(
+                "CARRY_PLANNER_VIEW_GOAL_FREEZE_M must be finite and nonnegative"
+            )
         self._carry_planner_draw_rejected = bool(int(os.environ.get(
             "CARRY_PLANNER_DRAW_REJECTED", "1",
         )))
@@ -87,6 +94,13 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         self._carry_planner_raw_ready = torch.zeros(
             self.num_envs, dtype=torch.bool, device=self.device,
         )
+        self._carry_planner_goal_freeze = torch.zeros(
+            (self.num_envs, 2), dtype=torch.bool, device=self.device,
+        )
+        self._carry_view_install_freeze = None
+        self._carry_planner_raw_frozen = torch.zeros_like(
+            self._carry_planner_goal_freeze,
+        )
         self._carry_planner_raw_valid = torch.ones_like(
             self._carry_planner_raw_ready,
         )
@@ -100,10 +114,10 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         print(
             "[carry-planner-view] checkpoint={} schema={} step={} "
             "replan={} proposal_mode={} delta_std={} std_source={} "
-            "frozen_agent=True".format(
+            "frozen_agent=True goal_freeze_m={}".format(
                 checkpoint.resolve(), payload["schema_version"],
                 payload.get("step", 0), period, mode, std,
-                self._carry_planner_std_source,
+                self._carry_planner_std_source, self._carry_planner_goal_freeze_m,
             ),
             flush=True,
         )
@@ -113,6 +127,21 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             "commands sent to ms18",
             flush=True,
         )
+
+    def _install_plan(self, env_ids, path, speed):
+        """Keep the installed dense path for agents frozen by the viewer."""
+        freeze = getattr(self, "_carry_view_install_freeze", None)
+        if freeze is None or not bool(freeze[env_ids].any()):
+            return super()._install_plan(env_ids, path, speed)
+        rows = self.agent_rows(env_ids).reshape(-1, 2)[freeze[env_ids]]
+        fields = (
+            "_gt_path", "_mscale", "_s_end", "_arc_root", "_arc_box",
+            "_prev_arc", "_coord_cmd_tick",
+        )
+        saved = {name: getattr(self, name)[rows].clone() for name in fields}
+        super()._install_plan(env_ids, path, speed)
+        for name, value in saved.items():
+            getattr(self, name)[rows] = value
 
     @torch.no_grad()
     def _maybe_replan(self, env_ids):
@@ -127,7 +156,30 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             >= self._carry_planner_period
         )
         phase_changed = (state.phase != self._carry_planner_phase).any(dim=1)
-        selected = due | phase_changed | restarted
+        phase_changed_agent = (state.phase != self._carry_planner_phase)
+        phase_changed_agent |= restarted[:, None]
+        held = state.held >= 0.5
+        eligible = (
+            held & self._carry_planner_history.previous_path_valid[:, None]
+            & ~phase_changed_agent
+        )
+        if (
+            self._carry_planner_goal_freeze_m > 0
+            and self._carry_planner.config.carry_suffix_replan
+        ):
+            near_goal = (
+                (state.root_xy - state.goal_xy).norm(dim=-1)
+                <= self._carry_planner_goal_freeze_m
+            )
+            self._carry_planner_goal_freeze = (
+                self._carry_planner_goal_freeze | near_goal
+            ) & eligible
+        else:
+            self._carry_planner_goal_freeze.zero_()
+        selected = (
+            (due | phase_changed | restarted)
+            & ~self._carry_planner_goal_freeze.all(dim=1)
+        )
         if not bool(selected.any()):
             return
 
@@ -148,9 +200,26 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             # Match training: execute the sampled proposal, but keep exploration
             # noise out of the recurrent path reference.
             history_path = output["mean_path_world"][:, 0]
+        frozen = self._carry_planner_goal_freeze[selected]
+        proposed = output["path_world"][:, 0].clone()
+        if bool(frozen.any()):
+            output = dict(output)
+            path = output["path_world"].clone()
+            speed = output["speed"].clone()
+            path[:, 0][frozen] = observation.previous_path_world[frozen]
+            speed[:, 0][frozen] = 1.0
+            output["path_world"] = path
+            output["speed"] = speed
+            history_path = history_path.clone()
+            history_path[frozen] = observation.previous_path_world[frozen]
         env_ids = torch.nonzero(selected, as_tuple=False).squeeze(-1)
-        valid = self.install_external_plan(output, env_ids=env_ids)
-        proposed = output["path_world"][:, 0]
+        self._carry_view_install_freeze = self._carry_planner_goal_freeze
+        try:
+            valid = self.install_external_plan(
+                output, env_ids=env_ids, ignored_agents=frozen,
+            )
+        finally:
+            self._carry_view_install_freeze = None
         if self._carry_planner_raw_path is None:
             self._carry_planner_raw_path = torch.zeros(
                 (self.num_envs,) + tuple(proposed.shape[1:]),
@@ -159,6 +228,7 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
         self._carry_planner_raw_path[env_ids] = proposed
         self._carry_planner_raw_ready[env_ids] = True
         self._carry_planner_raw_valid[env_ids] = valid
+        self._carry_planner_raw_frozen[env_ids] = frozen
         committed = self._carry_planner_history.previous_path_world.clone()
         committed[selected] = history_path
         base = self._carry_planner_history.base_path_world.clone()
@@ -183,11 +253,12 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 else rejection_reason(diagnostics, shown_local)
             )
             print(
-                "[carry-planner-view] env={} step={} phase={} valid={} "
+                "[carry-planner-view] env={} step={} phase={} frozen={} valid={} "
                 "reason={} max_turn_deg={:.2f} cursor={} root={} box={} "
                 "goal={}".format(
                     shown, int(self.progress_buf[shown]),
                     state.phase[shown].detach().cpu().tolist(),
+                    frozen[shown_local].detach().cpu().tolist(),
                     bool(valid[shown_local]),
                     reason, float(diagnostics["max_turn_deg"][shown_local]),
                     self._arc_root.reshape(self.num_envs, 2)[shown]
@@ -216,6 +287,8 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             ((1.0, 0.05, 0.05), (1.0, 0.30, 0.05)), dtype=np.float32,
         )
         for agent in range(vertices.shape[0]):
+            if bool(self._carry_planner_raw_frozen[0, agent]):
+                continue
             segment_count = vertices.shape[1]
             line_colors = np.repeat(
                 colors[agent:agent + 1], segment_count, axis=0,
@@ -240,6 +313,7 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             self._carry_planner_history.reset(mask)
             self._carry_planner_tick[env_ids] = -self._carry_planner_period
             self._carry_planner_phase[env_ids] = -99.0
+            self._carry_planner_goal_freeze[env_ids] = False
             self._carry_planner_raw_ready[env_ids] = False
             self._compute_observations(env_ids)
 

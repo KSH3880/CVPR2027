@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from carry_planner.layout import converging_goal_xy
 from carry_planner.episode import initial_timeout_deadlines
+from carry_planner.held_state import observed_box_held
 from carry_planner.reward import carry_remaining_distance
 from carry_planner.validity_debug import carry_plan_validity_debug
 from coordinator.schema import AGENTS
@@ -149,6 +150,36 @@ class HumanoidMACarryPlannerTrain(
 
         self._carry_converge_layout[ids] = True
 
+    def _coord_state(self, env_ids):
+        """Use observed hand contact as well as height for planner pickup."""
+        if env_ids is None:
+            env_ids = torch.arange(
+                self.num_envs, device=self.device, dtype=torch.long,
+            )
+        state = super()._coord_state(env_ids)
+        rows = self.agent_rows(env_ids)
+        rigid = self.humanoid_rows(self._rigid_body_pos)[rows]
+        hands = rigid[:, self._key_body_ids[[0, 1]]].mean(dim=1)
+        hands = hands.reshape(len(env_ids), AGENTS, 3)
+        box_size_z = self._box_lib._box_size[rows, 2].reshape(
+            len(env_ids), AGENTS,
+        )
+        held = observed_box_held(
+            state.root_xy, state.box_xyz, box_size_z, hands,
+        )
+        root_near = (
+            (state.root_xy - state.box_xyz[..., :2]).norm(dim=-1) <= 0.7
+        )
+        goal_near = (
+            (state.box_xyz[..., :2] - state.goal_xy).norm(dim=-1) <= 0.15
+        )
+        state.held = held.to(state.root_xy.dtype)
+        state.phase = torch.where(
+            goal_near & ~held, 3.0,
+            torch.where(held, 2.0, root_near.to(state.root_xy.dtype)),
+        )
+        return state
+
     def planner_state(self, env_ids=None):
         """Return only measured simulator state using the common planner ABI."""
         return self.coord_state(env_ids)
@@ -191,7 +222,7 @@ class HumanoidMACarryPlannerTrain(
             )
 
     @torch.no_grad()
-    def install_external_plan(self, output, env_ids=None):
+    def install_external_plan(self, output, env_ids=None, ignored_agents=None):
         """Install one stack-planner proposal without coordinator selection.
 
         The default carry planner has one head.  Keeping this boundary strict
@@ -213,9 +244,15 @@ class HumanoidMACarryPlannerTrain(
         if box_index is not None and box_index.ndim == 3:
             box_index = box_index[:, 0]
         state = self._coord_state(env_ids)
+        lost_box = (
+            (self._coord_phase[env_ids] == 2.0)
+            & (state.held < 0.5)
+        ).any(dim=1)
+        if lost_box.any():
+            self._coord_has_valid[env_ids[lost_box]] = False
         diagnostics = carry_plan_validity_debug(
             state, path, speed, box_index=box_index,
-            suffix_replan=suffix_replan,
+            suffix_replan=suffix_replan, ignored_agents=ignored_agents,
         )
         if suffix_replan:
             checks = torch.stack((

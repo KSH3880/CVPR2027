@@ -1,8 +1,28 @@
 # TokenHSI-coord — 변경 기록
 
+### Carry planner viewer-only goal freeze
+
+- `view.sh`는 기본적으로 carry 중인 에이전트가 goal 0.75m 안에 들어오면
+  그 에이전트의 마지막 설치 경로와 cursor를 고정한다. 다른 에이전트는
+  기존 주기로 재계획하며, phase 변화·상자 놓기·episode reset 때 고정을 푼다.
+- `CARRY_PLANNER_VIEW_GOAL_FREEZE_M=0`으로 기존 viewer 동작과 비교할 수 있다.
+  `eval_one.sh`은 이 실험용 옵션을 강제로 0으로 두어 정량 평가 기준을 유지한다.
+- 경로 유효성 검사에 고정 에이전트 무시 마스크를 추가하되 기본 동작은 그대로
+  유지한다.
+
+
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-09-30
+### Carry planner의 높은 미접촉 박스 보유 오인 수정
+
+- 학습·평가·viewer 공통 planner state에서 높이만으로 held를 판정하지 않고,
+  기존 executor의 손/몸통-상자 근접 proxy도 함께 확인한다. 높은 플랫폼의
+  미접촉 박스가 root→goal 직행 경로로 잘못 decode되던 경우를 막는다.
+- 보유→미보유 전이 직후 새 plan이 거절되면 이전 직행 경로를 재사용하지 않고
+  analytic fallback을 설치한다.
+- 높은 원거리 박스, 손이 먼 박스, 낮은 박스의 판정 회귀 테스트를 추가했다.
+
 ### Carry suffix replan consistency
 
 - 이전 경로의 실행 완료 prefix를 현재 root에서 잘라내고, 남은 이전/새 경로를
