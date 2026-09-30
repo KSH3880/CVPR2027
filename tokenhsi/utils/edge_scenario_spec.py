@@ -9,6 +9,8 @@ from utils.edge_interaction_spec import SIT, CLIMB
 
 
 INDEPENDENT_CLIMB_SAMPLER = 'two_agent_three_object_independent_with_climb'
+UNIFIED_SAMPLER = 'two_agent_four_object_independent_unified'
+PAIRED_PLACEMENT_SAMPLER = 'two_agent_four_object_paired_placement'
 CLIMB_TEMPLATES = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')
 PRESETS = ('random_scenario', 'holding', 'sit', 'climb', 'holding_at', 'holding_ontop')
 
@@ -51,26 +53,42 @@ def valid_binding_pair(templates, bindings):
     return True
 
 
-def validate_sampler(spec, m=2, o=3):
+def validate_sampler(spec, m=2, o=None):
     expected = {'mode', 'sampler', 'semantic_only', 'edge_capacity',
                 'max_edges_per_agent', 'template_probabilities',
                 'random_binding', 'shuffle_edge_order'}
+    sampler = spec.get('sampler')
+    if sampler == UNIFIED_SAMPLER:
+        expected.add('shuffle_token_order')
+        if spec.get('shuffle_token_order') is not True:
+            raise ValueError('Unified sampler requires token permutation')
+    if spec.get('owner_holding_state') is True:
+        expected.add('owner_holding_state')
     if set(spec) != expected or spec.get('mode') != 'edge_composition' or \
-            spec.get('sampler') != INDEPENDENT_CLIMB_SAMPLER:
+            sampler not in (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER):
         raise ValueError('Unsupported scenario sampler')
-    binding = {'objects': 'disjoint', 'goals': 'disjoint'}
-    if (m, o) != (2, 3) or spec['edge_capacity'] != 4 or \
+    if spec.get('owner_holding_state', False) and sampler not in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER):
+        raise ValueError('Owner-HOLDING state requires paired placement')
+    binding = ({'objects': 'canonical', 'goals': 'canonical'} if sampler == UNIFIED_SAMPLER
+               else {'objects': 'disjoint', 'goals': 'disjoint'})
+    required_objects = 4 if sampler in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER) else 3
+    if o is None:
+        o = required_objects
+    if (m, o) != (2, required_objects) or spec['edge_capacity'] != 4 or \
             spec['max_edges_per_agent'] != 2 or spec['semantic_only'] is not True or \
             spec['random_binding'] != binding or \
             type(spec['shuffle_edge_order']) is not bool:
-        raise ValueError('Scenario requires 2 humans, 3 objects and semantic capacity 4')
+        raise ValueError('Scenario requires 2 humans, {} objects and semantic capacity 4'.format(required_objects))
     p = spec['template_probabilities']
     templates = scenario_templates(spec)
     if tuple(p) != templates or any(isinstance(v, bool) or not isinstance(v, (int, float))
             or not math.isfinite(v) or v < 0 for v in p.values()) or \
             not math.isclose(sum(p.values()), 1., abs_tol=1e-8):
         raise ValueError('Scenario template probabilities must follow the contract')
-    if p['HOLDING_ON_TOP'] > .5:
+    if sampler == PAIRED_PLACEMENT_SAMPLER:
+        if any(p[k] != 0 for k in ('HOLDING', 'SIT', 'CLIMB')):
+            raise ValueError('Paired placement sampler permits AT and ON_TOP only')
+    elif sampler != UNIFIED_SAMPLER and p['HOLDING_ON_TOP'] > .5:
         raise ValueError('Independent ON_TOP probability cannot exceed 0.5')
 
 
@@ -92,7 +110,7 @@ def _rows(agent, template, binding, m=2, o=3):
             (obj(source), obj(support), ON_TOP, True)]
 
 
-def compose_graph(templates, bindings, shuffle=False, generator=None, device='cpu'):
+def compose_graph(templates, bindings, shuffle=False, generator=None, device='cpu', num_objects=3):
     n = len(templates)
     src = torch.zeros(n, 4, dtype=torch.long, device=device)
     dst = torch.zeros_like(src); relation = torch.zeros_like(src); owner = torch.zeros_like(src)
@@ -103,12 +121,12 @@ def compose_graph(templates, bindings, shuffle=False, generator=None, device='cp
             raise ValueError('Invalid scenario binding')
         offset = 0
         for agent in range(2):
-            rows = _rows(agent, templates[batch][agent], bindings[batch][agent])
+            rows = _rows(agent, templates[batch][agent], bindings[batch][agent], o=num_objects)
             for row, (s, d, r, req) in enumerate(rows, offset):
                 src[batch, row], dst[batch, row], relation[batch, row] = s, d, r
                 owner[batch, row], valid[batch, row], required[batch, row] = agent, True, req
             offset += len(rows)
-    graph = EdgeContextGraph(('slot0', 'slot1', 'slot2', 'slot3'), 2, 3,
+    graph = EdgeContextGraph(('slot0', 'slot1', 'slot2', 'slot3'), 2, num_objects,
         src, dst, relation, owner, valid, required,
         torch.zeros(n, 4, 4, dtype=torch.bool, device=device),
         torch.full((n, 4), -1, dtype=torch.long, device=device))
@@ -121,9 +139,14 @@ def compose_graph(templates, bindings, shuffle=False, generator=None, device='cp
 
 def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=False,
                  generator=None):
-    validate_sampler(spec)
+    paired = spec['sampler'] == PAIRED_PLACEMENT_SAMPLER
+    unified = spec['sampler'] == UNIFIED_SAMPLER
+    num_objects = 4 if paired or unified else 3
+    validate_sampler(spec, o=num_objects)
     if preset not in PRESETS:
         raise ValueError('Unknown scenario TASK_GRAPH preset: ' + preset)
+    if paired and preset not in ('random_scenario', 'holding_at', 'holding_ontop'):
+        raise ValueError('Paired placement permits AT and ON_TOP presets only')
     templates_available = scenario_templates(spec)
     probs = torch.tensor([spec['template_probabilities'][k] for k in templates_available],
                          device=device)
@@ -132,36 +155,48 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
              'holding_at': 'HOLDING_AT',
              'holding_ontop': 'HOLDING_ON_TOP'}
     if preset == 'random_scenario':
-        top = probs[-1]
-        pair_probs = torch.outer(probs, probs)
-        pair_probs[-1, -1] = 0
-        pair_probs[-1, :-1] /= 1 - top
-        pair_probs[:-1, -1] /= 1 - top
-        pair_probs[:-1, :-1] *= (1 - 2 * top) / (1 - top) ** 2
-        pair_ids = torch.multinomial(pair_probs.flatten(), n, replacement=True,
-                                     generator=generator).tolist()
+        if paired:
+            pair_ids = torch.multinomial(probs, n, replacement=True,
+                                         generator=generator).tolist()
+        elif unified:
+            pair_ids = torch.multinomial(probs, 2 * n, replacement=True,
+                                         generator=generator).reshape(n, 2).tolist()
+        else:
+            top = probs[-1]
+            pair_probs = torch.outer(probs, probs)
+            pair_probs[-1, -1] = 0
+            pair_probs[-1, :-1] /= 1 - top
+            pair_probs[:-1, -1] /= 1 - top
+            pair_probs[:-1, :-1] *= (1 - 2 * top) / (1 - top) ** 2
+            pair_ids = torch.multinomial(pair_probs.flatten(), n, replacement=True,
+                                         generator=generator).tolist()
     for row in range(n):
         if preset == 'random_scenario':
-            ids = divmod(pair_ids[row], len(templates_available))
-            templates = (templates_available[ids[0]], templates_available[ids[1]])
+            if paired:
+                template = templates_available[pair_ids[row]]
+                templates = (template, template)
+            else:
+                ids = pair_ids[row] if unified else divmod(pair_ids[row], len(templates_available))
+                templates = (templates_available[ids[0]], templates_available[ids[1]])
         else:
-            templates = (fixed[preset], 'HOLDING')
-            if role_swap:
+            templates = (fixed[preset], fixed[preset] if paired or unified else 'HOLDING')
+            if role_swap and not (paired or unified):
                 templates = templates[::-1]
-        objects = torch.randperm(3, device=device, generator=generator).tolist()
-        goals = torch.randperm(2, device=device, generator=generator).tolist()
+        objects = list(range(num_objects)) if unified else torch.randperm(num_objects, device=device, generator=generator).tolist()
+        goals = list(range(2)) if unified else torch.randperm(2, device=device, generator=generator).tolist()
         bindings = tuple((objects[agent], goals[agent]) if template == 'HOLDING_AT'
-            else (objects[agent], objects[2]) if template == 'HOLDING_ON_TOP'
+            else (objects[agent], objects[2 + agent] if paired or unified else objects[2]) if template == 'HOLDING_ON_TOP'
             else (objects[agent],) for agent, template in enumerate(templates))
         template_rows.append(templates); binding_rows.append(bindings)
     return compose_graph(template_rows, binding_rows,
         shuffle=spec['shuffle_edge_order'] if preset == 'random_scenario' else False,
-        generator=generator, device=device)
+        generator=generator, device=device, num_objects=num_objects)
 
 
 def compile_graph(spec, m, o, device=None):
     validate_sampler(spec, m, o)
-    return select_graph(sample_graph(1, spec, device or 'cpu', preset='holding'), 0)
+    preset = 'holding_at' if spec['sampler'] == PAIRED_PLACEMENT_SAMPLER else 'holding'
+    return select_graph(sample_graph(1, spec, device or 'cpu', preset=preset), 0)
 
 
 def validate_graph(graph):

@@ -82,3 +82,34 @@ class PackedEdgeSemanticFusion(nn.Module):
             1, indices, valid.long()).bool().reshape(n, l, l)
         background = background_bias[:, None].masked_fill(occupied[None, :, None], 0.)
         return dense.reshape(*dense.shape[:-1], l, l) + background
+
+
+class PackedEdgeOwnerHoldingFusion(nn.Module):
+    """Condition placement-edge bias on the owner's matching HOLDING state."""
+    def __init__(self):
+        super().__init__()
+        self.state_mlp = nn.Sequential(nn.Linear(65, 64), nn.ReLU(), nn.Linear(64, 64))
+
+    def forward(self, suffix, semantic_encoder, entity_types, background_bias):
+        from utils.edge_context_spec import AT
+        from utils.edge_ontop_spec import ON_TOP
+        from utils.edge_stage1_spec import parse_owner_holding_packet
+        valid, src, dst, relation, owner, state = parse_owner_holding_packet(suffix)
+        n, e = src.shape
+        l = entity_types.numel()
+        semantic = semantic_encoder.edge_mlp(torch.cat([
+            semantic_encoder.source_type_embed(entity_types[src]),
+            semantic_encoder.relation_embed(relation),
+            semantic_encoder.target_type_embed(entity_types[dst])], -1))
+        placement = valid & ((relation == AT) | (relation == ON_TOP))
+        edge = semantic + placement[..., None] * self.state_mlp(
+            torch.cat((semantic, state[..., None]), -1))
+        values = torch.einsum('bed,lhd->lbhe', edge,
+            semantic_encoder.bias_projection) * valid[None, :, None]
+        indices = src * l + dst
+        dense = values.new_zeros(*values.shape[:-1], l * l).scatter_add(
+            -1, indices[None, :, None].expand_as(values), values)
+        occupied = torch.zeros(n, l * l, dtype=torch.long, device=src.device).scatter_add(
+            1, indices, valid.long()).bool().reshape(n, l, l)
+        background = background_bias[:, None].masked_fill(occupied[None, :, None], 0.)
+        return dense.reshape(*dense.shape[:-1], l, l) + background

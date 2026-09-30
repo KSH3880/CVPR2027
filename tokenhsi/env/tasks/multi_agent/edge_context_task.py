@@ -11,9 +11,28 @@ from utils.edge_interaction_spec import SIT, CLIMB
 from env.tasks.multi_agent.edge_ontop_reward import mix_task_reward
 from env.tasks.multi_agent.edge_stage1_reward import stage1_context
 from utils.edge_stage1_spec import PLANE_VARIANTS
+from utils.edge_scenario_spec import agent_object_indices
 
 
 class EdgeContextTaskMixin:
+    def _reward_box_values(self, values, env_ids=None):
+        """Gather the graph-bound primary object for each agent's speed penalty.
+
+        Scenario graphs randomize logical object bindings independently of the
+        legacy assignment. Current positions and position history must both use
+        this mapping, including on partial resets.
+        """
+        if not getattr(self, '_scenario_no_climb', False):
+            return self._assigned_box_values(values, env_ids)
+        if env_ids is None:
+            env_ids = torch.arange(values.shape[0], device=values.device)
+        env = env_ids[:, None].expand(-1, self.num_agents)
+        agent = torch.arange(self.num_agents, device=values.device)[None].expand_as(env)
+        logical = agent_object_indices(self.relation_runtime.graph,
+            env.reshape(-1), agent.reshape(-1)).reshape_as(env)
+        physical = self._logical_box_order[env, logical]
+        return values[env, physical]
+
     def _init_relation_runtime(self):
         if not self._edge_context:
             return super()._init_relation_runtime()
@@ -57,7 +76,7 @@ class EdgeContextTaskMixin:
         else:
             self.relation_runtime.reset(env_ids, phi, diag['z_error'])
         self._prev_root_pos[env_ids] = self._kinematic_humanoid_rigid_body_states[env_ids, :, 0, :3]
-        self._prev_box_pos[env_ids] = self._assigned_box_values(self._box_states, env_ids)[..., :3]
+        self._prev_box_pos[env_ids] = self._reward_box_values(self._box_states, env_ids)[..., :3]
         self._relation_episode_id[env_ids] += 1
         self._edge_ever_goal[env_ids] = self.relation_runtime.done[env_ids]
         self._edge_ever_scene[env_ids] = scene_success(self.relation_runtime.own_success[env_ids], select_graph(self.relation_runtime.graph, env_ids))
@@ -76,7 +95,7 @@ class EdgeContextTaskMixin:
         else:
             result = runtime.step(phi, diag['progress'], diag['z_error'])
         roots = self._humanoid_root_states[..., :3]
-        objects = self._assigned_box_values(self._box_states)[..., :3]
+        objects = self._reward_box_values(self._box_states)[..., :3]
         power = torch.zeros_like(result['agent_task_reward']); collision = torch.zeros_like(power); speed = torch.zeros_like(power)
         if self._power_reward:
             power = -self._power_coefficient * (self.dof_force_tensor * self._dof_vel).abs().sum(-1)

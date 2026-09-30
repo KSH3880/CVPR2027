@@ -65,6 +65,14 @@ class EntityRunningMeanStd(nn.Module):
 
 class MAAgent(amp_agent.AMPAgent):
 
+    def _preproc_amp_obs(self, amp_obs):
+        normalized = super()._preproc_amp_obs(amp_obs)
+        task = self.vec_env.env.task
+        if getattr(task, '_amp_task_conditioning', False):
+            from utils.unified_training import preserve_amp_labels
+            normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps)
+        return normalized
+
     def __init__(self, base_name, config):
         super().__init__(base_name, config)
 
@@ -443,6 +451,18 @@ class MAAgent(amp_agent.AMPAgent):
         else:
             replay = self._amp_replay_buffer.sample(num_agent_samples)['amp_obs']
             batch_dict['amp_obs_replay'] = replay.view(scene_count, M, amp_dim)
+
+        task = self.vec_env.env.task
+        if getattr(task, '_amp_task_conditioning', False):
+            from utils.unified_training import sample_family_matched
+            reference = batch_dict['amp_obs'].reshape(num_agent_samples, amp_dim)
+            for key, buffer in (('amp_obs_demo', self._amp_obs_demo_buffer),
+                                ('amp_obs_replay', self._amp_replay_buffer)):
+                count = min(buffer.get_total_count(), buffer.get_buffer_size())
+                pool = buffer._data_buf['amp_obs'][:count] if count else reference[:0]
+                fallback = reference if key == 'amp_obs_replay' else None
+                matched = sample_family_matched(pool, reference, task._num_amp_obs_steps, fallback)
+                batch_dict[key] = matched.view(scene_count, M, amp_dim)
 
         self.set_train()
         self.curr_frames = batch_dict.pop('played_frames')

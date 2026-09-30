@@ -49,6 +49,7 @@ class SampledOnTopTaskMixin:
         self._sampling_counts=torch.zeros(18,device=self.device)
         self._sampling_retries=torch.zeros((),device=self.device)
         self._sampling_failures=torch.zeros((),device=self.device)
+        self._ontop_putdown_rsi_count=torch.zeros((),device=self.device)
         self._stage2_initial_rejections=torch.zeros((),device=self.device)
         self._stage2_rsi_counts=torch.zeros(len(self._skill),device=self.device)
         self._rsi_attempts=torch.zeros(2,device=self.device)
@@ -190,6 +191,10 @@ class SampledOnTopTaskMixin:
                 rejected |= initial_success
             accepted=pending[~rejected]
             if len(accepted):
+                putdown_supports = self._putdown_ontop_supports()
+                if putdown_supports is not None:
+                    self._ontop_putdown_rsi_count += (
+                        (putdown_supports[0][:, None] == accepted[None, :]).any(-1).sum())
                 # Isaac Gym tensor setters may be called only once between simulation steps.
                 # Keep accepted candidates in the shared tensors and aggregate their AMP
                 # metadata; commit the complete reset batch once after every scene is valid.
@@ -244,6 +249,7 @@ class SampledOnTopTaskMixin:
             if (self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS
                     or 'independent_training' in self._relation_cfg) and not self._is_eval:
                 self._configure_hard_skill_near_starts(ids)
+            self._configure_putdown_ontop_supports()
             return
         g=select_graph(self.relation_runtime.graph,ids)
         at=owner_sum(((g.edge_relation==AT)&g.edge_valid).long(),g).bool()
@@ -267,6 +273,42 @@ class SampledOnTopTaskMixin:
             # If clamping made an elevated target too low for a platform, put it on the floor.
             self._tar_pos[ids,:,2]=torch.where(at & ~active,sizes[...,2]/2,tar[...,2])
             self._tar_platform_pos[ids]=platforms
+
+    def _putdown_ontop_supports(self):
+        if (self._relation_cfg.get('stage1_variant') !=
+                'scenario_independent_stage1_ontop_putdown'
+                or 'putDown' not in self._reset_ref_slots):
+            return None
+        slot_env, slot_agent = self._reset_ref_slots['putDown']
+        graph = self.relation_runtime.graph
+        edges = (graph.edge_valid[slot_env] &
+                 (graph.edge_relation[slot_env] == ON_TOP) &
+                 (graph.edge_owner[slot_env] == slot_agent[:, None]))
+        selected = edges.any(-1)
+        if not selected.any():
+            return None
+        slot_env = slot_env[selected]
+        slot_agent = slot_agent[selected]
+        edge = edges[selected].long().argmax(-1)
+        logical = graph.edge_dst[slot_env, edge] - self.num_agents
+        physical = self._logical_box_order[slot_env, logical]
+        motion_ids = self._reset_ref_motion_ids['putDown'][selected]
+        return slot_env, slot_agent, physical, motion_ids
+
+    def _configure_putdown_ontop_supports(self):
+        slots = self._putdown_ontop_supports()
+        if slots is None:
+            return
+        slot_env, slot_agent, support, motion_ids = slots
+        motion = self._motion_lib['putDown']
+        final_pos, _ = motion.get_obj_motion_state(
+            motion_ids=motion_ids,
+            motion_times=motion.get_motion_length(motion_ids))
+        offset = self._agent_spawn_offsets[slot_agent] + self._env_origins[slot_env]
+        self._box_states[slot_env, support, :2] = (final_pos + offset)[:, :2]
+        self._box_states[slot_env, support, 2] = \
+            self._box_size[slot_env, support, 2] / 2
+        self._box_states[slot_env, support, 7:13] = 0.
 
     def _configure_hard_skill_near_starts(self, ids):
         independent_only = 'independent_training' in self._relation_cfg
@@ -293,7 +335,10 @@ class SampledOnTopTaskMixin:
                 rows = (selected & (relation == kind)).nonzero(as_tuple=True)[0]
                 if not len(rows):
                     continue
-                if kind == AT and 'putDown' in self._reset_ref_slots:
+                if ('putDown' in self._reset_ref_slots and
+                        (kind == AT or (kind == ON_TOP and
+                        self._relation_cfg.get('stage1_variant') ==
+                        'scenario_independent_stage1_ontop_putdown'))):
                     put_env, put_agent = self._reset_ref_slots['putDown']
                     owner = graph.edge_owner[rows, edge]
                     from_put_down = ((ids[rows, None] == put_env[None, :]) &
@@ -332,6 +377,24 @@ class SampledOnTopTaskMixin:
                 xy=(boxes[:,a,:2]-boxes[:,b,:2]).norm(dim=-1)
                 z=(boxes[:,a,2]-boxes[:,b,2]).abs()
                 bad|=(xy<radius[:,a]+radius[:,b]+.05)&(z<(sizes[:,a,2]+sizes[:,b,2])/2+.02)
+        putdown_supports = self._putdown_ontop_supports()
+        if putdown_supports is not None:
+            slot_env, _, physical, _ = putdown_supports
+            rows = torch.searchsorted(ids, slot_env)
+            support = self._box_states[slot_env, physical]
+            size = self._box_size[slot_env, physical]
+            body = self._kinematic_humanoid_rigid_body_states[
+                slot_env, :, :, :3].reshape(len(slot_env), -1, 3)
+            rotation = support[:, None, 3:7].expand(-1, body.shape[1], -1)
+            relative = body - support[:, None, :3]
+            cross = 2 * torch.cross(rotation[..., :3], relative, dim=-1)
+            local = (relative - rotation[..., 3:4] * cross +
+                     torch.cross(rotation[..., :3], cross, dim=-1))
+            inside_xy = (local[..., :2].abs() <
+                         size[:, None, :2] / 2 + .03).all(-1)
+            inside_z = ((local[..., 2] > -size[:, None, 2] / 2 - .03) &
+                        (local[..., 2] < size[:, None, 2] / 2 + .03))
+            bad[rows] |= (inside_xy & inside_z).any(-1)
         if self.num_objects>self.num_agents and not getattr(self, '_scenario_no_climb', False):
             free=boxes[:,self.num_agents:,:2]
             bad|=((free[:,:,None]-roots[:,None,:,:2]).norm(dim=-1)<self._box_min_agent_dist).any(-1).any(-1)
@@ -515,7 +578,12 @@ class SampledOnTopTaskMixin:
                 out['sampling/rsi_climb_attempts']=self._rsi_attempts[1].clone()
                 out['sampling/rsi_climb_rejection_rate']=self._rsi_rejected[1]/self._rsi_attempts[1].clamp_min(1)
                 out['sampling/rsi_climb_start_target_distance']=self._rsi_start_distance[1]/self._rsi_attempts[1].clamp_min(1)
+            if (self._relation_cfg.get('stage1_variant') ==
+                    'scenario_independent_stage1_ontop_putdown'):
+                out['sampling/rsi_ontop_putdown_fraction'] = \
+                    self._ontop_putdown_rsi_count / den
             c.zero_();self._sampling_retries.zero_();self._sampling_failures.zero_()
+            self._ontop_putdown_rsi_count.zero_()
             self._rsi_attempts.zero_();self._rsi_rejected.zero_();self._rsi_start_distance.zero_()
             return out
         if getattr(self,'_edge_interaction',False):

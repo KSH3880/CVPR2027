@@ -12,6 +12,11 @@ from utils.edge_interaction_spec import SIT, CLIMB
 STAGE1_CONTEXT_MODE = 'state_relation_edge_stage1_v1'
 STAGE1_PACKET_FIELDS = ('valid', 'src', 'dst', 'relation', 'owner', 'start', 'keep')
 STAGE1_SEMANTIC_FIELDS = STAGE1_PACKET_FIELDS[:5]
+STAGE1_OWNER_HOLDING_FIELDS = STAGE1_SEMANTIC_FIELDS + ('owner_holding_state',)
+OWNER_HOLDING_VARIANT = 'scenario_independent_stage1_paired_placement_owner_holding'
+UNIFIED_VARIANTS = ('scenario_independent_stage1_unified',
+                    'scenario_independent_stage1_unified_owner_holding')
+OWNER_HOLDING_VARIANTS = (OWNER_HOLDING_VARIANT, UNIFIED_VARIANTS[1])
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_SIT', 'HOLDING_CLIMB')
 PRESETS = ('random_stage1', 'holding', 'sit', 'climb', 'holding_at',
@@ -23,6 +28,11 @@ SIT_PLANE_VARIANTS = ('scenario_independent_stage1_sit_plane_normalized',
                       'scenario_independent_stage1_at_goal_fix',
                       'scenario_independent_stage1_self_sum',
                       'scenario_independent_stage1_slow_near_start',
+                      'scenario_independent_stage1_placement_focus',
+                      'scenario_independent_stage1_ontop_putdown',
+                      'scenario_independent_stage1_paired_at_no_near',
+                      'scenario_independent_stage1_paired_placement_no_near',
+                      OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
                       'scenario_stage2_sit_plane_self_sum')
 PLANE_VARIANTS = ('scenario_independent_stage1_plane',) + SIT_PLANE_VARIANTS
 CURRICULUM_VARIANT = 'scenario_independent_stage1_skill_curriculum'
@@ -30,11 +40,20 @@ CURRICULUM_VARIANTS = (CURRICULUM_VARIANT,
                        'scenario_independent_stage1_skill_curriculum_reward_preserved',
                        'scenario_independent_stage1_at_goal_fix',
                        'scenario_independent_stage1_self_sum',
-                       'scenario_independent_stage1_slow_near_start')
+                       'scenario_independent_stage1_slow_near_start',
+                       'scenario_independent_stage1_placement_focus',
+                       'scenario_independent_stage1_ontop_putdown',
+                       'scenario_independent_stage1_paired_at_no_near',
+                       'scenario_independent_stage1_paired_placement_no_near',
+                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS)
 
 
 def semantic_packet_size(capacity):
     return len(STAGE1_SEMANTIC_FIELDS) * capacity
+
+
+def owner_holding_packet_size(capacity):
+    return len(STAGE1_OWNER_HOLDING_FIELDS) * capacity
 
 
 def mix_late_climb_rsi_times(motion_lib, motion_ids, times, spec):
@@ -44,6 +63,12 @@ def mix_late_climb_rsi_times(motion_lib, motion_ids, times, spec):
         phase = lo + torch.rand(int(selected.sum()), device=times.device) * (hi - lo)
         times[selected] = motion_lib.get_motion_length(motion_ids[selected]) * phase
     return times
+
+
+def sample_ontop_putdown_times(motion_lib, motion_ids, phase_range):
+    lo, hi = phase_range
+    phase = lo + torch.rand(len(motion_ids), device=motion_ids.device) * (hi - lo)
+    return motion_lib.get_motion_length(motion_ids) * phase
 
 
 def semantic_graph_packet(graph, batch_size):
@@ -59,6 +84,35 @@ def parse_semantic_packet(packet):
     fields = packet.reshape(packet.shape[0], -1, width)
     return (fields[..., 0].bool(), fields[..., 1].long(), fields[..., 2].long(),
         fields[..., 3].long(), fields[..., 4].long())
+
+
+def owner_holding_graph_packet(graph, phi):
+    """Attach the matching H->source HOLDING phi to AT/ON_TOP edges only."""
+    if phi.ndim != 2 or phi.shape[1] != graph.edge_src.shape[-1]:
+        raise ValueError('Expected per-edge HOLDING phi [batch, edges]')
+    n = phi.shape[0]
+    valid, src, dst, relation, owner = [batched(getattr(graph, key), n) for key in
+        ('edge_valid', 'edge_src', 'edge_dst', 'edge_relation', 'edge_owner')]
+    placement = valid & ((relation == AT) | (relation == ON_TOP))
+    holds = (valid[:, None, :] & (relation[:, None, :] == HOLDING) &
+             (owner[:, None, :] == owner[:, :, None]) &
+             (dst[:, None, :] == src[:, :, None]))
+    if (holds.sum(-1)[placement] != 1).any():
+        raise ValueError('Each placement edge requires one owner/source HOLDING edge')
+    hold_phi = (holds.to(phi.dtype) * phi[:, None, :]).sum(-1)
+    state = torch.where(placement, hold_phi, torch.ones_like(phi))
+    fields = (valid.float(), src.float(), dst.float(), relation.float(),
+              owner.float(), state)
+    return (torch.stack(fields, -1) * fields[0][..., None]).flatten(1)
+
+
+def parse_owner_holding_packet(packet):
+    width = len(STAGE1_OWNER_HOLDING_FIELDS)
+    if packet.ndim != 2 or packet.shape[-1] % width:
+        raise ValueError('Expected owner-HOLDING graph packet [N,6*E]')
+    fields = packet.reshape(packet.shape[0], -1, width)
+    return (fields[..., 0].bool(), fields[..., 1].long(), fields[..., 2].long(),
+        fields[..., 3].long(), fields[..., 4].long(), fields[..., 5])
 
 
 def validate_relation_rsi(spec, skills):
@@ -169,11 +223,18 @@ def validate_stage1_context_config(config):
         raise ValueError('Scenario task sharing must be 0.9 self + 0.1 teammate')
     self_sum = variant in ('scenario_independent_stage1_self_sum',
                            'scenario_independent_stage1_slow_near_start',
+                           'scenario_independent_stage1_placement_focus',
+                           'scenario_independent_stage1_ontop_putdown',
+                           'scenario_independent_stage1_paired_at_no_near',
+                           'scenario_independent_stage1_paired_placement_no_near',
+                           OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
                            'scenario_stage2_sit_plane_self_sum')
     expected_aggregation = 'self_sum_teammate_mean' if self_sum else 'mean_active'
     if sit_plane and config['edge_aggregation'] != expected_aggregation:
         raise ValueError('Unsupported Stage-1 active-edge aggregation')
-    expected_observation = ({'graph_packet_fields': list(STAGE1_SEMANTIC_FIELDS)}
+    expected_observation = ({'graph_packet_fields': list(
+        STAGE1_OWNER_HOLDING_FIELDS if variant in OWNER_HOLDING_VARIANTS
+        else STAGE1_SEMANTIC_FIELDS)}
         if semantic_only else {'edge_context_fields': ['start', 'keep'],
             'graph_packet_fields': list(STAGE1_PACKET_FIELDS)})
     if config['observation'] != expected_observation:
@@ -249,6 +310,14 @@ def validate_stage1_context_config(config):
         }
         if variant == 'scenario_independent_stage1_slow_near_start':
             expected_training['near_start'].update(hold_steps=600000, anneal_steps=600000)
+        if variant in ('scenario_independent_stage1_paired_at_no_near',
+                       'scenario_independent_stage1_paired_placement_no_near',
+                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS):
+            expected_training['near_start'].update(probability_start=0., probability_end=0.)
+        if variant in UNIFIED_VARIANTS:
+            expected_training['climb_rsi']['late_fraction'] = 0.
+        if variant == 'scenario_independent_stage1_ontop_putdown':
+            expected_training['ontop_putdown_rsi'] = {'phase_range': [.45, .70]}
         if variant == CURRICULUM_VARIANT:
             expected_training['progress'] = {'max_distance': 8.}
             expected_training['climb_state'] = {'xy_scale': 2., 'height_scale': 4.}
@@ -256,11 +325,13 @@ def validate_stage1_context_config(config):
             raise ValueError('Unsupported Stage-1 hard-skill curriculum')
 
 
-def validate_sampler(spec, m=2, o=3):
-    from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER,
+def validate_sampler(spec, m=2, o=None):
+    from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER,
         validate_sampler as validate_scenario)
-    if spec.get('sampler') == INDEPENDENT_CLIMB_SAMPLER:
+    if spec.get('sampler') in (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER):
         return validate_scenario(spec, m, o)
+    if o is None:
+        o = 3
     if (m, o) != (2, 3):
         raise ValueError('Stage-1 sampler/presets require M=2, O=3')
     semantic_only = spec.get('semantic_only', False)
@@ -356,9 +427,9 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
     if spec.get('sampler') == 'two_agent_stage2_cooperative':
         from utils.edge_stage2_spec import sample_graph as sample_stage2_graph
         return sample_stage2_graph(n, spec, device, preset, role_swap, generator)
-    from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER,
+    from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER,
         sample_graph as sample_scenario)
-    if spec.get('sampler') == INDEPENDENT_CLIMB_SAMPLER:
+    if spec.get('sampler') in (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER):
         return sample_scenario(n, spec, device, preset, role_swap, generator)
     validate_sampler(spec)
     if preset not in PRESETS:
@@ -387,9 +458,9 @@ def compile_stage1_graph(spec, m, o, device=None):
     if spec.get('sampler') == 'two_agent_stage2_cooperative' or spec.get('mode') == 'stage2_explicit':
         from utils.edge_stage2_spec import compile_graph as compile_stage2_graph
         return compile_stage2_graph(spec, m, o, device)
-    from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER,
+    from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER,
         compile_graph)
-    if spec.get('sampler') == INDEPENDENT_CLIMB_SAMPLER:
+    if spec.get('sampler') in (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER):
         return compile_graph(spec, m, o, device)
     if spec.get('mode') != 'edge_composition':
         raise ValueError('Stage-1 accepts its conflict-free edge sampler only')

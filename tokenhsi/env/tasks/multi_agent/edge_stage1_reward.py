@@ -5,7 +5,8 @@ from utils.edge_ontop_spec import batched, graph_packet, select_graph
 from env.tasks.multi_agent.edge_context_reward import edge_context_reward, goal_success, owner_sum
 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
 from env.tasks.multi_agent.edge_ontop_reward import OnTopContextRuntime
-from utils.edge_stage1_spec import semantic_graph_packet
+from utils.edge_stage1_spec import (OWNER_HOLDING_VARIANT, OWNER_HOLDING_VARIANTS,
+    owner_holding_graph_packet, semantic_graph_packet)
 
 
 def stage1_context(phi, graph):
@@ -73,6 +74,8 @@ class Stage1ContextRuntime(OnTopContextRuntime):
     def suffix(self, ids=None):
         graph = self.graph if ids is None else select_graph(self.graph, ids)
         phi = self.phi if ids is None else self.phi[ids]
+        if self.config.get('stage1_variant') in OWNER_HOLDING_VARIANTS:
+            return owner_holding_graph_packet(graph, phi)
         if self.config['schema_version'] in (7, 8, 9, 10):
             return semantic_graph_packet(graph, phi.shape[0]).to(phi.device)
         return graph_packet(graph, stage1_context(phi, graph))

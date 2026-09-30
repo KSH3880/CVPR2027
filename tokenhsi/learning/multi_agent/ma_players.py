@@ -16,6 +16,13 @@ from utils.torch_utils import load_checkpoint
 
 class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
 
+    def _preproc_amp_obs(self, amp_obs):
+        normalized = super()._preproc_amp_obs(amp_obs)
+        if getattr(self.env.task, '_amp_task_conditioning', False):
+            from utils.unified_training import preserve_amp_labels
+            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps)
+        return normalized
+
     def __init__(self, config):
         super().__init__(config)
         debug_cfg = self.env.task.cfg["env"].get("debug", {})

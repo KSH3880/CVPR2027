@@ -34,12 +34,12 @@ def build_env_local_position_features(world_positions, env_origins, arena_scale)
 
 def build_gta_pose_records(human_positions, human_heading_quaternions,
                            object_positions, object_quaternions,
-                           target_positions, env_origins):
+                           target_positions, env_origins, goal_rotation="human_heading"):
     """Pack canonical ``[Human | Object | Target]`` GTA pose records.
 
     Input positions are simulator-world coordinates. Quaternions are local-to-world in
     xyzw order; the caller supplies heading-only Human quaternions and full Object
-    quaternions. Targets inherit the corresponding owner Human heading.
+    quaternions. Targets use legacy Human headings or a fixed identity frame.
     """
     position_groups = (human_positions, object_positions, target_positions)
     if any(x.ndim != 3 or x.shape[-1] != 3 for x in position_groups):
@@ -70,8 +70,14 @@ def build_gta_pose_records(human_positions, human_heading_quaternions,
         object_positions - origin,
         object_quaternions,
     ], dim=-1)
+    if goal_rotation not in ('human_heading', 'identity'):
+        raise ValueError('Unknown goal rotation: ' + goal_rotation)
+    goal_quat = human_heading_quaternions
+    if goal_rotation == 'identity':
+        goal_quat = torch.zeros_like(human_heading_quaternions)
+        goal_quat[..., 3] = 1.
     target_pose = torch.cat([
         target_positions - origin,
-        human_heading_quaternions,
+        goal_quat,
     ], dim=-1)
     return torch.cat([human_pose, object_pose, target_pose], dim=1)

@@ -131,11 +131,11 @@ from utils.ontop_task_spec import mixed_policy_graph
 
 from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
 from learning.multi_agent.edge_context_encoder import (EdgeContextFusion,
-    PackedEdgeContextFusion, PackedEdgeSemanticFusion)
+    PackedEdgeContextFusion, PackedEdgeSemanticFusion, PackedEdgeOwnerHoldingFusion)
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size
 from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, compile_interaction_graph
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
-    semantic_packet_size)
+    semantic_packet_size, owner_holding_packet_size)
 from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE
 from learning.multi_agent.coordination_head import GroundedEdgeCoordination
 
@@ -507,6 +507,9 @@ class RelationEncoder(nn.Module):
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
         self.semantic_only = self.stage1_context and bool(
             self.relation_graph_spec.get('semantic_only', False))
+        self.owner_holding_state = bool(self.relation_graph_spec.get('owner_holding_state', False))
+        if self.owner_holding_state and not self.semantic_only:
+            raise ValueError('Owner-HOLDING state requires a semantic Stage-1 packet')
         self.ontop_mixed = relation_reward_mode == ONTOP_MODE
         if self.ontop_mixed and (num_agents, num_objects) != (2, 3):
             raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
@@ -562,9 +565,11 @@ class RelationEncoder(nn.Module):
         if self.edge_context:
             compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
-            self.context_fusion = (PackedEdgeSemanticFusion() if self.semantic_only else
+            self.context_fusion = (PackedEdgeOwnerHoldingFusion() if self.owner_holding_state else
+                PackedEdgeSemanticFusion() if self.semantic_only else
                 PackedEdgeContextFusion() if self.packed_context else EdgeContextFusion(graph))
-            size_fn = (semantic_packet_size if self.semantic_only else
+            size_fn = (owner_holding_packet_size if self.owner_holding_state else
+                semantic_packet_size if self.semantic_only else
                 packet_size if self.packed_context else context_suffix_size)
             self.suffix_width = size_fn(len(graph.ids))
             self._set_context_background()
@@ -668,12 +673,15 @@ class RelationEncoder(nn.Module):
             raise ValueError('Explicit task graphs require edge-context mode')
         if self.semantic_only != bool(spec.get('semantic_only', False)):
             raise ValueError('Cannot change semantic-only packet architecture')
+        if self.owner_holding_state != bool(spec.get('owner_holding_state', False)):
+            raise ValueError('Cannot change owner-HOLDING packet architecture')
         compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
         graph = compiler(spec, self.num_agents, self.num_objects, self._relation_device())
         self.relation_graph_spec = spec
         if not self.packed_context:
             self.context_fusion.set_graph(graph)
-        size_fn = (semantic_packet_size if self.semantic_only else
+        size_fn = (owner_holding_packet_size if self.owner_holding_state else
+            semantic_packet_size if self.semantic_only else
             packet_size if self.packed_context else context_suffix_size)
         self.suffix_width = size_fn(len(graph.ids))
         self._set_context_background()
@@ -727,7 +735,7 @@ class RelationEncoder(nn.Module):
             dense = dense.index_copy(-1, self.state_edge_src * L + self.state_edge_dst, values)
         return dense.reshape(*values.shape[:-1], L, L)
 
-    def forward(self, obs, return_all=False):
+    def forward(self, obs, return_all=False, token_order=None):
         self.forward_calls += 1
         B = obs.shape[0]
 
@@ -808,6 +816,26 @@ class RelationEncoder(nn.Module):
                         'static_row_rms': (static - static.mean(-1, keepdim=True)).square().mean().sqrt(),
                         'dynamic_row_rms': (sampled - sampled.mean(-1, keepdim=True)).square().mean().sqrt()}
             relation_bias = relation_bias.unsqueeze(1) + dynamic
+        # Semantic indices stay canonical through edge construction. Permute every
+        # token-indexed operand together, then restore before human/readout heads.
+        inverse_order = None
+        if self.relation_graph_spec.get('shuffle_token_order', False) or token_order is not None:
+            if token_order is None:
+                token_order = torch.randperm(x.shape[1], device=x.device)
+            elif not torch.equal(token_order.sort().values,
+                                 torch.arange(x.shape[1], device=x.device)):
+                raise ValueError('token_order must permute all entity slots')
+            inverse_order = token_order.argsort()
+            x = x.index_select(1, token_order)
+            if relation_bias is not None:
+                relation_bias = relation_bias.index_select(-2, token_order).index_select(-1, token_order)
+            if gta_g is not None:
+                gta_g = gta_g.index_select(1, token_order)
+                gta_ginv = gta_ginv.index_select(1, token_order)
+            if geo_score is not None:
+                geo_score = geo_score.index_select(2, token_order).index_select(3, token_order)
+            if geo_message is not None:
+                geo_message = geo_message.index_select(2, token_order).index_select(3, token_order)
         for i, layer in enumerate(self.layers):
             rel_bias = None if relation_bias is None else relation_bias[i]
             diagnostics_label = None
@@ -819,6 +847,9 @@ class RelationEncoder(nn.Module):
             if collect:
                 self.last_diagnostics.update({'layer{}/{}'.format(i, k): v
                                                for k, v in layer.last_diagnostics.items()})
+
+        if inverse_order is not None:
+            x = x.index_select(1, inverse_order)
 
         self.last_shape_flow = {
             "obs": tuple(obs.shape),
@@ -980,6 +1011,11 @@ class AMPMultiAgentBuilder(AMPBuilder):
                         mlp_init(m.weight)
                         if getattr(m, "bias", None) is not None:
                             torch.nn.init.zeros_(m.bias)
+            if self.actor_encoder.owner_holding_state:
+                for branch in (self.actor_encoder.context_fusion.state_mlp,
+                               self.critic_encoder.context_fusion.state_mlp):
+                    torch.nn.init.zeros_(branch[-1].weight)
+                    torch.nn.init.zeros_(branch[-1].bias)
             return
 
         def set_entity_counts(self, num_agents, num_objects=None):

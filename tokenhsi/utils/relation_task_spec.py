@@ -7,7 +7,7 @@ from utils.edge_context_spec import CONTEXT_MODE, validate_edge_context_config
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, PACKET_FIELDS, validate_ontop_context_config
 from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, SIT, CLIMB, validate_interaction_context_config
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, STAGE1_PACKET_FIELDS,
-    STAGE1_SEMANTIC_FIELDS,
+    STAGE1_SEMANTIC_FIELDS, STAGE1_OWNER_HOLDING_FIELDS, OWNER_HOLDING_VARIANT, OWNER_HOLDING_VARIANTS,
     validate_stage1_context_config)
 from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE, validate_stage2_config
 
@@ -203,11 +203,16 @@ def checkpoint_metadata(config):
             taxonomy = {'holding': 6, 'at': 7, 'ontop': 8, 'sit': SIT}
             if config['schema_version'] in (7, 9, 10):
                 taxonomy['climb'] = CLIMB
+            owner_holding = config.get('stage1_variant') in OWNER_HOLDING_VARIANTS
             return {'reward_mode': mode, 'schema_version': config['schema_version'],
                     'relation_taxonomy': taxonomy,
-                    'suffix_fields': list(STAGE1_SEMANTIC_FIELDS), 'packet_version': 3,
-                    'graph_record_width': 5, 'context_dim_per_edge': 0,
-                    'context_fusion': 'semantic_only',
+                    'suffix_fields': list(STAGE1_OWNER_HOLDING_FIELDS if owner_holding
+                                          else STAGE1_SEMANTIC_FIELDS),
+                    'packet_version': 4 if owner_holding else 3,
+                    'graph_record_width': 6 if owner_holding else 5,
+                    'context_dim_per_edge': 1 if owner_holding else 0,
+                    'context_fusion': ('semantic64_owner_holding_residual65x64x64'
+                                       if owner_holding else 'semantic_only'),
                     'relation_reward_config': config}
         return {'reward_mode': mode, 'schema_version': config['schema_version'],
                 'relation_taxonomy': {'holding': 6, 'at': 7, 'ontop': 8,
