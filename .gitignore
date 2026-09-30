@@ -93,8 +93,8 @@ nohup.out
 /TokenHSI.pdf
 
 # Internal execution and temporary files
-/scripts/masteer/view_sequential_stack_local.sh
 TokenHSI-masteer/tokenhsi/data/dataset_amass_climb
+/scripts/masteer/view_sequential_stack_local.sh
 TokenHSI-masteer/tokenhsi/data/dataset_amass_loco
 TokenHSI-masteer/tokenhsi/data/dataset_amass_loco_stairs
 TokenHSI-masteer/tokenhsi/data/dataset_carry

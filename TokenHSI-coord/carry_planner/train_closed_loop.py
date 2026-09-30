@@ -413,7 +413,7 @@ def main():
         "CARRY_PLANNER_ANALYTIC_TIME_SAMPLES", 7,
     )
     consistency_coef = _env_float(
-        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.0,
+        "CARRY_PLANNER_REPLAN_CONSISTENCY_COEF", 0.05,
     )
     excess_length_coef = _env_float(
         "CARRY_PLANNER_EXCESS_LENGTH_COEF", 0.05,

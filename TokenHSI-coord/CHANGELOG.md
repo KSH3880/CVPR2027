@@ -2,6 +2,18 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-09-30
+### Carry suffix replan consistency
+
+- 이전 경로의 실행 완료 prefix를 현재 root에서 잘라내고, 남은 이전/새 경로를
+  동일한 arc-length 위치에서 비교하는 consistency loss를 추가했다. 서로 다른
+  point index를 직접 비교하던 legacy 방식은 그대로 유지한다.
+- 기본 계수 0.05를 활성화하고, collision risk gate와 Huber/cap을 유지해 필요한
+  우회 변경은 허용한다. 정렬된 경로 변위와 loss를 TensorBoard에 기록한다.
+- 동일 경로의 인덱스 차이, 경로 변경 gradient, 위험 gate, 경로 종료 조건과
+  기존 suffix/regularization/TensorBoard 관련 테스트 22개 통과.
+
+
 ## 2026-09-29
 ### Carry TensorBoard 핵심 지표 대시보드
 

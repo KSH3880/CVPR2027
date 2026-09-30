@@ -82,8 +82,12 @@ detach하므로 gradient는 path에만 간다. 계수와 관련 손잡이는
 cosine-space penalty로 함께 학습한다.
 
 suffix path는 replan마다 시작점 자체가 달라 point index가 서로 대응하지 않으므로,
-legacy dense-point consistency loss는 기본 0으로 비활성화한다. 대신 시작점은 현재
-measured root로 hard anchor되고 진행 방향 constraint가 첫 suffix tangent를 제한한다.
+이전 경로의 이미 지나온 부분을 현재 measured root에서 잘라내고 두 남은 경로를
+동일한 이동거리(arc length)에서 비교한다. 기본
+`CARRY_PLANNER_REPLAN_CONSISTENCY_COEF=0.05`이며 collision analytic risk가 큰
+상황에서는 기존 경로를 유지하도록 강제하지 않는다. `Path/replan_displacement_m`은
+이 정렬된 미래 경로의 평균 변위다. 시작점은 여전히 현재 measured root로 hard
+anchor되고 진행 방향 constraint가 첫 suffix tangent를 제한한다.
 CARRY_PLANNER_EXCESS_LENGTH_COEF(기본 0.05)는 현재 suffix 길이가 직접
 root→box→goal(held 이후 root→goal) 거리의 1.15배에 0.25m를 더한 허용 길이를 넘을
 때만 적용한다. 초과거리는 0.5m Huber transition 뒤에도 선형 gradient를 유지한다.

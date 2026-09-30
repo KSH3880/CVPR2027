@@ -55,6 +55,69 @@ def _arc_lookahead_delta(
     return point0 + blend[..., None] * (point1 - point0) - root_xy
 
 
+def _sample_at_arc(path: torch.Tensor, distance: torch.Tensor) -> torch.Tensor:
+    """Sample [B,A,P,2] paths at [B,A,S] metric arc distances."""
+    batch, agents, points, coordinates = path.shape
+    if coordinates != 2 or distance.shape[:2] != (batch, agents):
+        raise ValueError("arc sample path/distance shape mismatch")
+    segment = (path[..., 1:, :] - path[..., :-1, :]).norm(dim=-1)
+    arc = torch.cat((torch.zeros_like(segment[..., :1]), segment.cumsum(-1)), -1)
+    lookup = arc.detach().reshape(-1, points).contiguous()
+    target = distance.detach().reshape(-1, distance.shape[-1]).contiguous()
+    upper = torch.searchsorted(lookup, target, right=False).clamp(1, points - 1)
+    lower = upper - 1
+    arc0 = lookup.gather(1, lower)
+    arc1 = lookup.gather(1, upper)
+    blend = ((target - arc0) / (arc1 - arc0).clamp(min=1e-7)).clamp(0.0, 1.0)
+    flat = path.reshape(-1, points, coordinates)
+    point0 = flat.gather(1, lower[..., None].expand(-1, -1, coordinates))
+    point1 = flat.gather(1, upper[..., None].expand(-1, -1, coordinates))
+    return (point0 + blend[..., None] * (point1 - point0)).reshape(
+        batch, agents, distance.shape[-1], coordinates,
+    )
+
+
+def _suffix_consistency(path, observation, progress, beta, decay, cap,
+                        safe_weight):
+    """Compare unexecuted paths by traveled meters, not by point index."""
+    points = path.shape[-2]
+    root = observation.state.root_xy
+    previous = observation.previous_path_world.detach()
+    index = torch.arange(points, device=path.device, dtype=path.dtype)
+    # Discard the executed prefix and re-anchor its remainder at the measured
+    # root, including tracking error accumulated since the previous decision.
+    executed = index.reshape(1, 1, points) <= progress.floor()[..., None]
+    remaining = torch.where(executed[..., None], root[..., None, :], previous)
+    old_length = (remaining[..., 1:, :] - remaining[..., :-1, :]).norm(dim=-1).sum(-1)
+    new_length = (path[..., 1:, :] - path[..., :-1, :]).norm(dim=-1).sum(-1)
+    common_length = torch.minimum(old_length, new_length).detach()
+    fraction = torch.linspace(0.0, 1.0, points, device=path.device, dtype=path.dtype)
+    distance = common_length[..., None] * fraction[None, None, :]
+    old_sample = _sample_at_arc(remaining, distance)
+    new_sample = _sample_at_arc(path, distance)
+    displacement = (new_sample - old_sample).norm(dim=-1)
+    spacing = old_length.detach() / (points - 1 - progress).clamp(min=1.0)
+    decay_m = (spacing * decay).clamp(min=0.1)
+    weight = torch.exp(-distance / decay_m[..., None])
+    weight[..., 0] = 0.0  # both routes are anchored at the measured root
+    per_agent_cost = torch.where(
+        displacement < beta,
+        0.5 * displacement.square() / beta,
+        displacement - 0.5 * beta,
+    )
+    per_agent_cost = (per_agent_cost * weight).sum(-1) / weight.sum(-1).clamp(min=1e-7)
+    per_agent_displacement = (displacement * weight).sum(-1) / weight.sum(-1).clamp(min=1e-7)
+    active = (common_length > 0.1).to(path.dtype)
+    per_sample_cost = (per_agent_cost * active).sum(-1) / active.sum(-1).clamp(min=1.0)
+    per_sample_displacement = (
+        (per_agent_displacement * active).sum(-1) / active.sum(-1).clamp(min=1.0)
+    )
+    eligible = observation.previous_path_valid.to(path.dtype) * active.any(-1).to(path.dtype)
+    loss = _bounded_weighted_mean(per_sample_cost, eligible * safe_weight, cap)
+    metric = _bounded_weighted_mean(per_sample_displacement, eligible, float("inf"))
+    return loss, metric.detach()
+
+
 def carry_path_regularization(
     output: Dict[str, torch.Tensor],
     observation: StackPlannerObservation,
@@ -139,29 +202,34 @@ def carry_path_regularization(
     future_weight = future_weight * observation.previous_path_valid[
         :, None, None
     ].to(path.dtype)
-    displacement = (
-        path - observation.previous_path_world.detach()
-    ).norm(dim=-1)
-    huber = torch.where(
-        displacement < consistency_beta,
-        0.5 * displacement.square() / consistency_beta,
-        displacement - 0.5 * consistency_beta,
-    )
-    per_sample_consistency = (
-        (huber * future_weight).sum(dim=(1, 2))
-        / future_weight.sum(dim=(1, 2)).clamp(min=1.0)
-    )
-    consistency_eligible = (
-        observation.previous_path_valid.to(path.dtype) * safe_weight
-    )
     if suffix_replan:
-        # Old and new suffixes have different measured-root origins and are not
-        # point-index aligned. Continuity is imposed by the current root and
-        # direction anchor instead of the legacy dense-point consistency term.
-        consistency_eligible = torch.zeros_like(consistency_eligible)
-    consistency_loss = _bounded_weighted_mean(
-        per_sample_consistency, consistency_eligible, loss_cap,
-    )
+        consistency_loss, replan_displacement = _suffix_consistency(
+            path, observation, progress, consistency_beta,
+            near_future_decay, loss_cap, safe_weight,
+        )
+    else:
+        displacement = (
+            path - observation.previous_path_world.detach()
+        ).norm(dim=-1)
+        huber = torch.where(
+            displacement < consistency_beta,
+            0.5 * displacement.square() / consistency_beta,
+            displacement - 0.5 * consistency_beta,
+        )
+        per_sample_consistency = (
+            (huber * future_weight).sum(dim=(1, 2))
+            / future_weight.sum(dim=(1, 2)).clamp(min=1.0)
+        )
+        consistency_eligible = (
+            observation.previous_path_valid.to(path.dtype) * safe_weight
+        )
+        consistency_loss = _bounded_weighted_mean(
+            per_sample_consistency, consistency_eligible, loss_cap,
+        )
+        replan_displacement = _bounded_weighted_mean(
+            displacement.mean(dim=(1, 2)),
+            observation.previous_path_valid.to(path.dtype), float("inf"),
+        ).detach()
 
     state = observation.state
     # Progress is measured on the previous path. Weighting a newly changed
@@ -273,13 +341,7 @@ def carry_path_regularization(
         "excess_length_loss": excess_length_loss,
         "direction_loss": direction_loss,
         "safe_weight": safe_weight.mean().detach(),
-        "mean_replan_displacement": (
-            path.new_zeros(()) if suffix_replan else _bounded_weighted_mean(
-                displacement.mean(dim=(1, 2)),
-                observation.previous_path_valid.to(path.dtype),
-                float("inf"),
-            ).detach()
-        ),
+        "mean_replan_displacement": replan_displacement,
         "mean_future_length_ratio": (
             (length_ratio * active_agent.to(path.dtype)).sum()
             / active_agent.to(path.dtype).sum().clamp(min=1.0)

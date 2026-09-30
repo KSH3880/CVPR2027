@@ -164,6 +164,69 @@ class CarryPathRegularizationTest(unittest.TestCase):
             float(result["mean_future_length_ratio"]), 1.0 - 1e-6,
         )
 
+    def test_suffix_compares_same_remaining_route_at_different_point_indices(self):
+        state = crossing_state()
+        state.held.fill_(1.0)
+        state.goal_xy[..., 0] = 4.0
+        state.goal_xy[..., 1] = state.root_xy[..., 1]
+        old_root = state.root_xy.clone()
+        old_root[..., 0] = 0.0
+        fraction = torch.linspace(0.0, 1.0, 33).reshape(1, 1, 33, 1)
+        old = old_root[..., None, :] * (1.0 - fraction) + state.goal_xy[..., None, :] * fraction
+        state.root_xy[..., 0] = 1.0
+        new = state.root_xy[..., None, :] * (1.0 - fraction) + state.goal_xy[..., None, :] * fraction
+        result = carry_path_regularization(
+            {"path_world": new[:, None], "suffix_replan": True},
+            observation(state, old, progress=8.0), torch.zeros(1),
+        )
+        self.assertLess(float(result["consistency_loss"]), 1e-6)
+        self.assertLess(float(result["mean_replan_displacement"]), 1e-5)
+
+    def test_suffix_penalizes_changed_future_and_backpropagates(self):
+        state = crossing_state()
+        state.held.fill_(1.0)
+        state.goal_xy[..., 0] = 4.0
+        state.goal_xy[..., 1] = state.root_xy[..., 1]
+        old_root = state.root_xy.clone()
+        old_root[..., 0] = 0.0
+        fraction = torch.linspace(0.0, 1.0, 33).reshape(1, 1, 33, 1)
+        old = old_root[..., None, :] * (1.0 - fraction) + state.goal_xy[..., None, :] * fraction
+        state.root_xy[..., 0] = 1.0
+        new = state.root_xy[..., None, :] * (1.0 - fraction) + state.goal_xy[..., None, :] * fraction
+        changed = new[:, None].clone()
+        changed[0, 0, 0, 3:26, 1] += 0.75 * torch.sin(torch.linspace(0.0, torch.pi, 23))
+        changed.requires_grad_(True)
+        output = {"path_world": changed, "suffix_replan": True}
+        obs = observation(state, old, progress=8.0)
+        result = carry_path_regularization(output, obs, torch.zeros(1))
+        self.assertGreater(float(result["consistency_loss"]), 0.0)
+        self.assertGreater(float(result["mean_replan_displacement"]), 0.0)
+        self.assertLessEqual(float(result["consistency_loss"]), 0.25)
+        result["consistency_loss"].backward()
+        self.assertGreater(float(changed.grad.abs().sum()), 0.0)
+
+        dangerous = carry_path_regularization(
+            output, obs, torch.full((1,), 100.0),
+        )
+        self.assertEqual(float(dangerous["consistency_loss"]), 0.0)
+        obs.previous_path_valid.fill_(False)
+        no_previous = carry_path_regularization(output, obs, torch.zeros(1))
+        self.assertEqual(float(no_previous["consistency_loss"]), 0.0)
+        self.assertEqual(float(no_previous["mean_replan_displacement"]), 0.0)
+
+    def test_suffix_finished_path_has_no_consistency_cost(self):
+        state = crossing_state()
+        state.held.fill_(1.0)
+        old = crossing_path(state)[:, 0]
+        state.root_xy.copy_(state.goal_xy)
+        new = state.goal_xy[..., None, :].expand(-1, -1, 33, -1).clone()
+        result = carry_path_regularization(
+            {"path_world": new[:, None], "suffix_replan": True},
+            observation(state, old, progress=32.0), torch.zeros(1),
+        )
+        self.assertEqual(float(result["consistency_loss"]), 0.0)
+        self.assertEqual(float(result["mean_replan_displacement"]), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,8 @@ SCALARS = {
     "Path/mean_deviation_m": "mean_path_deviation",
     "Path/future_excess_m": "mean_future_excess_m",
     "Path/replan_displacement_m": "mean_replan_displacement",
+    "Loss/replan_consistency": "replan_consistency_loss",
+    "Loss/weighted_consistency": "weighted_consistency_loss",
     "Path/direction_error_deg": "mean_direction_error_deg",
     "Loss/policy": "policy_loss",
     "Loss/value": "value_loss",
