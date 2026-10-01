@@ -4,6 +4,58 @@
 
 ## 2026-10-01
 
+### Frozen ms18 + 명시적 경로에서 box 담당 교환
+
+- `carry_box_swap/launch_ms18.sh`, `ms18_env.py` 추가. 기존 Stage1 probe는
+  보존하고 ms18 + frozen 하위 Stage1 실행기로 명시적 33점 경로를 추종한다.
+  미보유는 root→담당 box→그 목표, 보유는 root→목표이며 속도 명령은 1.5m/s.
+  학습된 path planner, 속도 학습, 안전한 인계 동작을 구현한 것은 아니다.
+- 담당 변경 즉시 경로/진행 커서를 새 root/box/goal로 갱신한다. 관측·보상·
+  경로 생성의 중첩 호출에서는 permutation이 이중 적용되지 않도록 보호한다.
+  viewer 리본 목표도 담당 변경을 따르며 초록 목표 표시와 연결선을 제공한다.
+- 최초 episode 평가에서 PPO용 초기 timeout 분산을 제거했다. 경로는 phase
+  변화/담당 변경 때 설치하며 매 관측마다 초기화하지 않는다. scripted route는
+  후보 선택/곡률 validity 검사를 우회하므로 COORD invalid=0은 안전성 근거가 아니다.
+- GPU0, seed0, 기본 `ms18_maskteam_origscale_c06_s0_00009000.pth`, 16 env,
+  599스텝 기능 테스트: 운반 중 대조군 배송 proxy 7/8, 실제 교환 배송 3/7,
+  교환 후 바디 중심 <0.3m 근접 7/7. 집기 전 대조군 배송 6/8,
+  교환 배송 1/8, 교환 후 근접 3/8. 실제 접촉·안전한 인계를 증명하지 않으며
+  단일 seed와 대응되지 않는 초기 표본으로 일반 성능 비교를 주장하지 않는다.
+- swap 이벤트에서 물리 root/box 불변 및 새 경로 앵커 assert 통과.
+  trace의 물리 목표와 permutation을 독립적으로 비교해 endpoint도 확인했다.
+  기존 매핑 unittest 3개, py_compile, bash -n, diff 검사 통과. GUI는 미실행.
+- 최종 로그/trace/summary/analysis는 `runs/carry_box_swap/` 아래
+  `ms18_path_box_swap_carry_20261001_c`, `ms18_path_box_swap_walk_20261001_a`.
+  개발 중 실패/부분 설정 실행은 보존했다. 변경은 로컬이며 서버 반영은 별도다.
+
+### Original TokenHSI Carry 중간 box 담당 교환 probe
+
+- viewer launcher가 Codex 전용 PATH의 `rg`에 의존해 일반 conda shell에서
+  종료되던 문제를 `grep -E`로 수정했다. 실패 태그 산출물은 보존했으며,
+  shell 구문 검사와 사용자 conda 환경의 sidecar 필터 명령을 확인했다.
+- `carry_box_swap/`에 stage1 frozen-policy 테스트를 추가했다. path/speed
+  planner 없이 기존 A=2 Carry에서 담당 box permutation을 외부 API로
+  바꾼다. 기본은 box와 그 목적지를 함께 관측하며 물리 actor 상태는 유지한다.
+  box 크기/BPS/속도/회전/목표와 reward 이전 상태를 같은 매핑으로 읽는다.
+  관측·보상 계산 후 원래 simulator tensor alias를 복원한다.
+- 집기 전 `loco_carry`와 이미 운반 중인 `carryWith`를 별도 평가했다.
+  동일 실행의 짝수 env는 대조군, 홀수 env는 교환 대상으로 구성했다.
+  교환 시 root/box 물리 상태 불변과 관측 변화가 있음을 GPU에서 검증했다.
+- GPU0, stage1 checkpoint, seed0, 16환경(각 그룹 8개), 599실행 스텝:
+  집기 전 대조군은 두 box 배송 proxy 8/8, 교환은 5/8;
+  운반 중 대조군은 5/8, 실제 교환된 환경에서는 2/7이었다.
+  운반 중 1개 env는 교환 조건을 충족하지 않아 별도 제외했다.
+  운반 중 실제 교환 7/7에서 바디 중심 <0.3m 근접이 있었다.
+- held·배송·충돌은 geometry proxy이며 단일 seed의 기능 검증이다.
+  그룹 초기 모션/box 표본이 달라 일대일 인과 비교나 일반 성능 수치로
+  주장하지 않는다. 담당 변경만으로 안전한 인계가 달성된 것으로 해석하지 않는다.
+- 매핑/목표/형상/이전 상태 및 예외 시 alias 복원 테스트 3개,
+  py_compile·shell 구문·diff 검사 통과. viewer 옵션은 추가했지만 GUI는
+  실행하지 않았다. `TokenHSI/` baseline과 기존 실행 중 학습은 변경하지 않았다.
+- 로그·trace·summary·교환 미발생 env를 제외한 analysis는
+  `runs/carry_box_swap/original_{walk,carry}_box_swap_20261001_a/`에 보존했다.
+  로컬 코드이며 서버 반영은 별도다.
+
 ### Carry resume 시 지정한 LR 유지
 
 - optimizer 복원이 새 `CARRY_PLANNER_LR`을 checkpoint LR로 덮어쓰던
