@@ -1044,7 +1044,9 @@ class AMPMultiAgentBuilder(AMPBuilder):
                         humans, nodes = self.actor_encoder(obs, return_all=True)
                     context = self.coordination(
                         humans, nodes, obs[:, -self.actor_encoder.suffix_width:],
-                        self.actor_encoder.edge_encoder, self.actor_encoder.entity_types)
+                        self.actor_encoder.edge_encoder, self.actor_encoder.entity_types,
+                        self.actor_encoder.context_fusion if
+                        self.actor_encoder.owner_holding_state else None)
                     encoded = torch.cat((humans, context), -1)
                 else:
                     encoded = self.actor_encoder(obs)

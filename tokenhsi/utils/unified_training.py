@@ -64,17 +64,24 @@ def preserve_amp_labels(raw, normalized, steps):
 def validate_unified_env(env):
     """Fail early if the new sampler, AMP, geometry and reward contracts diverge."""
     from utils.edge_scenario_spec import UNIFIED_SAMPLER
-    from utils.edge_stage1_spec import UNIFIED_VARIANTS
-    unified = env['relationGraph'].get('sampler') == UNIFIED_SAMPLER
+    from utils.edge_stage1_spec import UNIFIED_VARIANTS, STAGE2_UNIFIED_OWNER_VARIANT
+    from utils.edge_stage2_spec import STAGE2_UNIFIED_OWNER_SAMPLER
+    sampler = env['relationGraph'].get('sampler')
+    unified = sampler in (UNIFIED_SAMPLER, STAGE2_UNIFIED_OWNER_SAMPLER)
     enabled = env.get('ampTaskConditioning', False)
     variant = env['relationReward'].get('stage1_variant')
-    if unified != (variant in UNIFIED_VARIANTS) or unified != (enabled is True):
+    if unified != (variant in (*UNIFIED_VARIANTS, STAGE2_UNIFIED_OWNER_VARIANT)) or unified != (enabled is True):
         raise ValueError('Unified sampler, reward variant and task-conditioned AMP must be paired')
+    if (sampler == STAGE2_UNIFIED_OWNER_SAMPLER) != (variant == STAGE2_UNIFIED_OWNER_VARIANT):
+        raise ValueError('Unified Stage-2 sampler requires its own reward variant')
     if not unified:
         return
     if tuple(env['skill']) != SKILLS or env.get('goalRotation') != 'identity':
         raise ValueError('Unified requires unified skills and identity goal rotation')
     if env['box']['reset'].get('ownerLocoDistanceRange') != [1., 2.]:
         raise ValueError('Unified loco sources must start 1..2m from owner')
-    if list(env['relationGraph']['template_probabilities'].values()) != [.05, .05, .20, .35, .35]:
+    probabilities = (env['relationGraph']['independent_template_probabilities']
+        if sampler == STAGE2_UNIFIED_OWNER_SAMPLER else
+        env['relationGraph']['template_probabilities'])
+    if list(probabilities.values()) != [.05, .05, .20, .35, .35]:
         raise ValueError('Unified requires independent task proportions 5/5/20/35/35')

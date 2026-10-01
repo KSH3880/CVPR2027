@@ -1,6 +1,7 @@
 import torch
 
-from utils.edge_stage1_spec import STAGE1_CONTEXT_MODE
+from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE,
+    UNIFIED_VARIANTS)
 
 
 FIRST_HEAD_WEIGHT = 'a2c_network.action_head.0.0.weight'
@@ -9,11 +10,17 @@ COORDINATION_PREFIX = 'a2c_network.coordination.'
 
 def transfer_stage1_weights(model, checkpoint):
     metadata = checkpoint.get('relation_metadata', {})
+    owner_target = model.a2c_network.actor_encoder.owner_holding_state
+    variant = metadata.get('relation_reward_config', {}).get('stage1_variant')
     if (metadata.get('reward_mode') != STAGE1_CONTEXT_MODE or
             metadata.get('schema_version') != 9 or
-            metadata.get('packet_version') != 3 or
-            metadata.get('context_fusion') != 'semantic_only'):
-        raise ValueError('Stage-2 import needs a semantic Stage-1 schema-9 checkpoint')
+            (owner_target and (variant != UNIFIED_VARIANTS[1] or
+                metadata.get('packet_version') != 4 or
+                metadata.get('context_fusion') !=
+                'semantic64_owner_holding_residual65x64x64')) or
+            (not owner_target and (metadata.get('packet_version') != 3 or
+                metadata.get('context_fusion') != 'semantic_only'))):
+        raise ValueError('Stage-2 import needs the matching Stage-1 schema-9 checkpoint')
     source = checkpoint.get('model')
     if not isinstance(source, dict) or FIRST_HEAD_WEIGHT not in source:
         raise ValueError('Stage-1 checkpoint has no compatible model state')

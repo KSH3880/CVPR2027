@@ -1,6 +1,6 @@
 # Multi-Agent Carry 실행 가이드
 
-현재 실행 가능한 실험은 원본 1번과 Stage 1 **27·28·30·31·32·33·34·35·36·37번 및 paired/unified 변형**, Stage 2 **29번 및 SIT plane 변형**이다. 과거 9~26번 config와 전용 실행 스크립트는 정리했다. 모든 명령은 저장소 루트에서 실행한다.
+현재 실행 가능한 실험은 원본 1번과 Stage 1 **27·28·30·31·32·33·34·35·36·37번 및 paired/unified 변형**, Stage 2 **29번·SIT plane·unified owner HOLDING 변형**이다. 과거 9~26번 config와 전용 실행 스크립트는 정리했다. 모든 명령은 저장소 루트에서 실행한다.
 
 ## 공통 규칙
 
@@ -9,7 +9,7 @@
 - 본학습 전 셸의 `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 확인한다.
 - 학습은 기본적으로 scratch다. 기존 실험의 reward/checkpoint 계약을 섞지 않는다. Stage 2 전이는 아래의 `STAGE1_CHECKPOINT`를 사용한다.
 - 평가·VNC 인자는 `<checkpoint.pth> [agents] [envs] [objects] [repeats]`다. `HEADLESS=0`은 로컬 viewer, `HEADLESS=1`은 화면 없는 평가다.
-- 로컬 viewer와 서버 VNC의 상자 색은 매 reset의 과제 배정을 따른다. 단독 대상은 해당 에이전트 색, 공동 대상은 노란색, 나머지는 회색이다. 실행 중인 뷰어는 다시 시작해야 반영된다.
+- Sampled-edge 로컬 viewer와 서버 VNC의 상자·AT goal marker 색은 매 reset의 과제 배정을 따른다. 단독 대상은 해당 에이전트 색, 공동 물체는 노란색, 미할당 대상은 회색이다. 실행 중인 뷰어는 다시 시작해야 반영된다.
 - 데이터 원본 `/home/hwanhee/CVPR2027/TokenHSI`는 읽기 전용이며, 이 저장소는 심링크로 사용한다.
 
 ## 현재 실험
@@ -21,6 +21,7 @@
 | 28 | [approach_scenario_stage1_plane.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_plane.yaml) | 27번의 ON_TOP·CLIMB을 상판 영역 성공으로 변경; Stage 2 기본 출발점 |
 | 29 | [approach_stage2_coordination.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_coordination.yaml) | Stage 1 checkpoint에서 협력 graph 학습 |
 | Stage 2 plane | [approach_stage2_coordination_sit_plane.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_coordination_sit_plane.yaml) | 34번 기반 SIT plane·보상·독립 과제 분포 |
+| Stage 2 unified owner HOLDING | [approach_stage2_unified_owner_holding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_unified_owner_holding.yaml) | Stage 1 unified owner HOLDING 기반 2H/4O 협력 3과제·독립 5과제 |
 | 30 | [approach_scenario_stage1_sit_plane_normalized.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_sit_plane_normalized.yaml) | 28번 + SIT 상판 성공·유효 edge 평균 보상 |
 | 31 | [approach_scenario_stage1_skill_curriculum.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum.yaml) | 30번 + 가까운 시작·후반 CLIMB RSI·어려운 과제 증량·보상 shaping |
 | 32 | [approach_scenario_stage1_skill_curriculum_reward_preserved.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved.yaml) | 31번의 시작 상태·RSI·샘플링을 유지하고 state/progress는 30번 식 |
@@ -242,6 +243,26 @@ TOKENHSI_GPU="$GPU" TASK_GRAPH=place_stack \
 ```
 
 3·4인 평가 graph는 `tokenhsi/data/cfg/multi_agent/graphs/`에 있다. 입력 크기 검증용이며 성공은 별도 학습으로 확인한다.
+
+## Stage 2 unified owner HOLDING
+
+이 실험은 Stage 1 `approach_scenario_stage1_unified_owner_holding`의 2H/4O 관측, owner HOLDING φ edge packet, 토큰 순열, 상자 크기·거리, 과제 조건 AMP, RSI 분포, 보상식과 현재 시점 포화를 이어받는다. Actor encoder를 지정한 Stage 1 checkpoint에서 복사해 고정하고, grounded edge 협력 attention과 확장 action head를 학습한다. 협력 `place_climb/place_sit/place_stack`은 전체 scene의 30/30/30%, 독립 scene은 10%이며 독립 scene의 각 agent는 Stage 1과 같은 5/5/20/35/35%로 샘플한다. 협력 scene에서는 운반 담당 `Hᵢ→Oᵢ HOLDING`, `Oᵢ→Gᵢ AT`와 동료의 `Hⱼ→Oᵢ SIT/CLIMB` 또는 `Hⱼ→Oⱼ HOLDING`, `Oⱼ→Oᵢ ON_TOP`을 동시에 준다. 공유 상자에 SIT/CLIMB하는 동료는 RSI 충돌을 피하려고 loco로 시작하며, Stage 2는 시작부터 하위 과제나 scene 전체가 성공한 reset을 재추첨한다. 자기 edge 합계 0.9 + 동료 edge 평균 0.1, 성공한 AT/ON_TOP과 같은 owner/source의 HOLDING 현재 step 포화는 독립·협력 모두 동일하다. 기존 Stage 2 config와 다른 별도 config·학습 설정·checkpoint·output을 사용한다.
+
+```bash
+STAGE1_CHECKPOINT='/absolute/path/to/ApproachScenarioStage1UnifiedOwnerHolding.pth' TOKENHSI_GPU="$GPU" \
+  bash tokenhsi/scripts/multi_agent/approach_stage2_unified_owner_holding_train.sh 2 2048 4
+RESUME_CHECKPOINT='/absolute/path/to/ApproachStage2UnifiedOwnerHolding.pth' TOKENHSI_GPU="$GPU" \
+  bash tokenhsi/scripts/multi_agent/approach_stage2_unified_owner_holding_train.sh 2 2048 4
+CKPT='/absolute/path/to/ApproachStage2UnifiedOwnerHolding.pth'
+TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=place_stack \
+  bash tokenhsi/scripts/multi_agent/approach_stage2_unified_owner_holding_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU="$GPU" HEADLESS=1 TASK_GRAPH=place_sit \
+  bash tokenhsi/scripts/multi_agent/approach_stage2_unified_owner_holding_test.sh "$CKPT" 2 16 4 3
+TOKENHSI_GPU="$GPU" TASK_GRAPH=place_climb \
+  bash tokenhsi/scripts/multi_agent/approach_stage2_unified_owner_holding_vnc.sh "$CKPT" 2 1 4 10
+```
+
+학습 시작은 해당 Stage 1 변형의 `.pth`가 필요하다. 짧은 확인은 `MAX_ITERATIONS=1 OUTPUT_PATH=output/approach_stage2_unified_owner_holding_check`를 명령 앞에 추가한다. Stage 2 checkpoint를 이어 학습할 때는 `RESUME_CHECKPOINT`를 지정한다.
 
 ## 원본 1번
 

@@ -14,9 +14,11 @@ STAGE1_PACKET_FIELDS = ('valid', 'src', 'dst', 'relation', 'owner', 'start', 'ke
 STAGE1_SEMANTIC_FIELDS = STAGE1_PACKET_FIELDS[:5]
 STAGE1_OWNER_HOLDING_FIELDS = STAGE1_SEMANTIC_FIELDS + ('owner_holding_state',)
 OWNER_HOLDING_VARIANT = 'scenario_independent_stage1_paired_placement_owner_holding'
+STAGE2_UNIFIED_OWNER_VARIANT = 'scenario_stage2_unified_owner_holding'
 UNIFIED_VARIANTS = ('scenario_independent_stage1_unified',
                     'scenario_independent_stage1_unified_owner_holding')
-OWNER_HOLDING_VARIANTS = (OWNER_HOLDING_VARIANT, UNIFIED_VARIANTS[1])
+OWNER_HOLDING_VARIANTS = (OWNER_HOLDING_VARIANT, UNIFIED_VARIANTS[1],
+                          STAGE2_UNIFIED_OWNER_VARIANT)
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_SIT', 'HOLDING_CLIMB')
 PRESETS = ('random_stage1', 'holding', 'sit', 'climb', 'holding_at',
@@ -33,7 +35,7 @@ SIT_PLANE_VARIANTS = ('scenario_independent_stage1_sit_plane_normalized',
                       'scenario_independent_stage1_paired_at_no_near',
                       'scenario_independent_stage1_paired_placement_no_near',
                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
-                      'scenario_stage2_sit_plane_self_sum')
+                      'scenario_stage2_sit_plane_self_sum', STAGE2_UNIFIED_OWNER_VARIANT)
 PLANE_VARIANTS = ('scenario_independent_stage1_plane',) + SIT_PLANE_VARIANTS
 CURRICULUM_VARIANT = 'scenario_independent_stage1_skill_curriculum'
 CURRICULUM_VARIANTS = (CURRICULUM_VARIANT,
@@ -45,7 +47,8 @@ CURRICULUM_VARIANTS = (CURRICULUM_VARIANT,
                        'scenario_independent_stage1_ontop_putdown',
                        'scenario_independent_stage1_paired_at_no_near',
                        'scenario_independent_stage1_paired_placement_no_near',
-                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS)
+                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
+                       STAGE2_UNIFIED_OWNER_VARIANT)
 
 
 def semantic_packet_size(capacity):
@@ -228,7 +231,8 @@ def validate_stage1_context_config(config):
                            'scenario_independent_stage1_paired_at_no_near',
                            'scenario_independent_stage1_paired_placement_no_near',
                            OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
-                           'scenario_stage2_sit_plane_self_sum')
+                           'scenario_stage2_sit_plane_self_sum',
+                           STAGE2_UNIFIED_OWNER_VARIANT)
     expected_aggregation = 'self_sum_teammate_mean' if self_sum else 'mean_active'
     if sit_plane and config['edge_aggregation'] != expected_aggregation:
         raise ValueError('Unsupported Stage-1 active-edge aggregation')
@@ -312,9 +316,10 @@ def validate_stage1_context_config(config):
             expected_training['near_start'].update(hold_steps=600000, anneal_steps=600000)
         if variant in ('scenario_independent_stage1_paired_at_no_near',
                        'scenario_independent_stage1_paired_placement_no_near',
-                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS):
+                       OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
+                       STAGE2_UNIFIED_OWNER_VARIANT):
             expected_training['near_start'].update(probability_start=0., probability_end=0.)
-        if variant in UNIFIED_VARIANTS:
+        if variant in (*UNIFIED_VARIANTS, STAGE2_UNIFIED_OWNER_VARIANT):
             expected_training['climb_rsi']['late_fraction'] = 0.
         if variant == 'scenario_independent_stage1_ontop_putdown':
             expected_training['ontop_putdown_rsi'] = {'phase_range': [.45, .70]}
@@ -424,7 +429,8 @@ def compose_graph(pattern, shuffle=False, generator=None):
 
 def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
                  generator=None):
-    if spec.get('sampler') == 'two_agent_stage2_cooperative':
+    if spec.get('sampler') in ('two_agent_stage2_cooperative',
+                                'two_agent_four_object_stage2_unified_owner'):
         from utils.edge_stage2_spec import sample_graph as sample_stage2_graph
         return sample_stage2_graph(n, spec, device, preset, role_swap, generator)
     from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER,
@@ -455,7 +461,8 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
 
 
 def compile_stage1_graph(spec, m, o, device=None):
-    if spec.get('sampler') == 'two_agent_stage2_cooperative' or spec.get('mode') == 'stage2_explicit':
+    if spec.get('sampler') in ('two_agent_stage2_cooperative',
+                                'two_agent_four_object_stage2_unified_owner') or spec.get('mode') == 'stage2_explicit':
         from utils.edge_stage2_spec import compile_graph as compile_stage2_graph
         return compile_stage2_graph(spec, m, o, device)
     from utils.edge_scenario_spec import (INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER,

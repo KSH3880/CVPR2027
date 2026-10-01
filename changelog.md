@@ -4,6 +4,16 @@
 
 ## 2026-09-30
 
+### Stage 1 unified owner HOLDING 기반 Stage 2 협력 실험
+
+- Stage 1의 2H/4O canonical binding, 토큰 순열, owner-HOLDING edge packet, 과제 조건 AMP, RSI, 상자·goal·거리 설정, 보상·포화를 계승한 별도 Stage 2 config·학습 설정·train/test/VNC를 추가했다. 협력 place_climb/place_sit/place_stack은 전체 scene의 30/30/30%, 독립 scene 10%의 agent별 5/5/20/35/35 샘플링을 적용한다. Stage 1 actor encoder를 고정 전이하고 owner-state packet을 grounded 협력 attention에 연결한다. 기존 Stage 2 실험과 현재 Stage 1 학습은 변경하지 않았다.
+- 관련 CPU 테스트 **18개 통과**. 2048환경·`MAX_ITERATIONS=1` 별도 output 학습에서 Stage 1 epoch 2500 checkpoint의 177개 tensor 전이·8개 협력 tensor 신규 초기화, scalar 177개 finite, 물리 reset 실패 0을 확인했다. 저장 checkpoint로 1환경·32step `place_stack` headless 평가를 완료했다. 이는 실행 경로 검증이며 학습 성과는 아직 확인하지 않았다.
+
+### AT goal marker 담당자 색 표시
+
+- viewer에서 빨간색으로 통일됐던 AT goal marker를 실제 graph edge owner의 에이전트 색으로, 미할당 goal은 회색으로 표시한다. 물체 색과 같은 reset 시점에 갱신하며 headless 무영상 학습에는 색 API 작업을 추가하지 않는다. Stage 2 협력·독립 graph에 대해 marker 호출을 확인했다. 현재 열린 viewer에는 재시작 후 적용된다.
+
+
 ### Unified 독립 5과제 · semantic/owner-HOLDING 두 실험
 
 - 두 agent가 HOLDING/SIT/CLIMB/HOLDING+AT/HOLDING+ON_TOP을 5/5/20/35/35로 독립 샘플링하는 4물체 config·train/test/VNC·별도 output을 추가했다. 두 실험은 edge의 담당 HOLDING φ 입력 유무만 다르다. 기존 실험의 설정·실행 중 학습은 유지했다.

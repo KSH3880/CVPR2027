@@ -38,7 +38,8 @@ from utils import torch_utils
 
 
 from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
-from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
+from utils.edge_context_spec import (AT, CONTEXT_MODE, compile_edge_context_graph,
+    context_suffix_size)
 from env.tasks.multi_agent.edge_context_reward import scene_success
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
 from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_interaction_graph,
@@ -81,7 +82,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE,
             STAGE2_CONTEXT_MODE)
         from utils.unified_training import validate_unified_env
-        if self._edge_stage1 and not self._stage2:
+        if self._edge_stage1:
             validate_unified_env(cfg['env'])
         self._amp_task_conditioning = cfg['env'].get('ampTaskConditioning', False)
         sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
@@ -100,7 +101,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             raise ValueError('Unknown sampled-edge graph preset or camera mode')
         if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
             expected_random = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
-            required_objects = 4 if sampler_name in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER) else 3
+            from utils.edge_stage2_spec import STAGE2_UNIFIED_OWNER_SAMPLER
+            required_objects = 4 if sampler_name in (PAIRED_PLACEMENT_SAMPLER,
+                UNIFIED_SAMPLER, STAGE2_UNIFIED_OWNER_SAMPLER) else 3
             if self._task_graph_preset != expected_random or \
                     (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2, required_objects):
                 raise ValueError('Sampled-edge training requires random graphs, 2 agents and {} objects'.format(required_objects))
@@ -716,7 +719,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         return
 
     def _update_box_assignment_colors(self, env_ids):
-        """Color each task object by its agents; shared objects use yellow."""
+        """Color task objects and AT goal markers by the graph's assigned agents."""
         rendered_envs = []
         if self.viewer is not None:
             rendered_envs = env_ids.detach().cpu().tolist()
@@ -748,6 +751,24 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                          self._agent_color(owners[0]) if owners else unassigned_color)
                 self.gym.set_rigid_body_color(
                     env_ptr, box_handle, 0, gymapi.MESH_VISUAL, color)
+            if self._edge_ontop and self._enable_markers:
+                graph = self.relation_runtime.graph
+                at = (graph.edge_valid[env_id] &
+                      (graph.edge_relation[env_id] == AT))
+                goals = (graph.edge_dst[env_id, at] - self.num_agents -
+                         self.num_objects).detach().cpu().tolist()
+                goal_owners = graph.edge_owner[env_id, at].detach().cpu().tolist()
+                owners_by_goal = {}
+                for goal, owner in zip(goals, goal_owners):
+                    owners_by_goal.setdefault(goal, set()).add(owner)
+                for goal in range(self.num_agents):
+                    owners = owners_by_goal.get(goal, set())
+                    color = (shared_color if len(owners) > 1 else
+                             self._agent_color(next(iter(owners))) if owners else
+                             unassigned_color)
+                    marker = self._marker_handles[env_id * self.num_agents + goal]
+                    self.gym.set_rigid_body_color(
+                        env_ptr, marker, 0, gymapi.MESH_VISUAL, color)
         return
 
     @staticmethod
