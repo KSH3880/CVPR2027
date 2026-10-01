@@ -1,0 +1,13 @@
+{
+  "completed": 8.0,
+  "successes": 3.0,
+  "proxy_collided": 6.0,
+  "proxy_steps": 510.0,
+  "executed_steps": 3060.0,
+  "mode": "nominal",
+  "executor": "/home/visitor/koo_cvpr/TokenHSI-masteer/output/masteer/ms18_carry_steer50_s0/Humanoid_23-12-39-56/nn/Humanoid_00012000.pth",
+  "seed": 0,
+  "delivery_fraction": 0.375,
+  "proxy_episode_fraction": 0.75,
+  "proxy_step_fraction": 0.16666666666666666
+}

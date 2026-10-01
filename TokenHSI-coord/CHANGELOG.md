@@ -4,6 +4,66 @@
 
 ## 2026-10-01
 
+### Carry resume 시 지정한 LR 유지
+
+- optimizer 복원이 새 `CARRY_PLANNER_LR`을 checkpoint LR로 덮어쓰던
+  문제를 수정했다. Adam moments/step은 복원하고 각 parameter group의
+  LR만 현재 실행 설정으로 다시 적용한다. clip/value 계수는 기존처럼
+  현재 환경변수에서 읽는다. 시작 로그에 실제 LR와 clip을 추가했다.
+- 작은 Adam 상태 복원 검증에서 moments와 step 유지, 3e-4 → 1e-4
+  변경 적용을 확인했다. py_compile, git diff --check 통과.
+  학습을 새로 시작하거나 실행 중인 프로세스를 중단하지 않았다.
+  로컬 수정이며 서버에는 별도 반영이 필요하다.
+
+### Carry 0.3m 바디 거리 기준 episode 충돌 평가
+
+- 평가 `MA_TAU=0.3`를 명시했다. 서로 다른 캐릭터의 바디 중심 최소 3D
+  거리 기준이며 물리 접촉이나 상자 충돌 지표가 아니다. 학습 reward의
+  root·상자 기반 근접 기준은 변경하지 않았다.
+- player 평가 하네스가 실제 채택한 첫 episode를 repeat/env/agent별로
+  기록하는 선택적 callback을 추가했다. 첫 회차 0과 이미 수집된 환경의
+  추가 episode는 최종 충돌 집계에서 제외한다. 결과 `.episodes.json`과
+  `.collision.json`에 threshold·분모·회차별 원시 수치를 보존한다.
+- eval launcher는 mixed 수렴 비율 override와 별도 label을 지원하고,
+  config/env sidecar를 보존한다. 집계 테스트 2개, py_compile 및 shell
+  구문 검사 통과. 다른 실행 중인 학습·평가는 종료하지 않았다.
+- 로컬 s6 `planner_000110.pth`, 기존 ms18 e9000 executor, GPU0,
+  64환경·seed0·수렴 비율 0.5·replan 12스텝으로 평가를 완료했다.
+  회차 1·2에서 49/128 episodes(38.28125%), 5411/74116 steps(7.3007%)가
+  0.3m 미만이었다. 두 agent 모두 성공한 episode는 69/128(53.90625%).
+  전체 실행의 제안 거절은 547/10727(5.0993%), 곡선 실패는 503건이었다.
+- 기존 전체 npy 행 집계의 collision 19.60%는 warmup과 추가 episode가
+  섞인 다른 분모이므로 이번 충돌 결과로 사용하지 않는다. 단일 checkpoint,
+  단일 seed의 deterministic 평가이며 학습 중 proxy 비율과 직접 비교하지 않는다.
+- 산출물: `runs/results/carry_planner/carry_implicit_consistency_s6/`
+  `planner_000110_mixed_s0_tau0p3_probe_20261001.*`. 서버에는 배포하지 않았다.
+
+### Carry 고정 경로 속도 회피 실험 추가
+
+- `carry_speed/`에 별도 train/eval/probe runner를 추가했다. visitor의
+  `ms18_carry_steer50_s0` 12000 checkpoint를 frozen executor로 읽는다.
+  기존 planner 출력과 checkpoint 형식은 바꾸지 않는다.
+- 상자를 든 carryWith 시작, 직각 교차 경로, 분리된 목표를 만든다.
+  episode별로 random priority agent는 정속, 다른 agent는 0~1.5m/s의
+  5개 명령을 PPO로 선택한다. 20% 평행 경로 대조 장면을 포함한다.
+  XY 경로는 reset에만 설치하고, 최소 속도 clamp를 별도 환경에서 해제했다.
+- 생성한 단일 config를 모든 모드에 사용하고 환경변수 sidecar, episode/step
+  근접 proxy, 요청/전송/실제 속도, held, 경로 trace를 보존한다.
+- 단위 테스트 7개, Python compile, shell 구문 검사 통과. GPU 8환경
+  smoke에서 executor 로딩, PPO 6회 업데이트, 저장까지 통과했다.
+  초기화 실패 3건(config task 인덱스, 버퍼 생성 순서, IET 필수 버퍼)을
+  수정했으며 실패 로그도 `runs/carry_speed/`에 보존했다.
+- 6초 정지 요청 probe의 실제 평균 속도는 전송 0 명령 구간에서 0.571m/s,
+  실제 0.2m/s 미만 표본은 0/204였다. 상자 유지 평균 0.995, 재출발
+  구간 평균 1.129m/s. 감속은 확인했지만 중간 완전 정지는 미검증이 아니라
+  이 조건에서 달성되지 않았다. 이 executor로 정지 회피를 보장하지 않는다.
+- 같은 episode의 XY 경로 고정을 trace로 확인했다. 정속 교차 대조군은
+  완료 8개 중 6개에서 근접 proxy가 있었고, 배송 성공은 3개였다.
+  단기 n=1 설정 검증이며 성능 비교나 수렴 결론은 아니다.
+- 동일 seed·8환경·384스텝의 양보 규칙 대조군도 종료했다. proxy step은
+  정속 0.1667 대비 0.0701, proxy episode는 6/8 대비 7/9였다.
+  step 근접 감소와 episode 회피를 구분하며 회피 성공을 주장하지 않는다.
+
 ### Carry planner 시작·목표 slot의 agent 번호 고정 해제
 
 - 기본 Cross 배치에서 agent 0은 수평, agent 1은 수직 경로에 고정되어 있던

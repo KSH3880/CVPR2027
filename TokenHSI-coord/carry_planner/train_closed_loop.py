@@ -393,11 +393,13 @@ def main():
         policy.action_log_std.data.copy_(
             payload["extras"]["action_log_std"].to(device)
         )
-    optimizer = torch.optim.Adam(
-        policy.parameters(), lr=_env_float("CARRY_PLANNER_LR", 3e-4),
-    )
+    learning_rate = _env_float("CARRY_PLANNER_LR", 3e-4)
+    optimizer = torch.optim.Adam(policy.parameters(), lr=learning_rate)
     if payload and "optimizer_state" in payload:
         optimizer.load_state_dict(payload["optimizer_state"])
+        # Restore Adam moments, then apply this run's requested learning rate.
+        for group in optimizer.param_groups:
+            group["lr"] = learning_rate
     policy.train()
 
     iterations = _env_int("CARRY_PLANNER_ITERS", 200)
@@ -530,6 +532,8 @@ def main():
         f"implicit_curve={implicit_curve} implicit_leg_scale={implicit_leg_scale} "
         f"randomize_agent_slots={int(task._carry_randomize_agent_slots)} "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
+        f"lr={optimizer.param_groups[0]['lr']:g} "
+        f"clip={_env_float('CARRY_PLANNER_CLIP', 0.2):g} "
         f"progress_coef={progress_coef:g} "
         f"collision_coef={collision_coef:g} "
         f"analytic_collision_coef={analytic_collision_coef:g} "

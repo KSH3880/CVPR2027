@@ -15,7 +15,7 @@ GPU=${MA_GPU:-0}
 STAGE1=${MS_CKPT:-"$EXEC_REPO/output/tokenhsi/ckpt_stage1.pth"}
 
 case "$PROFILE" in
-    mixed) SCENE=cross; CONVERGE=0.75 ;;
+    mixed) SCENE=cross; CONVERGE=${CARRY_PLANNER_CONVERGE_PROB:-0.75} ;;
     converge) SCENE=cross; CONVERGE=1.0 ;;
     cross) SCENE=cross; CONVERGE=0.0 ;;
     free) SCENE=free; CONVERGE=0.0 ;;
@@ -38,6 +38,9 @@ NAME=$(basename "$PLANNER" .pth)
 RUN=$(basename "$(dirname "$PLANNER")")
 SAFE_RUN=$(printf '%s' "$RUN" | tr -c 'A-Za-z0-9_.-' '_')
 EVAL_ID="${NAME}_${PROFILE}_s${SEED}"
+LABEL=${CARRY_PLANNER_EVAL_LABEL:-}
+case "$LABEL" in *[!A-Za-z0-9_.-]*) echo "invalid evaluation label" >&2; exit 2;; esac
+if [ -n "$LABEL" ]; then EVAL_ID="${EVAL_ID}_${LABEL}"; fi
 OUT="$ROOT/runs/results/carry_planner/$SAFE_RUN"
 LOG="$OUT/$EVAL_ID.log"
 METRICS="$OUT/$EVAL_ID.npy"
@@ -88,7 +91,15 @@ export COORD_ACCEL_DOWN=${COORD_ACCEL_DOWN:-1.0}
 export COORD_ALLOW_HAND_CONTACT=${COORD_ALLOW_HAND_CONTACT:-1}
 export COORD_PRESERVE_PICKUP_APPROACH=${COORD_PRESERVE_PICKUP_APPROACH:-1}
 export MS_METRICS="$METRICS" MA_METRICS="$METRICS"
+export MA_TAU=${MA_TAU:-0.3}
+export CARRY_PLANNER_EVAL_COLLISION_OUTPUT="$OUT/$EVAL_ID.episodes.json"
 unset MA_LAYOUT MA_LAYOUT_D MA_LAYOUT_S MA_LAYOUT_L MS_SCEN_CURVE MS_VIZ MA_VIDEO
+
+cp -- "$CFG" "$OUT/$EVAL_ID.env.yaml"
+{
+    printf 'planner=%q\nexecutor=%q\nstage1=%q\n' "$PLANNER" "$POLICY" "$STAGE1"
+    env | LC_ALL=C sort | grep -E '^(CARRY_PLANNER_|COORD_|MA_|MS_|CUDA_VISIBLE_DEVICES=)'
+} > "$OUT/$EVAL_ID.env"
 
 . "$COORD/stack_planner/physx_cuda_compat.sh"
 echo "carry eval: run=$RUN ckpt=$NAME profile=$PROFILE envs=$ENVS seed=$SEED physical_gpu=$GPU"
@@ -111,3 +122,5 @@ fi
 python "$ROOT/scripts/coord/summarize_eval.py" \
     --tag "$SAFE_RUN/$NAME" --scenario "$PROFILE" --checkpoint "$PLANNER" \
     --log "$LOG" --metrics "$METRICS" --output "$SUMMARY" | tee -a "$LOG"
+python "$COORD/carry_planner/eval_collision_summary.py" \
+    "$CARRY_PLANNER_EVAL_COLLISION_OUTPUT" "$OUT/$EVAL_ID.collision.json" | tee -a "$LOG"

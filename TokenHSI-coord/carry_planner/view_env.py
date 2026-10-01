@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,31 @@ from stack_planner.policy import StackPlannerActorCritic
 
 class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
     """Replan online while the frozen two-agent Carry policy executes."""
+
+    def record_evaluation_episode(self, repeat, rows, success):
+        """Record only the first scored episode per agent per eval repeat."""
+        destination = os.environ.get("CARRY_PLANNER_EVAL_COLLISION_OUTPUT")
+        if not destination:
+            return
+        records = getattr(self, "_carry_eval_episode_records", [])
+        for row, won in zip(rows.tolist(), success.tolist()):
+            records.append({
+                "repeat": int(repeat), "env": row // self.num_agents,
+                "agent": row % self.num_agents, "success": bool(won),
+                "collision_steps": int(self._ep_collide[row]),
+                "executed_steps": int(self.progress_buf[row // self.num_agents]),
+                "min_body_distance_m": float(self._ep_dmin[row]),
+            })
+        self._carry_eval_episode_records = records
+        payload = {
+            "definition": "minimum 3D distance between different agents' rigid-body centers < threshold",
+            "threshold_m": self._metric_tau,
+            "records": records,
+        }
+        target = Path(destination)
+        temporary = target.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, indent=2) + "\n")
+        os.replace(str(temporary), str(target))
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._carry_planner_view_ready = False

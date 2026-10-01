@@ -132,7 +132,7 @@ MA_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi118 \
 TensorBoard는 기본으로 켜져 있으며, 매 iteration의 핵심 지표를
 `runs/carry_planner/<tag>/tensorboard/`에 기록한다. 전체 원시 지표는 기존
 `metrics.jsonl`에 그대로 남는다. `Reward/`는 보상·진척,
-`Collision/`은 실제 충돌률과 analytic loss, `Plan/`은 sampled/mean 제안의
+`Collision/`은 근접 proxy 비율·cost와 analytic loss, `Plan/`은 sampled/mean 제안의
 유효율·곡률 통과율, `Path/`는 우회 거리·replan 변화, `Loss/`는 학습 손실이다.
 `done_rate`는 성공률이 아니라 episode 종료율이므로 성공률로 해석하지 않는다.
 `CARRY_PLANNER_TENSORBOARD=0`으로 기록을 끌 수 있다. TensorBoard 패키지가
@@ -153,6 +153,11 @@ ssh -N -L 6006:127.0.0.1:6006 hwanhee@<server-host>
 설치한다. 이 기능을 적용하기 전에 시작된 학습은 자동 event 파일이 없으므로
 기존 `metrics.jsonl`을 다음처럼 별도 터미널에서 읽어 그래프를 만든다
 (`--follow`는 이후 iteration도 계속 반영한다).
+
+재개 시 모델·std·Adam 상태는 checkpoint에서 복원한다. LR은 복원 후
+현재 실행의 `CARRY_PLANNER_LR`을 다시 적용하며 clip/value 계수도 현재
+환경변수를 사용한다. 시작 로그의 `lr=`, `clip=`으로 실제 설정을 확인한다.
+환경 episode·history·RNG 진행 상태까지 복원하는 재개는 아니다.
 
 ```bash
 PYTHONPATH=TokenHSI-coord python -m carry_planner.tensorboard_metrics \
@@ -234,3 +239,22 @@ MA_GPU=1 bash TokenHSI-coord/carry_planner/eval_suite.sh \
 `runs/results/carry_planner/<tag>/`에 저장되며 `both_place`, pair collision,
 minimum distance, command-speed 사용률, invalid/curve rate를 함께 보고한다. 한 분포만
 보려면 `eval_one.sh <planner> <executor> <profile> [envs] [seed]`를 사용한다.
+
+평가의 `MA_TAU=0.3`(기본값)은 서로 다른 캐릭터의 바디 중심 사이 최소
+3D 거리 기준이며 물리 접촉 판정이나 상자 충돌을 포함한 지표가 아니다.
+`mixed` 비율은 `CARRY_PLANNER_CONVERGE_PROB`로 지정한다(미지정 시 0.75).
+`CARRY_PLANNER_EVAL_LABEL`을 붙이면 같은 checkpoint를 별도 파일에 평가할 수 있다.
+실행 config와 환경변수는 결과 옆 `.env.yaml`, `.env`에 보존한다.
+
+하네스가 실제로 채택한 첫 episode만 repeat·env·agent별로
+`<평가ID>.episodes.json`에 기록한다. 첫 회차 0을 제외한 회차 1·2의
+바디 근접 episode/step 비율은 다음 명령으로 계산한다.
+
+```bash
+python TokenHSI-coord/carry_planner/eval_collision_summary.py \
+  <평가ID>.episodes.json <평가ID>.collision.json
+```
+
+기존 `.npy` 전체 행을 집계한 `.json`과 달리, 이 결과는 완료를 기다리는 동안
+이미 수집된 환경에서 추가로 실행된 episode를 제외한다. threshold와 분모를
+확인하며 학습의 root·상자 기반 근접 proxy 비율과 직접 동일시하지 않는다.
