@@ -2049,6 +2049,12 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         v = t if env_ids is None else t[env_ids]
         return v if self.num_agents == 1 else v.repeat_interleave(self.num_agents, dim=0)
 
+    def _layout_slot_indices(self, env_ids):
+        """Default layouts assign geometric slots in agent-index order."""
+        return torch.arange(self.num_agents, device=self.device)[None].expand(
+            len(env_ids), -1,
+        )
+
     def apply_layout(self, env_ids):
         """MA_LAYOUT 에 따라 에이전트·박스·타겟의 xy 를 배치한다.
 
@@ -2077,6 +2083,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         S = float(os.environ.get("MA_LAYOUT_S", 4.0))    # 에이전트 간 거리
         rows = self.agent_rows(env_ids)
         e, a = torch.div(rows, A, rounding_mode="floor"), rows % A
+        slot = self._layout_slot_indices(env_ids).reshape(-1)
 
         k = torch.arange(A, device=self.device, dtype=torch.float)
         off = (k - (A - 1) / 2) * S          # 에이전트를 S 간격으로 나열
@@ -2111,7 +2118,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         env_org = _h0.mean(dim=1)[e]
         h = self.agent_axis(self._humanoid_root_states)
         b_ = self.agent_axis(self._box_states)
-        s_xy = env_org + start[a]
+        s_xy = env_org + start[slot]
         # **사람과 박스를 같은 벡터만큼 옮긴다.** 박스를 절대 위치로 덮어쓰면
         # pickUp·carryWith·putDown 모션으로 시작한 경우 **손과 박스의 관계가 끊긴다** --
         # 캐릭터는 드는 자세인데 박스만 순간이동해서 잡을 게 없어진다.
@@ -2121,7 +2128,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         shift = s_xy - h[e, a, 0:2]
         h[e, a, 0:2] = s_xy
         b_[e, a, 0:2] += shift
-        self._box_tar_pos[rows, 0:2] = env_org + tar[a]
+        self._box_tar_pos[rows, 0:2] = env_org + tar[slot]
 
         # 받침대도 같이 옮긴다. carryResetRandomHeight 는 박스를 받침 위에 올려두고
         # 시작하는데, 박스만 옮기면 받침이 원래 자리에 남아 **박스가 공중에서 떨어진다**.

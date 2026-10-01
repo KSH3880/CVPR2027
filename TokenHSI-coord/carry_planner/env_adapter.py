@@ -12,7 +12,7 @@ import os
 import torch
 import torch.nn.functional as F
 
-from carry_planner.layout import converging_goal_xy
+from carry_planner.layout import converging_goal_xy, two_agent_layout_slots
 from carry_planner.episode import initial_timeout_deadlines
 from carry_planner.held_state import observed_box_held
 from carry_planner.reward import carry_remaining_distance
@@ -74,6 +74,12 @@ class HumanoidMACarryPlannerTrain(
         self._carry_goal_margin = float(os.environ.get(
             "CARRY_PLANNER_GOAL_MARGIN", "0.25",
         ))
+        randomize_slots = int(os.environ.get(
+            "CARRY_PLANNER_RANDOMIZE_AGENT_SLOTS", "1",
+        ))
+        if randomize_slots not in (0, 1):
+            raise ValueError("CARRY_PLANNER_RANDOMIZE_AGENT_SLOTS must be 0 or 1")
+        self._carry_randomize_agent_slots = bool(randomize_slots)
         if not 0.0 <= self._carry_converge_prob <= 1.0:
             raise ValueError("CARRY_PLANNER_CONVERGE_PROB must be in [0, 1]")
         if self._carry_goal_margin < 0.0:
@@ -116,6 +122,18 @@ class HumanoidMACarryPlannerTrain(
         self._apply_makespan_reward()
         self._ep_task_r[rows] += self.rew_buf[rows] - before
         self.reset_buf[:] = original | forced.long()
+
+    def _layout_slot_indices(self, env_ids):
+        """Each reset gives either agent either start/goal slot with p=0.5.
+
+        The parent translates each agent's own root, box and support together.
+        Its reference pose, box asset and target height stay paired correctly.
+        Subsequent convergence and viewer timing use the randomized geometry.
+        """
+        if not self._carry_randomize_agent_slots:
+            return super()._layout_slot_indices(env_ids)
+        swap = torch.rand(len(env_ids), device=self.device) < 0.5
+        return two_agent_layout_slots(swap)
 
     def apply_layout(self, env_ids):
         """Mix ordinary Cross with feasible close-goal convergence cases."""

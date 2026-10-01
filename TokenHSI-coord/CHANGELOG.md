@@ -2,6 +2,24 @@
 
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
+## 2026-10-01
+
+### Carry planner 시작·목표 slot의 agent 번호 고정 해제
+
+- 기본 Cross 배치에서 agent 0은 수평, agent 1은 수직 경로에 고정되어 있던
+  시작·목표 slot을 매 reset마다 50% 확률로 교환한다. 번호만으로 우회 방향이나
+  양보 역할을 외우는 편향을 줄이기 위한 변경이며, 실제 개선 여부는 미검증이다.
+- Carry planner에만 기본 적용한다. 공통 레이아웃에는 slot 선택 hook을 추가해
+  다른 환경의 기존 배치는 유지한다. 각 agent의 모션 자세·상자 asset/크기·높이는
+  그대로 두고 root·상자·받침을 함께 평행이동하며, 목표도 해당 slot으로 배치한다.
+- 학습·평가·viewer의 convergence/timed-cross 계산 전에 slot을 선택한다.
+  `CARRY_PLANNER_RANDOMIZE_AGENT_SLOTS=0`으로 기존 고정 배치를 비교할 수 있다.
+  새 프로세스에 적용되며 로컬 변경이 서버에 자동 배포되는 것은 아니다.
+- 레이아웃 테스트 6개 통과: 실제 reset 메서드를 GPU 없이 실행해 부분 reset,
+  strided actor view, 손-상자 상대 위치, 받침·목표 정렬, 양쪽 slot 표본,
+  비활성화와 A=1 기본 배치를 검증했다. 수정 Python 파일의 py_compile 및
+  git diff --check 통과. Isaac Gym 학습·viewer 실행은 이번 작업에서 하지 않았다.
+
 ## 2026-09-30
 
 ### Carry suffix replan history cursor 재설정

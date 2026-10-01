@@ -528,6 +528,7 @@ def main():
         f"control_scale={control_scale:g} "
         f"path_alpha={path_update_alpha:g} suffix_replan=True dynamic_box=True "
         f"implicit_curve={implicit_curve} implicit_leg_scale={implicit_leg_scale} "
+        f"randomize_agent_slots={int(task._carry_randomize_agent_slots)} "
         f"delta_std={policy.action_log_std[0, 0].exp().item():g} "
         f"progress_coef={progress_coef:g} "
         f"collision_coef={collision_coef:g} "

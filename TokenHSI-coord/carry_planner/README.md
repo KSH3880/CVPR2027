@@ -31,6 +31,11 @@ stack_planner의 Transformer, decision history, PPO action distribution과 33-po
   `CARRY_PLANNER_PROGRESS_COEF`(기본 2.0)으로 progress reward의 배율만
   바꿀 수 있다. 작은 우회가 직선 진척을 일시적으로 줄이는지 확인할 때 사용한다.
 - 기본 stress distribution은 `MS_SCEN=cross`다.
+- 매 에피소드에서 두 agent의 시작·목표 slot을 50% 확률로 교환한다. agent마다
+  자기 모션 자세·상자·받침을 함께 평행이동하므로 잡기 관계와 상자 크기는 유지된다.
+  학습·평가·viewer에 공통 적용하며 convergence goal과 viewer timing은 교환된
+  배치를 기준으로 만든다. `CARRY_PLANNER_RANDOMIZE_AGENT_SLOTS=0`이면 기존
+  고정 slot 배치로 비교할 수 있다. `MS_SCEN=free`의 랜덤 reset에는 적용되지 않는다.
 - reset의 기본 75%는 각 `box -> goal` 선분이 동일한 crossing을 지나도록 goal을
   crossing 너머에 두는 hard case, 25%는 일반 Cross다. goal 간격은 두 box의
   circumscribed radius 합 + 0.25 m라 최종 배치는 가능하지만, 먼저 도착해 정지한

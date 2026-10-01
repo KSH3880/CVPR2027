@@ -5,6 +5,14 @@ from __future__ import annotations
 import torch
 
 
+def two_agent_layout_slots(swap):
+    """Assign the two geometric slots independently of agent identity."""
+    if swap.ndim != 1 or swap.dtype != torch.bool:
+        raise ValueError("swap must be a one-dimensional bool tensor")
+    first = swap.long()
+    return torch.stack((first, 1 - first), dim=-1)
+
+
 def converging_goal_xy(box_xy, crossing, box_size_xy, margin,
                        minimum_direction_separation=0.25):
     """Put close goals beyond a shared crossing on both box rays.
@@ -41,4 +49,4 @@ def converging_goal_xy(box_xy, crossing, box_size_xy, margin,
     return goal, feasible
 
 
-__all__ = ["converging_goal_xy"]
+__all__ = ["converging_goal_xy", "two_agent_layout_slots"]
