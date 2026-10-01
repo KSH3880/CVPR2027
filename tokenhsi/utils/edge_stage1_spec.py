@@ -15,7 +15,8 @@ STAGE1_SEMANTIC_FIELDS = STAGE1_PACKET_FIELDS[:5]
 STAGE1_OWNER_HOLDING_FIELDS = STAGE1_SEMANTIC_FIELDS + ('owner_holding_state',)
 OWNER_HOLDING_VARIANT = 'scenario_independent_stage1_paired_placement_owner_holding'
 UNIFIED_VARIANTS = ('scenario_independent_stage1_unified',
-                    'scenario_independent_stage1_unified_owner_holding')
+                    'scenario_independent_stage1_unified_owner_holding',
+                    'scenario_independent_stage1_unified_shared_edge_encoder')
 OWNER_HOLDING_VARIANTS = (OWNER_HOLDING_VARIANT, UNIFIED_VARIANTS[1])
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_SIT', 'HOLDING_CLIMB')

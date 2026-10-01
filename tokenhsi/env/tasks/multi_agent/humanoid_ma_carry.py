@@ -38,7 +38,8 @@ from utils import torch_utils
 
 
 from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
-from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
+from utils.edge_context_spec import (CONTEXT_MODE, compile_edge_context_graph,
+    context_suffix_size, at_goal_marker_slots)
 from env.tasks.multi_agent.edge_context_reward import scene_success
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
 from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_interaction_graph,
@@ -632,7 +633,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         marker_handle = self.gym.create_actor(env_ptr, self._marker_asset, default_pose,
                                               "marker_{}".format(agent_id), col_group, col_filter, segmentation_id)
-        self.gym.set_rigid_body_color(env_ptr, marker_handle, 0, gymapi.MESH_VISUAL, gymapi.Vec3(0.8, 0.0, 0.0))
+        self.gym.set_rigid_body_color(env_ptr, marker_handle, 0, gymapi.MESH_VISUAL, self._agent_color(agent_id))
         self.gym.set_actor_scale(env_ptr, marker_handle, 0.3)
         self._marker_handles.append(marker_handle)
         return
@@ -1704,11 +1705,18 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._enable_markers:
             self._marker_pos[env_ids] = self._tar_pos[env_ids]
             if self._edge_ontop:
-                from env.tasks.multi_agent.edge_context_reward import owner_sum
                 from utils.edge_ontop_spec import select_graph
                 graph = select_graph(self.relation_runtime.graph, env_ids)
-                active = owner_sum(((graph.edge_relation == 7) & graph.edge_valid).long(), graph).bool()
+                at_edges, goal_slots, active = at_goal_marker_slots(graph)
                 self._marker_pos[env_ids, :, 2] = torch.where(active, self._tar_pos[env_ids, :, 2], 20.)
+                shown = torch.ones_like(env_ids, dtype=torch.bool) if self.viewer is not None else env_ids == 0
+                rows, edges = (at_edges & shown[:, None]).nonzero(as_tuple=True)
+                assignments = torch.stack((env_ids[rows], goal_slots[rows, edges],
+                                           graph.edge_owner[rows, edges]), dim=-1).cpu().tolist()
+                for env_id, goal_id, owner in assignments:
+                    marker = self._marker_handles[env_id * self.num_agents + goal_id]
+                    self.gym.set_rigid_body_color(self.envs[env_id], marker, 0,
+                                                  gymapi.MESH_VISUAL, self._agent_color(owner))
             ids.append(self._marker_actor_ids[env_ids].contiguous().view(-1))
         if self._reset_random_height:
             self._platform_states[env_ids, :, 3:6] = 0.0

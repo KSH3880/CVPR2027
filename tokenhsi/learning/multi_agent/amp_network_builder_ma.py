@@ -1016,6 +1016,13 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                self.critic_encoder.context_fusion.state_mlp):
                     torch.nn.init.zeros_(branch[-1].weight)
                     torch.nn.init.zeros_(branch[-1].bias)
+            if tp.get('share_edge_encoder', False):
+                if (self.relation_reward_mode != STAGE1_CONTEXT_MODE or
+                        relation_bias_mode != RELATION_BIAS_EDGE_MLP or
+                        not self.actor_encoder.semantic_only or
+                        self.actor_encoder.owner_holding_state):
+                    raise ValueError('Shared edge encoder requires semantic-only Stage 1 edge_mlp')
+                self.critic_encoder.edge_encoder = self.actor_encoder.edge_encoder
             return
 
         def set_entity_counts(self, num_agents, num_objects=None):

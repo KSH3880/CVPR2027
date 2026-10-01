@@ -41,6 +41,53 @@ def test_two_variants_differ_only_in_edge_state_and_contract():
         validate_unified_env(expected)
 
 
+def test_shared_edge_encoder_config_and_gradients():
+    torch.manual_seed(117)
+    torch.set_num_threads(1)
+    base = config()
+    shared = yaml.safe_load((ROOT / 'data/cfg/multi_agent/approach_scenario_stage1_unified_shared_edge_encoder.yaml').read_text())['env']
+    expected = deepcopy(base)
+    expected['relationReward']['stage1_variant'] += '_shared_edge_encoder'
+    assert shared == expected
+    validate_sampler(shared['relationGraph'], 2, 4)
+    validate_relation_config(shared['relationReward'])
+    validate_unified_env(shared)
+    with pytest.raises(ValueError):
+        check_checkpoint_metadata({'relation_metadata': checkpoint_metadata(base['relationReward'])},
+                                  checkpoint_metadata(shared['relationReward']))
+
+    base_train = yaml.safe_load((ROOT / 'data/cfg/train/rlg/amp_ma_carry_relation.yaml').read_text())
+    shared_train = yaml.safe_load((ROOT / 'data/cfg/train/rlg/amp_ma_carry_relation_unified_shared_edge_encoder.yaml').read_text())
+    expected_train = deepcopy(base_train)
+    expected_train['params']['network']['transformer']['share_edge_encoder'] = True
+    assert shared_train == expected_train
+    builder = AMPMultiAgentBuilder()
+    builder.load(shared_train['params']['network'])
+    network = builder.build('amp', actions_num=32, input_shape=(644,),
+        amp_input_shape=(1320,), value_size=1, num_agents=2, num_objects=4,
+        humanoid_obs_size=230, object_obs_size=39, goal_obs_size=6,
+        observation_mode='clean_scene', scene_entity_sizes=[223, 30, 1], scene_kinematic_size=7,
+        scene_arena_scale=5., relation_reward_mode=shared['relationReward']['mode'],
+        relation_graph_spec=shared['relationGraph'], device='cpu')
+    edge = network.actor_encoder.edge_encoder
+    assert network.critic_encoder.edge_encoder is edge
+    assert network.actor_encoder.layers[0] is not network.critic_encoder.layers[0]
+    assert sum(p is edge.bias_projection for p in network.parameters()) == 1
+    for encoder in (network.actor_encoder, network.critic_encoder):
+        encoder.gta_diagnostics_first_forward = False
+    graph = sample_graph(4, shared['relationGraph'])
+    packet = semantic_graph_packet(graph, 4)
+    kin = torch.randn(4, 8, 7)
+    kin[..., 3:] = torch.nn.functional.normalize(kin[..., 3:], dim=-1)
+    obs = torch.cat([torch.randn(4, 568), kin.flatten(1), packet], -1)
+    for encoder, head in ((network.actor_encoder, network.action_head),
+                          (network.critic_encoder, network.value_head)):
+        network.zero_grad()
+        head(encoder(obs)).square().mean().backward()
+        assert edge.bias_projection.grad is not None
+        assert edge.bias_projection.grad.abs().sum() > 0
+
+
 def test_independent_distribution_and_canonical_endpoints():
     n = 5000
     cfg = config()
@@ -115,6 +162,7 @@ def test_token_permutation_preserves_actions_values_and_gradients(owner):
         observation_mode='clean_scene',scene_entity_sizes=[223,30,1],scene_kinematic_size=7,
         scene_arena_scale=5.,relation_reward_mode=cfg['relationReward']['mode'],
         relation_graph_spec=cfg['relationGraph'],device='cpu')
+    assert network.actor_encoder.edge_encoder is not network.critic_encoder.edge_encoder
     network.eval()
     graph=sample_graph(8,cfg['relationGraph'])
     phi=torch.rand(8,4)
