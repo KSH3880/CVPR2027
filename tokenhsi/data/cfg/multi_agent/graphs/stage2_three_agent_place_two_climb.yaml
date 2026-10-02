@@ -1,0 +1,8 @@
+mode: stage2_explicit
+semantic_only: true
+edge_capacity: 4
+edges:
+  - {owner: 0, source: H_0, target: O_0, relation: HOLDING, required_goal: false}
+  - {owner: 0, source: O_0, target: G_0, relation: AT, required_goal: true}
+  - {owner: 1, source: H_1, target: O_0, relation: CLIMB, required_goal: true}
+  - {owner: 2, source: H_2, target: O_0, relation: CLIMB, required_goal: true}

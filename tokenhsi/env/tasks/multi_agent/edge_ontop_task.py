@@ -15,6 +15,9 @@ from env.tasks.multi_agent.edge_ontop_reward import OnTopContextRuntime, evaluat
 from env.tasks.multi_agent.edge_interaction_reward import (InteractionContextRuntime,
     evaluate_interaction_edges)
 from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
+from env.tasks.multi_agent.scene_features import (
+    task_target_owners, task_marker_vertices, SHARED_TASK_COLOR,
+)
 
 
 class SampledOnTopTaskMixin:
@@ -51,6 +54,7 @@ class SampledOnTopTaskMixin:
         self._sampling_failures=torch.zeros((),device=self.device)
         self._ontop_putdown_rsi_count=torch.zeros((),device=self.device)
         self._stage2_initial_rejections=torch.zeros((),device=self.device)
+        self._stage2_body_rejections=torch.zeros((),device=self.device)
         self._stage2_rsi_counts=torch.zeros(len(self._skill),device=self.device)
         self._rsi_attempts=torch.zeros(2,device=self.device)
         self._rsi_rejected=torch.zeros(2,device=self.device)
@@ -81,7 +85,13 @@ class SampledOnTopTaskMixin:
     def _sample_episode_graph(self, ids):
         if self._relation_graph_spec.get('mode')=='edge_composition':
             sampler=sample_stage1_graph if getattr(self,'_edge_stage1',False) else (sample_interaction_graph if getattr(self,'_edge_interaction',False) else sample_graph)
-            new=sampler(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
+            if getattr(self, '_stage2_shared9', False):
+                from utils.edge_stage2_spec import sample_graph as sample_stage2
+                new = sample_stage2(len(ids), self._relation_graph_spec, self.device,
+                    self._task_graph_preset, self._task_role_swap,
+                    scene_pools=self._stage2_scene_pools[ids])
+            else:
+                new=sampler(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
         else:
             compiler=compile_stage1_graph if getattr(self,'_edge_stage1',False) else (compile_interaction_graph if getattr(self,'_edge_interaction',False) else compile_ontop_graph)
             new=expand_graph(compiler(self._relation_graph_spec,self.num_agents,self.num_objects,self.device),len(ids))
@@ -92,8 +102,13 @@ class SampledOnTopTaskMixin:
         if getattr(self, '_stage2', False):
             from utils.edge_stage2_spec import classify_family
             family = classify_family(new)
-            self._sampling_counts[1:5] += torch.stack(
-                [(family == index).sum() for index in range(4)])
+            if getattr(self, '_stage2_shared9_eval', False):
+                from utils.stage2_shared_eval import family_counts
+                self._sampling_counts[1:11] += family_counts(new).sum(0)
+            else:
+                count = 10 if getattr(self, '_stage2_shared9', False) else 4
+                self._sampling_counts[1:1+count] += torch.stack(
+                    [(family == index).sum() for index in range(count)])
         elif self.num_agents==2 and getattr(self, '_scenario_no_climb', False):
             from utils.edge_scenario_spec import classify_templates, scenario_templates
             templates = scenario_templates(self._relation_graph_spec)
@@ -250,6 +265,15 @@ class SampledOnTopTaskMixin:
                     or 'independent_training' in self._relation_cfg) and not self._is_eval:
                 self._configure_hard_skill_near_starts(ids)
             self._configure_putdown_ontop_supports()
+            from utils.edge_stage2_spec import STAGE2_GENERAL_RESCUE_SAMPLER
+            if self._relation_graph_spec.get('sampler') == STAGE2_GENERAL_RESCUE_SAMPLER or getattr(self, '_stage2_shared9', False) or getattr(self, '_stage2_shared9_eval', False):
+                from utils.stage2_evaluation_layout import sample_at_goals
+                self._tar_pos[ids] = sample_at_goals(
+                    select_graph(self.relation_runtime.graph, ids),
+                    self._logical_box_values(self._box_states, ids),
+                    self._logical_box_values(self._box_size, ids),
+                    self._humanoid_root_states[ids, :, :3], self._tar_pos[ids],
+                    self._env_origins[ids, :2], self._box_spawn_radius)
             return
         g=select_graph(self.relation_runtime.graph,ids)
         at=owner_sum(((g.edge_relation==AT)&g.edge_valid).long(),g).bool()
@@ -369,6 +393,13 @@ class SampledOnTopTaskMixin:
         g=select_graph(self.relation_runtime.graph,ids)
         at=owner_sum(((g.edge_relation==AT)&g.edge_valid).long(),g).bool()
         bad=torch.zeros(len(ids),device=self.device,dtype=torch.bool)
+        if getattr(self, '_stage2_shared9', False) or getattr(self, '_stage2_shared9_eval', False):
+            from utils.stage2_shared_spec import initial_body_collisions
+            body_bad = initial_body_collisions(
+                self._kinematic_humanoid_rigid_body_states[ids, ..., :3], boxes, sizes,
+                self.cfg['env']['box']['reset']['initialBodyClearance'])
+            self._stage2_body_rejections += body_bad.sum()
+            bad |= body_bad
         # Bounding circles are conservative under arbitrary yaw. Assigned boxes may
         # legitimately start held; only reject box-box penetration and free-support obstruction.
         radius=sizes[...,:2].norm(dim=-1)/2
@@ -409,6 +440,13 @@ class SampledOnTopTaskMixin:
                 other=(logical!=src)&at_edges
                 distance=(goal_pos[...,:2]-boxes[:,logical,:2][:,None,:]).norm(dim=-1)
                 bad|=(other&(distance<source_radius+radius[:,logical,None]+.25)).any(-1)
+            from utils.edge_stage2_spec import STAGE2_GENERAL_RESCUE_SAMPLER
+            if self._relation_graph_spec.get('sampler') == STAGE2_GENERAL_RESCUE_SAMPLER or getattr(self, '_stage2_shared9', False) or getattr(self, '_stage2_shared9_eval', False):
+                for edge in range(len(g.ids)):
+                    distance = (goal_pos[:, edge:edge+1, :2] - goal_pos[:, :edge, :2]).norm(dim=-1)
+                    valid = at_edges[:, edge:edge+1] & at_edges[:, :edge]
+                    bad |= (valid & (distance < source_radius[:, edge:edge+1] +
+                                     source_radius[:, :edge] + .35)).any(-1)
         else:
             for a in range(self.num_agents):
                 goal=self._tar_pos[ids,a]
@@ -544,10 +582,17 @@ class SampledOnTopTaskMixin:
         out={'sampling/resets':c[0].clone(),'sampling/physical_retries':self._sampling_retries.clone(),
              'sampling/physical_failures':self._sampling_failures.clone()}
         if getattr(self, '_stage2', False):
-            for index, name in enumerate(('independent', 'place_climb', 'place_sit',
-                                          'place_stack'), 1):
-                out['sampling/' + name] = c[index] / den
+            names = ('independent', 'place_climb', 'place_sit', 'place_stack')
+            family_den = den
+            if getattr(self, '_stage2_shared9', False) or getattr(self, '_stage2_shared9_eval', False):
+                from utils.stage2_shared_spec import PAIRS
+                names = ('independent', *PAIRS)
+                if getattr(self, '_stage2_shared9_eval', False):
+                    family_den = c[1:11].sum().clamp_min(1)
+            for index, name in enumerate(names, 1):
+                out['sampling/' + name] = c[index] / family_den
             out['sampling/initial_success_rejections'] = self._stage2_initial_rejections.clone()
+            out['sampling/initial_body_rejections'] = self._stage2_body_rejections.clone()
             for index, name in enumerate(self._skill):
                 out['sampling/rsi_' + name] = self._stage2_rsi_counts[index] / (den * self.num_agents)
             for index, name in enumerate(('sit', 'climb')):
@@ -556,6 +601,7 @@ class SampledOnTopTaskMixin:
                     self._rsi_rejected[index] / self._rsi_attempts[index].clamp_min(1))
             c.zero_(); self._sampling_retries.zero_(); self._sampling_failures.zero_()
             self._stage2_initial_rejections.zero_()
+            self._stage2_body_rejections.zero_()
             self._stage2_rsi_counts.zero_(); self._rsi_attempts.zero_()
             self._rsi_rejected.zero_(); self._rsi_start_distance.zero_()
             return out
@@ -679,13 +725,19 @@ class SampledOnTopTaskMixin:
         if getattr(self,'_edge_interaction',False):
             visible|=(g.edge_relation[0]==SIT)|(g.edge_relation[0]==CLIMB)
         ids=(g.edge_valid[0]&visible).nonzero(as_tuple=False).flatten()
+        owners_by_task = task_target_owners(g, 0)
         self.gym.clear_lines(self.viewer)
         for e in ids.tolist():
             target=self._ontop_last_diag['target'][0,e].cpu().numpy()
-            vertices=[]
-            for axis in range(3):
-                delta=np.zeros(3);delta[axis]=.12
-                vertices.extend([target-delta,target+delta])
-            owner=int(g.edge_owner[0,e]);color=self._agent_color(owner)
-            colors=np.tile([color.x,color.y,color.z],(3,1)).astype(np.float32)
-            self.gym.add_lines(self.viewer,self.envs[0],3,np.asarray(vertices,dtype=np.float32),colors)
+            relation=int(g.edge_relation[0,e])
+            destination=int(g.edge_dst[0,e])
+            vertices=task_marker_vertices(relation, target)
+            num_lines=len(vertices)//2
+            owner=int(g.edge_owner[0,e])
+            if len(owners_by_task.get((relation, destination), ())) > 1:
+                color_rgb = SHARED_TASK_COLOR
+            else:
+                color=self._agent_color(owner)
+                color_rgb = (color.x, color.y, color.z)
+            colors=np.tile(color_rgb,(num_lines,1)).astype(np.float32)
+            self.gym.add_lines(self.viewer,self.envs[0],num_lines,vertices,colors)

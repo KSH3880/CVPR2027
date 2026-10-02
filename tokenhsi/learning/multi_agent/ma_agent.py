@@ -23,6 +23,7 @@ import learning.amp_agent as amp_agent
 import learning.amp_datasets as amp_datasets
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
+from env.tasks.multi_agent.collision_reward import agent_collision_config, check_agent_collision_checkpoint
 from utils.edge_stage1_spec import CURRICULUM_VARIANTS
 from utils.rsi_curriculum import SkillInitCurriculum
 from env.tasks.multi_agent.relation_diagnostics import relation_tensorboard_tag
@@ -222,6 +223,7 @@ class MAAgent(amp_agent.AMPAgent):
         weights = super().get_stats_weights()
         task = self.vec_env.env.task
         weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        weights['agent_collision_config'] = agent_collision_config(task.cfg['env'])
         if getattr(task, '_edge_context', False):
             from utils.edge_context_spec import task_instance
             weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)
@@ -239,6 +241,7 @@ class MAAgent(amp_agent.AMPAgent):
             from utils.edge_context_spec import check_task_resume
             check_task_resume(weights, task._relation_graph_spec, task.num_agents, task.num_objects)
         check_checkpoint_metadata(weights, checkpoint_metadata(self.vec_env.env.task._relation_cfg))
+        check_agent_collision_checkpoint(weights, task.cfg['env'])
         if getattr(task, '_stage2', False) and not stage2_evaluation:
             self._stage2_checkpoint_info = weights.get('stage2_checkpoint_info')
         return super().set_weights(weights)

@@ -84,6 +84,32 @@ def load_cfg(args):
     with open(os.path.join(os.getcwd(), args.cfg_env), 'r') as f:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
 
+    box_size_range = getattr(args, 'eval_box_size_range', '')
+    if cfg['env'].get('box', {}).get('build', {}).get('stage2RoleSizes') is not None and \
+            (box_size_range or getattr(args, 'relation_graph', '')):
+        raise ValueError('Shared9 role-sized assets require TASK_GRAPH presets without box/graph overrides')
+    if box_size_range:
+        if not (args.test or args.eval) or args.resume > 0 or \
+                cfg['env'].get('relationReward', {}).get('mode') != 'state_relation_edge_stage2_v1':
+            raise ValueError('--eval_box_size_range is for Stage-2 evaluation only')
+        try:
+            bounds = [float(value) for value in box_size_range.split(',')]
+        except ValueError:
+            raise ValueError('--eval_box_size_range needs xy_min,xy_max,z_min,z_max in meters')
+        if len(bounds) != 4 or not np.isfinite(bounds).all() or \
+                min(bounds) <= 0 or bounds[0] > bounds[1] or bounds[2] > bounds[3]:
+            raise ValueError('--eval_box_size_range needs positive, finite, ordered bounds')
+        build = cfg['env']['box']['build']
+        ranges = {}
+        interval = build['scaleSampleInterval']
+        for axis, physical in enumerate((bounds[:2], bounds[:2], bounds[2:])):
+            scales = [round(value / build['baseSize'][axis], 10) for value in physical]
+            if any(abs(value / interval - round(value / interval)) > 1e-6 for value in scales):
+                raise ValueError('--eval_box_size_range bounds must align with the box sampling grid')
+            ranges['scaleRange' + 'XYZ'[axis]] = scales
+        build.update(ranges, randomSize=True, randomModeEqualProportion=False)
+        print('[evaluation box sizes] X/Y={}..{}m, Z={}..{}m'.format(*bounds))
+
     graph_path = getattr(args, 'relation_graph', '')
     if graph_path:
         if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1', 'state_relation_edge_interaction_v1', 'state_relation_edge_stage1_v1', 'state_relation_edge_stage2_v1'):
@@ -92,6 +118,11 @@ def load_cfg(args):
             cfg['env']['relationGraph'] = yaml.safe_load(f)
 
     transfer = getattr(args, 'transfer_checkpoint', '')
+    if getattr(args, 'stage1_only', False):
+        if not (args.test or args.eval) or args.resume > 0 or transfer or args.checkpoint == 'Base':
+            raise ValueError('--stage1_only requires evaluation with --checkpoint and no training/resume')
+        if cfg['env'].get('relationReward', {}).get('mode') != 'state_relation_edge_stage2_v1':
+            raise ValueError('--stage1_only requires a Stage-2 evaluation config')
     if transfer and (args.resume > 0 or args.test or args.eval):
         raise ValueError('--transfer_checkpoint is for new training only; use --checkpoint for resume/evaluation')
     if cfg.get('experiment', {}).get('transfer') and not (args.resume > 0 or args.test or args.eval):
@@ -117,6 +148,10 @@ def load_cfg(args):
     # A value <= 0 means "one object per agent" for backward compatibility.
     if getattr(args, "num_objects", 0) > 0:
         cfg["env"]["numObjects"] = args.num_objects
+
+    from utils.edge_stage2_spec import configure_evaluation_graph
+    configure_evaluation_graph(cfg['env'], bool(args.test or args.eval),
+                               getattr(args, 'eval_stage2_sampler', ''))
 
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
@@ -271,6 +306,12 @@ def get_args(benchmark=False):
             "help": "Evaluation-only YAML explicit edges or independent_carry template"},
         {"name": "--transfer_checkpoint", "type": str, "default": "",
             "help": "Carry weights for a new mixed OnTop run (no optimizer/history restore)"},
+        {"name": "--stage1_only", "action": "store_true", "default": False,
+            "help": "Evaluate a Stage-1 checkpoint in Stage-2 tasks with zero context action weights"},
+        {"name": "--eval_box_size_range", "type": str, "default": "",
+            "help": "Stage-2 evaluation box sizes in meters: xy_min,xy_max,z_min,z_max"},
+        {"name": "--eval_stage2_sampler", "type": str, "default": "",
+            "help": "Rescue evaluation sampler: shared9 (nine pairs, expandable) or klclimb50 (three pairs)"},
         {"name": "--ontop_scenario", "type": str, "default": "mixed",
             "help": "Evaluation: mixed, carry_carry, carry_ontop_independent, carry_ontop_dependent"},
         {"name": "--test", "action": "store_true", "default": False,

@@ -11,6 +11,7 @@ import learning.amp_players as amp_players
 from learning.multi_agent.ma_agent import EntityRunningMeanStd
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
+from env.tasks.multi_agent.collision_reward import check_agent_collision_checkpoint
 from utils.torch_utils import load_checkpoint
 
 
@@ -45,7 +46,39 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     def restore(self, fn):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
+            args = self.env.task.cfg['args']
+            if getattr(args, 'stage1_only', False):
+                from learning.multi_agent.stage2_transfer import load_stage1_for_evaluation
+                report = load_stage1_for_evaluation(
+                    self.model, checkpoint,
+                    self.running_mean_std if self.normalize_input else None,
+                    self._amp_input_mean_std if self._normalize_amp_input else None)
+                self._checkpoint_fn = fn
+                report['checkpoint'] = os.path.abspath(fn)
+                report['num_agents'] = self.env.task.num_agents
+                report['num_objects'] = self.env.task.num_objects
+                if (getattr(args, 'eval_box_size_range', '') or getattr(self.env.task, '_stage2_shared9', False)
+                        or getattr(self.env.task, '_stage2_shared9_eval', False)):
+                    report['box_build_config'] = self.env.task.cfg['env']['box']['build']
+                    report['box_sizes_m'] = self.env.task._box_size.detach().cpu().tolist()
+                if getattr(self.env.task, '_stage2_shared9', False):
+                    report['scene_pool_ids'] = self.env.task._stage2_scene_pools.detach().cpu().tolist()
+                os.makedirs(args.output_path, exist_ok=True)
+                with open(os.path.join(args.output_path, 'stage1_only_import.json'), 'w') as f:
+                    json.dump(report, f, indent=2)
+                print('[stage1-only evaluation] source epoch={}, context action weight={}'.format(
+                    report['source_epoch'], report['context_action_weight_max_abs']))
+                return
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
+            check_agent_collision_checkpoint(checkpoint, self.env.task.cfg['env'])
+            if getattr(self.env.task, '_stage2_shared9', False):
+                from utils.edge_context_spec import check_task_resume
+                check_task_resume(checkpoint, self.env.task._relation_graph_spec,
+                                  self.env.task.num_agents, self.env.task.num_objects)
+            elif getattr(self.env.task, '_stage2_shared9_eval', False):
+                from utils.edge_context_spec import check_task_resume
+                from utils.stage2_shared_eval import training_spec
+                check_task_resume(checkpoint, training_spec(self.env.task._relation_graph_spec), 2, 4)
         return super().restore(fn)
 
     def _build_net(self, config):

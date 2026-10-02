@@ -1,0 +1,372 @@
+# Nine shared pairs; frozen rescue epoch8000, all-loco RSI, unconditioned AMP.
+experiment:
+  name: ApproachStage2RescueShared9
+  transfer:
+    checkpoint: null
+env:
+  numEnvs: 2048
+  envSpacing: 5
+  episodeLength: 600
+  isFlagrun: false
+  enableDebugVis: false
+  cameraFollow: true
+  video:
+    enable: false
+    focus: stack
+  relationGraph:
+    mode: edge_composition
+    sampler: two_agent_four_object_stage2_rescue_shared9
+    semantic_only: true
+    max_edges_per_agent: 2
+    edge_capacity: 4
+    shuffle_edge_order: true
+    shuffle_token_order: true
+    cooperative_probability: 0.9
+    family_probabilities:
+      at_climb: 0.16666666666666666
+      at_sit: 0.16666666666666666
+      at_ontop: 0.16666666666666666
+      ontop_ontop: 0.08333333333333333
+      ontop_climb: 0.08333333333333333
+      ontop_sit: 0.08333333333333333
+      climb_climb: 0.08333333333333333
+      sit_climb: 0.08333333333333333
+      sit_sit: 0.08333333333333333
+    independent_template_probabilities:
+      HOLDING: 0.05
+      SIT: 0.05
+      CLIMB: 0.5
+      HOLDING_AT: 0.3
+      HOLDING_ON_TOP: 0.1
+  relationReward:
+    mode: state_relation_edge_stage2_v1
+    schema_version: 10
+    stage1_variant: scenario_stage2_rescue_klclimb50
+    state_reward_weight: 0.2
+    progress_reward_weight: 0.2
+    success_reward_weight: 0.2
+    satisfaction_threshold: 0.9
+    holding:
+      hand_distance_scale: 10.0
+    at:
+      state_definition: box_near
+      near_distance_scale: 10.0
+    ontop:
+      state_definition: centered_stack_world_z
+      near_distance_scale: 10.0
+      z_tolerance: 0.001
+      vertical_extent: rotated_bbox
+      success_inner_margin_fraction: 0.1
+    sit:
+      state_definition: box_top_plus_pelvis_clearance
+      near_distance_scale: 10.0
+      pelvis_clearance: 0.12
+      success_inner_margin_fraction: 0.1
+      z_tolerance: 0.07
+    climb:
+      state_definition: root_target
+      near_distance_scale: 10.0
+      target_height: rotated_bbox_top_plus_char_h
+      success_inner_margin_fraction: 0.05
+      root_height_tolerance: 0.2
+      feet_height_tolerance: 0.07
+    progress:
+      kind: distance
+      delta: 0.5
+      sigma: 1.0
+      climb_pinning: bbox_valid_radius
+    success:
+      at_z_tolerance: 0.001
+      saturation: paired_placement_current_success
+      terminate_when_all_subgoals_done: false
+    task_sharing:
+      self: 0.9
+      teammate: 0.1
+    edge_aggregation: self_sum_teammate_mean
+    independent_training:
+      near_start:
+        probability_start: 0.8
+        probability_end: 0.3
+        anneal_steps: 300000
+        at_xy_range:
+        - 0.75
+        - 1.5
+        ontop_xy_range:
+        - 1.1
+        - 1.8
+      climb_rsi:
+        late_fraction: 0.7
+        phase_range:
+        - 0.65
+        - 0.98
+    observation:
+      graph_packet_fields:
+      - valid
+      - src
+      - dst
+      - relation
+      - owner
+    diagnostics:
+      enabled: true
+      sample_envs: 2
+      log_interval: 30
+  numAgents: 2
+  numObjects: 4
+  agentSpawnRadius: 2.5
+  policyObsMode: clean_scene
+  obsFrame: owner
+  agentCollisionPenalty: true
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
+  pdControl: true
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: Random
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  localRootObs: true
+  localRootObsPolicy: false
+  rootHeightObs: false
+  rootHeightObsPolicy: false
+  cleanSceneLocalRootObsPolicy: true
+  cleanSceneRootHeightObsPolicy: true
+  keyBodies:
+  - right_hand
+  - left_hand
+  - right_foot
+  - left_foot
+  contactBodies:
+  - right_foot
+  - left_foot
+  terminationHeight: 0.15
+  enableEarlyTermination: true
+  enableSelfCollisionDetection: true
+  enableTrackInitState: false
+  power_reward: true
+  power_coefficient: 0.0005
+  skill:
+  - loco
+  - sit
+  - climb
+  - climbNoRSI
+  - omomo
+  - pickUp
+  - carryWith
+  - putDown
+  skillInitProb:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  templateRsi:
+    HOLDING:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    SIT:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    CLIMB:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    HOLDING_AT:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    HOLDING_ON_TOP:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  independentTemplateRsi:
+    HOLDING:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    SIT:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    CLIMB:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    HOLDING_AT:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    HOLDING_ON_TOP:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  skillDiscProb:
+  - 0.26
+  - 0.2
+  - 0.08
+  - 0.06
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  enableTaskObs: true
+  onlyVelReward: true
+  onlyHeightHandHeldReward: false
+  box_vel_penalty: true
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.5
+  mode: train
+  box:
+    build:
+      baseSize:
+      - 0.4
+      - 0.4
+      - 0.4
+      randomSize: true
+      randomModeEqualProportion: false
+      scaleRangeX:
+      - 1.0
+      - 1.5
+      scaleRangeY:
+      - 1.0
+      - 1.5
+      scaleRangeZ:
+      - 0.75
+      - 1.25
+      scaleSampleInterval: 0.125
+      randomDensity: false
+      testSizes:
+      - - 0.4
+        - 0.4
+        - 0.3
+      - - 0.5
+        - 0.5
+        - 0.4
+      - - 0.6
+        - 0.6
+        - 0.5
+      stage2RoleSizes:
+        step: 0.05
+        ordinary:
+        - - 0.4
+          - 0.6
+        - - 0.4
+          - 0.6
+        - - 0.3
+          - 0.5
+        support:
+        - - 0.5
+          - 0.65
+        - - 0.65
+          - 0.7
+        - - 0.45
+          - 0.5
+        payload:
+        - - 0.3
+          - 0.4
+        - - 0.3
+          - 0.4
+        - - 0.4
+          - 0.5
+    reset:
+      randomRot: true
+      randomAssignment: true
+      testRandomArenaSpawn: false
+      arenaSpawnRadius: 0.0
+      minAgentDistance: 1.0
+      minBoxDistance: 0.7
+      randomHeight: false
+      randomHeightProb: 0.0
+      groundStandaloneSitClimb: true
+      minPlatformHeight: 0.05
+      maxTopSurfaceHeight: 1.2
+      initialBodyClearance: 0.08
+    obs:
+      enableBboxObs: true
+  debug:
+    vel: false
+    reward: true
+    rewardInterval: 30
+  eval:
+    successThreshold: 0.2
+    skill:
+    - loco
+    skillInitProb:
+    - 1.0
+  asset:
+    assetRoot: tokenhsi/data/assets
+    assetFileName: mjcf/phys_humanoid_v3.xml
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+  ampTaskConditioning: false
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

@@ -1,7 +1,7 @@
 # 현재 서버 실행 환경
 
 이 저장소의 학습 기준은 **NVIDIA RTX PRO 6000 Blackwell / 2048 환경**이다.
-실험별 학습·평가·VNC 명령과 checkpoint 규칙은 [config.md](config.md)를 따른다.
+실험별 학습·평가·VNC 명령과 checkpoint 규칙은 Stage 1 [config.md](config.md), Stage 2 [config_stage2.md](config_stage2.md)를 따른다.
 
 ## 환경과 데이터
 
@@ -49,8 +49,8 @@ RESUME_CHECKPOINT= OUTPUT_PATH=output/approach_scenario_stage1_skill_curriculum_
 
 평가·VNC는 학습 환경 수와 별개다. viewer는 보통 환경 1개로 확인한다.
 `TOKENHSI_GPU=5`를 명령 맨 앞에 두면 CUDA와 렌더링 GPU에 함께 적용된다.
-같은 터미널에서 계속 사용할 경우 `export TOKENHSI_GPU=5`를 먼저 실행해도 된다. 실행 명령, checkpoint 선택, 6080 포워딩은
-[config.md의 VNC 절](config.md#원격-서버에서-vnc로-시각화)에 있다.
+같은 터미널에서 계속 사용할 경우 `export TOKENHSI_GPU=5`를 먼저 실행해도 된다. 실행 명령과 checkpoint 선택은
+[Stage 1 평가·VNC](config.md#로컬-평가와-서버-vnc), [Stage 2 평가·VNC](config_stage2.md#로컬-평가와-서버-vnc)에 있다. 서버 viewer는 기본 6080 포트를 포워딩한다.
 
 ## 문제 확인
 

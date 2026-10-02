@@ -1,6 +1,6 @@
 # Collision Penalty 계산 방식
 
-구현: `tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py` (`_compute_reward`, `compute_*_collision_penalty`)
+현재 사람–사람 구현: `tokenhsi/env/tasks/multi_agent/collision_reward.py`, 적용 경로: `humanoid_ma_carry.py` → `edge_context_task.py`. `agentCollisionMode` 기본은 `static`, Shared9 CPA 전용 config는 `cpa`다. 아래 Agent–Object와 crossing scenario 항목은 현재 미구현 설계이며, 사람–상자 보상 패널티는 없다.
 
 ## 공통 사항
 
@@ -25,11 +25,11 @@ d_{ij} = \lVert \mathbf{p}_i - \mathbf{p}_j \rVert_{xy}, \qquad
 V_i = \max_{j \ne i} \frac{\max(d_{\min} - d_{ij},\ 0)}{d_{\min}}
 $$
 
-- 현재 거리만 보며, $d_{ij} < d_{\min}$일 때 선형으로 증가 (접촉 시 1).
+- 현재 root XY 거리만 보며, $d_{ij} < d_{\min}$일 때 선형으로 증가 (root XY 위치가 일치하면1; 실제 형상 접촉 여부를 측정하지 않음).
 
 ## 2. CPA(Closest Point of Approach) 페널티
 
-`compute_cross_entity_cpa_collision_penalty`
+현재 사람–사람은 `compute_agent_cpa_collision_penalty`; cross-entity/Agent–Object 확장은 아래 설계식만 정의한다.
 
 상대 위치/속도:
 
@@ -65,7 +65,13 @@ $$
 
 `compute_agent_object_cpa_collision_penalty`: $j$ = box, 속도는 box 선속도. 마스크 $\mathcal{M}_i$(`_get_other_object_collision_mask`)에서 자신에게 할당된 box는 제외.
 
-## 모드별 적용
+## 현재 실행 설정
+
+Shared9 CPA는 `agentCollisionMode: cpa`, `agentCollisionPenalty: true`, `agentCollisionCoeff: 0.5`, `agentCollisionDist: 0.7`, `agentCollisionTTCDiscount: 0.99`를 사용한다. 일반 config는 기본 `static`이다. CPA는 기존 정적 항을 교체하며 둘을 합산하지 않는다. 시간 할인은 제어 step의 `dt`를 사용하고, 사람당 위험도의 최댓값을 한 번만 지불한다.
+
+Collision은 edge 보상 공유 이후 task에 더해진다. Task/AMP 혼합0.5/0.5·reward shaper1에서는 `-0.5 V`가 최종 보상에 `-0.25 V`로 반영된다. 정지·멀어짐·root XY 일치 시 CPA는0일 수 있으며 물리 형상 관통 벌점이 아니다. 실행 명령은 [Stage 2 가이드](markdowns/config_stage2.md)에 있다.
+
+## Crossing/Agent–Object 설계 모드 (현재 미구현)
 
 | `collisionScenario.mode` | Agent–Agent | Agent–Object |
 |---|---|---|

@@ -61,18 +61,41 @@ def preserve_amp_labels(raw, normalized, steps):
     return torch.cat((normalized[..., :-3], raw[..., -3:]), -1).reshape(shape)
 
 
-def validate_unified_env(env):
+def validate_unified_env(env, evaluation=False):
     """Fail early if the new sampler, AMP, geometry and reward contracts diverge."""
     from utils.edge_scenario_spec import UNIFIED_SAMPLER
-    from utils.edge_stage1_spec import UNIFIED_VARIANTS, STAGE2_UNIFIED_OWNER_VARIANT
-    from utils.edge_stage2_spec import STAGE2_UNIFIED_OWNER_SAMPLER
+    from utils.edge_stage1_spec import UNIFIED_VARIANTS, STAGE2_UNIFIED_VARIANTS, STAGE2_RESCUE_VARIANT
+    from utils.edge_stage2_spec import (STAGE2_UNIFIED_SAMPLERS, STAGE2_RESCUE_SAMPLER,
+                                      STAGE2_GENERAL_RESCUE_SAMPLER, STAGE2_SHARED_RESCUE_SAMPLER,
+                                      STAGE2_GENERAL_SHARED_RESCUE_SAMPLER)
     sampler = env['relationGraph'].get('sampler')
-    unified = sampler in (UNIFIED_SAMPLER, STAGE2_UNIFIED_OWNER_SAMPLER)
+    unified = sampler in (UNIFIED_SAMPLER, *STAGE2_UNIFIED_SAMPLERS)
     enabled = env.get('ampTaskConditioning', False)
     variant = env['relationReward'].get('stage1_variant')
-    if unified != (variant in (*UNIFIED_VARIANTS, STAGE2_UNIFIED_OWNER_VARIANT)) or unified != (enabled is True):
+    if sampler in (STAGE2_GENERAL_RESCUE_SAMPLER, STAGE2_GENERAL_SHARED_RESCUE_SAMPLER) and not evaluation:
+        raise ValueError('General Stage-2 sampler is evaluation only')
+    explicit_rescue_eval = (evaluation and
+        env['relationGraph'].get('mode') == 'stage2_explicit' and
+        variant == STAGE2_RESCUE_VARIANT)
+    rescue = sampler in (STAGE2_RESCUE_SAMPLER, STAGE2_GENERAL_RESCUE_SAMPLER,
+                         STAGE2_SHARED_RESCUE_SAMPLER, STAGE2_GENERAL_SHARED_RESCUE_SAMPLER) or explicit_rescue_eval
+    if rescue != (variant == STAGE2_RESCUE_VARIANT):
+        raise ValueError('Rescue Stage-2 sampler requires its own reward variant')
+    if rescue and (enabled is not False or env.get('numAMPObsSteps') != 10):
+        raise ValueError('Rescue Stage-2 requires unconditioned ten-frame AMP')
+    if sampler == STAGE2_SHARED_RESCUE_SAMPLER:
+        from utils.stage2_shared_spec import validate_env
+        validate_env(env)
+    elif sampler == STAGE2_GENERAL_SHARED_RESCUE_SAMPLER:
+        from utils.stage2_shared_eval import validate_env
+        validate_env(env)
+    elif env.get('box', {}).get('build', {}).get('stage2RoleSizes') is not None:
+        raise ValueError('Role-sized assets require the Shared9 sampler')
+    if unified != (variant in (*UNIFIED_VARIANTS, *STAGE2_UNIFIED_VARIANTS)) or unified != (enabled is True):
         raise ValueError('Unified sampler, reward variant and task-conditioned AMP must be paired')
-    if (sampler == STAGE2_UNIFIED_OWNER_SAMPLER) != (variant == STAGE2_UNIFIED_OWNER_VARIANT):
+    if (sampler in STAGE2_UNIFIED_SAMPLERS) != (variant in STAGE2_UNIFIED_VARIANTS) or (
+            sampler in STAGE2_UNIFIED_SAMPLERS and
+            variant != STAGE2_UNIFIED_VARIANTS[STAGE2_UNIFIED_SAMPLERS.index(sampler)]):
         raise ValueError('Unified Stage-2 sampler requires its own reward variant')
     if not unified:
         return
@@ -81,7 +104,7 @@ def validate_unified_env(env):
     if env['box']['reset'].get('ownerLocoDistanceRange') != [1., 2.]:
         raise ValueError('Unified loco sources must start 1..2m from owner')
     probabilities = (env['relationGraph']['independent_template_probabilities']
-        if sampler == STAGE2_UNIFIED_OWNER_SAMPLER else
+        if sampler in STAGE2_UNIFIED_SAMPLERS else
         env['relationGraph']['template_probabilities'])
     if list(probabilities.values()) != [.05, .05, .20, .35, .35]:
         raise ValueError('Unified requires independent task proportions 5/5/20/35/35')
