@@ -95,6 +95,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         default_preset = ('place_climb' if self._stage2 else 'holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
         train_preset = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
         self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
+        self._policy_task_roles = bool(cfg['env'].get('relationGraph', {}).get('policy_task_roles', False))
+        if self._policy_task_roles:
+            from utils.task_role_spec import task_preset
+            self._task_graph_preset = task_preset(self._task_graph_preset)
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
         presets = STAGE2_PRESETS if self._stage2 else SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
         if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
@@ -168,7 +172,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             size_fn = (owner_holding_packet_size if self._owner_holding_state else
                 semantic_packet_size if self._semantic_only_stage1 else
                 packet_size if self._edge_ontop else context_suffix_size)
-            self._context_suffix_width = size_fn(len(graph.ids))
+            self._context_suffix_width = (5 * num_agents if self._policy_task_roles
+                                          else size_fn(len(graph.ids)))
             self.REWARD_TERM_NAMES = ('edge_state', 'edge_progress', 'edge_success',
                                       'power', 'collision', 'box_speed', 'total')
 
@@ -190,6 +195,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._mode = "test"
 
         box_cfg = cfg["env"]["box"]
+        self._size_aware_rsi = cfg['env'].get('sizeAwareRsi') is not None
         self._build_base_size = box_cfg["build"]["baseSize"]
         self._build_random_size = box_cfg["build"]["randomSize"]
         self._build_random_mode_equal_proportion = box_cfg["build"]["randomModeEqualProportion"]
@@ -263,7 +269,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 'CLIMB': {'loco', 'climb'},
                 'HOLDING_AT': {'loco', 'pickUp', 'carryWith', 'putDown'},
                 'HOLDING_ON_TOP': ({'loco', 'pickUp', 'carryWith', 'putDown'}
-                    if self._relation_cfg.get('stage1_variant') ==
+                    if self._size_aware_rsi or self._relation_cfg.get('stage1_variant') ==
                     'scenario_independent_stage1_ontop_putdown' else
                     {'loco', 'pickUp', 'carryWith'})}
             templates = scenario_templates(self._relation_graph_spec)
@@ -335,8 +341,22 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._skill_init_prob = torch.tensor(cfg["env"]["eval"]["skillInitProb"],
                                                  device=self.device, dtype=torch.float)
 
+        if self._size_aware_rsi:
+            from utils.size_rsi import task_probabilities
+            if self._policy_task_roles:
+                from utils.task_role_spec import task_size_probabilities
+                task_probabilities = task_size_probabilities
+            self._size_template_probabilities = task_probabilities(self._box_size[:, :2])
         if self._state_relation:
             self._init_relation_runtime()
+        if self._size_aware_rsi and not self._is_eval:
+            from env.tasks.multi_agent.size_rsi_cache import SizeRsiCache
+            self._size_rsi_cache = SizeRsiCache(self)
+            self._size_rsi_requested = torch.zeros(5, len(self._skill), device=self.device)
+            self._size_rsi_executed = torch.zeros_like(self._size_rsi_requested)
+            self._size_rsi_fallbacks = torch.zeros(5, device=self.device)
+            self._size_rsi_success_counts = torch.zeros(2, 5, 2, device=self.device)
+            self._size_rsi_pending_post = torch.zeros(N, dtype=torch.bool, device=self.device)
         return
 
     # ------------------------------------------------------------------ sizes
@@ -512,6 +532,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         self._box_density = torch.full((num_boxes,), 100.0, dtype=torch.float32, device=self.device)
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale
+        if self._size_aware_rsi:
+            from utils.size_rsi import sample_sizes
+            self._box_size = sample_sizes(N, self.device, self._task_graph_preset).reshape(num_boxes, 3)
+            self._box_scale = self._box_size / torch.tensor(self._build_base_size, device=self.device)
 
         if self._edge_ontop:
             heights = self._box_size.reshape(N, O, 3)[..., 2]
@@ -1247,6 +1271,15 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                                         device=self.device)[sk_ids]
             if retry.any():
                 raise RuntimeError('No valid template RSI combination after 16 attempts')
+            if self._size_aware_rsi:
+                from utils.size_rsi import resolve_skills
+                requested = sk_ids.clone()
+                sk_ids, fallback = resolve_skills(sk_ids, weights,
+                    self._size_rsi_cache.availability(slot_env, slot_agent, template),
+                    self._skill.index('loco'))
+                self._size_rsi_requested.index_put_((template, requested),
+                    torch.ones_like(template, dtype=torch.float), accumulate=True)
+                self._size_rsi_fallbacks.index_add_(0, template, fallback.float())
         elif self._relation_rsi is not None and not self._is_eval:
             graph = self.relation_runtime.graph
             owned = graph.edge_valid[slot_env] & (graph.edge_owner[slot_env] == slot_agent[:, None])
@@ -1266,15 +1299,18 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             curr_agent = slot_agent[sel]
             offset = self._agent_spawn_offsets[curr_agent] + self._env_origins[curr_env]
 
-            motion_ids = curr_motion_lib.sample_motions(len(sel))
-
-            if (self._state_init == HumanoidMACarry.StateInit.Random
-                    or self._state_init == HumanoidMACarry.StateInit.Hybrid):
-                motion_times = curr_motion_lib.sample_time_rsi(motion_ids)
-            elif (self._state_init == HumanoidMACarry.StateInit.Start):
-                motion_times = torch.zeros(len(sel), device=self.device)
+            if self._size_aware_rsi and not self._is_eval:
+                motion_ids, motion_times = self._size_rsi_cache.sample(
+                    sk_name, curr_env, curr_agent, template[sel])
             else:
-                assert (False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
+                motion_ids = curr_motion_lib.sample_motions(len(sel))
+                if (self._state_init == HumanoidMACarry.StateInit.Random
+                        or self._state_init == HumanoidMACarry.StateInit.Hybrid):
+                    motion_times = curr_motion_lib.sample_time_rsi(motion_ids)
+                elif (self._state_init == HumanoidMACarry.StateInit.Start):
+                    motion_times = torch.zeros(len(sel), device=self.device)
+                else:
+                    assert (False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
 
             if (sk_name == 'climb' and not self._is_eval and
                     self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS):
@@ -1597,8 +1633,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 continue
 
             curr_env, curr_agent = self._reset_ref_slots[sk_name]
-            if (self._scenario_no_climb and self._relation_cfg.get('stage1_variant') ==
-                    'scenario_independent_stage1_ontop_putdown'):
+            if (self._scenario_no_climb and (self._size_aware_rsi or
+                    self._relation_cfg.get('stage1_variant') ==
+                    'scenario_independent_stage1_ontop_putdown')):
                 templates = classify_templates(self.relation_runtime.graph,
                     curr_env, curr_agent, self._scenario_with_climb)
                 is_at = templates == scenario_templates(self._relation_graph_spec).index(
@@ -1790,7 +1827,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
     def _fetch_conditioned_amp_demo(self, num_samples):
         from utils.unified_training import FAMILY_PROBS, EXPERT_PROBS, append_family
-        family = torch.multinomial(torch.tensor(FAMILY_PROBS, device=self.device),
+        family_probs = (.65, .10, .25) if self._size_aware_rsi else FAMILY_PROBS
+        family = torch.multinomial(torch.tensor(family_probs, device=self.device),
                                    num_samples, replacement=True)
         weights = torch.tensor(EXPERT_PROBS, device=self.device)[family]
         skills = torch.multinomial(weights, 1).squeeze(-1)

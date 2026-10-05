@@ -84,6 +84,43 @@ class PackedEdgeSemanticFusion(nn.Module):
         return dense.reshape(*dense.shape[:-1], l, l) + background
 
 
+class PackedEdgeTypedBiasFusion(nn.Module):
+    def forward(self, suffix, semantic_encoder, entity_types, background_bias):
+        from utils.edge_stage1_spec import parse_semantic_packet
+        valid, src, dst, relation, owner = parse_semantic_packet(suffix)
+        n, e = src.shape
+        l = entity_types.numel()
+        values = semantic_encoder.bias_table[entity_types[src], relation, entity_types[dst]]
+        values = values.permute(2, 0, 3, 1) * valid[None, :, None]
+        indices = src * l + dst
+        dense = values.new_zeros(*values.shape[:-1], l * l).scatter_add(
+            -1, indices[None, :, None].expand_as(values), values)
+        occupied = torch.zeros(n, l * l, dtype=torch.long, device=src.device).scatter_add(
+            1, indices, valid.long()).bool().reshape(n, l, l)
+        background = background_bias[:, None].masked_fill(occupied[None, :, None], 0.)
+        return dense.reshape(*dense.shape[:-1], l, l) + background
+
+
+class PackedEdgeRelationMessage(nn.Module):
+    def __init__(self, d_model, num_heads, init_std):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
+        self.message_table = nn.Parameter(torch.empty(3, 11, 3, d_model))
+        nn.init.normal_(self.message_table, std=init_std)
+        with torch.no_grad():
+            self.message_table[:, :6].zero_()
+
+    def forward(self, suffix, entity_types):
+        from utils.edge_stage1_spec import parse_semantic_packet
+        valid, src, dst, relation, owner = parse_semantic_packet(suffix)
+        values = self.message_table[entity_types[src], relation, entity_types[dst]]
+        valid = valid & (relation >= 6) & (relation <= 10)
+        values = values * valid[..., None]
+        values = values.reshape(*src.shape, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
+        return src, dst, values
+
+
 class PackedEdgeOwnerHoldingFusion(nn.Module):
     """Condition placement-edge bias on the owner's matching HOLDING state."""
     def __init__(self):

@@ -2,6 +2,8 @@
 import math
 
 import torch
+from utils.size_rsi import SIZE_RSI_VARIANT, PROGRESS
+from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_FIELDS
 
 from utils.edge_context_spec import EdgeContextGraph, HOLDING, AT
 from utils.edge_ontop_spec import (ON_TOP, batched, permute_graph, select_graph,
@@ -14,9 +16,14 @@ STAGE1_PACKET_FIELDS = ('valid', 'src', 'dst', 'relation', 'owner', 'start', 'ke
 STAGE1_SEMANTIC_FIELDS = STAGE1_PACKET_FIELDS[:5]
 STAGE1_OWNER_HOLDING_FIELDS = STAGE1_SEMANTIC_FIELDS + ('owner_holding_state',)
 OWNER_HOLDING_VARIANT = 'scenario_independent_stage1_paired_placement_owner_holding'
+SIZE_RSI_TYPED_BIAS_VARIANT = SIZE_RSI_VARIANT + '_typed_bias'
+SIZE_RSI_TYPED_MESSAGE_VARIANT = SIZE_RSI_TYPED_BIAS_VARIANT + '_message'
+SIZE_RSI_VARIANTS = (SIZE_RSI_VARIANT, SIZE_RSI_TYPED_BIAS_VARIANT,
+                     SIZE_RSI_TYPED_MESSAGE_VARIANT, TASK_ROLE_VARIANT)
 UNIFIED_VARIANTS = ('scenario_independent_stage1_unified',
                     'scenario_independent_stage1_unified_owner_holding',
-                    'scenario_independent_stage1_unified_shared_edge_encoder')
+                    'scenario_independent_stage1_unified_shared_edge_encoder',
+                    *SIZE_RSI_VARIANTS)
 OWNER_HOLDING_VARIANTS = (OWNER_HOLDING_VARIANT, UNIFIED_VARIANTS[1])
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_SIT', 'HOLDING_CLIMB')
@@ -220,8 +227,10 @@ def validate_stage1_context_config(config):
         'terminate_when_all_subgoals_done': False}
     if config['success'] != expected_success:
         raise ValueError('Unsupported Stage-1 saturation contract')
-    if scenario and config['task_sharing'] != {'self': .9, 'teammate': .1}:
-        raise ValueError('Scenario task sharing must be 0.9 self + 0.1 teammate')
+    expected_sharing = ({'self': 1., 'teammate': 0.} if variant == TASK_ROLE_VARIANT
+                        else {'self': .9, 'teammate': .1})
+    if scenario and config['task_sharing'] != expected_sharing:
+        raise ValueError('Scenario task sharing does not match its variant')
     self_sum = variant in ('scenario_independent_stage1_self_sum',
                            'scenario_independent_stage1_slow_near_start',
                            'scenario_independent_stage1_placement_focus',
@@ -230,10 +239,12 @@ def validate_stage1_context_config(config):
                            'scenario_independent_stage1_paired_placement_no_near',
                            OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
                            'scenario_stage2_sit_plane_self_sum')
-    expected_aggregation = 'self_sum_teammate_mean' if self_sum else 'mean_active'
+    expected_aggregation = ('self_sum' if variant == TASK_ROLE_VARIANT else
+                            'self_sum_teammate_mean' if self_sum else 'mean_active')
     if sit_plane and config['edge_aggregation'] != expected_aggregation:
         raise ValueError('Unsupported Stage-1 active-edge aggregation')
     expected_observation = ({'graph_packet_fields': list(
+        TASK_FIELDS if variant == TASK_ROLE_VARIANT else
         STAGE1_OWNER_HOLDING_FIELDS if variant in OWNER_HOLDING_VARIANTS
         else STAGE1_SEMANTIC_FIELDS)}
         if semantic_only else {'edge_context_fields': ['start', 'keep'],
@@ -295,6 +306,8 @@ def validate_stage1_context_config(config):
     expected_progress = {'kind': 'distance', 'delta': .5, 'sigma': 1.}
     if schema in (7, 9):
         expected_progress['climb_pinning'] = 'bbox_valid_radius'
+    if variant in SIZE_RSI_VARIANTS:
+        expected_progress = PROGRESS
     if config['progress'] != expected_progress:
         raise ValueError('Unsupported Stage-1 distance progress')
     for key in ('state_reward_weight', 'progress_reward_weight', 'success_reward_weight'):
@@ -456,6 +469,9 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get('mode') == 'stage1_cleanup_demo':
+        from utils.box_cleanup_spec import compile_cleanup_graph
+        return compile_cleanup_graph(spec, m, o, device)
     if spec.get('sampler') == 'two_agent_stage2_cooperative' or spec.get('mode') == 'stage2_explicit':
         from utils.edge_stage2_spec import compile_graph as compile_stage2_graph
         return compile_stage2_graph(spec, m, o, device)

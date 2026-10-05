@@ -1,5 +1,6 @@
 """Stage-1 own-edge rewards and constant START/KEEP observations."""
 import torch
+from utils.task_role_spec import TASK_ROLE_VARIANT, task_graph_packet
 
 from utils.edge_ontop_spec import batched, graph_packet, select_graph
 from env.tasks.multi_agent.edge_context_reward import edge_context_reward, goal_success, owner_sum
@@ -53,6 +54,8 @@ class Stage1ContextRuntime(OnTopContextRuntime):
             sharing = self.config['task_sharing']
             teammate = (teammate_local.sum(-1, keepdim=True) - teammate_local) / (local.shape[-1] - 1) \
                 if self.config['schema_version'] == 10 and local.shape[-1] > 2 else teammate_local.flip(-1)
+            if sharing['teammate'] == 0:
+                teammate = torch.zeros_like(local)
             result = dict(phi_raw=phi, progress_raw=progress, own_success=success,
                 term_success=torch.zeros_like(success), reward_saturated=saturated,
                 paired_placement_success=paired, state_component=state,
@@ -74,6 +77,8 @@ class Stage1ContextRuntime(OnTopContextRuntime):
     def suffix(self, ids=None):
         graph = self.graph if ids is None else select_graph(self.graph, ids)
         phi = self.phi if ids is None else self.phi[ids]
+        if self.config.get('stage1_variant') == TASK_ROLE_VARIANT:
+            return task_graph_packet(graph, phi.shape[0])
         if self.config.get('stage1_variant') in OWNER_HOLDING_VARIANTS:
             return owner_holding_graph_packet(graph, phi)
         if self.config['schema_version'] in (7, 8, 9, 10):

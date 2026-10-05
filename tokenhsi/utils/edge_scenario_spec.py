@@ -62,6 +62,10 @@ def validate_sampler(spec, m=2, o=None):
         expected.add('shuffle_token_order')
         if spec.get('shuffle_token_order') is not True:
             raise ValueError('Unified sampler requires token permutation')
+    if spec.get('policy_task_roles') is True:
+        expected.add('policy_task_roles')
+        if sampler != UNIFIED_SAMPLER or spec['template_probabilities']['HOLDING'] != 0:
+            raise ValueError('Task-role policy requires unified sampling without standalone holding')
     if spec.get('owner_holding_state') is True:
         expected.add('owner_holding_state')
     if set(spec) != expected or spec.get('mode') != 'edge_composition' or \
@@ -137,8 +141,50 @@ def compose_graph(templates, bindings, shuffle=False, generator=None, device='cp
     return graph
 
 
+def compose_canonical_graph(template_ids, shuffle=False):
+    n = len(template_ids)
+    device = template_ids.device
+    owners = torch.arange(2, device=device)[None].expand(n, -1)
+    placement = template_ids >= 3
+    src = torch.stack((owners, owners + 2), -1).flatten(1)
+    dst = torch.stack((owners + 2,
+        torch.where(template_ids == 3, owners + 6, owners + 4)), -1).flatten(1)
+    base_relations = torch.tensor([HOLDING, SIT, CLIMB, HOLDING, HOLDING], device=device)
+    relation = torch.stack((base_relations[template_ids],
+        torch.where(template_ids == 3, AT, ON_TOP)), -1).flatten(1)
+    owner = owners[:, :, None].expand(-1, -1, 2).flatten(1)
+    valid = torch.stack((torch.ones_like(placement), placement), -1).flatten(1)
+    required = torch.stack((~placement, placement), -1).flatten(1)
+    order = valid.long().argsort(dim=-1, descending=True, stable=True)
+    values = [value.masked_fill(~valid, 0).gather(1, order)
+              for value in (src, dst, relation, owner, valid, required)]
+    graph = EdgeContextGraph(('slot0', 'slot1', 'slot2', 'slot3'), 2, 4, *values,
+        torch.zeros(n, 4, 4, dtype=torch.bool, device=device),
+        torch.full((n, 4), -1, dtype=torch.long, device=device))
+    if shuffle:
+        graph = permute_graph(graph, torch.rand(n, 4, device=device).argsort(-1))
+    return graph
+
+
+def sample_size_conditioned_graph(probabilities, spec, preset):
+    if spec.get('policy_task_roles', False):
+        from utils.task_role_spec import task_preset
+        preset = task_preset(preset)
+    n = len(probabilities)
+    if preset == 'random_scenario':
+        template_ids = torch.multinomial(probabilities.flatten(0, 1), 1).reshape(n, 2)
+    else:
+        template_ids = torch.full((n, 2), PRESETS.index(preset) - 1,
+                                  dtype=torch.long, device=probabilities.device)
+    return compose_canonical_graph(template_ids,
+        shuffle=spec['shuffle_edge_order'] and preset == 'random_scenario')
+
+
 def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=False,
                  generator=None):
+    if spec.get('policy_task_roles', False):
+        from utils.task_role_spec import task_preset
+        preset = task_preset(preset)
     paired = spec['sampler'] == PAIRED_PLACEMENT_SAMPLER
     unified = spec['sampler'] == UNIFIED_SAMPLER
     num_objects = 4 if paired or unified else 3
@@ -195,7 +241,8 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
 
 def compile_graph(spec, m, o, device=None):
     validate_sampler(spec, m, o)
-    preset = 'holding_at' if spec['sampler'] == PAIRED_PLACEMENT_SAMPLER else 'holding'
+    preset = ('holding_at' if spec['sampler'] == PAIRED_PLACEMENT_SAMPLER
+              or spec.get('policy_task_roles', False) else 'holding')
     return select_graph(sample_graph(1, spec, device or 'cpu', preset=preset), 0)
 
 

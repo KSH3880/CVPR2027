@@ -84,12 +84,16 @@ def load_cfg(args):
     with open(os.path.join(os.getcwd(), args.cfg_env), 'r') as f:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
 
+    from utils.unified_training import validate_typed_bias_config
+
     graph_path = getattr(args, 'relation_graph', '')
     if graph_path:
         if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1', 'state_relation_edge_interaction_v1', 'state_relation_edge_stage1_v1', 'state_relation_edge_stage2_v1'):
             raise ValueError('--relation_graph is an edge-context evaluation override only')
         with open(graph_path) as f:
             cfg['env']['relationGraph'] = yaml.safe_load(f)
+
+    validate_typed_bias_config(cfg['env'], cfg_train)
 
     transfer = getattr(args, 'transfer_checkpoint', '')
     if transfer and (args.resume > 0 or args.test or args.eval):

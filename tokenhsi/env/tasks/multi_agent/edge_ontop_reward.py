@@ -62,7 +62,15 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     progress_delta=torch.where(hold[...,None],roots[batch,src.clamp(0,m-1)]-dst_box[...,:3],delta)
     xy=progress_delta[...,:2].norm(dim=-1)
     phi=torch.exp(-10*delta.square().sum(-1))*valid
-    p=config['progress'];progress=1/(1+(xy-p['delta']).clamp_min(0)/p['sigma'])
+    p=config['progress']
+    radius = torch.full_like(xy, float(p.get('delta', 0.)))
+    if 'bbox_buffers' in p:
+        buffers = p['bbox_buffers']
+        bbox_radius = dst_size[..., :2].norm(dim=-1)/2
+        radius = torch.where(hold, bbox_radius + buffers['HOLDING'],
+                 torch.where(top, bbox_radius + buffers['ON_TOP'],
+                             torch.full_like(xy, buffers['AT'])))
+    progress=1/(1+(xy-radius).clamp_min(0)/p['sigma'])
     if config.get('stage1_variant') == CURRICULUM_VARIANT:
         max_distance = config['hard_skill_training']['progress']['max_distance']
         linear = (1 - (xy - p['delta']).clamp_min(0) / max_distance).clamp_min(0)

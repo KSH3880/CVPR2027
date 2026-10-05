@@ -61,7 +61,10 @@ GTA_REPRESENTATION_SE3_DIRECT_SUM = "se3_direct_sum"
 
 RELATION_BIAS_LOOKUP = "lookup"
 RELATION_BIAS_EDGE_MLP = "edge_mlp"
-RELATION_BIAS_MODES = (RELATION_BIAS_LOOKUP, RELATION_BIAS_EDGE_MLP)
+RELATION_BIAS_TYPED_LOOKUP = "typed_lookup"
+RELATION_BIAS_TASK_ROLE = "task_role_lookup"
+RELATION_BIAS_MODES = (RELATION_BIAS_LOOKUP, RELATION_BIAS_EDGE_MLP,
+                       RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE)
 
 
 def build_entity_type_ids(num_agents, num_objects, device=None):
@@ -131,13 +134,15 @@ from utils.ontop_task_spec import mixed_policy_graph
 
 from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
 from learning.multi_agent.edge_context_encoder import (EdgeContextFusion,
-    PackedEdgeContextFusion, PackedEdgeSemanticFusion, PackedEdgeOwnerHoldingFusion)
+    PackedEdgeContextFusion, PackedEdgeSemanticFusion, PackedEdgeOwnerHoldingFusion,
+    PackedEdgeTypedBiasFusion, PackedEdgeRelationMessage)
 from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size
 from utils.edge_interaction_spec import INTERACTION_CONTEXT_MODE, compile_interaction_graph
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     semantic_packet_size, owner_holding_packet_size)
 from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE
 from learning.multi_agent.coordination_head import GroundedEdgeCoordination
+from learning.multi_agent.task_role_encoder import TaskRoleFusion
 
 
 class EdgeEncoder(nn.Module):
@@ -189,6 +194,17 @@ class EdgeEncoder(nn.Module):
         return self.project_bias(self.build_edge_embeddings(entity_types, relation_matrix))
 
 
+class TypedEdgeBias(nn.Module):
+    def __init__(self, num_layers, num_heads, num_relation_types=11):
+        super().__init__()
+        self.bias_table = nn.Parameter(torch.zeros(
+            NUM_ENTITY_TYPES, num_relation_types, NUM_ENTITY_TYPES, num_layers, num_heads))
+
+    def forward(self, entity_types, relation_matrix):
+        bias = self.bias_table[entity_types[:, None], relation_matrix, entity_types[None, :]]
+        return bias.permute(2, 3, 0, 1)
+
+
 class RelationTransformerLayer(nn.Module):
     """Post-LN attention with semantic bias and optional GTA or historical Geo.
 
@@ -215,7 +231,8 @@ class RelationTransformerLayer(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
 
     def forward(self, x, rel_bias=None, geo_score=None, geo_message=None,
-                gta_g=None, gta_ginv=None, diagnostics_label=None, collect_diagnostics=False):
+                gta_g=None, gta_ginv=None, diagnostics_label=None, collect_diagnostics=False,
+                relation_message=None, relation_message_alpha=1.):
         # x: (B,L,d), rel_bias: (H,L,L), geo_score: (B,H,L,L),
         # geo_message: (B,H,L,L,head_dim), gta matrices: (B,L,4,4)
         B, L, d = x.shape
@@ -278,6 +295,22 @@ class RelationTransformerLayer(nn.Module):
             out = out + torch.sum(attn.unsqueeze(-1) * geo_message, dim=3)   # (B,H,L,hd)
         if gta_active:
             out = apply_gta_transform(gta_g, out)
+        if relation_message is not None:
+            src, dst, values = relation_message
+            weights = attn.flatten(2).gather(
+                2, (src * L + dst)[:, None].expand(-1, self.num_heads, -1))
+            message = torch.zeros_like(out).scatter_add(
+                2, src[:, None, :, None].expand_as(values), weights[..., None] * values)
+            # Semantic messages enter in the receiver's frame, after GTA's return transform.
+            message = relation_message_alpha * message
+            if collect_diagnostics:
+                with torch.no_grad():
+                    node_rms = out[:32].detach().float().square().mean().sqrt()
+                    message_rms = message[:32].detach().float().square().mean().sqrt()
+                    self.last_diagnostics.update(node_message_rms=node_rms,
+                        relation_message_rms=message_rms,
+                        relation_to_node_rms=message_rms / node_rms.clamp_min(1e-8))
+            out = out + message
         out = out.transpose(1, 2).reshape(B, L, d)
 
         x = self.norm1(x + self.proj(out))
@@ -489,7 +522,8 @@ class RelationEncoder(nn.Module):
                  observation_mode="legacy_multirow", kinematic_size=13,
                  relation_bias=True, relation_bias_mode=RELATION_BIAS_LOOKUP,
                  geometry_cfg=None, gta_cfg=None, diagnostics_name="encoder",
-                 relation_reward_mode=LEGACY_MODE, diagnostics_interval=100, relation_graph_spec=None):
+                 relation_reward_mode=LEGACY_MODE, diagnostics_interval=100, relation_graph_spec=None,
+                 relation_message_cfg=None):
         super().__init__()
         if relation_reward_mode not in (LEGACY_MODE, STATE_MODE, ONTOP_MODE, CONTEXT_MODE,
                                         ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
@@ -507,6 +541,9 @@ class RelationEncoder(nn.Module):
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
         self.semantic_only = self.stage1_context and bool(
             self.relation_graph_spec.get('semantic_only', False))
+        self.task_role_input = bool(self.relation_graph_spec.get('policy_task_roles', False))
+        if self.task_role_input != (relation_bias_mode == RELATION_BIAS_TASK_ROLE):
+            raise ValueError('Task-role packet and task_role_lookup must be paired')
         self.owner_holding_state = bool(self.relation_graph_spec.get('owner_holding_state', False))
         if self.owner_holding_state and not self.semantic_only:
             raise ValueError('Owner-HOLDING state requires a semantic Stage-1 packet')
@@ -520,8 +557,13 @@ class RelationEncoder(nn.Module):
         self.diagnostics_interval = max(1, int(diagnostics_interval))
         self.last_diagnostics = {}
         if self.state_relation and (observation_mode != 'clean_scene' or
-                relation_bias_mode != RELATION_BIAS_EDGE_MLP or not relation_bias):
-            raise ValueError('State relation modes require clean_scene and enabled edge_mlp relation bias')
+                relation_bias_mode not in (RELATION_BIAS_EDGE_MLP, RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE)
+                or not relation_bias):
+            raise ValueError('State relation modes require clean_scene and enabled edge_mlp or typed_lookup relation bias')
+        if relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE) and (
+                relation_reward_mode != STAGE1_CONTEXT_MODE or not self.semantic_only
+                or self.owner_holding_state):
+            raise ValueError('typed_lookup requires semantic-only Stage 1 without owner-HOLDING state')
         if relation_bias_mode not in RELATION_BIAS_MODES:
             raise ValueError("unknown relation_bias_mode {!r}; expected one of {}".format(
                 relation_bias_mode, RELATION_BIAS_MODES))
@@ -533,6 +575,13 @@ class RelationEncoder(nn.Module):
         self.kinematic_size = kinematic_size
         self.use_relation_bias = relation_bias
         self.relation_bias_mode = relation_bias_mode
+        relation_message_cfg = relation_message_cfg or {}
+        self.use_relation_message = bool(relation_message_cfg.get('enable', False))
+        if self.use_relation_message and relation_bias_mode not in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE):
+            raise ValueError('Relation messages require typed_lookup semantic bias')
+        if self.task_role_input and not self.use_relation_message:
+            raise ValueError('Task-role experiment requires relation messages')
+        self.relation_message_alpha = float(relation_message_cfg.get('alpha', 1.))
 
         self.tokenizers = nn.ModuleList([tokenizer_builder(sz) for sz in self.entity_sizes])
 
@@ -543,6 +592,8 @@ class RelationEncoder(nn.Module):
             # Preserve A1's parameter name and exact scalar-lookup implementation for
             # legacy checkpoints and clean-scene ablations.
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
+        elif self.relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE):
+            self.edge_encoder = TypedEdgeBias(num_layers, num_heads, 2 if self.task_role_input else 11)
         else:
             relation_types = 11 if self.interaction_context else 9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES
             self.edge_encoder = EdgeEncoder(num_layers, num_heads, num_relation_types=relation_types)
@@ -565,14 +616,21 @@ class RelationEncoder(nn.Module):
         if self.edge_context:
             compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
-            self.context_fusion = (PackedEdgeOwnerHoldingFusion() if self.owner_holding_state else
+            self.context_fusion = (TaskRoleFusion(d_model, num_heads, num_layers,
+                float(relation_message_cfg.get('init_std', .02))) if self.task_role_input else
+                PackedEdgeTypedBiasFusion() if self.relation_bias_mode == RELATION_BIAS_TYPED_LOOKUP else
+                PackedEdgeOwnerHoldingFusion() if self.owner_holding_state else
                 PackedEdgeSemanticFusion() if self.semantic_only else
                 PackedEdgeContextFusion() if self.packed_context else EdgeContextFusion(graph))
             size_fn = (owner_holding_packet_size if self.owner_holding_state else
                 semantic_packet_size if self.semantic_only else
                 packet_size if self.packed_context else context_suffix_size)
-            self.suffix_width = size_fn(len(graph.ids))
+            self.suffix_width = 5 * num_agents if self.task_role_input else size_fn(len(graph.ids))
             self._set_context_background()
+
+        if self.use_relation_message and not self.task_role_input:
+            self.relation_message = PackedEdgeRelationMessage(
+                d_model, num_heads, float(relation_message_cfg.get('init_std', .02)))
 
         self.layers = nn.ModuleList([
             RelationTransformerLayer(d_model, num_heads, dim_feedforward) for _ in range(num_layers)
@@ -673,6 +731,8 @@ class RelationEncoder(nn.Module):
             raise ValueError('Explicit task graphs require edge-context mode')
         if self.semantic_only != bool(spec.get('semantic_only', False)):
             raise ValueError('Cannot change semantic-only packet architecture')
+        if self.task_role_input != bool(spec.get('policy_task_roles', False)):
+            raise ValueError('Cannot change task-role packet architecture')
         if self.owner_holding_state != bool(spec.get('owner_holding_state', False)):
             raise ValueError('Cannot change owner-HOLDING packet architecture')
         compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
@@ -683,7 +743,7 @@ class RelationEncoder(nn.Module):
         size_fn = (owner_holding_packet_size if self.owner_holding_state else
             semantic_packet_size if self.semantic_only else
             packet_size if self.packed_context else context_suffix_size)
-        self.suffix_width = size_fn(len(graph.ids))
+        self.suffix_width = 5 * self.num_agents if self.task_role_input else size_fn(len(graph.ids))
         self._set_context_background()
 
     def set_num_agents(self, num_agents):
@@ -693,6 +753,8 @@ class RelationEncoder(nn.Module):
     def _relation_device(self):
         if self.relation_bias_mode == RELATION_BIAS_LOOKUP:
             return self.rel_embed.device
+        if self.relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE):
+            return self.edge_encoder.bias_table.device
         return self.edge_encoder.bias_projection.device
 
     def build_edge_embeddings(self):
@@ -794,12 +856,18 @@ class RelationEncoder(nn.Module):
             assert offset == obs.shape[1], \
                 "obs row is {} wide, entity blocks cover {}".format(obs.shape[1], offset)
 
+        relation_message = (self.relation_message(obs[:, -self.suffix_width:], self.entity_types)
+                            if self.use_relation_message and not self.task_role_input else None)
         relation_bias = self.build_relation_bias() if self.use_relation_bias and not self.ontop_mixed else None
         collect = self.state_relation and (self.forward_calls == 1 or
                                            self.forward_calls % self.diagnostics_interval == 0)
         if self.edge_context:
-            relation_bias = self.context_fusion(obs[:, -self.suffix_width:], self.edge_encoder,
-                                                self.entity_types, relation_bias)
+            if self.task_role_input:
+                relation_bias, relation_message = self.context_fusion(
+                    obs[:, -self.suffix_width:], relation_bias)
+            else:
+                relation_bias = self.context_fusion(obs[:, -self.suffix_width:], self.edge_encoder,
+                                                    self.entity_types, relation_bias)
             if collect:
                 self.last_diagnostics = {}
         elif self.ontop_mixed:
@@ -829,6 +897,9 @@ class RelationEncoder(nn.Module):
             x = x.index_select(1, token_order)
             if relation_bias is not None:
                 relation_bias = relation_bias.index_select(-2, token_order).index_select(-1, token_order)
+            if relation_message is not None:
+                src, dst, values = relation_message
+                relation_message = (inverse_order[src], inverse_order[dst], values)
             if gta_g is not None:
                 gta_g = gta_g.index_select(1, token_order)
                 gta_ginv = gta_ginv.index_select(1, token_order)
@@ -843,7 +914,9 @@ class RelationEncoder(nn.Module):
                     and self.forward_calls == 1):
                 diagnostics_label = "{} layer{}".format(self.diagnostics_name, i)
             x = layer(x, rel_bias, geo_score, geo_message, gta_g, gta_ginv,
-                      diagnostics_label=diagnostics_label, collect_diagnostics=collect)
+                      diagnostics_label=diagnostics_label, collect_diagnostics=collect,
+                      relation_message=relation_message,
+                      relation_message_alpha=self.relation_message_alpha)
             if collect:
                 self.last_diagnostics.update({'layer{}/{}'.format(i, k): v
                                                for k, v in layer.last_diagnostics.items()})
@@ -979,6 +1052,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                        gta_cfg=gta_cfg,
                                        relation_reward_mode=self.relation_reward_mode,
                                        relation_graph_spec=self.relation_graph_spec,
+                                       relation_message_cfg=tp.get('relation_message'),
                                        diagnostics_interval=tp.get('relation_diagnostics_interval', 100),
                                        diagnostics_name=diagnostics_name)
 

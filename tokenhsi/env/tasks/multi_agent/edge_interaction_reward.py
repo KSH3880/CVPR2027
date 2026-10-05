@@ -61,7 +61,11 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     progress_target_xy = torch.where(sit[..., None], sit_target[..., :2], support[..., :2])
     distance_xy = (human[..., :2] - progress_target_xy).norm(dim=-1)
     p = config['progress']
-    pinning_radius = torch.full_like(distance_xy, float(p['delta']))
+    pinning_radius = torch.full_like(distance_xy, float(p.get('delta', 0.)))
+    if 'bbox_buffers' in p:
+        bbox_radius = support_size[..., :2].norm(dim=-1)/2
+        pinning_radius = bbox_radius + torch.where(sit,
+            float(p['bbox_buffers']['SIT']), float(p['bbox_buffers']['CLIMB']))
     if p.get('climb_pinning') == 'bbox_valid_radius':
         climb_radius = support_size[..., :2].norm(dim=-1) / 2 + 0.3
         pinning_radius = torch.where(climb, climb_radius, pinning_radius)

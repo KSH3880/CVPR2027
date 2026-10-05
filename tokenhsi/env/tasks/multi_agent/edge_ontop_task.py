@@ -81,7 +81,12 @@ class SampledOnTopTaskMixin:
     def _sample_episode_graph(self, ids):
         if self._relation_graph_spec.get('mode')=='edge_composition':
             sampler=sample_stage1_graph if getattr(self,'_edge_stage1',False) else (sample_interaction_graph if getattr(self,'_edge_interaction',False) else sample_graph)
-            new=sampler(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
+            if getattr(self, '_size_aware_rsi', False):
+                from utils.edge_scenario_spec import sample_size_conditioned_graph
+                new = sample_size_conditioned_graph(self._size_template_probabilities[ids],
+                    self._relation_graph_spec, self._task_graph_preset)
+            else:
+                new=sampler(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
         else:
             compiler=compile_stage1_graph if getattr(self,'_edge_stage1',False) else (compile_interaction_graph if getattr(self,'_edge_interaction',False) else compile_ontop_graph)
             new=expand_graph(compiler(self._relation_graph_spec,self.num_agents,self.num_objects,self.device),len(ids))
@@ -228,6 +233,25 @@ class SampledOnTopTaskMixin:
         self._reset_ref_motion_times = {
             skill_name: torch.cat(chunks) for skill_name, chunks in accepted_ref_motion_times.items()
         }
+        if getattr(self, '_size_aware_rsi', False) and not self._is_eval:
+            from utils.edge_scenario_spec import classify_templates
+            from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
+            reference_phi, reference_diag = self._evaluate_ontop_context(env_ids)
+            reference_graph = select_graph(self.relation_runtime.graph, env_ids)
+            reference_success = interaction_own_success(reference_phi, reference_diag['z_error'],
+                reference_diag['feet_height_error'], reference_graph, self._relation_cfg,
+                reference_diag['region_error'])
+            for index, relation in enumerate((6, AT, ON_TOP, SIT, CLIMB)):
+                mask = reference_graph.edge_valid & (reference_graph.edge_relation == relation)
+                self._size_rsi_success_counts[0, index, 0] += (reference_success & mask).sum()
+                self._size_rsi_success_counts[0, index, 1] += mask.sum()
+            self._size_rsi_pending_post[env_ids] = True
+            for skill_index, skill_name in enumerate(self._skill):
+                slots = self._reset_ref_slots.get(skill_name)
+                if slots is not None:
+                    template = classify_templates(self.relation_runtime.graph, *slots, True)
+                    self._size_rsi_executed.index_put_((template, torch.full_like(template, skill_index)),
+                        torch.ones_like(template, dtype=torch.float), accumulate=True)
         if getattr(self, '_stage2', False):
             for skill_index, skill_name in enumerate(self._skill):
                 if skill_name in self._reset_ref_slots:
@@ -275,7 +299,7 @@ class SampledOnTopTaskMixin:
             self._tar_platform_pos[ids]=platforms
 
     def _putdown_ontop_supports(self):
-        if (self._relation_cfg.get('stage1_variant') !=
+        if (not getattr(self, '_size_aware_rsi', False) and self._relation_cfg.get('stage1_variant') !=
                 'scenario_independent_stage1_ontop_putdown'
                 or 'putDown' not in self._reset_ref_slots):
             return None
@@ -309,6 +333,9 @@ class SampledOnTopTaskMixin:
         self._box_states[slot_env, support, 2] = \
             self._box_size[slot_env, support, 2] / 2
         self._box_states[slot_env, support, 7:13] = 0.
+        if getattr(self, '_size_aware_rsi', False):
+            self._box_states[slot_env, support, 3:7] = torch.tensor(
+                [0., 0., 0., 1.], device=self.device)
 
     def _configure_hard_skill_near_starts(self, ids):
         independent_only = 'independent_training' in self._relation_cfg
@@ -372,13 +399,22 @@ class SampledOnTopTaskMixin:
         # Bounding circles are conservative under arbitrary yaw. Assigned boxes may
         # legitimately start held; only reject box-box penetration and free-support obstruction.
         radius=sizes[...,:2].norm(dim=-1)/2
+        screened_pairs = torch.zeros(len(ids), self.num_objects, self.num_objects,
+                                     device=self.device, dtype=torch.bool)
+        if getattr(self, '_size_aware_rsi', False):
+            slots = self._putdown_ontop_supports()
+            if slots is not None:
+                slot_env, slot_agent, physical, _ = slots
+                rows = torch.searchsorted(ids, slot_env)
+                screened_pairs[rows, physical, slot_agent] = True
+                screened_pairs[rows, slot_agent, physical] = True
         for a in range(self.num_objects):
             for b in range(a):
                 xy=(boxes[:,a,:2]-boxes[:,b,:2]).norm(dim=-1)
                 z=(boxes[:,a,2]-boxes[:,b,2]).abs()
-                bad|=(xy<radius[:,a]+radius[:,b]+.05)&(z<(sizes[:,a,2]+sizes[:,b,2])/2+.02)
+                bad|=(xy<radius[:,a]+radius[:,b]+.05)&(z<(sizes[:,a,2]+sizes[:,b,2])/2+.02)&~screened_pairs[:,a,b]
         putdown_supports = self._putdown_ontop_supports()
-        if putdown_supports is not None:
+        if putdown_supports is not None and not getattr(self, '_size_aware_rsi', False):
             slot_env, _, physical, _ = putdown_supports
             rows = torch.searchsorted(ids, slot_env)
             support = self._box_states[slot_env, physical]
@@ -395,6 +431,21 @@ class SampledOnTopTaskMixin:
             inside_z = ((local[..., 2] > -size[:, None, 2] / 2 - .03) &
                         (local[..., 2] < size[:, None, 2] / 2 + .03))
             bad[rows] |= (inside_xy & inside_z).any(-1)
+        if getattr(self, '_size_aware_rsi', False):
+            body = self._kinematic_humanoid_rigid_body_states[ids, ..., :3]
+            relative = body[:, :, None] - boxes[:, None, :, None, :3]
+            rotation = boxes[:, None, :, None, 3:7].expand(*relative.shape[:-1], 4)
+            cross = 2 * torch.cross(rotation[..., :3], relative, dim=-1)
+            local = relative - rotation[..., 3:4]*cross + torch.cross(rotation[..., :3], cross, dim=-1)
+            inside = (local.abs() < sizes[:, None, :, None]/2 - .06).all(-1).any(-1)
+            exempt = torch.zeros(len(ids), self.num_agents, self.num_objects,
+                                  dtype=torch.bool, device=self.device)
+            for owner in range(self.num_agents):
+                exempt[:, owner, owner] = True
+            if putdown_supports is not None:
+                slot_env, slot_agent, physical, _ = putdown_supports
+                exempt[torch.searchsorted(ids, slot_env), slot_agent, physical] = True
+            bad |= (inside & ~exempt).any(-1).any(-1)
         if self.num_objects>self.num_agents and not getattr(self, '_scenario_no_climb', False):
             free=boxes[:,self.num_agents:,:2]
             bad|=((free[:,:,None]-roots[:,None,:,:2]).norm(dim=-1)<self._box_min_agent_dist).any(-1).any(-1)
@@ -451,6 +502,8 @@ class SampledOnTopTaskMixin:
                            (local_body[..., 2] < size[:, None, 2] / 2 - .06))
                 penetration = (inner_xy & inner_z).any(-1)
                 invalid = penetration | (feet[..., 2].amin(-1) < -.02)
+                if getattr(self, '_size_aware_rsi', False):
+                    invalid = ~torch.isfinite(body).all(-1).all(-1)
                 bad[row] |= invalid
                 self._rsi_attempts[skill_index] += len(slot_env)
                 self._rsi_rejected[skill_index] += invalid.sum()
@@ -463,6 +516,12 @@ class SampledOnTopTaskMixin:
 
     def _record_ontop_diagnostics(self,result,diag):
         g=self.relation_runtime.graph;mask=g.edge_valid&(g.edge_relation==ON_TOP)
+        if getattr(self, '_size_aware_rsi', False) and not self._is_eval:
+            for index, relation in enumerate((6, AT, ON_TOP, SIT, CLIMB)):
+                first = g.edge_valid & (g.edge_relation == relation) & self._size_rsi_pending_post[:, None]
+                self._size_rsi_success_counts[1, index, 0] += (result['own_success'] & first).sum()
+                self._size_rsi_success_counts[1, index, 1] += first.sum()
+            self._size_rsi_pending_post.zero_()
         contact=self._logical_box_values(self._ontop_box_contact).norm(dim=-1)
         batch=torch.arange(self.num_envs,device=self.device)[:,None]
         diag['source_net_contact']=contact[batch,(g.edge_src-self.num_agents).clamp(0,self.num_objects-1)]*mask
@@ -578,13 +637,28 @@ class SampledOnTopTaskMixin:
                 out['sampling/rsi_climb_attempts']=self._rsi_attempts[1].clone()
                 out['sampling/rsi_climb_rejection_rate']=self._rsi_rejected[1]/self._rsi_attempts[1].clamp_min(1)
                 out['sampling/rsi_climb_start_target_distance']=self._rsi_start_distance[1]/self._rsi_attempts[1].clamp_min(1)
-            if (self._relation_cfg.get('stage1_variant') ==
+            if (getattr(self, '_size_aware_rsi', False) or self._relation_cfg.get('stage1_variant') ==
                     'scenario_independent_stage1_ontop_putdown'):
                 out['sampling/rsi_ontop_putdown_fraction'] = \
                     self._ontop_putdown_rsi_count / den
             c.zero_();self._sampling_retries.zero_();self._sampling_failures.zero_()
             self._ontop_putdown_rsi_count.zero_()
             self._rsi_attempts.zero_();self._rsi_rejected.zero_();self._rsi_start_distance.zero_()
+            if getattr(self, '_size_aware_rsi', False) and not self._is_eval:
+                for stage, label in enumerate(('reference', 'first_step')):
+                    for index, relation in enumerate(('holding', 'at', 'ontop', 'sit', 'climb')):
+                        count = self._size_rsi_success_counts[stage, index]
+                        out['sampling/rsi_'+relation+'_'+label+'_success'] = count[0]/count[1].clamp_min(1)
+                self._size_rsi_success_counts.zero_()
+                for task, name in enumerate(names):
+                    total = self._size_rsi_requested[task].sum().clamp_min(1)
+                    out['sampling/rsi_'+name+'_fallback_attempt_fraction'] = self._size_rsi_fallbacks[task]/total
+                    accepted = self._size_rsi_executed[task].sum().clamp_min(1)
+                    for skill, skill_name in enumerate(self._skill):
+                        out['sampling/rsi_'+name+'_actual_'+skill_name] = self._size_rsi_executed[task, skill]/accepted
+                self._size_rsi_requested.zero_()
+                self._size_rsi_executed.zero_()
+                self._size_rsi_fallbacks.zero_()
             return out
         if getattr(self,'_edge_interaction',False):
             names=('holding','sit','climb','holding_at','holding_ontop','holding_sit','holding_climb') if getattr(self,'_edge_stage1',False) else ('holding','sit','climb','holding_at','holding_ontop','holding_climb','holding_sit')
