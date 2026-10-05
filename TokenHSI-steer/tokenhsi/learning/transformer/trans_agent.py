@@ -189,6 +189,13 @@ class TransAgent(amp_agent.AMPAgent):
                 for param in self.model.parameters():
                     param.grad = None
 
+        sample_mask = input_dict.get('rand_action_mask')
+        if rnn_masks is not None:
+            sample_mask = rnn_masks if sample_mask is None else sample_mask.reshape(-1) * rnn_masks.reshape(-1)
+        approx_kl_before = self._approx_kl_from_neglogp(
+            action_log_probs.detach(), old_action_log_probs_batch, sample_mask)
+        self._record_ppo_minibatch_kl('before', approx_kl_before)
+
         self.scaler.scale(loss).backward()
         #TODO: Refactor this ugliest code of the year
         if self.truncate_grads:
@@ -214,9 +221,15 @@ class TransAgent(amp_agent.AMPAgent):
             if self.is_rnn:
                 kl_dist = (kl_dist * rnn_masks).sum() / rnn_masks.numel()  #/ sum_mask
                     
+        approx_kl = self._post_update_approx_kl(batch_dict, old_action_log_probs_batch, sample_mask)
+        self._record_ppo_minibatch_kl('after', approx_kl)
+
         self.train_result = {
             'entropy': entropy,
             'kl': kl_dist,
+            'approx_kl': approx_kl,
+            'approx_kl_before': approx_kl_before,
+            'kl_early_stop': approx_kl.new_tensor(float(self._target_kl_exceeded(approx_kl))),
             'last_lr': self.last_lr, 
             'lr_mul': lr_mul, 
             'b_loss': b_loss

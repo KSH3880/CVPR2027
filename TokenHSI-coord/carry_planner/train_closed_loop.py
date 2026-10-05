@@ -191,13 +191,18 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
         "direction_fallback_fraction": 0.0,
     }
     updates = 0
+    kl_before_sum = kl_after_sum = 0.0
+    kl_before_max = kl_after_max = 0.0
     for _ in range(epochs):
         for index in torch.randperm(total, device=actions.device).split(minibatch):
             observation = observations.index(index)
             log_prob, entropy, value, _ = policy.evaluate(
                 observation, actions[index],
             )
-            ratio = (log_prob - old_log_prob[index]).exp()
+            logratio = log_prob - old_log_prob[index]
+            ratio = logratio.exp()
+            with torch.no_grad():
+                kl_before = float((torch.expm1(logratio.float()) - logratio.float()).mean())
             objective = torch.minimum(
                 ratio * advantages[index],
                 ratio.clamp(1.0 - clip_ratio, 1.0 + clip_ratio)
@@ -244,18 +249,31 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
             loss = (
                 policy_loss + value_coef * value_loss
                 - entropy_coef * entropy_mean
-                + smoothness_coef * regularization["smoothness_loss"]
-                + speed_smoothness_coef
-                * regularization["speed_smoothness_loss"]
-                + analytic_collision_coef * analytic["loss"]
-                + analytic_curvature_coef * analytic["curvature_loss"]
-                + weighted_consistency + weighted_excess_length
-                + weighted_direction
             )
+            # Disabled auxiliaries must not enter backward, including 0 * NaN.
+            for coefficient, auxiliary in (
+                (smoothness_coef, regularization["smoothness_loss"]),
+                (speed_smoothness_coef, regularization["speed_smoothness_loss"]),
+                (analytic_collision_coef, analytic["loss"]),
+                (analytic_curvature_coef, analytic["curvature_loss"]),
+                (regularization_scale * consistency_coef, path_regularization["consistency_loss"]),
+                (regularization_scale * excess_length_coef, path_regularization["excess_length_loss"]),
+                (regularization_scale * direction_coef, path_regularization["direction_loss"]),
+            ):
+                if coefficient != 0:
+                    loss = loss + coefficient * auxiliary
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(policy.parameters(), 1.0)
             optimizer.step()
+            with torch.no_grad():
+                log_prob_after, _, _, _ = policy.evaluate(observation, actions[index])
+                logratio_after = log_prob_after.float() - old_log_prob[index].float()
+                kl_after = float((torch.expm1(logratio_after) - logratio_after).mean())
+            kl_before_sum += kl_before
+            kl_after_sum += kl_after
+            kl_before_max = max(kl_before_max, kl_before)
+            kl_after_max = max(kl_after_max, kl_after)
             sums["policy_loss"] += float(policy_loss.detach())
             sums["value_loss"] += float(value_loss.detach())
             sums["entropy"] += float(entropy_mean.detach())
@@ -313,6 +331,13 @@ def _ppo_update(policy, optimizer, observations, actions, old_log_prob,
         key: value / max(updates, 1) for key, value in sums.items()
     }
     averaged["max_future_excess_m"] = sums["max_future_excess_m"]
+    averaged.update(
+        approx_kl_before_mean=kl_before_sum / max(updates, 1),
+        approx_kl_before_max=kl_before_max,
+        approx_kl_after_mean=kl_after_sum / max(updates, 1),
+        approx_kl_after_max=kl_after_max,
+        ppo_updates=updates,
+    )
     return averaged
 
 
@@ -836,6 +861,7 @@ def main():
             "sample_path_deviation", "mean_path_deviation",
             "analytic_collision_loss", "mean_future_excess_m",
             "mean_direction_error_deg",
+            "approx_kl_before_max", "approx_kl_after_max", "ppo_updates",
         )
         print(
             "[carry-planner-train] " + " ".join(

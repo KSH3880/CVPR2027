@@ -12,6 +12,11 @@ from typing import Mapping
 
 # Keep the event file focused; metrics.jsonl remains the complete raw record.
 SCALARS = {
+    "PPO/approx_kl_before_mean": "approx_kl_before_mean",
+    "PPO/approx_kl_before_max": "approx_kl_before_max",
+    "PPO/approx_kl_after_mean": "approx_kl_after_mean",
+    "PPO/approx_kl_after_max": "approx_kl_after_max",
+    "PPO/updates": "ppo_updates",
     "Reward/total": "reward",
     "Reward/executor": "base_reward",
     "Reward/progress": "progress",

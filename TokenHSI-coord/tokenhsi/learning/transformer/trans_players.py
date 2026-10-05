@@ -120,6 +120,7 @@ class TransPlayerContinuous(common_player.CommonPlayer):
         return
     
     def _preproc_amp_obs(self, amp_obs):
+        amp_obs = amp_obs.to(self.device)
         if self._normalize_amp_input:
             # refer to CALM https://github.com/NVlabs/CALM
             shape = amp_obs.shape

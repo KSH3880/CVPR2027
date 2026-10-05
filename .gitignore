@@ -47,6 +47,17 @@
 *.log
 nohup.out
 
+# Runs are generated artifacts (env snapshots, metrics, traces, caches).
+# Keep queue configuration and its append-only result ledger under version control.
+/runs/*
+!/runs/queue/
+
+# Local runtime and Python environments
+/.runtime/
+.venv/
+/venv/
+/env/
+
 # Large experiment artifacts
 /runs/results/
 /runs/videos/

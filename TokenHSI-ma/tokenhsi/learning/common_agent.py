@@ -237,10 +237,13 @@ class CommonAgent(a2c_continuous.A2CAgent):
             frames_mask_ratio = rnn_masks.sum().item() / (rnn_masks.nelement())
             print(frames_mask_ratio)
 
+        self._ppo_kl_step = (self.epoch_num - 1) * self.mini_epochs_num * len(self.dataset)
+        stop_update = False
         for _ in range(0, self.mini_epochs_num):
             ep_kls = []
             for i in range(len(self.dataset)):
                 curr_train_info = self.train_actor_critic(self.dataset[i])
+                self._ppo_kl_step += 1
                 
                 if self.schedule_type == 'legacy':  
                     if self.multi_gpu:
@@ -255,6 +258,10 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 else:
                     for k, v in curr_train_info.items():
                         train_info[k].append(v)
+
+                stop_update = self._target_kl_exceeded(curr_train_info['approx_kl'])
+                if stop_update:
+                    break
             
             av_kls = torch_ext.mean_list(train_info['kl'])
 
@@ -264,9 +271,12 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
                 self.update_lr(self.last_lr)
 
+            if stop_update:
+                break
+
         if self.schedule_type == 'standard_epoch':
             if self.multi_gpu:
-                av_kls = self.hvd.average_value(torch_ext.mean_list(kls), 'ep_kls')
+                av_kls = self.hvd.average_value(av_kls, 'ep_kls')
             self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
             self.update_lr(self.last_lr)
 
@@ -391,6 +401,56 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
         return
 
+    @torch.no_grad()
+    def _post_update_approx_kl(self, batch_dict, old_neglogp, sample_mask=None):
+        """Re-evaluate rollout actions after the optimizer step without updating stats."""
+        modes = [(module, module.training) for module in self.model.modules()]
+        try:
+            self.model.eval()
+            with torch.cuda.amp.autocast(enabled=self.mixed_precision):
+                mu, logstd, _, _ = self.model.a2c_network(dict(batch_dict))
+            # Stored log probabilities are NEGATIVE log probabilities.
+            new_neglogp = self.model.neglogp(
+                batch_dict['prev_actions'].float(), mu.float(),
+                logstd.float().exp(), logstd.float())
+            return self._approx_kl_from_neglogp(new_neglogp, old_neglogp, sample_mask)
+        finally:
+            # Restore mixed modes too (e.g. frozen normalizers), even on failure.
+            for module, training in modes:
+                module.training = training
+
+    @torch.no_grad()
+    def _approx_kl_from_neglogp(self, new_neglogp, old_neglogp, sample_mask=None):
+        logratio = old_neglogp.float().reshape(-1) - new_neglogp.reshape(-1)
+        estimates = torch.expm1(logratio) - logratio
+        weights = torch.ones_like(estimates)
+        if sample_mask is not None:
+            weights *= sample_mask.reshape(-1).to(weights)
+        numerator = torch.where(weights > 0, estimates, 0.0).mul(weights).sum()
+        denominator = weights.sum()
+        if self.multi_gpu:
+            numerator = self.hvd.average_value(numerator, 'target_kl_sum')
+            denominator = self.hvd.average_value(denominator, 'target_kl_count')
+        return numerator / denominator.clamp_min(1.0 if not self.multi_gpu else 1e-12)
+
+    def _record_ppo_minibatch_kl(self, phase, approx_kl):
+        if self.rank != 0:
+            return
+        step = self._ppo_kl_step
+        self.writer.add_scalar('info/ppo_minibatch_approx_kl_' + phase, approx_kl.item(), step)
+        if phase == 'after':
+            self.writer.add_scalar('info/ppo_minibatch_target_kl', self.target_kl or 0.0, step)
+            stopped = self._target_kl_exceeded(approx_kl)
+            self.writer.add_scalar('info/ppo_minibatch_kl_early_stop', float(stopped), step)
+            if stopped:
+                print('[PPO_KL_STOP] epoch={} update={} approx_kl={:.6g} target_kl={:.6g}'.format(
+                    self.epoch_num, step, approx_kl.item(), self.target_kl), flush=True)
+                self.writer.flush()
+
+    def _target_kl_exceeded(self, approx_kl):
+        return self.target_kl is not None and (
+            not torch.isfinite(approx_kl).item() or approx_kl.item() > self.target_kl)
+
     def calc_gradients(self, input_dict):
         self.set_train()
 
@@ -455,6 +515,13 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 for param in self.model.parameters():
                     param.grad = None
 
+        sample_mask = None
+        if rnn_masks is not None:
+            sample_mask = rnn_masks if sample_mask is None else sample_mask.reshape(-1) * rnn_masks.reshape(-1)
+        approx_kl_before = self._approx_kl_from_neglogp(
+            action_log_probs.detach(), old_action_log_probs_batch, sample_mask)
+        self._record_ppo_minibatch_kl('before', approx_kl_before)
+
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
         self.scaler.update()
@@ -463,9 +530,15 @@ class CommonAgent(a2c_continuous.A2CAgent):
             reduce_kl = not self.is_rnn
             kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
                     
+        approx_kl = self._post_update_approx_kl(batch_dict, old_action_log_probs_batch, sample_mask)
+        self._record_ppo_minibatch_kl('after', approx_kl)
+
         self.train_result = {
             'entropy': entropy,
             'kl': kl_dist,
+            'approx_kl': approx_kl,
+            'approx_kl_before': approx_kl_before,
+            'kl_early_stop': approx_kl.new_tensor(float(self._target_kl_exceeded(approx_kl))),
             'last_lr': self.last_lr, 
             'lr_mul': lr_mul, 
             'b_loss': b_loss
@@ -509,6 +582,10 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
     def _load_config_params(self, config):
         self.last_lr = config['learning_rate']
+        target_kl = config.get('target_kl', 0.015)
+        self.target_kl = None if target_kl is None or target_kl == 0 else float(target_kl)
+        if self.target_kl is not None and (not np.isfinite(self.target_kl) or self.target_kl < 0):
+            raise ValueError('target_kl must be finite and positive, or 0/None to disable')
         return
 
     def _build_net_config(self):
@@ -602,6 +679,14 @@ class CommonAgent(a2c_continuous.A2CAgent):
         self.writer.add_scalar('info/e_clip', self.e_clip * train_info['lr_mul'][-1], frame)
         self.writer.add_scalar('info/clip_frac', torch_ext.mean_list(train_info['actor_clip_frac']).item(), frame)
         self.writer.add_scalar('info/kl', torch_ext.mean_list(train_info['kl']).item(), frame)
+        self.writer.add_scalar('info/approx_kl', train_info['approx_kl'][-1].item(), frame)
+        for phase, key in (('before', 'approx_kl_before'), ('after', 'approx_kl')):
+            values = torch.stack(train_info[key])
+            self.writer.add_scalar('info/approx_kl_' + phase + '_mean', values.mean().item(), frame)
+            self.writer.add_scalar('info/approx_kl_' + phase + '_max', values.max().item(), frame)
+        self.writer.add_scalar('info/target_kl', self.target_kl or 0.0, frame)
+        self.writer.add_scalar('info/kl_early_stop', train_info['kl_early_stop'][-1].item(), frame)
+        self.writer.add_scalar('info/ppo_updates', len(train_info['approx_kl']), frame)
         return
 
     def restore(self, fn):

@@ -1,5 +1,28 @@
 # Carry collision-avoidance planner
 
+## consistency7 190-iter 보조 loss 제거 실험
+
+프로젝트 루트에서 다음 명령으로 GPU 6의 기존 MPS에 연결해 실행한다.
+
+```bash
+bash TokenHSI-coord/carry_planner/reward_only_r190.sh
+```
+
+기본 tag는 `carry_implicit_consistency_s7_r190_rewardonly`이며 190-iter 체크포인트의
+planner·탐색 분산·Adam 상태를 복원해 191~300 iter를 학습한다. PPO policy/value/entropy와
+reward는 원 설정을 유지하며 보조 loss 계수 7개만 0으로 한다. simulator와 RNG는 새로 시작한다.
+원시 보조 지표는 계속 기록되므로 로그에 보조 loss 값이 표시될 수 있다.
+
+GPU·추가 iteration·tag 지정과 실행 없는 설정 검증은 다음 형태다.
+
+```bash
+bash TokenHSI-coord/carry_planner/reward_only_r190.sh <new-tag> 110 6 --dry-run
+```
+
+MPS가 꺼져 있으면 실행을 거부한다. 기존 실행을 종료하거나 출력 tag를 덮어쓰지 않는다.
+`metrics.jsonl`과 TensorBoard `PPO/approx_kl_before_mean/max`,
+`PPO/approx_kl_after_mean/max`에 KL을 기록한다. 이 실험에는 KL 조기 중단을 추가하지 않는다.
+
 stack_planner의 Transformer, decision history, PPO action distribution과 33-point
 실행 ABI를 사용한다. 새 Carry decoder는 episode-fixed 전체 경로를 다시 만들지 않고
 매 decision마다 현재 측정 위치부터 남은 task suffix를 생성한다.

@@ -281,10 +281,13 @@ class AMPAgent(common_agent.CommonAgent):
             frames_mask_ratio = rnn_masks.sum().item() / (rnn_masks.nelement())
             print(frames_mask_ratio)
 
+        self._ppo_kl_step = (self.epoch_num - 1) * self.mini_epochs_num * len(self.dataset)
+        stop_update = False
         for _ in range(0, self.mini_epochs_num):
             ep_kls = []
             for i in range(len(self.dataset)):
                 curr_train_info = self.train_actor_critic(self.dataset[i])
+                self._ppo_kl_step += 1
                 
                 if self.schedule_type == 'legacy':  
                     if self.multi_gpu:
@@ -299,6 +302,10 @@ class AMPAgent(common_agent.CommonAgent):
                 else:
                     for k, v in curr_train_info.items():
                         train_info[k].append(v)
+
+                stop_update = self._target_kl_exceeded(curr_train_info['approx_kl'])
+                if stop_update:
+                    break
             
             av_kls = torch_ext.mean_list(train_info['kl'])
 
@@ -308,9 +315,12 @@ class AMPAgent(common_agent.CommonAgent):
                 self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
                 self.update_lr(self.last_lr)
 
+            if stop_update:
+                break
+
         if self.schedule_type == 'standard_epoch':
             if self.multi_gpu:
-                av_kls = self.hvd.average_value(torch_ext.mean_list(kls), 'ep_kls')
+                av_kls = self.hvd.average_value(av_kls, 'ep_kls')
             self.last_lr, self.entropy_coef = self.scheduler.update(self.last_lr, self.entropy_coef, self.epoch_num, 0, av_kls.item())
             self.update_lr(self.last_lr)
 
@@ -416,6 +426,13 @@ class AMPAgent(common_agent.CommonAgent):
                 for param in self.model.parameters():
                     param.grad = None
 
+        sample_mask = input_dict.get('rand_action_mask')
+        if rnn_masks is not None:
+            sample_mask = rnn_masks if sample_mask is None else sample_mask.reshape(-1) * rnn_masks.reshape(-1)
+        approx_kl_before = self._approx_kl_from_neglogp(
+            action_log_probs.detach(), old_action_log_probs_batch, sample_mask)
+        self._record_ppo_minibatch_kl('before', approx_kl_before)
+
         self.scaler.scale(loss).backward()
         #TODO: Refactor this ugliest code of the year
         if self.truncate_grads:
@@ -441,9 +458,15 @@ class AMPAgent(common_agent.CommonAgent):
             if self.is_rnn:
                 kl_dist = (kl_dist * rnn_masks).sum() / rnn_masks.numel()  #/ sum_mask
                     
+        approx_kl = self._post_update_approx_kl(batch_dict, old_action_log_probs_batch, sample_mask)
+        self._record_ppo_minibatch_kl('after', approx_kl)
+
         self.train_result = {
             'entropy': entropy,
             'kl': kl_dist,
+            'approx_kl': approx_kl,
+            'approx_kl_before': approx_kl_before,
+            'kl_early_stop': approx_kl.new_tensor(float(self._target_kl_exceeded(approx_kl))),
             'last_lr': self.last_lr, 
             'lr_mul': lr_mul, 
             'b_loss': b_loss

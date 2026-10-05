@@ -9,6 +9,20 @@ EXEC_REPO=${CARRY_PLANNER_EXEC_REPO:-"$ROOT/TokenHSI-masteer"}
 PLANNER=${1:?usage: view.sh <planner.pth> <frozen-ms18.pth>}
 POLICY=${2:?usage: view.sh <planner.pth> <frozen-ms18.pth>}
 GPU=${MA_GPU:-0}
+
+# Run the viewer outside MPS even when launched from a training shell.
+# Keep the shared daemon and its other clients untouched.
+unset CUDA_MPS_PIPE_DIRECTORY CUDA_MPS_LOG_DIRECTORY CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+export CUDA_MPS_PIPE_DIRECTORY="$ROOT/runs/tools/carry-view-no-mps"
+if [ -e "$CUDA_MPS_PIPE_DIRECTORY/control" ] || [ -e "$CUDA_MPS_PIPE_DIRECTORY/nvidia-cuda-mps-control.pid" ]; then
+    echo "Unexpected MPS endpoint at viewer isolation path; refusing to connect" >&2
+    exit 2
+fi
+export TORCH_EXTENSIONS_DIR="$ROOT/runs/cache/torch_extensions"
+export CUDA_CACHE_PATH="$ROOT/runs/cache/cuda"
+export PYTHONDONTWRITEBYTECODE=1
+mkdir -p "$TORCH_EXTENSIONS_DIR" "$CUDA_CACHE_PATH"
+echo 'Carry viewer: MPS connection disabled (shared daemon unchanged)'
 STAGE1=${MS_CKPT:-"$EXEC_REPO/output/ckpt_stage1.pth"}
 
 [[ "$GPU" =~ ^[0-9]+$ ]] || { echo "MA_GPU must be non-negative" >&2; exit 2; }
@@ -108,14 +122,19 @@ echo "scene:    $MS_SCEN  timed_cross=$MS_VIEW_TIMED_CROSS  replan=$CARRY_PLANNE
 echo "GPU:      physical $GPU -> logical cuda:0"
 echo "DISPLAY:  $DISPLAY"
 
+SIM_ARGS=(--sim_device cuda:0 --rl_device cuda:0 --physx --pipeline gpu)
+if [ "${CARRY_PLANNER_VIEW_CPU_PHYSICS:-0}" = 1 ]; then
+    SIM_ARGS=(--sim_device cpu --rl_device cuda:0 --physx --pipeline cpu)
+    echo 'Carry viewer: CPU PhysX; policy inference and rendering on requested GPU'
+fi
 cd "$COORD"
 python -u -m carry_planner.run_view \
     --task HumanoidMACarryPlannerView \
-    --sim_device cuda:0 --rl_device cuda:0 \
-    --graphics_device_id "$TOKENHSI_GRAPHICS_DEVICE_ID" --physx --pipeline gpu \
+    "${SIM_ARGS[@]}" \
+    --graphics_device_id "$TOKENHSI_GRAPHICS_DEVICE_ID" \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" \
-    --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+    --motion_file "$EXEC_REPO/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" \
     --hrl_checkpoint "$STAGE1" --checkpoint "$POLICY" \
     --num_envs 1 --seed "$VIEW_SEED" \
     --test

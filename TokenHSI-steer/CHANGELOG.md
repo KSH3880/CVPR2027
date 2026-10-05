@@ -1,5 +1,21 @@
 # TokenHSI-steer — 변경 기록
 
+## 2026-10-01
+
+### 폭주 진단용 minibatch KL 기록
+
+- optimizer step 직전·직후 approximate KL을 minibatch마다 TensorBoard `info/ppo_minibatch_approx_kl_before/after`에 기록한다. rollout별 전후 평균·최댓값과 target KL도 남겨 마지막 값이 피크를 가리지 않도록 했다.
+- 임계값 초과 시 `[PPO_KL_STOP]` 콘솔 로그에 epoch·update·KL·threshold를 출력하고 이벤트를 flush한다. DDP 기록은 rank 0만 하며, 조기 중단을 꺼도 KL은 계속 측정한다.
+- 검증: CPU 회귀 테스트 7개로 전후 KL 이벤트, rank 0 기록, 비활성화 상태 측정과 기존 중단 동작을 확인했다. 실제 GPU 학습은 실행하지 않았다.
+
+### PPO post-step target KL 조기 중단
+
+- PPO clip만으로 정책 이동량을 제한하지 못하는 경우를 위해 `target_kl: 0.015`를 기본 학습 설정에 추가했다. `0` 또는 YAML `null`로 끌 수 있다.
+- Common/AMP/Transformer optimizer step 이후 같은 rollout action의 log-prob를 다시 계산하고, `mean(exp(logratio) - 1 - logratio)`가 임계값을 초과하면 이번 rollout의 남은 minibatch와 mini-epoch를 모두 중단한다. 다음 rollout은 정상 수집·학습한다.
+- AMP의 deterministic action과 RNN padding은 제외한다. 추가 forward는 eval/no-grad로 정규화 통계 갱신을 막고 모듈별 모드를 복원한다. 다중 GPU는 유효 샘플 수로 가중한 KL을 공유해 같은 시점에 중단한다. 비유한 KL도 중단한다.
+- 기존 LR 스케줄러의 KL은 유지하며 `info/approx_kl`, `info/kl_early_stop`, `info/ppo_updates`를 기록한다. `standard_epoch` 분산 경로의 미정의 `kls` 참조도 수정했다.
+- 검증: `scripts/tests/test_ppo_target_kl.py` CPU 회귀 테스트 6개 통과. 실제 gradient update 이후 KL, 마스크·설정·분산 가중 합산, 양쪽 Common/AMP 루프의 조기 중단·다음 rollout 재개와 세 LR schedule을 검증했다. 실제 GPU 학습·DDP 실행 검증은 하지 않았다. 실행 중 프로세스와 큐는 변경하지 않았다.
+
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-08-13

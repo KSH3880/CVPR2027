@@ -389,6 +389,17 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 flush=True,
             )
 
+    def _update_marker(self):
+        """Carry overlays must not submit physical actor states during render.
+
+        The inherited multi-task marker updater resubmits boxes/platforms as
+        well as markers. Render runs before every physics substep, including
+        after reset has already committed roots. Repeated root setters between
+        simulate calls can corrupt the GPU pipeline. Carry uses path lines;
+        retain those without the unrelated multi-task marker submission.
+        """
+        return
+
     def _draw_task(self):
         super()._draw_task()
         if (
@@ -417,6 +428,30 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 vertices[agent], line_colors,
             )
 
+    def _compute_reset(self):
+        super()._compute_reset()
+        # Interactive viewing should not keep a collapsed, already-delivered
+        # agent in the scene while its partner continues. Keep this watchdog
+        # out of training and headless evaluation.
+        if self.headless or not getattr(self, "_carry_planner_view_ready", False):
+            return
+        root_height = self.agent_axis(self._humanoid_root_states)[..., 2]
+        if not hasattr(self, "_carry_view_low_root_steps"):
+            self._carry_view_low_root_steps = torch.zeros_like(root_height, dtype=torch.long)
+        low = (root_height < 0.45) & (self.progress_buf[:, None] > 2)
+        self._carry_view_low_root_steps = torch.where(
+            low, self._carry_view_low_root_steps + 1,
+            torch.zeros_like(self._carry_view_low_root_steps),
+        )
+        sustained = (self._carry_view_low_root_steps >= max(3, round(0.5 / self.dt))).any(dim=1)
+        newly_done = sustained & ~self.reset_buf.bool()
+        if bool(newly_done.any()):
+            ids = torch.nonzero(newly_done, as_tuple=False).squeeze(-1)
+            self.reset_buf[ids] = 1
+            self._terminate_buf[ids] = 1
+            print("[carry-view-fall-reset] env={} root_z={}".format(
+                ids.tolist(), root_height[ids].tolist()), flush=True)
+
     def _reset_envs(self, env_ids):
         ready = getattr(self, "_carry_planner_view_ready", False)
         self._carry_planner_view_ready = False
@@ -424,7 +459,13 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             super()._reset_envs(env_ids)
         finally:
             self._carry_planner_view_ready = ready
+        if len(env_ids) and hasattr(self, "_carry_view_low_root_steps"):
+            self._carry_view_low_root_steps[env_ids] = 0
         if ready and len(env_ids):
+            if not self.headless:
+                print("[carry-view-reset] env={} root_z={}".format(
+                    env_ids.tolist(), self.agent_axis(self._humanoid_root_states)[env_ids, :, 2].tolist()),
+                    flush=True)
             mask = torch.zeros(
                 self.num_envs, dtype=torch.bool, device=self.device,
             )

@@ -1,5 +1,119 @@
 # TokenHSI-coord — 변경 기록
 
+## 2026-10-04
+
+### Carry GPU viewer의 render 중 물리 actor 상태 재제출 제거
+
+- inherited `_update_marker`가 매 physics substep의 render에서 marker뿐 아니라 box/platform 상태를 indexed root setter로 재제출하는 경로를 확인했다. reset 직후 setter 중복 및 simulation 중 상태 제출 위험이 있어 Carry viewer에서는 해당 marker updater를 no-op으로 override한다. 경로 ribbon/line overlay는 유지하며 학습 클래스는 변경하지 않는다.
+- `view_gpu6_nomps.sh` 기본을 GPU PhysX로 복원. CPU fallback은 CARRY_PLANNER_VIEW_CPU_PHYSICS=1로 선택 가능. MPS 미연결 설정 유지.
+- 검증: override가 Gym 상태 setter를 호출하지 않는 AST 테스트와 Python compile/bash syntax 통과. GPU6에 기존 MPS 학습2개가 실행 중이라 native GPU 실행 검증은 하지 않았다. illegal-memory-access 원인 해결 여부는 아직 미확인.
+
+
+### GPU6 no-MPS Carry viewer의 CPU PhysX 실행 경로
+
+- `carry_planner/view_gpu6_nomps.sh` 추가: 550iter 기본 checkpoint, GPU6 추론/렌더링, noVNC6109 및 실제 설치된 런타임/Stage1 경로를 지정. 기존 view.sh의 MPS 제외 경로를 사용하며 공유 daemon은 유지한다.
+- MPS 제외 후에도 GPU PhysX illegal memory access 재현. view.sh에 CARRY_PLANNER_VIEW_CPU_PHYSICS 옵션을 추가하고 새 래퍼는 CPU PhysX/CPU pipeline을 기본 사용한다. 학습과 동일한 GPU 물리 환경은 아니므로 정량 평가 용도로 동일성을 주장하지 않는다.
+- CPU AMP debug 관측의 장치 불일치를 trans_players._preproc_amp_obs의 player device 전송으로 수정.
+- 검증: 실제 1env noVNC HTTP200, 여러 물리 step 진행, viewer PID3068644는 GPU6 MPS client 목록에 없음. 기존 MPS client1678859 유지 확인. Python compile/bash syntax 통과. 로그 runs/debug/carry_view_nomps에 보존; viewer 실행 유지.
+
+
+## 2026-10-03
+
+### Curvature0.5 실험 600iter 재개 스크립트
+
+- `carry_planner/resume_curvature05_r600.sh` 추가. 실제 기존 run.env 및 planner_000600 checkpoint로 model/exploration std/optimizer를 복원하고 새 output tag에서 601..3000의 2400iter를 실행한다. curvature0.5/LR0.0003/clip0.2/seed0/env2048을 유지하며 기존 GPU6 MPS에 연결한다.
+- 원본 로그/checkpoint 보존. simulator/RNG 상태까지 연속 복원하는 것은 아니며 새 환경에서 rollout을 수집한다. bash 문법/MPS dry-run 확인; 학습은 자동 시작하지 않았다.
+
+### Carry viewer의 MPS 연결 제외
+
+- `carry_planner/view.sh`에서 상속된 MPS 설정을 제거하고 daemon이 없는 프로젝트 내부 전용 pipe 경로로 지정해 기본 MPS endpoint로 재접속하지 않도록 한다. 해당 경로에 endpoint가 있으면 실행을 거부한다. 공유 MPS 서버와 기존 클라이언트는 종료하지 않는다.
+- Torch/CUDA cache를 프로젝트 내부로 지정. bash 문법 확인; 실제 GPU viewer는 재실행하지 않았다. MPS 제외가 GPU 자체 오류로부터 완전한 격리를 보장하는 것은 아니다.
+
+### Interactive Carry viewer의 지속적인 넘어짐 reset 보조 조건
+
+- GPU6 MPS 1env probe에서 root를 0.15m로 낮춘 뒤 세 번 reset: root가 0.87~0.93m로 복원되고 다음 simulate 후에도 유지됨을 확인. 물리 reset 자체 미적용은 재현되지 않았다. 초기 asset 경로 오류 probe 및 성공 로그는 runs/debug/carry_view_reset에 보존.
+- 기존 종료 판정은 접촉력+신체 높이 조건이며 배송 성공 agent는 실패에서 제외한다. interactive viewer에만 root 높이 0.45m 미만이 0.5초 지속되면 공유 env 종료하는 watchdog 추가. headless 평가/학습 규칙은 유지하며 실제 reset과 watchdog의 root 높이 로그를 출력한다. 사용자 관찰의 정확한 원인은 아직 단정하지 않는다.
+- 검증: GPU 실제 반복 reset, 실제 메서드 AST 기반 지속/일시적 낮은 자세·다른 env 보존·headless 제외 검사 및 Python compile 통과. native viewer에서 수정 후 장기 재생은 아직 확인하지 않았음.
+
+### Carry viewer 객체 데이터 경로 수정
+
+- `carry_planner/view.sh`의 motion_file을 실제 데이터가 있는 executor repository 절대 경로로 지정. motion_file 부모를 기준으로 sit/climb 객체를 찾으므로 coord 상대 경로 사용 시 StraightChair_Normal 누락 오류가 발생했다. 학습 launcher와 동일한 데이터 경로를 사용한다.
+- 검증: 실제 chair 디렉터리 존재 및 bash 문법 확인. 기존 학습/conda 환경은 변경하지 않았다.
+
+### Curvature 0.5 scratch 3000iter 실행 설정
+
+- `carry_planner/train_curvature05_3000.sh` 추가. 기존 0.05 설정에서 curvature coefficient만 0.5로 변경하며 나머지 LR0.0003/clip0.2/seed0/env2048/3000iter, 기존 GPU6 MPS 연결을 유지한다.
+- 검증: bash 문법 및 dry-run으로 계수/출력 tag/MPS 설정 확인. 실행 중인 프로세스는 변경하지 않고 새 학습은 시작하지 않았다.
+
+### Curvature 0.05 scratch 3000iter 비교 설정
+
+- `carry_planner/train_curvature005_3000.sh` 추가. no-curvature scratch 설정에서 curvature coefficient만 0.05로 변경. LR0.0003/clip0.2/seed0/env2048/3000iter 및 다른 보조 항은 동일하며 새 tag와 기존 GPU6 MPS를 사용한다.
+- 검증: bash 문법 및 MPS dry-run 확인. 실행 중인 학습은 종료하지 않았으며 새 학습은 자동 시작하지 않았다.
+
+### Curvature loss 제외한 scratch 3000iter 실행 스크립트
+
+- `carry_planner/train_no_curvature_3000.sh` 추가. 기존 curvature1 scratch 실행과 동일한 seed0/env2048/LR0.0003/clip0.2/3000iter 및 consistency7 설정을 사용하고 analytic curvature coefficient만 0으로 바꾼다. 새로운 tag에 처음부터 학습하며 기존 GPU6 MPS에 연결한다.
+- 사용자 요청으로 기존 curvature1 학습 PID2665561의 MPS CUDA context를 terminate_client로 종료 후 프로세스를 정리했다. 다른 클라이언트와 기존 로그/checkpoint는 보존한다.
+- 검증: bash 문법 및 MPS dry-run으로 실행 설정 확인. 새 학습은 자동 시작하지 않았다.
+
+## 2026-10-02
+
+### 할당 학습 launcher의 기존 GPU6 MPS 연결
+
+- `task_allocation/launch.sh`가 `mps/shell.sh`의 `mps_use 6`으로 기존 MPS daemon의 소유자/GPU UUID/pipe/log 계약과 제어 접속을 확인한 뒤 환경변수를 자동 적용한다. 데몬 시작·종료 명령은 추가하지 않았고 GPU6 제한을 유지한다.
+- 출력 생성/학습 시작 전에 MPS를 검증한다. run.env에 CUDA_MPS_PIPE_DIRECTORY, CUDA_MPS_LOG_DIRECTORY, MPS_GPU_ROOT와 TOKENHSI_GPU를 기록한다. 세 번째 인자 --dry-run은 실제 MPS 설정만 검증하며 출력 폴더나 학습을 만들지 않는다.
+- 검증: bash syntax/diff whitespace 통과. 64 env/100 iter 설정 dry-run에서 GPU6 UUID 및 `/tmp/mps-test-1003/gpu6/pipe` 연결을 확인했다. 실제 학습은 시작하지 않고 사용자 실행 명령을 문서에 추가했다.
+
+### 할당 학습의 GPU 6 실제 연결 검증
+
+- gitignore된 ms18 checkpoint를 기존 run.env와 `rg --files --no-ignore`로 확인했다. 이전 “checkpoint 없음” 판단은 기본 경로와 gitignore 제외 검색에 따른 오류였다. launcher 기본 ms18을 output/stack, Stage1을 output/tokenhsi로 바로잡고 motion/학습 cfg를 기존 ms18 데이터 절대 경로로 지정했다. 최초 상대 motion 경로 오류 실행은 보존했다.
+- 사용자 GPU6 전용 지시 직후 GPU3에서 이 세션이 만든 smoke Python PID2716900만 TERM 종료(143)를 확인했다. 이후 실제 검증은 GPU6에서만 실행했고 task allocation launcher도 GPU6 외 번호를 거부하도록 했다. 기존 학습/watcher/큐/MPS 프로세스는 건드리지 않았다.
+- GPU6 2env/60step/PPO1회: reward=-1.03563, loss=1.25220, 실제 env-step120, 재할당1. ms18 state 불변, allocation 갱신, 저장/재로드의 확률·critic 출력 일치 assert 통과.
+- 저장 모델 720step eval: env-step1438, 배송 proxy0, 팀 완료0, 실패2, 재할당17. 거리 기반 초기 고정 담당 대조군: env-step1406, 배송 proxy8, 팀 완료4, 실패0, 재할당0. 팀 완료는 reset을 포함한 완료 episode 수이며 env2개를 분모로 성공률을 주장하지 않는다. 단일 seed 연결 검증으로 학습 효과/수렴을 확정하지 않는다.
+- ALLOC_VERIFY 옵션과 eval-only nearest_initial 대조군을 추가했다. 재할당 전후 물리 root/box/goal 불변을 assert하고 executor/allocation 파라미터 및 checkpoint roundtrip을 기록한다. held_box_steps는 grasp lock 이력의 누적이며 실제 접촉 시간은 아니다.
+- CPU 기존10개 및 추가 nearest-initial 선택/유지 테스트1개, Python compile, bash syntax, diff whitespace 통과. 실제 로그와 metrics/verification/status 및 readiness 요약은 runs/task_allocation 아래 보존했다. 장기 학습은 시작하지 않았다.
+
+### 랜덤 배송 task의 frozen ms18 주기적 할당 PPO
+
+- `task_allocation/`에 2 agents/2 boxes 초기 환경·공동 할당 actor/critic·semi-Markov PPO·launcher·문서를 추가했다. agent/box/goal 6개 위치를 간격 제약으로 랜덤 샘플링하고 물리 actor 축에 적용한다. 기존 frozen ms18 직선 경로 API를 재사용하며 baseline/ms18 소스와 기존 실행은 수정하지 않았다.
+- box–goal masked attention의 pair logits를 두 유효 permutation 점수로 합쳐 공동 categorical action을 샘플링한다. 30 simulator step마다 판단하며 최초 할당에는 전환 비용을 주지 않는다. grasp 이력 또는 배송 완료 후에는 현재 permutation을 유지한다. 가변 box 모델은 보존하되 simulator/action은 이번 버전에서 2개로 제한한다.
+- 매 실제 step의 시간 비용, 새 배송 보상, fall/timeout 실패 비용과 판단 시 agent별 변경 비용을 누적한다. step 기준 할인과 실제 실행 길이를 사용하는 GAE/terminal bootstrap 차단을 구현했다. 구간 중 종료된 env는 보상에서 제외한 후 row ID로 reset해 이후 episode를 이전 action에 섞지 않는다. 배송은 물리 box 기준 10-step 안정 placement geometry proxy다.
+- executor와 allocation checkpoint 계약을 분리하고 allocation만 optimizer로 갱신한다. 실제 설정 sidecar/생성 env cfg/metrics/atomic latest PTH를 runs 아래 저장하며 새 tag만 허용한다. 재개/평가 시 보상·시간축·배치 및 executor 경로 계약을 검사한다.
+- 검증: CPU 신규 7개 및 attention 3개 테스트, py_compile, launcher bash syntax, CLI import smoke, diff whitespace 통과. joint assignment/lock, switch 비용, 시간·배송·실패 보상, duration GAE, 랜덤 간격, PPO attention 갱신, 종료 보상 격리/row reset을 확인했다. 기본 ms18 및 Stage1 PTH가 현재 workspace에 없어 실제 GPU physics rollout과 성능은 미검증이다. 장기 학습은 시작하지 않았다.
+
+### 곡률 계수 1 신규 3000-iter 학습 스크립트
+
+- `carry_planner/train_curvature1_3000.sh`는 consistency7 run.env를 바탕으로 planner INIT를 비우고 curvature=1/LR=0.0003/clip=0.2로 1~3000 iter를 학습한다. seed=0/2048 env와 나머지 reward·보조 loss·frozen executor는 원 설정을 유지한다.
+- 기존 GPU 6 MPS를 검증해 연결하며 tag/GPU 지정과 dry-run을 지원한다. MPS를 시작·종료하거나 기존 산출물을 덮어쓰지 않는다. 새 CUDA/Torch 확장 캐시는 프로젝트 runs/cache 아래에 둔다.
+- 검증: bash syntax 및 설정 dry-run으로 INIT 공백·3000 iter·변경 계수와 나머지 보조 항 유지를 확인했다. 사용자 요청대로 학습은 실행하지 않았다.
+
+### 가변 box–goal 할당용 masked attention 모델
+
+- `coordinator/task_allocation.py`에 독립 `TaskAllocationModel` 추가. agent self-attention, box–goal 쌍 내부 self-attention, agent query/task key·value cross-attention 및 공유 Q–K 할당 scoring을 구성했다. entity ID/position embedding은 사용하지 않는다.
+- task token 순서는 box0/goal0/box1/goal1이며 다른 쌍 사이 attention은 차단한다. 입력은 `[B,A,Da]`, `[B,N,Db]`, `[B,N,Dg]`; 출력 logits/probabilities는 idle을 포함한 `[B,A,N+1]`이다. task_valid와 agent별 selectable mask, 빈 task 및 NaN padding 처리를 지원한다.
+- 기존 경로 모델·checkpoint·executor에는 연결하지 않았다. 출력은 agent별 분포이며 공동 matching, 할당 학습 목표, simulator 동적 대상 선택은 후속 통합 범위다. 저장소 진입점이 참조하는 `plan/PLAN_coord.md`는 현재 없으며 재생성하지 않았다.
+- 검증: CPU unittest 3개 통과. 쌍 간 정보 차단/자기 goal 반영, agent/task 순서 등변성, 선택 불가 task 확률 0, 전 task 비활성/빈 task의 idle 처리, 유한 gradient와 goal/cross-attention gradient를 확인했다.
+
+### 190-iter 단일 보조 loss 제거 비교
+
+- `carry_planner/ablate_loss_r190.sh`에 curvature/collision/smoothness/speed/consistency/excess/direction 선택을 추가했다. 원본 consistency7의 run.env와 190-iter checkpoint를 복원하고 선택한 계수만 0으로 변경한다. 누적 제거가 아니라 각 실험이 같은 원본 설정에서 시작한다.
+- 기본은 GPU 6 기존 MPS, 191~300 iter이며 원래 reward와 나머지 loss·Adam 상태를 유지한다. 스크립트 syntax와 curvature dry-run으로 `20→0` 및 나머지 계수 유지를 확인했다.
+- 사용자 요청으로 기존 r190_original의 MPS client만 terminate_client 성공 후 종료했다. 같은 MPS 서버의 다른 학습은 유지했다. 첫 실험 tag는 `carry_implicit_consistency_s7_r190_no_curvature`이고 로그는 `runs/logs/<tag>.log`다. 새 CUDA/Torch 확장 캐시는 runs/cache 아래로 지정했다.
+
+### TensorBoard protobuf JSON 호환 실행기
+
+- TensorBoard 2.14.0의 hparams plugin이 protobuf 5.29.6에서 제거된 `including_default_value_fields` 인자를 전달해 HTTP 요청이 실패했다.
+- `scripts/tensorboard_compat.py`는 실행 프로세스 안에서만 해당 인자를 `always_print_fields_with_no_presence`로 매핑한다. conda 패키지나 외부 파일은 수정하지 않는다.
+- 검증: 구 인자를 사용한 실제 protobuf JSON/Dict 변환과 TensorBoard CLI 시작 경로를 확인했다.
+
+### consistency7 190-iter reward-only 재개 실험
+
+- `carry_planner/reward_only_r190.sh`는 `carry_implicit_consistency_s7/run.env`를 읽고 `planner_000190.pth`의 planner·action log std·Adam 상태를 복원한다. 기본은 GPU 6의 기존 MPS 연결, 191~300 iter, 2048 env, seed 0이다. MPS를 시작·종료하지 않으며 기존 출력 tag를 덮어쓰지 않는다.
+- smoothness, speed smoothness, analytic collision, analytic curvature, replan consistency, excess length, direction 보조 loss 계수 7개만 0으로 한다. reward collision=5/invalid=0.5, PPO lr=0.0002/clip=0.15/value=0.5/entropy=0.0001 등은 원 설정을 유지한다. simulator와 RNG는 새로 시작하므로 당시 rollout의 완전한 재현은 아니다.
+- `_ppo_update`에서 계수가 0인 보조 항은 loss graph에 넣지 않아 `0 * NaN`도 backward에 전파되지 않는다. 원시 보조 지표는 진단을 위해 계속 계산한다.
+- 실제 planner PPO 경로에 업데이트 전후 approximate KL의 평균·최댓값과 업데이트 수를 JSONL·TensorBoard·콘솔에 기록한다. 이번 ablation에는 KL 조기 중단을 추가하지 않았다.
+- 검증: shell syntax, GPU 6 MPS 연결 dry-run, checkpoint/Adam 상태 검사, CPU PPO 회귀 테스트 통과. 0 계수의 NaN 보조 항이 gradient를 오염하지 않고 post-step KL이 변경된 정책으로 계산됨을 확인했다. 새 학습은 시작하지 않고 실행 명령을 제공한다.
+
 > 파일 변경은 hook이 자동 기록. 무엇을/왜 바꿨는지는 Claude가 `###` 항목으로 덧붙인다.
 
 ## 2026-10-01
