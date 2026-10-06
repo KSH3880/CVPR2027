@@ -92,6 +92,15 @@ export COORD_ALLOW_HAND_CONTACT=${COORD_ALLOW_HAND_CONTACT:-1}
 export COORD_PRESERVE_PICKUP_APPROACH=${COORD_PRESERVE_PICKUP_APPROACH:-1}
 export MS_METRICS="$METRICS" MA_METRICS="$METRICS"
 export MA_TAU=${MA_TAU:-0.3}
+export CARRY_PLANNER_EVAL_PROXIMITY=1
+export CARRY_PLANNER_EVAL_PROXIMITY_THRESHOLD=${CARRY_PLANNER_EVAL_PROXIMITY_THRESHOLD:-0.3}
+# Explicit non-daemon endpoint prevents inherited/default MPS connections.
+export CUDA_MPS_PIPE_DIRECTORY="$ROOT/runs/tools/carry-eval-no-mps"
+[ ! -e "$CUDA_MPS_PIPE_DIRECTORY/control" ] || { echo 'unexpected MPS endpoint' >&2; exit 2; }
+unset CUDA_MPS_LOG_DIRECTORY CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+export TORCH_EXTENSIONS_DIR="$ROOT/runs/cache/torch_extensions"
+export CUDA_CACHE_PATH="$ROOT/runs/cache/cuda"
+export PYTHONDONTWRITEBYTECODE=1
 export CARRY_PLANNER_EVAL_COLLISION_OUTPUT="$OUT/$EVAL_ID.episodes.json"
 unset MA_LAYOUT MA_LAYOUT_D MA_LAYOUT_S MA_LAYOUT_L MS_SCEN_CURVE MS_VIZ MA_VIDEO
 
@@ -109,7 +118,7 @@ python -u -m carry_planner.run_view \
     --task HumanoidMACarryPlannerView --headless \
     --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id -1 --physx --pipeline gpu \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
-    --cfg_env "$CFG" --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+    --cfg_env "$CFG" --motion_file "$EXEC_REPO/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" \
     --hrl_checkpoint "$STAGE1" --checkpoint "$TMP/nn/Humanoid.pth" \
     --num_envs "$ENVS" --seed "$SEED" --test --eval --eval_task carry > "$LOG" 2>&1
 RC=$?

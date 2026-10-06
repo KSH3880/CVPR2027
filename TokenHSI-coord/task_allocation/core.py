@@ -56,12 +56,12 @@ def gae(reward, value, next_value, done, duration, gamma=.99, lam=.95):
     return adv, adv+value
 
 
-def sample_layout(count, device, extent=3., clearance=1.2, max_tries=200):
-    """Six mutually separated points: agents, boxes, then goals."""
+def sample_layout(count, device, extent=3., clearance=1.2, max_tries=200, points=6):
+    """Mutually separated agent/box/goal points (six for the original task)."""
     if extent <= 0 or clearance <= 0:
         raise ValueError('extent/clearance must be positive')
-    result = torch.empty(count, 6, 2, device=device)
-    for j in range(6):
+    result = torch.empty(count, points, 2, device=device)
+    for j in range(points):
         pending = torch.ones(count, dtype=torch.bool, device=device)
         for _ in range(max_tries):
             ids = pending.nonzero(as_tuple=False).flatten()

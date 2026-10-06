@@ -62,6 +62,15 @@ conda activate tokenhsi_juan
 MA_GPU=6 ALLOC_MODE=train ALLOC_ENVS=64 ALLOC_ITERS=100 ALLOC_SEED=0 \
   bash TokenHSI-coord/task_allocation/launch.sh allocation_s0
 
+# 4개의 실제 박스, 2명의 agent. GPU6 기존 MPS에 연결해 짧게 검증한다.
+# 운반 중 재할당은 금지하며 배송 완료 후 다음 박스를 선택한다.
+ALLOC_BOXES=4 ALLOC_MPS=1 ALLOC_ENVS=2 ALLOC_ITERS=1 ALLOC_HORIZON=40 ALLOC_VERIFY=1 \
+  bash TokenHSI-coord/task_allocation/launch.sh allocation_four_mps_probe
+
+# 비-MPS 설정 확인. 존재하지 않는 pipe 경로로 기존 MPS 연결을 우회한다.
+ALLOC_MPS=0 ALLOC_ENVS=2 ALLOC_ITERS=1 \
+  bash TokenHSI-coord/task_allocation/launch.sh allocation_nomps_probe '' --dry-run
+
 # GPU6 MPS 연결과 실제 설정만 확인. 출력 폴더/학습 프로세스를 만들지 않는다.
 MA_GPU=6 ALLOC_ENVS=64 ALLOC_ITERS=100 \
   bash TokenHSI-coord/task_allocation/launch.sh allocation_s0 '' --dry-run

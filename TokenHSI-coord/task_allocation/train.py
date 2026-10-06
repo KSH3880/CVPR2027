@@ -14,6 +14,9 @@ from utils.config import get_args, load_cfg, set_seed
 from task_allocation.env import HumanoidTaskAllocationMS18
 from task_allocation.core import AllocationPolicy, SCHEMA, assignment_from_action, switch_cost, gae, nearest_initial_action
 registry.HumanoidTaskAllocationMS18 = HumanoidTaskAllocationMS18
+from task_allocation.four_env import HumanoidFourBoxAllocationMS18
+from task_allocation.four_core import FourBoxPolicy, SCHEMA_FOUR
+registry.HumanoidFourBoxAllocationMS18 = HumanoidFourBoxAllocationMS18
 
 
 def option(name, default, kind=float):
@@ -37,13 +40,20 @@ def main():
     player.model.eval().requires_grad_(False)
     player.env.reset()
     task=player.env.task
-    policy=AllocationPolicy(option('D_MODEL','64',int)).to(task.device)
+    boxes=option('BOXES','2',int)
+    if boxes not in (2,4): raise ValueError('ALLOC_BOXES must be 2 or 4')
+    if (boxes==4) != isinstance(task,HumanoidFourBoxAllocationMS18):
+        raise ValueError('box count does not match physical environment')
+    policy_class=FourBoxPolicy if boxes==4 else AllocationPolicy
+    schema=SCHEMA_FOUR if boxes==4 else SCHEMA
+    policy=policy_class(option('D_MODEL','64',int)).to(task.device)
     optimizer=torch.optim.Adam(policy.parameters(),lr=option('LR','0.0003'))
     steps,horizon,iters=option('INTERVAL','30',int),option('HORIZON','16',int),option('ITERS','100',int)
     epochs,batch=option('EPOCHS','4',int),option('MINIBATCH','256',int)
     gamma,lam=option('GAMMA','0.999'),option('LAMBDA','0.995')
     costs=(option('TIME_COEF','1'),option('DELIVERY_COEF','10'),option('FAILURE_COEF','40'))
     switch=option('SWITCH_COEF','0.1')
+    if boxes==4 and switch!=0: raise ValueError('four-box jobs are non-preemptive; switch cost must be zero')
     save_every=option('SAVE_EVERY','10',int)
     mode=os.environ.get('ALLOC_MODE','train')
     if mode not in ('train','eval') or min(steps,horizon,iters,epochs,batch,save_every)<=0 or not 0<gamma<=1 or not 0<=lam<=1 or min(*costs,switch)<0:
@@ -54,11 +64,13 @@ def main():
     baseline=os.environ.get('ALLOC_BASELINE','none')
     if baseline not in ('none','nearest_initial') or (mode=='train' and baseline!='none'):
         raise ValueError('baseline is evaluation-only')
+    if boxes==4 and baseline!='none':
+        raise ValueError('nearest_initial baseline applies only to two boxes')
     start=0
     initial=os.environ.get('ALLOC_INIT','')
     if initial:
         ck=torch.load(initial,map_location=task.device)
-        if ck['schema']!=SCHEMA:
+        if ck['schema']!=schema:
             raise ValueError('allocation checkpoint schema mismatch')
         if ck['config']['executor'] != str(Path(args.checkpoint).resolve()) or ck['config']['stage1'] != str(Path(args.hrl_checkpoint).resolve()):
             raise ValueError('executor checkpoint contract mismatch')
@@ -77,7 +89,9 @@ def main():
                 d_model=option('D_MODEL','64',int),executor=str(Path(args.checkpoint).resolve()),
                 stage1=str(Path(args.hrl_checkpoint).resolve()),mode=mode,
                 extent=contract['extent'],clearance=contract['clearance'],episode_steps=task.max_episode_length,baseline=baseline)
+    config['boxes']=boxes
     (out/'config.json').write_text(json.dumps(config,indent=2)+'\n')
+    print('ALLOCATION_SETUP '+json.dumps(dict(boxes=boxes,mps=option('MPS','1',int),schema=schema)),flush=True)
     policy.eval()  # no stochastic dropout; sample only the joint action
     verify=bool(option('VERIFY','0',int))
     executor_before={k:v.detach().cpu().clone() for k,v in player.model.state_dict().items()} if verify else None
@@ -92,21 +106,28 @@ def main():
                 action=dist.sample() if mode=='train' else dist.logits.argmax(-1)
                 if baseline=='nearest_initial':
                     action=nearest_initial_action(obs,task.allocation_initialized)
-                assignment=assignment_from_action(action)
-                changed=(assignment!=task.box_assignment).any(-1)
-                penalty=switch_cost(task.box_assignment,assignment,task.allocation_initialized,switch)
-                diagnostics['switches']+=int((changed & task.allocation_initialized).sum())
+                assignment=policy.assignment_from_action(action) if boxes==4 else assignment_from_action(action)
+                previous=obs['assignment'] if boxes==4 else task.box_assignment
+                changed=(assignment!=previous).any(-1)
+                penalty=torch.zeros(task.num_envs,device=task.device) if boxes==4 else switch_cost(previous,assignment,task.allocation_initialized,switch)
+                if boxes==4:
+                    busy_changed=(previous>=0) & (assignment!=previous)
+                    assert not busy_changed.any()
+                    diagnostics.setdefault('job_starts',0)
+                    diagnostics['job_starts']+=int(((previous<0)&(assignment>=0)).sum())
+                else:
+                    diagnostics['switches']+=int((changed & task.allocation_initialized).sum())
                 ids=changed.nonzero(as_tuple=False).flatten()
                 if len(ids):
                     if verify:
-                        physical_box=task._box_states.clone()
+                        physical_box=(task._allocation_boxes if boxes==4 else task._box_states).clone()
                         physical_root=task._humanoid_root_states.clone()
-                        physical_goal=task._box_tar_pos.clone()
+                        physical_goal=(task._allocation_goals if boxes==4 else task._box_tar_pos).clone()
                     task.set_box_assignment(ids,assignment[ids])
                     if verify:
-                        assert torch.equal(physical_box,task._box_states)
+                        assert torch.equal(physical_box,task._allocation_boxes if boxes==4 else task._box_states)
                         assert torch.equal(physical_root,task._humanoid_root_states)
-                        assert torch.equal(physical_goal,task._box_tar_pos)
+                        assert torch.equal(physical_goal,task._allocation_goals if boxes==4 else task._box_tar_pos)
                 task.allocation_initialized[:]=True
                 reward,done,duration,diag=macro_step(player,steps,gamma,*costs)
                 following=task.allocation_observation()
@@ -124,7 +145,7 @@ def main():
         with (out/'metrics.jsonl').open('a') as f: f.write(json.dumps(metrics)+'\n')
         print('ALLOCATION '+json.dumps(metrics),flush=True)
         if mode=='train':
-            ck=dict(schema=SCHEMA,policy=policy.state_dict(),optimizer=optimizer.state_dict(),iteration=iteration,config=config)
+            ck=dict(schema=schema,policy=policy.state_dict(),optimizer=optimizer.state_dict(),iteration=iteration,config=config)
             temp=out/'allocation_latest.tmp'; torch.save(ck,temp); temp.replace(out/'allocation_latest.pth')
             if iteration % save_every==0:
                 torch.save(ck,out/f'allocation_{iteration:06d}.pth')
@@ -137,7 +158,7 @@ def main():
         result=dict(executor_unchanged=unchanged,allocation_updated=changed,mode=mode)
         if mode=='train':
             saved=torch.load(out/'allocation_latest.pth',map_location=task.device)
-            loaded=AllocationPolicy(config['d_model']).to(task.device)
+            loaded=policy_class(config['d_model']).to(task.device)
             loaded.load_state_dict(saved['policy']); loaded.eval()
             observation=task.allocation_observation()
             with torch.no_grad():

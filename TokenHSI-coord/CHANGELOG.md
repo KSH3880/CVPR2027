@@ -1,5 +1,26 @@
 # TokenHSI-coord — 변경 기록
 
+## 2026-10-05
+
+### 4-box 비선점 할당과 GPU6 MPS 검증
+
+- 4개의 실제 box actor와 고정 goal, 2명의 frozen ms18 executor를 연결했다. box-goal attention masking을 유지하고 합법적인 joint matching만 선택한다. 운반 중 소유권은 유지하며 배송 완료 후 남은 박스를 선택한다. 완료 시간 비용과 배송/실패 보상을 사용하며 정상적인 다음 작업 할당에는 switching 비용을 부과하지 않는다.
+- `ALLOC_BOXES=4`로 별도 환경·정책·checkpoint schema를 선택한다. 기본 episode1200, switch cost0. assignment 변경 시 네 박스의 물리 상태와 goal이 유지되는지 검증한다.
+- CPU 합법 할당/운반 유지/전체 완료 idle/역전파, compile/bash 문법 확인. GPU6 기존 MPS에 2env·1iteration·horizon40 실행(`allocation_four_mps_smoke_20261005`) 정상 종료: 배송16, 전체4-box 완료 episode4, 실패0, 운반 중 switching0, job starts18. executor 가중치 유지, allocation 업데이트, checkpoint 재로드 통과. CUDA 메모리 오류 없음. 기존 MPS client1678859 유지 확인. 이 짧은 검증은 장기 학습 안정성이나 정책 성능 판정이 아니다.
+
+### Task allocation 비-MPS 검증 옵션
+
+- launcher에 `ALLOC_MPS=0` 추가. 물리 GPU6 UUID를 유지하고 존재하지 않는 전용 pipe 경로로 MPS 연결을 우회한다. 기본은 기존 MPS 연결이며 서버와 다른 job은 종료하지 않는다.
+- 검증은 bash 문법과 비-MPS dry-run으로 제한한다. 실제 GPU 물리 실행 및 4-box 환경 안전성은 아직 검증하지 않았다. 비-MPS 실행도 같은 GPU의 자원을 공유한다.
+
+### 0.3m 세 종류 근접률과 total 평가 기록
+
+- `proximity_metrics.py`: agent-agent 신체 중심 최소 3D 거리, 신체 중심-상대 OBB solid 거리(자기 박스 제외), OBB-OBB 최소 거리 계산. 회전/크기를 반영하고 박스 겹침은 SAT로 처리한다. 표면 간 거리는 vertex-face/edge-edge 후보로 계산하며 내부는 0이다. 실제 접촉력 측정이 아닌 기하 근접 지표다.
+- 평가 `_compute_reset`에서 매 실제 control step을 기록하고 episode reset에서 초기화. 평가 첫 scored episode의 세 항목+OR total step/min 기록을 저장한다. 요약은 warmup repeat0 제외, repeats1/2의 완료 env를 한 번씩 집계해 component/total episode 및 step fraction을 출력한다.
+- `eval_one.sh`에 proximity03 옵션과 MPS 제외 경로/내부 cache/실제 motion 경로 적용. `eval_proximity_1050.sh`는 기존 run.env와 converge0.5를 사용하며 local GPU0 기본, GPU/env/seed 인자 및 MS_CKPT override 지원.
+- 검증: CPU 테스트6개(axis gap/touch/overlap, rotated box, own box exclusion, OR union, threshold, reset, warmup 및 duplicate checks) 통과. compile/bash syntax 통과. 실제 GPU 평가는 실행하지 않았으며 측정 결과는 아직 없다.
+
+
 ## 2026-10-04
 
 ### Carry GPU viewer의 render 중 물리 actor 상태 재제출 제거

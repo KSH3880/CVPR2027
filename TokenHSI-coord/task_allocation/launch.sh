@@ -15,20 +15,43 @@ GPU=${MA_GPU:-6}
 [ "$GPU" = 6 ] || { echo "task allocation must use GPU 6" >&2; exit 2; }
 ENVS=${ALLOC_ENVS:-64}
 SEED=${ALLOC_SEED:-0}
-EPISODE=${ALLOC_EPISODE_STEPS:-600}
+export ALLOC_BOXES=${ALLOC_BOXES:-2}
+case "$ALLOC_BOXES" in
+  2) TASK=HumanoidTaskAllocationMS18; DEFAULT_EPISODE=600; DEFAULT_SWITCH=0.1;;
+  4) TASK=HumanoidFourBoxAllocationMS18; DEFAULT_EPISODE=1200; DEFAULT_SWITCH=0;;
+  *) echo 'ALLOC_BOXES must be 2 or 4' >&2; exit 2;;
+esac
+EPISODE=${ALLOC_EPISODE_STEPS:-$DEFAULT_EPISODE}
 export ALLOC_INTERVAL=${ALLOC_INTERVAL:-30} ALLOC_HORIZON=${ALLOC_HORIZON:-16} ALLOC_ITERS=${ALLOC_ITERS:-100}
 export ALLOC_MODE=${ALLOC_MODE:-train} ALLOC_D_MODEL=${ALLOC_D_MODEL:-64} ALLOC_LR=${ALLOC_LR:-0.0003}
 export ALLOC_EPOCHS=${ALLOC_EPOCHS:-4} ALLOC_MINIBATCH=${ALLOC_MINIBATCH:-256}
 export ALLOC_GAMMA=${ALLOC_GAMMA:-0.999} ALLOC_LAMBDA=${ALLOC_LAMBDA:-0.995}
 export ALLOC_TIME_COEF=${ALLOC_TIME_COEF:-1} ALLOC_DELIVERY_COEF=${ALLOC_DELIVERY_COEF:-10}
-export ALLOC_FAILURE_COEF=${ALLOC_FAILURE_COEF:-40} ALLOC_SWITCH_COEF=${ALLOC_SWITCH_COEF:-0.1}
+export ALLOC_FAILURE_COEF=${ALLOC_FAILURE_COEF:-40} ALLOC_SWITCH_COEF=${ALLOC_SWITCH_COEF:-$DEFAULT_SWITCH}
 export ALLOC_EXTENT=${ALLOC_EXTENT:-3} ALLOC_CLEARANCE=${ALLOC_CLEARANCE:-1.2} ALLOC_SAVE_EVERY=${ALLOC_SAVE_EVERY:-10}
 export ALLOC_ENVS="$ENVS" ALLOC_SEED="$SEED" ALLOC_EPISODE_STEPS="$EPISODE"
-# Attach only to the existing GPU6 server; do not start/stop MPS here.
-export MPS_GPU_ROOT=${MPS_GPU_ROOT:-/tmp/mps-test-${UID}}
-source "$ROOT/mps/shell.sh"
-mps_use "$GPU"
-UUID="$TOKENHSI_GPU"
+export ALLOC_MPS=${ALLOC_MPS:-1}
+case "$ALLOC_MPS" in
+  1)
+    # Attach only to the existing GPU6 server; do not start/stop MPS here.
+    export MPS_GPU_ROOT=${MPS_GPU_ROOT:-/tmp/mps-test-${UID}}
+    source "$ROOT/mps/shell.sh"
+    mps_use "$GPU"
+    UUID="$TOKENHSI_GPU"
+    ;;
+  0)
+    # An absent endpoint prevents fallback to the default MPS server.
+    unset CUDA_MPS_PIPE_DIRECTORY CUDA_MPS_LOG_DIRECTORY CUDA_MPS_ACTIVE_THREAD_PERCENTAGE
+    export CUDA_MPS_PIPE_DIRECTORY="$ROOT/runs/tools/task-allocation-no-mps"
+    if [ -e "$CUDA_MPS_PIPE_DIRECTORY" ] || [ -L "$CUDA_MPS_PIPE_DIRECTORY" ]; then
+      echo 'no-MPS pipe path must not exist' >&2; exit 2
+    fi
+    UUID=$(nvidia-smi -i "$GPU" --query-gpu=uuid --format=csv,noheader)
+    [[ "$UUID" =~ ^GPU-[[:xdigit:]-]+$ ]] || { echo 'invalid GPU UUID' >&2; exit 2; }
+    export TOKENHSI_GPU="$UUID" CUDA_VISIBLE_DEVICES="$UUID"
+    ;;
+  *) echo 'ALLOC_MPS must be 0 or 1' >&2; exit 2;;
+esac
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 if [ "$MODE" = --dry-run ]; then
     printf 'tag=%s gpu=%s envs=%s iterations=%s interval=%s
@@ -63,7 +86,7 @@ STAGE1=$(realpath -- "$STAGE1")
 cd "$ROOT/TokenHSI-coord"
 VIEW_ARGS=(--headless --graphics_device_id -1)
 if [ "${ALLOC_VIEW:-0}" = 1 ]; then VIEW_ARGS=(--graphics_device_id "$GPU"); fi
-python -u -m task_allocation.train --test "${VIEW_ARGS[@]}" --task HumanoidTaskAllocationMS18 \
+python -u -m task_allocation.train --test "${VIEW_ARGS[@]}" --task "$TASK" \
  --sim_device cuda:0 --rl_device cuda:0 --physx --pipeline gpu \
  --cfg_train "$ROOT/TokenHSI-masteer/tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml" \
  --cfg_env "$OUT/env.yaml" --motion_file "$ROOT/TokenHSI-masteer/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" \

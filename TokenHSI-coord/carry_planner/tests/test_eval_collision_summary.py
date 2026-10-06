@@ -27,3 +27,15 @@ class EvalCollisionSummaryTest(unittest.TestCase):
         data["records"].pop()
         with self.assertRaises(ValueError):
             summarize(data)
+
+    def test_proximity_total_is_union_not_sum(self):
+        data = self.payload()
+        data['proximity_threshold_m'] = .3
+        data['proximity_definition'] = {'total': 'union'}
+        for record in data['records']:
+            n = 10 if record['env'] == 0 else 0
+            record['proximity_steps'] = dict(agent_agent=n, agent_box=n, box_box=0, total=n)
+        result = summarize(data)
+        self.assertEqual(result['proximity']['total']['collision_episode_fraction'], .5)
+        self.assertEqual(result['proximity']['total']['collision_step_fraction'], .05)
+        self.assertEqual(result['proximity']['agent_box']['collision_step_fraction'], .05)

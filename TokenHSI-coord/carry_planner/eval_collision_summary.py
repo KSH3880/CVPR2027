@@ -36,6 +36,26 @@ def summarize(payload):
     totals.update(collision_episode_pair=totals["collided_episodes"] / totals["completed_episodes"],
                   collision_step_fraction=totals["collision_steps"] / max(totals["executed_steps"], 1),
                   both_success_fraction=totals["both_success"] / totals["completed_episodes"])
+    if "proximity_threshold_m" in payload:
+        names = ("agent_agent", "agent_box", "box_box", "total")
+        scored = [pair for (repeat, _), pair in groups.items() if repeat in (1, 2)]
+        proximity = {}
+        for name in names:
+            for pair in groups.values():
+                if pair[0]["proximity_steps"][name] != pair[1]["proximity_steps"][name]:
+                    raise ValueError("paired proximity counts disagree")
+                count = pair[0]["proximity_steps"][name]
+                if not 0 <= count <= pair[0]["executed_steps"]:
+                    raise ValueError("invalid proximity step count")
+            counts = [pair[0]["proximity_steps"][name] for pair in scored]
+            proximity[name] = dict(
+                collided_episodes=sum(count > 0 for count in counts),
+                collision_episode_fraction=sum(count > 0 for count in counts)/len(scored),
+                collision_steps=sum(counts),
+                collision_step_fraction=sum(counts)/max(totals["executed_steps"], 1))
+        totals["proximity"] = proximity
+        totals["proximity_threshold_m"] = payload["proximity_threshold_m"]
+        totals["proximity_definition"] = payload["proximity_definition"]
     return dict(definition=payload["definition"], threshold_m=payload["threshold_m"],
                 included_repeats=[1, 2], excluded_repeats=[0], per_repeat=per_repeat, **totals)
 

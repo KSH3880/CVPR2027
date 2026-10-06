@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from carry_planner.proximity_metrics import KINDS, ProximityTracker, proximity_distances
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain
 from carry_planner.view_debug import (
     rejected_path_vertices, rejection_reason, viewer_cross_slots,
@@ -36,12 +37,26 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 "executed_steps": int(self.progress_buf[row // self.num_agents]),
                 "min_body_distance_m": float(self._ep_dmin[row]),
             })
+        tracker = getattr(self, "_carry_eval_proximity", None)
+        if tracker is not None and len(rows):
+            for record in records[-len(rows):]:
+                env = record["env"]
+                record["proximity_steps"] = dict(zip(KINDS, tracker.steps[env].tolist()))
+                record["proximity_min_m"] = dict(zip(KINDS[:3], tracker.minimum[env].tolist()))
         self._carry_eval_episode_records = records
         payload = {
             "definition": "minimum 3D distance between different agents' rigid-body centers < threshold",
             "threshold_m": self._metric_tau,
             "records": records,
         }
+        if tracker is not None:
+            payload["proximity_threshold_m"] = tracker.threshold
+            payload["proximity_definition"] = {
+                "agent_agent": "minimum 3D body-center distance across different agents",
+                "agent_box": "minimum 3D body-center distance to OTHER agent's oriented box solid (zero inside)",
+                "box_box": "minimum 3D distance between oriented box solids (zero when touching/overlapping)",
+                "total": "union of three proximity events; each step/episode counted once",
+            }
         target = Path(destination)
         temporary = target.with_suffix(".tmp")
         temporary.write_text(json.dumps(payload, indent=2) + "\n")
@@ -430,6 +445,15 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
 
     def _compute_reset(self):
         super()._compute_reset()
+        if os.environ.get("CARRY_PLANNER_EVAL_PROXIMITY", "0") == "1":
+            if not hasattr(self, "_carry_eval_proximity"):
+                self._carry_eval_proximity = ProximityTracker(
+                    self.num_envs, self.device,
+                    float(os.environ.get("CARRY_PLANNER_EVAL_PROXIMITY_THRESHOLD", "0.3")))
+            self._carry_eval_proximity.update(proximity_distances(
+                self.agent_axis(self._rigid_body_pos),
+                self.agent_axis(self._box_states),
+                self._box_lib._box_size.reshape(self.num_envs, self.num_agents, 3)))
         # Interactive viewing should not keep a collapsed, already-delivered
         # agent in the scene while its partner continues. Keep this watchdog
         # out of training and headless evaluation.
@@ -459,6 +483,8 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             super()._reset_envs(env_ids)
         finally:
             self._carry_planner_view_ready = ready
+        if len(env_ids) and hasattr(self, "_carry_eval_proximity"):
+            self._carry_eval_proximity.reset(env_ids)
         if len(env_ids) and hasattr(self, "_carry_view_low_root_steps"):
             self._carry_view_low_root_steps[env_ids] = 0
         if ready and len(env_ids):
