@@ -134,3 +134,21 @@ box 속도 <0.2m/s, 해당 agent 미보유를 10스텝 유지한 proxy다. 두 a
 
 로그: `original_walk_box_swap_20261001_a`, `original_carry_box_swap_20261001_a`.
 매핑·형상/목표/이전 상태 일치·예외 시 tensor alias 복원 테스트 3개 통과.
+
+## 로컬 / VNC 뷰어
+
+첫 인자 `0`은 로컬 Isaac Gym 창, `1`은 noVNC 제공이다. 새 tag를 사용하며
+로그는 기존 launcher와 같이 `runs/carry_box_swap/<tag>/run.log`에 저장한다.
+
+```bash
+bash TokenHSI-coord/carry_box_swap/view.sh 0 swap_local_01 carryWith
+PORT=6110 bash TokenHSI-coord/carry_box_swap/view.sh 1 swap_vnc_01 carryWith
+```
+
+기본 2 env로 대조군과 교환 대상을 함께 표시한다. 집기 전 교환은 `loco_carry`를 쓴다.
+세 번째 launcher 인자인 ms18 checkpoint도 마지막에 지정할 수 있다.
+
+VNC 모드는 기존 공용 wrapper의 Xvfb/x11vnc/websockify를 사용한다. 원격 PC에서는
+`ssh -L <PORT>:127.0.0.1:<PORT> <user>@<server>` 터널을 유지하고
+`http://localhost:<PORT>/vnc.html`을 연다. `PORT` 기본값은 6100이다.
+재생은 기존 실행 길이 설정에서 종료하며, 별도 학습을 시작하지 않는다.

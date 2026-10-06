@@ -7,6 +7,12 @@ from task_allocation.core import sample_layout
 
 
 class HumanoidTaskAllocationMS18(HumanoidMACarryBoxSwapMS18):
+    def _update_marker(self):
+        # Carry-only scenes draw overlays with add_lines. The inherited marker
+        # writer resubmits physical actor roots during physics substeps. Use
+        # the same render isolation as the existing plain-Carry viewer.
+        return
+
     def _ensure_delivery(self):
         if not hasattr(self, 'allocation_delivered'):
             self.allocation_delivered = torch.zeros(self.num_envs, 2, dtype=torch.bool, device=self.device)
