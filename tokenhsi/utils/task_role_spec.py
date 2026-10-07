@@ -7,7 +7,9 @@ TASK_ROLE_VARIANT = SIZE_RSI_VARIANT + '_task_message'
 TASK_ROLE_MLP_VARIANT = SIZE_RSI_VARIANT + '_task_mlp'
 TASK_ROLE_SPLIT_MLP_VARIANT = SIZE_RSI_VARIANT + '_task_mlp_split'
 TASK_EMBEDDING_VARIANT = SIZE_RSI_VARIANT + '_task_embedding'
-TASK_ROLE_VARIANTS = (TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT)
+TASK_DISTILL_VARIANT = TASK_EMBEDDING_VARIANT + '_distill'
+CARRY_DISTILL_VARIANT = TASK_EMBEDDING_VARIANT + '_carry_distill'
+TASK_ROLE_VARIANTS = (TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, CARRY_DISTILL_VARIANT, TASK_DISTILL_VARIANT)
 TASKS = ('sit', 'climb', 'carry_at', 'carry_ontop')
 TASK_FIELDS = ('valid', 'task', 'actor', 'payload', 'target')
 TASK_PROBS = (0., .10, .25, .325, .325)
@@ -19,12 +21,17 @@ def task_preset(preset):
     return {'carry_at': 'holding_at', 'carry_ontop': 'holding_ontop'}.get(preset, preset)
 
 
-def task_size_probabilities(sizes):
+def task_size_probabilities(sizes, carry_only=False):
     # All three carry templates have identical size distributions. Their total
     # prior stays .65, preserving the asset distribution and existing RSI cache.
     probs = task_probabilities(sizes)
     probs[..., 3:] += probs[..., :1] / 2
     probs[..., 0] = 0
+    if carry_only:
+        probs[..., :3] = 0
+        if (probs.sum(-1) == 0).any():
+            raise ValueError('Carry-only source size is outside the carry range')
+        probs = probs / probs.sum(-1, keepdim=True)
     return probs
 
 

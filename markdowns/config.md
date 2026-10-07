@@ -4,6 +4,7 @@
 
 ## 빠른 확인
 
+- Distill 실행: [carry 두 과제](#carry-task-embedding-distillation), [네 과제 전체](#four-task-embedding-distillation). 각각 별도 config/output/checkpoint를 사용한다.
 - 최근 비교 대상은 **Task message / 공유 Task MLP / Task MLP split / Task embedding**이다. [네 실험 공통 설정과 차이](#task-4종-공통-설정과-비교), [최근 확인 기록](#task-3종-최근-확인-기록)을 먼저 확인한다.
 - 실행 명령: [Task message](#unified-size-rsi-task-message), [공유 Task MLP](#unified-size-rsi-task-mlp), [Task MLP split](#unified-size-rsi-task-mlp-split), [Task embedding](#unified-size-rsi-task-embedding). 네 실험 모두 **2명·2048환경·4물체**, 전용 train/test/VNC와 output을 사용한다. 서로의 checkpoint를 resume/eval에 섞지 않는다.
 - `split`은 **task별 concat 이후 MLP와 layer/head projection 분리**다. 역할 embedding은 공유하며, actor/critic은 독립이다. 두 MLP 실험 모두 관계 message는 없다.
@@ -52,6 +53,8 @@
 | Unified size RSI task MLP | [approach_scenario_stage1_unified_size_rsi_task_mlp.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp.yaml) | Task message와 동일한 과제·RSI·AMP·자기 보상, task·역할 MLP bias만 사용 |
 | Unified size RSI task MLP split | [approach_scenario_stage1_unified_size_rsi_task_mlp_split.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split.yaml) | Task MLP의 역할 embedding 공유, task별 MLP·projection 독립 |
 | Unified size RSI task embedding | [approach_scenario_stage1_unified_size_rsi_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding.yaml) | Task/NONE/SELF embedding과 H/O/G 타입 쌍별 projection, 중간 MLP·메시지 없음 |
+| Carry task embedding distill | [approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill.yaml) | Carry AT/ON_TOP 각 50%, 타입 쌍 projection 유지, 동결 unified teacher KL |
+| Four-task embedding distill | [approach_scenario_stage1_unified_size_rsi_task_embedding_distill.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill.yaml) | Sit/climb/carry_at/carry_ontop 원래 분포 유지, 동결 unified teacher KL |
 
 27~37번 Stage 1은 2-agent/3-object 독립 graph와 schema 9 semantic 관찰을 쓴다. ON_TOP 두 개를 동시에 샘플하지 않는다. 28~37번의 팀 보상은 자기 0.9, 동료 0.1이다. 30~33번은 유효 edge를 agent별로 평균 내어 단일 edge와 두 edge의 최대 task 보상을 0.6으로 맞춘다. 34~37번은 자기 edge를 합산하고 동료 edge만 평균 내며 state·progress·성공 식은 33번과 같다.
 
@@ -92,6 +95,8 @@ TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_u
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_train.sh 2 2048 4  # Unified size RSI task MLP
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split_train.sh 2 2048 4  # Unified size RSI task MLP split
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_train.sh 2 2048 4  # Unified size RSI task embedding
+TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_train.sh 2 2048 4  # Carry task embedding distill
+TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_train.sh 2 2048 4  # Four-task embedding distill
 ```
 
 한 번에 필요한 실험 **한 줄만** 실행한다. 짧은 확인은 별도 output을 쓴다.
@@ -133,6 +138,8 @@ TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task MLP
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task MLP split
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task embedding
+TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_test.sh "$CKPT" 2 1 4 10  # Carry task embedding distill
+TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_test.sh "$CKPT" 2 1 4 10  # Four-task embedding distill
 TOKENHSI_GPU=3 HEADLESS=0 bash tokenhsi/scripts/multi_agent/box_cleanup_demo_test.sh  # 4명·16상자 정리 데모
 ```
 
@@ -162,6 +169,8 @@ TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent
 TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_vnc.sh "$CKPT"  # Unified size RSI task MLP
 TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split_vnc.sh "$CKPT"  # Unified size RSI task MLP split
 TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_vnc.sh "$CKPT"  # Unified size RSI task embedding
+TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_vnc.sh "$CKPT"  # Carry task embedding distill
+TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_vnc.sh "$CKPT"  # Four-task embedding distill
 TOKENHSI_GPU=3 PORT=6080 bash tokenhsi/scripts/multi_agent/box_cleanup_demo_vnc.sh  # 4명·16상자 정리 데모
 ```
 
@@ -552,3 +561,55 @@ TOKENHSI_GPU=0 TASK_GRAPH=carry_ontop EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0
 # 같은 실험 checkpoint 재개
 TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_train.sh 2 2048 4
 ```
+
+## Carry task embedding distillation
+
+`approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill`은 task embedding 모델에서 두 agent가 carry_at/carry_ontop만 각각 50/50 독립 샘플링하는 전용 실험이다. 2명·2048환경·4물체와 기존 task/NONE/SELF `Embedding(6,64)`·H/O/G 타입 쌍 projection을 유지한다. Sit/climb embedding 슬롯과 공통 설정 행은 남지만 해당 과제는 샘플링하지 않는다. 기존 네 과제 실험과 checkpoint/output을 분리한다.
+
+- Source 크기는 carry 범위 XYZ 각각 0.20~0.60m, 0.05m 격자로 생성한다. 받침 범위와 밀도는 기존 설정을 유지한다. 고정 asset의 조건부 과제 확률도 carry 두 개만 허용한다.
+- RSI는 두 carry 모두 loco/pickUp/carryWith/putDown 40/10/40/10, 물리 검사·후반 프레임 규칙을 유지한다. 공통 RSI 캐시 코드는 그대로이며 실제 크기 조합의 누락 profile은 최초 검사한다.
+- AMP family는 carry 100%, 실제 전문가 skill 분포는 loco/omomo/pickUp/putDown = 1/3, 1/3, 1/6, 1/6이다. AMP one-hot·전문가/리플레이 matching은 유지한다. 보상은 자기 primitive 합계×1, 동료×0, PPO task/AMP 가중치는 0.5/0.5다.
+- 동결한 원본 unified Stage 1 teacher에 현재 agent 신체·담당 상자·목표를 354-D로 변환해 전달한다. AT는 graph goal, ON_TOP은 실제 회전 bbox 높이를 반영한 받침 위 source 중심을 목표로 한다. Teacher의 Carry task만 활성화하고 원본 정규화 통계를 사용한다.
+- 학생 rollout에서 teacher의 32-D Gaussian mean/sigma를 저장하고, scene/agent minibatch 정렬을 유지해 `0.001 × KL(teacher || student)`를 기존 PPO/AMP loss에 더한다. Critic에는 직접 KL gradient를 주지 않으며 teacher는 업데이트하지 않는다.
+- 기본 teacher는 `/home/hwanhee/CVPR2027/TokenHSI/output/tokenhsi/ckpt_stage1.pth`다. `TEACHER_CHECKPOINT`, `TEACHER_KL_COEF`, `TEACHER_GRAD_CHECKS`로 변경한다. Train YAML에도 기본 teacher 설정이 들어 있다. 평가는 학생 checkpoint만 사용하므로 teacher 파일이 필요 없다.
+- TensorBoard `distill/`에 KL·mean RMSE·teacher/학생 sigma·PPO/critic loss·template label 수를 기록한다. `TEACHER_GRAD_CHECKS=2`는 초기 두 optimizer update의 KL gradient·critic 비의존·actor 갱신과 teacher 동결을 검사한다.
+
+```bash
+# 본학습: GPU 5, 2명·2048환경·4물체. 실행 전 nvidia-smi로 점유 확인
+TOKENHSI_GPU=5 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_train.sh 2 2048 4
+# 짧은 확인 학습: 현재 종료 조건상 MAX_ITERATIONS=1은 epoch 2까지 진행
+TOKENHSI_GPU=5 MAX_ITERATIONS=1 TEACHER_GRAD_CHECKS=2 OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_check bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_train.sh 2 2048 4
+# CKPT는 이 실험에서 저장한 학생 checkpoint
+CKPT='/absolute/path/to/student.pth'
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=carry_at bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_test.sh "$CKPT" 2 16 4 3
+TOKENHSI_GPU=5 TASK_GRAPH=carry_ontop bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_vnc.sh "$CKPT" 2 1 4 10
+```
+
+Test wrapper는 기본 `HEADLESS=0`이며 서버의 화면 없는 평가는 `HEADLESS=1`을 명시한다. 기존 task embedding 또는 옛 34번 distill checkpoint를 직접 resume하지 않는다. 짧은 실행 확인은 장기 운반 성공률 검증과 구분한다.
+
+2026-10-07 연결 검증: CPU 63개 통과. GPU 5·2048환경에서 epoch 2/frame 262144까지 학습·저장했고 scalar 212종/424값 모두 finite, 물리 reset 실패 0, teacher 동결·KL actor/embedding gradient·critic 비의존을 확인했다. carry_at/carry_ontop + carryWith 각각 16환경·32-step headless 평가가 정상 종료됐다. 두 짧은 평가의 운반 완수율은 0이며 장기 성능 결과가 아니다. RSI 캐시 6,640개 profile은 `output/rsi_cache/6361a69fcf429a02a66602bb.pkl.gz`, 검증 결과는 `output/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_check/`와 `_check_carry_at/`, `_check_carry_ontop/`에 있다. 본학습은 시작하지 않았다.
+
+## Four-task embedding distillation
+
+`approach_scenario_stage1_unified_size_rsi_task_embedding_distill`은 원래 task embedding 실험의 sit/climb/carry_at/carry_ontop **10/25/32.5/32.5%**와 행동별 크기·RSI·AMP·보상·네트워크를 유지하고 원본 unified teacher KL을 추가한다. Env YAML은 원본과 variant만 다르다. 단독 HOLDING·별도 Traj task는 샘플링하지 않는다. Carry 전용 distill과는 독립된 scratch 실험이며 checkpoint를 직접 혼용하지 않는다.
+
+- Actor/critic 각각 task 4개+NONE+SELF `Embedding(6,64)`와 H/O/G 타입 쌍 projection을 사용한다. 중간 MLP·관계 message는 없다.
+- Teacher는 SIT→Sit, CLIMB→Climb, 두 carry→Carry로 라우팅한다. SIT 목표는 상판+pelvis clearance이며 facing은 상자의 로컬 +X다. CLIMB 목표는 상판+character height다. AT graph goal·ON_TOP 회전 bbox 목표·원본 teacher 정규화·teacher 동결·학생 rollout KL은 carry distill과 같은 구현이다.
+- RSI는 SIT loco/sit 50/50, CLIMB loco/climb 50/50, 두 carry loco/pickUp/carryWith/putDown 40/10/40/10이다. AMP carry/sit/climb family는 65/10/25이며 전문가/리플레이 matching을 유지한다. 크기별 물리 RSI 캐시는 공유하되 누락 profile은 검사 후 추가한다.
+- Teacher 기본 경로는 `/home/hwanhee/CVPR2027/TokenHSI/output/tokenhsi/ckpt_stage1.pth`, KL 계수는 0.001이다. `TEACHER_CHECKPOINT`, `TEACHER_KL_COEF`, `TEACHER_GRAD_CHECKS`를 지원한다. 기존 PPO·AMP 학습에 KL을 더하며 학생 평가는 teacher 파일 없이 가능하다.
+
+```bash
+# 본학습: 실행 전 GPU 점유 확인, 기존 carry 학습은 자동 중단하지 않음
+TOKENHSI_GPU=5 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_distill bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_train.sh 2 2048 4
+# 짧은 연결 검증
+TOKENHSI_GPU=5 MAX_ITERATIONS=1 TEACHER_GRAD_CHECKS=2 OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_check bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_train.sh 2 2048 4
+CKPT='/absolute/path/to/four_task_student.pth'
+# 로컬 viewer와 headless 평가; TASK_GRAPH=sit/climb/carry_at/carry_ontop/random_scenario
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=sit bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_test.sh "$CKPT" 2 16 4 3
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=climb bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_vnc.sh "$CKPT" 2 1 4 10
+```
+
+2026-10-07 연결 검증: 관련 CPU 56개 통과. GPU 5·MPS·2048환경에서 epoch 2/frame 262144까지 학습·저장했고 scalar 252종/504값 모두 finite, 물리 reset 실패·binding/보상 합산 오류 0을 확인했다. 네 task 모두 teacher label로 들어가며 teacher 동결·학생 actor/embedding gradient·critic KL 비의존을 확인했다. 저장 학생으로 sit/sit RSI·climb/climb RSI·두 carry/carryWith 각각 16환경·32-step 평가가 정상 종료됐다. Output은 `output/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_check/`와 `_check_<task>/`다. 공통 RSI 캐시는 3,622개 profile을 추가해 총 10,262개다. 이는 연결 검증이며 장기 성능 결과가 아니다. 새 본학습은 시작하지 않았으며 기존 carry 학습을 유지했다.

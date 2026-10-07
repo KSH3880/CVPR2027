@@ -84,6 +84,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         from utils.unified_training import validate_unified_env
         if self._edge_stage1 and not self._stage2:
             validate_unified_env(cfg['env'])
+        from utils.task_role_spec import CARRY_DISTILL_VARIANT
+        self._carry_only = self._relation_cfg.get('stage1_variant') == CARRY_DISTILL_VARIANT
         self._amp_task_conditioning = cfg['env'].get('ampTaskConditioning', False)
         sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
         primitive_config = self._edge_stage1 and sampler_name == PRIMITIVE_SAMPLER
@@ -99,6 +101,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._policy_task_roles:
             from utils.task_role_spec import task_preset
             self._task_graph_preset = task_preset(self._task_graph_preset)
+        if self._carry_only and self._task_graph_preset not in ('random_scenario', 'holding_at', 'holding_ontop'):
+            raise ValueError('Carry distillation supports only carry_at and carry_ontop')
         self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
         presets = STAGE2_PRESETS if self._stage2 else SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
         if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
@@ -345,8 +349,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             from utils.size_rsi import task_probabilities
             if self._policy_task_roles:
                 from utils.task_role_spec import task_size_probabilities
-                task_probabilities = task_size_probabilities
-            self._size_template_probabilities = task_probabilities(self._box_size[:, :2])
+                self._size_template_probabilities = task_size_probabilities(
+                    self._box_size[:, :2], carry_only=self._carry_only)
+            else:
+                self._size_template_probabilities = task_probabilities(self._box_size[:, :2])
         if self._state_relation:
             self._init_relation_runtime()
         if self._size_aware_rsi and not self._is_eval:
@@ -534,7 +540,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale
         if self._size_aware_rsi:
             from utils.size_rsi import sample_sizes
-            self._box_size = sample_sizes(N, self.device, self._task_graph_preset).reshape(num_boxes, 3)
+            size_preset = 'holding_at' if self._carry_only else self._task_graph_preset
+            self._box_size = sample_sizes(N, self.device, size_preset).reshape(num_boxes, 3)
             self._box_scale = self._box_size / torch.tensor(self._build_base_size, device=self.device)
 
         if self._edge_ontop:
@@ -1827,7 +1834,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
     def _fetch_conditioned_amp_demo(self, num_samples):
         from utils.unified_training import FAMILY_PROBS, EXPERT_PROBS, append_family
-        family_probs = (.65, .10, .25) if self._size_aware_rsi else FAMILY_PROBS
+        family_probs = ((1., 0., 0.) if self._carry_only else
+                        (.65, .10, .25) if self._size_aware_rsi else FAMILY_PROBS)
         family = torch.multinomial(torch.tensor(family_probs, device=self.device),
                                    num_samples, replacement=True)
         weights = torch.tensor(EXPERT_PROBS, device=self.device)[family]

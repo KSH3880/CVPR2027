@@ -4,6 +4,21 @@
 
 ## 2026-10-07
 
+### 네 과제 task embedding unified teacher distillation
+
+- 사용자 요청으로 `approach_scenario_stage1_unified_size_rsi_task_embedding_distill` env/train YAML·train/test/VNC·output을 추가했다. 원래 네 과제 sit/climb/carry_at/carry_ontop 10/25/32.5/32.5%와 크기·RSI·AMP·보상·task embedding/type projection을 유지하고, 기존 unified teacher KL 경로를 연결했다. SIT→Sit, CLIMB→Climb, 두 carry→Carry로 지도하며 기본 계수는 0.001이다. Carry-only와 원본 config·checkpoint를 별도로 유지한다.
+- 관련 CPU **56개 통과**: 원본 설정 동일성·checkpoint 격리·16개 task 쌍의 teacher 라우팅/goal/물체 binding·회전된 SIT 방향·네 task embedding gradient·teacher 동결·critic 비의존·AMP family 분포 및 carry/task embedding/RSI/unified 회귀. Python/셸 문법·문서 링크/명령 경로·diff 검사 통과.
+- **GPU 5·MPS·2048환경·MAX_ITERATIONS=1** 검증 학습을 완료했다(epoch 2, frame 262144). 공통 RSI 캐시에 누락 profile 3,622개를 추가해 총 10,262개를 확보했다. Scalar **252종/504값 모두 finite**, 물리 reset 실패·단독 HOLDING label·공유 primary 물체 0, 진단 CSV 16행의 owner binding·자기/동료 보상 오류 0이다. 실제 네 task teacher label·KL actor/embedding gradient·teacher 동결·critic KL gradient 없음을 확인했다.
+- 저장 학생으로 sit/sit RSI, climb/climb RSI, carry_at/carryWith, carry_ontop/carryWith 각각 **16환경·32-step headless 평가**와 JSON 저장을 완료했다. Output은 `output/approach_scenario_stage1_unified_size_rsi_task_embedding_distill_check/`와 `_check_<task>/`다. 연결 검증이며 장기 성공률·VNC 화면은 미검증이다. 새 본학습을 시작하지 않았고 기존 carry 본학습은 유지했다.
+
+### Carry-only task embedding unified teacher distillation
+
+- 사용자 요청으로 `approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill` env/train YAML·train/test/VNC·output을 분리했다. Task/NONE/SELF embedding과 H/O/G 타입 쌍 projection은 유지하고 carry_at/carry_ontop만 agent별 50/50 독립 샘플링한다. 실제 source 크기도 carry 범위로 제한하고 크기별 과제 확률·AMP carry family 100%를 연결했다. RSI 40/10/40/10·물리 검사·자기 보상 합계·634-D packet은 유지한다.
+- 보존된 `distill/`의 원본 unified teacher adapter와 rollout label·Gaussian KL 경로를 현재 PPO/AMP에 이식했다. 원본 `ckpt_stage1.pth`의 Carry 행동 분포를 동결해 계수 0.001로 지도하며 AT graph goal·ON_TOP 회전 bbox 목표·reset body·scene/agent minibatch 정렬을 따른다. 기존 AMP family matching·정규화와 네 과제 config는 유지했다. 새 variant로 checkpoint 혼용을 차단하며 학생 평가는 teacher 없이 실행한다.
+- 관련 CPU **63개 통과**: 원본 teacher strict 로드, 네 carry 조합·goal/물체 binding·회전 높이·reset·label shuffle, KL 공식·teacher 동결·학생 embedding gradient·critic 비의존, carry 크기/AMP·기존 task embedding/Size RSI/unified 회귀. Python/셸 문법·새 문서 링크/명령 경로·diff 검사 통과.
+- 지정한 **GPU 5·2048환경·MAX_ITERATIONS=1** 확인 학습을 완료했다(epoch 2, frame 262144). 최초 RSI 캐시 **6,640개 profile**을 생성했고 scalar **212종/424값 모두 finite**, 물리 reset 실패·단독 HOLDING/SIT/CLIMB label·공유 primary 물체는 0이다. 초기 두 update의 KL/PPO actor gradient 비율은 0.345/0.228이며 teacher 동결·critic KL gradient 없음·actor/projection/embedding 갱신을 확인했다. 진단 CSV 16행의 owner binding·자기/동료 보상 합산 오류는 0이다.
+- 저장 학생으로 carry_at/carry_ontop + carryWith 각각 **16환경·32-step headless 평가**와 JSON 저장을 완료했다. Output은 `output/approach_scenario_stage1_unified_size_rsi_task_embedding_carry_distill_check/` 및 `_check_carry_at/`, `_check_carry_ontop/`이다. 두 짧은 평가의 운반 완수율은 0으로, 실행 경로만 확인한 결과다. 본학습·장기 성능·VNC 화면은 검증하지 않았고 기존 GPU 프로세스와 `distill/` 원본은 변경하지 않았다.
+
 ### Task embedding·물리 타입 쌍별 projection 실험
 
 - 사용자 합의대로 `approach_scenario_stage1_unified_size_rsi_task_embedding` 전용 env/train config와 train/test/VNC·output을 연결했다. Actor/critic 각각 task 4개+NONE+SELF의 `Embedding(6,64)`와 `[src H/O/G,dst H/O/G,layer,head,64]` projection을 사용한다. 카테고리 간 projection은 공유하며 역할 입력·중간 MLP·관계 message는 없다. ON_TOP의 H→운반 상자와 H→받침은 같은 bias를 받는다.

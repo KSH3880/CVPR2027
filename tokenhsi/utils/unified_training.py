@@ -1,7 +1,7 @@
 """Task-family AMP contracts for the independent unified Stage-1 experiment."""
 import torch
 import torch.nn.functional as F
-from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
+from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, CARRY_DISTILL_VARIANT, TASK_DISTILL_VARIANT, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
 
 FAMILIES = ('carry', 'sit', 'climb')
 SKILLS = ('loco', 'sit', 'climb', 'climbNoRSI', 'omomo', 'pickUp', 'carryWith', 'putDown')
@@ -81,7 +81,8 @@ def validate_unified_env(env):
     task_roles = variant in TASK_ROLE_VARIANTS
     if task_roles != bool(env['relationGraph'].get('policy_task_roles', False)):
         raise ValueError('Task-role packet and reward variant must be paired')
-    expected = (list(ROLE_TASK_PROBS) if task_roles else list(TASK_PROBS)
+    expected = ([0., 0., 0., .5, .5] if variant == CARRY_DISTILL_VARIANT else
+                list(ROLE_TASK_PROBS) if task_roles else list(TASK_PROBS)
                 if variant in SIZE_RSI_VARIANTS else [.05, .05, .20, .35, .35])
     if list(env['relationGraph']['template_probabilities'].values()) != expected:
         raise ValueError('Unified task proportions do not match the selected variant')
@@ -110,7 +111,9 @@ def validate_typed_bias_config(env, train):
     task_roles = variant in TASK_ROLE_VARIANTS
     task_modes = {TASK_ROLE_VARIANT: 'task_role_lookup', TASK_ROLE_MLP_VARIANT: 'task_role_mlp',
                   TASK_ROLE_SPLIT_MLP_VARIANT: 'task_role_mlp_split',
-                  TASK_EMBEDDING_VARIANT: 'task_type_embedding'}
+                  TASK_EMBEDDING_VARIANT: 'task_type_embedding',
+                  CARRY_DISTILL_VARIANT: 'task_type_embedding',
+                  TASK_DISTILL_VARIANT: 'task_type_embedding'}
     mode = transformer.get('relation_bias_mode')
     if (task_roles != (mode in task_modes.values())
             or task_roles and mode != task_modes[variant]
@@ -120,7 +123,7 @@ def validate_typed_bias_config(env, train):
                      or transformer.get('relation_bias') is not True):
         raise ValueError('Typed bias requires enabled bias and separate actor/critic tables')
     message = transformer.get('relation_message', {})
-    if variant == TASK_EMBEDDING_VARIANT and (
+    if variant in (TASK_EMBEDDING_VARIANT, CARRY_DISTILL_VARIANT, TASK_DISTILL_VARIANT) and (
             transformer.get('num_features') != 64
             or transformer.get('num_layers') != 4
             or transformer.get('layer_num_heads') != 2

@@ -9,6 +9,7 @@ import time
 import os
 import copy
 import json
+import math
 import yaml
 import numpy as np
 import torch
@@ -22,6 +23,7 @@ from rl_games.algos_torch.running_mean_std import RunningMeanStd
 import learning.amp_agent as amp_agent
 import learning.amp_datasets as amp_datasets
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
+from learning.multi_agent.distillation import gaussian_forward_kl, gradient_report, teacher_digest
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
 from utils.edge_stage1_spec import CURRICULUM_VARIANTS
 from utils.rsi_curriculum import SkillInitCurriculum
@@ -184,6 +186,34 @@ class MAAgent(amp_agent.AMPAgent):
             freeze_stage2_encoder(self.model, self.optimizer)
             self.model.a2c_network.actor_encoder.eval()
             self.running_mean_std.eval()
+        self._teacher = None
+        self._distill_config = config.get('teacher_distillation', {})
+        if self._distill_config.get('checkpoint'):
+            from learning.multi_agent.stage1_unified_teacher import Stage1UnifiedTeacher
+            from utils.task_role_spec import CARRY_DISTILL_VARIANT, TASK_DISTILL_VARIANT
+            if (not self._scene_policy or task.__class__.__name__ != 'HumanoidMACarry'
+                    or task._relation_cfg.get('stage1_variant') not in (CARRY_DISTILL_VARIANT, TASK_DISTILL_VARIANT)):
+                raise ValueError('Teacher distillation requires a task-embedding distill variant')
+            self._teacher_kl_coef = float(self._distill_config.get('kl_coef', 1e-3))
+            if not math.isfinite(self._teacher_kl_coef) or self._teacher_kl_coef <= 0:
+                raise ValueError('teacher kl_coef must be finite and positive')
+            with torch.random.fork_rng(devices=[torch.device(self.ppo_device)]):
+                self._teacher = Stage1UnifiedTeacher(
+                    self._distill_config['checkpoint'], self.ppo_device)
+            if (task.get_action_size() != 32
+                    or task.cfg['env']['asset']['assetFileName'] != self._teacher.env_cfg['asset']['assetFileName']
+                    or not math.isclose(task.dt, self._teacher.env_cfg['controlFrequencyInv'] / 60,
+                                        rel_tol=1e-6)):
+                raise ValueError('Teacher requires matching humanoid, action layout and control timestep')
+            self._teacher_reset_ids = None
+            self._teacher_labeled_resets = 0
+            self._teacher_updates = 0
+            self._teacher_grad_checks = int(self._distill_config.get('grad_checks', 0))
+            if self._teacher_grad_checks < 0:
+                raise ValueError('teacher grad_checks must be nonnegative')
+            if self._teacher_grad_checks:
+                self._teacher_initial_digest = teacher_digest(self._teacher)
+            print('teacher distillation:', json.dumps(self._distill_config), flush=True)
         return
 
     def set_train(self):
@@ -203,7 +233,23 @@ class MAAgent(amp_agent.AMPAgent):
                 shape, dtype=torch.float32, device=self.ppo_device)
             self.experience_buffer.tensor_dict['next_obses'] = torch.zeros(
                 shape, dtype=torch.float32, device=self.ppo_device)
+        if self._teacher is not None:
+            for name, source in [('teacher_mu', 'mus'), ('teacher_sigma', 'sigmas')]:
+                self.experience_buffer.tensor_dict[name] = torch.zeros_like(
+                    self.experience_buffer.tensor_dict[source])
+                self.tensor_list.append(name)
         return
+
+    def env_reset(self, env_ids=None):
+        obs = super().env_reset(env_ids)
+        if self._teacher is not None:
+            task = self.vec_env.env.task
+            if env_ids is None:
+                self._teacher_reset_ids = torch.arange(task.num_envs, device=task.device)
+            elif len(env_ids):
+                self._teacher_reset_ids = torch.div(
+                    env_ids, task.num_agents, rounding_mode='floor').flatten().unique().to(task.device)
+        return obs
 
     def _update_training_curriculum(self):
         if self._skill_init_curriculum is None:
@@ -229,6 +275,8 @@ class MAAgent(amp_agent.AMPAgent):
             weights['relation_experiment_config'] = self._relation_experiment_config
         if getattr(task, '_stage2', False):
             weights['stage2_checkpoint_info'] = self._stage2_checkpoint_info
+        if self._teacher is not None:
+            weights['teacher_distillation'] = dict(self._distill_config)
         return weights
 
     def set_weights(self, weights):
@@ -304,6 +352,15 @@ class MAAgent(amp_agent.AMPAgent):
         for step_idx in range(self.horizon_length):
             self.obs = self.env_reset(done_indices)
             self.experience_buffer.update_data('obses', step_idx, self.obs['obs'])
+
+            if self._teacher is not None:
+                teacher_obs = self._teacher.observation(self.vec_env.env.task, self._teacher_reset_ids)
+                if self._teacher_reset_ids is not None:
+                    self._teacher_labeled_resets += len(self._teacher_reset_ids)
+                teacher_mu, teacher_sigma = self._teacher.distribution(teacher_obs)
+                self.experience_buffer.update_data('teacher_mu', step_idx, teacher_mu)
+                self.experience_buffer.update_data('teacher_sigma', step_idx, teacher_sigma)
+                self._teacher_reset_ids = None
 
             if self.use_action_masks:
                 masks = self.vec_env.get_action_masks()
@@ -423,6 +480,9 @@ class MAAgent(amp_agent.AMPAgent):
             'amp_obs_replay': batch_dict['amp_obs_replay'],
             'rand_action_mask': rand_action_mask,
         }
+        if self._teacher is not None:
+            for name in ('teacher_mu', 'teacher_sigma'):
+                dataset_dict[name] = batch_dict[name]
         self.dataset.update_values_dict(dataset_dict)
         return
 
@@ -512,6 +572,12 @@ class MAAgent(amp_agent.AMPAgent):
         train_info['update_time'] = update_time_end - update_time_start
         train_info['total_time'] = update_time_end - play_time_start
         self._record_train_batch_info(batch_dict, train_info)
+        if self._teacher is not None and self._teacher_grad_checks:
+            frozen = (teacher_digest(self._teacher) == self._teacher_initial_digest
+                      and all(p.grad is None for p in self._teacher.model.parameters()))
+            if not frozen:
+                raise RuntimeError('Teacher weights or gradients changed during training')
+            print('distill teacher frozen: true', flush=True)
         return train_info
 
     def calc_gradients(self, input_dict):
@@ -555,6 +621,7 @@ class MAAgent(amp_agent.AMPAgent):
             'amp_obs_replay': amp_obs_replay,
             'amp_obs_demo': amp_obs_demo,
         }
+        report = None
 
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
             res_dict = self.model(model_input)
@@ -587,6 +654,21 @@ class MAAgent(amp_agent.AMPAgent):
                     + self.bounds_loss_coef * b_loss
                     + self._disc_coef * disc_loss)
 
+            if self._teacher is not None:
+                teacher_mu = flatten_agents(input_dict['teacher_mu'])
+                teacher_sigma = flatten_agents(input_dict['teacher_sigma'])
+                teacher_kl = gaussian_forward_kl(mu, sigma, teacher_mu, teacher_sigma)
+                weighted_teacher_kl = self._teacher_kl_coef * teacher_kl
+                loss = loss + weighted_teacher_kl
+                if not torch.isfinite(loss):
+                    raise RuntimeError('Non-finite distillation/PPO loss')
+                if self._teacher_updates < self._teacher_grad_checks:
+                    report = gradient_report(self.model, weighted_teacher_kl, a_loss)
+                    report.update(update=self._teacher_updates + 1,
+                                  kl_joint=teacher_kl.item(), kl_weighted=weighted_teacher_kl.item())
+                    before_step = {name: p.detach().clone() for name, p in self.model.named_parameters()
+                                   if p.requires_grad and ('actor_encoder' in name or 'action_head' in name)}
+
             a_info['actor_loss'] = a_loss
             a_info['actor_clip_frac'] = a_clip_frac
             c_info['critic_loss'] = c_loss
@@ -598,6 +680,11 @@ class MAAgent(amp_agent.AMPAgent):
                     param.grad = None
 
         self.scaler.scale(loss).backward()
+        if report is not None:
+            report['student_backward_finite'] = all(torch.isfinite(p.grad).all().item()
+                                                    for p in self.model.parameters() if p.grad is not None)
+            if not report['student_backward_finite'] or not report['kl_critic_grad_absent']:
+                raise RuntimeError('Distillation gradient check failed')
         if self.truncate_grads:
             if self.multi_gpu:
                 self.optimizer.synchronize()
@@ -615,6 +702,15 @@ class MAAgent(amp_agent.AMPAgent):
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
+        if report is not None:
+            with torch.no_grad():
+                delta = sum((p - before_step[name]).square().sum()
+                            for name, p in self.model.named_parameters() if name in before_step)
+                report['actor_parameter_update_norm'] = delta.sqrt().item()
+                if not math.isfinite(report['actor_parameter_update_norm']) or delta == 0:
+                    raise RuntimeError('Student actor optimizer update failed')
+            print('distill gradients:', json.dumps(report), flush=True)
+
         with torch.no_grad():
             kl_dist = torch_ext.policy_kl(
                 mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, True)
@@ -629,6 +725,15 @@ class MAAgent(amp_agent.AMPAgent):
         self.train_result.update(a_info)
         self.train_result.update(c_info)
         self.train_result.update(disc_info)
+        if self._teacher is not None:
+            self._teacher_updates += 1
+            self.train_result.update(
+                teacher_kl=teacher_kl.detach(),
+                teacher_kl_weighted=weighted_teacher_kl.detach(),
+                teacher_mu_rmse=(mu.detach() - teacher_mu).square().mean().sqrt(),
+                teacher_sigma=teacher_sigma.mean(), student_sigma=sigma.detach().mean(),
+                student_policy_kl_exact=gaussian_forward_kl(
+                    old_mu_batch, old_sigma_batch, mu.detach(), sigma.detach()))
         return
 
     def _record_train_batch_info(self, batch_dict, train_info):
@@ -647,6 +752,19 @@ class MAAgent(amp_agent.AMPAgent):
         self.writer.add_scalar("reward_terms/amp", disc_reward_mean.item(), frame)
         for key, value in train_info.get('relation_diagnostics', {}).items():
             self.writer.add_scalar(relation_tensorboard_tag(key), value.item(), frame)
+        if self._teacher is not None:
+            metrics = {key: torch_ext.mean_list(train_info[key]).item() for key in
+                       ('teacher_kl', 'teacher_kl_weighted', 'teacher_mu_rmse',
+                        'teacher_sigma', 'student_sigma', 'actor_loss', 'critic_loss',
+                        'disc_loss', 'kl', 'student_policy_kl_exact', 'actor_clip_frac', 'b_loss')}
+            metrics['coefficient'] = self._teacher_kl_coef
+            metrics['labeled_scene_resets'] = self._teacher_labeled_resets
+            for name, count in zip(('holding', 'sit', 'climb', 'holding_at', 'holding_ontop'),
+                                   self._teacher.counts.cpu().tolist()):
+                metrics['template_' + name] = count
+            for key, value in metrics.items():
+                self.writer.add_scalar('distill/' + key, value, frame)
+            print('distill epoch:', json.dumps(dict(epoch=self.epoch_num, **metrics)), flush=True)
         network = self.model.a2c_network
         for name in ('actor', 'critic'):
             encoder = getattr(network, name + '_encoder')
