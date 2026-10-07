@@ -112,9 +112,11 @@ def validate_interaction(config):
         lo,hi=rsi['door_angle_degrees']
         if not 0 <= lo < rsi['door_early_max_degrees'] < hi < door['open_degrees']:
             raise ValueError('Invalid task RSI door angle range')
-        for name in ('frame_clearance','hand_gap','min_extension','door_height_tolerance'):
+        for name in ('frame_clearance','hand_gap','min_extension','door_height_tolerance','push_hand_radius'):
             if not math.isfinite(rsi[name]) or rsi[name]<=0:
                 raise ValueError('Invalid task RSI clearance: '+name)
+        if not math.isfinite(rsi['push_surface_gap']) or rsi['push_surface_gap']<0:
+            raise ValueError('Invalid RSI push surface gap')
         lo,hi=rsi['push_remaining']
         if not 0 < lo <= hi:raise ValueError('Invalid task RSI push distance')
         lo,hi=rsi['push_hand_height']

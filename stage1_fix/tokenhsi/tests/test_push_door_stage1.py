@@ -139,11 +139,11 @@ def test_random_start_clearance_and_target_distribution():
 
 def test_push_cube_mass_and_spawn_clearance():
     from utils.push_door_spec import sample_start_layout, push_box_start_x
-    for name in ('push_door_stage1', 'push_door_stage1_random_start'):
+    for name in ('push_door_stage1', 'push_door_stage1_random_start', 'push_door_stage1_task_rsi'):
         env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
         box=env['interaction']['push']['box']
         assert box['size']==[1.1,1.1,1.1]
-        assert abs(box['density']*1.1**3-15.75)<1e-6
+        assert abs(box['density']*1.1**3-30.)<1e-6
         radius=(2*.55**2)**.5
         start=push_box_start_x(box['size'],env['interaction']['push']['target_distance'][1])
         assert start+env['interaction']['push']['target_distance'][1]+radius<=-.2+1e-6
@@ -187,3 +187,13 @@ def test_frame_clearance_detects_crossing_limb_between_safe_joints():
     body[0,3]=torch.tensor([-.4,.52,1.])
     body[0,4]=torch.tensor([.4,.52,1.])
     assert frame_clearance(task,body).item()<0.
+
+
+def test_push_alignment_brings_unequal_hand_reach_to_same_face():
+    from utils.task_rsi import push_hand_normal
+    hands=torch.tensor([[[.5,-.2],[.8,.2]],[[.5,.2],[.8,-.2]],[[.6,0.],[.6,0.]]])
+    normal=push_hand_normal(hands)
+    distances=(hands*normal[:,None,:]).sum(-1)
+    torch.testing.assert_close(distances[:,0],distances[:,1])
+    assert (distances>0).all()
+    torch.testing.assert_close(normal.norm(dim=-1),torch.ones(3))

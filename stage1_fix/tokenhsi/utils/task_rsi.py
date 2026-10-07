@@ -1,7 +1,50 @@
 """Shared reference pose pools and geometric object bindings."""
 import math
 import torch
-from utils.torch_utils import quat_mul,quat_rotate
+from utils.torch_utils import quat_mul,quat_rotate,exp_map_to_quat
+
+def asset_reference_pose(task, root, rotation, dof):
+    """Use the simulated skeleton lengths/joint axes, not motion-file offsets."""
+    if not hasattr(task,'_rsi_asset_skeleton'):
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+        asset=task.cfg['env']['asset']
+        tree=ET.parse(str(Path(asset['assetRoot'])/asset['assetFileName']))
+        nodes=[];parents=[]
+        def walk(node,parent):
+            index=len(nodes);nodes.append(node);parents.append(parent)
+            for child in node.findall('body'):walk(child,index)
+        walk(tree.find('worldbody/body'),-1)
+        if len(nodes)!=task.num_bodies:raise ValueError('RSI asset body order mismatch')
+        offsets=root.new_tensor([[float(v) for v in node.get('pos','0 0 0').split()] for node in nodes])
+        axes={i:root.new_tensor([float(v) for v in node.find('joint').get('axis','0 0 1').split()]) for i,node in enumerate(nodes) if len(node.findall('joint'))==1}
+        task._rsi_asset_skeleton=(parents,offsets,axes)
+    parents,offsets,axes=task._rsi_asset_skeleton
+    local=torch.zeros(len(root),task.num_bodies,4,device=root.device);local[...,3]=1
+    for j,index in enumerate(task._dof_body_ids):
+        start,end=task._dof_offsets[j:j+2]
+        if end-start==3:local[:,index]=exp_map_to_quat(dof[:,start:end])
+        else:
+            angle=dof[:,start]/2
+            local[:,index,:3]=axes[index]*angle.sin()[:,None]
+            local[:,index,3]=angle.cos()
+    positions=[root];rotations=[rotation]
+    for i in range(1,task.num_bodies):
+        parent=parents[i]
+        positions.append(positions[parent]+quat_rotate(rotations[parent],offsets[i].expand(len(root),3)))
+        rotations.append(quat_mul(rotations[parent],local[:,i]))
+    return torch.stack(positions,1),torch.stack(rotations,1)
+
+
+def push_hand_normal(relative_xy):
+    """Face normal perpendicular to the hand pair, so both palms reach the face."""
+    midpoint=relative_xy.mean(-2)
+    separation=relative_xy[...,1,:]-relative_xy[...,0,:]
+    normal=torch.stack([-separation[...,1],separation[...,0]],-1)
+    normal=torch.where(((normal*midpoint).sum(-1)<0)[...,None],-normal,normal)
+    normal=torch.where((separation.norm(dim=-1)<1e-5)[...,None],midpoint,normal)
+    return normal/normal.norm(dim=-1,keepdim=True).clamp_min(1e-6)
+
 
 def frame_clearance(task, points):
     """Conservative body/limb envelopes against the three fixed frame boxes.
@@ -61,13 +104,13 @@ def build_pool(task,skill):
         if len(t):mids.append(torch.full_like(t,i,dtype=torch.long));times.append(t)
     mids=torch.cat(mids);times=torch.cat(times)
     root,rot,dof,rv,ra,dv,key=lib.get_motion_state(mids,times)
-    body,brot,_,_=lib.get_motion_state_max(mids,times)
+    body,brot=asset_reference_pose(task,root,rot,dof)
     hands=body[:,task._key_body_ids[:2]]
     extension=torch.linalg.vector_norm(hands[...,:2]-root[:,None,:2],dim=-1)
     if skill=='push':
         low,high=cfg['push_hand_height']
         rel=hands[...,:2]-root[:,None,:2]
-        normal=rel.mean(1);normal=normal/normal.norm(dim=-1,keepdim=True).clamp_min(1e-6)
+        normal=push_hand_normal(rel)
         tangent=torch.stack([-normal[:,1],normal[:,0]],-1)
         forward=(rel*normal[:,None,:]).sum(-1)
         lateral=((rel-rel.mean(1,keepdim=True))*tangent[:,None,:]).sum(-1).abs()
@@ -126,7 +169,7 @@ def sample_reference(task,tasks):
             early[mask]=want_early
         mid=mid[indices];tm=tm[indices]
         r,q,d,*_=lib.get_motion_state(mid,tm)
-        b,bq,_,_=lib.get_motion_state_max(mid,tm)
+        b,bq=asset_reference_pose(task,r,q,d)
         root[mask]=r;rot[mask]=q;dof[mask]=d;body[mask]=b;brot[mask]=bq
         phases[mask]=tm/lib._motion_lengths[mid]
     task._last_rsi_door_early=early.view_as(tasks)
@@ -145,8 +188,8 @@ def align_task_reference(task,env_ids,tasks,selected,refroot,body,unheading,newr
     boxes=task._box_states[env_ids].reshape(-1,13).clone()
     goals=task._targets[env_ids].reshape(-1,3).clone()
     if push.any():
-        # Orient the midpoint between the hands toward the rear box face.
-        h=hands[push].mean(1)
+        # Align BOTH hand centers to the rear face rather than only the nearer hand.
+        h=push_hand_normal(hands[push,...,:2])
         boxyaw=2*torch.atan2(boxes[push,5],boxes[push,6])
         yaw=boxyaw-torch.atan2(h[:,1],h[:,0])
         q=torch.zeros(len(yaw),4,device=task.device);q[:,2]=torch.sin(yaw/2);q[:,3]=torch.cos(yaw/2)
@@ -156,7 +199,7 @@ def align_task_reference(task,env_ids,tasks,selected,refroot,body,unheading,newr
         tangent=torch.stack([-normal[:,1],normal[:,0]],-1)
         reach=(rh[...,:2]*normal[:,None,:]).sum(-1).max(-1).values
         sideways=(rh[...,:2]*tangent[:,None,:]).sum(-1).mean(-1)
-        output[push,:2]=boxes[push,:2]-normal*(reach+task._box_size[0]/2+cfg['hand_gap'])[:,None]-tangent*sideways[:,None]
+        output[push,:2]=boxes[push,:2]-normal*(reach+task._box_size[0]/2+cfg['push_hand_radius']+cfg['push_surface_gap'])[:,None]-tangent*sideways[:,None]
         low,high=cfg['push_remaining'];distance=low+torch.rand(len(yaw),device=task.device)*(high-low)
         goal_yaw=boxyaw+torch.deg2rad((torch.rand(len(yaw),device=task.device)*2-1)*20)
         goals[push,:2]=boxes[push,:2]+distance[:,None]*torch.stack([torch.cos(goal_yaw),torch.sin(goal_yaw)],-1)

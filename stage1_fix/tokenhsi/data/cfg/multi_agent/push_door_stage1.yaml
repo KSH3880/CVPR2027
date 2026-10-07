@@ -88,8 +88,8 @@ env:
         - 1.1
         - 1.1
         - 1.1
-        density: 11.833208114199847
-        friction: 0.6
+        density: 22.539444027047328
+        friction: 0.1
       target_distance:
       - 0.7
       - 1.1

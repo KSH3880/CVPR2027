@@ -91,8 +91,8 @@ env:
         - 1.1
         - 1.1
         - 1.1
-        density: 11.833208114199847
-        friction: 0.6
+        density: 22.539444027047328
+        friction: 0.1
       target_distance:
       - 0.7
       - 1.1
@@ -140,13 +140,15 @@ env:
       - 5.0
       - 79.0
       frame_clearance: 0.03
+      push_hand_radius: 0.04
+      push_surface_gap: 0.001
       hand_gap: 0.03
       min_extension: 0.2
       door_height_tolerance: 0.1
       push_hand_height:
       - 0.75
       - 1.08
-      version: task_hand_aligned_early_door_v3
+      version: task_both_push_hands_contact_v4
       door_early_max_degrees: 25.0
       door_early_fraction: 0.75
   startRandomization:

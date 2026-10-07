@@ -543,3 +543,9 @@ bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_view.sh
 view는 학습된 정책이 아닌 초기 자세 preview다. R 재샘플/Esc 종료, 기본100% 과제 RSI(학습80%). `RSI_PREVIEW_PROBABILITY=0.8`로 학습 혼합비를 본다. GUI가 필요한 preview는 서버 DISPLAY/VNC 환경에서 실행한다. 학습·평가는 기존 manifest와 BONES 데이터가 필요하다. 새 초기화 설정은 checkpoint 계약에 포함되므로 이전 로컬v2 또는 다른 실험 checkpoint를 새v3 config로 resume하지 않는다. 새 학습을 시작하거나 기존 checkpoint에 맞는 설정을 사용한다.
 
 로컬 GPU0/NVRTC/MPS 우회는 여전히 Git 제외 `.local/run.sh`에서만 처리한다. 로컬 확인도 이제 공통 task와 공통 config를 사용한다. 서버 runtime_env.sh/MPS 설정은 수정하지 않았다. 출력·데이터·로컬 runtime은 전송 대상에서 제외한다.
+
+PUSH RSI v4: 양손을 연결한 XY 방향에 수직인 상자 면 법선으로 몸 방향을 정렬해 양손 깊이를 같게 한다. 실제 asset 골격 길이와 관절값으로 참조 몸 위치를 계산한다. `push_hand_radius: 0.04`, `push_surface_gap: 0.001`로 손 중심 대신 손 충돌 표면 기준1mm 간격을 둔다. `hand_gap: 0.03`은 DOOR 정렬에만 사용한다. RSI 리셋 시 해당 사람의 PD 목표를 초기 관절값으로 설정해 화면 반영용 물리 step에서 이전/0 목표 때문에 손이 떨어지지 않도록 한다. 정책의 첫 action은 정상적으로 새 목표를 설정한다. 설정 계약은 `task_both_push_hands_contact_v4`이며 기존v3 checkpoint와 혼용하지 않는다. 실행 중인 학습에는 코드 변경이 소급 적용되지 않는다.
+
+2026-10-08: 공통 fixed/random_start/task_rsi PUSH 상자 마찰을0.6→0.1로 낮췄다. 바닥 마찰1.0과 각 config의 기존 질량은 유지한다. CPU PhysX에서0.6/0.3/0.1/0.05/0.0 후보를 비교했으며 작은 감소의 효과는 제한적이었다. 높은 접촉점과 강한 수평 힘에서 전도는 여전히 발생하므로 마찰 감소를 전도 해결로 해석하지 않는다. 결과 output/push_box_friction_probe/report.json. 실행 중 프로세스에는 자동 반영되지 않으며 interaction metadata가 바뀌므로 이전 마찰의 checkpoint와 새 config를 혼용하지 않는다.
+
+2026-10-08 최신 PUSH 질량: 공통 fixed/random_start/task_rsi 상자를30kg으로 통일했다. 크기1.1m 정육면체, density=30/(1.1³)≈22.539444㎏/㎥, friction=0.1이다. 이전15.75/34.61kg 설정을 대체한다. 질량 증가는 전도와 미끄러짐에 필요한 힘을 모두 높이며 높은 손 위치의 전도까지 해결하지 않는다. 새 설정은 다음 실행부터 적용되며 이전 질량 checkpoint와 새 config는 혼용하지 않는다.

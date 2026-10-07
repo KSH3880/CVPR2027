@@ -250,6 +250,12 @@ class HumanoidMAPushDoor(HumanoidMA):
         articulated=torch.cat([self._humanoid_actor_ids[env_ids].flatten(),
             self.doors.actor_indices.view(self.num_envs,M)[env_ids].flatten()]).contiguous()
         self.gym.set_dof_state_tensor_indexed(self.sim,gymtorch.unwrap_tensor(self._dof_state),gymtorch.unwrap_tensor(articulated),len(articulated))
+        if 'task_rsi' in self._interaction and self._pd_control:
+            # Hold the reset pose until the policy supplies its first targets.
+            # Otherwise a preview commit step drives joints toward stale/zero targets.
+            reset_targets=self._dof_state[:,0].contiguous()
+            humanoids=self._humanoid_actor_ids[env_ids].flatten().to(torch.int32).contiguous()
+            self.gym.set_dof_position_target_tensor_indexed(self.sim,gymtorch.unwrap_tensor(reset_targets),gymtorch.unwrap_tensor(humanoids),len(humanoids))
         self.progress_buf[env_ids]=0;self.reset_buf[env_ids]=0;self._terminate_buf[self._flat_slot_ids(env_ids)]=0
         self._refresh_sim_tensors()
         self._compute_observations(env_ids)

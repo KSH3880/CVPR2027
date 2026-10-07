@@ -2,6 +2,23 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-08
+
+### PUSH 상자 질량30kg 통일
+
+- 사용자 요청으로 fixed/random_start/task_rsi 공통 상자를30kg으로 통일했다(기존15.75/34.61kg). 1.1m 정육면체와 friction0.1 유지, density22.539444027047325. 세 설정 질량을 검증하도록 기존 테스트를 갱신했다. 변경은 다음 실행부터 적용되고 checkpoint 계약의 density가 바뀐다. 진행 중 학습은 종료하지 않았다.
+
+
+### PUSH 상자 마찰 감소
+
+- 사용자 요청으로 공통3개 PUSH/DOOR config의 상자 friction을0.6→0.1로 낮췄다. 바닥 마찰/질량/정책은 유지한다. CPU PhysX에서 두 질량15.75/34.61kg, 접촉 높이1.0/1.08m, 수평 힘60~200N, 마찰5개 후보를 비교했다. 작은 감소는 효과가 제한적이었고0.1에서도 강한 힘의 전도는 남았다. 결과 output/push_box_friction_probe/report.json. 서버 공유 설정이며 현재 학습 프로세스는 재시작 전 기존 설정을 사용한다. checkpoint 계약에 마찰이 포함된다.
+
+
+### PUSH RSI 양손 표면 정렬과 리셋 PD 목표
+
+- 한 손의 최대 reach를 기준으로 하던 방향 정렬을 양손 깊이가 같아지는 방향으로 변경했다. 실제 asset 골격으로 위치를 계산하고 손 반경4cm+표면 간격1mm를 반영한다. RSI 리셋에서 해당 사람만 초기 자세 PD 목표를 설정해 preview commit step 중 손이 이전 목표로 되돌아가는 문제를 수정했다. 공통 task/helper/config에 적용해 서버도 동일하게 사용할 수 있다. DOOR 작은 각도 분포와 문틀 여유는 유지한다. checkpoint 초기화 계약v4.
+- CPU PhysX16환경×12리셋384샘플 검증 통과. 물리1step 후 양손 표면 간격0.729~1.267mm(95백분위1.187mm), 부분 reset/finite/초기 진행보상/DOOR 작은 각도 검사 통과. 결과 output/task_rsi_push_contact_cpu_check/rsi_report.json. GPU 확인은 기존 학습과 메모리 경합으로 중단했고 사용자 학습은 종료하지 않았다. 새 정렬 테스트 통과, 기존 질량 테스트는 별도로 변경된 random_start 밀도26과 기존15.75kg 기대값 불일치로 실패했다. 해당 사용자 설정은 수정하지 않았다.
+
 ## 2026-10-07
 
 ### 과제 RSI 서버 공통화와 작은 각도 시작 확대
