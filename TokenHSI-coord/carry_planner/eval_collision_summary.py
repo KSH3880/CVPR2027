@@ -56,7 +56,36 @@ def summarize(payload):
         totals["proximity"] = proximity
         totals["proximity_threshold_m"] = payload["proximity_threshold_m"]
         totals["proximity_definition"] = payload["proximity_definition"]
-    return dict(definition=payload["definition"], threshold_m=payload["threshold_m"],
+    if "physical_contact_definition" in payload:
+        physical = {}
+        scored = [pair for (repeat, _), pair in groups.items() if repeat in (1, 2)]
+        for name in ("agent_agent", "agent_box", "box_box", "total"):
+            for pair in groups.values():
+                count = pair[0]["physical_contact_steps"][name]
+                if count != pair[1]["physical_contact_steps"][name] or not 0 <= count <= pair[0]["executed_steps"]:
+                    raise ValueError("invalid paired physical contact counts")
+            counts = [pair[0]["physical_contact_steps"][name] for pair in scored]
+            physical[name] = dict(contacted_episodes=sum(x > 0 for x in counts),
+                contact_episode_fraction=sum(x > 0 for x in counts)/len(scored),
+                contact_steps=sum(counts), contact_step_fraction=sum(counts)/max(totals["executed_steps"], 1))
+        totals["physical_contact"] = physical
+        totals["physical_contact_definition"] = payload["physical_contact_definition"]
+        totals["physical_contact_force_threshold"] = payload["physical_contact_force_threshold"]
+        if all("physical_raw_contacts" in pair[0] for pair in scored):
+            raw = sum(pair[0]["physical_raw_contacts"] for pair in scored)
+            positive = sum(pair[0]["physical_positive_contacts"] for pair in scored)
+            if raw == 0 or positive == 0:
+                raise ValueError("no positive raw contacts observed; physical contact measurement unvalidated")
+            totals["physical_contact_raw_records"] = raw
+            totals["physical_contact_positive_records"] = positive
+    scored_rows = [record for record in payload["records"] if record["repeat"] in (1, 2)]
+    if scored_rows and all("speed_moments" in r for r in scored_rows):
+        try:
+            from carry_planner.speed_metrics import summarize_speed
+        except ModuleNotFoundError:
+            from speed_metrics import summarize_speed
+        totals["speed_statistics"] = summarize_speed([r["speed_moments"] for r in scored_rows])
+    return dict(baseline=payload.get("baseline", "none"), definition=payload["definition"], threshold_m=payload["threshold_m"],
                 included_repeats=[1, 2], excluded_repeats=[0], per_repeat=per_repeat, **totals)
 
 

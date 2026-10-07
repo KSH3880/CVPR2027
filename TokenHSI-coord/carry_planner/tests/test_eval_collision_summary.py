@@ -39,3 +39,16 @@ class EvalCollisionSummaryTest(unittest.TestCase):
         self.assertEqual(result['proximity']['total']['collision_episode_fraction'], .5)
         self.assertEqual(result['proximity']['total']['collision_step_fraction'], .05)
         self.assertEqual(result['proximity']['agent_box']['collision_step_fraction'], .05)
+
+    def test_physical_contact_excludes_warmup_and_checks_pair(self):
+        data = self.payload()
+        data['physical_contact_definition'] = 'PhysX contact pairs'
+        data['physical_contact_force_threshold'] = 0.
+        for record in data['records']:
+            n = 20 if record['repeat'] == 0 or record['env'] == 0 else 0
+            record['physical_contact_steps'] = dict(agent_agent=n, agent_box=n, box_box=0, total=n)
+        result = summarize(data)
+        self.assertEqual(result['physical_contact']['total']['contact_episode_fraction'], .5)
+        self.assertEqual(result['physical_contact']['total']['contact_step_fraction'], .1)
+        data['records'][-1]['physical_contact_steps']['total'] = 1
+        with self.assertRaises(ValueError): summarize(data)

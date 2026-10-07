@@ -266,12 +266,12 @@ class TransPlayerContinuous(common_player.CommonPlayer):
                 games_played += done_count
 
                 if done_count > 0:
+                    success_done = info['success'][done_indices.to(info['success'].device)]
+                    percision_done = info['precision'][done_indices.to(info['precision'].device)]
+                    terminate_done = info['terminate'][done_indices.to(info['terminate'].device)]
                     record_episode = getattr(self.env.task, "record_evaluation_episode", None)
                     if record_episode is not None:
-                        record_episode(i, done_indices, info['success'][done_indices])
-                    success_done = info['success'][done_indices]
-                    percision_done = info['precision'][done_indices]
-                    terminate_done = info['terminate'][done_indices]
+                        record_episode(i, done_indices, success_done)
 
                     # compute number of success
                     success_indices = success_done.nonzero(as_tuple=False)[:, 0]

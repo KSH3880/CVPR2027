@@ -9,6 +9,8 @@ EXEC_REPO=${CARRY_PLANNER_EXEC_REPO:-"$ROOT/TokenHSI-masteer"}
 PLANNER=${1:?usage: view.sh <planner.pth> <frozen-ms18.pth>}
 POLICY=${2:?usage: view.sh <planner.pth> <frozen-ms18.pth>}
 GPU=${MA_GPU:-0}
+PIPELINE=${CARRY_PLANNER_VIEW_PIPELINE:-gpu}
+case "$PIPELINE" in cpu|gpu) ;; *) echo 'viewer pipeline must be cpu or gpu' >&2; exit 2;; esac
 
 # Run the viewer outside MPS even when launched from a training shell.
 # Keep the shared daemon and its other clients untouched.
@@ -122,7 +124,8 @@ echo "scene:    $MS_SCEN  timed_cross=$MS_VIEW_TIMED_CROSS  replan=$CARRY_PLANNE
 echo "GPU:      physical $GPU -> logical cuda:0"
 echo "DISPLAY:  $DISPLAY"
 
-SIM_ARGS=(--sim_device cuda:0 --rl_device cuda:0 --physx --pipeline gpu)
+SIM_ARGS=(--sim_device cuda:0 --rl_device cuda:0 --physx --pipeline "$PIPELINE")
+echo "Carry viewer: GPU PhysX + $PIPELINE tensor pipeline + GPU policy"
 if [ "${CARRY_PLANNER_VIEW_CPU_PHYSICS:-0}" = 1 ]; then
     SIM_ARGS=(--sim_device cpu --rl_device cuda:0 --physx --pipeline cpu)
     echo 'Carry viewer: CPU PhysX; policy inference and rendering on requested GPU'

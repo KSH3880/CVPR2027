@@ -12,7 +12,16 @@ PROFILE=${3:?usage: eval_one.sh <planner.pth> <frozen-ms18.pth> <mixed|converge|
 ENVS=${4:-64}
 SEED=${5:-0}
 GPU=${MA_GPU:-0}
-STAGE1=${MS_CKPT:-"$EXEC_REPO/output/tokenhsi/ckpt_stage1.pth"}
+BASELINE=${CARRY_PLANNER_EVAL_BASELINE:-none}
+case "$BASELINE" in none|straight) ;; *) echo "baseline must be none or straight" >&2; exit 2;; esac
+PIPELINE=${CARRY_PLANNER_EVAL_PIPELINE:-gpu}
+EPISODE_STEPS=${CARRY_PLANNER_EVAL_EPISODE_STEPS:-600}
+[[ "$EPISODE_STEPS" =~ ^[1-9][0-9]*$ ]] || { echo 'episode steps must be positive' >&2; exit 2; }
+case "$PIPELINE" in cpu|gpu) ;; *) echo 'pipeline must be cpu or gpu' >&2; exit 2;; esac
+if [ "${CARRY_PLANNER_EVAL_PHYSICAL_CONTACT:-0}" = 1 ] && [ "$PIPELINE" != cpu ]; then
+    echo 'physical contact measurement requires CARRY_PLANNER_EVAL_PIPELINE=cpu' >&2; exit 2
+fi
+STAGE1=${MS_CKPT:-"/home/injesus1010/repos/CVPR2027/TokenHSI-masteer/output/ckpt_stage1.pth"}
 
 case "$PROFILE" in
     mixed) SCENE=cross; CONVERGE=${CARRY_PLANNER_CONVERGE_PROB:-0.75} ;;
@@ -38,6 +47,7 @@ NAME=$(basename "$PLANNER" .pth)
 RUN=$(basename "$(dirname "$PLANNER")")
 SAFE_RUN=$(printf '%s' "$RUN" | tr -c 'A-Za-z0-9_.-' '_')
 EVAL_ID="${NAME}_${PROFILE}_s${SEED}"
+if [ "$BASELINE" != none ]; then EVAL_ID="${EVAL_ID}_${BASELINE}"; fi
 LABEL=${CARRY_PLANNER_EVAL_LABEL:-}
 case "$LABEL" in *[!A-Za-z0-9_.-]*) echo "invalid evaluation label" >&2; exit 2;; esac
 if [ -n "$LABEL" ]; then EVAL_ID="${EVAL_ID}_${LABEL}"; fi
@@ -57,6 +67,7 @@ cp -- "$POLICY" "$TMP/nn/Humanoid.pth"
 sed -e 's/^  numAgents:.*/  numAgents: 2/' \
     -e "s/^  numEnvs:.*/  numEnvs: $ENVS/" \
     -e 's/^  envSpacing:.*/  envSpacing: 5/' \
+    -e "s/^  episodeLength:.*/  episodeLength: $EPISODE_STEPS/" \
     -e 's/^  enableDebugVis:.*/  enableDebugVis: False/' \
     "$COORD/tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml" > "$CFG"
 rm -f -- "$METRICS" "$SUMMARY"
@@ -69,6 +80,7 @@ fi
 . "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate "${TOKENHSI_CONDA_ENV:-tokenhsi118}"
 
+export CARRY_PLANNER_EVAL_BASELINE="$BASELINE"
 export CARRY_PLANNER_PHYSICAL_GPU="$GPU"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES="$GPU_UUID"
 export COORD_PROVIDER=external COORD_MODEL=c1 COORD_DRAW_CANDIDATES=0
@@ -92,6 +104,7 @@ export COORD_ALLOW_HAND_CONTACT=${COORD_ALLOW_HAND_CONTACT:-1}
 export COORD_PRESERVE_PICKUP_APPROACH=${COORD_PRESERVE_PICKUP_APPROACH:-1}
 export MS_METRICS="$METRICS" MA_METRICS="$METRICS"
 export MA_TAU=${MA_TAU:-0.3}
+export CARRY_PLANNER_EVAL_SPEED=${CARRY_PLANNER_EVAL_SPEED:-1}
 export CARRY_PLANNER_EVAL_PROXIMITY=1
 export CARRY_PLANNER_EVAL_PROXIMITY_THRESHOLD=${CARRY_PLANNER_EVAL_PROXIMITY_THRESHOLD:-0.3}
 # Explicit non-daemon endpoint prevents inherited/default MPS connections.
@@ -116,7 +129,7 @@ cd "$COORD"
 set +e
 python -u -m carry_planner.run_view \
     --task HumanoidMACarryPlannerView --headless \
-    --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id -1 --physx --pipeline gpu \
+    --sim_device cuda:0 --rl_device cuda:0 --graphics_device_id -1 --physx --pipeline "$PIPELINE" \
     --cfg_train tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml \
     --cfg_env "$CFG" --motion_file "$EXEC_REPO/tokenhsi/data/dataset_loco_sit_carry_climb.yaml" \
     --hrl_checkpoint "$STAGE1" --checkpoint "$TMP/nn/Humanoid.pth" \

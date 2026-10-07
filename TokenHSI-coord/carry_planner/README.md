@@ -1,5 +1,49 @@
 # Carry collision-avoidance planner
 
+## PhysX 접촉 쌍 기반 평가
+
+거리 proxy와 별도로 `physical_contact`를 기록할 수 있다. 학습은 변경하지 않는다.
+기존 Isaac Gym의 `get_env_rigid_contacts`는 CPU pipeline에서 읽는다.
+PhysX 계산과 ms18 inference는 기존 GPU 설정을 유지하며 simulator tensor
+pipeline만 CPU로 바꾼다. CPU 전송/동기화와 기하 근접 계산으로 GPU pipeline보다 느릴 수 있다.
+
+```bash
+MA_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi118 \
+MS_CKPT="$PWD/TokenHSI-masteer/output/ckpt_stage1.pth" \
+CARRY_PLANNER_EVAL_PIPELINE=cpu CARRY_PLANNER_EVAL_PHYSICAL_CONTACT=1 \
+CARRY_PLANNER_EVAL_LABEL=physical_contacts \
+bash TokenHSI-coord/carry_planner/eval_one.sh \
+  runs/carry_planner/carry_implicit_consistency_s6/planner_000110.pth \
+  TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth mixed 4 0
+```
+
+- `physical_contact.py`는 env-local rigid-body index를 실제 actor 소유자에 매핑한다.
+  agent-agent, agent-상대 box, box-box 및 OR total을 따로 기록한다.
+  바닥/기타 물체/자기 몸/자기 box grasp는 제외한다. 현재 A=2 Carry의
+  고정 agent-box 대응용이며 4-box allocation용 동적 소유권에는 별도 연결이 필요하다.
+- contact의 `lambda`(설치된 Gym 문서상 contact force magnitude)가
+  `CARRY_PLANNER_CONTACT_FORCE_THRESHOLD`보다 큰 쌍을 기록한다. 기본 0이다.
+  PhysX contact/rest offset과 solver 설정의 영향을 받는 물리 접촉력 지표이며,
+  운동량 변화/충격 심각도 또는 렌더링 mesh의 정확한 교차 여부를 뜻하지 않는다.
+- 모든 simulate 호출 후 fetch하고, 내부 substeps는 CC_ALL_SUBSTEPS로 수집한다.
+  control step 안에서 한 번이라도 해당 접촉이 있으면 1회로 집계한다.
+- 기존 scored episode callback에 함께 저장한다. `*.collision.json`의
+  `physical_contact`에 종류별 contact episode/step fraction이 들어간다.
+  repeat0은 제외하며 repeats1/2의 완료 env를 한 번씩 집계한다.
+- 짧은 기능 검증은 `CARRY_PLANNER_EVAL_EPISODE_STEPS=90`처럼 실행할 수 있다.
+  기본은 600이며 짧은 horizon 결과를 정식 600-step 성능과 비교하지 않는다.
+- 설치 API의 양성/음성 대조군: conda 환경에서
+  `PYTHONPATH=TokenHSI-coord python -m carry_planner.contact_api_probe`.
+  libpython 로딩 오류가 나면 `LD_LIBRARY_PATH`에 `$CONDA_PREFIX/lib`를 포함한다.
+- 2026-10-07 검증: 분리된 물체/실제 접촉 물체 대조군 통과. Carry 2env,
+  90-step episode에서 repeats1/2의 완료4환경을 집계했다. 실제 다른 actor
+  접촉은 0이었으며, 제외되는 바닥/자기 box 등 원시 접촉47,471건,
+  양의 힘 접촉24,861건으로 API가 빈 결과를 반환한 것이 아님을 확인했다.
+  짧은 기능 검증이므로 전체 경로 충돌률 성능으로 해석하지 않는다.
+  결과는 `runs/results/carry_planner/carry_implicit_consistency_s6/` 아래
+  `planner_000110_mixed_s0_physical_contact_cpu_rawcheck_20261007.*`이다.
+
+
 ## consistency7 190-iter 보조 loss 제거 실험
 
 프로젝트 루트에서 다음 명령으로 GPU 6의 기존 MPS에 연결해 실행한다.
@@ -281,3 +325,35 @@ python TokenHSI-coord/carry_planner/eval_collision_summary.py \
 기존 `.npy` 전체 행을 집계한 `.json`과 달리, 이 결과는 완료를 기다리는 동안
 이미 수집된 환경에서 추가로 실행된 episode를 제외한다. threshold와 분모를
 확인하며 학습의 root·상자 기반 근접 proxy 비율과 직접 동일시하지 않는다.
+
+### 직선 경로 baseline 평가
+
+`CARRY_PLANNER_EVAL_BASELINE=straight`를 `eval_one.sh`에 지정한다. 동일한
+ms18 실행기/배치/속도 제한/평가 반복/접촉 지표를 사용하며, 모델 추론 없이
+현재 root→box→goal(미보유), root→goal(보유)의 직선 구간을 33점으로 설치한다.
+기본 12 control steps마다 또는 phase 변경 시 현재 위치에서 다시 계획한다.
+속도 프로파일은 1.5m/s이고 기존 실행기의 가속 제한/목표 근처 처리는 적용된다.
+planner checkpoint 인자는 초기화 호환성을 위해 여전히 필요하지만 출력은 사용하지 않는다.
+학습 후보의 curve/safety 거절은 적용하지 않으므로 invalid=0은 충돌 안전성을 뜻하지 않는다.
+결과 이름에 `_straight`를 붙이며 episode/collision JSON에 baseline을 기록한다.
+
+```bash
+CARRY_PLANNER_EVAL_BASELINE=straight \
+CARRY_PLANNER_EVAL_PIPELINE=cpu CARRY_PLANNER_EVAL_PHYSICAL_CONTACT=1 \
+MA_GPU=0 bash TokenHSI-coord/carry_planner/eval_one.sh \
+  "$PLANNER" "$MS18" mixed 128 0
+```
+
+비교 시 planner 평가와 동일한 executor, stage1(`MS_CKPT`), seed 및 환경변수를 사용한다.
+기본 episode 길이600, repeat0 제외 후 repeats1/2의 256 환경 에피소드로 집계한다.
+
+### 실행 속도 분산
+
+평가 기본 `CARRY_PLANNER_EVAL_SPEED=1`로 episode별 속도 moments를 저장한다.
+`CARRY_COLLISION_EVAL.speed_statistics`에서 warmup 제외 agent-step 가중
+평균(m/s), population variance((m/s)^2), 표준편차(m/s)를 출력한다.
+`requested`: 설치된 경로의 현재 arc 지점 요구 속도(가속 제한 전),
+`command`: ms18에 쓰는 가속 제한 후 명령 속도,
+`actual`: 관측 humanoid root XY velocity norm.
+전체 구간을 포함하므로 집기/내려놓기/정지가 실제 속도 산포에 영향을 준다.
+requested는 거절된 raw proposal 전체나 경로 전체의 공간적 분산이 아니다.

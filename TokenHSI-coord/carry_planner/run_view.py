@@ -8,6 +8,15 @@ from pathlib import Path
 
 from isaacgym import gymapi as _gymapi  # noqa: F401
 
+import torch
+
+# Old Isaac Gym environments ship an NVRTC that cannot compile for newer
+# GPU architectures. Keep TorchScript execution, but use regular CUDA kernels
+# instead of its runtime-generated fusion kernels in this entry point.
+if os.environ.get("CARRY_PLANNER_JIT_FUSION", "0") == "0":
+    torch._C._jit_override_can_fuse_on_gpu(False)
+    torch._C._jit_override_can_fuse_on_cpu(False)
+
 COORD_ROOT = Path(__file__).resolve().parents[1]
 TOKENHSI_ROOT = COORD_ROOT / "tokenhsi"
 sys.path.insert(0, str(TOKENHSI_ROOT))

@@ -1,5 +1,74 @@
 # TokenHSI-coord — 변경 기록
 
+## 2026-10-07
+
+### Carry view의 eval pipeline 대조 옵션
+
+- `CARRY_PLANNER_VIEW_PIPELINE=cpu|gpu` 추가(기본gpu). 접촉 eval과 같은
+  GPU PhysX + CPU tensor pipeline + GPU policy로 GUI를 실행할 수 있다.
+  기존 `VIEW_CPU_PHYSICS=1`은 CPU PhysX override로 유지한다.
+- bash syntax/diff 검사 통과. 집기 실패 원인의 GPU/pipeline 인과는 미검증.
+
+### Carry viewer GPU TorchScript NVRTC 호환 처리
+
+- GPU pipeline 관측 계산의 `nvrtc: invalid value for --gpu-architecture` 오류를
+  피하도록 Carry run_view 진입점에서 JIT CPU/GPU fusion을 기본 비활성화.
+  TorchScript와 일반 CUDA 연산은 유지하며 `CARRY_PLANNER_JIT_FUSION=1`로 복원 가능.
+- Python compile 및 diff 검사 통과. 동일001050 checkpoint GPU pipeline에서
+  기존 실패 관측 계산을 통과하고 ms18 로딩/평가 루프 진입 확인. GUI 표시 미검증.
+
+### Carry eval 속도 평균·분산 기록
+
+- `speed_metrics.py`로 현재 설치 경로 요구 속도/제한 후 명령/root XY 실제 속도의
+  episode별 count/sum/squares를 기록. scored repeats1/2 agent-step 가중 평균,
+  population variance와 표준편차를 collision JSON에 추가한다.
+- eval 기본 활성화, `CARRY_PLANNER_EVAL_SPEED=0`으로 비활성화 가능.
+  요청 속도는 accepted/fallback 설치 경로 기준이며 거절된 raw proposal은 제외.
+- 알려진 값의 평균/분산 및 reset 확인, Python compile/bash syntax 통과.
+- 2env/90-step 실측 연결 검증: 집계 script 직접 실행 import 오류 수정 후
+  보존된 episode 기록으로 summary 생성. requested std0.00310m/s,
+  command0.13668m/s, actual0.32264m/s (로컬110 checkpoint의 짧은 기능 검증).
+
+### Carry 직선 baseline 평가 옵션
+
+- `CARRY_PLANNER_EVAL_BASELINE=straight`: 학습 모델 추론 없이 미보유 시
+  root→box→goal, 보유 시 root→goal 직선 경로를 동일 Carry 평가기에 설치한다.
+  33점/1.5m/s, 동일 replan 주기와 실행기 속도 제한을 사용한다.
+- 결과에 `_straight` suffix 및 JSON baseline 구분을 추가했다. 체크포인트는
+  초기화용으로 읽지만 추론하지 않는다. 학습 후보 거절 지표와는 비교하지 않는다.
+- 경로 앵커/보유 분기/퇴화 구간 테스트2개와 기존 평가 집계4개 통과.
+  Python compile, bash syntax, diff 검사 통과.
+- 실제 GPU PhysX/CPU pipeline 2env×90-step 연결 평가 완료. scored4환경,
+  356 control steps, 원시 contact48,407건/positive24,640건 기록.
+  짧은 기능 검증이므로 성공률·충돌률의 정식 비교에 사용하지 않는다.
+
+### Carry eval의 PhysX 접촉 쌍 기록
+
+- `physical_contact.py` 추가. CPU pipeline에서 env-local body pair를 실제
+  agent/box actor에 매핑하고 양의 contact force 쌍만 agent-agent,
+  agent-상대 box, box-box 및 OR total로 집계한다. ground/기타 물체/self/own
+  box grasp는 제외한다. 현재 고정 A=2 Carry용이며 4-box allocation에는 미연결.
+- `CARRY_PLANNER_EVAL_PHYSICAL_CONTACT=1`, `CARRY_PLANNER_EVAL_PIPELINE=cpu`로
+  eval에서만 활성화한다. physics simulate별 fetch/query와 CC_ALL_SUBSTEPS,
+  control step OR, episode reset, scored callback, warmup repeat0 제외를 적용한다.
+  물리 접촉력과 기존 거리 proximity 지표를 별도 출력한다. 학습은 변경하지 않는다.
+- eval 하네스가 CPU success/precision/terminate tensor를 CUDA done_indices로
+  읽던 오류를 결과 tensor device로 index를 맞춰 수정했다. GPU pipeline의
+  기존 동작은 유지한다. 첫 실패 로그를 보존했다.
+- `CARRY_PLANNER_EVAL_EPISODE_STEPS`(기본600)로 짧은 연결 검증 가능.
+  GPU PhysX + CPU tensor pipeline + GPU ms18의 2env/90-step 평가 완료.
+  scored repeats1/2 완료4환경/356 control steps에서 다른 actor 접촉0,
+  원시 contact47,471건/positive-force24,861건으로 빈 API 결과가 아님을 검증했다.
+  짧은 시간 동안 agent가 충분히 접근하지 않은 기능 테스트이며 정식 충돌률이 아니다.
+- 설치 API의 실제 CPU PhysX 양성/음성 대조군에서 contact hits [false,true],
+  raw pair [0,40] 검출. pair 분류2개와 warmup/집계/오류 테스트4개 통과,
+  compile/bash syntax/diff 검사 통과. 결과는 `runs/results/carry_planner/`
+  `carry_implicit_consistency_s6/*physical_contact_cpu_rawcheck_20261007.*`에 저장.
+- 원시 접촉이 전부 비어 있거나 힘이 전혀 검출되지 않으면 요약을 실패시켜
+  잘못된 물리 충돌률0을 보고하지 않는다. PhysX contact/rest offset과 solver의
+  영향이 있으며, 운동량 급변/충격 심각도/렌더 mesh 교차를 측정한 것은 아니다.
+  서버 반영은 별도다.
+
 ## 2026-10-05
 
 ### 4-box 비선점 할당과 GPU6 MPS 검증

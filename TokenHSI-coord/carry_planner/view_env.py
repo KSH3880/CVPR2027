@@ -10,6 +10,7 @@ import numpy as np
 import torch
 
 from carry_planner.proximity_metrics import KINDS, ProximityTracker, proximity_distances
+from carry_planner.baseline import straight_carry_path
 from carry_planner.env_adapter import HumanoidMACarryPlannerTrain
 from carry_planner.view_debug import (
     rejected_path_vertices, rejection_reason, viewer_cross_slots,
@@ -22,6 +23,36 @@ from stack_planner.policy import StackPlannerActorCritic
 
 class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
     """Replan online while the frozen two-agent Carry policy executes."""
+
+    def update_metrics(self):
+        if os.environ.get("CARRY_PLANNER_EVAL_SPEED", "0") == "1" and hasattr(self, "_coord_cmd_speed"):
+            from env.tasks.adapt_interaction_skills.humanoid_ma_steer_carry import HumanoidMASteerCarry
+            from carry_planner.speed_metrics import SpeedMoments
+            if not hasattr(self, "_carry_speed_moments"):
+                self._carry_speed_moments = SpeedMoments(self._rows, self.device)
+            rows = self.all_rows()
+            requested = HumanoidMASteerCarry._m_at(self, self._arc_root, rows) / 1.6
+            actual = self.humanoid_rows(self._humanoid_root_states)[:, 7:9].norm(dim=-1)
+            self._carry_speed_moments.update(requested, self._coord_cmd_speed, actual)
+        super().update_metrics()
+
+    def _physics_step(self):
+        if os.environ.get("CARRY_PLANNER_EVAL_PHYSICAL_CONTACT", "0") != "1":
+            return super()._physics_step()
+        if not hasattr(self, "_carry_physical_contact"):
+            from carry_planner.physical_contact import PhysicalContactTracker
+            self._carry_physical_contact = PhysicalContactTracker(self, float(os.environ.get(
+                "CARRY_PLANNER_CONTACT_FORCE_THRESHOLD", "0")))
+        tracker = self._carry_physical_contact
+        hits = {k: np.zeros(self.num_envs, dtype=bool) for k in tracker.steps}
+        for _ in range(self.control_freq_inv):
+            self.render()
+            self.gym.simulate(self.sim)
+            self.gym.fetch_results(self.sim, True)
+            sample = tracker.sample()
+            for key in hits:
+                hits[key] |= sample[key]
+        tracker.commit(hits)
 
     def record_evaluation_episode(self, repeat, rows, success):
         """Record only the first scored episode per agent per eval repeat."""
@@ -37,6 +68,10 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 "executed_steps": int(self.progress_buf[row // self.num_agents]),
                 "min_body_distance_m": float(self._ep_dmin[row]),
             })
+        if hasattr(self, "_carry_speed_moments") and len(rows):
+            for record in records[-len(rows):]:
+                record["speed_moments"] = self._carry_speed_moments.record(
+                    record["env"] * self.num_agents + record["agent"])
         tracker = getattr(self, "_carry_eval_proximity", None)
         if tracker is not None and len(rows):
             for record in records[-len(rows):]:
@@ -44,8 +79,17 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 record["proximity_steps"] = dict(zip(KINDS, tracker.steps[env].tolist()))
                 record["proximity_min_m"] = dict(zip(KINDS[:3], tracker.minimum[env].tolist()))
         self._carry_eval_episode_records = records
+        if hasattr(self, "_carry_physical_contact") and len(rows):
+            physical = self._carry_physical_contact
+            for record in records[-len(rows):]:
+                env = record["env"]
+                record["physical_contact_steps"] = {k: int(v[env]) for k, v in physical.steps.items()}
+                record["physical_contact_queries"] = int(physical.queries[env])
+                record["physical_raw_contacts"] = int(physical.raw_contacts[env])
+                record["physical_positive_contacts"] = int(physical.positive_contacts[env])
         payload = {
             "definition": "minimum 3D distance between different agents' rigid-body centers < threshold",
+            "baseline": self._carry_eval_baseline,
             "threshold_m": self._metric_tau,
             "records": records,
         }
@@ -58,11 +102,22 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 "total": "union of three proximity events; each step/episode counted once",
             }
         target = Path(destination)
+        if hasattr(self, "_carry_physical_contact"):
+            payload["physical_contact_force_threshold"] = self._carry_physical_contact.threshold
+            payload["physical_contact_definition"] = "PhysX positive-force contact pairs; own-box grasp, self, ground excluded; OR over physics steps per control step"
         temporary = target.with_suffix(".tmp")
         temporary.write_text(json.dumps(payload, indent=2) + "\n")
         os.replace(str(temporary), str(target))
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
+        if os.environ.get("CARRY_PLANNER_EVAL_PHYSICAL_CONTACT", "0") == "1":
+            from isaacgym import gymapi
+            if sim_params.use_gpu_pipeline:
+                raise ValueError("physical contact evaluation requires CPU pipeline")
+            sim_params.physx.contact_collection = gymapi.ContactCollection.CC_ALL_SUBSTEPS
+        self._carry_eval_baseline = os.environ.get("CARRY_PLANNER_EVAL_BASELINE", "none")
+        if self._carry_eval_baseline not in ("none", "straight"):
+            raise ValueError("CARRY_PLANNER_EVAL_BASELINE must be none or straight")
         self._carry_planner_view_ready = False
         self._carry_view_mixed_layout = bool(int(os.environ.get(
             "CARRY_PLANNER_VIEW_MIXED_LAYOUT", "0",
@@ -183,6 +238,7 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             ),
             flush=True,
         )
+        print("[carry-planner-view] baseline={}".format(self._carry_eval_baseline), flush=True)
         print(
             "[carry-planner-view] inherited ribbons show installed paths; "
             "rejected raw proposals are red; speed colors follow the "
@@ -274,9 +330,36 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
             getattr(self, name)[rows] = value
 
     @torch.no_grad()
+    def _replan_straight(self):
+        state = self.planner_state()
+        selected = (
+            (self.progress_buf < self._carry_planner_tick)
+            | ((self.progress_buf - self._carry_planner_tick) >= self._carry_planner_period)
+            | (state.phase != self._carry_planner_phase).any(dim=1)
+        )
+        ids = selected.nonzero(as_tuple=False).squeeze(-1)
+        if not len(ids):
+            return
+        path, speed = straight_carry_path(
+            state.root_xy[ids], state.box_xyz[ids, :, :2], state.goal_xy[ids], state.held[ids],
+        )
+        # Reanchored paths start at the observed root, so their cursor starts at zero.
+        self._carry_reset_cursor_on_install = True
+        self._install_plan(ids, path, speed)
+        self._coord_has_valid[ids] = True
+        self._coord_replans[ids] += 1
+        self._coord_last_replan[ids] = self.progress_buf[ids]
+        self._coord_phase[ids] = state.phase[ids]
+        self._carry_planner_tick[ids] = self.progress_buf[ids]
+        self._carry_planner_phase[ids] = state.phase[ids]
+        self._carry_planner_replans += len(ids)
+
+    @torch.no_grad()
     def _maybe_replan(self, env_ids):
         if not getattr(self, "_carry_planner_view_ready", False):
             return
+        if self._carry_eval_baseline == "straight":
+            return self._replan_straight()
         state = self.planner_state()
         restarted = self.progress_buf < self._carry_planner_tick
         if restarted.any():
@@ -477,6 +560,10 @@ class HumanoidMACarryPlannerView(HumanoidMACarryPlannerTrain):
                 ids.tolist(), root_height[ids].tolist()), flush=True)
 
     def _reset_envs(self, env_ids):
+        if hasattr(self, "_carry_speed_moments"):
+            self._carry_speed_moments.reset(self.agent_rows(env_ids))
+        if len(env_ids) and hasattr(self, "_carry_physical_contact"):
+            self._carry_physical_contact.reset(env_ids)
         ready = getattr(self, "_carry_planner_view_ready", False)
         self._carry_planner_view_ready = False
         try:
