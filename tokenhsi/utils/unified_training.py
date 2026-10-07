@@ -1,7 +1,7 @@
 """Task-family AMP contracts for the independent unified Stage-1 experiment."""
 import torch
 import torch.nn.functional as F
-from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_PROBS as ROLE_TASK_PROBS
+from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
 
 FAMILIES = ('carry', 'sit', 'climb')
 SKILLS = ('loco', 'sit', 'climb', 'climbNoRSI', 'omomo', 'pickUp', 'carryWith', 'putDown')
@@ -78,7 +78,7 @@ def validate_unified_env(env):
     if env['box']['reset'].get('ownerLocoDistanceRange') != [1., 2.]:
         raise ValueError('Unified loco sources must start 1..2m from owner')
     from utils.size_rsi import TASK_PROBS, SIZE_RANGES, SCREEN
-    task_roles = variant == TASK_ROLE_VARIANT
+    task_roles = variant in TASK_ROLE_VARIANTS
     if task_roles != bool(env['relationGraph'].get('policy_task_roles', False)):
         raise ValueError('Task-role packet and reward variant must be paired')
     expected = (list(ROLE_TASK_PROBS) if task_roles else list(TASK_PROBS)
@@ -107,10 +107,14 @@ def validate_typed_bias_config(env, train):
     transformer = train['params']['network'].get('transformer', {})
     if selected != (transformer.get('relation_bias_mode') == 'typed_lookup'):
         raise ValueError('Size RSI typed-bias variant and typed_lookup train config must be paired')
-    task_roles = variant == TASK_ROLE_VARIANT
-    if task_roles != (transformer.get('relation_bias_mode') == 'task_role_lookup') or \
-            task_roles != bool(env.get('relationGraph', {}).get('policy_task_roles', False)):
-        raise ValueError('Task-role variant, policy packet and task_role_lookup must be paired')
+    task_roles = variant in TASK_ROLE_VARIANTS
+    task_modes = {TASK_ROLE_VARIANT: 'task_role_lookup', TASK_ROLE_MLP_VARIANT: 'task_role_mlp',
+                  TASK_ROLE_SPLIT_MLP_VARIANT: 'task_role_mlp_split'}
+    mode = transformer.get('relation_bias_mode')
+    if (task_roles != (mode in task_modes.values())
+            or task_roles and mode != task_modes[variant]
+            or task_roles != bool(env.get('relationGraph', {}).get('policy_task_roles', False))):
+        raise ValueError('Task-role variant, policy packet and bias mode must be paired')
     if (selected or task_roles) and (transformer.get('share_edge_encoder', False)
                      or transformer.get('relation_bias') is not True):
         raise ValueError('Typed bias requires enabled bias and separate actor/critic tables')

@@ -199,13 +199,17 @@ def validate_relation_config(config):
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
     if mode in (STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
-        from utils.task_role_spec import TASK_ROLE_VARIANT, TASKS, TASK_FIELDS
-        if config.get('stage1_variant') == TASK_ROLE_VARIANT:
+        from utils.task_role_spec import TASK_ROLE_VARIANTS, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASKS, TASK_FIELDS
+        if config.get('stage1_variant') in TASK_ROLE_VARIANTS:
             return {'reward_mode': mode, 'schema_version': config['schema_version'],
                     'relation_taxonomy': dict(zip(TASKS, range(4))),
                     'suffix_fields': list(TASK_FIELDS), 'packet_version': 5,
                     'graph_record_width': 5, 'context_dim_per_edge': 0,
-                    'context_fusion': 'task_role_bias_and_message64',
+                    'context_fusion': ('task_role_split_mlp_bias64'
+                        if config['stage1_variant'] == TASK_ROLE_SPLIT_MLP_VARIANT
+                        else 'task_role_mlp_bias64'
+                        if config['stage1_variant'] == TASK_ROLE_MLP_VARIANT
+                        else 'task_role_bias_and_message64'),
                     'relation_reward_config': config}
         if config['schema_version'] in (7, 8, 9, 10):
             taxonomy = {'holding': 6, 'at': 7, 'ontop': 8, 'sit': SIT}

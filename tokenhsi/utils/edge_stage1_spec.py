@@ -3,7 +3,7 @@ import math
 
 import torch
 from utils.size_rsi import SIZE_RSI_VARIANT, PROGRESS
-from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_FIELDS
+from utils.task_role_spec import TASK_ROLE_VARIANTS, TASK_FIELDS
 
 from utils.edge_context_spec import EdgeContextGraph, HOLDING, AT
 from utils.edge_ontop_spec import (ON_TOP, batched, permute_graph, select_graph,
@@ -19,7 +19,7 @@ OWNER_HOLDING_VARIANT = 'scenario_independent_stage1_paired_placement_owner_hold
 SIZE_RSI_TYPED_BIAS_VARIANT = SIZE_RSI_VARIANT + '_typed_bias'
 SIZE_RSI_TYPED_MESSAGE_VARIANT = SIZE_RSI_TYPED_BIAS_VARIANT + '_message'
 SIZE_RSI_VARIANTS = (SIZE_RSI_VARIANT, SIZE_RSI_TYPED_BIAS_VARIANT,
-                     SIZE_RSI_TYPED_MESSAGE_VARIANT, TASK_ROLE_VARIANT)
+                     SIZE_RSI_TYPED_MESSAGE_VARIANT, *TASK_ROLE_VARIANTS)
 UNIFIED_VARIANTS = ('scenario_independent_stage1_unified',
                     'scenario_independent_stage1_unified_owner_holding',
                     'scenario_independent_stage1_unified_shared_edge_encoder',
@@ -227,7 +227,7 @@ def validate_stage1_context_config(config):
         'terminate_when_all_subgoals_done': False}
     if config['success'] != expected_success:
         raise ValueError('Unsupported Stage-1 saturation contract')
-    expected_sharing = ({'self': 1., 'teammate': 0.} if variant == TASK_ROLE_VARIANT
+    expected_sharing = ({'self': 1., 'teammate': 0.} if variant in TASK_ROLE_VARIANTS
                         else {'self': .9, 'teammate': .1})
     if scenario and config['task_sharing'] != expected_sharing:
         raise ValueError('Scenario task sharing does not match its variant')
@@ -239,12 +239,12 @@ def validate_stage1_context_config(config):
                            'scenario_independent_stage1_paired_placement_no_near',
                            OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS,
                            'scenario_stage2_sit_plane_self_sum')
-    expected_aggregation = ('self_sum' if variant == TASK_ROLE_VARIANT else
+    expected_aggregation = ('self_sum' if variant in TASK_ROLE_VARIANTS else
                             'self_sum_teammate_mean' if self_sum else 'mean_active')
     if sit_plane and config['edge_aggregation'] != expected_aggregation:
         raise ValueError('Unsupported Stage-1 active-edge aggregation')
     expected_observation = ({'graph_packet_fields': list(
-        TASK_FIELDS if variant == TASK_ROLE_VARIANT else
+        TASK_FIELDS if variant in TASK_ROLE_VARIANTS else
         STAGE1_OWNER_HOLDING_FIELDS if variant in OWNER_HOLDING_VARIANTS
         else STAGE1_SEMANTIC_FIELDS)}
         if semantic_only else {'edge_context_fields': ['start', 'keep'],

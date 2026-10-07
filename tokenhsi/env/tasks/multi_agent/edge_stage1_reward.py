@@ -1,6 +1,6 @@
 """Stage-1 own-edge rewards and constant START/KEEP observations."""
 import torch
-from utils.task_role_spec import TASK_ROLE_VARIANT, task_graph_packet
+from utils.task_role_spec import TASK_ROLE_VARIANTS, task_graph_packet
 
 from utils.edge_ontop_spec import batched, graph_packet, select_graph
 from env.tasks.multi_agent.edge_context_reward import edge_context_reward, goal_success, owner_sum
@@ -77,7 +77,7 @@ class Stage1ContextRuntime(OnTopContextRuntime):
     def suffix(self, ids=None):
         graph = self.graph if ids is None else select_graph(self.graph, ids)
         phi = self.phi if ids is None else self.phi[ids]
-        if self.config.get('stage1_variant') == TASK_ROLE_VARIANT:
+        if self.config.get('stage1_variant') in TASK_ROLE_VARIANTS:
             return task_graph_packet(graph, phi.shape[0])
         if self.config.get('stage1_variant') in OWNER_HOLDING_VARIANTS:
             return owner_holding_graph_packet(graph, phi)
