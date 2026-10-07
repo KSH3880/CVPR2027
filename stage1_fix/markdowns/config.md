@@ -2,6 +2,12 @@
 
 현재 실행 가능한 실험은 PUSH/DOOR Stage 1, 원본 1번과 Stage 1 **27·28·30·31·32·33·34·35·36·37번 및 paired/unified 변형**, Stage 2 **29번 및 SIT plane 변형**이다. 과거 9~26번 config와 전용 실행 스크립트는 정리했다. 모든 명령은 저장소 루트에서 실행한다.
 
+## PUSH 상자 크기 (공통 학습·평가)
+
+`push_door_stage1.yaml`와 `push_door_stage1_random_start.yaml`의 상자는 **1.1×1.1×1.1m 정육면체**다. 밀도는 약11.833kg/m³로 조정해 기존 질량15.75kg을 유지한다. `push_box_start_x()`가 최대 목표 거리·상자 XY 반경·전방 jitter를 고려해 미사용 문과 최소20cm 여유를 두고 배치한다. 랜덤 시작의 사람-상자 X 간격은 1.1~1.35m다. 큰 형상은 관측 bbox와 실제 물리 모두에 적용한다.
+
+이 설정은 추적 파일에 반영되므로 commit/push/pull 대상이다. 실행 중인 작업은 기존 형상을 유지하고 새 프로세스부터 적용된다. 상자 형상/밀도가 checkpoint 계약에 포함돼 이전 크기의 checkpoint와 혼용하지 않는다.
+
 ## 공통 규칙
 
 - 학습 인자는 `[num_agents] [num_envs] [num_objects]`; Stage 1 기본값은 `2 2048 3`이다. 짧은 확인도 환경 수 2048을 유지하고 `MAX_ITERATIONS`만 줄인다.
@@ -513,3 +519,27 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_random_start_v
 
 
 랜덤 시작 Push/Door는 기존 Unified와 동일하게 `agentCollisionPenalty: true`, `agentCollisionCoeff: 0.5`, `agentCollisionDist: 0.7`을 적용한다. 사람 root XY 거리 d에 대해 각 agent에 `-0.5 * max(0, (0.7-d)/0.7)`를 부과한다. 초기 lane 간격은 3.2m를 유지한다. 기본 task 보상에 패널티가 추가되며 `agent_collision_penalty` extras로 기록한다. 이 설정은 checkpoint 계약에 포함되므로 추가 전 checkpoint와 혼용하지 않는다. 기존 고정 시작 실험에는 적용하지 않는다. 테스트/학습은 실행하지 않았다.
+
+
+## DOOR 참조 방향 제한
+
+공통 Push/Door config의 `env.interaction.door.motion_direction: left_open`은 BONES `left_side` 원본과 `right_side` 미러(`_M`)만 로드한다. `left_side` 미러와 `right_side` 원본은 제외한다. 현재8개/36.233초이며 기존 weight=0 검토 제외는 유지한다. MotionLib 로드 단계에서 필터링하므로 AMP 개방/후반 참조와 같은 라이브러리를 쓰는 RSI에 함께 적용된다. 좌측 개방(+Y) 손 궤적을 대표 A512 원본/미러에서 확인했다. 방향 설정은 checkpoint 계약에 포함되며 이전 방향 혼합 checkpoint와 구분한다. 실행 중인 프로세스에는 자동 반영되지 않는다.
+
+## 과제 RSI와 작은 각도 DOOR 시작 (서버 공통)
+
+`push_door_stage1_task_rsi.yaml`과 `amp_ma_push_door_stage1_task_rsi.yaml`을 사용하는 별도 실험이다. 기존 fixed/random_start 설정은 loco 초기화를 유지한다. 과제별80%는 PUSH/doorOpen 데이터의 참조 자세로 시작하며 선택 구간의 후반 절반에70%를 배정한다.
+
+DOOR RSI의75%는5~25° 초기 각도를 사용한다. 해당 각도에서 문틀 여유를 확보하는 자세 pool을 먼저 샘플한 뒤 안전 각도를 고르므로 문틀 검사 때문에 큰 각도로 밀려나지 않는다. 나머지25%는5~79° 전체 안전 각도에서 뽑는다. 따라서 실제25° 이하 비율은75%보다 높을 수 있다. 초기 각도는 BONES의 문 annotation에서 추출한 값이 아니라 합성 값이다. 손잡이 정렬과 몸/팔다리의 보수적 문틀 여유3cm를 검사하며 불가능한 참조 자세는 제외한다. 이후 정책 동작 중 끼임까지 보장하지 않는다. PUSH는 공통1.1m 정육면체와 손 간격3cm, 남은 거리0.2~0.6m를 사용한다.
+
+서버 실행(기존 GPU6/MPS runtime 유지):
+```bash
+bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_train.sh
+# 짧은 확인 학습은 명시적으로 선택
+MAX_ITERATIONS=1 OUTPUT_PATH=output/task_rsi_check bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_train.sh
+bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_test.sh <task_rsi_checkpoint.pth>
+bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_view.sh
+```
+
+view는 학습된 정책이 아닌 초기 자세 preview다. R 재샘플/Esc 종료, 기본100% 과제 RSI(학습80%). `RSI_PREVIEW_PROBABILITY=0.8`로 학습 혼합비를 본다. GUI가 필요한 preview는 서버 DISPLAY/VNC 환경에서 실행한다. 학습·평가는 기존 manifest와 BONES 데이터가 필요하다. 새 초기화 설정은 checkpoint 계약에 포함되므로 이전 로컬v2 또는 다른 실험 checkpoint를 새v3 config로 resume하지 않는다. 새 학습을 시작하거나 기존 checkpoint에 맞는 설정을 사용한다.
+
+로컬 GPU0/NVRTC/MPS 우회는 여전히 Git 제외 `.local/run.sh`에서만 처리한다. 로컬 확인도 이제 공통 task와 공통 config를 사용한다. 서버 runtime_env.sh/MPS 설정은 수정하지 않았다. 출력·데이터·로컬 runtime은 전송 대상에서 제외한다.

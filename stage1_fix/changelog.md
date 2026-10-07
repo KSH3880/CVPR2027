@@ -4,6 +4,24 @@
 
 ## 2026-10-07
 
+### 과제 RSI 서버 공통화와 작은 각도 시작 확대
+
+- 로컬 PUSH/DOOR 참조 RSI와 문틀 여유3cm 검사를 공통 utils/task_rsi.py와 선택적 task reset에 옮겼다. 전용 env/train config, 서버 GPU6/MPS runtime을 사용하는 train/test/view 스크립트와 preview/검증 도구를 추가했다. 로컬 GPU/NVRTC/MPS 우회는 계속 Git 제외다.
+- DOOR RSI의75%를5~25°에서 시작하도록 작은 각도 호환 자세부터 샘플한다. 나머지는5~79° 안전 각도, 후반 phase 비중70%, 과제 RSI 확률80%는 유지한다. 작은 각도는 합성 초기 문 상태이며 실제 grasp/장기 학습 성능은 미검증이다. 초기화v3 계약으로 기존v2 checkpoint와 혼용하지 않는다.
+- CPU13테스트 통과. 로컬16환경/384 agent 리셋 검증에서 DOOR RSI166개 중80.12%가25° 이하, 문틀 여유/손잡이 정렬/부분 reset/finite/초기 진행보상 검증 통과. 결과 output/task_rsi_early_door_check/rsi_report.json. 공통 서버용 train/test 스크립트를 로컬 GPU 래퍼로 검증해2048환경 짧은 학습(epoch2/frame262144 checkpoint 저장) 및16환경/32-step/2회 평가 정상 종료했다. 결과 output/task_rsi_shared_early_train_check/PushDoorStage1TaskRSI_07-21-48-46/ 및 output/task_rsi_shared_early_eval_check/. 서버 GPU에서는 실행하지 않았다.
+
+
+### DOOR 왼쪽 개방 모션 제한
+
+- 사용자 요청으로 공통 Push/Door config에 `door.motion_direction: left_open`을 추가했다. BONES left_side 원본/right_side 미러만 로드하고 반대 조합을 제외한다. MotionLib의 선택적 필터를 task에서 전달해 AMP와 로컬 과제 RSI가 같은8개 참조를 사용한다. 대표 A512 원본/미러의 손 궤적에서 좌측 개방(+Y) 방향을 확인했다. 원본/미러 데이터 파일과 기존 weight=0은 유지한다.
+- CPU11개 통과. GPU0/2048환경/MAX_ITERATIONS=1 과제 RSI 확인 학습 정상 종료(epoch2/frame262144 checkpoint 저장), doorOpen8개/36.233초 로드 확인. 결과 `output/task_rsi_left_open_check/PushDoorStage1TaskRSI_07-21-33-29/`, 로그 `/tmp/task-rsi-left-open-check.log`. 공통 config/코드는 서버 반영 대상, .local 구현/환경은 Git 제외다. 장기 성능은 미검증이다.
+
+### PUSH 상자 공통 1.1m 정육면체
+
+- 사용자 요청으로 고정/랜덤 시작 공통 env YAML의 PUSH 상자를 1.1×1.1×1.1m로 변경했다. 밀도 약11.833kg/m³로 기존 질량15.75kg을 유지한다. 상자 XY 반경·최대 목표 거리·전방 jitter를 고려해 미사용 문과20cm 여유를 확보하고, 랜덤 시작 사람 간격은1.1~1.35m로 늘렸다. 학습/평가 실제 asset와 bbox에 모두 적용된다. 이 변경은 추적 파일이며 서버 반영 대상이다.
+- CPU10개 통과(크기·질량·초기 사람 간격·목표 지점 문 여유 포함). GPU0/2048환경/MAX_ITERATIONS=1 확인 학습 정상 종료(epoch2/frame262144), checkpoint의 정육면체 계약·82개 scalar finite 확인. 결과 `output/push_door_cube_check/PushDoorStage1RandomStart_07-21-27-15/`. 저장 checkpoint16환경/32-step/2회 평가 정상 종료(`output/push_door_cube_eval_check/`). diff 검사 통과.
+- Git 제외된 로컬 과제 RSI도 같은 크기/질량으로 맞췄으며16환경×12 reset의 손 정렬·부분 reset·초기 진행보상 검증 통과(`output/task_rsi_cube_geometry_check/`). 기존 크기 checkpoint와 혼용하지 않는다. 장기 수렴은 미검증이다.
+
 ### 랜덤 시작 Push/Door에 기존 Unified 충돌 패널티 적용
 
 - 기존 세팅에 맞추라는 요청으로 랜덤 시작 YAML에 agentCollisionPenalty=true·계수 0.5·거리 0.7m를 추가하고 Carry/Unified의 같은 root XY 거리 패널티 함수를 연결했다. 활성 설정만 checkpoint 계약에 추가하여 변경 전 보상 checkpoint 혼용을 거부한다. 기존 고정 시작 실험은 패널티 없이 유지한다.

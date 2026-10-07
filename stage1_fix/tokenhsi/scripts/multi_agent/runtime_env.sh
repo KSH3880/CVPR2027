@@ -54,13 +54,20 @@ if [ "${CONDA_DEFAULT_ENV:-}" != "$TOKENHSI_CONDA_ENV" ]; then
         exit 1
     fi
 
+    # Conda package hooks may expand unset optional variables (e.g. NVCC flags).
+    # Suspend nounset only while sourcing/activating, then restore caller options.
+    _tokenhsi_restore_nounset=0
+    case $- in *u*) _tokenhsi_restore_nounset=1; set +u ;; esac
     . "$conda_base/etc/profile.d/conda.sh"
     if ! conda activate "$TOKENHSI_CONDA_ENV"; then
+        if [ "$_tokenhsi_restore_nounset" = 1 ]; then set -u; fi
         echo "could not activate conda env '$TOKENHSI_CONDA_ENV'." >&2
         echo "Set TOKENHSI_CONDA_ENV to the name of your environment, e.g." >&2
         echo "  TOKENHSI_CONDA_ENV=my-env $0 ..." >&2
         exit 1
     fi
+    if [ "$_tokenhsi_restore_nounset" = 1 ]; then set -u; fi
+    unset _tokenhsi_restore_nounset
 fi
 export TOKENHSI_CONDA_ENV
 

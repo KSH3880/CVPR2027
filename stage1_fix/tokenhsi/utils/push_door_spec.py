@@ -92,6 +92,8 @@ def validate_interaction(config):
         if not math.isfinite(config[key]) or config[key] < 0:
             raise ValueError('Invalid reward weight: ' + key)
     push, door, amp = config['push'], config['door'], config['amp']
+    if door.get('motion_direction','all') not in ('all','left_open'):
+        raise ValueError('Invalid door motion direction')
     if not 0 < door['reopen_degrees'] < door['open_degrees'] < 110:
         raise ValueError('Door phase requires reopen < open < joint limit')
     for data, keys in ((push, ('goal_tolerance','settle_speed','settle_seconds','progress_speed','ground_tolerance')),
@@ -99,6 +101,24 @@ def validate_interaction(config):
         for key in keys:
             if not math.isfinite(data[key]) or data[key] <= 0:
                 raise ValueError('Invalid task parameter: ' + key)
+    rsi=config.get('task_rsi')
+    if rsi is not None:
+        for name in ('probability','late_fraction','door_early_fraction'):
+            if not math.isfinite(rsi[name]) or not 0 <= rsi[name] <= 1:
+                raise ValueError('Invalid task RSI probability: '+name)
+        for name in ('push_phase','door_phase'):
+            lo,hi=rsi[name]
+            if not 0 <= lo < hi <= 1:raise ValueError('Invalid task RSI phase: '+name)
+        lo,hi=rsi['door_angle_degrees']
+        if not 0 <= lo < rsi['door_early_max_degrees'] < hi < door['open_degrees']:
+            raise ValueError('Invalid task RSI door angle range')
+        for name in ('frame_clearance','hand_gap','min_extension','door_height_tolerance'):
+            if not math.isfinite(rsi[name]) or rsi[name]<=0:
+                raise ValueError('Invalid task RSI clearance: '+name)
+        lo,hi=rsi['push_remaining']
+        if not 0 < lo <= hi:raise ValueError('Invalid task RSI push distance')
+        lo,hi=rsi['push_hand_height']
+        if not 0 < lo < hi <= push['box']['size'][2]:raise ValueError('Invalid task RSI hand height')
     if amp['hold_source'] not in ('door_tail', 'loco'):
         raise ValueError('AMP hold_source must be door_tail or loco')
     for name in ('push_phase','open_phase','hold_phase'):
@@ -109,12 +129,19 @@ def validate_interaction(config):
         raise ValueError('Door open and holding reference phases must not overlap')
 
 
+def push_box_start_x(box_size, maximum_target_distance, forward_jitter=0.):
+    """Leave a 20cm gap to unused door geometry even at the farthest goal."""
+    radius = float(torch.linalg.vector_norm(torch.as_tensor(box_size[:2]) / 2))
+    return -(maximum_target_distance + radius + forward_jitter + .2)
+
+
 def sample_start_layout(tasks, config, box_size, lanes):
     """Collision-separated lane-local reset layout; doors stay closed and upright."""
     for name, bounds in config.items():
         if len(bounds) != 2 or not all(math.isfinite(x) for x in bounds) or bounds[0] > bounds[1]:
             raise ValueError('Invalid start randomization bounds: ' + name)
-    if config['push_distance'][0] < .6 or config['door_distance'][0] < .5:
+    radius = float(torch.linalg.vector_norm(torch.as_tensor(box_size[:2]) / 2))
+    if config['push_distance'][0] < radius + .25 or config['door_distance'][0] < .5:
         raise ValueError('Start distance must preserve human/object clearance')
     shape = tasks.shape
     device = tasks.device
@@ -125,7 +152,8 @@ def sample_start_layout(tasks, config, box_size, lanes):
     shift[..., 1] += lanes
     boxes = torch.zeros(*shape, 3, device=device)
     boxes[..., :2] = shift
-    boxes[..., 0] += torch.where(tasks.bool(), -2.2, -1.6) + uniform(config['box_x'])
+    start_x = push_box_start_x(box_size, config['target_distance'][1], config['box_x'][1])
+    boxes[..., 0] += torch.where(tasks.bool(), -2.2, start_x) + uniform(config['box_x'])
     boxes[..., 1] += tasks * .85 + uniform(config['box_y'])
     boxes[..., 2] = box_size[2] / 2 + .005
     target = boxes.clone()
@@ -142,3 +170,14 @@ def sample_start_layout(tasks, config, box_size, lanes):
     delta = facing - human[..., :2]
     yaw = torch.atan2(delta[..., 1], delta[..., 0]) + torch.deg2rad(uniform(config['human_yaw_degrees']))
     return boxes, target, human, yaw, torch.deg2rad(uniform(config['box_yaw_degrees'])), shift
+
+
+def door_motion_matches(path, direction):
+    """BONES left-opening references: left-side original or right-side mirror."""
+    if direction == 'all':
+        return True
+    if direction != 'left_open':
+        raise ValueError('door motion_direction must be all or left_open')
+    clip = str(path).replace('\\','/').split('/')[-3]
+    mirrored = clip.endswith('_M')
+    return ('inside_door_handle_left_side_open_' in clip and not mirrored) or ('inside_door_handle_right_side_open_' in clip and mirrored)

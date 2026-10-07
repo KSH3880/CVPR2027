@@ -135,3 +135,55 @@ def test_random_start_clearance_and_target_distribution():
     original=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1.yaml').read_text())['env']
     with pytest.raises(ValueError):
         check_interaction_checkpoint({'interaction_metadata':interaction_metadata(original)},interaction_metadata(env))
+
+
+def test_push_cube_mass_and_spawn_clearance():
+    from utils.push_door_spec import sample_start_layout, push_box_start_x
+    for name in ('push_door_stage1', 'push_door_stage1_random_start'):
+        env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
+        box=env['interaction']['push']['box']
+        assert box['size']==[1.1,1.1,1.1]
+        assert abs(box['density']*1.1**3-15.75)<1e-6
+        radius=(2*.55**2)**.5
+        start=push_box_start_x(box['size'],env['interaction']['push']['target_distance'][1])
+        assert start+env['interaction']['push']['target_distance'][1]+radius<=-.2+1e-6
+        if 'startRandomization' in env:
+            tasks=torch.zeros(4096,2,dtype=torch.long)
+            b,g,h,_,_,shift=sample_start_layout(tasks,env['startRandomization'],torch.tensor(box['size']),torch.tensor([-1.6,1.6]))
+            assert (b[...,2]-.555).abs().max()<1e-6
+            assert (b[...,0]-h[...,0]).min()>=1.1-1e-6
+            assert (g[...,0]-shift[...,0]+radius).max()<=-.2+1e-6
+
+
+def test_left_open_door_motion_filter():
+    from utils.push_door_spec import door_motion_matches
+    for side in ('left','right'):
+        for mirror in ('','_M'):
+            path='dataset_bones_dooropen/motions/inside_door_handle_'+side+'_side_open_walk_R_001__A512'+mirror+'/phys_humanoid_v3/ref_motion.npy'
+            assert door_motion_matches(path,'left_open') == ((side=='left') != bool(mirror))
+            assert door_motion_matches(path,'all')
+    assert not door_motion_matches('unknown/clip/phys_humanoid_v3/ref_motion.npy','left_open')
+    with pytest.raises(ValueError):door_motion_matches('x','invalid')
+
+
+def test_task_rsi_config_rejects_impossible_angles_and_probabilities():
+    config=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml').read_text())['env']['interaction']
+    validate_interaction(config)
+    for key,value in [('door_early_fraction',1.1),('frame_clearance',-.01),('door_early_max_degrees',80.)]:
+        broken=copy.deepcopy(config);broken['task_rsi'][key]=value
+        with pytest.raises(ValueError):validate_interaction(broken)
+
+
+def test_frame_clearance_detects_crossing_limb_between_safe_joints():
+    from types import SimpleNamespace
+    from utils.task_rsi import frame_clearance
+    from tokenhsi.utils.door_asset import DoorSpec
+    task=SimpleNamespace(_door_spec=DoorSpec())
+    body=torch.full((1,15,3),-3.)
+    body[...,2]=1.
+    assert frame_clearance(task,body).item()>1.
+    # Forearm endpoints lie clear on opposite sides of the right jamb;
+    # checking joints alone misses the intervening capsule crossing the frame.
+    body[0,3]=torch.tensor([-.4,.52,1.])
+    body[0,4]=torch.tensor([.4,.52,1.])
+    assert frame_clearance(task,body).item()<0.

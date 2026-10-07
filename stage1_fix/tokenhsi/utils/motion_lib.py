@@ -94,7 +94,8 @@ class DeviceCache:
 
 class MotionLib():
     def __init__(self, motion_file, skill, dof_body_ids, dof_offsets,
-                 key_body_ids, device):
+                 key_body_ids, device, motion_filter=None):
+        self._motion_filter = motion_filter
         self._dof_body_ids = dof_body_ids
         self._dof_offsets = dof_offsets
         self._num_dof = dof_offsets[-1]
@@ -369,6 +370,8 @@ class MotionLib():
             motion_list = motion_config['motions'][skill]
             for motion_entry in motion_list:
                 curr_file = motion_entry['file']
+                if getattr(self,'_motion_filter',None) is not None and not self._motion_filter(curr_file):
+                    continue
                 curr_weight = motion_entry['weight']
                 assert(curr_weight >= 0)
 
@@ -391,6 +394,8 @@ class MotionLib():
         else:
             raise NotImplementedError
 
+        if not motion_files or sum(motion_weights) <= 0:
+            raise ValueError("No positive-weight motion references remain for " + skill)
         return motion_files, motion_weights, motion_rsi_skipped_ranges, object_files
 
     def _calc_frame_blend(self, time, len, num_frames, dt):

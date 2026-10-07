@@ -92,3 +92,9 @@ Task message의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_st
 - `tokenhsi/tests/test_push_door_stage1.py`: ZIP 랜덤 시작 간격·목표 거리·높이·재샘플링·checkpoint 격리 테스트 소스 포함. 사용자 요청으로 이번 반영에서는 테스트·문법 검사 및 GPU 실행을 하지 않았다.
 
 - 랜덤 시작 Push/Door의 선택적 충돌 패널티는 `humanoid_ma_carry.py`의 `compute_agent_collision_penalty()`를 재사용한다. `push_door_spec.py`는 활성 충돌 보상 설정을 checkpoint 계약에 포함한다. 기존 고정 config는 기존 보상을 유지한다.
+
+`tokenhsi/utils/push_door_spec.py`의 `push_box_start_x()`는 PUSH 상자 크기와 최대 목표 거리를 기준으로 미사용 문과의 여유를 확보한다. 고정/랜덤 시작과 actor 생성에서 공통 사용한다.
+
+문 방향 필터: `push_door_spec.py`의 `door_motion_matches()`를 task가 `MotionLib(..., motion_filter=...)`에 전달한다. `motion_lib.py`는 초기 manifest 로드에서 필터를 적용하며 나머지 task의 기본 로드는 유지한다.
+
+과제 RSI 서버 공통 구현: `tokenhsi/utils/task_rsi.py`는 PUSH/doorOpen 참조 pool, 늦은 phase 가중치, 작은 각도 호환 pool, 문틀 여유와 손잡이 정렬을 처리한다. `humanoid_ma_push_door.py`는 interaction.task_rsi가 있을 때만 이를 호출한다. `push_door_stage1_task_rsi.yaml`, `amp_ma_push_door_stage1_task_rsi.yaml`과 `push_door_stage1_task_rsi_{train,test,view}.sh`가 전용 실행 경로다. `task_rsi_preview.py`는 정지 초기화 preview, `check_task_rsi.py`는 headless 리셋/분포 검증이다. `.local` task 복사본을 제거하고 공통 구현을 사용한다.

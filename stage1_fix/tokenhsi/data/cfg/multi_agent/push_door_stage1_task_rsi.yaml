@@ -16,6 +16,9 @@ env:
   numAgents: 2
   numObjects: 4
   agentSpawnRadius: 2.5
+  agentCollisionPenalty: true
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
   policyObsMode: clean_scene
   obsFrame: owner
   pdControl: true
@@ -121,6 +124,65 @@ env:
       - 0.7
       - 1.0
       hold_source: door_tail
+    task_rsi:
+      probability: 0.8
+      push_phase:
+      - 0.35
+      - 0.9
+      door_phase:
+      - 0.35
+      - 0.7
+      late_fraction: 0.7
+      push_remaining:
+      - 0.2
+      - 0.6
+      door_angle_degrees:
+      - 5.0
+      - 79.0
+      frame_clearance: 0.03
+      hand_gap: 0.03
+      min_extension: 0.2
+      door_height_tolerance: 0.1
+      push_hand_height:
+      - 0.75
+      - 1.08
+      version: task_hand_aligned_early_door_v3
+      door_early_max_degrees: 25.0
+      door_early_fraction: 0.75
+  startRandomization:
+    scene_x:
+    - -0.2
+    - 0.2
+    scene_y:
+    - -0.15
+    - 0.15
+    box_x:
+    - -0.15
+    - 0.15
+    box_y:
+    - -0.15
+    - 0.15
+    box_yaw_degrees:
+    - -30
+    - 30
+    push_distance:
+    - 1.1
+    - 1.35
+    door_distance:
+    - 0.55
+    - 0.95
+    human_lateral:
+    - -0.2
+    - 0.2
+    human_yaw_degrees:
+    - -25
+    - 25
+    target_yaw_degrees:
+    - -20
+    - 20
+    target_distance:
+    - 0.7
+    - 1.1
 sim:
   substeps: 2
   physx:

@@ -1,4 +1,5 @@
 """Independent Stage-1 PUSH and OPEN+HOLD with a unified scene Transformer."""
+from utils.task_rsi import sample_reference, align_task_reference
 import math
 from dataclasses import replace
 from isaacgym import gymapi, gymtorch
@@ -8,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout)
+                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -42,7 +43,8 @@ class HumanoidMAPushDoor(HumanoidMA):
         N, M = self.num_envs, self.num_agents
         self._skill = ['loco', 'push', 'doorOpen']
         self._motion_lib = {skill: MotionLib(cfg['env']['motion_file'], skill,
-            self._dof_body_ids, self._dof_offsets, self._key_body_ids.cpu().numpy(), self.device)
+            self._dof_body_ids, self._dof_offsets, self._key_body_ids.cpu().numpy(), self.device,
+            motion_filter=(lambda path: door_motion_matches(path,self._interaction['door'].get('motion_direction','all'))) if skill=='doorOpen' else None)
             for skill in self._skill}
         self._num_amp_motion_features = 13 + self._dof_obs_size + self.num_dof + 3 * len(self._key_body_ids)
         self._num_amp_obs_per_step = self._num_amp_motion_features + 3
@@ -97,7 +99,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         super()._build_env(env_id, env_ptr, humanoid_asset)
         handles = []
         for owner in range(self.num_agents):
-            pose = gymapi.Transform(); pose.p = gymapi.Vec3(-1.6, self._lane(owner), float(self._box_size[2]/2))
+            pose = gymapi.Transform(); pose.p = gymapi.Vec3(push_box_start_x(self._box_size,self._interaction['push']['target_distance'][1]), self._lane(owner), float(self._box_size[2]/2))
             actor = self.gym.create_actor(env_ptr, self._box_asset, pose, 'push_box_{}'.format(owner), env_id, 0)
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, actor)
             for prop in props: prop.friction = self._interaction['push']['box']['friction']; prop.restitution=0.
@@ -185,7 +187,8 @@ class HumanoidMAPushDoor(HumanoidMA):
         lanes=torch.tensor([self._lane(a) for a in range(M)],device=self.device)
         origins=self._env_origins[env_ids,None,:]
         boxes[...,:3]=origins
-        boxes[...,0] += torch.where(tasks.bool(),-2.2,-1.6)
+        box_start_x=push_box_start_x(self._box_size,self._interaction['push']['target_distance'][1])
+        boxes[...,0] += torch.where(tasks.bool(),-2.2,box_start_x)
         boxes[...,1] += lanes + tasks*.85
         boxes[...,2] += self._box_size[2]/2+.005
         self._box_states[env_ids]=boxes
@@ -210,14 +213,17 @@ class HumanoidMAPushDoor(HumanoidMA):
             door_root.zero_();door_root[...,6]=1
             door_root[...,:2] = shift + origins[...,:2]
             self._root_states[door_ids] = door_root
-        # Only locomotion RSI is used: BONES does not contain matching object states.
-        lib=self._motion_lib['loco']; mids=lib.sample_motions(E*M)
-        times=torch.full((E*M,),self.dt*(self._num_amp_obs_steps-1),device=self.device)
-        root_pos,root_rot,dof_pos,root_vel,root_ang,dof_vel,key=lib.get_motion_state(mids,times)
-        body_pos,body_rot,body_vel,body_ang=lib.get_motion_state_max(mids,times)
+        if 'task_rsi' in self._interaction:
+            root_pos,root_rot,dof_pos,body_pos,body_rot,rsi_mask=sample_reference(self,tasks)
+        else:
+            lib=self._motion_lib['loco']; mids=lib.sample_motions(E*M)
+            times=torch.full((E*M,),self.dt*(self._num_amp_obs_steps-1),device=self.device)
+            root_pos,root_rot,dof_pos,*_=lib.get_motion_state(mids,times)
+            body_pos,body_rot,_,_=lib.get_motion_state_max(mids,times)
         unheading=torch_utils.calc_heading_quat_inv(root_rot)
         new_root=origins.expand(E,M,3).clone()
-        new_root[...,0]+=torch.where(tasks.bool(),-.65,-2.25)
+        push_gap=max(.65,float(torch.linalg.vector_norm(self._box_size[:2]/2))+.35)
+        new_root[...,0]+=torch.where(tasks.bool(),-.65,box_start_x-push_gap)
         new_root[...,1]+=lanes-tasks*.36
         new_root[...,2]+=root_pos[:,2].view(E,M)
         if spawn is not None:
@@ -225,6 +231,8 @@ class HumanoidMAPushDoor(HumanoidMA):
             heading = torch.zeros(E,M,4,device=self.device)
             heading[...,2]=torch.sin(spawn_yaw/2);heading[...,3]=torch.cos(spawn_yaw/2)
             unheading=quat_mul(heading.reshape(-1,4),unheading)
+        if 'task_rsi' in self._interaction:
+            unheading,new_root=align_task_reference(self,env_ids,tasks,rsi_mask,root_pos,body_pos,unheading,new_root)
         rotation=unheading[:,None,:].expand(-1,self.num_bodies,-1).reshape(-1,4)
         relative=body_pos-root_pos[:,None,:]
         transformed=quat_rotate(rotation,relative.reshape(-1,3)).view(E,M,self.num_bodies,3)+new_root[:,:,None,:]
