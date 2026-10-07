@@ -1,0 +1,174 @@
+env:
+  numEnvs: 2048
+  envSpacing: 5
+  episodeLength: 600
+  isFlagrun: false
+  enableDebugVis: false
+  cameraFollow: true
+  video:
+    enable: false
+    focus: stack
+  relationGraph:
+    template: push_door_stage1_v1
+  relationReward:
+    mode: legacy_tokenhsi
+    stage1_variant: push_door_stage1_v1
+  numAgents: 2
+  numObjects: 4
+  agentSpawnRadius: 2.5
+  agentCollisionPenalty: true
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
+  policyObsMode: clean_scene
+  obsFrame: owner
+  pdControl: true
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: Random
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  localRootObs: true
+  localRootObsPolicy: false
+  rootHeightObs: false
+  rootHeightObsPolicy: false
+  cleanSceneLocalRootObsPolicy: true
+  cleanSceneRootHeightObsPolicy: true
+  keyBodies:
+  - right_hand
+  - left_hand
+  - right_foot
+  - left_foot
+  contactBodies:
+  - right_foot
+  - left_foot
+  terminationHeight: 0.15
+  enableEarlyTermination: true
+  enableSelfCollisionDetection: true
+  enableTrackInitState: false
+  power_reward: false
+  power_coefficient: 0.0005
+  skill:
+  - loco
+  - push
+  - doorOpen
+  skillInitProb:
+  - 1.0
+  - 0.0
+  - 0.0
+  skillDiscProb:
+  - 0.0
+  - 0.5
+  - 0.5
+  enableTaskObs: true
+  mode: train
+  debug:
+    reward: false
+  eval:
+    successThreshold: 0.2
+    skill:
+    - loco
+    skillInitProb:
+    - 1.0
+  asset:
+    assetRoot: tokenhsi/data/assets
+    assetFileName: mjcf/phys_humanoid_v3.xml
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+  ampTaskConditioning: true
+  goalRotation: identity
+  motion_file: tokenhsi/data/dataset_push_door_stage1.yaml
+  interaction:
+    lane_spacing: 3.2
+    door_probability: 0.5
+    progress_weight: 0.4
+    maintain_weight: 0.6
+    success_weight: 0.2
+    push:
+      box:
+        size:
+        - 0.5
+        - 0.45
+        - 0.7
+        density: 100.0
+        friction: 0.6
+      target_distance:
+      - 0.7
+      - 1.1
+      goal_tolerance: 0.15
+      settle_speed: 0.15
+      settle_seconds: 0.5
+      progress_speed: 0.5
+      ground_tolerance: 0.04
+    door:
+      spring:
+        spring_stiffness: 6.0
+        spring_damping: 3.0
+      open_degrees: 80.0
+      reopen_degrees: 65.0
+      hold_seconds: 2.0
+      hold_max_speed: 0.3
+      contact_distance: 0.16
+      contact_force: 0.5
+      progress_speed: 0.6
+    amp:
+      push_phase:
+      - 0.0
+      - 1.0
+      open_phase:
+      - 0.0
+      - 0.7
+      hold_phase:
+      - 0.7
+      - 1.0
+      hold_source: door_tail
+  startRandomization:
+    scene_x:
+    - -0.2
+    - 0.2
+    scene_y:
+    - -0.15
+    - 0.15
+    box_x:
+    - -0.15
+    - 0.15
+    box_y:
+    - -0.15
+    - 0.15
+    box_yaw_degrees:
+    - -30
+    - 30
+    push_distance:
+    - 0.65
+    - 0.95
+    door_distance:
+    - 0.55
+    - 0.95
+    human_lateral:
+    - -0.2
+    - 0.2
+    human_yaw_degrees:
+    - -25
+    - 25
+    target_yaw_degrees:
+    - -20
+    - 20
+    target_distance:
+    - 0.7
+    - 1.1
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

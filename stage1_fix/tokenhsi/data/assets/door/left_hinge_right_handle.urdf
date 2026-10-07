@@ -1,0 +1,162 @@
+<?xml version="1.0" ?>
+<robot name="left_hinge_right_handle_door">
+  <material name="frame">
+    <color rgba="0.17 0.2 0.25 1"/>
+  </material>
+  <material name="wood">
+    <color rgba="0.56 0.32 0.14 1"/>
+  </material>
+  <material name="metal">
+    <color rgba="0.8 0.83 0.86 1"/>
+  </material>
+  <link name="frame">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1.0"/>
+      <inertia ixx="0.001666666666666667" iyy="0.001666666666666667" izz="0.001666666666666667" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual name="left_post_visual">
+      <origin xyz="0 0.52 1.0725" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 0.08 2.145"/>
+      </geometry>
+      <material name="frame"/>
+    </visual>
+    <collision name="left_post_collision">
+      <origin xyz="0 0.52 1.0725" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 0.08 2.145"/>
+      </geometry>
+    </collision>
+    <visual name="right_post_visual">
+      <origin xyz="0 -0.52 1.0725" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 0.08 2.145"/>
+      </geometry>
+      <material name="frame"/>
+    </visual>
+    <collision name="right_post_collision">
+      <origin xyz="0 -0.52 1.0725" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 0.08 2.145"/>
+      </geometry>
+    </collision>
+    <visual name="lintel_visual">
+      <origin xyz="0 0 2.185" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 1.12 0.08"/>
+      </geometry>
+      <material name="frame"/>
+    </visual>
+    <collision name="lintel_collision">
+      <origin xyz="0 0 2.185" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.12 1.12 0.08"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="panel">
+    <inertial>
+      <origin xyz="0 -0.45 1.065" rpy="0 0 0"/>
+      <mass value="12.0"/>
+      <inertia ixx="5.220000000000001" iyy="4.412025" izz="0.8120250000000001" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual name="leaf_visual">
+      <origin xyz="0 -0.45 1.065" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.045 0.9 2.1"/>
+      </geometry>
+      <material name="wood"/>
+    </visual>
+    <collision name="leaf_collision">
+      <origin xyz="0 -0.45 1.065" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.045 0.9 2.1"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="door_hinge" type="revolute">
+    <parent link="frame"/>
+    <child link="panel"/>
+    <origin xyz="0 0.45 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="0" upper="1.9198621771937625" effort="40" velocity="4"/>
+    <dynamics damping="0" friction="0"/>
+  </joint>
+  <link name="handle">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.15"/>
+      <inertia ixx="0.00021906250000000005" iyy="1.28125e-05" izz="0.00021625000000000005" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual name="lever_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.13 0.025"/>
+      </geometry>
+      <material name="metal"/>
+    </visual>
+    <collision name="lever_collision">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.13 0.025"/>
+      </geometry>
+    </collision>
+    <visual name="stem_visual">
+      <origin xyz="0.02625 -0.0455 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0525 0.025 0.025"/>
+      </geometry>
+      <material name="metal"/>
+    </visual>
+    <collision name="stem_collision">
+      <origin xyz="0.02625 -0.0455 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0525 0.025 0.025"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="handle_mount" type="fixed">
+    <parent link="panel"/>
+    <child link="handle"/>
+    <origin xyz="-0.075 -0.81 1.05" rpy="0 0 0"/>
+  </joint>
+  <link name="handle_back">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.15"/>
+      <inertia ixx="0.00021906250000000005" iyy="1.28125e-05" izz="0.00021625000000000005" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+    <visual name="lever_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.13 0.025"/>
+      </geometry>
+      <material name="metal"/>
+    </visual>
+    <collision name="lever_collision">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.13 0.025"/>
+      </geometry>
+    </collision>
+    <visual name="stem_visual">
+      <origin xyz="-0.02625 -0.0455 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0525 0.025 0.025"/>
+      </geometry>
+      <material name="metal"/>
+    </visual>
+    <collision name="stem_collision">
+      <origin xyz="-0.02625 -0.0455 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0525 0.025 0.025"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="handle_back_mount" type="fixed">
+    <parent link="panel"/>
+    <child link="handle_back"/>
+    <origin xyz="0.075 -0.81 1.05" rpy="0 0 0"/>
+  </joint>
+</robot>
