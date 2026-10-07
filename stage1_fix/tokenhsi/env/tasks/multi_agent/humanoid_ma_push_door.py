@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
-from utils.push_door_spec import (phase_update, progress_reward, advance_success,
+from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
                                  expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
@@ -17,7 +17,7 @@ from tokenhsi.utils.door_asset import DoorSpec
 
 
 class HumanoidMAPushDoor(HumanoidMA):
-    REWARD_TERM_NAMES = ('push_progress', 'push_settled', 'door_progress', 'door_hold', 'success_bonus', 'total')
+    REWARD_TERM_NAMES = ('push_progress', 'push_settled', 'door_progress', 'door_hold', 'success_bonus', 'door_approach', 'door_closing', 'total')
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self.num_objects = cfg['env']['numObjects']
@@ -55,6 +55,8 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._done_task = torch.zeros_like(self._holding_phase)
         self._best_push = torch.zeros(N, M, device=self.device)
         self._best_angle = torch.zeros(N, M, device=self.device)
+        self._previous_door_angle = torch.zeros(N, M, device=self.device)
+        self._best_hand_distance = torch.zeros(N, M, device=self.device)
         self._targets = torch.zeros(N, M, 3, device=self.device)
         self._kinematic = self._initial_humanoid_rigid_body_states.clone()
         self._reward_term_sums = torch.zeros(len(self.REWARD_TERM_NAMES), device=self.device)
@@ -259,6 +261,11 @@ class HumanoidMAPushDoor(HumanoidMA):
         self.progress_buf[env_ids]=0;self.reset_buf[env_ids]=0;self._terminate_buf[self._flat_slot_ids(env_ids)]=0
         self._refresh_sim_tensors()
         self._compute_observations(env_ids)
+        angle,_,_,_,handle,back=self._door_geometry(env_ids)
+        self._previous_door_angle[env_ids]=angle
+        reset_hands=self._kinematic[env_ids][:,:,self._key_body_ids[:2],:3]
+        handles=torch.stack([handle,back],dim=2)
+        self._best_hand_distance[env_ids]=(reset_hands[:,:,:,None,:]-handles[:,:,None,:,:]).norm(dim=-1).amin(dim=(-1,-2))
         self._compute_amp_observations(env_ids)
         self._amp_obs_buf[env_ids]=self._amp_obs_buf[env_ids,:,0:1].expand(-1,-1,self._num_amp_obs_steps,-1)
 
@@ -268,7 +275,6 @@ class HumanoidMAPushDoor(HumanoidMA):
         angle_target=math.radians(d['open_degrees'])
         self._holding_phase=phase_update(self._holding_phase,angle,angle_target,math.radians(d['reopen_degrees'])) & self._tasks.bool()
         distance=torch.linalg.vector_norm(self._box_states[...,:2]-self._targets[...,:2],dim=-1)
-        door_progress,self._best_angle=progress_reward(angle.clamp(0,angle_target),self._best_angle,self.dt*d['progress_speed'])
         up=quat_rotate(self._box_states[...,3:7].reshape(-1,4),torch.tensor([0.,0.,1.],device=self.device).expand(self.num_envs*self.num_agents,3)).view(self.num_envs,self.num_agents,3)
         corners=self._box_bps[None,None,:,:].expand(self.num_envs,self.num_agents,-1,-1)
         rotations=self._box_states[...,3:7,None].transpose(-1,-2).expand(-1,-1,8,-1)
@@ -285,6 +291,10 @@ class HumanoidMAPushDoor(HumanoidMA):
         handle_pos=torch.stack([handle,back],dim=2)
         handle_force=torch.stack([torch.linalg.vector_norm(self._all_contacts[self.doors.body_indices[n]],dim=-1).view(self.num_envs,self.num_agents) for n in ('handle','handle_back')],-1)
         contact=hand_handle_contact(hands,handle_pos,hand_force,handle_force,d['contact_distance'],d['contact_force'])
+        hand_distance=(hands[:,:,:,None,:]-handle_pos[:,:,None,:,:]).norm(dim=-1).amin(dim=(-1,-2))
+        door_progress,self._best_angle,approach,self._best_hand_distance,closing=door_shaping(
+            angle,self._best_angle,self._previous_door_angle,hand_distance,self._best_hand_distance,contact,self.dt,d)
+        self._previous_door_angle.copy_(angle)
         door_valid=(angle>=angle_target) & (hinge_vel.abs()<d['hold_max_speed']) & contact
         valid=torch.where(self._tasks.bool(),door_valid,push_valid)
         duration=torch.where(self._tasks.bool(),d['hold_seconds'],p['settle_seconds'])
@@ -292,7 +302,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         push=(self._tasks==0).float();door=1-push
         terms=torch.stack([c['progress_weight']*push_progress*push,c['maintain_weight']*push_valid*push,
             c['progress_weight']*door_progress*door,c['maintain_weight']*door_valid*door,
-            c['success_weight']*first],-1)
+            c['success_weight']*first,d['approach_weight']*approach*door,-d['closing_weight']*closing*door],-1)
         total=terms.sum(-1)
         if self.cfg['env'].get('agentCollisionPenalty', False):
             collision = -self.cfg['env'].get('agentCollisionCoeff', .5) * compute_agent_collision_penalty(

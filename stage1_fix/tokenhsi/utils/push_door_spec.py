@@ -17,6 +17,21 @@ def progress_reward(value, best, scale):
     return (improved / scale).clamp_max(1), torch.maximum(best, value)
 
 
+def door_shaping(angle, best_angle, previous_angle, hand_distance, best_distance, contact, dt, config):
+    """Contact-gated opening, non-repeatable approach, and actual closing penalty."""
+    target=math.radians(config['open_degrees'])
+    opening,new_best=progress_reward(angle.clamp(0,target),best_angle,dt*config['progress_speed'])
+    # Always consume the record, even without contact: touching later cannot
+    # collect credit for an earlier body push or a close/reopen cycle.
+    opening=opening*contact.float()
+    approach,new_distance=progress_reward(-hand_distance,-best_distance,dt*config['approach_speed'])
+    # Door movement toward a stationary hand must not create approach credit.
+    stationary=(angle-previous_angle).abs()<=config['approach_angle_tolerance']
+    approach=approach*stationary.float()*(~contact).float()
+    closing=((previous_angle-angle-config['closing_deadband']).clamp_min(0)/(dt*config['closing_speed'])).clamp_max(1)
+    return opening,new_best,approach,-new_distance,closing
+
+
 def advance_success(valid, elapsed, done, dt, duration):
     elapsed = torch.where(valid, elapsed + dt, torch.zeros_like(elapsed))
     current = elapsed >= duration
@@ -92,6 +107,11 @@ def validate_interaction(config):
         if not math.isfinite(config[key]) or config[key] < 0:
             raise ValueError('Invalid reward weight: ' + key)
     push, door, amp = config['push'], config['door'], config['amp']
+    if door.get('reward_version') != 'handle_gated_v2':
+        raise ValueError('Door reward requires handle_gated_v2 configuration')
+    for key in ('approach_weight','closing_weight','approach_speed','closing_speed','approach_angle_tolerance','closing_deadband'):
+        if not math.isfinite(door[key]) or door[key]<=0:
+            raise ValueError('Invalid door reward parameter: '+key)
     if door.get('motion_direction','all') not in ('all','left_open'):
         raise ValueError('Invalid door motion direction')
     if not 0 < door['reopen_degrees'] < door['open_degrees'] < 110:

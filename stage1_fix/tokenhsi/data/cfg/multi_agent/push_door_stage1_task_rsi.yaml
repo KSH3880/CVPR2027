@@ -113,6 +113,13 @@ env:
       contact_force: 0.5
       progress_speed: 0.6
       motion_direction: left_open
+      reward_version: handle_gated_v2
+      approach_weight: 0.1
+      approach_speed: 0.5
+      approach_angle_tolerance: 0.01
+      closing_weight: 0.2
+      closing_speed: 0.6
+      closing_deadband: 0.005
     amp:
       push_phase:
       - 0.0

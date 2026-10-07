@@ -4,6 +4,12 @@
 
 ## 2026-10-08
 
+### DOOR 손잡이 접촉 기반 보상
+
+- 공통 task/helpers와3개 config에 handle_gated_v2 적용. 개방 진행 보상을 손잡이 접촉으로 제한하고 접촉 없는 최고 기록도 소비해 지연 보상/닫기-재개방 악용을 막았다. 최고 접근 진행 보상0.1, 닫힘 패널티-0.2 추가. 문 이동으로 접근 보상을 얻는 것을 제한하고 RSI 리셋에서 거리/직전 각도 기준을 초기화했다. 기존 유지·성공·PUSH·AMP 혼합비 유지, TensorBoard 신규항목 기록, checkpoint 계약 변경.
+- CPU15테스트 통과: 몸으로 개방, 뒤늦은 접촉, 접근 왕복, 닫힘/작은 진동/RSI 초기 기준 검사. CPU PhysX16환경×12리셋384샘플/부분 reset/finite/초기 진행 보상 검증 통과: output/door_reward_v2_reset_check/rsi_report.json. GPU 학습은 다른 진행 중 학습을 유지하기 위해 실행하지 않았다. 서버에는 추적 공통 코드/config를 반영하면 되며 기존 보상 checkpoint와 새 설정은 호환되지 않는다.
+
+
 ### PUSH 상자 질량30kg 통일
 
 - 사용자 요청으로 fixed/random_start/task_rsi 공통 상자를30kg으로 통일했다(기존15.75/34.61kg). 1.1m 정육면체와 friction0.1 유지, density22.539444027047325. 세 설정 질량을 검증하도록 기존 테스트를 갱신했다. 변경은 다음 실행부터 적용되고 checkpoint 계약의 density가 바뀐다. 진행 중 학습은 종료하지 않았다.

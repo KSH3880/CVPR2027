@@ -197,3 +197,28 @@ def test_push_alignment_brings_unequal_hand_reach_to_same_face():
     torch.testing.assert_close(distances[:,0],distances[:,1])
     assert (distances>0).all()
     torch.testing.assert_close(normal.norm(dim=-1),torch.ones(3))
+
+
+def test_door_shaping_blocks_body_push_delayed_credit_and_approach_farming():
+    from utils.push_door_spec import door_shaping
+    cfg=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml').read_text())['env']['interaction']['door']
+    t=lambda x:torch.tensor([x],dtype=torch.float32)
+    def step(angle,best,prev,distance,closest,contact):
+        return door_shaping(t(angle),t(best),t(prev),t(distance),t(closest),torch.tensor([contact]),.1,cfg)
+    opening,best,approach,closest,closing=step(.2,0.,0.,.2,.5,False)
+    assert opening.item()==0 and approach.item()==0 and closing.item()==0
+    assert best.item()==pytest.approx(.2)
+    # Later contact at the same angle must not claim the earlier body push.
+    assert step(.2,.2,.2,.2,.2,True)[0].item()==0
+    assert step(.25,.2,.2,.2,.2,True)[0].item()>0
+    closed=step(.15,.25,.25,.2,.2,False)
+    assert closed[-1].item()>0
+    assert step(.25,.25,.15,.2,.2,True)[0].item()==0
+    near=step(.1,.1,.1,.3,.5,False)
+    assert near[2].item()>0 and near[3].item()==pytest.approx(.3)
+    assert step(.1,.1,.1,.3,.3,False)[2].item()==0
+    assert step(.1,.1,.1,.5,.3,False)[2].item()==0
+    # RSI reset values produce no opening/approach/closing shaping.
+    reset=step(.3,.3,.3,.1,.1,False)
+    assert reset[0].item()==0 and reset[2].item()==0 and reset[4].item()==0
+    assert step(.299,.3,.3,.1,.1,False)[-1].item()==0
