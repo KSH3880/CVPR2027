@@ -1,7 +1,7 @@
 """Task-family AMP contracts for the independent unified Stage-1 experiment."""
 import torch
 import torch.nn.functional as F
-from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
+from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
 
 FAMILIES = ('carry', 'sit', 'climb')
 SKILLS = ('loco', 'sit', 'climb', 'climbNoRSI', 'omomo', 'pickUp', 'carryWith', 'putDown')
@@ -109,7 +109,8 @@ def validate_typed_bias_config(env, train):
         raise ValueError('Size RSI typed-bias variant and typed_lookup train config must be paired')
     task_roles = variant in TASK_ROLE_VARIANTS
     task_modes = {TASK_ROLE_VARIANT: 'task_role_lookup', TASK_ROLE_MLP_VARIANT: 'task_role_mlp',
-                  TASK_ROLE_SPLIT_MLP_VARIANT: 'task_role_mlp_split'}
+                  TASK_ROLE_SPLIT_MLP_VARIANT: 'task_role_mlp_split',
+                  TASK_EMBEDDING_VARIANT: 'task_type_embedding'}
     mode = transformer.get('relation_bias_mode')
     if (task_roles != (mode in task_modes.values())
             or task_roles and mode != task_modes[variant]
@@ -119,6 +120,12 @@ def validate_typed_bias_config(env, train):
                      or transformer.get('relation_bias') is not True):
         raise ValueError('Typed bias requires enabled bias and separate actor/critic tables')
     message = transformer.get('relation_message', {})
+    if variant == TASK_EMBEDDING_VARIANT and (
+            transformer.get('num_features') != 64
+            or transformer.get('num_layers') != 4
+            or transformer.get('layer_num_heads') != 2
+            or train['params']['network'].get('separate') is not True):
+        raise ValueError('Task embedding requires separate actor/critic and 64-D/2-head/4-layer')
     if (variant in (SIZE_RSI_TYPED_MESSAGE_VARIANT, TASK_ROLE_VARIANT)) != bool(message.get('enable', False)):
         raise ValueError('Typed relation-message variant and enabled relation_message must be paired')
     if variant in (SIZE_RSI_TYPED_MESSAGE_VARIANT, TASK_ROLE_VARIANT) and (
