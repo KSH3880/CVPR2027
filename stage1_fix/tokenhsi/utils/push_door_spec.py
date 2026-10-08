@@ -17,6 +17,19 @@ def progress_reward(value, best, scale):
     return (improved / scale).clamp_max(1), torch.maximum(best, value)
 
 
+def door_open_amp_phase(previous, distance, contact, holding, enter, leave):
+    """Distance hysteresis; actual contact/holding always keeps DOOR AMP active."""
+    return torch.where(previous, distance<=leave, distance<=enter) | contact | holding
+
+
+def door_amp_family(tasks, hand, holding, opening, count):
+    if count>=5:
+        family=1+hand+2*holding.long()
+        if count==6:family=torch.where(opening | holding,family,5)
+        return torch.where(tasks==0,0,family)
+    return torch.where(tasks==0,0,torch.where(holding,2,1))
+
+
 def door_shaping(angle, best_angle, previous_angle, hand_distance, best_distance, contact, dt, config):
     """Contact-gated opening, non-repeatable approach, and actual closing penalty."""
     target=math.radians(config['open_degrees'])
@@ -152,6 +165,13 @@ def validate_interaction(config):
         if not 0 < lo <= hi:raise ValueError('Invalid task RSI push distance')
         lo,hi=rsi['push_hand_height']
         if not 0 < lo < hi <= push['box']['size'][2]:raise ValueError('Invalid task RSI hand height')
+    approach=amp.get('approach_loco')
+    if approach is not None:
+        if amp.get('hand_conditioning')!='user_hands_v1':
+            raise ValueError('Approach loco requires hand-conditioned AMP')
+        enter,leave=approach['enter_door_distance'],approach['return_loco_distance']
+        if not math.isfinite(enter) or not math.isfinite(leave) or not 0 < enter < leave:
+            raise ValueError('Invalid DOOR AMP distance hysteresis')
     if amp['hold_source'] not in ('door_tail', 'loco'):
         raise ValueError('AMP hold_source must be door_tail or loco')
     for name in ('push_phase','open_phase','hold_phase'):

@@ -338,3 +338,30 @@ def test_five_amp_families_match_hands_and_preserve_raw_labels():
         sample_family_matched(pool[ids!=4],reference,10,num_families=5)
     fallback=sample_family_matched(pool[ids!=4],reference,10,reference,5)
     torch.testing.assert_close(amp_family_ids(fallback,10,5),amp_family_ids(reference,10,5))
+
+
+def test_door_amp_approach_distance_hysteresis_and_contact_priority():
+    from utils.push_door_spec import door_open_amp_phase,door_amp_family
+    t=lambda x:torch.tensor([x])
+    phase=t(False)
+    for distance,expected in ((1.5,False),(.81,False),(.8,True),(.9,True),(1.,True),(1.01,False)):
+        phase=door_open_amp_phase(phase,t(distance),t(False),t(False),.8,1.)
+        assert phase.item()==expected
+    assert door_open_amp_phase(t(False),t(1.5),t(True),t(False),.8,1.).item()
+    assert door_open_amp_phase(t(False),t(1.5),t(False),t(True),.8,1.).item()
+    tasks=torch.tensor([0,1,1,1,1,1]);hands=torch.tensor([0,0,1,0,1,0])
+    hold=torch.tensor([False,False,False,True,True,False])
+    near=torch.tensor([False,True,True,False,False,False])
+    assert door_amp_family(tasks,hands,hold,near,6).tolist()==[0,1,2,3,4,5]
+    assert door_amp_family(tasks,hands,hold,near,5).tolist()==[0,1,2,3,4,1]
+
+
+def test_six_amp_family_loco_demos_and_replay_do_not_mix_with_door():
+    from utils.unified_training import sample_family_matched,preserve_amp_labels,amp_family_ids
+    ids=torch.arange(6).repeat(3)
+    frame=torch.cat([ids[:,None].float(),torch.nn.functional.one_hot(ids,6).float()],-1)
+    pool=frame[:,None,:].repeat(1,10,1).flatten(1)
+    matched=sample_family_matched(pool,pool.flip(0),10,num_families=6)
+    torch.testing.assert_close(matched.reshape(-1,10,7)[:,0,0].long(),amp_family_ids(pool.flip(0),10,6))
+    normalized=preserve_amp_labels(pool,pool+42,10,6).reshape(-1,10,7)
+    torch.testing.assert_close(normalized[:,:,1:],pool.reshape(-1,10,7)[:,:,1:])

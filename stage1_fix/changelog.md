@@ -4,6 +4,13 @@
 
 ## 2026-10-08
 
+### DOOR 원거리 접근 loco와 근거리 손별 개방 AMP 전환
+
+- 사용자 요청으로 공통3설정에 approach_loco를 추가했다. root-앞/뒤손잡이 최소XY거리0.8m 진입·1.0m 복귀 히스테리시스로 원거리loco/근거리손별doorOpen을 전환한다. 접촉·개방유지 phase는DOOR우선이다. reset/물리step에서 상태를 갱신한다.
+- 기존5종에 접근loco family5를 추가해6종/1350-D AMP를 사용한다. 실제 전문가source는loco phase0~1이며 demo/replay/정규화/history가6종으로 매칭된다. hold_source=door_tail·보상·정책관측/action·좌우손라벨은 유지한다. approach 설정이 없는 구viewer는3/5종을 유지한다. task RSI계약v8 및 실행문서를 갱신했다.
+- CPU31테스트 통과(거리 경계·히스테리시스·접촉/유지 우선·6종/loco매칭·라벨정규화·기존3종회귀), 수정 Python문법/diff검사 통과. GPU/전체물리·학습은 실행하지 않았고 기존학습/MPS는 변경하지 않았다. 실제 접근/개방 성능은 미검증이다.
+
+
 ### 사용자 확인 좌우 손 라벨로 RSI·AMP 참조/replay 매칭
 
 - 사용자 확인 `right_side`미러=왼손, `left_side`원본=오른손 라벨을 추가해 RSI reach 추정을 대체했다. 알려지지 않은 경로는 명시적으로 거부한다. 정면/높이/reach/문틀 조건은 유지하며 RSI124frame·양손 종류가 남았다. task RSI계약v7.

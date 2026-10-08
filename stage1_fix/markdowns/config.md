@@ -588,7 +588,7 @@ CPU27테스트 및 CPU PhysX1-step에서 앞/뒤 손잡이 실제 높이0.95m �
 
 ### DOOR RSI 정면·참조 손 일치 필터 (2026-10-08)
 
-현재 task_rsi 초기화 계약은 `task_door_user_hand_amp_v7`다. `door_facing_degrees: 60`으로 골반과 torso의 정면 XY 방향이 손잡이 방향에서 모두60° 이내인 후보만 허용한다. 기존 문틀 여유·손 높이·팔 reach 조건도 함께 적용한다. PUSH 초기화와 보상은 유지한다.
+현재 task_rsi 초기화 계약은 `task_door_loco_approach_v8`다. `door_facing_degrees: 60`으로 골반과 torso의 정면 XY 방향이 손잡이 방향에서 모두60° 이내인 후보만 허용한다. 기존 문틀 여유·손 높이·팔 reach 조건도 함께 적용한다. PUSH 초기화와 보상은 유지한다.
 
 `door_hand_binding: user_paths_v1`은 사용자가 확인한 손 라벨을 사용한다. `left_side` 원본은 오른손(0), `right_side` 미러는 왼손(1)이다. 높이에 가까운 반대 손으로 바꾸지 않으며 해당 손의 높이/reach/정면/문틀 조건을 만족하는 frame만 남긴다. 이전 reach 추정 라벨을 대체했다.
 
@@ -597,14 +597,22 @@ CPU 실제 DOOR8모션 검사에서 사용자 손 라벨 적용 후124프레임�
 
 ### DOOR 접근 시작 혼합 (2026-10-08)
 
-`push_door_stage1_task_rsi`에만 DOOR의 접촉 참조RSI 확률 `interaction.task_rsi.door_rsi_probability: 0.5`를 적용한다. 나머지50%는 기존 loco 참조와 닫힌 문으로 시작하며 `startRandomization.door_distance: [1.2, 1.8]`에서 문 plane까지 X 방향 거리를 샘플한다(손잡이까지의 유클리드 거리와는 다름). 사람은 손잡이 쪽을 보도록 기존 heading/lateral 분포를 사용한다. PUSH RSI80%와 기타 실험의 초기화는 유지한다. 기존 DOOR 접근 보상을 사용하며 보상 자체는 수정하지 않았다. AMP는 사용자 손 조건화의 doorOpen approach/open 구간을 사용하며 접근 전용 family는 추가하지 않았다.
+`push_door_stage1_task_rsi`에만 DOOR의 접촉 참조RSI 확률 `interaction.task_rsi.door_rsi_probability: 0.5`를 적용한다. 나머지50%는 기존 loco 참조와 닫힌 문으로 시작하며 `startRandomization.door_distance: [1.2, 1.8]`에서 문 plane까지 X 방향 거리를 샘플한다(손잡이까지의 유클리드 거리와는 다름). 사람은 손잡이 쪽을 보도록 기존 heading/lateral 분포를 사용한다. PUSH RSI80%와 기타 실험의 초기화는 유지한다. 기존 DOOR 접근 보상을 사용하며 보상 자체는 수정하지 않았다. AMP는 원거리 접근에 별도 loco family를 사용하고 손잡이 근처에서 손별 doorOpen으로 전환한다.
 
 RSI preview는 기본으로 학습 분포를 따른다. 명령 앞의 `RSI_PREVIEW_PROBABILITY=0`은 떨어진 시작만, `=1`은 손잡이 접촉RSI만 보여준다. R로 재샘플해 비교한다. 기본50:50은 확률적이며 소수 reset에서는 같은 종류가 연속될 수 있다. 새 계약v6으로 구checkpoint 혼용은 거부한다. 변경은 새 실행에 적용된다. CPU30테스트 통과, 실제 걷기/문 개방은 아직 학습으로 검증하지 않았다.
 
-### 사용자 확인 손 라벨과 AMP5-family (2026-10-08)
+### 사용자 확인 손 라벨과 AMP family (2026-10-08)
 
-`interaction.amp.hand_conditioning: user_hands_v1`을 공통 fixed/random_start/task_rsi에 적용했다. 라벨0=PUSH,1=오른손 개방,2=왼손 개방,3=오른손 유지,4=왼손 유지다. `left_side` 원본=오른손, `right_side` 미러=왼손으로 전문가 clip을 고르고 demo/replay도 같은 phase/손 family로 매칭한다. AMP 입력은 기존1320-D에서1340-D로 늘며 정책/critic 관측과 action 차원은 유지한다. 정규화에서5개 one-hot을 보존하고 물리 history 전체에 현재 family를 적용한다. 다른 task의 기본3-family는 유지한다.
+`interaction.amp.hand_conditioning: user_hands_v1`을 공통 fixed/random_start/task_rsi에 적용했다. 라벨0=PUSH,1=오른손 개방,2=왼손 개방,3=오른손 유지,4=왼손 유지,5=DOOR 접근(loco)이다. `left_side` 원본=오른손, `right_side` 미러=왼손으로 전문가 clip을 고르고 demo/replay도 같은 phase/손 family로 매칭한다. 현재 접근 loco 포함6-family AMP 입력은1350-D이며(이전3종1320-D,5종1340-D) 정책/critic 관측과 action 차원은 유지한다. 정규화에서 현재6개 one-hot을 보존하고 물리 history 전체에 현재 family를 적용한다. 다른 task의 기본3-family는 유지한다.
 
 접촉RSI는 선택한 clip의 사용자 손 라벨로 시작한다. 접근 시작은 좌우를 랜덤 지정하고, 실제 손잡이에 손이 닿으면 거리+손/손잡이 양쪽 힘 조건으로 접촉 손을 갱신한다. 손 전환 시 AMP 참조/replay도 전환하며 두 손 접촉은 더 가까운 손을 따른다. 손별 정책을 따로 만드는 변경은 아니다. `hold_source:loco`를 사용하는 구/다른 설정은 유지 참조를 공유하지만 현재 설정은 door_tail이므로 유지도 손별 clip을 쓴다.
 
-검증: CPU29테스트 통과(기존 Unified3-family 회귀 포함), 실제8모션 사용자 라벨 일치·RSI124frame·오른손/왼손 각2048 AMP clip 샘플의 손 일치·phase window 확인. 보고서 `/home/hwanhee/juan/CVPR2027/runs/rsi_checks/door_user_hands_amp.json`. GPU 학습/물리 및 손 전환 동작은 미실행. 구checkpoint는 현재5-family와 호환되지 않으며 기존 viewer YAML로만 본다. 새 설정은 scratch 학습한다.
+검증: CPU29테스트 통과(기존 Unified3-family 회귀 포함), 실제8모션 사용자 라벨 일치·RSI124frame·오른손/왼손 각2048 AMP clip 샘플의 손 일치·phase window 확인. 보고서 `/home/hwanhee/juan/CVPR2027/runs/rsi_checks/door_user_hands_amp.json`. GPU 학습/물리 및 손 전환 동작은 미실행. 구checkpoint는 현재6-family와 호환되지 않으며 기존 viewer YAML로만 본다. 새 설정은 scratch 학습한다.
+
+### 거리 기반 DOOR 접근 loco → 개방 AMP (2026-10-08)
+
+공통 fixed/random_start/task_rsi의 `interaction.amp.approach_loco`를 사용한다. agent root와 앞/뒤 손잡이 중 가까운 손잡이의 XY 거리가 `enter_door_distance: 0.8`m 이하면 손별 개방 family로 들어가고, 다시 `return_loco_distance: 1.0`m 밖이면 접근 loco family로 돌아간다. 중간 구간은 이전 상태를 유지한다. 실제 손잡이 접촉이나 개방 유지 phase는 거리보다 우선해 DOOR AMP를 유지한다. reset에서 거리 기준을 초기화하고 물리 step마다 갱신한다.
+
+접근 family5의 전문가 source는 `loco`와 phase0~1이며 `hold_source`와 무관하다. 개방은 사용자 확인 손별 `doorOpen`, 유지는 `hold_source: door_tail`을 유지한다. demo/replay도6-family로 매칭하고 현재 phase 라벨은 전체 물리 history에 반영한다. 보상·actor/critic 정책 관측·action은 유지하고 AMP 입력은1350-D다. 설정은 interaction checkpoint 계약에 포함되어 기존3/5종 checkpoint와 혼용하지 않는다. 학습 명령은 같은 task_rsi_train.sh이며 새로 scratch 실행한다. 구 viewer YAML은 기존3/5-family를 유지한다.
+
+CPU31테스트 통과: 거리 진입/복귀 히스테리시스·접촉/유지 우선·6종/loco demo/replay·one-hot 보존·기존3종 회귀. GPU/전체물리 학습은 실행하지 않았으며 실제 접근 성능은 새 학습에서 확인해야 한다.

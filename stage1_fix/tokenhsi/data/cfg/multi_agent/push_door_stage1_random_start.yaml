@@ -124,6 +124,9 @@ env:
       closing_deadband: 0.005
     amp:
       hand_conditioning: user_hands_v1
+      approach_loco:
+        enter_door_distance: 0.8
+        return_loco_distance: 1.0
       push_phase:
       - 0.0
       - 1.0

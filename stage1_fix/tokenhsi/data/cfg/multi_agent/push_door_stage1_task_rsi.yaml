@@ -124,6 +124,9 @@ env:
       closing_deadband: 0.005
     amp:
       hand_conditioning: user_hands_v1
+      approach_loco:
+        enter_door_distance: 0.8
+        return_loco_distance: 1.0
       push_phase:
       - 0.0
       - 1.0
@@ -161,7 +164,7 @@ env:
       push_hand_height:
       - 0.75
       - 1.08
-      version: task_door_user_hand_amp_v7
+      version: task_door_loco_approach_v8
       door_early_max_degrees: 25.0
       door_early_fraction: 0.75
   startRandomization:
