@@ -38,6 +38,14 @@ def door_open_amp_phase(previous, distance, contact, holding, enter, leave):
     return torch.where(previous, distance<=leave, distance<=enter) | contact | holding
 
 
+def nearest_door_hand_on_entry(previous_hand, previous_open, opening, tasks, hands, handles, contact):
+    """Choose once on approach entry; preserve contact and RSI hand bindings."""
+    distance=(hands[..., :, None, :]-handles[..., None, :, :]).norm(dim=-1).amin(-1)
+    nearest=distance.argmin(-1)
+    entering=(tasks==1) & opening & ~previous_open & ~contact
+    return torch.where(entering, nearest, previous_hand)
+
+
 def door_amp_family(tasks, hand, holding, opening, count):
     if count>=5:
         family=1+hand+2*holding.long()

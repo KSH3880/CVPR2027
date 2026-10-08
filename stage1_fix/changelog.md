@@ -4,6 +4,13 @@
 
 ## 2026-10-08
 
+### TaskRSI DOOR 근거리 진입 시 가까운 손 AMP 선택
+
+- 현재TaskRSI에 `amp.door_hand_selection: nearest_on_entry_v1`을 적용한다. loco→door 전환 시 양손과 앞/뒤손잡이의 최소3D거리를 비교해 가까운 손으로 AMP family를 선택한다. 근거리 유지 중에는 재선택하지 않고 실제접촉 손이 우선한다. 원거리로 복귀한 뒤 재진입하면 다시 선택한다.
+- reset의 근거리 non-RSI에도 적용하며 RSI의 모션별 손 바인딩은 유지한다. 옵션 없는 기존 checkpoint 설정은 기존 동작을 보존한다.
+- CPU27테스트 통과(진입선택·근거리유지·접촉우선·RSI바인딩·PUSH제외). Python문법/diff검사 통과. GPU학습/물리 개선은 미검증이며 현재학습/MPS는 변경하지 않았다.
+
+
 ### TaskRSI PUSH 목표 거리 확대
 
 - 짧은 이동거리 개선 요청으로 현재 task_rsi의 일반 시작 목표거리를1.5~2.0m, RSI 남은 거리를0.5~1.2m로 늘렸다. interaction과 startRandomization 거리 설정을 함께 맞췄다. 기존 문 반대 방향 및 각도 랜덤화는 유지한다.

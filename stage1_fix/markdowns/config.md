@@ -666,3 +666,6 @@ BOX_SIZE= CFG_ENV=output/push_door_stage1_task_rsi/PushDoorStage1TaskRSI_08-12-1
 
 
 현재 TaskRSI PUSH 목표거리(2026-10-08): 일반 시작1.5~2.0m, RSI 시작의 남은 거리0.5~1.2m. 문 반대 방향을 유지하며 일반 목표각±20°, RSI는 박스yaw에±20°를 더한다. 새 학습부터 적용된다. 이전 checkpoint view는 해당 run의 `relation_config.yaml`을 사용한다.
+
+
+현재 TaskRSI는 `amp.door_hand_selection: nearest_on_entry_v1`을 사용한다. loco→door 근거리 진입 시 앞/뒤 손잡이에 가까운 손을 선택하고 근거리 동안 유지한다. 실제 접촉 시 실제 손이 우선하며, RSI 모션 손 바인딩은 유지한다. 원거리로 나갔다 다시 접근하면 재선택한다. 새 학습부터 적용되며 기존 checkpoint view는 저장 설정을 사용한다.

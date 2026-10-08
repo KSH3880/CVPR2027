@@ -394,3 +394,18 @@ def test_push_box_size_override_preserves_mass_and_clearance():
     sample_start_layout(torch.zeros(16,2,dtype=torch.long),env['startRandomization'],torch.tensor(box['size']),torch.tensor([-1.6,1.6]))
     for invalid in (-1, float('nan'), float('inf'), 0):
         with pytest.raises(ValueError): resize_push_box(env, invalid)
+
+
+def test_nearest_door_hand_entry_preserves_binding_and_contact():
+    from utils.push_door_spec import nearest_door_hand_on_entry
+    hands=torch.tensor([[[2.,0.,0.],[.1,0.,0.]]]).expand(5,-1,-1)
+    handles=torch.zeros(5,2,3)
+    result=nearest_door_hand_on_entry(torch.zeros(5,dtype=torch.long),
+        torch.tensor([False,True,False,False,False]),
+        torch.tensor([True,True,False,True,True]),torch.tensor([1,1,1,0,1]),
+        hands,handles,torch.tensor([False,False,False,False,True]))
+    assert result.tolist()==[1,0,0,0,0]
+    # No switching while staying near, even if the other hand becomes closer.
+    assert nearest_door_hand_on_entry(result,torch.ones(5,dtype=torch.bool),
+        torch.ones(5,dtype=torch.bool),torch.ones(5,dtype=torch.long),
+        hands.flip(1),handles,torch.zeros(5,dtype=torch.bool)).tolist()==result.tolist()

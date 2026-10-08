@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, door_motion_hand, door_open_amp_phase, door_amp_family, push_hand_alignment)
+                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, door_motion_hand, door_open_amp_phase, door_amp_family, push_hand_alignment, nearest_door_hand_on_entry)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -287,9 +287,15 @@ class HumanoidMAPushDoor(HumanoidMA):
         if self._amp_label_count==6:
             approach=self._interaction['amp']['approach_loco']
             near_distance=(self._humanoid_root_states[env_ids][:,:,None,:2]-torch.stack([handle,back],2)[...,:2]).norm(dim=-1).amin(-1)
-            self._door_open_amp[env_ids]=door_open_amp_phase(self._door_open_amp[env_ids],near_distance,
+            previous_open=self._door_open_amp[env_ids].clone()
+            self._door_open_amp[env_ids]=door_open_amp_phase(previous_open,near_distance,
                 torch.zeros_like(self._door_open_amp[env_ids]),self._holding_phase[env_ids],
                 approach['enter_door_distance'],approach['return_loco_distance'])
+            if self._interaction['amp'].get('door_hand_selection')=='nearest_on_entry_v1':
+                self._door_amp_hand[env_ids]=nearest_door_hand_on_entry(
+                    self._door_amp_hand[env_ids],previous_open,self._door_open_amp[env_ids],tasks,
+                    self._kinematic[env_ids][:,:,self._key_body_ids[:2],:3],torch.stack([handle,back],2),
+                    torch.zeros_like(previous_open))
         self._previous_door_angle[env_ids]=angle
         reset_hands=self._kinematic[env_ids][:,:,self._key_body_ids[:2],:3]
         handles=torch.stack([handle,back],dim=2)
@@ -340,8 +346,12 @@ class HumanoidMAPushDoor(HumanoidMA):
         if self._amp_label_count==6:
             approach=self._interaction['amp']['approach_loco']
             near_distance=(self._humanoid_root_states[:,:,None,:2]-handle_pos[...,:2]).norm(dim=-1).amin(-1)
-            self._door_open_amp=door_open_amp_phase(self._door_open_amp,near_distance,contact,self._holding_phase,
+            previous_open=self._door_open_amp.clone()
+            self._door_open_amp=door_open_amp_phase(previous_open,near_distance,contact,self._holding_phase,
                 approach['enter_door_distance'],approach['return_loco_distance'])
+            if self._interaction['amp'].get('door_hand_selection')=='nearest_on_entry_v1':
+                self._door_amp_hand=nearest_door_hand_on_entry(
+                    self._door_amp_hand,previous_open,self._door_open_amp,self._tasks,hands,handle_pos,contact)
         hand_distance=(hands[:,:,:,None,:]-handle_pos[:,:,None,:,:]).norm(dim=-1).amin(dim=(-1,-2))
         door_progress,self._best_angle,approach,self._best_hand_distance,closing=door_shaping(
             angle,self._best_angle,self._previous_door_angle,hand_distance,self._best_hand_distance,contact,self.dt,d)
