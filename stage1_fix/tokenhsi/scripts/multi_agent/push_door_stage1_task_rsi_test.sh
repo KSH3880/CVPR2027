@@ -11,7 +11,7 @@ if [ "${HEADLESS:-1}" != 0 ]; then args+=(--headless); fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then args+=(--episode_length "$EPISODE_LENGTH"); fi
 if [ -n "${SEED:-}" ]; then args+=(--seed "$SEED"); fi
 python tokenhsi/run.py --task HumanoidMAPushDoor \
- --cfg_env tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml \
+ --cfg_env "${CFG_ENV:-tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml}" \
  --cfg_train tokenhsi/data/cfg/train/rlg/amp_ma_push_door_stage1_task_rsi.yaml \
  --motion_file tokenhsi/data/dataset_push_door_stage1.yaml \
  --checkpoint "$1" --num_agents 2 --num_envs "${2:-16}" --num_objects 4 \

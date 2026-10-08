@@ -653,3 +653,13 @@ BOX_SIZE=1.3 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_t
 ```
 
 평가/view에도 학습 때와 같은 `BOX_SIZE`를 지정한다. 크기가 다른 checkpoint는 계약 검사에서 거부되므로 새 크기는 새 학습으로 시작한다. 실행 중 학습에는 반영되지 않는다.
+
+
+크기 변경 전 TaskRSI checkpoint는 해당 run의 저장 설정으로 view한다:
+
+```bash
+cd /home/hwanhee/juan/CVPR2027/stage1_fix
+BOX_SIZE= CFG_ENV=output/push_door_stage1_task_rsi/PushDoorStage1TaskRSI_08-12-17-28/relation_config.yaml TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_vnc.sh output/push_door_stage1_task_rsi/PushDoorStage1TaskRSI_08-12-17-28/nn/PushDoorStage1TaskRSI_00001000.pth 1 3
+```
+
+`BOX_SIZE=`는 기존 export의 크기 override를 해제한다. 다른 run은 해당 run의 설정/checkpoint 경로로 바꾼다.

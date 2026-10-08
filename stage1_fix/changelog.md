@@ -4,6 +4,12 @@
 
 ## 2026-10-08
 
+### 크기 변경 전 TaskRSI checkpoint viewer 설정 override
+
+- task_rsi_test에 `CFG_ENV` override를 추가해 VNC에서도 학습 당시 `relation_config.yaml`을 사용할 수 있게 했다. 현재1.3m 설정과 계약 검사는 유지한다.
+- 08-12-17-28의1000 checkpoint와 저장 설정(1.1m)의 계약 정확 일치를 CPU에서 확인했다. 셸문법/diff 검사 통과. GPU viewer와 기존학습/MPS는 실행·변경하지 않았다.
+
+
 ### TaskRSI PUSH 박스 1.3m 및 실행 시 크기 지정
 
 - 기본 박스를1.3m 정육면체로 늘리고 밀도로30kg을 유지한다. 초기 push 거리1.2~1.45m로 조정했다. `--push_box_size`와 train/test/preview의 `BOX_SIZE`로 크기를 지정하고 질량·최소 접근 간격을 자동 보정한다. VNC는 환경변수를 그대로 전달한다.
