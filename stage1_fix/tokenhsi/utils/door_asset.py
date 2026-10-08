@@ -124,3 +124,24 @@ def write_door_asset(path, spec=DoorSpec()):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(minidom.parseString(ET.tostring(robot)).toprettyxml(indent='  '))
     return path
+
+
+def cached_door_asset(directory, spec):
+    """Immutable per-spec URDF; atomic publication keeps concurrent viewers safe."""
+    import hashlib
+    import json
+    import os
+    import tempfile
+    directory=Path(directory)
+    directory.mkdir(parents=True,exist_ok=True)
+    key=hashlib.sha256(json.dumps(asdict(spec),sort_keys=True).encode()).hexdigest()[:20]
+    path=directory/('door_'+key+'.urdf')
+    if not path.exists():
+        fd,name=tempfile.mkstemp(prefix='.door_',suffix='.urdf',dir=str(directory))
+        os.close(fd)
+        try:
+            write_door_asset(Path(name),spec)
+            os.replace(name,path)
+        finally:
+            if os.path.exists(name):os.unlink(name)
+    return path

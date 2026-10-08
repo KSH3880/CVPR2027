@@ -86,6 +86,7 @@ env:
     maintain_weight: 0.6
     success_weight: 0.2
     push:
+      direction: away_from_door
       box:
         size:
         - 1.1
@@ -102,6 +103,7 @@ env:
       progress_speed: 0.5
       ground_tolerance: 0.04
     door:
+      handle_height: 0.95
       spring:
         spring_stiffness: 6.0
         spring_damping: 3.0
@@ -121,6 +123,7 @@ env:
       closing_speed: 0.6
       closing_deadband: 0.005
     amp:
+      hand_conditioning: user_hands_v1
       push_phase:
       - 0.0
       - 1.0
@@ -132,6 +135,9 @@ env:
       - 1.0
       hold_source: door_tail
     task_rsi:
+      door_rsi_probability: 0.5
+      door_facing_degrees: 60.0
+      door_hand_binding: user_paths_v1
       probability: 0.8
       push_phase:
       - 0.35
@@ -155,7 +161,7 @@ env:
       push_hand_height:
       - 0.75
       - 1.08
-      version: task_both_push_hands_contact_v4
+      version: task_door_user_hand_amp_v7
       door_early_max_degrees: 25.0
       door_early_fraction: 0.75
   startRandomization:
@@ -178,8 +184,8 @@ env:
     - 1.1
     - 1.35
     door_distance:
-    - 0.55
-    - 0.95
+    - 1.2
+    - 1.8
     human_lateral:
     - -0.2
     - 0.2

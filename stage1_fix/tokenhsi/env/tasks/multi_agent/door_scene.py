@@ -2,7 +2,7 @@
 from pathlib import Path
 from isaacgym import gymapi, gymtorch
 import torch
-from tokenhsi.utils.door_asset import DoorSpec
+from tokenhsi.utils.door_asset import DoorSpec, cached_door_asset
 
 ROOT=Path(__file__).resolve().parents[4]
 ASSET=ROOT/'tokenhsi/data/assets/door/left_hinge_right_handle.urdf'
@@ -11,6 +11,8 @@ ASSET=ROOT/'tokenhsi/data/assets/door/left_hinge_right_handle.urdf'
 class DoorFixture:
     def __init__(self,gym,sim,spec=DoorSpec(),asset_path=ASSET):
         self.gym,self.sim,self.spec=gym,sim,spec
+        if asset_path == ASSET and spec.handle_height != DoorSpec().handle_height:
+            asset_path = cached_door_asset(ROOT.parent/'runs/door_assets',spec)
         options=gymapi.AssetOptions()
         options.fix_base_link=True
         options.collapse_fixed_joints=False

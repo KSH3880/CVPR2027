@@ -100,3 +100,9 @@ Task message의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_st
 과제 RSI 서버 공통 구현: `tokenhsi/utils/task_rsi.py`는 PUSH/doorOpen 참조 pool, 늦은 phase 가중치, 작은 각도 호환 pool, 문틀 여유와 손잡이 정렬을 처리한다. `humanoid_ma_push_door.py`는 interaction.task_rsi가 있을 때만 이를 호출한다. `push_door_stage1_task_rsi.yaml`, `amp_ma_push_door_stage1_task_rsi.yaml`과 `push_door_stage1_task_rsi_{train,test,view}.sh`가 전용 실행 경로다. `task_rsi_preview.py`는 정지 초기화 preview, `check_task_rsi.py`는 headless 리셋/분포 검증이다. `.local` task 복사본을 제거하고 공통 구현을 사용한다.
 
 DOOR reward handle_gated_v2: push_door_spec.py의 door_shaping()은 접촉 개방/최저 거리 접근/닫힘 항을 계산한다. humanoid_ma_push_door.py는 실제 손/손잡이 힘과 거리로 호출하고 reset에서 previous_door_angle/best_hand_distance를 초기화한다. REWARD_TERM_NAMES에 door_approach/door_closing을 추가했다.
+
+PUSH 방향 변환은 `utils/push_door_spec.py`의 `redirect_push_away`에서 수행하며, 공통 task reset이 RSI 정렬 전에 적용한다.
+
+문 손잡이 높이는 `interaction.door.handle_height`에서 지정한다. `door_scene.py`는 기본과 다른 높이에 `door_asset.py::cached_door_asset`으로 `runs/door_assets/`의 spec별 URDF를 사용한다.
+
+DOOR RSI 정면 및 모션 작업 손 필터는 `utils/task_rsi.py`의 `motion_contact_hand`, `safe_door_candidates`, `build_pool`에서 처리한다. 접촉 손은 preview의 `[RSI hand]` 로그에 표시한다.

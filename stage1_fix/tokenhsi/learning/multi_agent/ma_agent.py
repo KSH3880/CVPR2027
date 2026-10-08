@@ -70,7 +70,7 @@ class MAAgent(amp_agent.AMPAgent):
         task = self.vec_env.env.task
         if getattr(task, '_amp_task_conditioning', False):
             from utils.unified_training import preserve_amp_labels
-            normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps)
+            normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps, getattr(task, '_amp_label_count', 3))
         return normalized
 
     def __init__(self, base_name, config):
@@ -466,7 +466,7 @@ class MAAgent(amp_agent.AMPAgent):
                 count = min(buffer.get_total_count(), buffer.get_buffer_size())
                 pool = buffer._data_buf['amp_obs'][:count] if count else reference[:0]
                 fallback = reference if key == 'amp_obs_replay' else None
-                matched = sample_family_matched(pool, reference, task._num_amp_obs_steps, fallback)
+                matched = sample_family_matched(pool, reference, task._num_amp_obs_steps, fallback, getattr(task, '_amp_label_count', 3))
                 batch_dict[key] = matched.view(scene_count, M, amp_dim)
 
         self.set_train()

@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches)
+                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, door_motion_hand)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -30,6 +30,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._relation_graph_spec = cfg['env']['relationGraph']
         self._state_relation = self._edge_context = self._stage2 = False
         self._amp_task_conditioning = True
+        self._amp_label_count = 5 if self._interaction['amp'].get('hand_conditioning')=='user_hands_v1' else 3
         self._enable_task_obs = True
         self._mode = 'test' if cfg['args'].test or cfg['args'].eval else 'train'
         self._task_preset = getattr(cfg['args'], 'task_graph', '') or 'random'
@@ -37,7 +38,8 @@ class HumanoidMAPushDoor(HumanoidMA):
             raise ValueError('TASK_GRAPH must be random/push/door/push_door/door_push')
         if self._mode == 'train' and self._task_preset != 'random':
             raise ValueError('Training must use random independent task sampling')
-        self._door_spec = replace(DoorSpec(), **self._interaction['door']['spring'])
+        self._door_spec = replace(DoorSpec(), handle_height=self._interaction['door'].get('handle_height',1.05),
+                                  **self._interaction['door']['spring'])
         self._num_amp_obs_steps = cfg['env']['numAMPObsSteps']
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
         N, M = self.num_envs, self.num_agents
@@ -47,8 +49,11 @@ class HumanoidMAPushDoor(HumanoidMA):
             motion_filter=(lambda path: door_motion_matches(path,self._interaction['door'].get('motion_direction','all'))) if skill=='doorOpen' else None)
             for skill in self._skill}
         self._num_amp_motion_features = 13 + self._dof_obs_size + self.num_dof + 3 * len(self._key_body_ids)
-        self._num_amp_obs_per_step = self._num_amp_motion_features + 3
+        self._num_amp_obs_per_step = self._num_amp_motion_features + self._amp_label_count
         self._amp_obs_buf = torch.zeros(N, M, self._num_amp_obs_steps, self._num_amp_obs_per_step, device=self.device)
+        self._door_amp_hand = torch.zeros(N,M,dtype=torch.long,device=self.device)
+        if self._amp_label_count==5:
+            self._door_reference_hands=torch.tensor([door_motion_hand(p) for p in self._motion_lib['doorOpen']._motion_files],device=self.device)
         self._tasks = torch.zeros(N, M, dtype=torch.long, device=self.device)
         self._holding_phase = torch.zeros(N, M, dtype=torch.bool, device=self.device)
         self._elapsed = torch.zeros(N, M, device=self.device)
@@ -183,6 +188,8 @@ class HumanoidMAPushDoor(HumanoidMA):
             row={'push':[0,0],'door':[1,1],'push_door':[0,1],'door_push':[1,0]}[self._task_preset]
             tasks=torch.tensor(row,device=self.device).expand(E,M)
         self._tasks[env_ids]=tasks
+        if self._amp_label_count==5:
+            self._door_amp_hand[env_ids]=torch.randint(2,(E,M),device=self.device)
         self._holding_phase[env_ids]=False; self._elapsed[env_ids]=0; self._done_task[env_ids]=False
         self._door_state_view[env_ids]=0
         boxes=self._box_states[env_ids].clone(); boxes.zero_(); boxes[...,6]=1
@@ -233,8 +240,18 @@ class HumanoidMAPushDoor(HumanoidMA):
             heading = torch.zeros(E,M,4,device=self.device)
             heading[...,2]=torch.sin(spawn_yaw/2);heading[...,3]=torch.cos(spawn_yaw/2)
             unheading=quat_mul(heading.reshape(-1,4),unheading)
+        if self._interaction['push'].get('direction', 'toward_door') == 'away_from_door':
+            boxes, goals, new_root, heading = redirect_push_away(
+                self._box_states[env_ids], self._targets[env_ids], new_root,
+                unheading.reshape(E,M,4), tasks)
+            self._box_states[env_ids] = boxes
+            self._targets[env_ids] = goals
+            unheading = heading.reshape(-1,4)
         if 'task_rsi' in self._interaction:
-            unheading,new_root=align_task_reference(self,env_ids,tasks,rsi_mask,root_pos,body_pos,unheading,new_root)
+            unheading,new_root=align_task_reference(self,env_ids,tasks,rsi_mask,root_pos,body_pos,unheading,new_root,root_rot,body_rot)
+        if self._amp_label_count==5 and 'task_rsi' in self._interaction:
+            bound=self._last_rsi_contact_hand
+            self._door_amp_hand[env_ids]=torch.where(bound>=0,bound,self._door_amp_hand[env_ids])
         rotation=unheading[:,None,:].expand(-1,self.num_bodies,-1).reshape(-1,4)
         relative=body_pos-root_pos[:,None,:]
         transformed=quat_rotate(rotation,relative.reshape(-1,3)).view(E,M,self.num_bodies,3)+new_root[:,:,None,:]
@@ -291,6 +308,13 @@ class HumanoidMAPushDoor(HumanoidMA):
         handle_pos=torch.stack([handle,back],dim=2)
         handle_force=torch.stack([torch.linalg.vector_norm(self._all_contacts[self.doors.body_indices[n]],dim=-1).view(self.num_envs,self.num_agents) for n in ('handle','handle_back')],-1)
         contact=hand_handle_contact(hands,handle_pos,hand_force,handle_force,d['contact_distance'],d['contact_force'])
+        if self._amp_label_count==5:
+            gaps=(hands[:,:,:,None,:]-handle_pos[:,:,None,:,:]).norm(dim=-1)
+            touch=(gaps<d['contact_distance']) & (hand_force[:,:,:,None]>d['contact_force']) & (handle_force[:,:,None,:]>d['contact_force'])
+            score=gaps.masked_fill(~touch,float('inf')).amin(-1)
+            actual=score.argmin(-1)
+            self._door_amp_hand=torch.where(touch.any(-1).any(-1)&self._tasks.bool(),actual,self._door_amp_hand)
+
         hand_distance=(hands[:,:,:,None,:]-handle_pos[:,:,None,:,:]).norm(dim=-1).amin(dim=(-1,-2))
         door_progress,self._best_angle,approach,self._best_hand_distance,closing=door_shaping(
             angle,self._best_angle,self._previous_door_angle,hand_distance,self._best_hand_distance,contact,self.dt,d)
@@ -315,13 +339,16 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._reward_term_sums+=terms.mean(0);self._reward_term_count+=1
         self.extras['success']=self._done_task.flatten().float()
         self.extras['precision']=torch.where(self._tasks.bool(),(angle/angle_target).clamp(0,1),torch.exp(-distance)).flatten()
-        self._diagnostics={'push_fraction':push.mean(),'door_hold_phase_fraction':self._holding_phase.float().mean(),
+        self._diagnostics={'push_fraction':push.mean(),
+            'door_hold_phase_fraction':self._holding_phase.float().mean(),
             'door_handle_contact_fraction':(contact*door).sum()/door.sum().clamp_min(1),
             'push_success':(self._done_task*push).sum()/push.sum().clamp_min(1),
             'door_success':(self._done_task*door).sum()/door.sum().clamp_min(1)}
 
     def _family(self, env_ids=None):
         ids=slice(None) if env_ids is None else env_ids
+        if self._amp_label_count==5:
+            return torch.where(self._tasks[ids]==0,0,1+self._door_amp_hand[ids]+2*self._holding_phase[ids].long())
         return torch.where(self._tasks[ids]==0,0,torch.where(self._holding_phase[ids],2,1))
 
     def _compute_amp_observations(self, env_ids=None):
@@ -336,36 +363,44 @@ class HumanoidMAPushDoor(HumanoidMA):
             self._dof_pos[ids].reshape(B,-1),self._dof_vel[ids].reshape(B,-1),pos[:,:,self._key_body_ids].reshape(B,-1,3),
             self._local_root_obs,self._root_height_obs,self._dof_obs_size,self._dof_offsets)
         family=self._family(env_ids)
-        self._amp_obs_buf[ids,:,0]=torch.cat([obs,F.one_hot(family.flatten(),3).float()],-1).view(*family.shape,-1)
+        self._amp_obs_buf[ids,:,0]=torch.cat([obs,F.one_hot(family.flatten(),self._amp_label_count).float()],-1).view(*family.shape,-1)
         # Whole physical history is conditioned on its CURRENT task/phase. Keeping
         # old labels would reveal transitions to the discriminator as a shortcut.
-        self._amp_obs_buf[ids,:,:, -3:]=F.one_hot(family,3).float()[:,:,None,:].expand(-1,-1,self._num_amp_obs_steps,-1)
+        self._amp_obs_buf[ids,:,:, -self._amp_label_count:]=F.one_hot(family,self._amp_label_count).float()[:,:,None,:].expand(-1,-1,self._num_amp_obs_steps,-1)
 
     def _expert_source(self, family):
+        if self._amp_label_count==5 and family>0:
+            family=1 if family<=2 else 2
         if family==0:return 'push',self._interaction['amp']['push_phase']
         if family==1:return 'doorOpen',self._interaction['amp']['open_phase']
         name='loco' if self._interaction['amp']['hold_source']=='loco' else 'doorOpen'
         return name,self._interaction['amp']['hold_phase'] if name=='doorOpen' else [0.,1.]
 
     def _validate_expert_windows(self):
-        for family in range(3):
+        for family in range(self._amp_label_count):
             name,phase=self._expert_source(family);lib=self._motion_lib[name]
             expert_time(lib._motion_lengths[lib._motion_weights>0],self.dt*(self._num_amp_obs_steps-1),phase)
 
     def fetch_amp_obs_demo(self, num_samples):
         # Populate every family even for small demo updates.
-        family=torch.arange(num_samples,device=self.device)%3
+        family=torch.arange(num_samples,device=self.device)%self._amp_label_count
         result=torch.empty(num_samples,self.get_num_amp_obs(),device=self.device)
-        for uid in range(3):
+        for uid in range(self._amp_label_count):
             inds=(family==uid).nonzero(as_tuple=False).flatten()
             if not len(inds):continue
-            name,phase=self._expert_source(uid);lib=self._motion_lib[name];mids=lib.sample_motions(len(inds))
+            name,phase=self._expert_source(uid);lib=self._motion_lib[name]
+            if self._amp_label_count==5 and name=='doorOpen':
+                hand=(uid-1)%2
+                weights=lib._motion_weights*(self._door_reference_hands==hand)
+                if weights.sum()<=0:raise ValueError('Missing DOOR expert hand: '+str(hand))
+                mids=torch.multinomial(weights,len(inds),replacement=True)
+            else:mids=lib.sample_motions(len(inds))
             t=expert_time(lib.get_motion_length(mids),self.dt*(self._num_amp_obs_steps-1),phase)
             times=t[:,None]-self.dt*torch.arange(self._num_amp_obs_steps,device=self.device)
             motion_ids=mids[:,None].expand_as(times).reshape(-1)
             root,rot,dof,vel,ang,dofvel,key=lib.get_motion_state(motion_ids,times.flatten())
             obs=build_amp_observations(root,rot,vel,ang,dof,dofvel,key,self._local_root_obs,self._root_height_obs,self._dof_obs_size,self._dof_offsets)
-            labels=F.one_hot(torch.full((len(obs),),uid,device=self.device),3).float()
+            labels=F.one_hot(torch.full((len(obs),),uid,device=self.device),self._amp_label_count).float()
             result[inds]=torch.cat([obs,labels],-1).view(len(inds),-1)
         return result
 

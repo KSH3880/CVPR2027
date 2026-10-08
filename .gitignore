@@ -30,6 +30,7 @@
 *.ckpt
 *.onnx
 *.engine
+*.bvh
 
 # Generated outputs and visualizations
 **/output/

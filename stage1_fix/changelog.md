@@ -4,6 +4,62 @@
 
 ## 2026-10-08
 
+### 사용자 확인 좌우 손 라벨로 RSI·AMP 참조/replay 매칭
+
+- 사용자 확인 `right_side`미러=왼손, `left_side`원본=오른손 라벨을 추가해 RSI reach 추정을 대체했다. 알려지지 않은 경로는 명시적으로 거부한다. 정면/높이/reach/문틀 조건은 유지하며 RSI124frame·양손 종류가 남았다. task RSI계약v7.
+- 공통3설정에 AMP user_hands_v1을 추가해 PUSH/오른손개방/왼손개방/오른손유지/왼손유지5-family(1340-D)를 사용한다. 전문가 clip은 사용자 손 라벨로 샘플하고 demo/replay는5-family로 매칭한다. 정규화/물리history label도5종을 지원하며 다른task/구viewer의3종 기본과 오류 메시지는 보존했다.
+- RSI는 모션 작업 손을 초기 AMP손으로 지정하고 접근 시작은 랜덤 좌우로 지정한다. 실제손-손잡이 거리와 양쪽 접촉힘 조건을 만족하면 현재손으로 갱신하며 두손접촉은 더 가까운 손을 따른다. 보상/정책관측/action/문방향 필터는 유지한다. 구checkpoint 현재계약 혼용은 거부하므로 새학습이 필요하다.
+- CPU29테스트 통과: 명시라벨·미지원경로 거부·5종demo/replay와 정규화·fallback·기존Unified3종 회귀. 실제8모션/양손 각2048 expert샘플·phasewindow·RSI124frame 검증. 보고서 runs/rsi_checks/door_user_hands_amp.json. GPU학습/전체물리·손전환 동작은 실행하지 않았고 MPS/기존학습은 변경하지 않았다.
+
+
+### DOOR 접촉RSI와 떨어진 접근 시작50:50 혼합
+
+- 문에서 걸어가서 여는 시작도 필요하다는 사용자 요청으로 task_rsi 실험에 DOOR RSI확률0.5를 추가했다. 나머지0.5는 loco 자세·닫힌 문·문plane 앞1.2~1.8m 시작이다. PUSH RSI0.8·정면/참조 손 필터·보상·AMP는 유지한다. 구설정은 단일확률 동작을 유지한다. 초기화 계약v6으로 변경했다.
+- Preview 기본100%강제를 제거해 현재 학습 분포를 그대로 본다. 명시적 RSI_PREVIEW_PROBABILITY=0/1로 접근/접촉만 볼 수 있으며 문서를 갱신했다.
+- CPU30테스트 통과: 20,000환경의 PUSH0.8/DOOR0.5 혼합비·거리1.2~1.8m·lane분포·legacy확률 및 기존 회귀. GPU 학습·viewer·전체 RSI물리는 실행하지 않았고 기존 학습/MPS는 변경하지 않았다. 실제 접근 후 문 개방 학습 성능은 미검증이다.
+
+
+### DOOR RSI 등진 자세 제외·모션 작업 손 고정
+
+- 사용자 관측에 따라 DOOR RSI에서 골반/torso 정면이 손잡이 방향60° 밖인 후보를 제외한다. 참조 회전을 정렬까지 전달하고 문틀/손 높이/reach 검사를 함께 적용한다. 몸을 등진 채 손만 붙는 후보는 제외한다.
+- 실제 asset FK로 복원한 clip의 RSI phase 양손 reach 평균을 비교하여 작업 손을 고정한다. 차이6cm 미만은 모호한 clip으로 RSI 제외, 선택된 모션의 작업 손만 손잡이에 정렬하며 높이 때문에 반대 손으로 바꾸지 않는다. 원본 contact annotation이 없어 손 정보는 자세 기반 추정이다. left_side/right_side 파일명은 접촉 손 라벨이 아니다. preview에 손 인덱스 로그를 추가하고 초기화 계약v5/문서를 갱신했다. AMP3-family 좌우혼합은 유지하고 손별 AMP 조건화는 하지 않았다.
+- CPU29테스트 통과: 좌우미러/모호 clip·골반/torso 등짐·강제 손 높이 불일치·기존 reward/geometry 회귀. 실제 DOOR8모션에서104 RSI프레임·양손 종류·모든 frame의 유효 후보를 확인하고 대표 자세 그림을 검토했다. 보고서/그림은 `runs/rsi_checks/door_facing_hands.{json,png}`. CPU 정렬 손잡이 최대 오차0.1012m(높이 tolerance10cm+gap3cm). GPU viewer/학습 및 전체 물리 RSI는 실행하지 않았고 MPS·학습 프로세스는 변경하지 않았다.
+
+
+### 직전 보상 강화 원복·손잡이10cm 낮춤
+
+- 사용자 요청으로 PUSH 양손 표면 보상·진행 감쇠, DOOR opening_weight0.8·angle_weight0.2와 관련 helper/로그/테스트를 제거했다. 기존0.4 진행 및 handle_gated_v2는 유지한다. 문 반대 PUSH 동선은 유지한다.
+- 공통3개 설정에 door.handle_height0.95m를 추가했다(기존1.05m). 명치 부근으로 낮추려는 첫 조정이며 자세별 높이 일치는 아직 미검증이다. 실제 asset을 spec별 `runs/door_assets/`에서 원자적으로 생성해 물리/관측/RSI를 일치시켰다. 기본 DoorSpec/원본URDF는1.05m로 유지해 구 checkpoint viewer를 보존한다. 높이는 interaction 계약에 포함된다.
+- CPU27테스트 통과, 수정 Python 문법 검증 통과. CPU PhysX1-step에서 앞/뒤 손잡이 actual z=0.94999999m 확인. CPU 실행의 libcuda preload 경고가 있었으나 geometry 검증은 완료했다. 전체 agent RSI·GPU 학습은 실행하지 않았으며 진행 중 학습·MPS는 변경하지 않았다.
+
+
+### 로컬 TaskRSI 5500 viewer 계약 복원
+
+- 구3500 viewer 설정과 다른 로컬 TaskRSI5500 checkpoint의 interaction·시작 분포·충돌 설정을 CPU에서 복원해 `runs/checkpoint_views/push_door_task_rsi_from_local_5500.yaml`을 생성했다. 원래 RSI와 구 보상으로 실행하며 현재 학습의 방향/보상은 유지한다.
+- interaction 검증·checkpoint metadata 정확한 일치·TaskRSI/random_start network 설정 동등성 확인. GPU viewer 실행·학습·MPS 변경 없음.
+
+
+### PUSH 양손 이탈 억제와 DOOR 접촉 개방 보상 강화
+
+- 상자가 틀어지면서 손이 올라가고 DOOR가 옆으로 피하는 관측에 따라 fixed/random_start/task_rsi 공통 보상을 수정했다. PUSH는 상자 로컬 좌표의 목표 반대 측면·손 반경·높이 범위로 양손 오차를 계산하고 최소 Gaussian 품질로 진행 보상을 감쇠한다. 품질 기반 손 보상0.15는 진행/정착 때만 지급해 손만 붙이고 정지하는 보상을 막는다. 실제 접촉력 판정은 아니며 기존 상자 바닥/upright·정착/성공 조건은 유지한다.
+- DOOR는 접촉 개방 진행 계수0.4→0.8 및 접촉 조건부 개방각 보상0.2를 추가했다. 기존 손잡이 gate·기록 소비·닫힘 패널티는 유지하며 통과 목표는 추가하지 않았다. 보상/진단 로그와 실행 문서를 갱신했다. 새 키는 interaction 계약에 포함되어 구 checkpoint 혼용을 거부한다. 키가 없는 구 viewer config는 기존 보상을 유지한다.
+- CPU18테스트 통과(양손·높이 이탈·반대 면·한 손 이탈·목표 도착·기존 reward 회귀·계약/설정). GPU 학습·시뮬레이션은 실행하지 않았으며 사용자 학습·MPS는 변경하지 않았다. 실제 동작 개선은 새 학습에서 확인해야 한다.
+
+
+### 기존 checkpoint의 원래 환경으로 viewer 실행
+
+- 사용자 요청으로 epoch3500 checkpoint의 interaction·시작 랜덤화·충돌 설정을 CPU에서 읽어 `runs/checkpoint_views/push_door_random_start_08-01-39-16_3500.yaml`로 복원했다. 현재 학습 config의 away_from_door는 유지한다.
+- random_start 평가 스크립트에 명령별 `CFG_ENV` override를 추가해 view/VNC에서 별도 환경을 선택한다. 기본값과 학습 스크립트는 유지하며 checkpoint 계약 검증을 우회하지 않는다. 실행 가이드에 구 checkpoint VNC 명령을 기재했다.
+- 복원 YAML의 metadata와 checkpoint 계약 정확히 일치·interaction 검증·현재 학습 방향 유지·셸 문법 검사 통과. GPU viewer는 실행하지 않았으며 MPS·학습 프로세스는 변경하지 않았다.
+
+
+### PUSH 목표와 시작 자세를 문 반대 방향으로 전환
+
+- 문 쪽으로 밀던 동선에 대한 사용자 요청으로 fixed/random_start/task_rsi에 `interaction.push.direction: away_from_door`를 적용했다. 공통 reset에서 PUSH의 목표·사람 위치를 상자 중심으로 180도 돌리고 상자·사람 orientation도 함께 회전한다. DOOR는 유지한다. RSI는 회전된 상자 방향에서 정렬·목표 재생성을 수행하므로 같은 방향을 유지한다.
+- 방향 설정은 기존 interaction checkpoint 계약에 포함된다. 이전 방향 checkpoint 혼용은 거부하며 새 설정은 scratch 학습한다. 진행 중 학습·MPS는 변경하지 않았다. 실행·구조 문서를 갱신했다.
+- CPU 테스트 16개 통과: 혼합 task 8192 agent 샘플의 목표 -X·사람 뒤쪽 배치·거리 보존·DOOR 불변·RSI 기준 상자 방향을 검사했다. 수정 Python 3개 문법 검사 통과. 테스트 실행은 Isaac Gym 선행 import와 conda 라이브러리 경로를 사용했다. GPU 시뮬레이션·학습은 실행하지 않았다.
+
+
 ### DOOR 손잡이 접촉 기반 보상
 
 - 공통 task/helpers와3개 config에 handle_gated_v2 적용. 개방 진행 보상을 손잡이 접촉으로 제한하고 접촉 없는 최고 기록도 소비해 지연 보상/닫기-재개방 악용을 막았다. 최고 접근 진행 보상0.1, 닫힘 패널티-0.2 추가. 문 이동으로 접근 보상을 얻는 것을 제한하고 RSI 리셋에서 거리/직전 각도 기준을 초기화했다. 기존 유지·성공·PUSH·AMP 혼합비 유지, TensorBoard 신규항목 기록, checkpoint 계약 변경.

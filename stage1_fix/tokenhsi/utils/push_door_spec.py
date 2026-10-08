@@ -121,8 +121,14 @@ def validate_interaction(config):
         for key in keys:
             if not math.isfinite(data[key]) or data[key] <= 0:
                 raise ValueError('Invalid task parameter: ' + key)
+    if push.get('direction', 'toward_door') not in ('toward_door', 'away_from_door'):
+        raise ValueError('Invalid PUSH direction')
+    if 'handle_height' in door and (not math.isfinite(door['handle_height']) or not 0 < door['handle_height'] < 2.1):
+        raise ValueError('Invalid DOOR handle height')
     rsi=config.get('task_rsi')
     if rsi is not None:
+        if 'door_rsi_probability' in rsi and (not math.isfinite(rsi['door_rsi_probability']) or not 0 <= rsi['door_rsi_probability'] <= 1):
+            raise ValueError('Invalid DOOR RSI probability')
         for name in ('probability','late_fraction','door_early_fraction'):
             if not math.isfinite(rsi[name]) or not 0 <= rsi[name] <= 1:
                 raise ValueError('Invalid task RSI probability: '+name)
@@ -137,6 +143,11 @@ def validate_interaction(config):
                 raise ValueError('Invalid task RSI clearance: '+name)
         if not math.isfinite(rsi['push_surface_gap']) or rsi['push_surface_gap']<0:
             raise ValueError('Invalid RSI push surface gap')
+        if 'door_facing_degrees' in rsi:
+            if not math.isfinite(rsi['door_facing_degrees']) or not 0 < rsi['door_facing_degrees'] < 90:
+                raise ValueError('DOOR RSI facing limit must be below 90 degrees')
+            if rsi.get('door_hand_binding') not in ('motion_extension_v1','user_paths_v1'):
+                raise ValueError('Facing-filtered RSI requires motion hand binding')
         lo,hi=rsi['push_remaining']
         if not 0 < lo <= hi:raise ValueError('Invalid task RSI push distance')
         lo,hi=rsi['push_hand_height']
@@ -149,6 +160,20 @@ def validate_interaction(config):
             raise ValueError('Invalid AMP phase: ' + name)
     if amp['open_phase'][1] > amp['hold_phase'][0]:
         raise ValueError('Door open and holding reference phases must not overlap')
+
+
+def redirect_push_away(boxes, goals, humans, rotations, tasks):
+    """Half-turn PUSH about its box; preserve DOOR and all relative distances."""
+    push = tasks == 0
+    boxes, goals, humans, rotations = (x.clone() for x in (boxes, goals, humans, rotations))
+    for value in (goals, humans):
+        value[..., :2] = torch.where(push[..., None],
+            2 * boxes[..., :2] - value[..., :2], value[..., :2])
+    # Quaternion order xyzw: left-multiply a world-Z half-turn.
+    for q in (boxes[..., 3:7], rotations):
+        turned = torch.stack([-q[..., 1], q[..., 0], q[..., 3], -q[..., 2]], -1)
+        q.copy_(torch.where(push[..., None], turned, q))
+    return boxes, goals, humans, rotations
 
 
 def push_box_start_x(box_size, maximum_target_distance, forward_jitter=0.):
@@ -192,6 +217,16 @@ def sample_start_layout(tasks, config, box_size, lanes):
     delta = facing - human[..., :2]
     yaw = torch.atan2(delta[..., 1], delta[..., 0]) + torch.deg2rad(uniform(config['human_yaw_degrees']))
     return boxes, target, human, yaw, torch.deg2rad(uniform(config['box_yaw_degrees'])), shift
+
+
+def door_motion_hand(path):
+    """User-confirmed working hand: 0=right, 1=left (keyBodies order)."""
+    clip=str(path).replace('\\','/').split('/')[-3]
+    if 'inside_door_handle_left_side_open_' in clip and not clip.endswith('_M'):
+        return 0
+    if 'inside_door_handle_right_side_open_' in clip and clip.endswith('_M'):
+        return 1
+    raise ValueError('No user-confirmed working-hand label for DOOR clip: '+clip)
 
 
 def door_motion_matches(path, direction):

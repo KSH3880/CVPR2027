@@ -20,7 +20,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         normalized = super()._preproc_amp_obs(amp_obs)
         if getattr(self.env.task, '_amp_task_conditioning', False):
             from utils.unified_training import preserve_amp_labels
-            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps)
+            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps, getattr(self.env.task, '_amp_label_count', 3))
         return normalized
 
     def __init__(self, config):

@@ -222,3 +222,119 @@ def test_door_shaping_blocks_body_push_delayed_credit_and_approach_farming():
     reset=step(.3,.3,.3,.1,.1,False)
     assert reset[0].item()==0 and reset[2].item()==0 and reset[4].item()==0
     assert step(.299,.3,.3,.1,.1,False)[-1].item()==0
+
+
+def test_push_away_direction_preserves_door_and_clears_trajectory():
+    from utils.push_door_spec import sample_start_layout, redirect_push_away
+    for name in ('push_door_stage1_random_start', 'push_door_stage1_task_rsi'):
+        env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
+        assert env['interaction']['push']['direction']=='away_from_door'
+        tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]]).repeat(1024,1)
+        b,g,h,y,by,shift=sample_start_layout(tasks,env['startRandomization'],torch.tensor([1.1]*3),torch.tensor([-1.6,1.6]))
+        boxes=torch.zeros(*tasks.shape,13);boxes[...,:3]=b
+        boxes[...,5]=torch.sin(by/2);boxes[...,6]=torch.cos(by/2)
+        q=torch.zeros(*tasks.shape,4);q[...,2]=torch.sin(y/2);q[...,3]=torch.cos(y/2)
+        nb,ng,nh,nq=redirect_push_away(boxes,g,h,q,tasks)
+        push=tasks==0;door=~push
+        assert torch.all(ng[...,0][push]<b[...,0][push])
+        assert torch.all(nh[...,0][push]>b[...,0][push])
+        # Entire box-to-goal segment moves away from the door plane.
+        assert torch.all(ng[...,0][push]<shift[...,0][push])
+        torch.testing.assert_close(torch.linalg.vector_norm(ng[...,:2]-b[...,:2],dim=-1),torch.linalg.vector_norm(g[...,:2]-b[...,:2],dim=-1))
+        for original,changed in ((boxes,nb),(g,ng),(h,nh),(q,nq)):
+            torch.testing.assert_close(original[door],changed[door])
+        torch.testing.assert_close(nb[...,:3],boxes[...,:3])
+        torch.testing.assert_close(torch.linalg.vector_norm(nq,dim=-1),torch.ones_like(y))
+        # RSI follows the box orientation when it regenerates a PUSH goal.
+        yaw=2*torch.atan2(nb[...,5],nb[...,6])
+        assert torch.all(torch.cos(yaw[push])<0)
+
+
+
+def test_restored_reward_and_lower_handle_configuration():
+    for name in ('push_door_stage1','push_door_stage1_random_start','push_door_stage1_task_rsi'):
+        env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
+        c=env['interaction'];validate_interaction(c)
+        assert 'hand_reward_weight' not in c['push']
+        assert 'opening_weight' not in c['door'] and 'angle_weight' not in c['door']
+        assert c['progress_weight']==.4 and c['door']['handle_height']==.95
+        assert c['push']['direction']=='away_from_door'
+        old=copy.deepcopy(env);old['interaction']['door'].pop('handle_height')
+        with pytest.raises(ValueError):
+            check_interaction_checkpoint({'interaction_metadata':interaction_metadata(old)},interaction_metadata(env))
+
+
+def test_motion_contact_hand_tracks_mirror_and_rejects_ambiguous_clip():
+    from utils.task_rsi import motion_contact_hand
+    extension=torch.tensor([[.6,.2],[.5,.2],[.2,.6],[.2,.5],[.3,.31],[.32,.3]])
+    ids=torch.tensor([0,0,1,1,2,2])
+    assert motion_contact_hand(extension,ids,3,.06).tolist()==[0,1,-1]
+
+
+def test_door_rsi_rejects_backwards_pelvis_or_torso_and_forces_motion_hand():
+    from types import SimpleNamespace
+    from tokenhsi.utils.door_asset import DoorSpec
+    from utils.task_rsi import safe_door_candidates
+    cfg={'min_extension':.2,'door_height_tolerance':.1,'door_angle_degrees':[5.,79.],
+         'hand_gap':.03,'frame_clearance':.03,'door_facing_degrees':60.}
+    task=SimpleNamespace(_interaction={'task_rsi':cfg},_key_body_ids=torch.tensor([5,8]),_door_spec=DoorSpec(handle_height=.95))
+    root=torch.tensor([[0.,0.,1.]])
+    body=root[:,None,:].expand(-1,15,-1).clone()
+    body[:,5]=torch.tensor([.55,-.05,.95]);body[:,8]=torch.tensor([.3,.05,.95])
+    identity=torch.tensor([[0.,0.,0.,1.]])
+    back=torch.tensor([[0.,0.,1.,0.]])
+    hand=torch.tensor([0])
+    angles,q,origins,safe=safe_door_candidates(task,root,body,identity,identity,hand)
+    assert safe.any()
+    for pelvis,torso in ((back,identity),(identity,back),(back,back)):
+        assert not safe_door_candidates(task,root,body,pelvis,torso,hand)[3].any()
+    assert not safe_door_candidates(task,root,body,identity,identity,torch.tensor([-1]))[3].any()
+    body[:,5,2]=1.5
+    assert not safe_door_candidates(task,root,body,identity,identity,hand)[3].any()
+
+
+def test_door_approach_contact_mix_and_far_spawn():
+    from utils.task_rsi import select_task_rsi
+    from utils.push_door_spec import sample_start_layout
+    env=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml').read_text())['env']
+    config=env['interaction']['task_rsi'];validate_interaction(env['interaction'])
+    torch.manual_seed(42);tasks=torch.tensor([[0,1]]).repeat(20000,1)
+    selected=select_task_rsi(tasks,config)
+    assert abs(selected[:,0].float().mean().item()-.8)<.02
+    assert abs(selected[:,1].float().mean().item()-.5)<.02
+    b,g,h,yaw,by,shift=sample_start_layout(tasks,env['startRandomization'],torch.tensor([1.1]*3),torch.tensor([-1.6,1.6]))
+    distance=shift[:,1,0]-h[:,1,0]
+    assert distance.min()>=1.2-1e-6 and distance.max()<=1.8+1e-6
+    assert (h[:,1,1]-shift[:,1,1]+.36).abs().max()<=.2+1e-6
+    # Legacy viewer configs keep their original single probability.
+    legacy=select_task_rsi(tasks,{'probability':1.})
+    assert legacy.all()
+    assert not select_task_rsi(tasks,{'probability':0.,'door_rsi_probability':0.}).any()
+
+
+def test_user_confirmed_door_motion_hands():
+    from utils.push_door_spec import door_motion_hand
+    for actor in ('A512','A513','A514','A515'):
+        assert door_motion_hand('motions/inside_door_handle_left_side_open_walk_R_001__'+actor+'/phys_humanoid_v3/ref_motion.npy')==0
+        assert door_motion_hand('motions/inside_door_handle_right_side_open_walk_R_001__'+actor+'_M/phys_humanoid_v3/ref_motion.npy')==1
+    with pytest.raises(ValueError):
+        door_motion_hand('motions/inside_door_handle_left_side_open_walk_R_001__A512_M/phys_humanoid_v3/ref_motion.npy')
+
+
+def test_five_amp_families_match_hands_and_preserve_raw_labels():
+    from utils.unified_training import sample_family_matched,preserve_amp_labels,amp_family_ids
+    ids=torch.arange(5).repeat(3)
+    labels=torch.nn.functional.one_hot(ids,5).float()
+    frame=torch.cat([ids[:,None].float(),labels],-1)
+    pool=frame[:,None,:].repeat(1,10,1).flatten(1)
+    reference=pool.flip(0)
+    matched=sample_family_matched(pool,reference,10,num_families=5)
+    torch.testing.assert_close(amp_family_ids(matched,10,5),amp_family_ids(reference,10,5))
+    torch.testing.assert_close(matched.reshape(-1,10,6)[:,0,0].long(),amp_family_ids(reference,10,5))
+    normalized=preserve_amp_labels(pool,pool+42,10,5).reshape(-1,10,6)
+    torch.testing.assert_close(normalized[:,:,1:],pool.reshape(-1,10,6)[:,:,1:])
+    torch.testing.assert_close(normalized[:,:,0],pool.reshape(-1,10,6)[:,:,0]+42)
+    with pytest.raises(ValueError):
+        sample_family_matched(pool[ids!=4],reference,10,num_families=5)
+    fallback=sample_family_matched(pool[ids!=4],reference,10,reference,5)
+    torch.testing.assert_close(amp_family_ids(fallback,10,5),amp_family_ids(reference,10,5))

@@ -71,7 +71,18 @@ def frame_clearance(task, points):
     sdf=delta.clamp_min(0).norm(dim=-1)+delta.amax(-1).clamp_max(0)
     return (sdf-radii.unsqueeze(-1)).amin(dim=(-1,-2))
 
-def safe_door_candidates(task, root, body):
+def motion_contact_hand(extension, motion_ids, num_motions, margin):
+    """Infer a clip's working hand from mean root-relative XY reach; reject ties."""
+    labels=torch.full((num_motions,),-1,dtype=torch.long,device=extension.device)
+    for mid in range(num_motions):
+        values=extension[motion_ids==mid]
+        if not len(values):continue
+        score=values.mean(0)
+        if (score.max()-score.min())>=margin:labels[mid]=score.argmax()
+    return labels
+
+
+def safe_door_candidates(task, root, body, root_rotation=None, torso_rotation=None, contact_hand=None):
     """Return aligned transforms and safe angle masks before sampling a reset."""
     cfg=task._interaction['task_rsi'];dev=body.device
     rel=body-root[:,None,:]
@@ -79,6 +90,10 @@ def safe_door_candidates(task, root, body):
     heights=body[:,task._key_body_ids[:2],2]
     eligible=hands[...,:2].norm(dim=-1)>cfg['min_extension']
     pick=(heights-task._door_spec.handle_height).abs().masked_fill(~eligible,float('inf')).argmin(-1)
+    if contact_hand is not None:
+        pick=contact_hand.clamp_min(0)
+    chosen_ok=eligible.gather(1,pick[:,None]).squeeze(1) & ((heights.gather(1,pick[:,None]).squeeze(1)-task._door_spec.handle_height).abs()<cfg['door_height_tolerance'])
+    if contact_hand is not None: chosen_ok &= contact_hand>=0
     hand=hands[torch.arange(len(root),device=dev),pick]
     low,high=cfg['door_angle_degrees']
     angles=torch.deg2rad(torch.linspace(low,high,64,device=dev))
@@ -92,7 +107,18 @@ def safe_door_candidates(task, root, body):
     normal=torch.stack([angles.cos(),angles.sin()],-1)
     origins[...,:2]=handle[None,:,:2]-normal[None,:,:]*cfg['hand_gap']-hand_rotated[...,:2]
     clearance=frame_clearance(task,rotated+origins[:,:,None,:])
-    return angles,q,origins,clearance>=cfg.get('frame_clearance',.03)
+    safe=(clearance>=cfg.get('frame_clearance',.03)) & chosen_ok[:,None]
+    if cfg.get('door_facing_degrees') is not None:
+        if root_rotation is None or torso_rotation is None:
+            raise ValueError('Facing-filtered RSI requires reference root/torso rotations')
+        towards=handle[None,:,:2]-origins[...,:2]
+        towards=towards/towards.norm(dim=-1,keepdim=True).clamp_min(1e-6)
+        for reference in (root_rotation,torso_rotation):
+            forward=quat_rotate(reference,reference.new_tensor([1.,0.,0.]).expand(len(root),3))
+            facing=quat_rotate(q.reshape(-1,4),forward[:,None,:].expand(-1,len(angles),-1).reshape(-1,3)).view(len(root),len(angles),3)[...,:2]
+            facing=facing/facing.norm(dim=-1,keepdim=True).clamp_min(1e-6)
+            safe &= (facing*towards).sum(-1)>=math.cos(math.radians(cfg['door_facing_degrees']))
+    return angles,q,origins,safe
 
 def build_pool(task,skill):
     cfg=task._interaction['task_rsi'];lib=task._motion_lib[skill]
@@ -107,6 +133,16 @@ def build_pool(task,skill):
     body,brot=asset_reference_pose(task,root,rot,dof)
     hands=body[:,task._key_body_ids[:2]]
     extension=torch.linalg.vector_norm(hands[...,:2]-root[:,None,:2],dim=-1)
+    contact_hand=None
+    if skill=='doorOpen' and cfg.get('door_hand_binding')=='user_paths_v1':
+        from utils.push_door_spec import door_motion_hand
+        labels=torch.tensor([door_motion_hand(p) for p in lib._motion_files],device=task.device)
+        task._door_motion_contact_hands=labels
+        contact_hand=labels[mids]
+    if skill=='doorOpen' and cfg.get('door_hand_binding')=='motion_extension_v1':
+        labels=motion_contact_hand(extension,mids,len(lib._motion_lengths),cfg['door_hand_score_margin'])
+        task._door_motion_contact_hands=labels
+        contact_hand=labels[mids]
     if skill=='push':
         low,high=cfg['push_hand_height']
         rel=hands[...,:2]-root[:,None,:2]
@@ -118,13 +154,15 @@ def build_pool(task,skill):
     else:
         near=(hands[...,2]-task._door_spec.handle_height).abs()<cfg['door_height_tolerance']
         valid=(near&(extension>cfg['min_extension'])).any(-1)
+        if contact_hand is not None:
+            valid &= (contact_hand>=0) & (near & (extension>cfg['min_extension'])).gather(1,contact_hand.clamp_min(0)[:,None]).squeeze(1)
         indices=valid.nonzero().flatten()
         for chunk in indices.split(128):
-            valid[chunk]&=safe_door_candidates(task,root[chunk],body[chunk])[3].any(-1)
+            valid[chunk]&=safe_door_candidates(task,root[chunk],body[chunk],rot[chunk],brot[chunk,1],None if contact_hand is None else contact_hand[chunk])[3].any(-1)
     early_safe=torch.zeros_like(valid)
     if skill=='doorOpen':
         for chunk in valid.nonzero().flatten().split(128):
-            angles,_,_,safe=safe_door_candidates(task,root[chunk],body[chunk])
+            angles,_,_,safe=safe_door_candidates(task,root[chunk],body[chunk],rot[chunk],brot[chunk,1],None if contact_hand is None else contact_hand[chunk])
             early_safe[chunk]=(safe & (angles<=math.radians(cfg['door_early_max_degrees']))).any(-1)
         if not early_safe.any():raise ValueError('No frame-safe small-angle door RSI poses')
     if not valid.any():raise ValueError('No physically bindable RSI reference poses for '+skill)
@@ -140,15 +178,23 @@ def build_pool(task,skill):
     print('[task RSI pool]',skill,'eligible_frames',len(times),'late_probability',float(weights[late].sum()),flush=True)
     return mids,times,weights,early_safe[valid]
 
+def select_task_rsi(tasks, config):
+    """PUSH and DOOR may use different contact-start probabilities."""
+    probability=torch.full(tasks.shape,float(config['probability']),device=tasks.device)
+    probability=torch.where(tasks==1,probability.new_full((),float(config.get('door_rsi_probability',config['probability']))),probability)
+    return torch.rand(tasks.shape,device=tasks.device)<probability
+
+
 def sample_reference(task,tasks):
     cfg=task._interaction['task_rsi'];n=tasks.numel();dev=task.device
-    selected=torch.rand(n,device=dev)<cfg['probability']
+    selected=select_task_rsi(tasks,cfg).flatten()
     loco=task._motion_lib['loco'];ids=loco.sample_motions(n)
     t=torch.full((n,),task.dt*(task._num_amp_obs_steps-1),device=dev)
     root,rot,dof,*_=loco.get_motion_state(ids,t)
     body,brot,_,_=loco.get_motion_state_max(ids,t)
     if not hasattr(task,'_task_rsi_pools'):
         task._task_rsi_pools={s:build_pool(task,s) for s in ('push','doorOpen')}
+    bound_hand=torch.full((n,),-1,dtype=torch.long,device=dev)
     phases=torch.zeros(n,device=dev)
     early=torch.zeros(n,device=dev,dtype=torch.bool)
     for uid,skill in enumerate(('push','doorOpen')):
@@ -168,16 +214,19 @@ def sample_reference(task,tasks):
             indices[want_early]=torch.multinomial(early_weights,int(want_early.sum()),replacement=True) if want_early.any() else indices[want_early]
             early[mask]=want_early
         mid=mid[indices];tm=tm[indices]
+        if skill=='doorOpen' and hasattr(task,'_door_motion_contact_hands'):
+            bound_hand[mask]=task._door_motion_contact_hands[mid]
         r,q,d,*_=lib.get_motion_state(mid,tm)
         b,bq=asset_reference_pose(task,r,q,d)
         root[mask]=r;rot[mask]=q;dof[mask]=d;body[mask]=b;brot[mask]=bq
         phases[mask]=tm/lib._motion_lengths[mid]
+    task._last_rsi_contact_hand=bound_hand.view_as(tasks)
     task._last_rsi_door_early=early.view_as(tasks)
     task._last_rsi_selected=selected.view_as(tasks)
     task._last_rsi_phase=phases.view_as(tasks)
     return root,rot,dof,body,brot,selected
 
-def align_task_reference(task,env_ids,tasks,selected,refroot,body,unheading,newroot):
+def align_task_reference(task,env_ids,tasks,selected,refroot,body,unheading,newroot,refrotation=None,bodyrotation=None):
     cfg=task._interaction['task_rsi'];E,M=tasks.shape;flat_tasks=tasks.flatten()
     relhands=body[:,task._key_body_ids[:2]]-refroot[:,None,:]
     rot=unheading[:,None,:].expand(-1,2,-1)
@@ -204,7 +253,10 @@ def align_task_reference(task,env_ids,tasks,selected,refroot,body,unheading,newr
         goal_yaw=boxyaw+torch.deg2rad((torch.rand(len(yaw),device=task.device)*2-1)*20)
         goals[push,:2]=boxes[push,:2]+distance[:,None]*torch.stack([torch.cos(goal_yaw),torch.sin(goal_yaw)],-1)
     if door.any():
-        angles,qs,origins,safe=safe_door_candidates(task,refroot[door],body[door])
+        angles,qs,origins,safe=safe_door_candidates(task,refroot[door],body[door],
+            None if refrotation is None else refrotation[door],
+            None if bodyrotation is None else bodyrotation[door,1],
+            task._last_rsi_contact_hand.flatten()[door] if cfg.get('door_hand_binding') else None)
         if not safe.any(-1).all():raise RuntimeError('Door RSI pool contains a pose without frame clearance')
         requested_early=task._last_rsi_door_early.flatten()[door]
         small=angles<=math.radians(cfg['door_early_max_degrees'])

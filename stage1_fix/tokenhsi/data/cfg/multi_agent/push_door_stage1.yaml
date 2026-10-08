@@ -83,6 +83,7 @@ env:
     maintain_weight: 0.6
     success_weight: 0.2
     push:
+      direction: away_from_door
       box:
         size:
         - 1.1
@@ -99,6 +100,7 @@ env:
       progress_speed: 0.5
       ground_tolerance: 0.04
     door:
+      handle_height: 0.95
       spring:
         spring_stiffness: 6.0
         spring_damping: 3.0
@@ -118,6 +120,7 @@ env:
       closing_speed: 0.6
       closing_deadband: 0.005
     amp:
+      hand_conditioning: user_hands_v1
       push_phase:
       - 0.0
       - 1.0

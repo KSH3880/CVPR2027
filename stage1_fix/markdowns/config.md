@@ -527,7 +527,7 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_random_start_v
 
 ## 과제 RSI와 작은 각도 DOOR 시작 (서버 공통)
 
-`push_door_stage1_task_rsi.yaml`과 `amp_ma_push_door_stage1_task_rsi.yaml`을 사용하는 별도 실험이다. 기존 fixed/random_start 설정은 loco 초기화를 유지한다. 과제별80%는 PUSH/doorOpen 데이터의 참조 자세로 시작하며 선택 구간의 후반 절반에70%를 배정한다.
+`push_door_stage1_task_rsi.yaml`과 `amp_ma_push_door_stage1_task_rsi.yaml`을 사용하는 별도 실험이다. 기존 fixed/random_start 설정은 loco 초기화를 유지한다. PUSH는80%, DOOR는50%가 과제 참조 RSI로 시작한다. DOOR 나머지50%는 문에서1.2~1.8m 떨어진 loco 자세·닫힌 문으로 시작한다. 선택된 참조 구간의 후반 절반에는70%를 배정한다.
 
 DOOR RSI의75%는5~25° 초기 각도를 사용한다. 해당 각도에서 문틀 여유를 확보하는 자세 pool을 먼저 샘플한 뒤 안전 각도를 고르므로 문틀 검사 때문에 큰 각도로 밀려나지 않는다. 나머지25%는5~79° 전체 안전 각도에서 뽑는다. 따라서 실제25° 이하 비율은75%보다 높을 수 있다. 초기 각도는 BONES의 문 annotation에서 추출한 값이 아니라 합성 값이다. 손잡이 정렬과 몸/팔다리의 보수적 문틀 여유3cm를 검사하며 불가능한 참조 자세는 제외한다. 이후 정책 동작 중 끼임까지 보장하지 않는다. PUSH는 공통1.1m 정육면체와 손 간격3cm, 남은 거리0.2~0.6m를 사용한다.
 
@@ -540,7 +540,7 @@ bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_test.sh <task_rsi_ch
 bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_view.sh
 ```
 
-view는 학습된 정책이 아닌 초기 자세 preview다. R 재샘플/Esc 종료, 기본100% 과제 RSI(학습80%). `RSI_PREVIEW_PROBABILITY=0.8`로 학습 혼합비를 본다. GUI가 필요한 preview는 서버 DISPLAY/VNC 환경에서 실행한다. 학습·평가는 기존 manifest와 BONES 데이터가 필요하다. 새 초기화 설정은 checkpoint 계약에 포함되므로 이전 로컬v2 또는 다른 실험 checkpoint를 새v3 config로 resume하지 않는다. 새 학습을 시작하거나 기존 checkpoint에 맞는 설정을 사용한다.
+view는 학습된 정책이 아닌 초기 자세 preview다. R 재샘플/Esc 종료, 기본은 현재 학습 혼합비(PUSH RSI80%, DOOR 접촉RSI50%/원거리 접근50%)다. `RSI_PREVIEW_PROBABILITY=1`로 모두 접촉RSI, `RSI_PREVIEW_PROBABILITY=0`으로 모두 접근 시작을 본다. GUI가 필요한 preview는 서버 DISPLAY/VNC 환경에서 실행한다. 학습·평가는 기존 manifest와 BONES 데이터가 필요하다. 새 초기화 설정은 checkpoint 계약에 포함되므로 이전 로컬v2 또는 다른 실험 checkpoint를 새v3 config로 resume하지 않는다. 새 학습을 시작하거나 기존 checkpoint에 맞는 설정을 사용한다.
 
 로컬 GPU0/NVRTC/MPS 우회는 여전히 Git 제외 `.local/run.sh`에서만 처리한다. 로컬 확인도 이제 공통 task와 공통 config를 사용한다. 서버 runtime_env.sh/MPS 설정은 수정하지 않았다. 출력·데이터·로컬 runtime은 전송 대상에서 제외한다.
 
@@ -557,3 +557,54 @@ PUSH RSI v4: 양손을 연결한 XY 방향에 수직인 상자 면 법선으로 
 닫힘 패널티는 직전 각도보다 닫힌 양에서0.005rad의 작은 진동 여유를 빼고dt×0.6rad/s로 정규화해 최대-0.2/step이다. 스프링 때문에 자연스럽게 닫히는 것도 대상이다. 기존80°/각속도0.3rad/s 미만/손잡이 접촉 유지 보상0.6과 연속2초 성공 보너스0.2는 유지한다. 접촉은 손잡이16cm 이내의 해당 손과 손잡이에 모두0.5N 초과 힘이 있는 근사 검사이며 정확한 충돌 쌍이나 grasp를 증명하지는 않는다.
 
 리셋에서 RSI 초기 문 각도/손잡이 거리로 직전 각도·최저 거리 기록을 초기화한다. 기존PUSH 보상과 task/AMP 혼합비0.5/0.5는 유지한다. TensorBoard reward_terms에 door_approach, door_closing을 추가했다. 새 보상 설정은 checkpoint 계약에 포함되므로 이전 보상 checkpoint와 새 config는 혼용하지 않는다. 기존 서버 실행법은 그대로 사용한다. 실행 중인 프로세스에는 수정이 자동 적용되지 않는다.
+
+### PUSH 동선을 문 반대쪽으로 변경 (2026-10-08)
+
+fixed/random_start/task_rsi의 `interaction.push.direction: away_from_door`는 PUSH 목표와 사람 시작 위치를 상자 중심으로 반 바퀴 회전한다. 상자는 기존 위치를 유지하고 사람은 문 쪽에서 상자를 -X 방향으로 민다. 상자 방향도 회전하여 RSI의 목표 재샘플링이 문 반대 방향을 유지한다. DOOR 배치와 보상·모델·AMP는 유지한다. 방향 설정은 checkpoint 계약에 포함되어 이전 방향 checkpoint와 혼용하지 않으며, 새 설정으로 scratch 학습한다. 실행 중 프로세스에는 적용되지 않는다.
+
+### 방향 변경 전 checkpoint 잠시 보기
+
+random_start test/view/VNC에 `CFG_ENV`로 별도 env YAML을 전달할 수 있다. 기본값은 현재 학습 YAML 그대로다. epoch 3500 (`PushDoorStage1RandomStart_08-01-39-16`)의 원래 interaction·시작 분포·충돌 설정을 checkpoint metadata에서 복원한 viewer YAML은 `/home/hwanhee/juan/CVPR2027/runs/checkpoint_views/push_door_random_start_08-01-39-16_3500.yaml`이다.
+
+```bash
+CFG_ENV=/home/hwanhee/juan/CVPR2027/runs/checkpoint_views/push_door_random_start_08-01-39-16_3500.yaml \
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_random_start_vnc.sh \
+  output/push_door_stage1_random_start/PushDoorStage1RandomStart_08-01-39-16/nn/PushDoorStage1RandomStart_00003500.pth 1 3
+```
+
+이 명령에만 `CFG_ENV`를 지정하며 셸 전체에 export하지 않는다. 다른 checkpoint는 해당 metadata와 일치하는 YAML이 필요하다. 현재 학습의 문 반대 방향은 유지한다.
+
+### 보상 원복·손잡이 높이 조정 (2026-10-08)
+
+사용자 요청으로 직전 PUSH 양손 보상/진행 감쇠 및 DOOR 개방 강화/각도 보상을 제거했다. 원래 PUSH 진행0.4·정착0.6·성공0.2와 DOOR handle_gated_v2 보상으로 돌아갔다. 문 반대 PUSH 동선은 유지한다.
+
+공통 fixed/random_start/task_rsi의 `interaction.door.handle_height: 0.95`로 손잡이를 기존1.05m에서10cm 낮췄다. 명치 부근으로 낮추려는 요청의 첫 조정값이며, 실제 agent 자세에 따른 명치 높이는 viewer로 확인해 조정한다. 이 설정은 물리 URDF·앞/뒤 손잡이 관측·RSI 높이 선택/정렬에 연결된다. 높이가 다른 asset은 `runs/door_assets/`에 spec별로 생성하여 원본 URDF와 구 viewer를 보존한다. 높이 키가 없는 구 checkpoint viewer는 기존1.05m를 사용한다. 변경된 geometry 계약으로 구 checkpoint와 현재 config 혼용은 거부한다. 진행 중 실행에는 적용되지 않는다.
+
+CPU27테스트 및 CPU PhysX1-step에서 앞/뒤 손잡이 실제 높이0.95m 검증 통과. 전체 agent RSI·학습 동작은 미검증이며 GPU/MPS를 사용하지 않았다.
+
+### 로컬 TaskRSI 5500 checkpoint 보기
+
+`PushDoorStage1TaskRSI_00005500.pth`는 원래 task RSI 초기화와 변경 전 PUSH/DOOR 보상을 사용한다. `CFG_ENV=/home/hwanhee/juan/CVPR2027/runs/checkpoint_views/push_door_task_rsi_from_local_5500.yaml`을 명령 앞에 지정하고 random_start VNC wrapper에 해당 checkpoint를 전달한다. 두 train YAML의 네트워크 설정은 동일함을 확인했다. 이전3500전용 YAML과 혼용하지 않는다. 현재 학습 설정은 유지한다.
+
+### DOOR RSI 정면·참조 손 일치 필터 (2026-10-08)
+
+현재 task_rsi 초기화 계약은 `task_door_user_hand_amp_v7`다. `door_facing_degrees: 60`으로 골반과 torso의 정면 XY 방향이 손잡이 방향에서 모두60° 이내인 후보만 허용한다. 기존 문틀 여유·손 높이·팔 reach 조건도 함께 적용한다. PUSH 초기화와 보상은 유지한다.
+
+`door_hand_binding: user_paths_v1`은 사용자가 확인한 손 라벨을 사용한다. `left_side` 원본은 오른손(0), `right_side` 미러는 왼손(1)이다. 높이에 가까운 반대 손으로 바꾸지 않으며 해당 손의 높이/reach/정면/문틀 조건을 만족하는 frame만 남긴다. 이전 reach 추정 라벨을 대체했다.
+
+
+CPU 실제 DOOR8모션 검사에서 사용자 손 라벨 적용 후124프레임이 남았고 오른손·왼손 모두 존재한다. 후보/clip별 손은 `/home/hwanhee/juan/CVPR2027/runs/rsi_checks/door_facing_hands.json`, 대표 top-view 자세는 같은 디렉터리의 `door_facing_hands.png`다. preview 로그의 `[RSI hand]`는0=오른손,1=왼손,-1=non-RSI다. 기존 view 명령과 R 재샘플을 사용한다. AMP도 아래 사용자 손 조건화5-family를 사용한다. 기존 viewer YAML은 새 필터 키가 없어 기존 RSI 계약을 유지한다. 새 설정과 구checkpoint 계약은 불일치한다.
+
+### DOOR 접근 시작 혼합 (2026-10-08)
+
+`push_door_stage1_task_rsi`에만 DOOR의 접촉 참조RSI 확률 `interaction.task_rsi.door_rsi_probability: 0.5`를 적용한다. 나머지50%는 기존 loco 참조와 닫힌 문으로 시작하며 `startRandomization.door_distance: [1.2, 1.8]`에서 문 plane까지 X 방향 거리를 샘플한다(손잡이까지의 유클리드 거리와는 다름). 사람은 손잡이 쪽을 보도록 기존 heading/lateral 분포를 사용한다. PUSH RSI80%와 기타 실험의 초기화는 유지한다. 기존 DOOR 접근 보상을 사용하며 보상 자체는 수정하지 않았다. AMP는 사용자 손 조건화의 doorOpen approach/open 구간을 사용하며 접근 전용 family는 추가하지 않았다.
+
+RSI preview는 기본으로 학습 분포를 따른다. 명령 앞의 `RSI_PREVIEW_PROBABILITY=0`은 떨어진 시작만, `=1`은 손잡이 접촉RSI만 보여준다. R로 재샘플해 비교한다. 기본50:50은 확률적이며 소수 reset에서는 같은 종류가 연속될 수 있다. 새 계약v6으로 구checkpoint 혼용은 거부한다. 변경은 새 실행에 적용된다. CPU30테스트 통과, 실제 걷기/문 개방은 아직 학습으로 검증하지 않았다.
+
+### 사용자 확인 손 라벨과 AMP5-family (2026-10-08)
+
+`interaction.amp.hand_conditioning: user_hands_v1`을 공통 fixed/random_start/task_rsi에 적용했다. 라벨0=PUSH,1=오른손 개방,2=왼손 개방,3=오른손 유지,4=왼손 유지다. `left_side` 원본=오른손, `right_side` 미러=왼손으로 전문가 clip을 고르고 demo/replay도 같은 phase/손 family로 매칭한다. AMP 입력은 기존1320-D에서1340-D로 늘며 정책/critic 관측과 action 차원은 유지한다. 정규화에서5개 one-hot을 보존하고 물리 history 전체에 현재 family를 적용한다. 다른 task의 기본3-family는 유지한다.
+
+접촉RSI는 선택한 clip의 사용자 손 라벨로 시작한다. 접근 시작은 좌우를 랜덤 지정하고, 실제 손잡이에 손이 닿으면 거리+손/손잡이 양쪽 힘 조건으로 접촉 손을 갱신한다. 손 전환 시 AMP 참조/replay도 전환하며 두 손 접촉은 더 가까운 손을 따른다. 손별 정책을 따로 만드는 변경은 아니다. `hold_source:loco`를 사용하는 구/다른 설정은 유지 참조를 공유하지만 현재 설정은 door_tail이므로 유지도 손별 clip을 쓴다.
+
+검증: CPU29테스트 통과(기존 Unified3-family 회귀 포함), 실제8모션 사용자 라벨 일치·RSI124frame·오른손/왼손 각2048 AMP clip 샘플의 손 일치·phase window 확인. 보고서 `/home/hwanhee/juan/CVPR2027/runs/rsi_checks/door_user_hands_amp.json`. GPU 학습/물리 및 손 전환 동작은 미실행. 구checkpoint는 현재5-family와 호환되지 않으며 기존 viewer YAML로만 본다. 새 설정은 scratch 학습한다.

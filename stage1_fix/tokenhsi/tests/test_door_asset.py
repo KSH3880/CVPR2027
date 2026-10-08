@@ -57,3 +57,17 @@ def test_asset_has_one_revolute_hinge_and_collidable_handles(tmp_path):
                                  {'handle_inset':.6},{'handle_height':3},{'frame_gap':.01}])
 def test_reject_invalid_physical_specs(kwargs):
     with pytest.raises(ValueError):DoorSpec(**kwargs)
+
+
+def test_lower_handle_asset_matches_geometry_and_preserves_default(tmp_path):
+    from tokenhsi.utils.door_asset import cached_door_asset
+    spec=DoorSpec(handle_height=.95)
+    path=cached_door_asset(tmp_path,spec)
+    assert cached_door_asset(tmp_path,spec)==path
+    robot=ET.parse(path).getroot()
+    for name in ('handle_mount','handle_back_mount'):
+        xyz=robot.find("joint[@name='"+name+"']/origin").attrib['xyz']
+        assert float(xyz.split()[2])==.95
+    for angle in (0.,.7,math.pi/2):assert spec.handle_position(angle)[2]==.95
+    assert DoorSpec().handle_height==1.05
+    assert cached_door_asset(tmp_path,DoorSpec())!=path

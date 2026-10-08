@@ -10,8 +10,11 @@ from utils.parse_task import parse_task
 args=get_args()
 cfg,train,_=load_cfg(args)
 if 'task_rsi' in cfg['env']['interaction']:
-    cfg['env']['interaction']['task_rsi']['probability']=float(os.environ.get('RSI_PREVIEW_PROBABILITY','1.0'))
-    print('[preview] Task-pose probability:',cfg['env']['interaction']['task_rsi']['probability'],'(preview only)',flush=True)
+    rsi=cfg['env']['interaction']['task_rsi']
+    if 'RSI_PREVIEW_PROBABILITY' in os.environ:
+        probability=float(os.environ['RSI_PREVIEW_PROBABILITY'])
+        rsi['probability']=rsi['door_rsi_probability']=probability
+    print('[preview] RSI probabilities PUSH:',rsi['probability'],'DOOR:',rsi.get('door_rsi_probability',rsi['probability']),flush=True)
 set_seed(42,False)
 if args.motion_file:cfg['env']['motion_file']=args.motion_file
 sim_params=parse_sim_params(args,cfg,train)
@@ -44,6 +47,7 @@ def reset_scene():
     task.gym.write_viewer_image_to_file(task.viewer,str(out/('reset_%03d.png'%count)))
     print('[RSI frozen] sample=%d tasks=%s | R: resample, Esc: quit'%(count,task._tasks.cpu().tolist()),flush=True)
     if hasattr(task,'_last_rsi_selected'):
+        print('[RSI hand] -1=non-RSI, 0=right, 1=left:',task._last_rsi_contact_hand.cpu().tolist(),flush=True)
         print('[RSI pose] selected=',task._last_rsi_selected.cpu().tolist(),'phase=',task._last_rsi_phase.cpu().tolist(),'door_angles_deg=',torch.rad2deg(task._door_state_view[...,0]).cpu().tolist(),flush=True)
     count+=1
 
