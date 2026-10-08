@@ -84,6 +84,13 @@ def load_cfg(args):
     with open(os.path.join(os.getcwd(), args.cfg_env), 'r') as f:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
 
+    box_size = getattr(args, 'push_box_size', 0.)
+    if box_size != 0.:
+        if args.task != 'HumanoidMAPushDoor':
+            raise ValueError('--push_box_size is only supported for HumanoidMAPushDoor')
+        from utils.push_door_spec import resize_push_box
+        resize_push_box(cfg['env'], box_size)
+
     from utils.unified_training import validate_typed_bias_config
 
     graph_path = getattr(args, 'relation_graph', '')
@@ -300,6 +307,7 @@ def get_args(benchmark=False):
             "help": "Experiment name. If used with --metadata flag an additional information about physics engine, sim device, pipeline and domain randomization will be added to the name"},
         {"name": "--metadata", "action": "store_true", "default": False,
             "help": "Requires --experiment flag, adds physics engine, sim device, pipeline info and if domain randomization is used to the experiment name provided by user"},
+        {"name": "--push_box_size", "type": float, "default": 0., "help": "PUSH cube side length in meters (0 uses YAML; preserves mass)"},
         {"name": "--cfg_env", "type": str, "default": "Base", "help": "Environment configuration file (.yaml)"},
         {"name": "--cfg_train", "type": str, "default": "Base", "help": "Training configuration file (.yaml)"},
 

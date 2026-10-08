@@ -4,6 +4,7 @@ export TOKENHSI_GPU=${TOKENHSI_GPU:-6}
 export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
 . "$(dirname "$0")/runtime_env.sh"
 args=()
+if [ -n "${BOX_SIZE:-}" ]; then args+=(--push_box_size "$BOX_SIZE"); fi
 if [ -n "${MAX_ITERATIONS:-}" ]; then args+=(--max_iterations "$MAX_ITERATIONS"); fi
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then args+=(--checkpoint "$RESUME_CHECKPOINT" --resume 1); fi
 if [ -n "${SEED:-}" ]; then args+=(--seed "$SEED"); fi

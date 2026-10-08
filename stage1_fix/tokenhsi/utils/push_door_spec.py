@@ -6,6 +6,22 @@ VARIANT = 'push_door_stage1_v1'
 FAMILIES = ('push', 'door_open', 'door_hold')
 
 
+def resize_push_box(env, size):
+    """Resize the PUSH cube while preserving mass and safe reset clearance."""
+    size = float(size)
+    if not math.isfinite(size) or size <= 0:
+        raise ValueError('PUSH box size must be finite and positive')
+    box = env['interaction']['push']['box']
+    mass = float(box['density']) * math.prod(box['size'])
+    box['size'] = [size, size, size]
+    box['density'] = mass / size ** 3
+    randomization = env.get('startRandomization')
+    if randomization is not None:
+        low, high = randomization['push_distance']
+        safe_low = max(low, math.sqrt(2) * size / 2 + .25)
+        randomization['push_distance'] = [safe_low, safe_low + high - low]
+
+
 def phase_update(holding, angle, enter, leave):
     """Hysteresis prevents AMP family flicker at the opening threshold."""
     return torch.where(holding, angle >= leave, angle >= enter)

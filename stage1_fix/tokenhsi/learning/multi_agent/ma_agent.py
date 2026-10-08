@@ -432,6 +432,8 @@ class MAAgent(amp_agent.AMPAgent):
         return
 
     def train_epoch(self):
+        if self.print_stats and self.rank == 0:
+            print('[train] iter={} frames={} (starting)'.format(self.epoch_num, self.frame), flush=True)
         task = self.vec_env.env.task
         if (task._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS or
                 'independent_training' in task._relation_cfg):

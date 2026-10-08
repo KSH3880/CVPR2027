@@ -635,3 +635,21 @@ TOKENHSI_GPU=6 PORT=6081 bash tokenhsi/scripts/multi_agent/push_door_stage1_task
 ### PUSH 손 위치 보상 복구 (2026-10-08)
 
 사용자의 원복 요청은 보상 크기에 관한 것이었으므로 현재 task_rsi의 PUSH 손 위치 항을 복구했다. 양손 중 낮은 표면 정렬품질 q를 사용해 `0.15*q*(기존 PUSH 진행 + 목표 정착 조건)`을 더한다. 상자 로컬좌표에서 미는 측면·손 반경4cm·높이60~95%·거리 scale15cm를 사용해 손이 올라가거나 한손이 벗어나면 추가보상이 줄어든다. 실제 접촉힘 gate는 아니다. 이전에 함께 넣었던 진행보상 감쇠는 추가하지 않아 기존 progress는 유지한다. DOOR 접근0.15·원래 개방0.4·높이0.95m·AMP거리전환을 유지한다. fixed/random_start에는 손 항을 추가하지 않았다. 새 실행부터 적용하며 기존 checkpoint와 현재 보상계약은 달라진다.
+
+### 학습 iteration 로그
+
+Multi-agent 학습은 각 iteration 시작에 `[train] iter=<epoch_num> frames=<누적 프레임> (starting)`을 출력한다. checkpoint의 epoch와 같은 번호이며 resume 시 이어진 번호를 사용한다. print_stats가 켜진 rank0에서 flush하여 출력한다. 새 프로세스부터 적용된다.
+
+
+### PUSH 박스 크기 지정 (2026-10-08)
+
+현재 TaskRSI 기본 박스는 1.3×1.3×1.3m, 질량30kg이다. 다른 PushDoor 설정 기본값은 유지한다.
+`BOX_SIZE`는 train/test/RSI view에 전달되며 VNC에서도 동일하게 지정한다. 직접 실행은 `--push_box_size 1.3`을 쓴다.
+크기를 변경하면 밀도와 랜덤 시작의 최소 접근 간격을 자동 조정한다. 손 목표는 박스 크기에 따라 계산된다.
+
+```bash
+cd /home/hwanhee/juan/CVPR2027/stage1_fix
+BOX_SIZE=1.3 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_train.sh
+```
+
+평가/view에도 학습 때와 같은 `BOX_SIZE`를 지정한다. 크기가 다른 checkpoint는 계약 검사에서 거부되므로 새 크기는 새 학습으로 시작한다. 실행 중 학습에는 반영되지 않는다.

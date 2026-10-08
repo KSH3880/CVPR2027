@@ -6,6 +6,7 @@ export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
 if [ "${HEADLESS:-1}" = 0 ]; then . "$(dirname "$0")/gui_gpu_env.sh"; fi
 . "$(dirname "$0")/runtime_env.sh"
 args=()
+if [ -n "${BOX_SIZE:-}" ]; then args+=(--push_box_size "$BOX_SIZE"); fi
 if [ "${HEADLESS:-1}" != 0 ]; then args+=(--headless); fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then args+=(--episode_length "$EPISODE_LENGTH"); fi
 if [ -n "${SEED:-}" ]; then args+=(--seed "$SEED"); fi

@@ -4,6 +4,18 @@
 
 ## 2026-10-08
 
+### TaskRSI PUSH 박스 1.3m 및 실행 시 크기 지정
+
+- 기본 박스를1.3m 정육면체로 늘리고 밀도로30kg을 유지한다. 초기 push 거리1.2~1.45m로 조정했다. `--push_box_size`와 train/test/preview의 `BOX_SIZE`로 크기를 지정하고 질량·최소 접근 간격을 자동 보정한다. VNC는 환경변수를 그대로 전달한다.
+- CPU26테스트 통과(질량·배치간격·크기override·잘못된 입력 포함). 셸문법/Python문법/diff 검사 통과. GPU학습·viewer는 실행하지 않았고 기존학습/MPS는 유지했다. 크기가 다른 checkpoint는 기존 계약 검사를 따른다.
+
+
+### 학습 로그에 iteration 명시
+
+- iteration이 잘 보이지 않는다는 사용자 요청으로 MAAgent의 iteration 시작에 `[train] iter=... frames=... (starting)`을 flush 출력한다. checkpoint/resume의 epoch_num을 그대로 사용하고 print_stats/rank0 조건을 따른다.
+- Python 문법 및 diff 검사 통과. GPU학습은 실행하지 않았으며 실행 중 학습/MPS는 변경하지 않았다. 새프로세스부터 반영된다.
+
+
 ### 잘못 제거한 TaskRSI PUSH 손 위치 보상 복구
 
 - 사용자의 "다시 바꾸기"는 보상크기를 의미했는데 손보상까지 제거한 해석을 수정했다. 현재task_rsi에 양손표면품질 기반 추가보상0.15를 복구했다. 기존PUSH progress감쇠는 추가하지 않고 손보상만 적용한다. DOOR 접근0.15 등 기존조정은 유지한다.

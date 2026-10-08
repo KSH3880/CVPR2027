@@ -142,15 +142,16 @@ def test_push_cube_mass_and_spawn_clearance():
     for name in ('push_door_stage1', 'push_door_stage1_random_start', 'push_door_stage1_task_rsi'):
         env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
         box=env['interaction']['push']['box']
-        assert box['size']==[1.1,1.1,1.1]
-        assert abs(box['density']*1.1**3-30.)<1e-6
-        radius=(2*.55**2)**.5
+        size=1.3 if name.endswith('task_rsi') else 1.1
+        assert box['size']==[size]*3
+        assert abs(box['density']*size**3-30.)<1e-6
+        radius=(2*(size/2)**2)**.5
         start=push_box_start_x(box['size'],env['interaction']['push']['target_distance'][1])
         assert start+env['interaction']['push']['target_distance'][1]+radius<=-.2+1e-6
         if 'startRandomization' in env:
             tasks=torch.zeros(4096,2,dtype=torch.long)
             b,g,h,_,_,shift=sample_start_layout(tasks,env['startRandomization'],torch.tensor(box['size']),torch.tensor([-1.6,1.6]))
-            assert (b[...,2]-.555).abs().max()<1e-6
+            assert (b[...,2]-(size/2+.005)).abs().max()<1e-6
             assert (b[...,0]-h[...,0]).min()>=1.1-1e-6
             assert (g[...,0]-shift[...,0]+radius).max()<=-.2+1e-6
 
@@ -380,3 +381,16 @@ def test_restored_push_hands_bonus_rejects_lifted_and_single_hand():
         assert bad.item()<.01
     backwards,_=push_hand_alignment(-hands,direction,torch.tensor([.55]*3),cfg)
     assert backwards.item()<.01
+
+
+def test_push_box_size_override_preserves_mass_and_clearance():
+    from utils.push_door_spec import resize_push_box, sample_start_layout
+    env=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml').read_text())['env']
+    resize_push_box(env, 1.5)
+    box=env['interaction']['push']['box']
+    assert box['size']==[1.5]*3
+    assert abs(box['density']*1.5**3-30)<1e-6
+    assert env['startRandomization']['push_distance'][0]>=2**.5*.75+.25
+    sample_start_layout(torch.zeros(16,2,dtype=torch.long),env['startRandomization'],torch.tensor(box['size']),torch.tensor([-1.6,1.6]))
+    for invalid in (-1, float('nan'), float('inf'), 0):
+        with pytest.raises(ValueError): resize_push_box(env, invalid)
