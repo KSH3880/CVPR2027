@@ -255,7 +255,8 @@ def test_restored_reward_and_lower_handle_configuration():
     for name in ('push_door_stage1','push_door_stage1_random_start','push_door_stage1_task_rsi'):
         env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
         c=env['interaction'];validate_interaction(c)
-        assert 'hand_reward_weight' not in c['push']
+        if name=='push_door_stage1_task_rsi':assert c['push']['hand_reward_weight']==.15
+        else:assert 'hand_reward_weight' not in c['push']
         assert 'opening_weight' not in c['door'] and 'angle_weight' not in c['door']
         assert c['progress_weight']==.4 and c['door']['handle_height']==.95
         assert c['push']['direction']=='away_from_door'
@@ -365,3 +366,17 @@ def test_six_amp_family_loco_demos_and_replay_do_not_mix_with_door():
     torch.testing.assert_close(matched.reshape(-1,10,7)[:,0,0].long(),amp_family_ids(pool.flip(0),10,6))
     normalized=preserve_amp_labels(pool,pool+42,10,6).reshape(-1,10,7)
     torch.testing.assert_close(normalized[:,:,1:],pool.reshape(-1,10,7)[:,:,1:])
+
+
+def test_restored_push_hands_bonus_rejects_lifted_and_single_hand():
+    from utils.push_door_spec import push_hand_alignment
+    cfg={'hand_radius':.04,'hand_distance_scale':.15,'hand_height_fraction':[.6,.95]}
+    hands=torch.tensor([[[-.59,-.2,.2],[-.59,.2,.2]]]);direction=torch.tensor([[1.,0.,0.]])
+    quality,error=push_hand_alignment(hands,direction,torch.tensor([.55]*3),cfg)
+    torch.testing.assert_close(quality,torch.ones(1))
+    for index in (0,1):
+        raised=hands.clone();raised[:,index,2]=1.
+        bad,_=push_hand_alignment(raised,direction,torch.tensor([.55]*3),cfg)
+        assert bad.item()<.01
+    backwards,_=push_hand_alignment(-hands,direction,torch.tensor([.55]*3),cfg)
+    assert backwards.item()<.01

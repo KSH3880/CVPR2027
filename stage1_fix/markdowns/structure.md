@@ -106,3 +106,5 @@ PUSH 방향 변환은 `utils/push_door_spec.py`의 `redirect_push_away`에서 �
 문 손잡이 높이는 `interaction.door.handle_height`에서 지정한다. `door_scene.py`는 기본과 다른 높이에 `door_asset.py::cached_door_asset`으로 `runs/door_assets/`의 spec별 URDF를 사용한다.
 
 DOOR RSI 정면 및 모션 작업 손 필터는 `utils/task_rsi.py`의 `motion_contact_hand`, `safe_door_candidates`, `build_pool`에서 처리한다. 접촉 손은 preview의 `[RSI hand]` 로그에 표시한다.
+
+새 TaskRSI 정책 VNC는 `scripts/multi_agent/push_door_stage1_task_rsi_vnc.sh`이며, frozen RSI preview인 `push_door_stage1_task_rsi_view.sh`와 용도가 다르다.

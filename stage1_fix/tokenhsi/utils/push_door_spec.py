@@ -30,6 +30,21 @@ def door_amp_family(tasks, hand, holding, opening, count):
     return torch.where(tasks==0,0,torch.where(holding,2,1))
 
 
+def push_hand_alignment(local_hands, local_direction, half_size, config):
+    """Both hands close to the trailing side face and below the box top."""
+    axis=local_direction[...,:2].abs().argmax(-1)
+    sign=torch.gather(local_direction[...,:2],-1,axis[...,None]).squeeze(-1).sign()
+    sign=torch.where(sign==0,torch.ones_like(sign),sign)
+    side=torch.nn.functional.one_hot(axis,3).to(local_hands.dtype)
+    face=-sign[...,None]*side*(half_size+config['hand_radius'])
+    desired=torch.maximum(torch.minimum(local_hands,half_size),-half_size)
+    desired=torch.where(side[...,None,:].bool(),face[...,None,:],desired)
+    low,high=config['hand_height_fraction']
+    desired[...,2]=local_hands[...,2].clamp(-half_size[2]+2*half_size[2]*low,-half_size[2]+2*half_size[2]*high)
+    error=(local_hands-desired).norm(dim=-1)
+    return torch.exp(-(error/config['hand_distance_scale']).square()).min(-1).values,error.mean(-1)
+
+
 def door_shaping(angle, best_angle, previous_angle, hand_distance, best_distance, contact, dt, config):
     """Contact-gated opening, non-repeatable approach, and actual closing penalty."""
     target=math.radians(config['open_degrees'])
@@ -136,6 +151,12 @@ def validate_interaction(config):
                 raise ValueError('Invalid task parameter: ' + key)
     if push.get('direction', 'toward_door') not in ('toward_door', 'away_from_door'):
         raise ValueError('Invalid PUSH direction')
+    if 'hand_reward_weight' in push:
+        for key in ('hand_reward_weight','hand_radius','hand_distance_scale'):
+            if not math.isfinite(push[key]) or push[key]<=0:
+                raise ValueError('Invalid PUSH hand parameter: '+key)
+        lo,hi=push['hand_height_fraction']
+        if not 0 < lo < hi < 1:raise ValueError('Invalid PUSH hand height band')
     if 'handle_height' in door and (not math.isfinite(door['handle_height']) or not 0 < door['handle_height'] < 2.1):
         raise ValueError('Invalid DOOR handle height')
     rsi=config.get('task_rsi')

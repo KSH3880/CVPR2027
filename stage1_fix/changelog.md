@@ -4,6 +4,24 @@
 
 ## 2026-10-08
 
+### 잘못 제거한 TaskRSI PUSH 손 위치 보상 복구
+
+- 사용자의 "다시 바꾸기"는 보상크기를 의미했는데 손보상까지 제거한 해석을 수정했다. 현재task_rsi에 양손표면품질 기반 추가보상0.15를 복구했다. 기존PUSH progress감쇠는 추가하지 않고 손보상만 적용한다. DOOR 접근0.15 등 기존조정은 유지한다.
+- 손높이 이탈·반대면·한손이탈 회귀검사를 포함한 CPU테스트 통과. 현재학습/GPU/MPS는 변경하지 않았으며 새실행부터 반영된다. GPU동작 개선은 미검증이다.
+
+
+### TaskRSI DOOR 접근 보상0.1→0.15
+
+- 접근reward를 조금 올려보자는 사용자 요청으로 현재 task_rsi의 approach_weight만0.15로 조정했다. 손거리 최고기록·접촉 전 gate·문각변화 gate는 유지한다. 다른보상/AMP/PUSH 및 fixed/random_start 설정은 변경하지 않았다.
+- YAML을 읽어 단일계수 외 동일함과 interaction검증 통과를 확인했다. GPU학습/평가/테스트는 실행하지 않았고 현재학습/MPS는 변경하지 않았다. 새실행부터 적용되며 checkpoint계약 계수도 달라진다.
+
+
+### 현재 TaskRSI checkpoint 정책 VNC wrapper
+
+- 새버전 view 요청으로 task_rsi 전용 VNC wrapper를 추가해 현재 env/train YAML과 checkpoint로 정책을 실행한다. 기존 runtime/GUI/MPS 연결을 재사용하며 frozen RSI preview와 구checkpoint viewer는 유지한다. 실행/구조 문서를 갱신했다.
+- 현재 run의500 checkpoint와현재 config metadata 정확한 일치를 CPU에서 확인했다. 셸문법검사 통과. GPU viewer는 실행하지 않았고 학습/MPS는 변경하지 않았다.
+
+
 ### DOOR 원거리 접근 loco와 근거리 손별 개방 AMP 전환
 
 - 사용자 요청으로 공통3설정에 approach_loco를 추가했다. root-앞/뒤손잡이 최소XY거리0.8m 진입·1.0m 복귀 히스테리시스로 원거리loco/근거리손별doorOpen을 전환한다. 접촉·개방유지 phase는DOOR우선이다. reset/물리step에서 상태를 갱신한다.

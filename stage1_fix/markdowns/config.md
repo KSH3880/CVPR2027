@@ -616,3 +616,22 @@ RSI preview는 기본으로 학습 분포를 따른다. 명령 앞의 `RSI_PREVI
 접근 family5의 전문가 source는 `loco`와 phase0~1이며 `hold_source`와 무관하다. 개방은 사용자 확인 손별 `doorOpen`, 유지는 `hold_source: door_tail`을 유지한다. demo/replay도6-family로 매칭하고 현재 phase 라벨은 전체 물리 history에 반영한다. 보상·actor/critic 정책 관측·action은 유지하고 AMP 입력은1350-D다. 설정은 interaction checkpoint 계약에 포함되어 기존3/5종 checkpoint와 혼용하지 않는다. 학습 명령은 같은 task_rsi_train.sh이며 새로 scratch 실행한다. 구 viewer YAML은 기존3/5-family를 유지한다.
 
 CPU31테스트 통과: 거리 진입/복귀 히스테리시스·접촉/유지 우선·6종/loco demo/replay·one-hot 보존·기존3종 회귀. GPU/전체물리 학습은 실행하지 않았으며 실제 접근 성능은 새 학습에서 확인해야 한다.
+
+### 새 TaskRSI 정책 VNC viewer
+
+RSI 초기 자세만 보는 `push_door_stage1_task_rsi_view.sh`와 달리, `push_door_stage1_task_rsi_vnc.sh`는 현재 TaskRSI checkpoint의 실제 정책을 실행한다. GPU/MPS는 기존 공통 wrapper를 그대로 사용한다.
+
+```bash
+TOKENHSI_GPU=6 PORT=6081 bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_vnc.sh \
+  output/push_door_stage1_task_rsi/PushDoorStage1TaskRSI_08-12-17-28/nn/PushDoorStage1TaskRSI_00000500.pth 1 10
+```
+
+500 checkpoint와 현재 config 계약 일치를 CPU에서 확인했다. 브라우저는6081포워딩 후 `http://localhost:6081/vnc.html?autoconnect=1&resize=remote`에 접속한다. 출력은 `output/push_door_stage1_task_rsi_viewer`다. 구checkpoint 복원용CFG_ENV는 필요 없다.
+
+### TaskRSI 접근 보상 소폭 증가 (2026-10-08)
+
+현재 `push_door_stage1_task_rsi.yaml`의 `interaction.door.approach_weight`만0.1→0.15로 올렸다. 기존 손-손잡이 최소거리 기록 개선 조건·AMP 거리전환·기타보상은 유지한다. fixed/random_start 계수는0.1이다. 변경은 새 실행부터 적용되며 진행 중 학습에는 반영되지 않는다. reward계수가 checkpoint 계약에 포함되어 기존 checkpoint는 원래viewer설정으로 확인해야 한다.
+
+### PUSH 손 위치 보상 복구 (2026-10-08)
+
+사용자의 원복 요청은 보상 크기에 관한 것이었으므로 현재 task_rsi의 PUSH 손 위치 항을 복구했다. 양손 중 낮은 표면 정렬품질 q를 사용해 `0.15*q*(기존 PUSH 진행 + 목표 정착 조건)`을 더한다. 상자 로컬좌표에서 미는 측면·손 반경4cm·높이60~95%·거리 scale15cm를 사용해 손이 올라가거나 한손이 벗어나면 추가보상이 줄어든다. 실제 접촉힘 gate는 아니다. 이전에 함께 넣었던 진행보상 감쇠는 추가하지 않아 기존 progress는 유지한다. DOOR 접근0.15·원래 개방0.4·높이0.95m·AMP거리전환을 유지한다. fixed/random_start에는 손 항을 추가하지 않았다. 새 실행부터 적용하며 기존 checkpoint와 현재 보상계약은 달라진다.

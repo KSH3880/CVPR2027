@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, door_motion_hand, door_open_amp_phase, door_amp_family)
+                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, door_motion_hand, door_open_amp_phase, door_amp_family, push_hand_alignment)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -17,7 +17,7 @@ from tokenhsi.utils.door_asset import DoorSpec
 
 
 class HumanoidMAPushDoor(HumanoidMA):
-    REWARD_TERM_NAMES = ('push_progress', 'push_settled', 'door_progress', 'door_hold', 'success_bonus', 'door_approach', 'door_closing', 'total')
+    REWARD_TERM_NAMES = ('push_progress', 'push_settled', 'door_progress', 'door_hold', 'success_bonus', 'door_approach', 'door_closing', 'push_hands', 'total')
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self.num_objects = cfg['env']['numObjects']
@@ -313,6 +313,17 @@ class HumanoidMAPushDoor(HumanoidMA):
         push_progress,self._best_push=progress_reward(torch.where(grounded & upright,-distance,self._best_push),self._best_push,self.dt*p['progress_speed'])
         push_valid=(distance<p['goal_tolerance']) & (torch.linalg.vector_norm(self._box_states[...,7:10],dim=-1)<p['settle_speed']) & upright & grounded
         hands=self._rigid_body_pos[:,:,self._key_body_ids[:2]]
+        push_hands=torch.zeros_like(push_progress)
+        if 'hand_reward_weight' in p:
+            inverse=self._box_states[...,3:7].clone();inverse[...,:3]*=-1
+            local_hands=quat_rotate(inverse[:,:,None,:].expand(-1,-1,2,-1).reshape(-1,4),
+                (hands-self._box_states[:,:,None,:3]).reshape(-1,3)).view(self.num_envs,self.num_agents,2,3)
+            local_direction=quat_rotate(inverse.reshape(-1,4),
+                (self._targets-self._box_states[...,:3]).reshape(-1,3)).view(self.num_envs,self.num_agents,3)
+            quality,_=push_hand_alignment(local_hands,local_direction,self._box_size/2,p)
+            # Additional hand term only; original progress is unchanged.
+            # No bonus for stationary hand placement away from the goal.
+            push_hands=p['hand_reward_weight']*quality*(push_progress+push_valid.float())
         # Net forces alone cannot identify collision pairs. Require near-handle hands
         # and simultaneous forces on that same hand and handle link.
         hand_force=torch.linalg.vector_norm(self._contact_forces[:,:,self._key_body_ids[:2]],dim=-1)
@@ -342,7 +353,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         push=(self._tasks==0).float();door=1-push
         terms=torch.stack([c['progress_weight']*push_progress*push,c['maintain_weight']*push_valid*push,
             c['progress_weight']*door_progress*door,c['maintain_weight']*door_valid*door,
-            c['success_weight']*first,d['approach_weight']*approach*door,-d['closing_weight']*closing*door],-1)
+            c['success_weight']*first,d['approach_weight']*approach*door,-d['closing_weight']*closing*door,push_hands*push],-1)
         total=terms.sum(-1)
         if self.cfg['env'].get('agentCollisionPenalty', False):
             collision = -self.cfg['env'].get('agentCollisionCoeff', .5) * compute_agent_collision_penalty(
