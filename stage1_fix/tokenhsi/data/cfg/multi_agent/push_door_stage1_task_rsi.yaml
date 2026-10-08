@@ -99,8 +99,8 @@ env:
         density: 13.654984069185252
         friction: 0.1
       target_distance:
-      - 0.7
-      - 1.1
+      - 1.5
+      - 2.0
       goal_tolerance: 0.15
       settle_speed: 0.15
       settle_seconds: 0.5
@@ -154,8 +154,8 @@ env:
       - 0.7
       late_fraction: 0.7
       push_remaining:
-      - 0.2
-      - 0.6
+      - 0.5
+      - 1.2
       door_angle_degrees:
       - 5.0
       - 79.0
@@ -203,8 +203,8 @@ env:
     - -20
     - 20
     target_distance:
-    - 0.7
-    - 1.1
+    - 1.5
+    - 2.0
 sim:
   substeps: 2
   physx:

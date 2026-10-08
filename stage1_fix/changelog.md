@@ -4,6 +4,12 @@
 
 ## 2026-10-08
 
+### TaskRSI PUSH 목표 거리 확대
+
+- 짧은 이동거리 개선 요청으로 현재 task_rsi의 일반 시작 목표거리를1.5~2.0m, RSI 남은 거리를0.5~1.2m로 늘렸다. interaction과 startRandomization 거리 설정을 함께 맞췄다. 기존 문 반대 방향 및 각도 랜덤화는 유지한다.
+- CPU26테스트와 diff검사 통과. GPU학습은 실행하지 않았고 현재학습/MPS는 변경하지 않았다. 새 실행부터 적용되며 이전 checkpoint view는 run의 저장 설정을 사용한다.
+
+
 ### 크기 변경 전 TaskRSI checkpoint viewer 설정 override
 
 - task_rsi_test에 `CFG_ENV` override를 추가해 VNC에서도 학습 당시 `relation_config.yaml`을 사용할 수 있게 했다. 현재1.3m 설정과 계약 검사는 유지한다.

@@ -663,3 +663,6 @@ BOX_SIZE= CFG_ENV=output/push_door_stage1_task_rsi/PushDoorStage1TaskRSI_08-12-1
 ```
 
 `BOX_SIZE=`는 기존 export의 크기 override를 해제한다. 다른 run은 해당 run의 설정/checkpoint 경로로 바꾼다.
+
+
+현재 TaskRSI PUSH 목표거리(2026-10-08): 일반 시작1.5~2.0m, RSI 시작의 남은 거리0.5~1.2m. 문 반대 방향을 유지하며 일반 목표각±20°, RSI는 박스yaw에±20°를 더한다. 새 학습부터 적용된다. 이전 checkpoint view는 해당 run의 `relation_config.yaml`을 사용한다.
