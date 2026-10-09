@@ -15,6 +15,8 @@ from env.tasks.multi_agent.edge_ontop_reward import OnTopContextRuntime, evaluat
 from env.tasks.multi_agent.edge_interaction_reward import (InteractionContextRuntime,
     evaluate_interaction_edges)
 from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
+from env.tasks.multi_agent.scene_features import (
+    task_target_owners, task_marker_vertices, SHARED_TASK_COLOR)
 
 
 class SampledOnTopTaskMixin:
@@ -45,6 +47,12 @@ class SampledOnTopTaskMixin:
         prototype=compiler(self._relation_graph_spec,self.num_agents,self.num_objects,self.device)
         g=expand_graph(prototype,self.num_envs)
         runtime=Stage1ContextRuntime if getattr(self,'_edge_stage1',False) else (InteractionContextRuntime if getattr(self,'_edge_interaction',False) else OnTopContextRuntime)
+        if getattr(self, '_joint_carry', False):
+            from env.tasks.multi_agent.joint_carry_reward import JointCarryRuntime
+            runtime = JointCarryRuntime
+        if getattr(self, '_before', False):
+            from env.tasks.multi_agent.before_reward import BeforeRuntime
+            runtime = BeforeRuntime
         self.relation_runtime=runtime(self.num_envs,g,self._relation_cfg,self.device)
         self._sampling_counts=torch.zeros(18,device=self.device)
         self._sampling_retries=torch.zeros((),device=self.device)
@@ -74,6 +82,13 @@ class SampledOnTopTaskMixin:
                                                 graph,self._relation_cfg,self._char_h)
         else:
             phi,diag=evaluate_ontop_edges(hands,bodies[...,0,:],objects,sizes,goals,graph,self._relation_cfg)
+        if getattr(self, '_joint_carry', False):
+            from env.tasks.multi_agent.joint_carry_reward import apply_joint_geometry
+            phi, gate = apply_joint_geometry(phi, diag, hands, objects, sizes, graph, self._relation_cfg)
+            if env_ids is None:
+                self.relation_runtime.coupled_holding.copy_(gate)
+            else:
+                self.relation_runtime.coupled_holding[env_ids] = gate
         if env_ids is None:
             self._ontop_last_diag=diag
         return phi,diag
@@ -81,7 +96,15 @@ class SampledOnTopTaskMixin:
     def _sample_episode_graph(self, ids):
         if self._relation_graph_spec.get('mode')=='edge_composition':
             sampler=sample_stage1_graph if getattr(self,'_edge_stage1',False) else (sample_interaction_graph if getattr(self,'_edge_interaction',False) else sample_graph)
-            if getattr(self, '_size_aware_rsi', False):
+            if getattr(self, '_before', False):
+                from utils.before_spec import sample_graph as sample_before
+                new = sample_before(len(ids), self._relation_graph_spec, self.device,
+                    self._task_graph_preset, families=self._before_families[ids])
+            elif getattr(self, '_mixed_carry', False):
+                from utils.mixed_carry_spec import sample_graph as sample_mixed
+                new = sample_mixed(len(ids), self._relation_graph_spec, self.device,
+                    self._task_graph_preset, joint_mask=self._joint_env_mask[ids])
+            elif getattr(self, '_size_aware_rsi', False):
                 from utils.edge_scenario_spec import sample_size_conditioned_graph
                 new = sample_size_conditioned_graph(self._size_template_probabilities[ids],
                     self._relation_graph_spec, self._task_graph_preset)
@@ -94,7 +117,14 @@ class SampledOnTopTaskMixin:
         self._edge_goal_owners[ids]=owner_sum((new.required_goal & new.edge_valid).float(),new)>0
         self._ontop_maintain_steps[ids]=0
         self._sampling_counts[0]+=len(ids)
-        if getattr(self, '_stage2', False):
+        if getattr(self, '_joint_carry', False):
+            ontop = ((new.edge_relation == ON_TOP) & new.edge_valid).any(-1)
+            from utils.mixed_carry_spec import joint_scenes
+            joint = joint_scenes(new)
+            self._sampling_counts[1] += (joint & ~ontop).sum()
+            self._sampling_counts[2] += (joint & ontop).sum()
+            self._sampling_counts[3] += (~joint).sum()
+        elif getattr(self, '_stage2', False):
             from utils.edge_stage2_spec import classify_family
             family = classify_family(new)
             self._sampling_counts[1:5] += torch.stack(
@@ -160,9 +190,11 @@ class SampledOnTopTaskMixin:
                 lower=((new.edge_relation==ON_TOP)&(new.edge_dst==4)&(new.edge_owner==a)).any(-1)
                 self._sampling_counts[16+a]+=(families[6]&lower).sum()
 
-    def _reset_ontop_context_envs(self, env_ids):
+    def _reset_ontop_context_envs(self, env_ids, finalize=True):
         if not len(env_ids):return
         self._sample_episode_graph(env_ids)
+        if getattr(self, '_before', False):
+            self._before_reset_skills[env_ids] = -1
         accepted_default=[]
         accepted_ref_slots={}
         accepted_ref_motion_ids={}
@@ -178,7 +210,7 @@ class SampledOnTopTaskMixin:
             self._reset_task(pending)
             self._configure_ontop_targets(pending)
             rejected=self._ontop_scene_infeasible(pending)
-            if getattr(self, '_stage2', False):
+            if getattr(self, '_stage2', False) and not getattr(self, '_mixed_carry', False) and not getattr(self, '_before', False):
                 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
                 from env.tasks.multi_agent.edge_context_reward import scene_success
                 candidate_graph = select_graph(self.relation_runtime.graph, pending)
@@ -256,6 +288,8 @@ class SampledOnTopTaskMixin:
             for skill_index, skill_name in enumerate(self._skill):
                 if skill_name in self._reset_ref_slots:
                     self._stage2_rsi_counts[skill_index] += len(self._reset_ref_slots[skill_name][0])
+        if not finalize:
+            return
         self._reset_env_tensors(env_ids)
         self._refresh_sim_tensors()
         self._reset_relation_history(env_ids)
@@ -269,6 +303,8 @@ class SampledOnTopTaskMixin:
                 int(self._relation_episode_id[0]),signature,bindings),flush=True)
 
     def _configure_ontop_targets(self, ids):
+        if getattr(self, '_before', False):
+            return
         if getattr(self, '_scenario_no_climb', False):
             if (self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS
                     or 'independent_training' in self._relation_cfg) and not self._is_eval:
@@ -441,7 +477,11 @@ class SampledOnTopTaskMixin:
             exempt = torch.zeros(len(ids), self.num_agents, self.num_objects,
                                   dtype=torch.bool, device=self.device)
             for owner in range(self.num_agents):
-                exempt[:, owner, owner] = True
+                if getattr(self, '_before', False):
+                    source = self._scenario_physical_object(ids, torch.full_like(ids, owner))
+                    exempt[torch.arange(len(ids), device=self.device), owner, source] = True
+                else:
+                    exempt[:, owner, owner] = True
             if putdown_supports is not None:
                 slot_env, slot_agent, physical, _ = putdown_supports
                 exempt[torch.searchsorted(ids, slot_env), slot_agent, physical] = True
@@ -458,6 +498,10 @@ class SampledOnTopTaskMixin:
             goal_pos=self._tar_pos[ids][batch,goal]
             for logical in range(self.num_objects):
                 other=(logical!=src)&at_edges
+                if getattr(self, '_before', False):
+                    child = g.edge_valid & (g.edge_relation == ON_TOP) & (g.edge_src == self.num_agents+logical)
+                    supported = (child[:, None, :] & (g.edge_dst[:, None, :] == g.edge_src[:, :, None])).any(-1)
+                    other &= ~supported
                 distance=(goal_pos[...,:2]-boxes[:,logical,:2][:,None,:]).norm(dim=-1)
                 bad|=(other&(distance<source_radius+radius[:,logical,None]+.25)).any(-1)
         else:
@@ -602,7 +646,29 @@ class SampledOnTopTaskMixin:
         c=self._sampling_counts;den=c[0].clamp_min(1)
         out={'sampling/resets':c[0].clone(),'sampling/physical_retries':self._sampling_retries.clone(),
              'sampling/physical_failures':self._sampling_failures.clone()}
+        if getattr(self, '_joint_carry', False):
+            out['sampling/joint_carry_at'] = c[1] / den
+            out['sampling/joint_carry_ontop'] = c[2] / den
+            joint = (self._joint_env_mask if getattr(self, '_mixed_carry', False) else
+                     torch.ones(self.num_envs, device=self.device, dtype=torch.bool))
+            out['joint/coupled_holding'] = (
+                (self.relation_runtime.coupled_holding & joint).sum() / joint.sum().clamp_min(1))
+            if getattr(self, '_mixed_carry', False):
+                out['sampling/independent'] = c[3] / den
+                out['sampling/joint_environment_fraction'] = joint.float().mean()
+            for index, name in enumerate(self._skill):
+                out['sampling/rsi_' + name] = self._stage2_rsi_counts[index] / (den * self.num_agents)
+            c.zero_(); self._sampling_retries.zero_(); self._sampling_failures.zero_()
+            self._stage2_rsi_counts.zero_()
+            return out
         if getattr(self, '_stage2', False):
+            if getattr(self, '_before', False):
+                for family, name in enumerate(('independent', 'before_climb', 'before_sit', 'before_stack')):
+                    out['sampling/environment_' + name] = (self._before_families == family).float().mean()
+                dependent = self.relation_runtime.graph.prereq_mask.any(-1)
+                gate = self.relation_runtime.last_result.get('prerequisite_gate') if self.relation_runtime.last_result else None
+                if gate is not None:
+                    out['before/current_prerequisite'] = (gate & dependent).sum() / dependent.sum().clamp_min(1)
             for index, name in enumerate(('independent', 'place_climb', 'place_sit',
                                           'place_stack'), 1):
                 out['sampling/' + name] = c[index] / den
@@ -753,13 +819,19 @@ class SampledOnTopTaskMixin:
         if getattr(self,'_edge_interaction',False):
             visible|=(g.edge_relation[0]==SIT)|(g.edge_relation[0]==CLIMB)
         ids=(g.edge_valid[0]&visible).nonzero(as_tuple=False).flatten()
+        owners_by_task = task_target_owners(g, 0)
         self.gym.clear_lines(self.viewer)
         for e in ids.tolist():
             target=self._ontop_last_diag['target'][0,e].cpu().numpy()
-            vertices=[]
-            for axis in range(3):
-                delta=np.zeros(3);delta[axis]=.12
-                vertices.extend([target-delta,target+delta])
-            owner=int(g.edge_owner[0,e]);color=self._agent_color(owner)
-            colors=np.tile([color.x,color.y,color.z],(3,1)).astype(np.float32)
-            self.gym.add_lines(self.viewer,self.envs[0],3,np.asarray(vertices,dtype=np.float32),colors)
+            relation=int(g.edge_relation[0,e])
+            destination=int(g.edge_dst[0,e])
+            vertices=task_marker_vertices(relation, target)
+            num_lines=len(vertices)//2
+            owner=int(g.edge_owner[0,e])
+            if len(owners_by_task.get((relation, destination), ())) > 1:
+                color_rgb = SHARED_TASK_COLOR
+            else:
+                color=self._agent_color(owner)
+                color_rgb = (color.x, color.y, color.z)
+            colors=np.tile(color_rgb,(num_lines,1)).astype(np.float32)
+            self.gym.add_lines(self.viewer,self.envs[0],num_lines,vertices,colors)

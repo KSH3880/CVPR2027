@@ -45,6 +45,8 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     def restore(self, fn):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
+            from utils.joint_carry_amp import check_ablation_checkpoint
+            check_ablation_checkpoint(checkpoint, self.env.task.cfg['env'])
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
         return super().restore(fn)
 

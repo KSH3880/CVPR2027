@@ -54,7 +54,8 @@ def test_four_task_size_sampling_and_amp_family_distribution():
     libs = {name: SimpleNamespace(index=i,
         sample_motions=lambda n: torch.zeros(n, dtype=torch.long),
         sample_time=lambda ids, truncate_time: torch.zeros(len(ids))) for i, name in enumerate(SKILLS)}
-    task = SimpleNamespace(_carry_only=False, _size_aware_rsi=True, device='cpu',
+    task = SimpleNamespace(_carry_only=False, _joint_carry=False, _before=False,
+        _size_aware_rsi=True, device='cpu', cfg={'env': {'skill': SKILLS}},
         _skill=SKILLS, _motion_lib=libs, dt=1/30, _num_amp_obs_steps=10,
         get_num_amp_obs=lambda: 50,
         build_amp_obs_demo=lambda ids, times, lib: torch.full((len(ids), 20), float(lib.index)))

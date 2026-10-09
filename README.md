@@ -43,6 +43,10 @@ Read detailed references as needed:
 
 ## Setup
 
+Joint-carry LocoAMP (CA/head-only): corrected AMP and paired RSI are included in
+the checkout. Reuse your existing environment/data with the [clone setup](joint_carry/README.md).
+The two launchers connect `TOKENHSI_DATA_ROOT` and verify required files before starting.
+
 This checkout uses the existing `tokenhsi` environment on the RTX PRO 6000 server.
 Training uses **2048 environments**. See [`USAGE.md`](markdowns/USAGE.md) for the
 installed environment and data paths.
@@ -72,6 +76,7 @@ location, and everything else is auto-detected with an environment-variable over
 | `TOKENHSI_CONDA_ENV` | the env you already activated, else `tokenhsi` | conda env to activate |
 | `CONDA_BASE` | `conda info --base`, then the usual install prefixes | conda installation prefix |
 | `TOKENHSI_GPU` | `0` | physical GPU for both CUDA and viewer rendering |
+| `TOKENHSI_DATA_ROOT` | existing checkout data links | existing `TokenHSI/tokenhsi/data`; the two LocoAMP launchers connect missing/broken links |
 | `X11VNC` / `VNC_DIR` | `x11vnc` on `PATH` | x11vnc binary, or the prefix of a user-local install |
 | `NOVNC_DIR` | `/usr/share/novnc`, `~/opt/novnc`, … | directory containing `vnc.html` |
 | `WEBSOCKIFY` | `PATH` → conda env → noVNC bundle | websockify executable |

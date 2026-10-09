@@ -1,0 +1,22 @@
+{
+  "sha256": {
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B10_-_Walk_turn_left_45_stageii.npy": "a0932290734060007086e76069f01cd72c8a3a841131d67d28666c1adac8542b",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B13_-_Walk_turn_right_45_stageii.npy": "4bd5faf4ead699d786d9b456baf2e23e0baaf64ff2082f354e69b524fbe9599f",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B15_-_Walk_turn_around_stageii.npy": "57bfab0dd634c7a919d7f344f273465992843575e76bda4d85c8e37701e69ed6",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B16_-_Walk_turn_change_stageii.npy": "21e380f244645eb13c11da5a842486ddbc0ccedeb2dd360b38c1c24ca3f8cb9a",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B10_-__Walk_turn_left_45_stageii.npy": "05a9f9761a4f74effa596932a9e3f8c9a80fe6b6cc08d847900c7596c9fb3807",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B11_-__Walk_turn_left_135_stageii.npy": "e12f65a867ebf2ae5f3a946ab728e7b0ae40847c4949b22c2140feeed1542d51",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B13_-__Walk_turn_right_90_stageii.npy": "050afd7d9c861dd63bee907afe29fe9d3e863258f030956c087d67c820df8a1b",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B15_-__Walk_turn_around_stageii.npy": "db6edcf2183cb068aeb103f74f10fcc32e4262c5ed0c897743e8d7e51415b24f",
+    "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B9_-__Walk_turn_left_90_stageii.npy": "3aef948c38bce4658a0bc1533e2106509e9d101ea8e5c9798052a57494c966c3",
+    "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_113_18_poses.npy": "da3cbd49ce4098d28bc89b8e6e06515e401db8e60b8e3de81addbe4e15845ebc",
+    "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_141_33_poses.npy": "8b8e8e00c7c1300c5080682ecf3a2175178276d0cfdef37167012d42c577739b",
+    "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_143_40_poses.npy": "edb00868dd9a73813fb0b7c25bcea5e2d9e211d691d6a19af4267d84a3e5d924",
+    "joint_carry/carry_joint_corrected/pickUp/cooperative_rsi_candidate.npz": "86ca0be79a155fcfbaecf642706a60703bb82798a0df5c5348cd8423e46a8fee",
+    "joint_carry/carry_joint_corrected/pickUp/screened_rsi_snapshots.npz": "b1877816b3e6b4d65eb93b152f7c7a1534ad22ab0417be15a27cd43718dea010",
+    "joint_carry/carry_joint_corrected/carryWith/cooperative_rsi_candidate.npz": "a4807c9eb1d60626f23c4c1ccf637e9c711f756baf2fc8eaa387662e3f5ab2cc",
+    "joint_carry/carry_joint_corrected/carryWith/screened_rsi_snapshots.npz": "97fc207bfe4101a553d6244e0fb52943072d0a3f182882d4d29110c0dde3f284",
+    "joint_carry/carry_joint_corrected/putDown/cooperative_rsi_candidate.npz": "410f8e5fe8ba06dcb54fa552d9d7a5d9cc62c74e4ca440463e056a8fdc2ba913",
+    "joint_carry/carry_joint_corrected/putDown/screened_rsi_snapshots.npz": "2e4fcf15cc28767100047a31a271ce4fddb5396521d588ff606cfef02a079675"
+  }
+}

@@ -2,6 +2,60 @@
 
 import torch
 
+SHARED_TASK_COLOR = (1.0, 0.85, 0.15)
+
+
+def object_task_owners(graph, env_id):
+    row = lambda value: value if value.ndim == 1 else value[env_id]
+    valid = row(graph.edge_valid)
+    src = row(graph.edge_src)[valid].detach().cpu().tolist()
+    dst = row(graph.edge_dst)[valid].detach().cpu().tolist()
+    owners = row(graph.edge_owner)[valid].detach().cpu().tolist()
+    result = {}
+    for source, target, owner in zip(src, dst, owners):
+        for entity in (source, target):
+            obj = entity - graph.num_agents
+            if 0 <= obj < graph.num_objects:
+                result.setdefault(obj, set()).add(owner)
+    return result
+
+
+def task_target_owners(graph, env_id):
+    row = lambda value: value if value.ndim == 1 else value[env_id]
+    valid = row(graph.edge_valid)
+    relations = row(graph.edge_relation)[valid].detach().cpu().tolist()
+    targets = row(graph.edge_dst)[valid].detach().cpu().tolist()
+    owners = row(graph.edge_owner)[valid].detach().cpu().tolist()
+    result = {}
+    for relation, target, owner in zip(relations, targets, owners):
+        result.setdefault((relation, target), set()).add(owner)
+    return result
+
+
+def task_marker_vertices(relation, target):
+    import numpy as np
+    from utils.edge_interaction_spec import SIT, CLIMB
+    from utils.edge_ontop_spec import ON_TOP
+
+    target = np.asarray(target, dtype=np.float32)
+    if relation == SIT:
+        angles = np.linspace(0., 2. * np.pi, 25)
+        points = target + np.stack((.18 * np.cos(angles), .18 * np.sin(angles),
+                                    np.zeros_like(angles)), axis=-1)
+        vertices = np.stack((points[:-1], points[1:]), axis=1).reshape(-1, 3)
+    elif relation == ON_TOP:
+        corners = np.array([[x, y, z] for x in (-.12, .12)
+                            for y in (-.12, .12) for z in (-.12, .12)])
+        edges = [(i, i ^ bit) for i in range(8) for bit in (1, 2, 4)
+                 if i < (i ^ bit)]
+        vertices = target + corners[np.asarray(edges)].reshape(-1, 3)
+    elif relation == CLIMB:
+        offsets = np.eye(3) * .12
+        vertices = np.stack((target - offsets, target + offsets), axis=1).reshape(-1, 3)
+    else:
+        raise ValueError('Unsupported task marker relation: ' + str(relation))
+    return vertices.astype(np.float32)
+
 
 def scenario_neutral_targets(env_origins, env_ids, num_targets):
     """Place inactive scenario targets at each environment's local origin."""

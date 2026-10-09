@@ -171,15 +171,17 @@ class MAAgent(amp_agent.AMPAgent):
                 report['source_config_available'] = 'relation_experiment_config' in checkpoint
                 report['source_commit'] = checkpoint.get('git_commit')
                 self._stage2_checkpoint_info = {
-                    'stage': 2, 'coordination': 'grounded_edge_cross_attention',
-                    'edge_width': 64, 'context_width': 64,
+                    'stage': 2, 'coordination': ('stage1_head_only' if not self.model.a2c_network.use_coordination else 'before_task_cross_attention' if getattr(task, '_before', False) else 'coupled_task_cross_attention'
+                        if getattr(task, '_joint_carry', False) else 'grounded_edge_cross_attention'),
+                    'edge_width': 64, 'context_width': report['head_expansion']['context_columns'],
                     'source_checkpoint': path,
                     'source_config': checkpoint.get('relation_experiment_config'),
                     'source_reward_config': checkpoint['relation_metadata']['relation_reward_config'],
                     'source_experiment': checkpoint.get('relation_experiment_config', {}).get('experiment'),
                     'source_commit': checkpoint.get('git_commit'),
                     'freeze': 'actor_encoder_and_actor_observation_rms',
-                    'rsi': 'template_with_shared_interaction_loco',
+                    'rsi': ('shared_object_stage1_templates' if getattr(task, '_before', False) else 'paired_snapshot' if getattr(task, '_joint_carry', False)
+                            else 'template_with_shared_interaction_loco'),
                 }
                 with open(os.path.join(self.experiment_dir, 'stage2_transfer_report.json'), 'w') as f:
                     json.dump(report, f, indent=2)
@@ -268,6 +270,8 @@ class MAAgent(amp_agent.AMPAgent):
         weights = super().get_stats_weights()
         task = self.vec_env.env.task
         weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        if task.cfg['env'].get('jointCarryAblation'):
+            weights['joint_carry_ablation'] = copy.deepcopy(task.cfg['env']['jointCarryAblation'])
         if getattr(task, '_edge_context', False):
             from utils.edge_context_spec import task_instance
             weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)
@@ -281,6 +285,8 @@ class MAAgent(amp_agent.AMPAgent):
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
+        from utils.joint_carry_amp import check_ablation_checkpoint
+        check_ablation_checkpoint(weights, task.cfg['env'])
         stage2_evaluation = getattr(task, '_stage2', False) and (
             task.cfg['args'].test or task.cfg['args'].eval)
         if getattr(task, '_edge_context', False) and not stage2_evaluation:

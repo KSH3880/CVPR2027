@@ -118,6 +118,15 @@ nn/
 # ...except the small height maps shipped with the long-term task plans
 !/tokenhsi/data/dataset_longterm_task_completion/**/height_map/*.npy
 
+# Portable joint-carry training data and inputs for reproducing its AMP export.
+!/joint_carry/teamhoi_reference/**/*.npy
+!/joint_carry/teamhoi_retarget_posture_all/*.npy
+!/joint_carry/teamhoi_retarget_posture_all/*_targets.npz
+!/joint_carry/carry_joint_corrected/*/cooperative_rsi_candidate.npz
+!/joint_carry/carry_joint_corrected/*/screened_rsi_snapshots.npz
+/joint_carry/carry_joint_corrected/before_after/
+/joint_carry/carry_corrected_physics/
+
 # Baseline demo GIFs from the original README (~74MB, not used here).
 # Note: tokenhsi/data/assets/ (robot meshes) is intentionally NOT ignored.
 /assets/

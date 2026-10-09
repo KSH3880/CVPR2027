@@ -19,6 +19,38 @@ def validate_stage2_config(config):
     if config.get('mode') != STAGE2_CONTEXT_MODE or config.get('schema_version') != 10:
         raise ValueError('Stage 2 requires its own mode and schema 10')
     variant = config.get('stage1_variant')
+    if 'before' in config:
+        from utils.before_spec import CONTRACT
+        from utils.task_role_spec import TASK_EMBEDDING_VARIANT
+        if config['before'] != CONTRACT or variant != TASK_EMBEDDING_VARIANT:
+            raise ValueError('Unsupported BEFORE reward contract')
+        legacy = dict(config, mode=STAGE1_CONTEXT_MODE, schema_version=9)
+        legacy.pop('before')
+        validate_stage1_context_config(legacy)
+        return
+    if 'joint_carry' in config:
+        from utils.task_role_spec import TASK_EMBEDDING_VARIANT
+        joint = dict(config['joint_carry'])
+        independent = joint.pop('independent', None)
+        alignment = joint.pop('alignment', None)
+        if alignment is not None and alignment != {
+                'leader': 'farthest_goal_xy', 'weight': .1, 'buffer': .8,
+                'saturation': 'target_bbox_radius', 'gate': 'opposite_current_holding',
+                'sharing': 'all_agents'}:
+            raise ValueError('Unsupported joint-carry alignment contract')
+        if independent not in (None, {'environment_fraction': .2,
+                'placement_gate': 'own_current_holding', 'rsi': 'stage1_size_aware'}):
+            raise ValueError('Unsupported independent-carry contract')
+        if variant != TASK_EMBEDDING_VARIANT or joint != {
+                'anchor_inset': .15, 'placement_gate': 'opposite_current_holding',
+                'collision': {'mode': 'cpa', 'ttc_discount': .99}} or \
+                config['success'].get('saturation') != 'none':
+            raise ValueError('Unsupported joint-carry reward contract')
+        legacy = dict(config, mode=STAGE1_CONTEXT_MODE, schema_version=9)
+        legacy.pop('joint_carry')
+        legacy['success'] = dict(config['success'], saturation='paired_placement_current_success')
+        validate_stage1_context_config(legacy)
+        return
     if variant not in (
             'scenario_independent_stage1_plane', 'scenario_stage2_sit_plane_self_sum'):
         raise ValueError('Unsupported Stage-2 plane success geometry')

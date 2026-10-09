@@ -22,6 +22,11 @@
 
 Isaac Gym은 활성화된 conda 환경에서 import되는 설치본을 사용합니다.
 
+공동운반 LocoAMP CA/head-only는 보정 AMP·paired RSI가 Git에 포함됩니다.
+기존 데이터 경로만 `TOKENHSI_DATA_ROOT=/path/to/TokenHSI/tokenhsi/data`로 지정하면
+전용 train/test/VNC가 자동 연결·무결성 검사를 합니다. 체크포인트는 별도 경로로 지정합니다.
+최초 준비와 두 학습 명령은 [joint_carry/README.md](../joint_carry/README.md)를 따릅니다.
+
 ## 포팅 절차
 
 1. 기존 작업을 보존하도록 `git status --short`를 먼저 확인한다.

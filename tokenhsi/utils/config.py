@@ -94,6 +94,8 @@ def load_cfg(args):
             cfg['env']['relationGraph'] = yaml.safe_load(f)
 
     validate_typed_bias_config(cfg['env'], cfg_train)
+    from utils.joint_carry_amp import validate_ablation
+    validate_ablation(cfg['env'], cfg_train)
 
     transfer = getattr(args, 'transfer_checkpoint', '')
     if transfer and (args.resume > 0 or args.test or args.eval):

@@ -76,7 +76,8 @@ def test_carry_amp_samples_real_carry_family_experts_only():
     def build(motions, times, lib):
         calls.extend([SKILLS[lib.index]] * len(motions))
         return torch.full((len(motions), 20), float(lib.index))
-    task = SimpleNamespace(_carry_only=True, _size_aware_rsi=True, device='cpu',
+    task = SimpleNamespace(_carry_only=True, _joint_carry=False, _before=False,
+        _size_aware_rsi=True, device='cpu', cfg={'env': {'skill': SKILLS}},
         _skill=SKILLS, _motion_lib=libs, dt=1/30, _num_amp_obs_steps=10,
         get_num_amp_obs=lambda: 50, build_amp_obs_demo=build)
     obs = HumanoidMACarry._fetch_conditioned_amp_demo(task, 4096).reshape(4096, 10, 5)

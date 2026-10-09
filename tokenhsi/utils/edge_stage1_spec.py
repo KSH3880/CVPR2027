@@ -438,6 +438,15 @@ def compose_graph(pattern, shuffle=False, generator=None):
 
 def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
                  generator=None):
+    from utils.before_spec import SAMPLER as BEFORE_SAMPLER, sample_graph as sample_before
+    if spec.get('sampler') == BEFORE_SAMPLER:
+        return sample_before(n, spec, device, preset, role_swap, generator)
+    from utils.mixed_carry_spec import MIXED_SAMPLER, sample_graph as sample_mixed
+    if spec.get('sampler') == MIXED_SAMPLER:
+        return sample_mixed(n, spec, device, preset, role_swap, generator)
+    from utils.joint_carry_spec import JOINT_SAMPLER, sample_graph as sample_joint
+    if spec.get('sampler') == JOINT_SAMPLER:
+        return sample_joint(n, spec, device, preset, role_swap, generator)
     if spec.get('sampler') == 'two_agent_stage2_cooperative':
         from utils.edge_stage2_spec import sample_graph as sample_stage2_graph
         return sample_stage2_graph(n, spec, device, preset, role_swap, generator)
@@ -469,6 +478,15 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    from utils.before_spec import SAMPLER as BEFORE_SAMPLER, compile_graph as compile_before
+    if spec.get('sampler') == BEFORE_SAMPLER:
+        return compile_before(spec, m, o, device)
+    from utils.mixed_carry_spec import MIXED_SAMPLER, compile_graph as compile_mixed
+    if spec.get('sampler') == MIXED_SAMPLER:
+        return compile_mixed(spec, m, o, device)
+    from utils.joint_carry_spec import JOINT_SAMPLER, compile_graph as compile_joint
+    if spec.get('sampler') == JOINT_SAMPLER:
+        return compile_joint(spec, m, o, device)
     if spec.get('mode') == 'stage1_cleanup_demo':
         from utils.box_cleanup_spec import compile_cleanup_graph
         return compile_cleanup_graph(spec, m, o, device)

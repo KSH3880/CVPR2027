@@ -145,6 +145,7 @@ from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
     semantic_packet_size, owner_holding_packet_size)
 from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE
 from learning.multi_agent.coordination_head import GroundedEdgeCoordination
+from learning.multi_agent.task_coordination import TaskCoordination
 from learning.multi_agent.task_role_encoder import (TaskRoleFusion, TaskRoleMLPFusion,
     TaskTypeEmbeddingBias, TaskTypeEmbeddingFusion)
 
@@ -565,7 +566,9 @@ class RelationEncoder(nn.Module):
                 or not relation_bias):
             raise ValueError('State relation modes require clean_scene and enabled edge_mlp or typed_lookup relation bias')
         if relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING) and (
-                relation_reward_mode != STAGE1_CONTEXT_MODE or not self.semantic_only
+                (relation_reward_mode != STAGE1_CONTEXT_MODE and not (
+                    relation_reward_mode == STAGE2_CONTEXT_MODE and
+                    relation_bias_mode == RELATION_BIAS_TASK_EMBEDDING)) or not self.semantic_only
                 or self.owner_holding_state):
             raise ValueError('typed_lookup requires semantic-only Stage 1 without owner-HOLDING state')
         if relation_bias_mode not in RELATION_BIAS_MODES:
@@ -622,7 +625,8 @@ class RelationEncoder(nn.Module):
         if self.edge_context:
             compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
-            self.context_fusion = (TaskTypeEmbeddingFusion()
+            self.context_fusion = (TaskTypeEmbeddingFusion(
+                merge_shared=relation_reward_mode == STAGE2_CONTEXT_MODE)
                 if self.relation_bias_mode == RELATION_BIAS_TASK_EMBEDDING else TaskRoleMLPFusion(num_layers, num_heads,
                 split_tasks=self.relation_bias_mode == RELATION_BIAS_TASK_SPLIT_MLP)
                 if self.relation_bias_mode in (RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP) else
@@ -1002,9 +1006,10 @@ class AMPMultiAgentBuilder(AMPBuilder):
             tp = params["transformer"]
             d_model = tp["num_features"]
             coordination_cfg = params.get('coordination', {})
-            if self.stage2 and (coordination_cfg.get('enabled') is not True or
-                                d_model != 64):
-                raise ValueError('Stage 2 requires enabled 64-D coordination')
+            head_only = coordination_cfg == {'enabled': False, 'mode': 'stage1_head_only'}
+            self.use_coordination = self.stage2 and coordination_cfg.get('enabled') is True
+            if self.stage2 and (not (self.use_coordination or head_only) or d_model != 64):
+                raise ValueError('Stage 2 requires 64-D coordination or explicit head-only ablation')
             if not self.stage2 and coordination_cfg.get('enabled', False):
                 raise ValueError('Coordination requires the Stage-2 task mode')
             num_heads = tp["layer_num_heads"]
@@ -1079,18 +1084,27 @@ class AMPMultiAgentBuilder(AMPBuilder):
                     torch.nn.Linear(units[-1], output_size),
                 )
 
-            if self.stage2:
-                self.coordination = GroundedEdgeCoordination(
+            if self.use_coordination:
+                task_ca = self.actor_encoder.task_role_input
+                before = self.relation_graph_spec.get('sampler') == 'two_agent_before_task_embedding'
+                expected_mode = 'task_before' if before else 'task_coupled' if task_ca else 'grounded_edge'
+                if coordination_cfg.get('mode', 'grounded_edge') != expected_mode:
+                    raise ValueError('Stage-2 coordination mode must match its policy packet')
+                coordination = TaskCoordination if task_ca else GroundedEdgeCoordination
+                self.coordination = coordination(
                     d_model, coordination_cfg.get('grounding_hidden', 128),
-                    coordination_cfg.get('num_heads', 2))
+                    coordination_cfg.get('num_heads', 2),
+                    **({'shuffle_task_order': coordination_cfg.get('shuffle_task_order', False),
+                        'before': before}
+                       if task_ca else {}))
             self.action_head = head(kwargs['actions_num'], tp["extra_mlp_units"],
-                                    2 * d_model if self.stage2 else d_model)
+                                    2 * d_model if self.use_coordination else d_model)
             self.value_head = head(self.value_size, tp["extra_mlp_units"])
 
             mlp_init = self.init_factory.create(**{"name": "default"})
             modules = [self.actor_encoder, self.critic_encoder,
                        self.action_head, self.value_head]
-            if self.stage2:
+            if self.use_coordination:
                 modules.append(self.coordination)
             for net in modules:
                 for m in net.modules():
@@ -1135,11 +1149,15 @@ class AMPMultiAgentBuilder(AMPBuilder):
             if self.is_continuous and self.space_config['fixed_sigma']:
                 if self.stage2:
                     with torch.no_grad():
-                        humans, nodes = self.actor_encoder(obs, return_all=True)
-                    context = self.coordination(
-                        humans, nodes, obs[:, -self.actor_encoder.suffix_width:],
-                        self.actor_encoder.edge_encoder, self.actor_encoder.entity_types)
-                    encoded = torch.cat((humans, context), -1)
+                        if self.use_coordination:
+                            humans, nodes = self.actor_encoder(obs, return_all=True)
+                        else:
+                            encoded = self.actor_encoder(obs)
+                    if self.use_coordination:
+                        context = self.coordination(
+                            humans, nodes, obs[:, -self.actor_encoder.suffix_width:],
+                            self.actor_encoder.edge_encoder, self.actor_encoder.entity_types)
+                        encoded = torch.cat((humans, context), -1)
                 else:
                     encoded = self.actor_encoder(obs)
                 mu = self.action_head(encoded)

@@ -94,17 +94,36 @@ class EdgeContextTaskMixin:
                    else {}))
         else:
             result = runtime.step(phi, diag['progress'], diag['z_error'])
+        alignment = self._relation_cfg.get('joint_carry', {}).get('alignment')
+        if alignment is not None:
+            from env.tasks.multi_agent.joint_carry_reward import shared_alignment_reward
+            align_reward, align_diag = shared_alignment_reward(
+                self._humanoid_root_states, self._logical_box_values(self._box_states),
+                self._logical_box_values(self._box_size), self._tar_pos, graph,
+                runtime.coupled_holding, alignment)
+            result['agent_task_reward'] = result['agent_task_reward'] + align_reward[:, None]
+            result['local_task_reward'] = result['local_task_reward'] + align_reward[:, None]
+            self.extras['joint_alignment'] = dict(align_diag, reward=align_reward)
         roots = self._humanoid_root_states[..., :3]
         objects = self._reward_box_values(self._box_states)[..., :3]
         power = torch.zeros_like(result['agent_task_reward']); collision = torch.zeros_like(power); speed = torch.zeros_like(power)
         if self._power_reward:
             power = -self._power_coefficient * (self.dof_force_tensor * self._dof_vel).abs().sum(-1)
         if self._agent_collision_penalty and self.num_agents > 1:
-            collision = -self._agent_collision_coeff * collision_fn(roots, self._agent_collision_dist)
+            cpa = self._relation_cfg.get('before', self._relation_cfg.get('joint_carry', {})).get('collision', {})
+            if cpa.get('mode') == 'cpa':
+                from env.tasks.multi_agent.joint_carry_reward import cpa_collision_penalty
+                collision = -self._agent_collision_coeff * cpa_collision_penalty(
+                    roots, self._humanoid_root_states[..., 7:10], self._agent_collision_dist,
+                    cpa['ttc_discount'], self.dt)
+            else:
+                collision = -self._agent_collision_coeff * collision_fn(roots, self._agent_collision_dist)
         if self._box_vel_penalty:
             speed = box_speed_penalty(self._prev_box_pos, objects, self.dt, self._box_vel_pen_coeff, self._box_vel_pen_thre)
         reward = result['agent_task_reward'] + power + collision + speed
         components = [owner_sum(result[k], graph) for k in ('state_component', 'progress_component', 'success_component')]
+        if alignment is not None:
+            components.append(align_reward[:, None].expand(-1, self.num_agents))
         if self._relation_cfg.get('edge_aggregation') == 'mean_active':
             count = owner_sum(batched(graph.edge_valid, self.num_envs).float(), graph).clamp_min(1)
             sharing = self._relation_cfg['task_sharing']
@@ -125,6 +144,12 @@ class EdgeContextTaskMixin:
         dcfg = self._relation_cfg['diagnostics']; self._edge_steps += 1
         if not dcfg.get('enabled', True):
             return
+        if alignment is not None:
+            for field in ('score', 'saturated'):
+                key = 'joint_alignment/' + field
+                value = (align_diag[field] * align_diag['joint']).sum()
+                self._edge_metric_sums[key] = self._edge_metric_sums.get(key, 0) + value
+                self._edge_metric_denominators[key] = self._edge_metric_denominators.get(key, 0) + align_diag['joint'].sum()
         is_stage1 = getattr(self, '_edge_stage1', False)
         semantic_only = getattr(self, '_semantic_only_stage1', False)
         context_fields = ([] if semantic_only else
@@ -193,7 +218,7 @@ class EdgeContextTaskMixin:
             return super().consume_relation_diagnostics()
         result = {}
         for key, sums in self._edge_metric_sums.items():
-            if key.startswith(('ontop/', 'sharing/', 'sit/', 'climb/')):
+            if key.startswith(('ontop/', 'sharing/', 'sit/', 'climb/', 'joint_alignment/')):
                 denominator = self._edge_metric_denominators.get(key, max(self._edge_metric_steps, 1))
                 if isinstance(denominator, torch.Tensor):
                     if denominator == 0:

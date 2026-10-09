@@ -2,7 +2,130 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-09
+
+### Mixed80 LocoAMP 공동 방향 보상 연결
+
+- 사용자 합의대로 `approach_stage2_joint_carry_mixed80_locoamp_align_task_embedding` env/train 및 train/test/VNC를 분리했다. 공동 HOLDING 중 목표 XY에서 가장 먼 사람의 heading 점수×0.1을 두 사람에게 각각 한 번 공유한다. 방향 포화 거리는 목표 XY 반대각선+0.8m(AT0.8m·ON_TOP약1.277m)이며 단독 환경에는 적용하지 않는다. 기존 placement progress buffer0.1·AMP80/10/10·RSI·CPA·CA/SA 셔플·동결 및 head 전이는 유지한다.
+- 방향 reward 계약을 checkpoint metadata로 분리하고 `reward_terms/joint_alignment`와 공동 점수/포화 비율을 기록한다. 관련 CPU28개·Python/셸 문법·diff 검사를 통과했다. GPU5·2048환경에서 Stage1 epoch23000 전이→epoch2 저장→epoch3 재개를 확인했고 encoder69개 tensor/RMS 동결·모델 및 scalar136종 finite를 검사했다.
+- 저장 모델의64환경32-step 혼합 평가(공동 AT27·ON_TOP24·단독13)에서 두 사람의 동일 방향 보상·task total에 한 번만 추가·단독/gate-off 보상0·성분 합과 total 일치를 확인했다. 전용 test wrapper의16환경32-step headless 평가도 통과했다. 실제 VNC 화면·장기 학습 개선은 미검증이다. 결과는 `output/approach_stage2_joint_carry_mixed80_locoamp_align_task_embedding_check/saved_check.json` 및 `output_etc/joint_alignment_check/{runtime_check,resume_check}.json`이다.
+
+### 공동운반 clone 배포 준비·외부 데이터 자동 연결
+
+- 현재 보정 AMP12개·검사용 target·TeamHOI 원본12개·paired RSI6개를 `.gitignore` 예외로 지정했다. 영상·이전 보정 binary·checkpoint는 제외한다. `joint_carry/README.md`의 연결 전 전달 안내를 현재 clone 실행법으로 교체하고 config·structure·포팅 문서를 갱신했다.
+- `prepare_joint_carry.py`가 `TOKENHSI_DATA_ROOT` 또는 `--data-root`의 기존 TokenHSI 데이터를 없거나 끊어진 링크에 연결한다. 유효한 기존 데이터는 덮어쓰지 않는다. 두 LocoAMP train/test(VNC 포함)에 원본 파일100개 존재·현재 AMP/RSI18개 SHA256 검사를 연결했다. 보상·모델·분포·기존 학습 프로세스는 변경하지 않았다.
+- 별도 임시 Git index로 배포 대상만 archive하여 공백 포함 새 경로에 복원했다. AMP12개·RSI6개 포함, 공동 RSI319개 로드·원본12개 해시·경로/파일 보존/오염 검출 CPU4개·셸 문법·diff 검사를 통과했다. 실제 index는 변경하지 않았으며 commit/push는 수행하지 않았다.
+- 새 경로·GPU5·2048환경에서 Stage1 epoch23000으로 두 모델의 짧은 학습을 완료했다(`MAX_ITERATIONS=1`, 실제 저장 epoch2). CA는 RSI 캐시2279 profile을 새로 생성했고 head-only는 데이터 경로 재지정 없이 링크·캐시를 재사용했다. 두 모델 모두 actor69개 tensor 원본 유지·모델/기록 scalar133종 finite·정상 종료를 확인했다. 결과: `output/clone_portability_{ca,head_only}_check/portability_check.json`. 동일 서버의 경로 이관 검사이며 다른 서버의 드라이버/환경까지 검증한 것은 아니다.
+
+### output 검증 산출물 보관 정리
+
+- 사용자 요청으로 비활성 검증·분석·이전 영상 디렉터리19개를 `output_etc/`로 이동했다. `output/`에는 본학습 결과4개·`rsi_cache`·현재 전체 보정 영상/검사만 남겼다. 이동 목록은 `output_etc/archive_20261009_cleanup.json`이다.
+- 같은 파일시스템의 rename으로 디렉터리 inode를 보존했고 실행 중 프로세스가 이동 경로를 사용하지 않는지 확인했다. 문서·이전 데이터 검증 report 경로·보조 영상/검사 스크립트 출력 경로를 갱신했다. 현재 학습 config·AMP 데이터·캐시·checkpoint는 변경하지 않았다.
+- 이동19개·문서 링크·데이터 검증 report4개·보조 스크립트 Python 문법·diff 확인 통과. 두 본학습 프로세스는 이동 후에도 실행 중이다.
+
+### 자세 보존 보행 전체12개·LocoAMP CA/head-only 연결
+
+- 승인받은 자세 보존 방식을 후진9개·옆걸음3개에 적용해 `joint_carry/teamhoi_retarget_posture_all/`로 분리했다. IK 범위 안쪽0.001rad 여유로 quaternion 보간의 작은 한계 초과를 제거했다. 무릎 중앙값의 원본 대비 변화는 최대3.1°이며 원본·이전 보정본 해시는 보존했다. Male2 B9/B11/B13/B15만 중간 샘플을 추가해60fps, 총4458프레임이다.
+- GPU5·2048환경에서4458/4458프레임의0.1초 초기 물리 검사·프레임/중간 시점 관절 범위·발 접지·FK 검사를 통과했다. 시뮬 body/FK 차이 최대0.12mm 미만, CPU/GPU 실제 AMP3200×1320 finite. 개별4열 비교12개·후진/옆걸음 모아보기2개 전체 MP4 decode 통과. 결과는 `output/teamhoi_retarget_posture_all_check/`다. 연속 보행 안정성·미끄러짐0·학습 개선을 보장하는 검사는 아니다.
+- 두 `approach_stage2_joint_carry_mixed80_locoamp_{task_embedding,head_only}` env/train·train/test/VNC를 새 데이터 해시로 연결했다. AMP만 기존80%·후진10%·옆걸음10%로 보강하며 사람별 방향 배정은 없다. 공동80/단독20, 기존 reward·CPA·RSI·SA 셔플은 유지한다. Stage1 actor/RMS 동결, CA는128입력 `[W,0]`, head-only는CA 모듈 없이64입력 `W`로 초기화하고 action head를 학습한다. Critic·AMP 판별자는 학습하며 이전 보정 데이터 checkpoint는 계약 불일치로 구분한다.
+- 관련 CPU18개 및 최종 데이터 계약4개 재검사, Python/전용 셸6개 문법·diff·문서 링크 검사를 통과했다. GPU5·2048환경에서 두 모델 각각 epoch2 저장, epoch3 재개, 16환경32-step headless 평가 로드를 확인했다. Actor69개 tensor·관찰 RMS 불변, head64/128·CA 유무·head/critic/discriminator 갱신과 scalar finite를 검사했다. 확인용 결과는 각 `output_etc/approach_stage2_joint_carry_mixed80_locoamp_*_posture_{check,resume_check,eval_check}/`다.
+- 실제 AMP30000개 샘플의 원래/후진/옆걸음 비율은79.68/10.25/10.07%, 두 새 라이브러리와 원래 RSI 라이브러리 분리·carry label·시간 범위·공동1638/단독410·부분 reset1024/32/32의 미선택 상태 보존·8 control step finite를 확인했다. `head_only_posture_check/reset_check.json` 참조. 본학습은 시작하지 않았다.
+
+### TeamHOI 과도한 무릎 굽힘 수정 pilot
+
+- 사용자 영상 검토로 이전 IK의 자세 왜곡을 확인했다. 골반 고정 상태에서 발 목표를 맞춘 뒤 접지하던 순서가 원본보다 과도한 굽힘을 만들었다. 이전 전체12개 보정본과 연결된 LocoAMP 본학습은 사용 보류로 문서화했다. 기존 학습 프로세스·AMP/RSI/config 데이터 해시는 바꾸지 않았다.
+- `--posture-first`로 별도2개를 생성한다. 골반과 발 목표의 공통 높이를 IK 전에 정렬하고 원본 무릎 자세 유지 항을 강화했다. 기존 loco5개를 대조했으며 무릎 중앙값은 후진 원본9.5°→이전60.5°→새11.0°, 옆걸음22.3°→56.8°→20.3°다. XY 경로·root 방향·원본 해시를 유지한다.
+- GPU5·2048환경의0.1초 초기 충격 검사는253/253·530/530, CPU/GPU 실제 AMP640×1320 finite, 관절 범위·프레임/중간 시점 발 접지·FK/시뮬 body 일치 검사를 통과했다. 실제 FK 차이0.12mm 미만, 최저 발 여유 약0.4–1.2cm. Python 문법·diff·두 MP4 전체 decode 검사도 통과했다.
+- **한계:** 후진의 바닥3.5cm 이내 발 표면 속도 proxy 평균은0.42m/s(이전0.22), 옆걸음0.11m/s다. 이는 접촉 미끄러짐 측정이 아니며 자연스러움·미끄러짐0·폐루프 보행·학습 효과는 미검증이다. 발 목표 오차는 최대3.1cm를 허용한 자세 보존 결과다. 새 데이터는 학습 미연결이며 나머지10개에 아직 적용하지 않았다.
+- 결과: `output_etc/teamhoi_retarget_posture_pilot_check/{report,gait_comparison}.json`, `backward.mp4`, `sideways.mp4`. 영상은 원본/이전/새 보정/기존 걷기의4열 기구학 재생이며 기존 걷기는 별도 클립 반복이다. 재현 스크립트는 기존3개에 `--posture-first`, 자세 비교는 `joint_carry/scripts/compare_teamhoi_gait.py`다.
+
+### TeamHOI 후진·옆걸음 각1개 보정 및 GPU 검증
+
+- 사용자 승인으로 Male1 B10 후진·CMU141_33 옆걸음을 `teamhoi_retarget_pilot/`에 별도 변환했다. 현재 asset의 관절 범위 내 다리 IK, 이동하는 발의 지면 여유, 부드러운 지지 발 높이 기반 root Z 보정을 적용했다. Root XY/방향은 float32 정밀도 내 보존하며 실제 체형으로 FK·선속도·각속도를 재계산했다. 원본 SHA256은 불변이다.
+- 실제 10-frame carry AMP 경로 CPU/GPU·1320차원·finite, 프레임/중간 시점의 관절 범위·발 mesh 바닥 관통·속도와 경로 정합성을 검사했다. GPU5·2048환경·GPU PhysX에서 후진253/253·옆걸음530/530프레임의0.1초 초기 충격 검사 통과, 실제 simulator body와 FK 최대 차이0.12mm 미만. 낮은 쪽 발의 바닥 여유는 약0.4–1.3cm다.
+- **한계:** 바닥 근처 발 표면 속도 proxy 평균은 후진0.22m/s·옆걸음0.10m/s로 미끄러짐0을 보장하지 않는다. 8초 자유 root PD는 기존 모션 대조군도 넘어지므로 학습 가능성 판정에서 제외한다. AMP 학습 개선·폐루프 모방·joint RSI는 검증하지 않았다. 나머지10개·학습 config·실행 중 학습은 변경하지 않았다.
+- 재현: `joint_carry/scripts/{retarget_teamhoi_reference,check_teamhoi_retarget,preview_teamhoi_retarget}.py`. 결과와 원본/보정 기구학 비교 영상은 `output_etc/teamhoi_retarget_pilot_check/`의 `report.json`, `backward.mp4`, `sideways.mp4`. 보정본은 AMP에 아직 연결하지 않았다.
+
+### TeamHOI reference 원본 호환성·GPU 물리 검사
+
+- 후진9개·옆걸음3개 원본은 기존 MotionLib/32-DOF 및 실제 10-frame carry AMP 생성 경로에서 로드됐다(384×1320, finite). 다만 원본 다리 skeleton offset이 현재 asset과 달라 동일 DOF의 발 위치가 클립 평균5.4–7.6cm 어긋나고 실제 발 mesh 기준 최대10.2–13.6cm 바닥 관통이 계산됐다. 기존 reference 대조군은 발 위치 평균 오차0.01cm 미만이었다.
+- GPU5·2048환경·실제 phys_humanoid_v3·GPU PhysX에서 모든3721프레임을 0.1초 검사했다. root 속도 변화≤3m/s·변위≤0.3m 기준2064/3721(55.5%) 통과, 기존 모션 대조군238/238 통과. 8초 자유 root PD 재생은 대조군도 넘어져 AMP 사용성 판정 지표에서 제외했다. 최종 root/DOF는 모두 finite였다.
+- 결과/재현 스크립트: `output_etc/teamhoi_reference_compatibility_20261009/`의 `report.json`, `amp_history.json`, `check.py`. 원본 즉시 투입은 권장하지 않으며 현재 체형으로 재타게팅·접지/속도 정합성 보정 후 재검증이 필요하다. 학습 config·RSI·실행 중 학습은 변경하지 않았고 변환 및 학습 성능 검증은 미수행이다.
+
+### TeamHOI 후진·옆걸음 reference 다운로드·미리보기
+
+- 사용자 요청으로 공식 TeamHOI commit `6fdc9885f8a9c82854be99adca6f2570e67ac63a`의 `near_table.yaml`에 포함된 후진9개·옆걸음3개를 `joint_carry/teamhoi_reference/`에 다운로드했다. 원본 경로·SHA256·프레임 정보는 `manifest.json`, 출처 설정·라이선스도 함께 보존했다.
+- 12개 모션의 finite 배열·단위 quaternion·SHA256을 확인하고, 원본 FK·몸 방향/이동 방향 화살표를 표시하는 CPU 재생 스크립트와 두 MP4를 만들었다. 이는 reference skeleton 미리보기이며 물리 재생·현재 32-DOF로의 전환·AMP 학습 연결은 수행하지 않았다.
+
+### 공유 목표 색상·과제별 마커 통일
+
+- 사용자 지정 `stage2_team` shared9 시각화를 참고해 공유 물체·받침·AT 목표와 공동 과제 마커를 노란색으로 통일했다. AT 목표를 마지막 owner 색으로 덮어쓰던 경로를 제거하고 ON_TOP 와이어 큐브·SIT 수평 원·CLIMB 3축 십자를 적용했다.
+- 실제 joint AT/ON_TOP graph와 렌더 API 대역을 사용한 CPU 색상 검사, 단일 graph 소유자 집계·마커 정점·Python 문법·diff 검사를 통과했다. 실제 VNC 화면은 미확인이고, 실행 중 뷰어에는 재시작 후 반영된다.
+
+## 2026-10-08
+
+### BEFORE 80%·독립 20% task CA 연결
+
+- GPU5 기본의 `approach_stage2_before_task_embedding` env/train YAML·train/test/VNC를 추가했다. 현재 AT prerequisite으로 B state/success·포화를 gate하고 progress/HOLDING은 유지한다. 공통27개 크기·세 BEFORE 각546/독립410환경·Stage 1 RSI/AMP·SA/CA token 셔플을 연결했다. Carry-only source/기존 joint Stage 2 checkpoint와 구분한다.
+- 공유 상자 상태는 A가 한 번만 결정하며 B reference·속도·AMP history를 정렬한다. 실제 source/support 크기로 RSI를 조회하고 geometry 재시도에서 skill을 유지한다. 부분 reset의 상태 보존과 평가 skill별 과제 적합성도 확인했다.
+- CPU94개·셸/diff 검사, GPU5·2048환경 짧은 학습/epoch2 저장·epoch3 재개 통과. Actor69개 tensor·관찰 RMS6개 불변, NONE/SELF/BEFORE 갱신·COUPLED0, scalar182종/364값 finite. AMP 대응·1024개 혼합 및 각32개 그룹 부분 reset·16환경32-step headless 평가 경로를 확인했다. 결과: `output/approach_stage2_before_task_embedding_check_final/{saved_check,reset_check,resume_check}.json`.
+- **미완료:** 초기 자세0.1초 물리 진단은1575/2048 통과·473개 미통과다. geometry reset 실패0과 별개이며 합성 RSI 물리 안정성은 보완이 필요하다. 강화 캐시는 fallback 증가와 잔여 불안정 때문에 적용하지 않았고 기존 Stage 1 비율/선별 기준을 유지했다. 본학습·장기 성능·VNC 화면은 실행/검증하지 않았다.
+
+
+### 공동 80%·단독 20% Mixed80 실험 분리
+
+- 사용자 승인으로 `approach_stage2_joint_carry_mixed80_task_embedding` env/train config·train/test/VNC를 추가했다. 2048환경 중 공동1638·단독410을 생성 시 고정하며 공동 AT/ON_TOP은 scene별50/50, 단독은 agent별 독립50/50이다. 기존100% 공동운반 실행은 유지했다.
+- 단독은 Stage 1 carry 상자/받침 크기·크기별 물리 선별 RSI(40/10/40/10)·reference AMP history를 재사용한다. 공동 paired RSI·반복 AMP history와 reset을 단일 물리 commit으로 결합했다. 공동 SELF/COUPLED와 단독 SELF/NONE을 기존 task CA에 연결하고, 단독 placement는 자기 현재 HOLDING으로 gate한다. 새 reward 계약으로 기존 Stage 2 checkpoint와 구분한다.
+- 관련 CPU **64개**, Python/셸 문법·새 문서 경로·diff 검사 통과. GPU5·2048환경·MAX_ITERATIONS=1 학습은 epoch2 저장, scalar133종/266값 finite, 물리 reset 실패0이었다. 지정 Stage 1 epoch11000 대비 actor69개 tensor·관찰 RMS 불변, 세 CA bias 갱신을 확인했다.
+- 실제1638/410 분할·서로 다른 payload/goal의 SELF/NONE·공동/단독 AMP 이력·carry demo label·1024환경 혼합 및 각32환경 단일그룹 부분 reset에서 미선택 상태/관측/AMP 보존을 확인했다. 11 control step finite. 결과는 `output/approach_stage2_joint_carry_mixed80_task_embedding_check/{saved_check,reset_check}.json`이다.
+- 저장 모델의 단독 AT/ON_TOP 혼합과 공동 ON_TOP을 각각16환경·32-step headless 평가해 전용 test 실행/로드 경로를 확인했다. 본학습·단독 능력 유지 및 공동운반 장기 성능·VNC 화면은 검증하지 않았다.
+
+### 지정 carry distill epoch11000의 Stage 2 전이 허용
+
+- 사용자 지정 `stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00011000.pth`를 확인하고, 호환되는 carry-only distill variant를 Stage 2 source 허용 목록에 추가했다. Tensor shape·키 검증은 유지하고 실행 가이드의 source를 갱신했다.
+- 실제 checkpoint epoch11000·157개 tensor 전이·69개 actor 파라미터 동결·finite action을 CPU에서 확인했다. 관련 CPU 10개와 diff 검사 통과. 학습은 실행하지 않았다.
+
 ## 2026-10-07
+
+### Joint carry collision을 기존 shared9 CPA로 변경
+
+- 사용자 지정 `stage2_team/output/approach_stage2_rescue_shared9_cpa_team03`의 저장 config와 `collision_reward.py`를 대조해, root XY 접근 방향 × CPA 거리 위험도 × `0.99^(t/control_dt)`를 적용했다. 기존 계수0.5·거리0.7m를 유지하며 정지/동일속도/멀어지는 쌍에는0, static 거리 항은 중복 가산하지 않는다. 공동운반 외 기존 실험 경로는 유지했다.
+- CPA mode/discount를 joint reward 계약에 기록했다. 이전 distance Stage 2 checkpoint의 직접 resume/eval은 거부하며 Stage 1 source 전이는 유지한다. 실행 가이드·코드 역할 문서를 갱신했다.
+- 관련 CPU 24개 통과(접근/이탈/스침/정지·제어 dt 감쇠·순열·checkpoint 및 기존 Stage 2 회귀). GPU 5·2048환경에서 실제 reward 경로의 네 사례와 8 control step finite/bounds, 초기 물리·AMP·부분 reset을 확인했다. 원본 CPA와 1024개 4-agent 무작위 배치의 최대 차이는1.35e-7 미만이다. 결과는 `output/approach_stage2_joint_carry_cpa_check/reset_check.json`; 본학습은 실행하지 않았다.
+
+### Joint carry ON_TOP 받침 크기 축소
+
+- 사용자 요청으로 받침을 72×100×30cm에서 운반 상자와 가로·세로가 같은 **52×80×30cm**로 변경했다. Env YAML·크기 계약·실행 가이드를 동기화했다.
+- 관련 CPU 6개 통과. GPU 5·실제 Stage 2 2048환경에서 새 asset 크기·0.1초 초기 물리 검사·AMP 초기 이력·1024환경 부분 reset을 확인했다. 결과는 `output/approach_stage2_joint_carry_support_size_check/reset_check.json`이다. 실제 올려놓기 성능은 이번 검사에 포함하지 않는다.
+
+### Joint carry Stage 2 실행 연결
+
+- 사용자 승인으로 `approach_stage2_joint_carry_task_embedding` env/train YAML·train/test/VNC를 연결했다. 원본 task embedding 기반 actor/RMS 동결, scene별 joint AT/ON_TOP 50/50, 2명·4물체, 52×80×40cm payload·72×100×30cm 받침을 쓴다. 기존 Stage 1·29번과 config/output/checkpoint를 분리했다.
+- 양손 중점의 object-local Y ±25cm 앵커 중 자유 선택과 반대 앵커 동시 HOLDING gate를 구현했다. 자기 HOLDING은 항상 보상하고 placement state/progress/success만 gate한다. 포화·성공 latch는 제거했다. CA의 task packet/KV/relation bias를 함께 셔플하고 SA 복원 순서와 action 대응을 유지한다.
+- 보정 snapshot의 두 사람·공유 상자·root/DOF 속도를 같은 행에서 공동 복원하며 부분 reset은 단일 root commit을 쓴다. RSI는 AT 40/10/40/10, ON_TOP 50/10/40/0(loco/pickUp/carryWith/putDown)이다. AMP는 기존 single-human carry 전문가만 유지하고 reset 상태 반복 이력·carry label·demo/replay matching을 연결했다. 평가 skill 축소가 expert 인덱스를 바꾸지 않게 했다.
+- 관련 CPU **59개 통과**: 보상 gate/비포화·앵커 대칭/회전·RSI 원본 대응/속도·config/checkpoint 격리·SA/CA 순열 출력 및 gradient·reload·기존 Stage 1/2 회귀. GPU 5·2048환경·MAX_ITERATIONS=1 학습은 epoch2 저장, 131종 scalar/262값 finite. Actor69개 tensor/RMS 불변, CA bias·확장 head·critic·AMP 갱신을 확인했다.
+- 실제 Stage 2 reset의 2048환경 0.1초 물리 검사(loco905/pickUp217/carryWith832/putDown94) 모두 통과. 공유 binding·속도·AMP 초기 이력·carry demo label·1024개 부분 reset의 미선택 상태/관측/history 보존을 확인했다. 학습 재개와 4가지 16환경·32-step headless 평가도 완료했다.
+- 결과는 `output/approach_stage2_joint_carry_task_embedding_check/`의 `saved_check.json`, `reset_check.json`, `resume_check.json`과 `_check_joint_carry_*` 평가 폴더에 있다. 임시 미학습 source의 연결 검사로, 네 평가의 운반 완수율은0이다. 본학습·VNC 화면·장기 공동운반·실제 하중 분담·완료 후 손 놓기는 검증하지 않았다.
+
+
+### Joint carry GPU 5 RSI 검사·TeamHOI AMP 확인
+
+- 사용자 요청으로 `output/joint_carry_gpu5_check_20261007/check_gpu.py`에서 GPU 5·GPU PhysX/GPU pipeline·2048환경을 검사했다. 52×80×40cm·밀도100의 공유 상자와 두 사람을 같은 snapshot에서 복원하고 공통 yaw 0/90/180/270°를 적용했다. 기존 보정본은 변경하지 않았다.
+- pickUp/carryWith/putDown 55/129/135개 snapshot 전부 포함, 반복 배치 385/853/810환경 모두 0.1초 초기 충격 기준 통과. 부분 reset 1024환경도 통과, root/DOF 위치 복사 오차0·미선택 root/DOF tensor 보존을 확인했다. 최대 root 속도 변화1.097m/s·변위0.195m, 상자 속도1.913m/s·변위0.172m 미만이다. 결과는 `report.json`, 환경별 값은 `per_env.npz`, 실행 로그는 `run.log`에 있다.
+- 이는 별도 2인/1상자 물리 검사이며 Stage 2 reset/AMP 연결·장기 공동 운반 검증은 아니다. 손 접촉 진단은 손-상자 근접+net force의 대용 지표로, 물체별 접촉력 판정과 구분한다.
+- TeamHOI 공식 코드와 로컬 사본에서 single-human locomotion/pickup reference, 근거리 팔/손 AMP masking·두 discriminator 보상 혼합, 전원 양손 근접 조건의 운반 보상 gate를 확인했다. 공동 모션을 AMP expert로 즉시 넣지 않고 기존 carry expert를 우선 사용하는 안을 제안했으며, AMP 설정 자체는 변경하지 않았다.
+
+### Joint carry RSI 재생성·물리 재검증
+
+- 사용자 요청으로 원본 B19/B20/B21에서 복제·32-DOF 팔 IK·CPU PhysX 검사를 다시 실행했다. 결과는 `output/joint_carry_rsi_rebuild_20261007/`에 분리했다. 보정 전 통과 수 29/0/0개에서 보정 후 pickUp/carryWith/putDown 55/129/135개로, 총 319개 snapshot의 모든 배열이 기존 인계본과 동일하다.
+- 입력 해시 12개·snapshot shape/finite/quaternion/reference 대응·선별 조건·ZIP 무결성을 확인했다. 기존 인계본 79개 파일·의존 파일 3개도 검사 통과했다. 근거는 `verification.json`과 `physics_after/report.json`이다.
+- `corrected/before_after/`에 보정 전후 영상, `pd_videos/`에 reference 대 실제 PD 추종 영상을 생성했다. 0.1초 초기 상태 검사는 통과했으나 연속 PD 추종은 균형을 잃었다. 학습 reset·AMP 연결과 GPU 학습 검증은 수행하지 않았다.
+
+### Joint carry task CA 연결 준비
+
+- `joint_carry_spec.py`에 2명·4물체의 joint AT/ON_TOP scene별 50/50 sampler를 추가했다. `task_coordination.py`는 동결 task embedding과 최종 actor/payload/target 토큰을 256→128→64로 결합하고, 2-head CA에 NONE/SELF/COUPLED zero-init bias를 적용한다. 공유 물체→목표의 중복 Stage-1 bias는 Stage 2에서 한 번만 반영한다.
+- Task embedding 전이에 원본·네 과제 distill source를 허용하고 기존 actor 동결·action head `[W,0]` 확장을 연결했다. 지정한 외부 distill epoch1000 checkpoint의 157개 tensor 전이·69개 actor 파라미터 동결·finite action 출력을 CPU에서 확인했다. 관련 CPU 22개 통과, diff 검사 통과.
+- **미완료:** RSI 초기화·팀 보상 선택 답변 대기. 전용 env/train config·실행 스크립트·GPU 5 시뮬레이션 검증은 아직 완료하지 않았으며 실행 가능한 실험으로 등록하지 않았다.
 
 ### 네 과제 task embedding unified teacher distillation
 
