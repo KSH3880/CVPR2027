@@ -142,7 +142,8 @@ def test_push_cube_mass_and_spawn_clearance():
     for name in ('push_door_stage1', 'push_door_stage1_random_start', 'push_door_stage1_task_rsi'):
         env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
         box=env['interaction']['push']['box']
-        size=1.3 if name.endswith('task_rsi') else 1.1
+        size=1.3
+        assert 'size_range' not in box
         assert box['size']==[size]*3
         assert abs(box['density']*size**3-30.)<1e-6
         radius=(2*(size/2)**2)**.5
@@ -518,3 +519,24 @@ def test_split_push_relations_independent_rewards_and_no_repeat_results():
     assert goal[0,3]==cfg['at_state_weight'] and goal[0,5]==cfg['at_result_weight']
     bad,*_=push_relation_rewards(quality,contact,distance,torch.tensor([False]),torch.ones(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
     assert bad.eq(0).all()
+
+
+def test_push_surface_distance_handles_size_and_rotation():
+    from utils.push_door_spec import push_surface_distance
+    boxes=torch.zeros(3,13);boxes[:,6]=1
+    sizes=torch.tensor([[.9,.9,.9],[1.4,1.4,1.4],[2.,1.,1.]])
+    roots=torch.tensor([[1.45,0.,1.],[1.7,0.,1.],[0.,2.,1.]])
+    boxes[2,5:7]=torch.tensor([2**-.5,2**-.5]) # rotate long edge to Y
+    torch.testing.assert_close(push_surface_distance(roots,boxes,sizes),torch.ones(3))
+
+
+def test_push_loco_amp_switch_and_legacy_compatibility():
+    from utils.push_door_spec import door_open_amp_phase,door_amp_family
+    phase=torch.tensor([False]);false=torch.tensor([False])
+    for distance,expected in ((1.2,False),(.69,True),(.8,True),(.96,False),(.8,False)):
+        phase=door_open_amp_phase(phase,torch.tensor([distance]),false,false,.7,.95)
+        assert phase.item()==expected
+    assert door_open_amp_phase(false,torch.tensor([1.2]),torch.tensor([True]),false,.7,.95).item()
+    tasks=torch.tensor([0,0,1,1]);hand=torch.tensor([0,0,0,1]);hold=torch.tensor([False,False,False,True]);opening=torch.tensor([False,False,True,True])
+    assert door_amp_family(tasks,hand,hold,opening,6,pushing=torch.tensor([False,True,False,False])).tolist()==[5,0,1,4]
+    assert door_amp_family(tasks,hand,hold,opening,6).tolist()==[0,0,1,4]

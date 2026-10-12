@@ -39,6 +39,14 @@ def door_open_amp_phase(previous, distance, contact, holding, enter, leave):
     return torch.where(previous, distance<=leave, distance<=enter) | contact | holding
 
 
+def push_surface_distance(roots, boxes, sizes):
+    """XY root distance to the oriented box footprint, independent of box size."""
+    delta=roots[...,:3]-boxes[...,:3]
+    q=-boxes[...,3:6];w=boxes[...,6:7]
+    local=delta+2*torch.cross(q,torch.cross(q,delta,dim=-1)+w*delta,dim=-1)
+    return (local[...,:2].abs()-sizes[...,:2]/2).clamp_min(0).norm(dim=-1)
+
+
 def nearest_door_hand_on_entry(previous_hand, previous_open, opening, tasks, hands, handles, contact):
     """Choose once on approach entry; preserve contact and RSI hand bindings."""
     distance=(hands[..., :, None, :]-handles[..., None, :, :]).norm(dim=-1).amin(-1)
@@ -47,11 +55,12 @@ def nearest_door_hand_on_entry(previous_hand, previous_open, opening, tasks, han
     return torch.where(entering, nearest, previous_hand)
 
 
-def door_amp_family(tasks, hand, holding, opening, count):
+def door_amp_family(tasks, hand, holding, opening, count, pushing=None):
     if count>=5:
         family=1+hand+2*holding.long()
         if count==6:family=torch.where(opening | holding,family,5)
-        return torch.where(tasks==0,0,family)
+        push_family=torch.where(pushing,0,5) if count==6 and pushing is not None else 0
+        return torch.where(tasks==0,push_family,family)
     return torch.where(tasks==0,0,torch.where(holding,2,1))
 
 
@@ -270,6 +279,10 @@ def validate_interaction(config):
         enter,leave=approach['enter_door_distance'],approach['return_loco_distance']
         if not math.isfinite(enter) or not math.isfinite(leave) or not 0 < enter < leave:
             raise ValueError('Invalid DOOR AMP distance hysteresis')
+    if approach is not None and 'enter_push_surface_distance' in approach:
+        enter,leave=approach['enter_push_surface_distance'],approach['return_push_surface_distance']
+        if not all(math.isfinite(v) for v in (enter,leave)) or not 0 < enter < leave:
+            raise ValueError('Invalid PUSH AMP distance hysteresis')
     if amp['hold_source'] not in ('door_tail', 'loco'):
         raise ValueError('AMP hold_source must be door_tail or loco')
     for name in ('push_phase','open_phase','hold_phase'):

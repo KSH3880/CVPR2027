@@ -103,10 +103,10 @@ env:
       hand_height_fraction: [0.6, 0.95]
       box:
         size:
-        - 1.1
-        - 1.1
-        - 1.1
-        density: 22.539444027047328
+        - 1.3
+        - 1.3
+        - 1.3
+        density: 13.654984069185252
         friction: 0.5
       target_distance:
       - 0.7
@@ -139,6 +139,8 @@ env:
     amp:
       hand_conditioning: user_hands_v1
       approach_loco:
+        enter_push_surface_distance: 0.7
+        return_push_surface_distance: 0.95
         enter_door_distance: 0.8
         return_loco_distance: 1.0
       push_phase:

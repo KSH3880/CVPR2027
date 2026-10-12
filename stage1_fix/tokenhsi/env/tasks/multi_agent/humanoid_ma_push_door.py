@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, rotate_push_layout, door_motion_hand, door_open_amp_phase, door_amp_family, push_hand_alignment, push_relation_rewards, nearest_door_hand_on_entry)
+                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, rotate_push_layout, door_motion_hand, door_open_amp_phase, door_amp_family, push_surface_distance, push_hand_alignment, push_relation_rewards, nearest_door_hand_on_entry)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -82,6 +82,7 @@ class HumanoidMAPushDoor(HumanoidMA):
             self._door_reference_hands=torch.tensor([door_motion_hand(p) for p in self._motion_lib['doorOpen']._motion_files],device=self.device)
         self._tasks = torch.zeros(N, M, dtype=torch.long, device=self.device)
         self._door_open_amp = torch.zeros(N,M,dtype=torch.bool,device=self.device)
+        self._push_amp = torch.zeros(N,M,dtype=torch.bool,device=self.device)
         self._holding_phase = torch.zeros(N, M, dtype=torch.bool, device=self.device)
         self._elapsed = torch.zeros(N, M, device=self.device)
         self._done_task = torch.zeros_like(self._holding_phase)
@@ -237,6 +238,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         if self._amp_label_count>=5:
             self._door_amp_hand[env_ids]=torch.randint(2,(E,M),device=self.device)
         self._door_open_amp[env_ids]=False
+        self._push_amp[env_ids]=False
         self._holding_phase[env_ids]=False; self._elapsed[env_ids]=0; self._done_task[env_ids]=False
         self._door_state_view[env_ids]=0
         boxes=self._box_states[env_ids].clone(); boxes.zero_(); boxes[...,6]=1
@@ -311,6 +313,7 @@ class HumanoidMAPushDoor(HumanoidMA):
             bound=self._last_rsi_contact_hand
             self._door_amp_hand[env_ids]=torch.where(bound>=0,bound,self._door_amp_hand[env_ids])
             self._door_open_amp[env_ids]=tasks.bool() & rsi_mask.reshape(E,M)
+            self._push_amp[env_ids]=tasks.eq(0) & rsi_mask.reshape(E,M)
         rotation=unheading[:,None,:].expand(-1,self.num_bodies,-1).reshape(-1,4)
         relative=body_pos-root_pos[:,None,:]
         transformed=quat_rotate(rotation,relative.reshape(-1,3)).view(E,M,self.num_bodies,3)+new_root[:,:,None,:]
@@ -344,6 +347,9 @@ class HumanoidMAPushDoor(HumanoidMA):
         angle,_,_,_,handle,back=self._door_geometry(env_ids)
         if self._amp_label_count==6:
             approach=self._interaction['amp']['approach_loco']
+            if 'enter_push_surface_distance' in approach:
+                distance=push_surface_distance(self._humanoid_root_states[env_ids],self._box_states[env_ids],self._box_sizes[env_ids])
+                self._push_amp[env_ids]=(self._push_amp[env_ids] | (distance<=approach['enter_push_surface_distance'])) & tasks.eq(0)
             near_distance=(self._humanoid_root_states[env_ids][:,:,None,:2]-torch.stack([handle,back],2)[...,:2]).norm(dim=-1).amin(-1)
             previous_open=self._door_open_amp[env_ids].clone()
             self._door_open_amp[env_ids]=door_open_amp_phase(previous_open,near_distance,
@@ -421,6 +427,13 @@ class HumanoidMAPushDoor(HumanoidMA):
             if self._interaction['amp'].get('door_hand_selection')=='nearest_on_entry_v1':
                 self._door_amp_hand=nearest_door_hand_on_entry(
                     self._door_amp_hand,previous_open,self._door_open_amp,self._tasks,hands,handle_pos,contact)
+        push_approach=c['amp'].get('approach_loco',{})
+        if self._amp_label_count==6 and 'enter_push_surface_distance' in push_approach:
+            near=push_surface_distance(self._humanoid_root_states,self._box_states,self._box_sizes)
+            hand_cfg=p.get('relation_rewards',{})
+            touching=(quality>=math.exp(-(hand_cfg.get('hand_contact_distance',.06)/p['hand_distance_scale'])**2)) & (hand_force>hand_cfg.get('contact_force',.5)).all(-1)
+            self._push_amp=door_open_amp_phase(self._push_amp,near,touching,torch.zeros_like(self._push_amp),
+                push_approach['enter_push_surface_distance'],push_approach['return_push_surface_distance']) & self._tasks.eq(0)
         hand_distance=(hands[:,:,:,None,:]-handle_pos[:,:,None,:,:]).norm(dim=-1).amin(dim=(-1,-2))
         door_progress,self._best_angle,approach,self._best_hand_distance,closing=door_shaping(
             angle,self._best_angle,self._previous_door_angle,hand_distance,self._best_hand_distance,contact,self.dt,d)
@@ -465,13 +478,16 @@ class HumanoidMAPushDoor(HumanoidMA):
             'door_handle_contact_fraction':(contact*door).sum()/door.sum().clamp_min(1),
             'push_success':(self._done_task*push).sum()/push.sum().clamp_min(1),
             'door_success':(self._done_task*door).sum()/door.sum().clamp_min(1)}
+        if 'enter_push_surface_distance' in push_approach:
+            self._diagnostics['push_amp_fraction']=(self._push_amp*push).sum()/push.sum().clamp_min(1)
         if split is not None:
             self._diagnostics['push_hand_contact_fraction']=(push_contact*push).sum()/push.sum().clamp_min(1)
             self._diagnostics['push_hand_quality']=(quality*push).sum()/push.sum().clamp_min(1)
 
     def _family(self, env_ids=None):
         ids=slice(None) if env_ids is None else env_ids
-        return door_amp_family(self._tasks[ids],self._door_amp_hand[ids],self._holding_phase[ids],self._door_open_amp[ids],self._amp_label_count)
+        return door_amp_family(self._tasks[ids],self._door_amp_hand[ids],self._holding_phase[ids],self._door_open_amp[ids],self._amp_label_count,
+            pushing=self._push_amp[ids] if 'enter_push_surface_distance' in self._interaction['amp'].get('approach_loco',{}) else None)
 
     def _compute_amp_observations(self, env_ids=None):
         ids=slice(None) if env_ids is None else env_ids

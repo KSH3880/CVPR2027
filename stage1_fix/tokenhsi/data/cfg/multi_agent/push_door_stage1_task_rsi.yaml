@@ -143,6 +143,8 @@ env:
       hand_conditioning: user_hands_v1
       door_hand_selection: nearest_on_entry_v1
       approach_loco:
+        enter_push_surface_distance: 0.7
+        return_push_surface_distance: 0.95
         enter_door_distance: 0.8
         return_loco_distance: 1.0
       push_phase:

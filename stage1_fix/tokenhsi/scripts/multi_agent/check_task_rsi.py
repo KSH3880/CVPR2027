@@ -49,6 +49,8 @@ for i in range(12):
   requested=task._last_rsi_door_early & door
   assert (angle[requested]<=math.radians(25)).all()
  if push.any():
+  if 'enter_push_surface_distance' in task._interaction['amp'].get('approach_loco',{}):
+   assert (task._family()[push]==0).all()
   boxes=task._box_states;q=boxes[...,3:7].clone();q[...,:3]*=-1
   local=quat_rotate(q[:,:,None,:].expand(-1,-1,2,-1).reshape(-1,4),(hands-boxes[:,:,None,:3]).reshape(-1,3)).view(task.num_envs,2,2,3)
   gap=-task._box_sizes[...,0,None]/2-local[...,0]-task._interaction['task_rsi']['push_hand_radius']
@@ -84,6 +86,20 @@ physical=torch.cat(physical_gaps)
 assert physical.abs().max()<.003, physical.abs().max().item()
 report=dict(post_step_push_gap_p95_m=float(torch.quantile(physical,.95)),post_step_push_gap_min_m=float(physical.min()),post_step_push_gap_max_m=float(physical.max()),door_rsi_count=door_count,small_angle_fraction=early_count/door_count,sample_count=total,rsi_fraction=selected_count/total,max_door_hand_distance_m=max_door,push_surface_gap_m=max_push,frame_clearance_m=.03,finite=True,partial_reset=True,initial_progress_reward_zero=True)
 report['box_side_min_m']=float(task._box_sizes.min());report['box_side_max_m']=float(task._box_sizes.max())
+if 'enter_push_surface_distance' in task._interaction['amp'].get('approach_loco',{}):
+ push_slots=task._tasks.eq(0)
+ assert push_slots.any()
+ task._contact_forces.zero_();task._all_contacts.zero_()
+ task._humanoid_root_states[...,:2]=task._box_states[...,:2]+20
+ task._compute_reward(None)
+ assert (task._family()[push_slots]==5).all()
+ local=torch.zeros_like(task._humanoid_root_states[...,:3]);local[...,0]=task._box_sizes[...,0]/2+.5
+ task._humanoid_root_states[...,:3]=task._box_states[...,:3]+quat_rotate(task._box_states[...,3:7].reshape(-1,4),local.reshape(-1,3)).view_as(local)
+ task._compute_reward(None)
+ assert (task._family()[push_slots]==0).all()
+ task._compute_amp_observations()
+ assert (task._amp_obs_buf[...,-task._amp_label_count:].argmax(-1)[push_slots]==0).all()
+ report['push_loco_transition']=True
 out=Path(args.output_path);out.mkdir(parents=True,exist_ok=True);(out/'rsi_report.json').write_text(json.dumps(report,indent=2))
 print('PASS',report,flush=True)
 task.gym.destroy_sim(task.sim)
