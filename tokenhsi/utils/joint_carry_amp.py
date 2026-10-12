@@ -18,7 +18,7 @@ def validate_ablation(env, train=None):
             raise ValueError('Head-only policy requires the joint-carry ablation contract')
         return
     from utils.mixed_carry_spec import MIXED_SAMPLER
-    if env['relationGraph']['sampler'] != MIXED_SAMPLER or spec['policy'] not in ('task_ca', 'stage1_head_only'):
+    if env['relationGraph']['sampler'] != MIXED_SAMPLER or spec['policy'] not in ('task_ca', 'task_ca4', 'stage1_head_only'):
         raise ValueError('Locomotion AMP ablation requires Mixed80 and an explicit policy')
     amp = spec['amp']
     if (amp['probabilities'] != {'original': .8, 'backward': .1, 'sideways': .1}
@@ -29,11 +29,15 @@ def validate_ablation(env, train=None):
         expected = {'enabled': False, 'mode': 'stage1_head_only'} if spec['policy'] == 'stage1_head_only' else {
             'enabled': True, 'mode': 'task_coupled', 'grounding_hidden': 128,
             'num_heads': 2, 'shuffle_task_order': True}
+        if spec['policy'] == 'task_ca4':
+            expected.update(num_layers=4, feedforward_dim=128)
         if train['params']['network'].get('coordination') != expected:
             raise ValueError('Joint-carry policy and network coordination config differ')
 
 
 def check_ablation_checkpoint(weights, env):
+    if weights.get('joint_carry_goal_sampling') != env.get('jointCarryRsi', {}).get('goalSampling'):
+        raise ValueError('Checkpoint joint-carry goal sampling differs')
     if weights.get('joint_carry_ablation') != env.get('jointCarryAblation'):
         raise ValueError('Checkpoint joint-carry AMP/policy ablation differs')
 

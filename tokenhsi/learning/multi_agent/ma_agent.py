@@ -270,6 +270,9 @@ class MAAgent(amp_agent.AMPAgent):
         weights = super().get_stats_weights()
         task = self.vec_env.env.task
         weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        goals = task.cfg['env'].get('jointCarryRsi', {}).get('goalSampling')
+        if goals is not None:
+            weights['joint_carry_goal_sampling'] = copy.deepcopy(goals)
         if task.cfg['env'].get('jointCarryAblation'):
             weights['joint_carry_ablation'] = copy.deepcopy(task.cfg['env']['jointCarryAblation'])
         if getattr(task, '_edge_context', False):

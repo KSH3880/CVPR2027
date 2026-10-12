@@ -2,6 +2,57 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-11
+
+### CA4 Goal360 TeamHold 공동 HOLDING state 교체
+
+- `approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_teamhold_task_embedding` env/train·train/test/VNC를 추가했다. 공동 환경의 개인 HOLDING state만 반대 앵커 조합별 최소 점수 중 최댓값 `c`의 `0.2*c`로 교체한다. 개인 progress/success·운반 gate·AT/ON_TOP·단독 보상은 유지하며 Move/Align은 없다. Reward metadata로 기존 Goal360 checkpoint와 혼용을 차단한다.
+- CPU52개 통과·공동 ON_TOP putDown1개 skip, Python/셸 문법·문서 링크·diff 검사를 통과했다. GPU6·64환경32-step에서 공동 AT29/ON_TOP22·단독13의 state 교체/동일 지급, 개인 progress/success·placement gate·단독 보상 불변, gate-off451 scene-step의 연속 공동 점수와 부분 reset cache를 확인했다.
+- GPU6·2048환경에서 Stage1 epoch30000·seed8429 전이→epoch2 저장→epoch3 재개,16환경32-step headless test wrapper 평가를 통과했다. Actor69개 tensor/RMS 불변·CA4 bias/context head 갱신·모델/scalar133종 finite를 확인했다. 공동1638/단독410, AMP30000개80.09/10.24/9.67%, RSI 라이브러리/초기 이력·부분 reset1024/32/32·8-step finite와 AT4/ON_TOP3 시작 단계별 Goal360 목표/pose/velocity 검사를 통과했다.
+- 결과는 `output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_teamhold_task_embedding_check/{teamhold_runtime_check,reset_check,goal360_runtime_check,saved_check}.json` 및 `*_resume_check/`, `*_eval_check/`다. 본학습·실제 VNC 화면·장기 공동집기 개선은 미검증이다.
+
+### CA4 Goal360 공동 목표·putDown 끝점 초기화 분리
+
+- `approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding` env/train·train/test/VNC를 추가했다. 공동 loco/pickUp/carryWith는 상자 기준 독립 각도0~360°·거리2.2~2.8m로 AT 목표/ON_TOP 받침을 배치하고 물체·사람 근접/받침 bbox 겹침을 재샘플링한다. 공동 AT putDown은 보정 reference 마지막 XY에 현재 프레임과 동일한 중심 이동·yaw/translation을 적용한다.
+- PutDown135개 중30개의 끝점이 기존 미사용 상자와 겹쳐, 해당 장면의 미사용3개만 목표 반대쪽 반경4m에 분산 배치했다. 전135프레임 목표·상자/상자·상자/사람 clearance와 환경 범위를 검사했다. RSI 사람/운반 상자·속도·프레임 선택·단독·AMP80/10/10·보상·SA/CA 셔플을 유지하고 Move/Align은 추가하지 않았다. 기존 config 분기는 유지하며 `joint_carry_goal_sampling` 저장/로드 계약으로 실험 혼용을 차단한다.
+- CPU35개 통과·공동 ON_TOP putDown1개 skip 및 최종 추가 clearance 검사 통과. GPU6·2048환경에서 최종 Stage1 epoch30000·seed2899 전이→epoch2 저장→epoch3 재개,16환경32-step headless test wrapper 평가를 통과했다. Actor69개 tensor/RMS 불변·CA4 bias/context head 갱신·모델/scalar133종 finite를 확인했다.
+- 실제 공동1638/단독410, AMP30000개80.09/10.24/9.67%, 초기 이력·부분 reset1024/32/32 및 AT4/ON_TOP3 시작 단계별1638개 RSI/목표 검사와 각4-step finite를 통과했다. 상대 목표8방향·2.2~2.8m·받침/putDown 끝점 좌표 일치와 초기 clearance를 확인했다. PutDown 목표 거리는0~3.74m다. 결과는 `output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding_final_check/{reset_check,goal360_runtime_check,saved_check}.json` 및 `*_final_{resume,eval}_check/`다. 본학습·실제 VNC 화면·장기 성능은 미검증이다.
+
+### Mixed80 사람 번호·SA/CA 순열 토이 검사
+
+- `tests/toy_joint_carry_permutation.py`로 기존 Mixed80 epoch15000을 GPU6·64환경(공동51/단독13)·carryWith 시작180-step에서 검사했다. 832개 장면의 사람 상태/goal/graph 참조를 함께 교환해 실제 관측 재생성→공유 RMS→encoder→CA→최종 action을 비교했다. 물리 step 전 상태를 복원하며 학습 설정/가중치는 변경하지 않는다.
+- 재생성 관측·정규화 오차0, 최종 action 교환 최대 오차1.03e-5·RMSE1.39e-7 미만, SA/CA 셔플 최대7.08e-6 미만, task 행 순서 오차0이었다. Encoder 내부 최대8.57e-5로 진단 기준5e-5를 넘은 항목은 결과에 그대로 남겼다. RMS 불변·모델/비교값 finite를 확인했다.
+- 결과는 `output_etc/joint_carry_permutation_20261011/permutation_check.json`, 재현 명령은 config에 있다. 동일 시뮬 상태의 정책 질의 검사이며 사람을 교환한 별도 물리 rollout·다른 모델·모든 목표 방향의 일반화 검증은 아니다. 현재 reset의 공동 회전은 사람/상자/목표 상대 배치를 다양화하지 않으므로 번호 독립성과 협동 운반 성능을 구분한다.
+
+### CA4 공동 이동 방향 min 보상·pinning 연결
+
+- `approach_stage2_joint_carry_mixed80_locoamp_ca4_move_task_embedding` env/train·train/test/VNC를 분리했다. 공동 HOLDING 중 두 사람의 실제 골반 world XY 이동 방향과 상자→목표 방향의 양수 cosine 최솟값×0.2를 각자 한 번 지급한다. AT0.8m·ON_TOP 목표 반대각선+0.8m 안에서는 점수1이며 단독/gate-off는0이다. 기존 heading 모드는 유지하고 새 실험에는 추가하지 않는다.
+- CA4 구조·Stage1 actor/RMS 동결·head `[W,0]`·기존 reward/CPA·공동80/단독20·AMP80/10/10·paired/단독 RSI·SA/CA 셔플을 유지했다. Stage1 epoch30000·seed2899에서 Stage2 재개 없이 시작하는 명령을 문서화했다. 새 reward 계약으로 기존 CA4/Align의 직접 resume/eval을 차단한다.
+- CPU63개(방향/속도 크기·heading 독립성·정지/반대 이동·pinning 경계·물체/goal 재배정·사람/edge 순열·좌표 변환·기존 회귀) 및 Python/셸 문법·diff 검사를 통과했다. GPU5·2048환경 전이→epoch2 저장→epoch3 재개,16환경32-step test wrapper 평가를 통과했다. Encoder69개 tensor/RMS 불변·각 층 bias/context head 갱신·모델/scalar136종 finite를 확인했다.
+- GPU64환경32-step에서 공동 AT25/ON_TOP26·단독13의 새 보상 공유·한 번만 합산·성분 합 일치·단독/gate-off 0을 확인했다(양수 보상192 scene-step). 별도2048환경 AMP30000개 비율79.68/10.25/10.07%, RSI 라이브러리/초기 이력·부분 reset1024/32/32·8-step finite도 통과했다. 결과는 `output/approach_stage2_joint_carry_mixed80_locoamp_ca4_move_task_embedding_check/{saved_check,runtime_check,reset_check}.json` 및 `*_resume_check/`, `*_eval_check/`다. 본학습·실제 VNC 화면·장기 운반 개선은 미검증이다.
+
+## 2026-10-10
+
+### Mixed80 LocoAMP 4층 task CA 연결
+
+- 기본 `approach_stage2_joint_carry_mixed80_locoamp_task_embedding`에서 CA+FFN(64→128→64)+pre-LayerNorm+residual 4층·64차원·2head 실험을 `locoamp_ca4_task_embedding` env/train·train/test/VNC로 분리했다. 각 층 bias/weight는 독립이며, grounding·관계·task 셔플·padding은 한 번 계산해 재사용한다. 보상(Align 없음)·AMP80/10/10·RSI·공동80/단독20·SA 셔플·Stage1 actor/RMS 동결·head `[W,0]` 전이를 유지한다.
+- 정책 계약 `task_ca4`로 기존1층/head-only checkpoint와 격리했다. 전체 파라미터4,371,226(+117,266; +2.76%), 학습 파라미터3,844,730이다. 관련 CPU40개 및 추가된 학습 후 SA/CA 셔플 재검사, 셸 문법·문서 링크·diff 검사를 통과했다.
+- GPU5·2048환경에서 지정 Stage1 epoch23000 전이→epoch2 저장→epoch3 재개, 저장 모델16환경32-step 혼합 평가를 통과했다. Actor encoder69개 tensor/RMS 불변·각 층 bias와 context head 갱신·모델/scalar133종 finite를 확인했다. 실제 AMP30000개 비율79.68/10.25/10.07%, 공동1638/단독410·RSI 라이브러리/초기 이력·부분 reset1024/32/32·8-step finite도 통과했다.
+- 결과는 `output/approach_stage2_joint_carry_mixed80_locoamp_ca4_task_embedding_check/{saved_check,reset_check}.json` 및 `*_resume_check/`, `*_eval_check/`다. 본학습·실제 VNC 화면·장기 협동 성능·속도 비교는 미검증이다.
+
+### 실제 이동 방향으로 목표를 옮긴 보상 검사
+
+- 사용자 요청으로 AMP 유지100회 학습본(`amp05`, epoch8100)을 GPU5·64환경에서 평가했다. 동일 초기 물리 상태에서 기존 목표/기존2초 이동 방향의1.5m 목표를 비교하고, 별도로 기존 action을 그대로 재생해 목표 위치만 바꿨다. 학습·본 보상식은 변경하지 않았다.
+- 목표를 이동 방향에 놓아도 정책은 움직임을 바꿔 평균 최종 거리2.87m로 멀어졌다. 고정 장면1에서는 A 전진/B 후진이 A 후진/B 전진 쪽으로 바뀌었다. 목표 입력 변화에 행동이 반응한다는 관찰이며, 정확한 원인이나 접촉 힘의 주도자를 확정하지 않는다.
+- Action 재생은 원래 run 대비 body/box/action/AMP/HOLDING 보상 차이0이었다. 고정 장면1의 접근 구간에서 거리1.48→0.17m·AT0.084→0.186, 같은 시점/물리 상태의 목표 위치만 비교하면 각 사람의 task 보상+0.134·혼합 보상+0.067이었다. 세 조건의 공동 HOLDING 접근9420 step에서 AT 거리 항 감소0, 식과 실제 값 오차≤1.5e-8, 두 사람 AT 동일·보상 성분 합 일치·finite를 확인했다. 모든 총보상의 시간상 단조 증가나 학습 유도의 충분성을 뜻하지 않는다.
+- 재현은 기존 toy wrapper의 `reward_eval`, `TOY_DIRECTION_FILE`, `TOY_REPLAY_FILE` 및 `toy_joint_carry_goal_reward{,_report}.py`다. 결과/그래프/시뮬 관절 영상2개는 `output_etc/align_goal_reward_20261010/`에 저장했다. Python/셸 문법·diff·MP4 전체 decode를 확인했다.
+
+### Align epoch8000의 AMP 유지/제거 직선 운반 토이실험
+
+- 사용자 제공 `align_tmp/..._00008000.pth`에서 공동 AT·이미 잡은 carryWith·A 초기 전방/후방 1.5m 목표만 사용하는 격리 진단 실행기를 추가했다. GPU5·2048환경에서 task 가중치0.5를 유지하고 AMP 가중치0.5/0으로 각각100회 학습했다. 기존 실행 YAML·보상식·RSI/AMP 데이터는 변경하지 않았다.
+- 두 조건 모두 epoch8100 정상 종료, source 대비 actor encoder69개 tensor/RMS 불변·head/CA 갱신·모델과 기록 scalar111종×100회 finite를 확인했다. 동일 초기 상태64개(방향별32개)의 최대6초 평가에서 평균 목표 거리 감소는 학습 전−0.90/−1.52m, AMP 유지−0.80/−2.66m, 제거−0.36/−1.39m다. 음수는 목표에서 멀어진 것이다. 제거 쪽이 유지보다 낫지만 평균적인 목표 접근은 아직 실패하며,100회·단일 seed로 AMP를 주원인이라 단정하지 않는다.
+- 실행/집계는 `tokenhsi/scripts/multi_agent/joint_carry_amp_toy.sh`, `tokenhsi/tests/toy_joint_carry_amp{,_report}.py`다. 결과는 `output_etc/align_amp_toy_20261010/{training_verification,summary}.json`, 거리 그래프·실제 시뮬 관절 궤적 영상이다. 구문·diff 검사와 두 MP4 전체 decode를 확인했다.
+
 ## 2026-10-09
 
 ### Mixed80 LocoAMP 공동 방향 보상 연결

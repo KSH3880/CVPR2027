@@ -89,6 +89,11 @@ class SampledOnTopTaskMixin:
                 self.relation_runtime.coupled_holding.copy_(gate)
             else:
                 self.relation_runtime.coupled_holding[env_ids] = gate
+            if 'joint_holding_state' in diag:
+                if env_ids is None:
+                    self.relation_runtime.joint_holding_state.copy_(diag['joint_holding_state'])
+                else:
+                    self.relation_runtime.joint_holding_state[env_ids] = diag['joint_holding_state']
         if env_ids is None:
             self._ontop_last_diag=diag
         return phi,diag

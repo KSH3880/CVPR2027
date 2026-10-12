@@ -10,6 +10,9 @@ JOINT_PRESETS = ('random_scenario', 'joint_carry_at', 'joint_carry_ontop')
 
 
 def validate_env(env):
+    from utils.joint_carry_goals import GOAL360
+    if env['jointCarryRsi'].get('goalSampling') not in (None, GOAL360):
+        raise ValueError('Unsupported joint goal sampling contract')
     from utils.joint_carry_amp import validate_ablation
     validate_ablation(env)
     from utils.mixed_carry_spec import MIXED_SAMPLER, validate_sampler as validate_mixed

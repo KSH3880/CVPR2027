@@ -32,11 +32,16 @@ def validate_stage2_config(config):
         from utils.task_role_spec import TASK_EMBEDDING_VARIANT
         joint = dict(config['joint_carry'])
         independent = joint.pop('independent', None)
+        if joint.pop('holding_state', None) not in (None, 'opposite_anchor_min'):
+            raise ValueError('Unsupported joint-carry holding state contract')
         alignment = joint.pop('alignment', None)
-        if alignment is not None and alignment != {
+        if alignment is not None and alignment not in ({
                 'leader': 'farthest_goal_xy', 'weight': .1, 'buffer': .8,
                 'saturation': 'target_bbox_radius', 'gate': 'opposite_current_holding',
-                'sharing': 'all_agents'}:
+                'sharing': 'all_agents'}, {
+                'direction': 'min_root_velocity_xy', 'weight': .2, 'buffer': .8,
+                'saturation': 'target_bbox_radius', 'gate': 'opposite_current_holding',
+                'sharing': 'all_agents'}):
             raise ValueError('Unsupported joint-carry alignment contract')
         if independent not in (None, {'environment_fraction': .2,
                 'placement_gate': 'own_current_holding', 'rsi': 'stage1_size_aware'}):

@@ -26,15 +26,44 @@ def task_relations(packet, num_agents, before=False):
     return relations
 
 
+class CoordinationBlock(nn.Module):
+    def __init__(self, width, heads, feedforward_dim, relations):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(width, heads, dropout=0., batch_first=True)
+        self.query_norm = nn.LayerNorm(width)
+        self.ffn_norm = nn.LayerNorm(width)
+        self.ffn = nn.Sequential(nn.Linear(width, feedforward_dim), nn.ReLU(),
+                                 nn.Linear(feedforward_dim, width))
+        self.relation_bias = nn.Parameter(torch.zeros(heads, relations))
+
+    def forward(self, humans, tokens, relations, padding):
+        bias = self.relation_bias[:, relations].permute(1, 0, 2, 3)
+        bias = bias.masked_fill(padding, float('-inf')).flatten(0, 1)
+        context, _ = self.attention(self.query_norm(humans), tokens, tokens,
+                                    attn_mask=bias, need_weights=False)
+        humans = humans + context
+        return humans + self.ffn(self.ffn_norm(humans))
+
+
 class TaskCoordination(nn.Module):
-    def __init__(self, width=64, hidden=128, heads=2, shuffle_task_order=False, before=False):
+    def __init__(self, width=64, hidden=128, heads=2, shuffle_task_order=False, before=False,
+                 num_layers=1, feedforward_dim=None):
         super().__init__()
         self.shuffle_task_order = shuffle_task_order
         self.before = before
         self.grounding = nn.Sequential(nn.Linear(4 * width, hidden), nn.ReLU(),
                                        nn.Linear(hidden, width))
-        self.attention = nn.MultiheadAttention(width, heads, dropout=0., batch_first=True)
-        self.relation_bias = nn.Parameter(torch.zeros(heads, 4 if before else 3))
+        if feedforward_dim is None:
+            if num_layers != 1:
+                raise ValueError('Stacked task CA requires a feedforward dimension')
+            self.attention = nn.MultiheadAttention(width, heads, dropout=0., batch_first=True)
+            self.relation_bias = nn.Parameter(torch.zeros(heads, 4 if before else 3))
+        else:
+            if num_layers < 1 or feedforward_dim < 1:
+                raise ValueError('Task CA block dimensions must be positive')
+            self.blocks = nn.ModuleList([
+                CoordinationBlock(width, heads, feedforward_dim, 4 if before else 3)
+                for _ in range(num_layers)])
 
     def task_tokens(self, nodes, packet, edge_encoder):
         valid, task, actor, payload, target = packet.reshape(packet.shape[0], -1, 5).long().unbind(-1)
@@ -54,10 +83,16 @@ class TaskCoordination(nn.Module):
             packet = packet[:, torch.randperm(packet.shape[1], device=packet.device)]
         tokens, valid = self.task_tokens(nodes, packet, edge_encoder)
         relations = task_relations(packet, humans.shape[1], self.before)
-        bias = self.relation_bias[:, relations].permute(1, 0, 2, 3)
         has_task = valid.any(-1)
         safe_valid = valid.clone()
         safe_valid[~has_task, 0] = True
+        if hasattr(self, 'blocks'):
+            padding = ~safe_valid[:, None, None]
+            context = humans
+            for block in self.blocks:
+                context = block(context, tokens, relations, padding)
+            return context * has_task[:, None, None]
+        bias = self.relation_bias[:, relations].permute(1, 0, 2, 3)
         bias = bias.masked_fill(~safe_valid[:, None, None], float('-inf'))
         context, _ = self.attention(humans, tokens, tokens,
             attn_mask=bias.flatten(0, 1), need_weights=False)

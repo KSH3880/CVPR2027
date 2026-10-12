@@ -37,6 +37,11 @@ def opposite_gate(scores, threshold):
     return (close[:, 0, 0] & close[:, 1, 1]) | (close[:, 0, 1] & close[:, 1, 0])
 
 
+def joint_holding_score(scores):
+    return torch.maximum(torch.minimum(scores[:, 0, 0], scores[:, 1, 1]),
+                         torch.minimum(scores[:, 0, 1], scores[:, 1, 0]))
+
+
 def apply_joint_geometry(phi, diag, hands, objects, sizes, graph, config):
     scores, anchors = anchor_scores(hands, objects[:, 0], sizes[:, 0],
         config['joint_carry']['anchor_inset'], config['holding']['hand_distance_scale'])
@@ -51,6 +56,8 @@ def apply_joint_geometry(phi, diag, hands, objects, sizes, graph, config):
     diag['target'] = torch.where(holding[..., None], target[rows, owner], diag['target'])
     distance = (hands.mean(-2) - target).norm(dim=-1)
     diag['distance'] = torch.where(holding, distance[rows, owner], diag['distance'])
+    if config['joint_carry'].get('holding_state') == 'opposite_anchor_min':
+        diag['joint_holding_state'] = joint_holding_score(scores) * joint
     return phi, opposite_gate(scores, config['satisfaction_threshold']) & joint
 
 
@@ -68,25 +75,36 @@ def shared_alignment_reward(roots, objects, sizes, goals, graph, gate, config):
     target_xy = torch.where(ontop[:, None], objects[row, support, :2], goals[row, goal, :2])
     delta = target_xy - objects[row, source.clamp(0, graph.num_objects - 1), :2]
     distance = delta.norm(dim=-1)
-    leader = (roots[..., :2] - target_xy[:, None]).norm(dim=-1).argmax(-1)
-    x, y, z, w = roots[row, leader, 3:7].unbind(-1)
-    yaw = torch.atan2(2 * (w*z + x*y), 1 - 2 * (y*y + z*z))
-    facing = torch.stack((yaw.cos(), yaw.sin()), -1)
-    score = (facing * delta / distance.clamp_min(1e-6)[:, None]).sum(-1).clamp(0., 1.)
+    if config.get('direction') == 'min_root_velocity_xy':
+        velocity = roots[..., 7:9]
+        moving = velocity / velocity.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+        direction = delta / distance.clamp_min(1e-6)[:, None]
+        agent_scores = (moving * direction[:, None]).sum(-1).clamp(0., 1.)
+        score = agent_scores.amin(-1)
+        details = dict(agent_scores=agent_scores)
+    else:
+        leader = (roots[..., :2] - target_xy[:, None]).norm(dim=-1).argmax(-1)
+        x, y, z, w = roots[row, leader, 3:7].unbind(-1)
+        yaw = torch.atan2(2 * (w*z + x*y), 1 - 2 * (y*y + z*z))
+        facing = torch.stack((yaw.cos(), yaw.sin()), -1)
+        score = (facing * delta / distance.clamp_min(1e-6)[:, None]).sum(-1).clamp(0., 1.)
+        details = dict(leader=leader)
     radius = torch.where(ontop, sizes[row, support, :2].norm(dim=-1) / 2, 0.)
     radius = radius + config['buffer']
     saturated = distance <= radius
     score = torch.where(saturated, 1., score)
     joint = joint_scenes(graph)
     reward = score * (gate & joint) * config['weight']
-    return reward, dict(score=score, leader=leader, distance=distance,
-                        radius=radius, saturated=saturated, joint=joint)
+    return reward, dict(score=score, distance=distance, radius=radius,
+                        saturated=saturated, joint=joint, **details)
 
 
 class JointCarryRuntime(Stage1ContextRuntime):
     def __init__(self, n, graph, config, device):
         super().__init__(n, graph, config, device)
         self.coupled_holding = torch.zeros(n, dtype=torch.bool, device=device)
+        if config['joint_carry'].get('holding_state') == 'opposite_anchor_min':
+            self.joint_holding_state = torch.zeros(n, device=device)
 
     def current_success(self, phi, z_error, feet_error, graph, region_error, gate):
         success = interaction_own_success(phi, z_error, feet_error, graph, self.config, region_error)
@@ -115,6 +133,11 @@ class JointCarryRuntime(Stage1ContextRuntime):
                                        self.coupled_holding)
         active = self.active_edges(phi, self.graph, self.coupled_holding)
         state = phi * active * self.config['state_reward_weight']
+        if self.config['joint_carry'].get('holding_state') == 'opposite_anchor_min':
+            shared = (batched(self.graph.edge_relation, len(phi)) == HOLDING) & self.graph.edge_valid & \
+                joint_scenes(self.graph)[:, None]
+            state = torch.where(shared, self.joint_holding_state[:, None] *
+                                self.config['state_reward_weight'], state)
         prog = progress * active * self.config['progress_reward_weight']
         bonus = success * self.config['success_reward_weight']
         total = state + prog + bonus

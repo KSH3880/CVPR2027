@@ -8,6 +8,10 @@
 | --- | --- |
 | `tokenhsi/scripts/prepare_joint_carry.py`, `joint_carry/runtime_manifest.json` | Clone 후 기존 데이터 링크·필수 파일·현재 AMP/RSI 해시 검사; 두 LocoAMP train/test 및 VNC 경로에서 실행 |
 | `tokenhsi/run.py` | 학습·평가 태스크와 알고리즘 등록 |
+| `tokenhsi/tests/toy_joint_carry_amp.py`, `tokenhsi/scripts/multi_agent/joint_carry_amp_toy.sh` | Align checkpoint의 공동 AT·carryWith 직선 운반 AMP 유지/제거 진단; 2048환경 짧은 학습·64환경 평가, 본학습 설정은 유지 |
+| `tokenhsi/tests/toy_joint_carry_amp_report.py` | 위 진단의 동일 초기 상태 검사·거리 그래프·시뮬 관절 궤적 비교 영상 → `output_etc/align_amp_toy_20261010/` |
+| `tokenhsi/tests/toy_joint_carry_goal_reward{,_report}.py` | 같은 물리 초기 상태에서 목표를 기존 이동 방향으로 변경한 정책 평가·기존 action 재생; 보상 성분/공동 지급/거리 단조성 검사 → `output_etc/align_goal_reward_20261010/` |
+| `tokenhsi/tests/toy_joint_carry_permutation.py` | 2명·4물체 Mixed80의 사람 상태/goal/graph 교환 및 SA/CA 순열에 대한 관측·RMS·encoder·action 검사 → `output_etc/joint_carry_permutation_20261011/`; 별도 물리 rollout 교환 검사는 아님 |
 | `tokenhsi/box_cleanup_demo.py` | 지정 rescue checkpoint의 4명·16상자 정리 데모 평가 전용 진입점 |
 | `tokenhsi/scripts/multi_agent/` | 현재 실험별 train/test/VNC, `runtime_env.sh`, `run-gui.sh` |
 | `tokenhsi/data/cfg/multi_agent/` | 현재 실험 YAML과 평가 graph 예제 |
@@ -42,6 +46,10 @@
 | `tokenhsi/learning/multi_agent/amp_network_builder_ma.py`, `edge_context_encoder.py`, `ma_agent.py` | GTA actor/critic, edge bias·HOLDING 상태 융합, AMP·PPO 학습 |
 | `tokenhsi/learning/multi_agent/coordination_head.py`, `stage2_transfer.py` | 협력 attention·Stage 1 weight 이식 |
 | `tokenhsi/utils/joint_carry_spec.py`, `tokenhsi/learning/multi_agent/task_coordination.py`, `tokenhsi/tests/test_joint_carry.py` | Joint AT/ON_TOP sampler·config 계약·task CA·NONE/SELF/COUPLED bias·전이·순열 검증 |
+| `tokenhsi/tests/{test_joint_carry_teamhold,check_joint_carry_teamhold_runtime}.py`, `approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_teamhold_task_embedding` env/train·train/test/VNC | Goal360 기반 공동 HOLDING state 교체; `joint_carry_reward.py` 점수/보상과 `edge_ontop_task.py` 부분 reset 전달, reward metadata 격리·개인 success/progress/단독 불변 검사 |
+| `tokenhsi/utils/joint_carry_goals.py`, `tokenhsi/tests/{test_joint_carry_goal360,check_joint_carry_goal360_runtime}.py`, `approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding` env/train·train/test/VNC | CA4 공동 목표360°·거리 샘플링·받침 겹침 검사; `joint_carry_reset.py` 선택 분기와 보정 putDown 끝점, 별도 checkpoint 계약·RSI/AMP/부분 reset 검증 |
+| `tokenhsi/tests/test_joint_carry_ca4.py`, `approach_stage2_joint_carry_mixed80_locoamp_ca4_task_embedding` env/train·train/test/VNC | 기본 LocoAMP 기반4층 CA+FFN+LayerNorm+residual; `task_coordination.py`의 `CoordinationBlock`, 층별 bias·공유 memory·순열/gradient·전이·계약 격리 검사 |
+| `tokenhsi/tests/{test_joint_carry_move,check_joint_carry_move_runtime}.py`, `approach_stage2_joint_carry_mixed80_locoamp_ca4_move_task_embedding` env/train·train/test/VNC | CA4 기반 공동 XY 이동 방향 min 보상·pinning; `joint_carry_reward.py`의 `shared_alignment_reward` 이동 모드, `edge_stage2_spec.py` reward 계약; 방향/속도 크기·순열·좌표 변환·gate·실제 보상 합 검증 |
 | `tokenhsi/tests/test_joint_carry_alignment.py`, `approach_stage2_joint_carry_mixed80_locoamp_align_task_embedding` env/train·train/test/VNC | 공동 HOLDING 중 farthest-human heading 공유 보상·포화 거리·좌표/순열·checkpoint 계약 검사; 구현은 `joint_carry_reward.py`, 통합은 `edge_context_task.py` |
 | `tokenhsi/utils/joint_carry_amp.py`, `tokenhsi/tests/{test_joint_carry_amp_ablation,check_joint_carry_amp_runtime}.py` | AMP 전용 후진/옆걸음 라이브러리·80/10/10·데이터 해시·CA/head-only checkpoint 격리; CPU 및 실제 Mixed80 reset/AMP 검증 |
 | `tokenhsi/utils/joint_carry_rsi.py`, `tokenhsi/env/tasks/multi_agent/joint_carry_reset.py`, `joint_carry_reward.py`, `tokenhsi/tests/test_joint_carry_runtime.py` | 보정 paired snapshot 로드·공통 좌표 변환·공동/부분 reset·AMP 초기 이력·반대 앵커 placement gate·agent CPA 보상 검증 |

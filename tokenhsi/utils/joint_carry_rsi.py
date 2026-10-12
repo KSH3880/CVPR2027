@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 
-def load_paired_snapshots(directory, device):
+def load_paired_snapshots(directory, device, terminal_targets=False):
     pools = {}
     for skill in ('pickUp', 'carryWith', 'putDown'):
         path = Path(directory) / skill
@@ -23,6 +23,9 @@ def load_paired_snapshots(directory, device):
             values = {key: snapshot[key] for key in
                       ('root_state', 'dof_position', 'dof_velocity', 'box_state')}
             values['body_state'] = body
+            if terminal_targets and skill == 'putDown':
+                values['terminal_box_xy'] = np.broadcast_to(
+                    reference['box_position'][-1, :2], (len(frame), 2)).copy()
             if not all(np.isfinite(value).all() for value in values.values()):
                 raise ValueError('Joint RSI contains non-finite state')
             pools[skill] = {key: torch.tensor(value, device=device, dtype=torch.float)

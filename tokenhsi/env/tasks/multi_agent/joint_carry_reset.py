@@ -7,7 +7,9 @@ from utils.joint_carry_rsi import load_paired_snapshots, rotate_vectors, transfo
 class JointCarryReset:
     def __init__(self, task):
         self.task = task
-        self.pools = load_paired_snapshots(task.cfg['env']['jointCarryRsi']['directory'], task.device)
+        self.goal_sampling = task.cfg['env']['jointCarryRsi'].get('goalSampling')
+        self.pools = load_paired_snapshots(task.cfg['env']['jointCarryRsi']['directory'],
+                                          task.device, terminal_targets=self.goal_sampling is not None)
         self.source_frame = torch.full((task.num_envs,), -1, device=task.device, dtype=torch.long)
         self.skill_index = torch.zeros(task.num_envs, device=task.device, dtype=torch.long)
 
@@ -45,6 +47,9 @@ class JointCarryReset:
         boxes[:, 2, :2] = destination[:, :2]
         # In AT scenes the unused support must not occupy the goal.
         boxes[~ontop, 2, :2] = boxes.new_tensor([0., 3.5])
+        if self.goal_sampling is not None:
+            bodies = boxes.new_empty(len(ids), t.num_agents, t.num_bodies, 3)
+            terminal = torch.zeros(len(ids), dtype=torch.bool, device=t.device)
         for index, name in enumerate(names):
             selected = (skills == index).nonzero().flatten()
             if not len(selected):
@@ -66,11 +71,24 @@ class JointCarryReset:
                 box[:, :3] -= center
                 boxes[selected, 0] = box
                 self.source_frame[envs] = pool['source_frame'][row]
+                if self.goal_sampling is not None and name == 'putDown':
+                    destination[selected, :2] = pool['terminal_box_xy'][row] - center[:, :2]
+                    terminal[selected] = True
+            if self.goal_sampling is not None:
+                bodies[selected] = body[..., :3]
             t._humanoid_root_states[envs] = transform_states(root, yaw[selected], shift[selected])
             t._dof_pos[envs], t._dof_vel[envs] = dof, vel
             t._kinematic_humanoid_rigid_body_states[envs] = transform_states(body, yaw[selected], shift[selected])
             t._every_env_init_dof_pos[envs] = dof
             t._stage2_rsi_counts[index] += 2 * len(envs)
+        if self.goal_sampling is not None:
+            from utils.joint_carry_goals import sample_goals, clear_terminal_goals
+            moving = ~terminal
+            destination[moving, :2] = sample_goals(boxes[moving], t._box_size[ids[moving]],
+                bodies[moving], ontop[moving], self.goal_sampling)
+            boxes[ontop, 2, :2] = destination[ontop, :2]
+            boxes[terminal] = clear_terminal_goals(boxes[terminal], t._box_size[ids[terminal]],
+                destination[terminal, :2], self.goal_sampling['clearance'])
         t._box_states[ids] = transform_states(boxes, yaw, shift)
         goal = rotate_vectors(destination, yaw) + shift
         t._tar_pos[ids] = goal[:, None]

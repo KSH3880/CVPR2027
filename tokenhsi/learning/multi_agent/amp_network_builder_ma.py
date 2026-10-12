@@ -1095,7 +1095,8 @@ class AMPMultiAgentBuilder(AMPBuilder):
                     d_model, coordination_cfg.get('grounding_hidden', 128),
                     coordination_cfg.get('num_heads', 2),
                     **({'shuffle_task_order': coordination_cfg.get('shuffle_task_order', False),
-                        'before': before}
+                        'before': before, 'num_layers': coordination_cfg.get('num_layers', 1),
+                        'feedforward_dim': coordination_cfg.get('feedforward_dim')}
                        if task_ca else {}))
             self.action_head = head(kwargs['actions_num'], tp["extra_mlp_units"],
                                     2 * d_model if self.use_coordination else d_model)
