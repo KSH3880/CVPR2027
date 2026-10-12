@@ -90,8 +90,8 @@ def test_free_symmetric_spacing_and_reject_center_asymmetry_outside():
 def test_box_width_mass_density_and_scaled_separation():
     path=Path(__file__).parents[1]/'data/cfg/multi_agent/joint_push_scene.yaml'
     config=yaml.safe_load(path.read_text());spec=config['pushBox']
-    assert spec['size']==[2.6,2.6,2.6] and spec['mass']==40.
-    assert spec['mass']/math.prod(spec['size'])==pytest.approx(40/2.6**3)
+    assert spec['size']==[2.6,2.6,2.6] and spec['mass']==60.
+    assert spec['mass']/math.prod(spec['size'])==pytest.approx(60/2.6**3)
     roots,hands,boxes,goals=scene()
     for width in (1.3,2.6,3.9):
         r=joint_push_reward(roots,hands,boxes,goals,[width,2.6,2.6])

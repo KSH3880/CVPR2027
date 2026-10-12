@@ -1,3 +1,32 @@
+## 현재 무학습 비교 관측: 뒷면 정렬1.3m cube (2026-10-12)
+
+이전 가로 폭만 절반인1.3×2.6×2.6m 관측은 잘못된 크기 해석이었다. 현재는 agent별 가상 box를 Stage1 학습 크기인1.3×1.3×1.3m로 수정했다. 실제2.6m cube의 미는 뒷면과 바닥에 정확히 맞추고 좌우로 배치한다. local offset은 가로±0.65m, 목표를 향하는 법선 반대 방향0.65m, 아래로0.65m이며 가상 중심 높이는 바닥에서0.65m다. 목표에도 같은 offset을 적용해 공유 실제 box와 동일한 이동량을 요구한다. 회전/속도/corners/goal pose를 함께 갱신한다.
+
+현재 config의 실제 상자는60kg이다. 실행 중인 기존 본학습은40kg으로 계속 실행되며 변경하거나 중단하지 않았다. 비교는 기존 Stage1 추론만 사용한다. 테스트/뷰어 명령은 기존 `joint_push_virtual_test.sh`/`joint_push_virtual_view.sh`를 그대로 사용한다. 뷰어는 자동 재실행하지 않았다. 새 비교 기본 산출물은 `runs/jointpush/virtual_rear_cubes_stage1/`이다.
+
+CPU5개 통과:4방향 뒷면·바닥 일치,1.3m 크기,목표 이동량,물리 tensor 비변경,회전 및 offset velocity. 이전 half-width 평가 수치는 이전 관측에서 얻은 결과이며 현재 비교 결과와 구분한다. GPU6·실제60kg·16환경600step 평가 rc=0, 공동 목표 성공0/16, scene termination56.25%. trace의30→570step 평균 실제 goal 거리2.453→1.906m. 이전40kg 실험과 질량도 달라 직접 성능 비교하지 않는다.
+
+## 상자 질량 변경 (2026-10-12)
+
+공동 Push 및 무학습 반쪽 관측 config의 상자 질량을60kg으로 변경했다. 실행 중인 학습·뷰어는 중지/재시작하지 않았으므로40kg을 유지한다. 다음 신규 실행부터60kg을 적용한다. 아래40kg 검증은 변경 전 결과다. 기존40kg Stage2 모델을60kg 설정으로 평가/재개하면 물리 계약 검증이 거부하므로 기존 run의40kg 설정을 사용해야 한다.
+
+## 무학습 Stage1 반쪽 관측 비교 (2026-10-12)
+
+- `HumanoidMAJointPushVirtual`은 동일한 실제2.6m 정육면체40kg를 두 사람이 밀되, 기존 koo Stage1 epoch29000을 strict restore해 그대로 추론한다. CA4/확장 head/optimizer/추가 학습은 없다. 기존 Stage2 본학습 config는 바꾸지 않는다.
+- 각 사람은 graph에서 자기 가상 상자/목표를 맡는다. 하나의 Stage1 scene policy가 두 사람의 action을 출력하며, 원래 Stage1의 사람·장면 attention은 유지한다. 두 사람의 관측을 완전히 독립된 scene으로 잘라 각각 별도 forward하는 비교는 아니다.
+- 가상 상자는 미는 면의 가로 축을 반씩 분할한 크기다. 폭1.3m, 깊이/높이2.6m이며 중심은 실제 box 중심에서 lateral±0.65m. XYZ를 모두 절반으로 축소하지 않는다. 초기 목표 방향으로 lateral 축을 정하고 에피소드 동안 고정한다. box가 회전하면 중심 offset도 회전하고 rigid-body offset velocity를 반영한다.
+- 가상 목표도 동일한 offset을 더해 두 사람 모두 실제 box→공유 목표와 같은 이동량을 요구받는다. object feature의8corners·pose·velocity와 goal pose를 함께 바꾸며, 물리 tensor/실제 collider/질량/힘/보상/성공 판정은 그대로 둔다. 두 사람의 실제 손 위치가 자동으로 대칭이 될 것을 보장하지는 않는다.
+- Stage1 모델 전용 inference 계약 검증으로 schema12/semantic/PUSH relation/관측 차원/network 일치를 요구하며 Stage2 모델은 거부한다. 비교 config의 물리·RSI 차이는 의도적으로 허용하고 strict model/RMS 복원을 수행한다.
+
+```bash
+bash stage2_jointpush/scripts/joint_push_virtual_test.sh
+PORT=6083 bash stage2_jointpush/scripts/joint_push_virtual_view.sh
+```
+
+GPU6 고정. 기본 모델은 로컬 Stage1 epoch29000이며 `STAGE1_CHECKPOINT`로 바꿀 수 있다. `OUTPUT_PATH`, `NUM_ENVS`, `REPEATS`, `SEED`를 지원한다. noVNC6083 포트 포워딩 후 접속한다.
+
+검증: 기하 CPU2개 통과(half-box tiling/목표 이동량/회전/offset velocity/물리 tensor 비변경). GPU6 16환경600step1회 평가 rc=0, 공동 목표 성공0/16·scene termination81.25%. trace의30→570step 평균 실제 목표 거리2.456→2.081m, 손 중점 간격1.090→2.061m, 공동 접촉 gate는0. 이 작은 표본은 유효한 비교 경로 확인이며 학습된 Stage2와 성능 우열을 판정하지 않는다. 결과: `runs/jointpush/virtual_half_stage1_check_20261012/`; 실제 물리 trace는 `virtual_push_trace.jsonl`, 공식 성공 지표는 `metrics/edge_context_*.json`.
+
 ## 공동 Push 학습 연결 (2026-10-12)
 
 현재 실행 경로는 `ports/koo_push/`의 `HumanoidMAJointPush`와 `joint_push_loco_rsi_ca4.yaml`이다. 아래의 함수만 구현했던 기록보다 이 연결 설정을 우선한다.

@@ -50,8 +50,11 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     def restore(self, fn):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
-            check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
-            if getattr(self.env.task,'_open_push',False) and checkpoint.get('open_push_contract') != self.env.task.get_open_push_contract():
+            if hasattr(self.env.task,'validate_inference_checkpoint'):
+                self.env.task.validate_inference_checkpoint(checkpoint)
+            else:
+                check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
+            if not hasattr(self.env.task,'validate_inference_checkpoint') and getattr(self.env.task,'_open_push',False) and checkpoint.get('open_push_contract') != self.env.task.get_open_push_contract():
                 raise ValueError('OPEN/PUSH checkpoint physics/reference contract differs')
             if getattr(self.env.task,'_door_open',False) and checkpoint.get('door_experiment_contract') != self.env.task.get_door_experiment_contract():
                 raise ValueError('Door checkpoint network/reference contract differs')

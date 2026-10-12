@@ -241,7 +241,7 @@ env:
     - 2.6
     - 2.6
     - 2.6
-    mass: 40.0
+    mass: 60.0
     friction: 0.6
   jointPush:
     rsi: loco_only

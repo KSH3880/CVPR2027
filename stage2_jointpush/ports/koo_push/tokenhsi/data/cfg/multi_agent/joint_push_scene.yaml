@@ -4,6 +4,6 @@ numAgents: 2
 pushBox:
   # local X = width of the pushed +/-Y face, Y = depth, Z = height
   size: [2.6, 2.6, 2.6]
-  mass: 40.0
+  mass: 60.0
   friction: 0.6
 reward_spec: tokenhsi/data/cfg/multi_agent/joint_push_reward.yaml

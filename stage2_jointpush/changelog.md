@@ -4,6 +4,25 @@
 
 ## 2026-10-12
 
+### 무학습 가상 box를 Stage1 크기·실제 뒷면에 정렬
+
+- 사용자 지적에 따라 가로 폭만 절반인1.3×2.6×2.6m 관측을1.3m 정육면체로 수정했다. 실제 박스의 뒷면·바닥에 맞춰 가로±0.65m/뒷방향0.65m/아래0.65m 배치하고 목표·corners·offset velocity를 함께 수정한다. 네 방향의 면 정렬과 물리 tensor 비변경 등 CPU5개 통과.
+- 기존 Stage1 추론만 사용하며 실제 박스 크기·힘은 변경하지 않는다. config 질량은앞선변경60kg, 실행 중인 기존 학습은40kg 유지. 검증 산출물은 runs/jointpush/virtual_rear_cubes_check_20261012. GPU6·60kg·16환경600step 평가 rc=0, 목표 성공0/16, scene termination56.25%, 평균 goal 거리2.453→1.906m(30→570step). 기존 뷰어는 재실행하지 않았다.
+
+
+### 공유 상자 질량60kg 설정
+
+- 사용자 요청으로 공동 Push·무학습 반쪽 관측·공유 박스 명세의 질량을40→60kg으로 변경했다. 크기2.6m 정육면체·마찰0.6은 유지한다.
+- 런타임 질량 감사는 config의 목표 질량과 비교하도록 바꿨다. YAML 질량 일치 및 관련 CPU 보상 테스트를 확인했다. 실행 중인 학습·뷰어·MPS는 중지/재시작하지 않았으며 현재 프로세스는40kg을 유지한다. 새 실행부터60kg.
+
+
+### 무학습 Stage1·가상 반쪽 box 공동 Push 비교
+
+- 사용자 제안대로 실제 공유 박스는 유지하고 가로 폭만 반씩 분할한 가상 box/goal graph를 관측에 넣는 inference-only 환경을 추가했다. Stage1 epoch29000과64입력 action head를 strict 복원하며 CA4·추가 학습은 없다. 원래 Stage1 scene attention은 유지한다.
+- local corner·pose·offset velocity·goal pose를 함께 갱신하고 실제 물리 상태는 변경하지 않는다. source schema/network 검증을 갖춘 명시적 inference 전용 복원 분기를 추가했으며 기존 Stage2 계약은 유지한다.
+- CPU기하2개 통과, GPU6 16환경600step 평가 rc=0. 공동 목표 성공0/16, scene termination81.25%; 평균 물리 goal 거리2.456→2.081m(30→570step), 손 중점 간격1.090→2.061m. 결과 runs/jointpush/virtual_half_stage1_check_20261012. viewer6083과 전용 test/view wrapper를 추가했다. 본학습·MPS·원본 저장소는 수정하지 않았다.
+
+
 ### 루트 Git 편입 후 실행 산출물 ignore 보완
 
 - 내부 Git 경계 제거 후 복사본 코드/설정이 루트 저장소에 나타나는 것은 정상이다. 코드·로봇 asset·portable reference는 유지하고 중첩 output/output_etc, logs/summaries/metrics, 화면 산출물, TensorBoard event, PID/lock과 align_tmp를 제외했다.

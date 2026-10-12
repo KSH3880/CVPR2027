@@ -23,7 +23,7 @@ def audit_runtime(task,path):
     assert (task._humanoid_root_states[:,0,:2]-task._humanoid_root_states[:,1,:2]).norm(dim=-1).min()>=1.2
     props=task.gym.get_actor_rigid_body_properties(task.envs[0],task._box_handles[2])
     mass=sum(x.mass for x in props)
-    assert abs(mass-40.)<.001
+    assert abs(mass-task.cfg['env']['pushBox']['mass'])<.001
     demo=task._fetch_conditioned_amp_demo(4096)
     labels=demo.reshape(4096,task._num_amp_obs_steps,-1)[...,-2:]
     assert (labels[...,0]==0).all() and (labels[...,1]==1).all()
