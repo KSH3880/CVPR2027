@@ -1,0 +1,42 @@
+"""Opt-in real simulator contract audit. Runs only on the explicit verification path."""
+import json
+from pathlib import Path
+import torch
+from env.tasks.multi_agent.joint_push_reward import push_face_geometry
+
+
+def audit_runtime(task,path):
+    ids=torch.arange(task.num_envs,device=task.device);task._reset_envs(ids)
+    graph=task.relation_runtime.graph
+    assert (task._push_binding==0).all()
+    assert (task._agent_box_assignment==2).all()
+    assert (graph.edge_src==torch.tensor([0,4,1,4],device=task.device)).all()
+    assert (graph.edge_dst==torch.tensor([4,6,4,6],device=task.device)).all()
+    assert (task._tar_pos[:,0]==task._tar_pos[:,1]).all()
+    assert set(task._reset_ref_motion_ids)=={'loco'}
+    assert torch.allclose(task._hist_amp_obs_buf,task._curr_amp_obs_buf[:,:,None].expand_as(task._hist_amp_obs_buf))
+    center,normal,tangent,half,_=push_face_geometry(task._box_states[:,2],task._tar_pos[:,0],task.cfg['env']['pushBox']['size'],task._joint_push_spec['reward'])
+    relative=task._humanoid_root_states[...,:2]-center[:,None,:2]
+    depth=(relative*normal[:,None]).sum(-1);lateral=(relative*tangent[:,None]).sum(-1)
+    assert ((depth<=-1.)&(depth>=-2.)).all()
+    assert (lateral[:,0]*lateral[:,1]<0).all()
+    assert (task._humanoid_root_states[:,0,:2]-task._humanoid_root_states[:,1,:2]).norm(dim=-1).min()>=1.2
+    props=task.gym.get_actor_rigid_body_properties(task.envs[0],task._box_handles[2])
+    mass=sum(x.mass for x in props)
+    assert abs(mass-40.)<.001
+    demo=task._fetch_conditioned_amp_demo(4096)
+    labels=demo.reshape(4096,task._num_amp_obs_steps,-1)[...,-2:]
+    assert (labels[...,0]==0).all() and (labels[...,1]==1).all()
+    assert torch.isfinite(demo).all()
+    before=task._humanoid_root_states[1:].clone();before_graph=graph.edge_src[1:].clone();before_goal=task._tar_pos[1:].clone()
+    task._reset_envs(ids[:1])
+    assert torch.equal(before,task._humanoid_root_states[1:])
+    assert torch.equal(before_graph,graph.edge_src[1:]) and torch.equal(before_goal,task._tar_pos[1:])
+    task._compute_reward(None)
+    assert torch.isfinite(task.rew_buf).all()
+    report=dict(num_envs=task.num_envs,shared_box=2,shared_goal=0,size=task.cfg['env']['pushBox']['size'],
+        measured_mass=mass,loco_only_rsi=True,repeat_reset_history=True,partial_reset_preserved=True,
+        conditioned_push_amp_finite=True,spawn_depth_range=[depth.min().item(),depth.max().item()],
+        min_root_gap=(task._humanoid_root_states[:,0,:2]-task._humanoid_root_states[:,1,:2]).norm(dim=-1).min().item())
+    target=Path(path);target.parent.mkdir(parents=True,exist_ok=True);target.write_text(json.dumps(report,indent=2)+'\n')
+    print('[Joint Push runtime audit]',report,flush=True)

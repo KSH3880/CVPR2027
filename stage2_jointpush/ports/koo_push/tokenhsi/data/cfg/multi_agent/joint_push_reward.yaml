@@ -1,0 +1,16 @@
+# Reward specification only; not an executable environment config.
+# Per-owner edges: H_i --PUSH--> shared O; shared O --AT--> shared G.
+# Based on Goal360 JointCarryRuntime, not the optional TeamHold variant.
+state_reward_weight: 0.2
+progress_reward_weight: 0.2
+success_reward_weight: 0.2
+satisfaction_threshold: 0.9
+hand_distance_scale: 10.0
+at_distance_scale: 10.0
+at_z_tolerance: 0.001
+progress_sigma: 1.0
+push_bbox_buffer: 0.2
+at_bbox_buffer: 0.1
+min_separation_fraction: 0.25
+symmetry_distance_scale: 10.0
+hand_target_height: 0.8

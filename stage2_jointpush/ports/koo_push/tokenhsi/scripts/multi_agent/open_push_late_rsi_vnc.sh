@@ -1,0 +1,19 @@
+#!/bin/bash
+export TOKENHSI_GPU=${TOKENHSI_GPU:-6}
+if [ "$TOKENHSI_GPU" != 6 ]; then echo "OPEN/PUSH uses GPU 6 only" >&2; exit 1; fi
+set -eu
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$SCRIPT_DIR/../../.." && pwd)
+cd "$ROOT"
+if [ $# -lt 1 ] || [ $# -gt 5 ] || [ ! -f "$1" ]; then
+  echo "Provide an existing checkpoint.pth; paths are relative to the repository root." >&2
+  exit 1
+fi
+export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
+export VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
+export OUTPUT_PATH=${OUTPUT_PATH:-output/open_push_late_rsi_cube_low_midpoint_xy_hand_credit}
+export HEADLESS=0
+export TASK_GRAPH=${TASK_GRAPH:-random_open_push}
+exec bash "$SCRIPT_DIR/run-gui.sh" \
+  bash "$SCRIPT_DIR/open_push_late_rsi_test.sh" \
+  "$1" "${2:-2}" "${3:-1}" "${4:-4}" "${5:-10}"
