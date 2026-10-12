@@ -9,7 +9,7 @@ if [ -n "${MAX_ITERATIONS:-}" ]; then args+=(--max_iterations "$MAX_ITERATIONS")
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then args+=(--checkpoint "$RESUME_CHECKPOINT" --resume 1); fi
 if [ -n "${SEED:-}" ]; then args+=(--seed "$SEED"); fi
 python tokenhsi/run.py --task HumanoidMAPushDoor \
- --cfg_env tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml \
+ --cfg_env "${CFG_ENV:-tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi.yaml}" \
  --cfg_train tokenhsi/data/cfg/train/rlg/amp_ma_push_door_stage1_task_rsi.yaml \
  --motion_file tokenhsi/data/dataset_push_door_stage1.yaml \
  --num_agents 2 --num_envs "${NUM_ENVS:-2048}" --num_objects 4 \

@@ -256,8 +256,8 @@ def test_restored_reward_and_lower_handle_configuration():
     for name in ('push_door_stage1','push_door_stage1_random_start','push_door_stage1_task_rsi'):
         env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
         c=env['interaction'];validate_interaction(c)
-        if name=='push_door_stage1_task_rsi':assert c['push']['hand_reward_weight']==.15
-        else:assert 'hand_reward_weight' not in c['push']
+        assert 'hand_reward_weight' not in c['push']
+        assert c['push']['relation_rewards']['hand_progress_weight']==.15
         assert 'opening_weight' not in c['door'] and 'angle_weight' not in c['door']
         assert c['progress_weight']==.4 and c['door']['handle_height']==.95
         assert c['push']['direction']=='away_from_door'
@@ -409,3 +409,112 @@ def test_nearest_door_hand_entry_preserves_binding_and_contact():
     assert nearest_door_hand_on_entry(result,torch.ones(5,dtype=torch.bool),
         torch.ones(5,dtype=torch.bool),torch.ones(5,dtype=torch.long),
         hands.flip(1),handles,torch.zeros(5,dtype=torch.bool)).tolist()==result.tolist()
+
+
+def test_variable_box_wide_goal_distribution():
+    from utils.push_door_spec import sample_start_layout
+    env=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi_variable_box.yaml').read_text())['env']
+    validate_interaction(env['interaction'])
+    with torch.random.fork_rng():
+        torch.manual_seed(42)
+        tasks=torch.zeros(4096,2,dtype=torch.long)
+        sizes=(.9+.5*torch.rand(4096,2,1)).expand(-1,-1,3)
+        box,goal,*_=sample_start_layout(tasks,env['startRandomization'],sizes,torch.tensor([-1.6,1.6]))
+        delta=goal[...,:2]-box[...,:2]
+        distance=delta.norm(dim=-1)
+        angle=torch.rad2deg(torch.atan2(delta[...,1],delta[...,0]))
+        assert distance.min()>=2-1e-5 and distance.max()<=4+1e-5
+        assert angle.abs().max()<=60+1e-4
+        assert (angle>40).float().mean()>.1
+        assert (angle<-40).float().mean()>.1
+        assert (delta[...,1].abs()>2).float().mean()>.1
+        torch.testing.assert_close(box[...,2],sizes[...,2]/2+.005)
+    assert env['interaction']['task_rsi']['push_goal_yaw_degrees']==[-60,60]
+
+
+def test_full_circle_push_preserves_geometry_and_door():
+    from utils.push_door_spec import rotate_push_layout
+    tasks=torch.tensor([[0,1]]).repeat(1024,1)
+    boxes=torch.zeros(1024,2,13);boxes[...,6]=1
+    boxes[...,0]=-5.5;boxes[:,1,1]=12
+    goals=boxes[...,:3].clone();goals[...,0]+=3
+    humans=boxes[...,:3].clone();humans[...,0]-=1.5
+    rotations=boxes[...,3:7].clone()
+    angles=torch.linspace(-torch.pi,torch.pi,1024)[:,None].expand(-1,2)
+    b,g,h,q=rotate_push_layout(boxes,goals,humans,rotations,tasks,angles)
+    torch.testing.assert_close((g-b[...,:3]).norm(dim=-1),torch.full((1024,2),3.))
+    torch.testing.assert_close((h-b[...,:3]).norm(dim=-1),torch.full((1024,2),1.5))
+    for original,result in ((boxes,b),(goals,g),(humans,h),(rotations,q)):
+        torch.testing.assert_close(original[:,1],result[:,1])
+    delta=g[:,0,:2]-b[:,0,:2]
+    assert all(((delta[:,0]*x>0)&(delta[:,1]*y>0)).any() for x,y in ((1,1),(1,-1),(-1,1),(-1,-1)))
+    torch.testing.assert_close(q.norm(dim=-1),torch.ones(1024,2))
+
+
+def test_semantic_push_door_edges_and_checkpoint_contract():
+    tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]])
+    hold=torch.tensor([[False,False],[False,True],[False,False],[True,False]])
+    matrix=task_relation_matrix(tasks,hold,semantic=True)
+    for row in range(4):
+        for owner in range(2):
+            obj=2+owner+2*int(tasks[row,owner]);goal=6+owner
+            expected=11 if tasks[row,owner]==0 else 13 if hold[row,owner] else 12
+            assert matrix[row,owner,obj]==expected
+            assert matrix[row,obj,goal]==(7 if tasks[row,owner]==0 else expected)
+            assert matrix[row,obj,owner]==matrix[row,owner,obj]
+            assert matrix[row,goal,obj]==matrix[row,obj,goal]
+    env=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi_variable_box.yaml').read_text())['env']
+    legacy=copy.deepcopy(env);legacy['relationGraph'].pop('semantic_relations')
+    with pytest.raises(ValueError):
+        check_interaction_checkpoint({'interaction_metadata':interaction_metadata(legacy)},interaction_metadata(env))
+
+
+def test_semantic_relations_reach_attention_with_gradients():
+    import torch.nn as nn
+    from learning.multi_agent.amp_network_builder_ma import RelationEncoder
+    encoder=RelationEncoder([223,34,9],2,4,16,2,2,32,
+        lambda size:nn.Sequential(nn.Linear(size,16),nn.ReLU()),
+        observation_mode='clean_scene',kinematic_size=7,relation_bias=True,
+        relation_bias_mode='edge_mlp',relation_graph_spec={'template':'push_door_stage1_v1','semantic_relations':True},
+        gta_cfg={'enable':True,'translation_scale':1.,'representation':'se3_direct_sum'})
+    assert encoder.edge_encoder.relation_embed.num_embeddings==14
+    obs=torch.randn(4,656)
+    goals=obs[:,582:600].view(4,2,9)
+    goals[...,:2]=torch.nn.functional.one_hot(torch.tensor([[0,0],[0,1],[1,0],[1,1]]),2).float()
+    goals[...,2]=torch.tensor([[0.,0.],[0.,1.],[0.,0.],[1.,0.]])
+    obs[:,600:].view(4,8,7)[...,3:7]=torch.tensor([0.,0.,0.,1.])
+    seen=[]
+    hook=encoder.edge_encoder.register_forward_pre_hook(lambda module,args:seen.append(args[1].clone()))
+    with torch.no_grad():encoder.edge_encoder.bias_projection.normal_(std=.02)
+    result=encoder(obs)
+    result.square().sum().backward();hook.remove()
+    assert {7,11,12,13}.issubset(set(seen[-1].unique().tolist()))
+    grad=encoder.edge_encoder.relation_embed.weight.grad
+    assert all(grad[index].abs().sum()>0 for index in (7,11,12,13))
+    shuffled=encoder(obs,token_order=torch.tensor([4,7,1,3,0,6,5,2]))
+    torch.testing.assert_close(result,shuffled,atol=2e-6,rtol=2e-5)
+
+
+def test_split_push_relations_independent_rewards_and_no_repeat_results():
+    from utils.push_door_spec import push_relation_rewards
+    cfg=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi_variable_box.yaml').read_text())['env']['interaction']['push']['relation_rewards']
+    quality=torch.tensor([.8]);distance=torch.tensor([3.]);stable=torch.tensor([True]);contact=torch.tensor([False])
+    best=torch.tensor([.2]);elapsed=torch.zeros(1);done=torch.tensor([False])
+    terms,best,elapsed,done=push_relation_rewards(quality,contact,distance,stable,torch.zeros(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
+    assert terms[0,0]>0 and terms[0,1]>0 # hands can learn before the box moves
+    assert terms[0,2]==0 and terms[0,4]==0 and terms[0,5]==0
+    repeated,*_=push_relation_rewards(quality,contact,distance,stable,torch.zeros(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
+    assert repeated[0,1]==0 # no progress for waiting or returning to old quality
+    contact[:]=True
+    for _ in range(2):
+        terms,best,elapsed,done=push_relation_rewards(quality,contact,distance,stable,torch.ones(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
+    assert terms[0,2]==cfg['hand_result_weight'] and terms[0,4]==cfg['at_progress_weight']
+    contact[:]=False
+    _,best,elapsed,done=push_relation_rewards(quality,contact,distance,stable,torch.ones(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
+    for _ in range(2):
+        terms,best,elapsed,done=push_relation_rewards(quality,torch.tensor([True]),distance,stable,torch.ones(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
+    assert terms[0,2]==0 # releasing and touching again cannot farm result
+    goal,*_=push_relation_rewards(quality,contact,torch.zeros(1),stable,torch.zeros(1),torch.tensor([True]),best,elapsed,done,.1,cfg)
+    assert goal[0,3]==cfg['at_state_weight'] and goal[0,5]==cfg['at_result_weight']
+    bad,*_=push_relation_rewards(quality,contact,distance,torch.tensor([False]),torch.ones(1),torch.tensor([False]),best,elapsed,done,.1,cfg)
+    assert bad.eq(0).all()

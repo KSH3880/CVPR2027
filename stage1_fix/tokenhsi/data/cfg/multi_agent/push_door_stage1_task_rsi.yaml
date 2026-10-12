@@ -10,6 +10,7 @@ env:
     focus: stack
   relationGraph:
     template: push_door_stage1_v1
+    semantic_relations: true
   relationReward:
     mode: legacy_tokenhsi
     stage1_variant: push_door_stage1_v1
@@ -86,8 +87,20 @@ env:
     maintain_weight: 0.6
     success_weight: 0.2
     push:
+      relation_rewards:
+        version: push_at_state_progress_result_v1
+        hand_state_weight: 0.05
+        hand_progress_weight: 0.15
+        hand_result_weight: 0.1
+        hand_progress_speed: 2.0
+        hand_hold_seconds: 0.15
+        hand_contact_distance: 0.06
+        contact_force: 0.5
+        at_state_weight: 0.3
+        at_progress_weight: 0.4
+        at_result_weight: 0.2
+        at_distance_scale: 0.5
       direction: away_from_door
-      hand_reward_weight: 0.15
       hand_radius: 0.04
       hand_distance_scale: 0.15
       hand_height_fraction: [0.6, 0.95]
@@ -97,7 +110,7 @@ env:
         - 1.3
         - 1.3
         density: 13.654984069185252
-        friction: 0.1
+        friction: 0.5
       target_distance:
       - 1.5
       - 2.0

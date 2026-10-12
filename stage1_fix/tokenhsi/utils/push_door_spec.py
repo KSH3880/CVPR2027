@@ -13,6 +13,7 @@ def resize_push_box(env, size):
         raise ValueError('PUSH box size must be finite and positive')
     box = env['interaction']['push']['box']
     mass = float(box['density']) * math.prod(box['size'])
+    box.pop('size_range',None)
     box['size'] = [size, size, size]
     box['density'] = mass / size ** 3
     randomization = env.get('startRandomization')
@@ -61,12 +62,35 @@ def push_hand_alignment(local_hands, local_direction, half_size, config):
     sign=torch.where(sign==0,torch.ones_like(sign),sign)
     side=torch.nn.functional.one_hot(axis,3).to(local_hands.dtype)
     face=-sign[...,None]*side*(half_size+config['hand_radius'])
-    desired=torch.maximum(torch.minimum(local_hands,half_size),-half_size)
+    bounds=half_size.unsqueeze(-2)
+    desired=torch.maximum(torch.minimum(local_hands,bounds),-bounds)
     desired=torch.where(side[...,None,:].bool(),face[...,None,:],desired)
     low,high=config['hand_height_fraction']
-    desired[...,2]=local_hands[...,2].clamp(-half_size[2]+2*half_size[2]*low,-half_size[2]+2*half_size[2]*high)
+    desired[...,2]=torch.maximum(torch.minimum(local_hands[...,2],(half_size[...,2]*(2*high-1)).unsqueeze(-1)),(half_size[...,2]*(2*low-1)).unsqueeze(-1))
     error=(local_hands-desired).norm(dim=-1)
     return torch.exp(-(error/config['hand_distance_scale']).square()).min(-1).values,error.mean(-1)
+
+
+def push_relation_rewards(quality, contact, distance, stable, at_progress, at_result,
+                          best_quality, elapsed, achieved, dt, config):
+    """Independent PUSH-hand and AT state/progress/result components.
+
+    Progress rewards only a new record; results are once per episode. AT motion
+    records are consumed outside this function even without hand contact.
+    """
+    hand_progress,new_best=progress_reward(quality,best_quality,dt*config['hand_progress_speed'])
+    valid=contact & stable
+    elapsed,achieved,first=advance_success(valid,elapsed,achieved,dt,config['hand_hold_seconds'])
+    hand_state=quality*stable
+    at_state=torch.exp(-(distance/config['at_distance_scale']).square())*stable
+    components=torch.stack([
+        config['hand_state_weight']*hand_state,
+        config['hand_progress_weight']*hand_progress*stable,
+        config['hand_result_weight']*first,
+        config['at_state_weight']*at_state,
+        config['at_progress_weight']*at_progress*valid,
+        config['at_result_weight']*at_result],-1)
+    return components,new_best,elapsed,achieved
 
 
 def door_shaping(angle, best_angle, previous_angle, hand_distance, best_distance, contact, dt, config):
@@ -91,8 +115,12 @@ def advance_success(valid, elapsed, done, dt, duration):
     return elapsed, done | current, first
 
 
-def task_relation_matrix(tasks):
+def task_relation_matrix(tasks, holding=None, semantic=False):
     """Canonical H[M], boxes[M], doors[M], goals[M]; bind actual active object."""
+    from utils.edge_context_spec import AT
+    from utils.edge_interaction_spec import PUSH, DOOR_OPEN, DOOR_HOLD
+    if holding is None:
+        holding=torch.zeros_like(tasks,dtype=torch.bool)
     B, M = tasks.shape
     L = 4 * M
     matrix = torch.zeros(B, L, L, dtype=torch.long, device=tasks.device)
@@ -105,10 +133,12 @@ def task_relation_matrix(tasks):
         obj = M + owner + tasks[:, owner].long() * M
         goal = 3 * M + owner
         rows = torch.arange(B, device=tasks.device)
-        matrix[rows, owner, obj] = 3
-        matrix[rows, obj, owner] = 3
+        interaction=torch.where(tasks[:,owner].bool(),torch.where(holding[:,owner],DOOR_HOLD,DOOR_OPEN),PUSH) if semantic else 3
+        matrix[rows, owner, obj] = interaction
+        matrix[rows, obj, owner] = interaction
         matrix[:, owner, goal] = matrix[:, goal, owner] = 4
-        matrix[rows, obj, goal] = matrix[rows, goal, obj] = 5
+        placement=torch.where(tasks[:,owner].bool(),interaction,AT) if semantic else 5
+        matrix[rows, obj, goal] = matrix[rows, goal, obj] = placement
     return matrix
 
 
@@ -131,6 +161,9 @@ def interaction_metadata(env):
             'num_objects': env['numObjects'], 'amp_steps': env['numAMPObsSteps'],
             'interaction': env['interaction'], 'motion_file': env['motion_file'],
             'entity_sizes': [223, 34, 9], 'pose_size': 7}
+    if env.get('relationGraph',{}).get('semantic_relations',False):
+        metadata['relation_graph']=env['relationGraph']
+        metadata['relation_taxonomy']={'AT':7,'PUSH':11,'DOOR_OPEN':12,'DOOR_HOLD':13}
     if 'startRandomization' in env:
         metadata['start_randomization'] = env['startRandomization']
     if env.get('agentCollisionPenalty', False):
@@ -159,6 +192,12 @@ def validate_interaction(config):
         if not math.isfinite(config[key]) or config[key] < 0:
             raise ValueError('Invalid reward weight: ' + key)
     push, door, amp = config['push'], config['door'], config['amp']
+    bounds=push['box'].get('size_range')
+    if bounds is not None:
+        lo,hi=bounds
+        if not all(math.isfinite(x) for x in bounds) or not 0<lo<=hi:
+            raise ValueError('Invalid PUSH box size range')
+
     if door.get('reward_version') != 'handle_gated_v2':
         raise ValueError('Door reward requires handle_gated_v2 configuration')
     for key in ('approach_weight','closing_weight','approach_speed','closing_speed','approach_angle_tolerance','closing_deadband'):
@@ -175,8 +214,18 @@ def validate_interaction(config):
                 raise ValueError('Invalid task parameter: ' + key)
     if push.get('direction', 'toward_door') not in ('toward_door', 'away_from_door'):
         raise ValueError('Invalid PUSH direction')
-    if 'hand_reward_weight' in push:
-        for key in ('hand_reward_weight','hand_radius','hand_distance_scale'):
+    split=push.get('relation_rewards')
+    if split is not None:
+        if split.get('version')!='push_at_state_progress_result_v1':
+            raise ValueError('Unsupported PUSH relation reward version')
+        for key in ('hand_state_weight','hand_progress_weight','hand_result_weight','at_state_weight','at_progress_weight','at_result_weight'):
+            if not math.isfinite(split[key]) or split[key]<0:
+                raise ValueError('Invalid PUSH relation reward weight: '+key)
+        for key in ('hand_progress_speed','hand_hold_seconds','hand_contact_distance','contact_force','at_distance_scale'):
+            if not math.isfinite(split[key]) or split[key]<=0:
+                raise ValueError('Invalid PUSH relation reward parameter: '+key)
+    if 'hand_reward_weight' in push or split is not None:
+        for key in (('hand_reward_weight',) if 'hand_reward_weight' in push else ()) + ('hand_radius','hand_distance_scale'):
             if not math.isfinite(push[key]) or push[key]<=0:
                 raise ValueError('Invalid PUSH hand parameter: '+key)
         lo,hi=push['hand_height_fraction']
@@ -206,6 +255,10 @@ def validate_interaction(config):
                 raise ValueError('DOOR RSI facing limit must be below 90 degrees')
             if rsi.get('door_hand_binding') not in ('motion_extension_v1','user_paths_v1'):
                 raise ValueError('Facing-filtered RSI requires motion hand binding')
+        if 'push_goal_yaw_degrees' in rsi:
+            bounds=rsi['push_goal_yaw_degrees']
+            if len(bounds)!=2 or not all(math.isfinite(v) for v in bounds) or not -90 < bounds[0] <= bounds[1] < 90:
+                raise ValueError('Invalid RSI push goal yaw range')
         lo,hi=rsi['push_remaining']
         if not 0 < lo <= hi:raise ValueError('Invalid task RSI push distance')
         lo,hi=rsi['push_hand_height']
@@ -241,9 +294,27 @@ def redirect_push_away(boxes, goals, humans, rotations, tasks):
     return boxes, goals, humans, rotations
 
 
+def rotate_push_layout(boxes, goals, humans, rotations, tasks, angles):
+    """Rotate each PUSH scene about its box; leave DOOR scenes untouched."""
+    push=tasks==0
+    boxes,goals,humans,rotations=(value.clone() for value in (boxes,goals,humans,rotations))
+    c,s=torch.cos(angles),torch.sin(angles)
+    for value in (goals,humans):
+        delta=value[...,:2]-boxes[...,:2]
+        turned=torch.stack([c*delta[...,0]-s*delta[...,1],s*delta[...,0]+c*delta[...,1]],-1)
+        value[...,:2]=torch.where(push[...,None],boxes[...,:2]+turned,value[...,:2])
+    c,s=torch.cos(angles/2),torch.sin(angles/2)
+    for q in (boxes[...,3:7],rotations):
+        x,y,z,w=q.unbind(-1)
+        turned=torch.stack([c*x-s*y,s*x+c*y,c*z+s*w,c*w-s*z],-1)
+        q.copy_(torch.where(push[...,None],turned,q))
+    return boxes,goals,humans,rotations
+
+
 def push_box_start_x(box_size, maximum_target_distance, forward_jitter=0.):
     """Leave a 20cm gap to unused door geometry even at the farthest goal."""
-    radius = float(torch.linalg.vector_norm(torch.as_tensor(box_size[:2]) / 2))
+    sizes=torch.as_tensor(box_size)
+    radius=torch.linalg.vector_norm(sizes[..., :2]/2,dim=-1)
     return -(maximum_target_distance + radius + forward_jitter + .2)
 
 
@@ -252,8 +323,9 @@ def sample_start_layout(tasks, config, box_size, lanes):
     for name, bounds in config.items():
         if len(bounds) != 2 or not all(math.isfinite(x) for x in bounds) or bounds[0] > bounds[1]:
             raise ValueError('Invalid start randomization bounds: ' + name)
-    radius = float(torch.linalg.vector_norm(torch.as_tensor(box_size[:2]) / 2))
-    if config['push_distance'][0] < radius + .25 or config['door_distance'][0] < .5:
+    box_size=torch.as_tensor(box_size,device=tasks.device,dtype=torch.float32)
+    radius=torch.linalg.vector_norm(box_size[..., :2]/2,dim=-1)
+    if torch.any(config['push_distance'][0] < radius + .25) or config['door_distance'][0] < .5:
         raise ValueError('Start distance must preserve human/object clearance')
     shape = tasks.shape
     device = tasks.device
@@ -267,7 +339,7 @@ def sample_start_layout(tasks, config, box_size, lanes):
     start_x = push_box_start_x(box_size, config['target_distance'][1], config['box_x'][1])
     boxes[..., 0] += torch.where(tasks.bool(), -2.2, start_x) + uniform(config['box_x'])
     boxes[..., 1] += tasks * .85 + uniform(config['box_y'])
-    boxes[..., 2] = box_size[2] / 2 + .005
+    boxes[..., 2] = box_size[..., 2] / 2 + .005
     target = boxes.clone()
     direction = torch.deg2rad(uniform(config['target_yaw_degrees']))
     distance = uniform(config['target_distance'])

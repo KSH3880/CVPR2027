@@ -156,6 +156,11 @@ def build_pool(task,skill):
         valid=(near&(extension>cfg['min_extension'])).any(-1)
         if contact_hand is not None:
             valid &= (contact_hand>=0) & (near & (extension>cfg['min_extension'])).gather(1,contact_hand.clamp_min(0)[:,None]).squeeze(1)
+        requested_hand=getattr(task,'_door_rsi_hand',None)
+        if requested_hand is not None:
+            if contact_hand is None:
+                raise ValueError('DOOR hand preview requires motion hand binding')
+            valid &= contact_hand==requested_hand
         indices=valid.nonzero().flatten()
         for chunk in indices.split(128):
             valid[chunk]&=safe_door_candidates(task,root[chunk],body[chunk],rot[chunk],brot[chunk,1],None if contact_hand is None else contact_hand[chunk])[3].any(-1)
@@ -164,8 +169,14 @@ def build_pool(task,skill):
         for chunk in valid.nonzero().flatten().split(128):
             angles,_,_,safe=safe_door_candidates(task,root[chunk],body[chunk],rot[chunk],brot[chunk,1],None if contact_hand is None else contact_hand[chunk])
             early_safe[chunk]=(safe & (angles<=math.radians(cfg['door_early_max_degrees']))).any(-1)
-        if not early_safe.any():raise ValueError('No frame-safe small-angle door RSI poses')
+        if not early_safe.any():
+            if getattr(task,'_door_rsi_hand',None) is None or not valid.any():
+                raise ValueError('No frame-safe small-angle door RSI poses')
+            print('[viewer] Requested hand has no safe small-angle RSI; using safe available angles',flush=True)
     if not valid.any():raise ValueError('No physically bindable RSI reference poses for '+skill)
+    if skill=='push':
+        task._rsi_push_height=hands[...,2].max(-1).values[valid]
+        task._rsi_push_width=lateral.max(-1).values[valid]
     mids=mids[valid];times=times[valid]
     count=torch.bincount(mids,minlength=len(lib._motion_lengths)).clamp_min(1)
     weights=lib._motion_weights[mids]/count[mids]
@@ -185,14 +196,17 @@ def select_task_rsi(tasks, config):
     return torch.rand(tasks.shape,device=tasks.device)<probability
 
 
-def sample_reference(task,tasks):
+def sample_reference(task,tasks,env_ids=None):
     cfg=task._interaction['task_rsi'];n=tasks.numel();dev=task.device
     selected=select_task_rsi(tasks,cfg).flatten()
+    if getattr(task,'_door_rsi_hand',None) is not None:
+        selected |= tasks.flatten()==1
+    if getattr(task, "_initial_task_start", False):selected.zero_()
     loco=task._motion_lib['loco'];ids=loco.sample_motions(n)
     t=torch.full((n,),task.dt*(task._num_amp_obs_steps-1),device=dev)
     root,rot,dof,*_=loco.get_motion_state(ids,t)
     body,brot,_,_=loco.get_motion_state_max(ids,t)
-    if not hasattr(task,'_task_rsi_pools'):
+    if selected.any() and not hasattr(task,'_task_rsi_pools'):
         task._task_rsi_pools={s:build_pool(task,s) for s in ('push','doorOpen')}
     bound_hand=torch.full((n,),-1,dtype=torch.long,device=dev)
     phases=torch.zeros(n,device=dev)
@@ -202,8 +216,27 @@ def sample_reference(task,tasks):
         if not size:continue
         lib=task._motion_lib[skill];mid,tm,weights,early_safe=task._task_rsi_pools[skill]
         indices=torch.multinomial(weights,size,replacement=True)
+        if skill=='push' and hasattr(task,'_box_sizes'):
+            sizes=task._box_sizes if env_ids is None else task._box_sizes[env_ids]
+            sizes=sizes.reshape(-1,3)[mask]
+            eligible=(task._rsi_push_height[None,:]+cfg['push_hand_radius']<=sizes[:,2:3]) & (task._rsi_push_width[None,:]+cfg['push_hand_radius']<=sizes[:,1:2]/2)
+            probabilities=weights[None,:]*eligible
+            usable=probabilities.sum(-1)>0
+            slots=mask.nonzero().flatten()
+            selected[slots[~usable]]=False
+            mask=mask.clone();mask[slots[~usable]]=False
+            probabilities=probabilities[usable]
+            if not len(probabilities):continue
+            lo,hi=cfg['push_phase'];late=(tm/lib._motion_lengths[mid])>lo+.5*(hi-lo)
+            late_sum=probabilities[:,late].sum(-1,keepdim=True)
+            early_sum=probabilities[:,~late].sum(-1,keepdim=True)
+            both=(late_sum>0)&(early_sum>0)
+            weighted=torch.where(late[None,:],probabilities/late_sum.clamp_min(1e-12)*cfg['late_fraction'],probabilities/early_sum.clamp_min(1e-12)*(1-cfg['late_fraction']))
+            probabilities=torch.where(both,weighted,probabilities)
+            indices=torch.multinomial(probabilities,1).squeeze(-1)
+
         if skill=='doorOpen':
-            want_early=torch.rand(size,device=dev)<cfg['door_early_fraction']
+            want_early=(torch.rand(size,device=dev)<cfg['door_early_fraction']) & early_safe.any()
             # Sample the pose from the small-angle-compatible pool FIRST.
             # Angle rejection must not bias the requested mixture toward wide-open starts.
             early_weights=weights*early_safe
@@ -248,9 +281,10 @@ def align_task_reference(task,env_ids,tasks,selected,refroot,body,unheading,newr
         tangent=torch.stack([-normal[:,1],normal[:,0]],-1)
         reach=(rh[...,:2]*normal[:,None,:]).sum(-1).max(-1).values
         sideways=(rh[...,:2]*tangent[:,None,:]).sum(-1).mean(-1)
-        output[push,:2]=boxes[push,:2]-normal*(reach+task._box_size[0]/2+cfg['push_hand_radius']+cfg['push_surface_gap'])[:,None]-tangent*sideways[:,None]
+        output[push,:2]=boxes[push,:2]-normal*(reach+task._box_sizes[env_ids].reshape(-1,3)[push,0]/2+cfg['push_hand_radius']+cfg['push_surface_gap'])[:,None]-tangent*sideways[:,None]
         low,high=cfg['push_remaining'];distance=low+torch.rand(len(yaw),device=task.device)*(high-low)
-        goal_yaw=boxyaw+torch.deg2rad((torch.rand(len(yaw),device=task.device)*2-1)*20)
+        low,high=cfg.get('push_goal_yaw_degrees',[-20.,20.])
+        goal_yaw=boxyaw+torch.deg2rad(low+torch.rand(len(yaw),device=task.device)*(high-low))
         goals[push,:2]=boxes[push,:2]+distance[:,None]*torch.stack([torch.cos(goal_yaw),torch.sin(goal_yaw)],-1)
     if door.any():
         angles,qs,origins,safe=safe_door_candidates(task,refroot[door],body[door],

@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, door_motion_hand, door_open_amp_phase, door_amp_family, push_hand_alignment, nearest_door_hand_on_entry)
+                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, rotate_push_layout, door_motion_hand, door_open_amp_phase, door_amp_family, push_hand_alignment, push_relation_rewards, nearest_door_hand_on_entry)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -17,7 +17,7 @@ from tokenhsi.utils.door_asset import DoorSpec
 
 
 class HumanoidMAPushDoor(HumanoidMA):
-    REWARD_TERM_NAMES = ('push_progress', 'push_settled', 'door_progress', 'door_hold', 'success_bonus', 'door_approach', 'door_closing', 'push_hands', 'total')
+    REWARD_TERM_NAMES = ('push_progress', 'push_settled', 'door_progress', 'door_hold', 'success_bonus', 'door_approach', 'door_closing', 'push_hands', 'push_hand_state', 'push_hand_progress', 'push_hand_result', 'at_state', 'at_progress', 'at_result', 'total')
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self.num_objects = cfg['env']['numObjects']
@@ -35,6 +35,30 @@ class HumanoidMAPushDoor(HumanoidMA):
             self._amp_label_count=6
         self._enable_task_obs = True
         self._mode = 'test' if cfg['args'].test or cfg['args'].eval else 'train'
+        self._initial_task_start = getattr(cfg['args'], 'initial_task_start', False)
+        if self._initial_task_start and self._mode == 'train':
+            raise ValueError('--initial_task_start is only supported for evaluation/preview')
+        requested_hand=getattr(cfg['args'],'door_rsi_hand','auto')
+        if requested_hand not in ('auto','left','right'):
+            raise ValueError('--door_rsi_hand must be auto/left/right')
+        self._door_rsi_hand={'auto':None,'right':0,'left':1}[requested_hand]
+        if self._door_rsi_hand is not None:
+            if self._mode=='train' or self._initial_task_start:
+                raise ValueError('--door_rsi_hand requires evaluation with task RSI enabled')
+            if 'task_rsi' not in self._interaction:
+                raise ValueError('--door_rsi_hand requires a task RSI configuration')
+            print('[viewer] DOOR RSI contact hand:',requested_hand,flush=True)
+        lo=getattr(cfg['args'],'door_start_min',0.)
+        hi=getattr(cfg['args'],'door_start_max',0.)
+        self._door_start_distance=(lo,hi) if lo != 0. or hi != 0. else None
+        if self._door_start_distance is not None:
+            lo,hi=self._door_start_distance
+            if not self._initial_task_start or not all(math.isfinite(v) for v in (lo,hi)) or not .5 <= lo <= hi:
+                raise ValueError('--door_start_min/--door_start_max requires evaluation --initial_task_start and 0.5 <= min <= max')
+            if cfg['env'].get('startRandomization') is None:
+                raise ValueError('DOOR distance override requires startRandomization')
+        if self._initial_task_start:
+            print('[viewer] Initial approach starts: PUSH full target distance, DOOR closed, no task RSI',flush=True)
         self._task_preset = getattr(cfg['args'], 'task_graph', '') or 'random'
         if self._task_preset not in ('random', 'push', 'door', 'push_door', 'door_push'):
             raise ValueError('TASK_GRAPH must be random/push/door/push_door/door_push')
@@ -62,6 +86,9 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._elapsed = torch.zeros(N, M, device=self.device)
         self._done_task = torch.zeros_like(self._holding_phase)
         self._best_push = torch.zeros(N, M, device=self.device)
+        self._best_push_hand_quality = torch.zeros(N,M,device=self.device)
+        self._push_hand_elapsed = torch.zeros(N,M,device=self.device)
+        self._push_hand_achieved = torch.zeros(N,M,device=self.device,dtype=torch.bool)
         self._best_angle = torch.zeros(N, M, device=self.device)
         self._previous_door_angle = torch.zeros(N, M, device=self.device)
         self._best_hand_distance = torch.zeros(N, M, device=self.device)
@@ -74,6 +101,8 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._box_states = self._root_states.view(N, self.get_num_actors_per_env(), 13)[:, M:2*M]
         self._all_contacts = gymtorch.wrap_tensor(self.gym.acquire_net_contact_force_tensor(self.sim))
         self._box_actor_ids = self._humanoid_actor_ids + M
+        self._box_body_ids=torch.tensor([[self.gym.get_actor_rigid_body_index(env,actor,0,gymapi.DOMAIN_SIM)
+            for actor in handles] for env,handles in zip(self.envs,self._box_handles)],device=self.device,dtype=torch.long)
         self._door_state_view = self._dof_state.view(N, self._dofs_per_env, 2)[:, M*self.num_dof:]
         self._interaction_checkpoint_metadata = interaction_metadata(cfg['env'])
         self._validate_expert_windows()
@@ -96,21 +125,35 @@ class HumanoidMAPushDoor(HumanoidMA):
         options = gymapi.AssetOptions(); options.density = box['density']
         self._box_size = torch.tensor(box['size'], device=self.device)
         self._box_asset = self.gym.create_box(self.sim, *box['size'], options)
+        self._box_sizes=self._box_size.expand(num_envs,self.num_agents,3).clone()
+        self._box_mass=box['density']*math.prod(box['size'])
+        if box.get('size_range') is not None:
+            lo,hi=box['size_range']
+            side=lo+torch.rand(num_envs,self.num_agents,1,device=self.device)*(hi-lo)
+            self._box_sizes=side.expand(-1,-1,3).clone()
+        # Geometry is sampled once per actor before simulation initialization.
+        self._box_sizes_cpu=self._box_sizes.cpu().numpy()
+
         self._box_handles = []
         super()._create_envs(num_envs, spacing, num_per_row)
         # Isaac Gym state tensors use ENV-local coordinates; get_env_origin is
         # the viewer/world grid offset and must not be added to actor resets.
         self._env_origins.zero_()
         corners = torch.tensor([[x,y,z] for x in (-1,1) for y in (-1,1) for z in (-1,1)], device=self.device)
-        self._box_bps = corners * self._box_size / 2
+        self._box_bps = corners[None,None,:,:] * self._box_sizes[:,:,None,:] / 2
         self._door_bps = corners * torch.tensor([self._door_spec.thickness, self._door_spec.width, self._door_spec.height], device=self.device)/2
 
     def _build_env(self, env_id, env_ptr, humanoid_asset):
         super()._build_env(env_id, env_ptr, humanoid_asset)
         handles = []
         for owner in range(self.num_agents):
-            pose = gymapi.Transform(); pose.p = gymapi.Vec3(push_box_start_x(self._box_size,self._interaction['push']['target_distance'][1]), self._lane(owner), float(self._box_size[2]/2))
-            actor = self.gym.create_actor(env_ptr, self._box_asset, pose, 'push_box_{}'.format(owner), env_id, 0)
+            size=self._box_sizes_cpu[env_id,owner]
+            asset=self._box_asset
+            if self._interaction['push']['box'].get('size_range') is not None:
+                options=gymapi.AssetOptions();options.density=self._box_mass/float(size.prod())
+                asset=self.gym.create_box(self.sim,*map(float,size),options)
+            pose = gymapi.Transform(); pose.p = gymapi.Vec3(float(push_box_start_x(size,self._interaction['push']['target_distance'][1])), self._lane(owner), float(size[2]/2))
+            actor = self.gym.create_actor(env_ptr, asset, pose, 'push_box_{}'.format(owner), env_id, 0)
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, actor)
             for prop in props: prop.friction = self._interaction['push']['box']['friction']; prop.restitution=0.
             self.gym.set_actor_rigid_shape_properties(env_ptr, actor, props)
@@ -160,7 +203,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         box_inv = boxes[...,3:7].clone(); box_inv[..., :3] *= -1
         bv = quat_rotate(box_inv.reshape(-1,4), boxes[...,7:10].reshape(-1,3)).view(B,M,3)
         bw = quat_rotate(box_inv.reshape(-1,4), boxes[...,10:13].reshape(-1,3)).view(B,M,3)
-        box_nodes = torch.cat([bv,bw,self._box_bps.reshape(1,1,24).expand(B,M,-1),
+        box_nodes = torch.cat([bv,bw,self._box_bps[ids].reshape(B,M,24),
             torch.ones(B,M,1,device=self.device),torch.zeros(B,M,3,device=self.device)],-1)
         door_vel = torch.zeros(B,M,6,device=self.device); door_vel[...,5]=hinge_vel
         door_nodes = torch.cat([door_vel,self._door_bps.reshape(1,1,24).expand(B,M,-1),
@@ -200,10 +243,10 @@ class HumanoidMAPushDoor(HumanoidMA):
         lanes=torch.tensor([self._lane(a) for a in range(M)],device=self.device)
         origins=self._env_origins[env_ids,None,:]
         boxes[...,:3]=origins
-        box_start_x=push_box_start_x(self._box_size,self._interaction['push']['target_distance'][1])
+        box_start_x=push_box_start_x(self._box_sizes[env_ids],self._interaction['push']['target_distance'][1])
         boxes[...,0] += torch.where(tasks.bool(),-2.2,box_start_x)
         boxes[...,1] += lanes + tasks*.85
-        boxes[...,2] += self._box_size[2]/2+.005
+        boxes[...,2] += self._box_sizes[env_ids,...,2]/2+.005
         self._box_states[env_ids]=boxes
         target=boxes[...,:3].clone()
         low,high=self._interaction['push']['target_distance']
@@ -214,7 +257,10 @@ class HumanoidMAPushDoor(HumanoidMA):
         spawn = self.cfg['env'].get('startRandomization')
         spawn_yaw = torch.zeros(E,M,device=self.device)
         if spawn is not None:
-            boxes_xyz,target,human_xyz,spawn_yaw,box_yaw,shift = sample_start_layout(tasks,spawn,self._box_size,lanes)
+            spawn_config=spawn
+            if self._door_start_distance is not None:
+                spawn_config=dict(spawn,door_distance=self._door_start_distance)
+            boxes_xyz,target,human_xyz,spawn_yaw,box_yaw,shift = sample_start_layout(tasks,spawn_config,self._box_sizes[env_ids],lanes)
             boxes[...,:3] = boxes_xyz + origins
             boxes[...,3:7] = 0
             boxes[...,5] = torch.sin(box_yaw/2);boxes[...,6] = torch.cos(box_yaw/2)
@@ -227,7 +273,7 @@ class HumanoidMAPushDoor(HumanoidMA):
             door_root[...,:2] = shift + origins[...,:2]
             self._root_states[door_ids] = door_root
         if 'task_rsi' in self._interaction:
-            root_pos,root_rot,dof_pos,body_pos,body_rot,rsi_mask=sample_reference(self,tasks)
+            root_pos,root_rot,dof_pos,body_pos,body_rot,rsi_mask=sample_reference(self,tasks,env_ids)
         else:
             lib=self._motion_lib['loco']; mids=lib.sample_motions(E*M)
             times=torch.full((E*M,),self.dt*(self._num_amp_obs_steps-1),device=self.device)
@@ -235,7 +281,7 @@ class HumanoidMAPushDoor(HumanoidMA):
             body_pos,body_rot,_,_=lib.get_motion_state_max(mids,times)
         unheading=torch_utils.calc_heading_quat_inv(root_rot)
         new_root=origins.expand(E,M,3).clone()
-        push_gap=max(.65,float(torch.linalg.vector_norm(self._box_size[:2]/2))+.35)
+        push_gap=(torch.linalg.vector_norm(self._box_sizes[env_ids,...,:2]/2,dim=-1)+.35).clamp_min(.65)
         new_root[...,0]+=torch.where(tasks.bool(),-.65,box_start_x-push_gap)
         new_root[...,1]+=lanes-tasks*.36
         new_root[...,2]+=root_pos[:,2].view(E,M)
@@ -253,6 +299,14 @@ class HumanoidMAPushDoor(HumanoidMA):
             unheading = heading.reshape(-1,4)
         if 'task_rsi' in self._interaction:
             unheading,new_root=align_task_reference(self,env_ids,tasks,rsi_mask,root_pos,body_pos,unheading,new_root,root_rot,body_rot)
+        if self._interaction['push'].get('full_circle_start',False):
+            angles=(torch.rand(E,M,device=self.device)*2-1)*math.pi
+            boxes,goals,new_root,heading=rotate_push_layout(
+                self._box_states[env_ids],self._targets[env_ids],new_root,
+                unheading.reshape(E,M,4),tasks,angles)
+            self._box_states[env_ids]=boxes;self._targets[env_ids]=goals
+            self._best_push[env_ids]=-torch.linalg.vector_norm(boxes[...,:2]-goals[...,:2],dim=-1)
+            unheading=heading.reshape(-1,4)
         if self._amp_label_count>=5 and 'task_rsi' in self._interaction:
             bound=self._last_rsi_contact_hand
             self._door_amp_hand[env_ids]=torch.where(bound>=0,bound,self._door_amp_hand[env_ids])
@@ -280,6 +334,10 @@ class HumanoidMAPushDoor(HumanoidMA):
             reset_targets=self._dof_state[:,0].contiguous()
             humanoids=self._humanoid_actor_ids[env_ids].flatten().to(torch.int32).contiguous()
             self.gym.set_dof_position_target_tensor_indexed(self.sim,gymtorch.unwrap_tensor(reset_targets),gymtorch.unwrap_tensor(humanoids),len(humanoids))
+        if self._initial_task_start and not getattr(self,'_initial_start_logged',False):
+            distance=(self._box_states[env_ids,...,:2]-self._targets[env_ids,...,:2]).norm(dim=-1)
+            print('[initial start] tasks=',tasks.cpu().tolist(),'box_goal_distance_m=',distance.cpu().tolist(),'door_angle_deg=',torch.rad2deg(self._door_state_view[env_ids,...,0]).cpu().tolist(),flush=True)
+            self._initial_start_logged=True
         self.progress_buf[env_ids]=0;self.reset_buf[env_ids]=0;self._terminate_buf[self._flat_slot_ids(env_ids)]=0
         self._refresh_sim_tensors()
         self._compute_observations(env_ids)
@@ -300,6 +358,14 @@ class HumanoidMAPushDoor(HumanoidMA):
         reset_hands=self._kinematic[env_ids][:,:,self._key_body_ids[:2],:3]
         handles=torch.stack([handle,back],dim=2)
         self._best_hand_distance[env_ids]=(reset_hands[:,:,:,None,:]-handles[:,:,None,:,:]).norm(dim=-1).amin(dim=(-1,-2))
+        inverse=self._box_states[env_ids,...,3:7].clone();inverse[...,:3]*=-1
+        local_hands=quat_rotate(inverse[:,:,None,:].expand(-1,-1,2,-1).reshape(-1,4),
+            (reset_hands-self._box_states[env_ids][:,:,None,:3]).reshape(-1,3)).view(E,M,2,3)
+        local_direction=quat_rotate(inverse.reshape(-1,4),
+            (self._targets[env_ids]-self._box_states[env_ids,...,:3]).reshape(-1,3)).view(E,M,3)
+        if 'relation_rewards' in self._interaction['push']:
+            self._best_push_hand_quality[env_ids]=push_hand_alignment(local_hands,local_direction,self._box_sizes[env_ids]/2,self._interaction['push'])[0]
+        self._push_hand_elapsed[env_ids]=0;self._push_hand_achieved[env_ids]=False
         self._compute_amp_observations(env_ids)
         self._amp_obs_buf[env_ids]=self._amp_obs_buf[env_ids,:,0:1].expand(-1,-1,self._num_amp_obs_steps,-1)
 
@@ -310,7 +376,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._holding_phase=phase_update(self._holding_phase,angle,angle_target,math.radians(d['reopen_degrees'])) & self._tasks.bool()
         distance=torch.linalg.vector_norm(self._box_states[...,:2]-self._targets[...,:2],dim=-1)
         up=quat_rotate(self._box_states[...,3:7].reshape(-1,4),torch.tensor([0.,0.,1.],device=self.device).expand(self.num_envs*self.num_agents,3)).view(self.num_envs,self.num_agents,3)
-        corners=self._box_bps[None,None,:,:].expand(self.num_envs,self.num_agents,-1,-1)
+        corners=self._box_bps
         rotations=self._box_states[...,3:7,None].transpose(-1,-2).expand(-1,-1,8,-1)
         rotated=quat_rotate(rotations.reshape(-1,4),corners.reshape(-1,3)).view(self.num_envs,self.num_agents,8,3)
         bottom=self._box_states[...,2]+rotated[...,2].min(-1).values
@@ -320,16 +386,19 @@ class HumanoidMAPushDoor(HumanoidMA):
         push_valid=(distance<p['goal_tolerance']) & (torch.linalg.vector_norm(self._box_states[...,7:10],dim=-1)<p['settle_speed']) & upright & grounded
         hands=self._rigid_body_pos[:,:,self._key_body_ids[:2]]
         push_hands=torch.zeros_like(push_progress)
-        if 'hand_reward_weight' in p:
+        split=p.get('relation_rewards')
+        quality=torch.zeros_like(push_progress)
+        if 'hand_reward_weight' in p or split is not None:
             inverse=self._box_states[...,3:7].clone();inverse[...,:3]*=-1
             local_hands=quat_rotate(inverse[:,:,None,:].expand(-1,-1,2,-1).reshape(-1,4),
                 (hands-self._box_states[:,:,None,:3]).reshape(-1,3)).view(self.num_envs,self.num_agents,2,3)
             local_direction=quat_rotate(inverse.reshape(-1,4),
                 (self._targets-self._box_states[...,:3]).reshape(-1,3)).view(self.num_envs,self.num_agents,3)
-            quality,_=push_hand_alignment(local_hands,local_direction,self._box_size/2,p)
+            quality,_=push_hand_alignment(local_hands,local_direction,self._box_sizes/2,p)
             # Additional hand term only; original progress is unchanged.
             # No bonus for stationary hand placement away from the goal.
-            push_hands=p['hand_reward_weight']*quality*(push_progress+push_valid.float())
+            if split is None:
+                push_hands=p['hand_reward_weight']*quality*(push_progress+push_valid.float())
         # Net forces alone cannot identify collision pairs. Require near-handle hands
         # and simultaneous forces on that same hand and handle link.
         hand_force=torch.linalg.vector_norm(self._contact_forces[:,:,self._key_body_ids[:2]],dim=-1)
@@ -361,9 +430,24 @@ class HumanoidMAPushDoor(HumanoidMA):
         duration=torch.where(self._tasks.bool(),d['hold_seconds'],p['settle_seconds'])
         self._elapsed,self._done_task,first=advance_success(valid,self._elapsed,self._done_task,self.dt,duration)
         push=(self._tasks==0).float();door=1-push
+        split_terms=torch.zeros(*push.shape,6,device=self.device)
+        if split is not None:
+            # Pair proxy: both hands near the pushing face and both hands plus box
+            # carrying contact force. Net forces cannot establish exact pairs.
+            force=(hand_force>split['contact_force']).all(-1)
+            box_force=torch.linalg.vector_norm(self._all_contacts[self._box_body_ids],dim=-1)
+            contact_threshold=math.exp(-(split['hand_contact_distance']/p['hand_distance_scale'])**2)
+            push_contact=(quality>=contact_threshold) & force & (box_force>split['contact_force']) & self._tasks.eq(0)
+            split_terms,self._best_push_hand_quality,self._push_hand_elapsed,self._push_hand_achieved=push_relation_rewards(
+                quality,push_contact,distance,grounded & upright,push_progress,first & self._tasks.eq(0),
+                self._best_push_hand_quality,self._push_hand_elapsed,self._push_hand_achieved,self.dt,split)
+            split_terms*=push[...,None]
         terms=torch.stack([c['progress_weight']*push_progress*push,c['maintain_weight']*push_valid*push,
             c['progress_weight']*door_progress*door,c['maintain_weight']*door_valid*door,
             c['success_weight']*first,d['approach_weight']*approach*door,-d['closing_weight']*closing*door,push_hands*push],-1)
+        if split is not None:
+            terms[...,0]=0;terms[...,1]=0;terms[...,4]*=door
+        terms=torch.cat([terms,split_terms],-1)
         total=terms.sum(-1)
         if self.cfg['env'].get('agentCollisionPenalty', False):
             collision = -self.cfg['env'].get('agentCollisionCoeff', .5) * compute_agent_collision_penalty(
@@ -381,6 +465,9 @@ class HumanoidMAPushDoor(HumanoidMA):
             'door_handle_contact_fraction':(contact*door).sum()/door.sum().clamp_min(1),
             'push_success':(self._done_task*push).sum()/push.sum().clamp_min(1),
             'door_success':(self._done_task*door).sum()/door.sum().clamp_min(1)}
+        if split is not None:
+            self._diagnostics['push_hand_contact_fraction']=(push_contact*push).sum()/push.sum().clamp_min(1)
+            self._diagnostics['push_hand_quality']=(quality*push).sum()/push.sum().clamp_min(1)
 
     def _family(self, env_ids=None):
         ids=slice(None) if env_ids is None else env_ids
@@ -439,6 +526,43 @@ class HumanoidMAPushDoor(HumanoidMA):
             labels=F.one_hot(torch.full((len(obs),),uid,device=self.device),self._amp_label_count).float()
             result[inds]=torch.cat([obs,labels],-1).view(len(inds),-1)
         return result
+
+    def render(self, sync_frame_time=False):
+        if self.viewer is not None:
+            import numpy as np
+            self.gym.clear_lines(self.viewer)
+            targets=self._targets.detach().cpu().numpy()
+            boxes=self._box_states.detach().cpu().numpy()
+            tasks=self._tasks.detach().cpu().numpy()
+            radius=self._interaction['push']['goal_tolerance']
+            sizes=self._box_sizes.detach().cpu().numpy()
+            for env_id, env in enumerate(self.envs):
+                segments=[]
+                for owner in range(self.num_agents):
+                    if tasks[env_id,owner]!=0:continue
+                    x,y=targets[env_id,owner,:2];z=.035
+                    half=sizes[env_id,owner,:2]/2
+                    # Ground ring = successful box-center tolerance; square = box footprint.
+                    theta=np.linspace(0,2*math.pi,33)
+                    ring=np.stack([x+radius*np.cos(theta),y+radius*np.sin(theta),np.full_like(theta,z)],axis=-1)
+                    segments.extend(zip(ring[:-1],ring[1:]))
+                    q=boxes[env_id,owner,3:7]
+                    yaw=math.atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2]))
+                    rotation=np.array([[math.cos(yaw),-math.sin(yaw)],[math.sin(yaw),math.cos(yaw)]])
+                    corners=np.array([[-half[0],-half[1]],[half[0],-half[1]],[half[0],half[1]],[-half[0],half[1]],[-half[0],-half[1]]])@rotation.T
+                    corners=np.column_stack([corners+np.array([x,y]),np.full(5,z)])
+                    segments.extend(zip(corners[:-1],corners[1:]))
+                    # Tall flag remains visible when the box overlaps the ground marker.
+                    top=float(sizes[env_id,owner,2])+0.3
+                    segments.extend([([x,y,z],[x,y,top]),([x,y,top],[x+.25,y,top]),([x+.25,y,top],[x,y,top-.15])])
+                    start=np.array([*boxes[env_id,owner,:2],z]);end=np.array([x,y,z])
+                    for t in np.arange(0,1,.1):
+                        segments.append((start+(end-start)*t,start+(end-start)*min(t+.05,1)))
+                if segments:
+                    vertices=np.asarray(segments,dtype=np.float32)
+                    colors=np.tile(np.array([1.,.8,.05],dtype=np.float32),(len(segments),1))
+                    self.gym.add_lines(self.viewer,env,len(segments),vertices,colors)
+        super().render(sync_frame_time)
 
     def post_physics_step(self):
         self.progress_buf+=1;self._refresh_sim_tensors()

@@ -669,3 +669,37 @@ BOX_SIZE= CFG_ENV=output/push_door_stage1_task_rsi/PushDoorStage1TaskRSI_08-12-1
 
 
 현재 TaskRSI는 `amp.door_hand_selection: nearest_on_entry_v1`을 사용한다. loco→door 근거리 진입 시 앞/뒤 손잡이에 가까운 손을 선택하고 근거리 동안 유지한다. 실제 접촉 시 실제 손이 우선하며, RSI 모션 손 바인딩은 유지한다. 원거리로 나갔다 다시 접근하면 재선택한다. 새 학습부터 적용되며 기존 checkpoint view는 저장 설정을 사용한다.
+
+PUSH checkpoint viewer는 목표에 노란 깃발·성공 반경 링·상자 크기 바닥 윤곽과 상자→목표 점선을 표시한다. 링은 상자 중심 목표 오차(goal_tolerance)의 범위이며 윤곽은 크기 참고용이다(목표 yaw 맞추기 조건 아님). PUSH slot에만 표시하며 viewer의 선으로 그려 충돌/관측/보상/체크포인트 계약을 바꾸지 않는다.
+
+체크포인트 viewer에서 `START_FROM_INITIAL=1 TASK_GRAPH=push_door`를 사용하면 매 reset마다 PUSH/DOOR 한 명씩 접근 자세로 시작한다. 과제 RSI를 평가에서만 건너뛰므로 PUSH는 일반 target_distance 전체 거리, DOOR는0° 닫힌 상태다. 학습/config/checkpoint 계약을 바꾸지 않는다. 현재 config가 체크포인트와 달라졌다면 `CFG_ENV=<해당 run>/relation_config.yaml`로 당시 저장 설정을 지정한다.
+
+초기 상태 checkpoint viewer에서 DOOR를 더 멀리서 시작하려면 `START_FROM_INITIAL=1 DOOR_START_MIN=2.5 DOOR_START_MAX=3.5`를 사용한다. 평가용 `--door_start_min min --door_start_max max`로 접근 거리만 덮어쓰며 config/checkpoint 계약과 학습 분포는 변경하지 않는다. 좌우 랜덤화와 문을 향한 yaw 랜덤화는 유지한다.
+
+
+가변 상자 PUSH 실험: `push_door_stage1_task_rsi_variable_box.yaml`을 선택한다. 일반 시작과 RSI 시작 모두 남은 목표거리 2~4m, 상자는 각 환경/agent마다 한 변 0.9~1.4m의 정육면체를 균등 샘플링한다. 크기는 시뮬레이터 생성 때 정하고 reset 동안 유지한다. 크기별 밀도를 조절해 질량은 30kg, 마찰은 0.5로 유지한다. 관측의 상자 꼭짓점, 초기 높이, 손 정렬과 보상은 실제 크기를 사용한다. 작은 상자 위로 손이 지나가는 RSI 자세는 제외하며 맞는 자세가 없으면 접근 자세로 시작한다. `BOX_SIZE`를 지정하면 랜덤 크기 대신 해당 고정 크기를 사용한다. 별도 출력 경로에서 새로 학습하고 view는 해당 run의 저장 설정을 사용한다.
+
+```bash
+BOX_SIZE= CFG_ENV=tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi_variable_box.yaml \
+OUTPUT_PATH=output/push_door_variable_box \
+bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_task_rsi_train.sh
+```
+
+서버에서는 `.local/run.sh` 없이 같은 환경변수로 공유 train 스크립트를 실행한다. 기존 기본 설정은 그대로 유지된다.
+
+가변 상자 실험의 목표 방향은 일반 시작 기준 전방 ±60°, RSI는 상자 yaw 기준 ±60°로 샘플링한다. 목표거리 2~4m는 유지한다. RSI 방향 범위는 `interaction.task_rsi.push_goal_yaw_degrees`, 일반 시작은 `startRandomization.target_yaw_degrees`로 조절한다. 기존 설정에 RSI 방향 범위가 없으면 ±20°를 유지한다.
+
+가변 상자 실험은 `interaction.push.full_circle_start: true`로 RSI 정렬 후 PUSH 상자/goal/agent 초기 자세를 상자 중심으로 함께 360° 균등 회전한다. 세계 좌표 목표 방향은 전 방향으로 샘플링하며 거리 2~4m와 손 표면 정렬은 유지한다. 서로의 경로가 겹치지 않도록 lane_spacing=12m, envSpacing=26m를 사용한다. DOOR 배치와 초기 자세는 이 회전에서 제외한다. 학습 중 충돌을 막는 물리 제약은 아니며 초기 배치의 분리를 위한 설정이다.
+
+DOOR 손별 RSI checkpoint view: `HEADLESS=0 START_FROM_INITIAL=0 TASK_GRAPH=door DOOR_HAND=left` 또는 `right`를 공유 task_rsi_test.sh에 전달한다. 모든 DOOR slot은 지정 손이 붙은 모션 기반 RSI에서 시작하며 문틀 clearance 검사는 유지한다. 기존 run의 `CFG_ENV=<run>/relation_config.yaml`, `BOX_SIZE=`를 사용한다. 초기 접촉 손만 지정하며 이후 policy 행동을 강제하지 않는다. 평가용 `--door_rsi_hand` 옵션이라 학습 설정/체크포인트 계약은 변경하지 않는다.
+
+손별 평가에서 지정 손에 안전한 작은-angle RSI 후보가 없으면 작은-angle 비중을 강제하지 않고 안전한 전체 각도 후보로 시작한다. 기존 08-20 체크포인트 설정은 오른손 후보가 이에 해당한다.
+
+현재 PUSH 상자 마찰 계수는 fixed/random_start/task_rsi/variable_box 공통 0.5이다. 바닥 정지·운동 마찰 1.0과 상자 질량 30kg은 유지한다. 상자 전체 표면에 적용되므로 손 접촉에도 적용된다. 새 실행부터 적용되며 기존 checkpoint view는 저장된 relation_config.yaml의 당시 마찰을 사용한다.
+
+PUSH/DOOR 학습 그래프는 `relationGraph.semantic_relations: true`로 명시적 관계를 사용한다: agent↔box PUSH(11), box↔goal AT(7), agent↔door 및 door↔goal DOOR_OPEN(12)/DOOR_HOLD(13). 문 유지 단계에 따라 관계가 전환되며 edge_mlp attention bias의 embedding은 14개 타입을 지원한다. 기존 PUSH/DOOR 보상과 AMP는 유지한다. 새 관계는 체크포인트 계약에 기록되므로 새로 학습한다. 기존 run의 저장 config에 semantic_relations가 없으면 기존 ID3/5 및 embedding 크기를 사용해 view 호환성을 유지한다.
+
+
+PUSH 보상은 `interaction.push.relation_rewards.version: push_at_state_progress_result_v1`로 분리한다. PUSH(손–상자)는 state=두 손 정렬 점수×0.05, progress=정렬 점수가 reset 이후 최고 기록을 갱신한 양×0.15, result=두 손 정렬 오차 6cm 이내와 두 손/상자 접촉력 0.5N 이상을 0.15초 유지했을 때 episode당 최초 0.1이다. 접촉력은 net-force 기반 근접 proxy이며 정확한 충돌 pair 판정은 아니다. 정렬 점수는 두 손 중 나쁜 쪽을 사용한다.
+AT(상자–goal)는 state=exp(-(수평 거리/0.5m)^2)×0.3, progress=목표까지 거리가 최고 기록보다 줄어든 양×0.4(두 손 접촉 조건 필요), result=목표 오차 15cm/속도 0.15m/s 조건을 0.5초 유지한 최초 성공×0.2이다. 손을 떼어도 안정적으로 도착하면 AT result를 받을 수 있다. 기존 upright/ground 조건을 state/progress 및 성공 조건에 유지한다. 손이 없는 동안의 상자 이동 기록도 소비해서 나중에 접촉해 이전 이동의 progress를 받는 것을 방지한다.
+기존 push_progress/push_settled/push_hands 및 PUSH success_bonus는 새 보상과 중복 합산하지 않는다. 로그에 push_hand_state/push_hand_progress/push_hand_result/at_state/at_progress/at_result를 따로 기록한다. state는 매 step 보상, progress는 최고 기록 개선, result는 최초 성공 보상이다. HOLDING+AT의 관계별 분리 구조를 참고했지만 거리 기반 progress와 반복 성공 보상을 그대로 복사하지 않았다. 기존 DOOR 보상·AMP·관측은 유지하며 새 계약으로 처음부터 학습한다. 구형 저장 설정에는 relation_rewards가 없으므로 기존 보상을 사용한다.

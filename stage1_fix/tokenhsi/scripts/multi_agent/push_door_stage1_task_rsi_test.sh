@@ -6,6 +6,11 @@ export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
 if [ "${HEADLESS:-1}" = 0 ]; then . "$(dirname "$0")/gui_gpu_env.sh"; fi
 . "$(dirname "$0")/runtime_env.sh"
 args=()
+if [ -n "${DOOR_HAND:-}" ]; then args+=(--door_rsi_hand "$DOOR_HAND"); fi
+if [ -n "${DOOR_START_MIN:-}${DOOR_START_MAX:-}" ]; then
+    args+=(--door_start_min "${DOOR_START_MIN:-2.5}" --door_start_max "${DOOR_START_MAX:-3.5}")
+fi
+if [ "${START_FROM_INITIAL:-0}" = 1 ]; then args+=(--initial_task_start); fi
 if [ -n "${BOX_SIZE:-}" ]; then args+=(--push_box_size "$BOX_SIZE"); fi
 if [ "${HEADLESS:-1}" != 0 ]; then args+=(--headless); fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then args+=(--episode_length "$EPISODE_LENGTH"); fi
