@@ -15,6 +15,10 @@ def run_edge_context_eval(player):
     results = {}
     for repeat in range(task.cfg['args'].eval_repeats):
         obs = player.env_reset(); player.get_batch_size(obs['obs'], 1)
+        order = None
+        if getattr(task.cfg['args'], 'before_follower_near', False):
+            from env.tasks.multi_agent.before_viewer import BeforeOrder
+            order = BeforeOrder(graph, task._before_families)
         alive = torch.ones(N, dtype=torch.bool, device=player.device)
         final = torch.zeros(N, M, dtype=torch.bool, device=player.device)
         ever = torch.zeros_like(final)
@@ -24,10 +28,12 @@ def run_edge_context_eval(player):
         edge_valid = batched(graph.edge_valid, N).clone()
         edge_relation = batched(graph.edge_relation, N).clone()
         terminated = torch.zeros_like(alive); resets = []
-        for _ in range(task.max_episode_length + 1):
+        for step in range(task.max_episode_length + 1):
             obs = player.env_reset(resets)
             action = player.get_action(obs, player.is_determenistic)
             obs, _, done, info = player.env_step(player.env, action)
+            if order is not None:
+                order.update(task.relation_runtime.last_result, (step + 1)*task.dt, alive)
             current = task.relation_runtime.done
             scene = scene_success(task.relation_runtime.own_success, graph)
             ever |= current & alive[:, None]; ever_scene |= scene & alive
@@ -48,6 +54,8 @@ def run_edge_context_eval(player):
             final_scene_goal_success=final_scene.float().mean().item(), ever_scene_goal_success=ever_scene.float().mean().item(),
             final_edge_own_success={name: (final_edges & edge_valid & (edge_relation == rel)).sum().item() / max(1, (edge_valid & (edge_relation == rel)).sum().item()) for rel,name in ([(6,'holding'),(7,'at'),(8,'ontop'),(9,'sit'),(10,'climb')] if getattr(task,'_edge_interaction',False) else [(6,'holding'),(7,'at'),(8,'ontop')])} if getattr(task,'_edge_ontop',False) else dict(zip(graph.ids,final_edges.float().mean(0).tolist())),
             scene_termination_rate=terminated.float().mean().item())
+        if order is not None:
+            metrics['before_order'] = order.report()
         results['repeat_' + str(repeat)] = metrics
         print('[edge context evaluation]', metrics, flush=True)
     directory = os.path.join(task.cfg['args'].output_path, 'metrics'); os.makedirs(directory, exist_ok=True)

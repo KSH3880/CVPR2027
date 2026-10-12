@@ -13,6 +13,7 @@ NUM_ENVS=${3:-16}
 NUM_OBJECTS=${4:-4}
 NUM_REPEATS=${5:-3}
 set -- --task_graph "${TASK_GRAPH:-before_climb}" --task_camera "${TASK_CAMERA:-stack}"
+if [ "${BEFORE_FOLLOWER_NEAR:-0}" = 1 ]; then set -- "$@" --before_follower_near; fi
 if [ -n "${RELATION_GRAPH:-}" ]; then set -- "$@" --relation_graph "$RELATION_GRAPH"; fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then set -- "$@" --episode_length "$EPISODE_LENGTH"; fi
 if [ -n "${SEED:-}" ]; then set -- "$@" --seed "$SEED"; fi

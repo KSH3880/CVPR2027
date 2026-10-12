@@ -2,6 +2,28 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-11
+
+### BEFORE 전체 gate·CA4·Stage1 distill32000 연결
+
+- 승인된 후행 goal 전체 gate를 `approach_stage2_before_allgate_ca4_task_embedding` env/train YAML·train/test/VNC·output으로 분리했다. SIT/CLIMB/ON_TOP의 state/progress/success·포화는 현재 AT 성공 조건을 따르고, 자기 HOLDING·AMP·RSI·80/20 분포·공통 크기·CPA는 유지한다. 보상 계약이 달라 기존 BEFORE checkpoint resume/eval을 구분한다.
+- 공동운반 CA4와 같은 residual attention/LayerNorm/FFN128 block4개를 연결하며 기존 CA1 parameter 경로는 보존했다. 기본 source는 `stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingDistill_00032000.pth`, GPU는4다.
+- CPU31개·셸 문법·diff 검사를 통과했다. GPU4·2048환경 짧은 학습에서 epoch2 저장·encoder69개/관찰 RMS6개 불변·네 CA block의 NONE/SELF/BEFORE bias 갱신/COUPLED0·head/critic/discriminator 갱신·model/scalar182종364값 finite를 확인했다. 결과는 `output/approach_stage2_before_allgate_ca4_task_embedding_check/saved_check.json`이다.
+- 저장 모델의16환경32-step 근접 랜덤 평가2회(총32장면, BEFORE climb13/sit7/stack5·독립7)가 정상 종료됐다. 실제 로그에서 AT 미충족 dependent goal4개의 양수 raw progress가 state/progress/success 보상0으로 차단됨을 확인했다. 결과는 `output/approach_stage2_before_allgate_ca4_task_embedding_eval_check/verification.json`이다. 기존 학습은 유지했고 새 본학습은 실행하지 않았다. 장기 순서 학습 개선·실제 VNC 화면·합성 RSI 안정성 보완은 미검증이다.
+
+## 2026-10-10
+
+### BEFORE 후행 근접 평가 옵션·실제 완료 순서 기록
+
+- `BEFORE_FOLLOWER_NEAR=1`/`--before_follower_near` 평가 옵션을 추가했다. SIT/CLIMB은 파랑을 공유 상자0.8m·연두를2m 거리에, STACK은 자기 상자/공유 받침을1.1m 간격으로 두고 파랑을 자기 상자0.8m 거리에 배치한다. AT 목표는1.5m 떨어뜨리며 loco 자세·초기 속도0만 허용한다. 독립 장면·옵션 미사용 배치·학습/보상/CPA/checkpoint 계약은 유지한다.
+- terminal `[BEFORE order]`와 평가 JSON `before_order`에 AT·gate 없는 실제 후행·gated 후행의 최초 성공 시점과 early/same_step/after_at/incomplete·gate-off 완료 여부를 기록한다. 같은 control step 내부 순서는 구분하지 않는다.
+- CPU19개·셸 문법·diff 검사 통과. GPU6·16환경에서 BEFORE 배치82개의 선행/후행 성공 초기0·거리·부분 reset11회 상태 보존·36 control step finite를 확인했다. epoch500 모델의1환경128-step 평가20회(SIT7·STACK6·CLIMB4·독립3)에서 기록 생성·reward finite·비-loco 인자 거부를 확인했다. 실제 후행 조기 완료11건·미완료6건이므로 엄격한 순차 수행 성공으로 해석하지 않는다. 결과는 `output/approach_stage2_before_near_check/{layout_check,verification}.json`이다. 실제 VNC 화면은 미검증이다.
+
+### BEFORE 단일 환경 랜덤 평가 과제 재추첨
+
+- 1환경 `random_scenario` 뷰어가 CLIMB로 고정되던 문제를 수정했다. 평가 reset 대상만 독립20%·각 BEFORE80/3% 확률로 재배정한다. 학습의 고정2048환경 분할·명시적 평가 preset·상자 거리 배치·reward/checkpoint 계약은 유지한다.
+- CPU17개로 단일 환경 반복·부분 reset의 미선택 graph 보존·학습/고정 preset 유지를 확인했다. GPU6·epoch500 checkpoint·1환경32-step 평가40회에서 SIT13·CLIMB11·STACK7·독립9를 확인했고 기록 reward finite·실행 오류0이었다. 결과는 `output/approach_stage2_before_random_eval_check/verification.json`이다. 실제 VNC 화면은 미검증이며 기존 뷰어는 재실행해야 반영된다.
+
 ## 2026-10-09
 
 ### Mixed80 LocoAMP 공동 방향 보상 연결

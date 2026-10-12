@@ -9,7 +9,7 @@ import yaml
 from utils.before_spec import (environment_families, sample_graph, sample_sizes,
                                validate_env, family_probabilities)
 from utils.edge_context_spec import AT, HOLDING
-from utils.edge_ontop_spec import permute_graph
+from utils.edge_ontop_spec import permute_graph, select_graph
 from utils.edge_stage2_spec import classify_family
 from utils.task_role_spec import task_graph_packet
 from env.tasks.multi_agent.before_reward import BeforeRuntime
@@ -47,6 +47,52 @@ def test_sampling_sizes_families_and_partial_reset():
     assert torch.unique((sizes*20).round().reshape(-1, 3), dim=0).shape[0] == 27
     expected = torch.tensor([.65, .1, .25])*(410/2048) + torch.tensor([2., .5, .5])*(546/2048)
     torch.testing.assert_close(family_probabilities(family, 'random_scenario'), expected)
+
+
+def episode_sampler(n, evaluation, preset):
+    families = environment_families(n, 'cpu', preset)
+    return SimpleNamespace(_before=True, _stage2=True, _is_eval=evaluation,
+        _relation_graph_spec=SPEC, _task_graph_preset=preset, device='cpu',
+        _before_families=families, _edge_goal_owners=torch.zeros(n, 2, dtype=torch.bool),
+        _ontop_maintain_steps=torch.zeros(n, 4), _sampling_counts=torch.zeros(18),
+        relation_runtime=SimpleNamespace(graph=sample_graph(n, SPEC, preset=preset,
+                                                          families=families)))
+
+
+@pytest.mark.parametrize('n,selected', [(1, [0]), (8, [1, 6])])
+def test_random_evaluation_resamples_families_on_partial_reset(n, selected):
+    from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
+    torch.manual_seed(42)
+    task = episode_sampler(n, True, 'random_scenario')
+    ids = torch.tensor(selected)
+    untouched = torch.ones(n, dtype=torch.bool)
+    untouched[ids] = False
+    old_families = task._before_families.clone()
+    old_graph = deepcopy(task.relation_runtime.graph)
+    observed = set()
+    for _ in range(120):
+        SampledOnTopTaskMixin._sample_episode_graph(task, ids)
+        family = classify_family(task.relation_runtime.graph)
+        torch.testing.assert_close(family, task._before_families)
+        torch.testing.assert_close(family[untouched], old_families[untouched])
+        for name in ('edge_src', 'edge_dst', 'edge_owner', 'edge_relation', 'prereq_mask'):
+            torch.testing.assert_close(getattr(task.relation_runtime.graph, name)[untouched],
+                                       getattr(old_graph, name)[untouched])
+        observed.update(family[ids].tolist())
+    assert observed == {0, 1, 2, 3}
+
+
+@pytest.mark.parametrize('evaluation,preset', [(False, 'random_scenario'),
+    (True, 'before_climb'), (True, 'before_sit'), (True, 'before_stack'), (True, 'independent')])
+def test_training_and_explicit_evaluation_keep_families(evaluation, preset):
+    from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
+    task = episode_sampler(2048, evaluation, preset)
+    old = task._before_families.clone()
+    ids = torch.arange(0, 2048, 3)
+    for _ in range(3):
+        SampledOnTopTaskMixin._sample_episode_graph(task, ids)
+        torch.testing.assert_close(task._before_families, old)
+        torch.testing.assert_close(classify_family(task.relation_runtime.graph), old)
 
 
 def test_rsi_cache_uses_shared_source_and_support_sizes():

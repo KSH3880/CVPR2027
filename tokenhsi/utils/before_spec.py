@@ -14,6 +14,7 @@ TASK_PROBS = [0., .10, .25, .325, .325]
 CONTRACT = dict(gate='current_at_success', progress='always',
                 holding='always', saturation='gated_current_success',
                 collision={'mode': 'cpa', 'ttc_discount': .99})
+ALLGATE_CONTRACT = dict(CONTRACT, progress='current_at_success')
 
 
 def validate_sampler(spec, m=2, o=4):

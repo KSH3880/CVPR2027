@@ -9,6 +9,7 @@
 - 공동운반 방향 보상: [LocoAMP Align task CA](#stage2-mixed80-locoamp-align). 가장 먼 사람의 방향 점수를 공동 HOLDING 중 두 사람에게 공유.
 - 자세 보존 보행 AMP·CA ablation: [Mixed80 LocoAMP 비교](#stage2-mixed80-locoamp). 후진/옆걸음 reference 추가, CA 유지와 Stage1 64입력 head-only를 동일 조건으로 비교한다.
 - BEFORE 80%·독립 20%: [BEFORE task CA](#stage2-before-task-ca). 현재 AT prerequisite·Stage 1 과제별 RSI/AMP·공통 크기를 사용하는 별도 실험이다.
+- BEFORE 전체 gate·CA4: [Allgate CA4 task CA](#stage2-before-allgate-ca4-task-ca). 후행 goal의 state/progress/success를 현재 AT로 gate하고 Stage1 distill epoch32000에서 전이한다. GPU 기본값4.
 - 공동 80%·단독 20%: [Mixed80 task CA](#stage2-mixed80-task-ca). 고정 환경 분할, 단독 Stage 1 크기·RSI 재사용.
 - 공동운반 Stage 2: [Joint carry task CA](#stage2-joint-carry-task-ca). Frozen task embedding·공유 상자·opposite-anchor 보상·paired RSI를 사용하는 전용 실험이다.
 
@@ -76,6 +77,7 @@ TOKENHSI_GPU=5 bash -c '
 | Mixed80 LocoAMP Align CA | [approach_stage2_joint_carry_mixed80_locoamp_align_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_align_task_embedding.yaml) | LocoAMP CA 기반, 공동 HOLDING 중 가장 먼 사람의 방향 보상 공유 |
 | Mixed80 LocoAMP head-only | [approach_stage2_joint_carry_mixed80_locoamp_head_only.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_head_only.yaml) | 동일 AMP/reward/RSI, CA 없음·Stage1 64입력 head |
 | Stage 2 BEFORE | [approach_stage2_before_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_before_task_embedding.yaml) | BEFORE 80%·독립 20%, carry→climb/sit/stack·현재 AT gate·공통 크기 |
+| BEFORE Allgate CA4 | [approach_stage2_before_allgate_ca4_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_before_allgate_ca4_task_embedding.yaml) | 후행 state/progress/success 현재 AT gate, residual task CA4·FFN128, Stage1 distill32000 전이 |
 | 30 | [approach_scenario_stage1_sit_plane_normalized.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_sit_plane_normalized.yaml) | 28번 + SIT 상판 성공·유효 edge 평균 보상 |
 | 31 | [approach_scenario_stage1_skill_curriculum.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum.yaml) | 30번 + 가까운 시작·후반 CLIMB RSI·어려운 과제 증량·보상 shaping |
 | 32 | [approach_scenario_stage1_skill_curriculum_reward_preserved.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved.yaml) | 31번의 시작 상태·RSI·샘플링을 유지하고 state/progress는 30번 식 |
@@ -833,7 +835,7 @@ TOKENHSI_GPU=5 TASK_GRAPH=joint_carry_ontop EVAL_SKILLS=carryWith bash tokenhsi/
 
 `approach_stage2_before_task_embedding`은 COUPLED를 제외한 별도 env/train config·train/test/VNC·output이다. 네 과제 Stage 1 task embedding 또는 네 과제 distill checkpoint에서 전이한다. Carry-only source와 기존 공동운반 Stage 2 checkpoint의 직접 전이/resume/eval은 거부한다. 실행 연결은 확인했으나, 합성 RSI 초기 자세의 물리 안정성 검사는 일부 미통과 상태다(아래 검증 결과 참조).
 
-- 2명·2048환경·4물체. 환경 생성 시 BEFORE-climb/sit/stack 각546개·독립410개를 셔플 배정하고 부분 reset에도 그룹을 유지한다. 독립 과제는 agent별 sit/climb/carry_at/carry_ontop 10/25/32.5/32.5%다. 짧은 에피소드가 많은 그룹은 reset 횟수 기준 로그에서 더 자주 나타날 수 있으며 고정 환경 비율과 구분한다.
+- 2명·2048환경·4물체. 학습 환경 생성 시 BEFORE-climb/sit/stack 각546개·독립410개를 셔플 배정하고 부분 reset에도 그룹을 유지한다. 독립 과제는 agent별 sit/climb/carry_at/carry_ontop 10/25/32.5/32.5%다. 짧은 에피소드가 많은 그룹은 reset 횟수 기준 로그에서 더 자주 나타날 수 있으며 고정 환경 비율과 구분한다.
 - BEFORE는 A(H0)의 `carry_at(O0,G0)` 이후 B(H1)의 `climb(O0)`, `sit(O0)`, `carry_ontop(O1,O0)`다. 사람/entity·interaction 토큰 순서를 셔플하고 대응을 복원한다. 별도 역할 교환은 하지 않는다. NONE/SELF/COUPLED/BEFORE의 head별 bias 중 COUPLED는 사용하지 않는다. Actor encoder/task embedding·관찰 RMS 동결과 `[W,0]` head 확장을 유지한다.
 - A의 현재 AT geometry 성공만 prerequisite으로 사용한다. A가 손을 놓아도 AT가 성립하면 열린다. B의 dependent state/success와 성공 포화는 gate를 따르고 progress는 항상 적용한다. B의 자기 HOLDING은 항상 보상한다. Latch·강제 대기·행동 시작 순서 제약은 없다. 독립 scene의 보상은 Stage 1 자기 edge 합계다. Collision은 기존 CPA 계수0.5·거리0.7m·discount0.99를 사용한다.
 - 모든 물체는 X/Y 50–60cm·Z35–45cm의 각 축5cm 간격, 총27개 크기에서 샘플링한다. 밀도100을 유지한다. 크기는 asset 생성 시 고정하며 서로 다른 역할에 같은 허용 범위를 쓴다.
@@ -856,10 +858,51 @@ TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=before_climb bash tokenhsi/scripts/multi_ag
 TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=before_stack bash tokenhsi/scripts/multi_agent/approach_stage2_before_task_embedding_test.sh "$CKPT" 2 16 4 3
 # 서버 VNC
 TOKENHSI_GPU=5 TASK_GRAPH=before_sit bash tokenhsi/scripts/multi_agent/approach_stage2_before_task_embedding_vnc.sh "$CKPT" 2 1 4 10
+# 서버 VNC: reset마다 과제 종류 재추첨
+TOKENHSI_GPU=5 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_stage2_before_task_embedding_vnc.sh "$CKPT" 2 1 4 10
+# 파란 후행을 상자 가까이에 배치하고 완료 순서 기록
+BEFORE_FOLLOWER_NEAR=1 TOKENHSI_GPU=5 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_stage2_before_task_embedding_vnc.sh "$CKPT" 2 1 4 10
 ```
 
-평가 preset은 `before_climb`, `before_sit`, `before_stack`, `independent`, `sit`, `climb`, `carry_at`, `carry_ontop`, `random_scenario`다. 기본은 두 사람 loco 시작이다. `EPISODE_LENGTH`와 `EVAL_SKILLS`/`EVAL_SKILL_PROBS`를 지원하며, skill 목록에서 각 agent 과제에 적합한 항목만 샘플링하며, 어느 한쪽에 가능한 항목이 없으면 오류를 낸다. GPU 기본값은 wrapper 전체에서5이며 `TOKENHSI_GPU`로 한 번 덮어쓸 수 있다.
+평가 preset은 `before_climb`, `before_sit`, `before_stack`, `independent`, `sit`, `climb`, `carry_at`, `carry_ontop`, `random_scenario`다. 평가의 `random_scenario`는 선택된 환경의 매 reset마다 독립20%·각 BEFORE80/3% 확률로 과제 종류를 다시 뽑는다. 따라서 1환경 뷰어에서도 climb/sit/stack/독립이 바뀌며, 짧은 실행에서 모든 종류가 나오거나 정확한80/20 비율이 맞는 것은 보장하지 않는다. 나머지 명시적 preset과 학습의 고정 환경 분할은 유지한다. 기본은 두 사람 loco 시작이다. `EPISODE_LENGTH`와 `EVAL_SKILLS`/`EVAL_SKILL_PROBS`를 지원하며, skill 목록에서 각 agent 과제에 적합한 항목만 샘플링하며, 어느 한쪽에 가능한 항목이 없으면 오류를 낸다. GPU 기본값은 wrapper 전체에서5이며 `TOKENHSI_GPU`로 한 번 덮어쓸 수 있다.
+
+`BEFORE_FOLLOWER_NEAR=1`은 평가 전용 CLI `--before_follower_near`를 전달한다. 두 사람은 loco 자세·초기 속도0으로 시작하며, 연두 H0은 노란 공유 상자에서2m, 파랑 H1은 SIT/CLIMB의 공유 상자에서0.8m 거리다. STACK은 파랑의 자기 상자를 공유 받침에서1.1m 떨어뜨리고 파랑을 자기 상자에서0.8m 거리에 둔다. 공유 상자의 AT 목표는1.5m 떨어진 위치라 선행 조건이 닫힌 상태로 시작한다. 독립 장면과 기본 평가 배치는 유지하며 다른 `EVAL_SKILLS`와 함께 쓰면 오류를 낸다. 학습 reward·CPA·checkpoint 계약은 바꾸지 않는다.
+
+옵션 사용 시 터미널 `[BEFORE order]`와 평가 JSON의 `before_order`에 최초 `at_seconds`, gate를 제외한 실제 후행 성공 `raw_b_seconds`, 보상상 후행 성공 `gated_b_seconds`를 기록한다. `order`는 `early`(AT보다 먼저 또는 AT 미완료), `same_step`, `after_at`, `incomplete`다. `raw_b_while_gate_closed`는 AT 미충족 상태에서 후행 동작이 완성된 적이 있는지 표시한다. 시간은 에피소드 시작 이후 초이며, 같은 control step의 내부 순서는 구분하지 않는다. 보상상 성공이 있어도 `early`이면 현재 AT gate가 엄격한 시간 순서를 보장하지 않은 사례다. 뷰어 화면의 별도 글자 표시는 추가하지 않는다.
+
+근접 옵션 검증: CPU19개·GPU6의16환경에서 BEFORE 배치82개·부분 reset11회·36 control step을 확인했다. epoch500 모델의1환경128-step 평가20회는 SIT7·STACK6·CLIMB4·독립3이며 기록 reward finite·순서 기록을 확인했다. 후행 조기 완료11건·미완료6건이 관측돼 이 결과를 순차 수행 성공으로 해석하면 안 된다. 결과는 [근접 배치 검증](../output/approach_stage2_before_near_check/layout_check.json), [완료 순서 검증](../output/approach_stage2_before_near_check/verification.json)이다. 다른 `EVAL_SKILLS`와 옵션을 함께 주는 경우 초기화 전에 거부하는 것도 확인했다.
+
+2026-10-10 랜덤 평가 수정 검증: CPU17개·GPU6의 epoch500 모델·1환경32-step 평가40회를 통과했다. reset별 SIT13·CLIMB11·STACK7·독립9, 기록 reward finite·실행 오류0을 확인했다. 단일 환경에서도 과제가 바뀌며, 부분 reset의 미선택 graph·학습 고정 그룹·명시적 평가 preset은 유지된다. 결과는 [랜덤 평가 검증](../output/approach_stage2_before_random_eval_check/verification.json)이다. 기존 VNC 뷰어에는 재실행 후 반영된다.
 
 2026-10-08 검증: 관련 CPU94개와 GPU5·2048환경 짧은 학습/epoch2 저장·epoch3 재개를 통과했다. Actor69개 tensor·관찰 RMS6개 불변, NONE/SELF/BEFORE bias 갱신·COUPLED0, scalar182종/364값 finite를 확인했다. 환경 분할은 독립410·각 BEFORE546이며 첫 reset의 RSI fallback은0이었다. AMP family/demo 대응·reference history와 1024개 혼합/각32개 그룹 부분 reset에서 미선택 상태 보존을 확인했다. 최종 모델의 BEFORE-climb에서 agent별 loco/climb reference 선택·16환경32-step headless 평가가 완료됐다. 초기 연결 모델의 나머지 sit/stack/독립 평가 경로도 각각16환경32-step으로 확인했다.
 
 **남은 제한:** 고정 PD target으로 초기 자세를0.1초 유지하는 별도 물리 진단은1575/2048개만 통과했다(473개 미통과, 최대 box 속도14.42m/s·변위1.21m). 따라서 코드의 geometry 재시도 실패0을 물리 안정성 통과로 해석하면 안 된다. 더 엄격한 단일-agent 캐시를 시험했지만 skill fallback이 증가했고 모든 장면을 안정화하지 못해 기본 설정에 적용하지 않았다. Stage 1 RSI 비율은 유지했으며 합성 초기화의 물리 안정성 보완은 남아 있다. 결과는 `output/approach_stage2_before_task_embedding_check_final/{saved_check,reset_check,resume_check}.json`; 본학습·장기 성능·VNC 화면은 미검증이다.
+
+<a id="stage2-before-allgate-ca4-task-ca"></a>
+## Stage 2 BEFORE 전체 gate·CA4 task CA
+
+`approach_stage2_before_allgate_ca4_task_embedding`은 위 BEFORE와 별도 env/train YAML·train/test/VNC·output을 사용한다. [train YAML](../tokenhsi/data/cfg/train/rlg/amp_ma_stage2_before_allgate_ca4_task_embedding.yaml)의 task CA는 residual attention·LayerNorm·FFN128을 가진4개 block이며, block마다 NONE/SELF/BEFORE bias를 학습한다. COUPLED는 사용하지 않는다. 기존 CA1 실행 경로는 유지한다.
+
+후행 SIT/CLIMB/ON_TOP goal edge에 현재 선행 AT geometry 성공 gate `g(t)`를 적용한다. `state'=g·state`, `progress'=g·progress`, `success'=g·success`이며 성공 포화도 gated success 기준이다. AT가 다시 깨지면 gate도 닫힌다. ON_TOP의 자기 HOLDING은 항상 보상하고 AMP는 gate와 독립이다. Latch·조기 실행 penalty·강제 행동 차단은 없으므로 실제 동작 시작 순서의 보장은 아니다.
+
+기본 source는 `stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingDistill_00032000.pth`, GPU는4다. Actor encoder/task embedding·관찰 RMS 동결 및64+64 action head의 `[W,0]` 초기화를 유지한다. RSI/AMP·고정 BEFORE80/독립20·공통 크기·CPA·배치는 위 BEFORE와 동일하다. 보상 계약이 다르므로 기존 CA1 BEFORE checkpoint의 resume/eval은 거부한다. 새 학습은 Stage1 source에서 시작하고 재개는 이 실험의 CA4 checkpoint만 사용한다.
+
+```bash
+# 본학습: 잔여 resume/짧은 학습 인자를 제거한다. source32000·GPU4는 스크립트 기본값이다.
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS TOKENHSI_GPU=4 OUTPUT_PATH=output/approach_stage2_before_allgate_ca4_task_embedding STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingDistill_00032000.pth bash tokenhsi/scripts/multi_agent/approach_stage2_before_allgate_ca4_task_embedding_train.sh 2 2048 4
+# 짧은 연결 확인: 본학습과 output을 분리한다.
+env -u RESUME_CHECKPOINT TOKENHSI_GPU=4 MAX_ITERATIONS=1 OUTPUT_PATH=output/approach_stage2_before_allgate_ca4_task_embedding_check bash tokenhsi/scripts/multi_agent/approach_stage2_before_allgate_ca4_task_embedding_train.sh 2 2048 4
+# 같은 실험의 checkpoint에서 재개
+CKPT=/absolute/path/to/allgate_ca4_checkpoint.pth
+env -u MAX_ITERATIONS TOKENHSI_GPU=4 RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_stage2_before_allgate_ca4_task_embedding bash tokenhsi/scripts/multi_agent/approach_stage2_before_allgate_ca4_task_embedding_train.sh 2 2048 4
+# 로컬 viewer
+TOKENHSI_GPU=4 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_stage2_before_allgate_ca4_task_embedding_test.sh "$CKPT" 2 1 4 10
+# 화면 없는 평가
+TOKENHSI_GPU=4 HEADLESS=1 TASK_GRAPH=random_scenario BEFORE_FOLLOWER_NEAR=1 bash tokenhsi/scripts/multi_agent/approach_stage2_before_allgate_ca4_task_embedding_test.sh "$CKPT" 2 16 4 3
+# 서버 VNC: 파랑 근접·매 reset 과제 재추첨
+TOKENHSI_GPU=4 TASK_GRAPH=random_scenario BEFORE_FOLLOWER_NEAR=1 bash tokenhsi/scripts/multi_agent/approach_stage2_before_allgate_ca4_task_embedding_vnc.sh "$CKPT" 2 1 4 10
+```
+
+평가 preset·`BEFORE_FOLLOWER_NEAR`·완료 순서 기록은 위 BEFORE와 동일하다. 근접 옵션은 평가 전용이고 기본 학습 배치를 바꾸지 않는다. 기존 합성 RSI 초기 물리 안정성 제한도 유지한다. 장기 학습 성능·실제 VNC 화면은 별도 확인이 필요하다.
+
+2026-10-11 연결 검증: CPU31개·GPU4의2048환경 짧은 학습/epoch2 저장·encoder69개/RMS6개 불변·네 block의 NONE/SELF/BEFORE bias 갱신/COUPLED0·head/critic/discriminator 갱신·scalar182종364값 finite를 확인했다. 저장 모델의16환경32-step 근접 랜덤 평가2회(32장면)도 통과했고, 실제 로그의 AT 미충족 dependent goal4개에서 양수 raw progress가 보상0으로 차단됐다. [학습/동결 검증](../output/approach_stage2_before_allgate_ca4_task_embedding_check/saved_check.json), [평가/gate 검증](../output/approach_stage2_before_allgate_ca4_task_embedding_eval_check/verification.json) 참조. 새 본학습은 미실행이다.

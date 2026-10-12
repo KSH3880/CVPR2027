@@ -29,6 +29,8 @@ class BeforeRuntime(Stage1ContextRuntime):
         saturated = (success | paired) & self.graph.edge_valid
         state = torch.where(saturated, 1., phi) * gate * self.graph.edge_valid * self.config['state_reward_weight']
         prog = torch.where(saturated, 1., progress) * self.graph.edge_valid * self.config['progress_reward_weight']
+        if self.config['before']['progress'] == 'current_at_success':
+            prog = prog * gate
         bonus = saturated.to(phi.dtype) * self.config['success_reward_weight']
         total = state + prog + bonus
         local = owner_sum(total, self.graph)

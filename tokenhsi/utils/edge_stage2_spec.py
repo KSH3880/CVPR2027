@@ -20,9 +20,9 @@ def validate_stage2_config(config):
         raise ValueError('Stage 2 requires its own mode and schema 10')
     variant = config.get('stage1_variant')
     if 'before' in config:
-        from utils.before_spec import CONTRACT
+        from utils.before_spec import CONTRACT, ALLGATE_CONTRACT
         from utils.task_role_spec import TASK_EMBEDDING_VARIANT
-        if config['before'] != CONTRACT or variant != TASK_EMBEDDING_VARIANT:
+        if config['before'] not in (CONTRACT, ALLGATE_CONTRACT) or variant != TASK_EMBEDDING_VARIANT:
             raise ValueError('Unsupported BEFORE reward contract')
         legacy = dict(config, mode=STAGE1_CONTEXT_MODE, schema_version=9)
         legacy.pop('before')

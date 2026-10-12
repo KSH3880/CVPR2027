@@ -98,6 +98,10 @@ class SampledOnTopTaskMixin:
             sampler=sample_stage1_graph if getattr(self,'_edge_stage1',False) else (sample_interaction_graph if getattr(self,'_edge_interaction',False) else sample_graph)
             if getattr(self, '_before', False):
                 from utils.before_spec import sample_graph as sample_before
+                if self._is_eval and self._task_graph_preset == 'random_scenario':
+                    probabilities = torch.tensor([.2, .8/3, .8/3, .8/3], device=self.device)
+                    self._before_families[ids] = torch.multinomial(
+                        probabilities, len(ids), replacement=True)
                 new = sample_before(len(ids), self._relation_graph_spec, self.device,
                     self._task_graph_preset, families=self._before_families[ids])
             elif getattr(self, '_mixed_carry', False):
@@ -304,6 +308,9 @@ class SampledOnTopTaskMixin:
 
     def _configure_ontop_targets(self, ids):
         if getattr(self, '_before', False):
+            if getattr(self.cfg['args'], 'before_follower_near', False):
+                from env.tasks.multi_agent.before_viewer import apply_layout
+                apply_layout(self, ids)
             return
         if getattr(self, '_scenario_no_climb', False):
             if (self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS

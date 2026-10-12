@@ -139,6 +139,12 @@ def load_cfg(args):
         cfg["env"]["eval"]["skill"] = eval_skills
         cfg["env"]["eval"]["skillInitProb"] = eval_skill_probs
 
+    if getattr(args, "before_follower_near", False):
+        if not (args.test and args.eval) or cfg['env'].get('relationGraph', {}).get('sampler') != 'two_agent_before_task_embedding':
+            raise ValueError('--before_follower_near requires BEFORE evaluation')
+        if cfg['env']['eval']['skill'] != ['loco']:
+            raise ValueError('--before_follower_near requires EVAL_SKILLS=loco')
+
     # Turn off periodic video recording (e.g. when watching through a viewer instead)
     if getattr(args, "no_video", False) and "video" in cfg["env"]:
         cfg["env"]["video"]["enable"] = False
@@ -280,6 +286,8 @@ def get_args(benchmark=False):
         {"name": "--task_camera", "type": str, "default": "stack", "help": "OnTop viewer camera: stack or agent"},
         {"name": "--task_graph", "type": str, "default": "", "help": "Edge viewer preset (OnTop or SIT/CLIMB); random re-samples each episode"},
         {"name": "--task_role_swap", "action": "store_true", "default": False, "help": "Swap A/B roles in fixed OnTop viewer presets"},
+        {"name": "--before_follower_near", "action": "store_true", "default": False,
+            "help": "BEFORE evaluation: place the follower near its box and record completion order"},
         {"name": "--relation_graph", "type": str, "default": "",
             "help": "Evaluation-only YAML explicit edges or independent_carry template"},
         {"name": "--transfer_checkpoint", "type": str, "default": "",
