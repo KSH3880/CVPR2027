@@ -35,7 +35,7 @@ def run_push_door_eval(player):
                 rows=info['reward_terms'][:task.num_agents].detach().cpu().tolist()
                 for agent,values in enumerate(rows):
                     terms=dict(zip(task.REWARD_TERM_NAMES,values))
-                    names=('push_hand_state','push_hand_progress','push_hand_result','at_state','at_progress','at_result') if int(assignments[0,agent])==0 else ('door_progress','door_hold','success_bonus','door_approach','door_closing')
+                    names=('push_hand_state','push_hand_progress','push_hand_result','at_state','at_progress','at_result','push_tilt','push_lift') if int(assignments[0,agent])==0 else ('door_progress','door_hold','success_bonus','door_approach','door_closing')
                     print('[view reward] step={} agent={} task={} {}'.format(step,agent,'PUSH' if int(assignments[0,agent])==0 else 'DOOR',
                         ' '.join('{}={:.4f}'.format(name,terms[name]) for name in names)),flush=True)
             success[alive]|=task._done_task[alive]

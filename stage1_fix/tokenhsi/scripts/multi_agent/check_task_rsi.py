@@ -82,9 +82,12 @@ torch.testing.assert_close(before,task._humanoid_root_states[1:])
 task.gym.simulate(task.sim);task.gym.fetch_results(task.sim,True)
 if task._door_rsi_hand is None or task._task_rsi_pools['doorOpen'][3].any():
  assert early_count/door_count>.65, (early_count,door_count)
-physical=torch.cat(physical_gaps)
-assert physical.abs().max()<.003, physical.abs().max().item()
+physical=torch.cat(physical_gaps) if physical_gaps else torch.zeros(1,device=task.device)
+if physical_gaps:assert physical.abs().max()<.003, physical.abs().max().item()
 report=dict(post_step_push_gap_p95_m=float(torch.quantile(physical,.95)),post_step_push_gap_min_m=float(physical.min()),post_step_push_gap_max_m=float(physical.max()),door_rsi_count=door_count,small_angle_fraction=early_count/door_count,sample_count=total,rsi_fraction=selected_count/total,max_door_hand_distance_m=max_door,push_surface_gap_m=max_push,frame_clearance_m=.03,finite=True,partial_reset=True,initial_progress_reward_zero=True)
+report['push_rsi_measured']=bool(physical_gaps)
+if not physical_gaps:
+ for key in ('post_step_push_gap_p95_m','post_step_push_gap_min_m','post_step_push_gap_max_m','push_surface_gap_m'):report[key]=None
 report['box_side_min_m']=float(task._box_sizes.min());report['box_side_max_m']=float(task._box_sizes.max())
 if 'enter_push_surface_distance' in task._interaction['amp'].get('approach_loco',{}):
  push_slots=task._tasks.eq(0)

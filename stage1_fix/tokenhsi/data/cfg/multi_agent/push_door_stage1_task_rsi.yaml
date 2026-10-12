@@ -103,7 +103,7 @@ env:
       direction: away_from_door
       hand_radius: 0.04
       hand_distance_scale: 0.15
-      hand_height_fraction: [0.6, 0.95]
+      hand_height_fraction: [0.5384615384615384, 0.6923076923076923]
       box:
         size:
         - 1.3
@@ -118,7 +118,13 @@ env:
       settle_speed: 0.15
       settle_seconds: 0.5
       progress_speed: 0.5
-      ground_tolerance: 0.04
+      ground_tolerance: 0.02
+      max_tilt_degrees: 15.0
+      tilt_free_degrees: 5.0
+      tilt_penalty_weight: 0.2
+      lift_penalty_weight: 0.2
+      lift_free_height: 0.01
+      lift_penalty_scale: 0.03
     door:
       handle_height: 0.95
       spring:
@@ -161,9 +167,9 @@ env:
       door_rsi_probability: 0.5
       door_facing_degrees: 60.0
       door_hand_binding: user_paths_v1
-      probability: 0.8
+      probability: 0.0
       push_phase:
-      - 0.35
+      - 0.05
       - 0.9
       door_phase:
       - 0.35
@@ -182,8 +188,8 @@ env:
       min_extension: 0.2
       door_height_tolerance: 0.1
       push_hand_height:
-      - 0.75
-      - 1.08
+      - 0.7
+      - 0.9
       version: task_door_loco_approach_v8
       door_early_max_degrees: 25.0
       door_early_fraction: 0.75

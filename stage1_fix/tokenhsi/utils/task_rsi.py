@@ -173,7 +173,11 @@ def build_pool(task,skill):
             if getattr(task,'_door_rsi_hand',None) is None or not valid.any():
                 raise ValueError('No frame-safe small-angle door RSI poses')
             print('[viewer] Requested hand has no safe small-angle RSI; using safe available angles',flush=True)
-    if not valid.any():raise ValueError('No physically bindable RSI reference poses for '+skill)
+    if not valid.any():
+        if skill!='push':raise ValueError('No physically bindable RSI reference poses for '+skill)
+        print('[task RSI] No low-hand PUSH candidates; using approach starts',flush=True)
+        task._rsi_push_height=times[:0];task._rsi_push_width=times[:0]
+        return mids[:0],times[:0],times[:0],early_safe[:0]
     if skill=='push':
         task._rsi_push_height=hands[...,2].max(-1).values[valid]
         task._rsi_push_width=lateral.max(-1).values[valid]
@@ -215,6 +219,9 @@ def sample_reference(task,tasks,env_ids=None):
         mask=selected&(tasks.flatten()==uid);size=int(mask.sum())
         if not size:continue
         lib=task._motion_lib[skill];mid,tm,weights,early_safe=task._task_rsi_pools[skill]
+        if not len(weights):
+            selected[mask]=False
+            continue
         indices=torch.multinomial(weights,size,replacement=True)
         if skill=='push' and hasattr(task,'_box_sizes'):
             sizes=task._box_sizes if env_ids is None else task._box_sizes[env_ids]

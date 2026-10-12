@@ -303,7 +303,7 @@ def test_door_approach_contact_mix_and_far_spawn():
     config=env['interaction']['task_rsi'];validate_interaction(env['interaction'])
     torch.manual_seed(42);tasks=torch.tensor([[0,1]]).repeat(20000,1)
     selected=select_task_rsi(tasks,config)
-    assert abs(selected[:,0].float().mean().item()-.8)<.02
+    assert not selected[:,0].any() # low-hand PUSH RSI is disabled after physics validation
     assert abs(selected[:,1].float().mean().item()-.5)<.02
     b,g,h,yaw,by,shift=sample_start_layout(tasks,env['startRandomization'],torch.tensor([1.1]*3),torch.tensor([-1.6,1.6]))
     distance=shift[:,1,0]-h[:,1,0]
@@ -540,3 +540,26 @@ def test_push_loco_amp_switch_and_legacy_compatibility():
     tasks=torch.tensor([0,0,1,1]);hand=torch.tensor([0,0,0,1]);hold=torch.tensor([False,False,False,True]);opening=torch.tensor([False,False,True,True])
     assert door_amp_family(tasks,hand,hold,opening,6,pushing=torch.tensor([False,True,False,False])).tolist()==[5,0,1,4]
     assert door_amp_family(tasks,hand,hold,opening,6).tolist()==[0,0,1,4]
+
+
+def test_push_stability_penalties_reject_tilt_and_lift():
+    from utils.push_door_spec import push_stability_penalties
+    import math
+    cfg=dict(max_tilt_degrees=15.,tilt_free_degrees=5.,tilt_penalty_weight=.2,lift_penalty_weight=.2,lift_penalty_scale=.04)
+    tilt,lift=push_stability_penalties(torch.tensor([1.,math.cos(math.radians(10)),math.cos(math.radians(20))]),torch.tensor([0.,.02,.08]),cfg)
+    torch.testing.assert_close(tilt,torch.tensor([0.,-.1,-.2]),atol=1e-6,rtol=1e-5)
+    torch.testing.assert_close(lift,torch.tensor([0.,-.1,-.2]))
+
+
+def test_low_push_hand_band_and_ground_contact_slack():
+    from utils.push_door_spec import push_hand_alignment,push_stability_penalties
+    cfg=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_task_rsi_variable_box.yaml').read_text())['env']['interaction']['push']
+    torch.testing.assert_close(torch.tensor(cfg['hand_height_fraction'])*1.3,torch.tensor([.7,.9]))
+    hands=torch.tensor([[[-.69,-.2,.15],[-.69,.2,.15]]])
+    direction=torch.tensor([[1.,0.,0.]])
+    good,_=push_hand_alignment(hands,direction,torch.tensor([.65]*3),cfg)
+    raised=hands.clone();raised[...,2]=.45
+    bad,_=push_hand_alignment(raised,direction,torch.tensor([.65]*3),cfg)
+    assert good>.99 and bad<.2
+    _,lift=push_stability_penalties(torch.ones(3),torch.tensor([.005,.01,.04]),cfg)
+    torch.testing.assert_close(lift,torch.tensor([0.,0.,-.2]))

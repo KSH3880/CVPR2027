@@ -80,6 +80,15 @@ def push_hand_alignment(local_hands, local_direction, half_size, config):
     return torch.exp(-(error/config['hand_distance_scale']).square()).min(-1).values,error.mean(-1)
 
 
+def push_stability_penalties(up_z, bottom, config):
+    tilt=torch.acos(up_z.clamp(-1,1))
+    free=math.radians(config['tilt_free_degrees'])
+    scale=math.radians(config['max_tilt_degrees'])-free
+    tilt_loss=((tilt-free).clamp_min(0)/scale).clamp_max(1)*config['tilt_penalty_weight']
+    lift_loss=((bottom-config.get('lift_free_height',0.)).clamp_min(0)/config['lift_penalty_scale']).clamp_max(1)*config['lift_penalty_weight']
+    return -tilt_loss,-lift_loss
+
+
 def push_relation_rewards(quality, contact, distance, stable, at_progress, at_result,
                           best_quality, elapsed, achieved, dt, config):
     """Independent PUSH-hand and AT state/progress/result components.
@@ -223,6 +232,12 @@ def validate_interaction(config):
                 raise ValueError('Invalid task parameter: ' + key)
     if push.get('direction', 'toward_door') not in ('toward_door', 'away_from_door'):
         raise ValueError('Invalid PUSH direction')
+    if 'max_tilt_degrees' in push:
+        if not 0 <= push['tilt_free_degrees'] < push['max_tilt_degrees'] < 90:
+            raise ValueError('Invalid PUSH tilt penalty bounds')
+        for key in ('tilt_penalty_weight','lift_penalty_weight','lift_penalty_scale'):
+            if not math.isfinite(push[key]) or push[key]<=0:
+                raise ValueError('Invalid PUSH stability parameter: '+key)
     split=push.get('relation_rewards')
     if split is not None:
         if split.get('version')!='push_at_state_progress_result_v1':
