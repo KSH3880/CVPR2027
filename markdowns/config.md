@@ -4,14 +4,19 @@
 
 ## 빠른 확인
 
-- 최근 비교 대상은 **Task message / 공유 Task MLP / Task MLP split / Task embedding**이다. [네 실험 공통 설정과 차이](#task-4종-공통-설정과-비교), [최근 확인 기록](#task-3종-최근-확인-기록)을 먼저 확인한다.
-- 실행 명령: [Task message](#unified-size-rsi-task-message), [공유 Task MLP](#unified-size-rsi-task-mlp), [Task MLP split](#unified-size-rsi-task-mlp-split), [Task embedding](#unified-size-rsi-task-embedding). 네 실험 모두 **2명·2048환경·4물체**, 전용 train/test/VNC와 output을 사용한다. 서로의 checkpoint를 resume/eval에 섞지 않는다.
+- 신규 **[Task/Role Gate + Entmax](#unified-size-rsi-task-role-gate-entmax)**는 `task_embedding` 기반 독립 실험이다. Additive bias/message 없이 task·role로 GTA K/V를 함께 조절하고 전체 scene에 Entmax 1.5를 적용한다. 기존 5종과 checkpoint를 섞지 않는다.
+
+- 최근 비교 대상은 **Task message / 공유 Task MLP / Task MLP split / Task embedding / Task embedding action**이다. [다섯 실험 공통 설정과 차이](#task-5종-공통-설정과-비교), [최근 확인 기록](#task-3종-최근-확인-기록)을 먼저 확인한다.
+- 실행 명령: [Task message](#unified-size-rsi-task-message), [공유 Task MLP](#unified-size-rsi-task-mlp), [Task MLP split](#unified-size-rsi-task-mlp-split), [Task embedding](#unified-size-rsi-task-embedding), [Task embedding action](#unified-size-rsi-task-embedding-action). 다섯 실험 모두 **2명·2048환경·4물체**, 전용 train/test/VNC와 output을 사용한다. 서로의 checkpoint를 resume/eval에 섞지 않는다.
 - `split`은 **task별 concat 이후 MLP와 layer/head projection 분리**다. 역할 embedding은 공유하며, actor/critic은 독립이다. 두 MLP 실험 모두 관계 message는 없다.
 - `task_embedding`은 역할 입력·중간 MLP·message 없이 task/NONE/SELF의 6개 embedding과 H/O/G 타입 쌍별 projection을 사용한다. Actor/critic은 독립이며 각 branch 안에서 모든 카테고리가 projection을 공유한다.
+- `task_embedding_action`은 task embedding 기반으로 SELF/NONE bias를 0으로 고정하고, GTA 복귀 후 사람 토큰에 `z + MLP([z, e_task])`를 적용한다. MLP는 128→64→64 ReLU·4개 layer 공유, actor/critic 독립이며 edge message는 없다.
 - 학습 중 HOLDING/AT/ON_TOP 성공률은 보상 primitive 지표다. 정책의 네 task 및 별도 평가의 운반 완수율과 구분한다. Bias는 원래 값과 같은 물리 타입의 NONE 대비 차이를 구분한다.
 - 현재 GPU/PID·epoch는 문서의 과거 기록으로 판단하지 않는다. 실행 전 `nvidia-smi`, 실행 중인 `tokenhsi/run.py` 인자와 해당 run의 `relation_config.yaml`·`summaries/`·`nn/`을 확인한다.
 
 ## 공통 규칙
+
+- `output/`에는 본학습 폴더와 `rsi_cache`를 유지한다. 완료된 검증·평가·분석 14폴더는 2026-10-10에 `output_etc/`로 이동했다. 이동 목록·원래 경로는 `output_etc/archive_manifest_20261010.json`에서 확인한다. 아래 실행 명령은 새 실행의 `output/` 경로를 사용한다.
 
 - 학습 인자는 `[num_agents] [num_envs] [num_objects]`; Stage 1 기본값은 `2 2048 3`이다. 짧은 확인도 환경 수 2048을 유지하고 `MAX_ITERATIONS`만 줄인다.
 - 실행 전 `nvidia-smi`로 점유를 확인하고 명령 앞에 `TOKENHSI_GPU`를 지정한다. 실행 중인 프로세스는 임의 종료하지 않는다.
@@ -21,6 +26,66 @@
 - 로컬 viewer와 서버 VNC의 상자 색은 매 reset의 과제 배정을 따른다. 단독 대상은 해당 에이전트 색, 공동 대상은 노란색, 나머지는 회색이다. 상자 정리 데모는 모든 상자를 같은 회색으로 표시한다. AT goal 점도 해당 edge 담당 에이전트 색이며, goal 슬롯이 바뀌어도 배정을 따른다. 실행 중인 뷰어는 다시 시작해야 반영된다.
 - 공유 데이터 원본은 읽기 전용으로 취급하고 이 저장소에서는 심링크로 사용한다. 현재 로컬 링크는 `/home/cvlab/Desktop/CVPR2027/TokenHSI`로 연결된다(2026-10-07, 12개 링크 모두 유효). 서버 문서의 `/home/hwanhee/CVPR2027/TokenHSI`와 경로가 다르므로 다른 머신에서는 실제 링크 대상을 확인한다. RSI 캐시는 이 저장소의 `output/rsi_cache`다.
 - 4명·16상자 정리 데모는 아래 **상자 정리 VNC 데모** 절을 따른다. 지정된 rescue checkpoint를 사용하는 평가 전용 실행이다.
+
+## Carry 관절 영상·공동운반 RSI 후보
+
+관련 코드·산출물은 저장소 루트 `joint_carry/`에 모은다. **보정본 RSI 연결은 [인계 문서](../joint_carry/HANDOFF.md)를 먼저 읽는다.** 최종 파일은 [joint_carry 안내](../joint_carry/README.md), 전용 코드는 `joint_carry/scripts/`, 보정 전 자료는 `joint_carry/archive/`다. 전달 ZIP에는 최신 보정본·코드·물리 검사·인계 문서를 포함한다.
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+python joint_carry/scripts/check_handoff.py  # 학습/물리 실행 없이 무결성과 snapshot 계약 확인
+```
+
+학습 없이 CPU에서 원본 `pickUp` B19·`carryWith` B20·`putDown` B21의 관절값을 재생하고 두 사람 합성 영상을 만든다. 실행 가능한 **시각화·후보 export**이며, 학습용 공동운반 reset에는 연결하지 않았다.
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+python joint_carry/scripts/carry_joint_preview.py --output joint_carry/archive/carry_joint_preview
+python joint_carry/scripts/carry_joint_preview.py --skill all --grip-inset 0.15 --output joint_carry/archive/carry_joint_preview_all_inset15
+```
+
+`joint_carry/archive/carry_joint_preview/`의 `comparison.mp4`는 원본/공동운반을 나란히 보이는 30fps·129프레임(4.3초) 영상이다. `original.mp4`, `cooperative.mp4`와 `comparison_half_speed.mp4`도 저장한다. 원근·평면 시점은 동일한 관절 데이터에서 렌더링한다.
+
+`--skill all`은 `pickUp/`, `carryWith/`, `putDown/`에 각각 같은 파일 세트를 저장하고, 루트에 `comparison_all_skills.mp4` 등 모음 영상과 `all_skills.json`을 만든다. 세 클립은 각각 100/129/135프레임이며 모음은 364프레임(약 12.13초)이다. **서로 다른 원본 클립을 순서대로 보여주는 영상이며 연속 궤적으로 연결한 데이터가 아니다.** 단일 동작은 `--skill pickUp`, `--skill carryWith`(기본값), `--skill putDown`으로 선택한다. `joint_candidates_all_skills.zip`에는 세 동작의 원본/합성 NPZ·메타데이터와 root/관절/상자 배열 사용법 `README.txt`를 묶는다.
+
+원본 0.4m 상자를 공동운반에서는 0.52×0.80×0.40m로 바꾼다. 첫 사람을 상자 로컬 Y의 `-(0.4 - grip_inset)`m만큼 이동하고 두 번째 사람은 매 프레임 상자 중심 주위로 180° 회전한다. `--grip-inset 0.15`는 끝부분 배치 대비 각 사람의 몸 전체를 15cm 안쪽으로 이동한다. 몸 내부 관절각과 뼈 길이는 그대로이며 IK는 없다. `original_joints.npz`, `cooperative_rsi_candidate.npz`에 로컬 quaternion(xyzw), 32-DOF 각도·속도, root/body 위치·회전·속도, 공유 상자 상태·크기를 저장한다. 사람 배열은 `[frame, agent, joint/body, component]`이며 root/DOF는 해당 축을 생략한다. 속도는 합성 궤적에서 다시 계산한다. 영상과 NPZ는 동일한 상태를 사용하며 장면 재현에는 root·상자 상태도 함께 필요하다.
+
+영상의 full quaternion FK와 32-DOF 물리 캐릭터의 FK는 정확히 같지 않다. 물리 팔꿈치는 Y축 1-DOF라 원본 X/Z 회전이 제외되고, 이번 세 클립에서는 손 위치가 최대 약 8.45cm 달라졌다. NPZ의 root/DOF/상자 상태를 넣으면 이 **32-DOF 근사 자세**가 재현된다. full quaternion/body 배열은 영상 자세를 보존한다.
+
+NPZ의 `source_rsi_allowed`는 원본 YAML 제외 구간을 기존 `MotionLib` 시간 변환식으로 반영한 마스크다. 합성 데이터의 물리 유효성을 뜻하지 않으며 `physics_valid_frame_mask`는 생성 시 미검증이므로 모두 false다. 원본 상자의 높이도 그대로 보존하므로 바닥과의 간격이 있을 수 있다.
+
+`metadata.json`에 합성 방법·손 관절점의 상자 표면 거리·낮은 발의 수평 속도를 기록한다. 이는 실제 접촉 판정이 아니다. 반대편 복제 사람은 발 미끄러짐이 크므로 `rsi_ready=false`, `physics_validated=false`다. RSI 채택 전 발 접촉 보정·충돌·물리 안정성 검증과 두 사람 동시 reset 경로가 필요하다. 원본 모션과 기존 학습 설정은 수정하지 않는다.
+
+### 합성 carry 물리 검사
+
+```bash
+TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python joint_carry/scripts/validate_carry_physics.py --input joint_carry/archive/carry_joint_preview_all_inset15 --output joint_carry/archive/carry_physics_validation'
+```
+
+Isaac Gym **CPU PhysX·1환경씩**으로 원본/합성 세 동작을 검사한다. 학습은 하지 않는다. 기존 asset·PD gain·중력·마찰·밀도 100kg/m³·1/60초·substeps 2를 사용한다. 모든 프레임에 기존 RSI의 0.1초 고정 PD target 충격 기준을 적용하고, 실제 시뮬레이터 FK에서 구/캡슐과 상자의 관통·발 mesh의 바닥 침범을 계산한다. 초기 상자 속도는 NPZ를 사용하므로 실제 학습 reset의 0 속도 설정과 다르다. 2cm 관통 제한은 이번 보수적 검사 기준이며 물리 엔진의 절대 허용 오차를 뜻하지 않는다. 캡슐은 중심선 5mm 이하 간격 표본, 사람 간 겹침은 더 성긴 표본의 하한이며 mesh-상자·self collision은 실제 PhysX에서 처리한다.
+
+`report.json`, 동작/원본·합성별 `frames.csv`, `screen_masks.npz`, `simulator_reset_geometry.npz`, `pd_rollout.npz`를 저장하며 입력 후보·학습 캐시를 수정하지 않는다. 연속 PD 검사는 root를 고정하거나 강제 이동하지 않는다. 학습된 균형 제어기가 없으므로 장기 PD 실패가 학습 불가능을 증명하지는 않는다.
+
+2026-10-07의 15cm 안쪽 합성본은 원본 RSI 허용 프레임 중 **pickUp 29/55·carryWith 0/129·putDown 0/135**가 충격+관통 검사를 함께 통과했다. pickUp의 통과 구간은 집기 전 0~28프레임이다. 충격만 검사하면 각각 55/55·129/129·128/135여서 그것만으로 접촉 타당성을 보장할 수 없다. 운반 중 손/팔의 최대 관통은 약 11.5/10.1cm다. 이 결과로 학습용 RSI 승인을 부여하지 않았다.
+
+### 공동운반 보정·검사 후 RSI snapshot 추출
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+python joint_carry/scripts/correct_carry_candidates.py --no-render
+TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python joint_carry/scripts/validate_carry_physics.py --input joint_carry/carry_joint_corrected --output joint_carry/carry_corrected_physics'
+python joint_carry/scripts/correct_carry_candidates.py --finalize
+```
+
+기본 입력은 `joint_carry/archive/carry_joint_preview_all_inset15`, 보정 출력은 `joint_carry/carry_joint_corrected`다. 실제 32-DOF 팔꿈치·고정 손목에 맞춘 뒤 상자 옆면 접촉과 팔 capsule의 관통을 함께 최소화하는 IK를 적용한다. 상자 크기와 15cm 안쪽 잡기 위치, 하체·몸통·머리 관절각은 유지하고, root 높이만 클립별 상수 1.4~2.6cm를 올린다. **팔 각도는 변경된다**(해당 입력의 최대 DOF 변화 pickUp 42.0°·carryWith 29.4°·putDown 36.6°). 속도는 수정 궤적에서 다시 계산한다.
+
+`--finalize`는 보고서의 입력 SHA256을 확인한 후 원본 RSI 제외·0.1초 충격·관통 검사를 통과한 프레임만 추출한다. carryWith에는 두 사람 모두 6 step 중 3 step 이상 손 접촉이 생겨야 한다는 조건을 추가한다. `screened_rsi_snapshots.npz`의 `root_state`는 `[sample,2,13]`, `dof_position/dof_velocity`는 `[sample,2,32]`, `box_state`는 `[sample,1,13]`이고 각 13-D state는 위치·xyzw quaternion·선속도·각속도다. `source_frame/source_time`으로 보정 reference의 원래 프레임을 찾는다.
+
+2026-10-07 보정본은 **55/55·129/129·135/135, 총 319개** 원본 RSI 허용 프레임이 짧은 검사를 통과했다. carryWith 손/팔 최대 관통은 11.51/10.10cm에서 약 0.50/0cm로 감소했고 실제 PhysX FK와 렌더 FK의 최대 위치 차이는 6.44e-7m 미만이다. pickUp 전체 클립 중 원본 제외 구간은 계속 제외한다. `before_after/comparison_all_skills.mp4`에 실제 물리 관절 기준 보정 전후 영상, `corrected_rsi_bundle.zip`에 보정 reference·snapshot·메타데이터·물리 결과를 묶는다.
+
+**이는 단기 reset용 snapshot 후보이며 연속 전문가 모션이나 장기 균형을 검증한 데이터가 아니다.** 복제 사람의 연속 발 미끄러짐은 남아 있고 native PD의 장기 운반도 실패한다. `training_loader_integrated=false`, `continuous_motion_validated=false`로 저장하며 현재 독립 과제 reset에는 연결하지 않았다. 영상·snapshot에서 모든 관절을 원본 그대로 유지했다는 의미도 아니다. 기존 학습·원본 데이터는 수정하지 않는다.
 
 ## 현재 실험
 
@@ -52,6 +117,8 @@
 | Unified size RSI task MLP | [approach_scenario_stage1_unified_size_rsi_task_mlp.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp.yaml) | Task message와 동일한 과제·RSI·AMP·자기 보상, task·역할 MLP bias만 사용 |
 | Unified size RSI task MLP split | [approach_scenario_stage1_unified_size_rsi_task_mlp_split.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split.yaml) | Task MLP의 역할 embedding 공유, task별 MLP·projection 독립 |
 | Unified size RSI task embedding | [approach_scenario_stage1_unified_size_rsi_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding.yaml) | Task/NONE/SELF embedding과 H/O/G 타입 쌍별 projection, 중간 MLP·메시지 없음 |
+| Unified size RSI task embedding action | [approach_scenario_stage1_unified_size_rsi_task_embedding_action.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action.yaml) | SELF/NONE=0, task embedding bias + 사람 토큰의 concat/비선형 residual MLP |
+| Unified size RSI task role gate entmax | [approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax.yaml) | Task64 + role3 → layer별 GTA block K/V gate, 전체 scene Entmax 1.5; bias/message 없음 |
 
 27~37번 Stage 1은 2-agent/3-object 독립 graph와 schema 9 semantic 관찰을 쓴다. ON_TOP 두 개를 동시에 샘플하지 않는다. 28~37번의 팀 보상은 자기 0.9, 동료 0.1이다. 30~33번은 유효 edge를 agent별로 평균 내어 단일 edge와 두 edge의 최대 task 보상을 0.6으로 맞춘다. 34~37번은 자기 edge를 합산하고 동료 edge만 평균 내며 state·progress·성공 식은 33번과 같다.
 
@@ -92,6 +159,8 @@ TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_u
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_train.sh 2 2048 4  # Unified size RSI task MLP
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split_train.sh 2 2048 4  # Unified size RSI task MLP split
 TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_train.sh 2 2048 4  # Unified size RSI task embedding
+TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_train.sh 2 2048 4  # Unified size RSI task embedding action
+TOKENHSI_GPU="$GPU" bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_train.sh 2 2048 4  # Unified size RSI task role gate entmax
 ```
 
 한 번에 필요한 실험 **한 줄만** 실행한다. 짧은 확인은 별도 output을 쓴다.
@@ -133,6 +202,8 @@ TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task MLP
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task MLP split
 TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task embedding
+TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task embedding action
+TOKENHSI_GPU="$GPU" HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_test.sh "$CKPT" 2 1 4 10  # Unified size RSI task role gate entmax
 TOKENHSI_GPU=3 HEADLESS=0 bash tokenhsi/scripts/multi_agent/box_cleanup_demo_test.sh  # 4명·16상자 정리 데모
 ```
 
@@ -162,6 +233,8 @@ TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent
 TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_vnc.sh "$CKPT"  # Unified size RSI task MLP
 TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split_vnc.sh "$CKPT"  # Unified size RSI task MLP split
 TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_vnc.sh "$CKPT"  # Unified size RSI task embedding
+TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_vnc.sh "$CKPT"  # Unified size RSI task embedding action
+TOKENHSI_GPU="$GPU" TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_vnc.sh "$CKPT"  # Unified size RSI task role gate entmax
 TOKENHSI_GPU=3 PORT=6080 bash tokenhsi/scripts/multi_agent/box_cleanup_demo_vnc.sh  # 4명·16상자 정리 데모
 ```
 
@@ -393,20 +466,20 @@ RESUME_CHECKPOINT="$CKPT" TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/appro
 ```
 
 
-## Task 4종 공통 설정과 비교
+## Task 5종 공통 설정과 비교
 
-아래 네 실험의 환경 설정은 checkpoint 격리용 `stage1_variant`만 다르다. Task bias/message 표현을 비교하며 과제·보상·크기·RSI·AMP와 634-D 관측을 유지한다.
+아래 다섯 실험의 환경 설정은 checkpoint 격리용 `stage1_variant`만 다르다. Task bias/message 표현을 비교하며 과제·보상·크기·RSI·AMP와 634-D 관측을 유지한다.
 
-| 항목 | Task message | 공유 Task MLP | Task MLP split | Task embedding |
-| --- | --- | --- | --- | --- |
-| 실험명 접미사 | `task_message` | `task_mlp` | `task_mlp_split` | `task_embedding` |
-| Train mode | `task_role_lookup` | `task_role_mlp` | `task_role_mlp_split` | `task_type_embedding` |
-| Task bias | task·출발/도착 역할·layer/head별 표 | 역할/task embedding → 공유 MLP → 공유 projection | 역할/task embedding → task별 MLP → task별 projection | task embedding → 물리 타입 쌍별 projection |
-| 관계 message | task·역할별 학습 벡터 표 | 없음 | 없음 | 없음 |
-| NONE/SELF 배경 | 물리 타입·관계·물리 타입별 표 | 별도 EdgeEncoder MLP | 별도 EdgeEncoder MLP, task별 분리하지 않음 | NONE/SELF embedding → task와 공유하는 타입 쌍별 projection |
-| Actor/critic | 독립 | 독립 | 독립 | 독립 |
+| 항목 | Task message | 공유 Task MLP | Task MLP split | Task embedding | Task embedding action |
+| --- | --- | --- | --- | --- | --- |
+| 실험명 접미사 | `task_message` | `task_mlp` | `task_mlp_split` | `task_embedding` | `task_embedding_action` |
+| Train mode | `task_role_lookup` | `task_role_mlp` | `task_role_mlp_split` | `task_type_embedding` | `task_type_embedding_action` |
+| Task bias | task·출발/도착 역할·layer/head별 표 | 역할/task embedding → 공유 MLP → 공유 projection | 역할/task embedding → task별 MLP → task별 projection | task embedding → 물리 타입 쌍별 projection | task embedding → 물리 타입 쌍별 projection |
+| 관계 message | task·역할별 학습 벡터 표 | 없음 | 없음 | 없음 | 없음; 사람 토큰에 상태/task concat MLP 직접 주입 |
+| NONE/SELF 배경 | 물리 타입·관계·물리 타입별 표 | 별도 EdgeEncoder MLP | 별도 EdgeEncoder MLP, task별 분리하지 않음 | NONE/SELF embedding → task와 공유하는 타입 쌍별 projection | 학습 파라미터 없이 항상 0 |
+| Actor/critic | 독립 | 독립 | 독립 | 독립 | 독립 |
 
-네 이름 앞에는 `approach_scenario_stage1_unified_size_rsi_`가 붙는다. Env YAML은 `tokenhsi/data/cfg/multi_agent/`, train YAML은 `tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_size_rsi_<접미사>.yaml`, wrapper는 `tokenhsi/scripts/multi_agent/<실험명>_{train,test,vnc}.sh`다. Output은 `output/<실험명>/<run>/`이며 저장 설정은 `relation_config.yaml`, 모델은 `nn/`, TensorBoard는 `summaries/`에 있다.
+다섯 이름 앞에는 `approach_scenario_stage1_unified_size_rsi_`가 붙는다. Env YAML은 `tokenhsi/data/cfg/multi_agent/`, train YAML은 `tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_size_rsi_<접미사>.yaml`, wrapper는 `tokenhsi/scripts/multi_agent/<실험명>_{train,test,vnc}.sh`다. Output은 `output/<실험명>/<run>/`이며 저장 설정은 `relation_config.yaml`, 모델은 `nn/`, TensorBoard는 `summaries/`에 있다.
 
 ### Task와 edge
 
@@ -452,7 +525,7 @@ Carry의 세 연결에는 **모두 같은 `carry_at` 또는 `carry_ontop` task I
 
 동일한 2,801~3,000 epoch의 전체 성공은 message 5.41%, 공유 MLP 5.70%, split 6.48%였다. 해당 확인에서 scalar NaN/Inf는 없고 최근 구간의 물리 reset 실패·동료 보상 기여는 0이었다. Split의 actor/critic 각각 네 task MLP가 본학습 checkpoint 500→1,000 사이에 모두 업데이트된 것도 확인했다. 한 seed의 학습 기록이며 분리 효과나 별도 평가 성공률을 확정하지 않는다.
 
-Bias 확인 checkpoint는 message 10,000 / 공유 MLP 10,500 / split 3,000 epoch다. 공유 MLP의 carry_at H→O는 원래 bias +2.398, NONE −16.112, Δ +18.511로 NONE 억제의 영향이 컸다. Split의 동일 연결은 원래 +0.717, Δ +4.006이었다. 전체 edge·actor/critic 값은 로컬 분석 산출물 [CSV](../output/trend_review_20261006/three_edge_vs_none_latest.csv)·[그래프](../output/trend_review_20261006/three_edge_vs_none_latest.png)를 참조한다. 이 `latest` 산출물은 재분석 때 갱신되며 Git에 포함되지 않는다.
+Bias 확인 checkpoint는 message 10,000 / 공유 MLP 10,500 / split 3,000 epoch다. 공유 MLP의 carry_at H→O는 원래 bias +2.398, NONE −16.112, Δ +18.511로 NONE 억제의 영향이 컸다. Split의 동일 연결은 원래 +0.717, Δ +4.006이었다. 전체 edge·actor/critic 값은 로컬 분석 산출물 [CSV](../output_etc/trend_review_20261006/three_edge_vs_none_latest.csv)·[그래프](../output_etc/trend_review_20261006/three_edge_vs_none_latest.png)를 참조한다. 이 `latest` 파일은 당시 분석의 보관본이며 Git에 포함되지 않는다.
 
 검증 이력은 [changelog](../changelog.md)에 있다. Split 관련 CPU 84개 및 2048환경 짧은 학습, carry_at/carry_ontop 각각 16환경·32-step headless 평가가 통과했다. 장기 성능 비교와 VNC 화면 검증을 대신하는 결과는 아니다.
 
@@ -551,4 +624,63 @@ TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi
 TOKENHSI_GPU=0 TASK_GRAPH=carry_ontop EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_vnc.sh "$CKPT" 2 1 4 10
 # 같은 실험 checkpoint 재개
 TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_train.sh 2 2048 4
+```
+
+## Unified size RSI task embedding action
+
+`approach_scenario_stage1_unified_size_rsi_task_embedding_action`은 기존 task embedding 기반의 별도 scratch 실험이다. Env YAML은 `stage1_variant`, train YAML은 `relation_bias_mode=task_type_embedding_action`만 다르다. 보상·샘플링·RSI·AMP·GTA·634-D packet·토큰/edge 셔플은 동일하다.
+
+- Actor/critic 각각 `Embedding(4,64)`와 `[src type=3,dst type=3,layer=4,head=2,64]` projection을 사용한다. 카테고리는 sit/climb/carry_at/carry_ontop이며, NONE/SELF embedding은 없다. 비과제 연결·대각선 bias는 항상 **0**이고 attention 연결 자체를 마스킹하지 않는다. Task bias는 부호·크기를 제한하거나 강제로 증폭하지 않는다.
+- 같은 branch에서 task embedding은 bias와 직접 주입 경로가 공유한다. 각 layer의 `A×V → GTA 복귀 → head concat` 뒤, output projection 전에 사람 토큰에만 `z_H += MLP(concat(z_H, e_task))`를 적용한다. MLP는 **Linear(128,64) → ReLU → Linear(64,64)**다. Task 벡터에 A를 곱하거나 상대 j축으로 합산하지 않는다. 사람마다 유효 task record 하나를 사용하며 carry 연결 수로 주입 횟수가 늘지 않는다. 물체·목표·padding에는 직접 추가하지 않는다.
+- MLP 하나를 네 layer가 공유하고 actor/critic은 별도다. Task·agent별 MLP는 만들지 않는다. Canonical packet의 `actor` endpoint를 token permutation의 역매핑으로 옮긴 뒤 gather/scatter하므로 task record 순서나 인간 토큰의 현재 위치에 의존하지 않는다. Human readout은 기존처럼 역순열 복원 후 수행한다.
+- Embedding std=.02, task bias projection=0, **추가 MLP 출력층 weight/bias=0**으로 시작한다. Builder의 전역 Linear 초기화 뒤에도 이 초기화를 보존한다. 첫 optimizer step에는 출력층/projection이 먼저 학습되고 이후 MLP 앞층과 embedding으로 gradient가 전달된다. 초기 주입은 정확히 0이다.
+- 주입 MLP는 branch당 12,416개, 두 branch 합계 24,832개다. NONE/SELF embedding 256개를 제거해 전체 모델은 **4,155,202개**로 기존 task embedding보다 24,576개(+0.595%) 증가한다. Layer 공유는 파라미터 공유이며 forward는 네 번 실행한다.
+- 보상은 자기 primitive 합계 ×1·동료 ×0, PPO task/AMP 0.5/0.5다. Task prior는 sit/climb/carry_at/carry_ontop 10/25/32.5/32.5%, AMP family carry/sit/climb 65/10/25를 유지한다. SIT loco/sit 50/50, CLIMB loco/climb 50/50, carry loco/pickUp/carryWith/putDown 40/10/40/10 RSI와 기존 물리 캐시 `output/rsi_cache`를 사용한다.
+- `relation_attention/{actor,critic}/layer{0..3}/task_action_{input_rms,delta_rms,to_input_rms}`를 기록한다. 이는 사람 토큰의 주입 전 RMS·추가량 RMS·비율이며 task 의미를 유용하게 사용한다는 증거 자체는 아니다. CPU 검증은 bias/QK를 고정한 task 벡터 교체의 출력 영향도 확인한다. 학습된 정책의 task 입력 제거/교체 성공률 평가는 별도로 수행해야 한다.
+- 새 variant·fusion 계약·4행 embedding·주입 MLP로 기존 checkpoint의 resume/eval 혼용을 거부한다. 기존 task embedding checkpoint를 직접 이어 학습하지 않는다.
+
+2026-10-08 검증: 관련 CPU 103개, GPU 0·2048환경 확인 학습(epoch 2/frame 262144), carry_at 및 역할 교환 ON_TOP의 carryWith·16환경·32-step headless 평가 통과. 기존 RSI 캐시 hit, scalar 257종/514값 finite, 물리 reset 실패·binding/보상 합산 오류 0. 네 task embedding·MLP·bias projection의 실제 업데이트와 SELF/NONE=0을 확인했다. Output은 `_task_embedding_action_check` 및 `_check_carry_at`, `_check_carry_ontop`이다. 이는 실행/학습 경로 검증이며 장기 성공률·VNC 화면·학습된 task 입력 제거/교체 평가는 미검증이다.
+
+```bash
+# Scratch 본학습: 실행 전 GPU 점유 확인, 2명·2048환경·4물체
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_train.sh 2 2048 4
+# 짧은 확인 학습: 별도 output
+TOKENHSI_GPU=0 MAX_ITERATIONS=1 RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_check bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_train.sh 2 2048 4
+# CKPT에는 이 새 실험의 checkpoint 지정
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=carry_at EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 16 4 3
+TOKENHSI_GPU=0 TASK_GRAPH=carry_ontop EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_vnc.sh "$CKPT" 2 1 4 10
+# 같은 새 실험 checkpoint 재개
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_train.sh 2 2048 4
+```
+
+## Unified size RSI task role gate entmax
+
+2026-10-10 속도 최적화: 학습 시 gate 표 조회의 gradient 합산을 one-hot 행렬곱으로 변경하고, 16D 조회 뒤 4D block을 확장한다. No-grad/frozen/FP32 TF32 경로는 compact index lookup을 사용한다. 수식·weight key·optimizer·config와 Entmax는 유지하므로 **같은 실험의 기존 checkpoint로 resume 가능**하다. 현재 실행 중인 Python에는 파일 변경이 반영되지 않으므로 저장 checkpoint에서 다시 실행해야 적용된다. 저장 전 종료하면 아직 저장되지 않은 진행은 잃는다. 기존 본학습은 자동으로 중단하지 않는다.
+
+GPU에서 같은 checkpoint·입력의 8192 scene actor+critic forward/backward는 170.0→87.3ms, 다른 교차 측정에서는 332.6→163.0ms로 약 49~51% 단축됐다. **전체 iteration 단축률이나 장기 성공률 개선을 뜻하지 않는다.** CPU 137개·CUDA 1개 및 기존 optimizer를 복원한 2048환경 epoch 2→3 학습을 확인했다. 자료는 `output_etc/task_role_gate_lookup_opt_20261010/`와 `output_etc/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_lookup_opt_check/`에 있다.
+
+`approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax`는 `task_embedding` 기반의 독립 scratch 실험이다. Env YAML은 `stage1_variant`만 변경하므로 기존 과제·보상·크기·RSI·AMP·634-D packet·edge/token 순열을 그대로 사용한다. Train YAML에서는 attention 설정만 변경한다. 별도 variant/fusion 계약으로 이전 checkpoint의 resume/eval을 거부한다.
+
+- Actor/critic은 각각 `Embedding(4,64)` 하나를 네 layer에서 공유한다. `task64 + role one-hot3`의 12개 조합을 만들고, 각 layer의 독립 `67→64→16` SiLU MLP가 `1+tanh` gate를 생성한다. 2 heads × 8 blocks이며 각 block의 4개 차원에는 같은 스칼라를 곱한다. Task별·agent별 MLP는 없다.
+- `relation_attention_mode=task_role_gate_entmax`, `relation_bias_mode=none`, `relation_bias=false`, `relation_message.enable=false`, `attention_normalizer=entmax15`를 함께 검증한다. 기존 bias encoder·relation message·사람 토큰 직접 주입 MLP는 생성하지 않는다. Builder의 전역 초기화 후 gate 출력층을 다시 0으로 만들어 초기 gate=1을 보존한다.
+- GTA Q/K/V 적용 뒤 task edge의 K score와 V 집계만 gather/scatter로 보정하고, V를 합친 후 GTA 역변환을 한 번 수행한다. 토큰을 섞으면 src/dst도 역순열로 재매핑한다. Invalid packet은 embedding 조회와 gather 전에 안전한 index로 바꾸고 correction을 0으로 처리한다. Non-task·self·reverse는 gate=1이며 attention 후보로 남는다.
+- Entmax는 full sort 기반 정확한 1.5 정규화와 해석적 backward를 사용한다. [원 논문](https://arxiv.org/abs/1905.05702)의 threshold/Jacobian을 독립 bisection oracle 및 finite-difference로 확인한다. Dense score/attention은 유지하므로 계산은 여전히 N² 규모다. 초기 gate가 1이어도 Softmax baseline과 출력은 다르다.
+- RSI는 SIT loco/sit 50/50, CLIMB loco/climb 50/50, carry loco/pickUp/carryWith/putDown 40/10/40/10, 후반/전체 70/30을 유지한다. AMP family carry/sit/climb 65/10/25·행별 expert/replay 매칭·원래 캐시를 사용한다. 보상은 자기 primitive 합계 ×1, 동료 ×0, PPO task/AMP 0.5/0.5다.
+- `relation_attention/{actor,critic}/layer{0..3}/` 아래 task attention mass·edge zero-rate·평균 nonzero support 수·gate delta RMS·과제별 zero-rate와 gate gradient norm을 기록한다. 각 task embedding 행의 gradient norm도 기록한다. Attention 통계는 진단 시점의 앞 32개 sample, gradient norm은 마지막 minibatch 기준이다. 기존 환경의 task 성공·collision 진단은 유지한다. 별도 distractor/근접 장애물 행동 평가와 장기 성능 비교는 수행하지 않았다.
+- Gate 파라미터는 branch당 21,824개(embedding 256 + 4 MLP 21,568), 전체 모델은 4,164,290개다. 파라미터 수는 entity 개수와 무관하지만 현재 unified sampler는 2H/4O용이다. 4H/8O·4H/16O rollout 지원이나 Stage 2 연결을 뜻하지 않는다.
+
+2026-10-10 검증: 관련 CPU **135개 통과**, GPU 0·2048환경·MAX_ITERATIONS=1 학습(epoch 2/frame 262144) 및 네 과제 각 16환경·32-step headless 평가 완료. Carry는 carryWith, ON_TOP은 role swap을 사용했다. RSI 캐시 hit·scalar 321종/642값 finite·물리 reset 실패 0·CSV binding/보상 합산 오류 0이며 양 branch의 모든 gate와 네 task embedding 행이 업데이트됐다. 검증 자료는 `output_etc/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_check/verification.json`·`validation/`, 평가 결과는 네 `_check_<task>/metrics/`다. `_check`는 실행 경로 확인 전용이며 본학습·장기 성공률·VNC 화면은 검증하지 않았다.
+
+```bash
+# Scratch 본학습: 실행 전 nvidia-smi, 2명·2048환경·4물체
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_train.sh 2 2048 4
+# 짧은 확인: 본학습과 별도 output
+TOKENHSI_GPU=0 MAX_ITERATIONS=1 RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_check bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_train.sh 2 2048 4
+# CKPT에는 이 실험에서 저장한 checkpoint 경로 지정
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=carry_at EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_test.sh "$CKPT" 2 16 4 3
+TOKENHSI_GPU=0 TASK_GRAPH=carry_ontop EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_vnc.sh "$CKPT" 2 1 4 10
+# 같은 실험 checkpoint 재개
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_train.sh 2 2048 4
 ```

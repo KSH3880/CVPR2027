@@ -2,7 +2,97 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-12
+
+### Action·Role gate 간단 평가
+
+- 사용자 요청으로 action 32,000 / role gate 13,500 checkpoint를 GPU 0에서 순차 평가했다. 모델당 64환경·2명·4물체·600 step·seed 42·loco 시작·random scenario 1회이며 task 교체 probe는 제외했다. 초기 task/binding packet은 두 모델 및 10월 11일 평가와 일치한다.
+- 종료 시 개인 목표 성공 수(SIT/CLIMB/AT/ON_TOP, 표본 11/37/45/35)는 action **5/37/14/34**, gate **0/0/0/0**. Gate의 마지막 HOLDING 조건 만족 비율은 32.5%이나 과제 목표는 평가 중 한 번도 달성하지 못했다. 학습 RSI 혼합 지표와 구분하며 단일 seed 소표본 결과다.
+- 두 실행 종료 코드 0·128개 agent 표본 합·성공 수 범위·finite 지표를 확인했다. `output_etc/rough_eval_20261012/`에 실행 코드·manifest·summary·로그를 보관한다. 학습 프로세스와 설정은 변경하지 않았다.
+
+## 2026-10-11
+
+### Task embedding SIT 정체 진단
+
+- 사용자 요청으로 최신 로그의 SIT 배정·RSI·보상과 embedding 35,000 / action 23,500의 SIT 전용 평가를 확인했다. 모델당 loco/sit 모션 초기화 각각 32환경·2명·600 step·seed 42 1회: 종료 성공은 embedding **0/64, 5/64**, action **28/64, 27/64**다. Sit 모션 초기화는 이미 앉은 상태를 강제한 유지 평가가 아니다.
+- Embedding의 최근 SIT 접근 보상은 0.185/최대 0.2이나 성공 상태 비율은 약 10.5%다. Loco 평가 마지막 표본에서 목표 XY 거리 0.707m·높이 오차 0.367m였다. Actor 대상 edge attention은 층별 평균 0.410/0.161/0.116/0.081이며, 같은 관측의 SIT 임베딩을 CLIMB로 교체하면 정책 평균 출력 상대 RMS가 39.6% 변했다. Task 무시·대상 attention 포화 가설은 이 측정으로 지지되지 않으며, 낮은 attention의 인과 효과나 과제별 PPO gradient 충돌은 검증하지 않았다.
+- 두 모델과 task MLP의 variant 제외 reward 설정은 같고, 최신 두 실행의 SIT 배정 약 10%·loco/sit RSI 약 50:50·RSI 거부/대체 0을 확인했다. 평가 4건 종료 코드 0, 동일 입력/임베딩 재실행의 출력 차이 0. 분석·코드·로그는 `output_etc/sit_diagnosis_20261011/`에 보관하며 학습 중단·학습 설정 변경은 하지 않았다.
+
+### 실행 중인 세 모델의 소규모 평가·task 입력 민감도
+
+- 사용자 요청으로 embedding 34,500 / action 23,000 / role gate 5,000 checkpoint를 GPU 0에서 순차 평가했다. 모델당 64환경·2명·4물체·600 step·seed 42·loco 시작·random scenario 1회이며, 초기 task/binding packet hash가 일치했다. 학습 프로세스·모델 코드는 변경하지 않았다.
+- 종료 시 개인 목표 성공 수(SIT/CLIMB/AT/ON_TOP, 표본 11/37/45/35): embedding **0/37/31/31**, action **4/37/5/33**, gate **0/0/0/0**. 학습량이 다르고 단일 seed 소표본이며, 학습 RSI 혼합 성공 상태 비율과 구분한다.
+- 기준 rollout의 10개 시점에서 actor task embedding을 순환 교체했을 때 정책 평균 출력의 상대 RMS 차이는 embedding **18.7~20.4%**, action **22.5~29.9%**, gate **4.2~6.3%**다. Action의 bias를 유지하고 직접 주입 경로만 교체하면 **22.5~30.3%**, 제거하면 **23.2%**다. 대체 행동으로 rollout하지 않았으므로 성공률 기여도/인과 효과를 뜻하지 않는다.
+- 세 평가 종료 코드 0, 128개 agent 표본 합·성공 수 범위·probe finite를 확인했다. 스크립트·실행 인자·결과는 `output_etc/rough_eval_20261011/`에 보관한다. NVML 버전 불일치로 nvidia-smi는 실패했지만 CUDA 연산·여유 메모리 확인 후 평가를 완료했다.
+
+## 2026-10-10
+
+### Task/Role gate 역전파 속도 최적화
+
+- Profiler에서 gate category 조회의 backward가 12개 행으로 gradient를 집중 합산하는 `_index_put_impl_`에 큰 시간을 쓰는 것을 확인했다. 학습 시 one-hot selector × 12×16 gate 표로 바꾸고, 4D block 확장은 조회 뒤에 수행한다. Rollout/frozen 및 FP32 TF32 활성화 경로는 compact index lookup을 사용한다. 모델 수식·파라미터·checkpoint key·AMP·RSI·보상·셔플·Entmax·실행 config는 유지한다.
+- 동일 checkpoint·입력의 GPU 교차 측정에서 **8192 scene actor+critic forward/backward 170.0→87.3ms(약 49% 감소)**, 재측정 332.6→163.0ms(약 51% 감소). 공유 GPU이므로 절대 시간은 변동하며 전체 iteration 단축률을 뜻하지 않는다. 출력 최대 차이 1.19e-7, 180개 gradient tensor 최대 차이 1.11e-7. Entmax prefix GEMM 후보는 개별 연산만 빨라지고 전체 모델 추가 개선은 없어 제외했다.
+- **CPU 137개 + CUDA TF32 fallback 1개 통과**. 기존 checkpoint를 optimizer와 함께 복원해 **2048환경·epoch 2→3/frame 262144→393216** 확인 학습·저장을 완료했다. Optimizer state 186개 step 96→144, gate/task embedding 갱신·321 scalar finite·물리 reset 실패 0을 확인했다.
+- 분석 자료는 `output_etc/task_role_gate_lookup_opt_20261010/`, 확인 실행은 `output_etc/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_lookup_opt_check/`에 보관한다. 실행 중인 본학습은 중단·재시작하지 않았으며 새 코드 적용에는 저장 checkpoint에서 재개가 필요하다. 장기 성능 동일성은 검증하지 않았다.
+
+
+### output 검증·분석 산출물 보관 정리
+
+- 사용자 요청으로 gate/Entmax 짧은 학습·네 과제 평가, task action 영향 분석, rough loco 평가, 날짜별 trend 분석의 **14폴더·87파일(약 53MiB)**을 기존 `output_etc/`로 이동했다. `output/`에는 본학습 6폴더와 `rsi_cache`를 유지하고 실행 중인 학습 3개는 변경하지 않았다.
+- 이동 대상의 실행 인자 참조·열린 쓰기 파일·목적지 충돌이 없음을 확인하고, 동일 파일시스템 rename 뒤 87파일의 크기·SHA256 일치를 검사했다. 대응 경로와 hash는 `output_etc/archive_manifest_20261010.json`에 보관한다. 문서의 보관본 경로·링크를 갱신했으며 기존 실행 명령의 신규 output 경로와 산출물 내부의 원래 실행 기록은 유지한다. 문서 링크·diff 검사 통과; 학습·평가는 새로 실행하지 않았다.
+
+
+### Task/Role GTA K/V gate + Entmax 연결
+
+- `task_embedding` 기반 `approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax` env/train YAML·train/test/VNC·output을 분리했다. Env는 variant만 변경하고 과제·보상·크기·RSI·AMP·634-D packet·edge/token 순열을 유지한다. 새 attention mode는 additive bias/message를 끄며 전용 fusion 계약으로 기존 checkpoint 혼용을 거부한다.
+- Actor/critic 독립 `Embedding(4,64)`와 layer별 `67→64→16` SiLU gate를 연결했다. Task/role 12조합을 재사용하고 4D GTA block별 같은 gate로 K/V를 함께 조절한다. GTA 뒤 sparse correction·전체 scene Entmax 1.5·GTA 복귀 순서를 유지하며, global 초기화 뒤 gate=1을 복원한다. 전체 4,164,290개 파라미터다.
+- 관련 CPU **135개 통과**: Entmax bisection/finite-difference·sparse/dense 출력/gradient·GTA 교환/삽입 순서·padding·non-task 후보·human/object/goal 재배정 및 토큰/edge/task 순열·actor/critic 독립 업데이트·AMP/RSI/보상·checkpoint·기존 attention 회귀. 셸/Python 문법·문서 경로·diff 검사 통과.
+- **GPU 0·2048환경·MAX_ITERATIONS=1** 학습 완료(epoch 2/frame 262144). RSI 캐시 hit, scalar **321종/642값 모두 finite**, 물리 reset 실패 0, 진단 CSV 16행/8그룹의 binding·보상 합산 오류 0. Actor/critic task embedding 네 행 및 gate MLP 전체 34개 tensor의 optimizer moment가 finite/nonzero다. Task attention mass·zero-rate·support 수·gate/embedding gradient norm을 기록한다.
+- 저장 모델로 SIT/CLIMB/carry_at/carry_ontop 각각 **16환경·32-step headless 평가** 완료. Carry는 carryWith 시작, ON_TOP은 role swap을 적용했다. 검증 자료는 `output_etc/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax_check/verification.json`·`validation/` 및 네 `_check_<task>/`에 저장했다. 기존 학습 3개를 유지했으며 새 본학습·장기 성능·distractor/근접 장애물 행동 비교·확장 scene·VNC 화면·Stage 2는 검증하지 않았다.
+
+## 2026-10-08
+
+### Task embedding + 사람 토큰 행동 정보 주입
+
+- 사용자 합의대로 `approach_scenario_stage1_unified_size_rsi_task_embedding_action` env/train YAML·train/test/VNC·output을 분리했다. 기존 task embedding의 과제·보상·상자 크기·RSI·AMP·캐시·634-D packet은 유지한다. Task 4개 `Embedding(4,64)`를 타입별 bias projection과 직접 주입 MLP가 공유하며 NONE/SELF bias는 항상 0이다. 관계 message는 없다.
+- GTA 복귀·head concat 뒤 output projection 전에 사람 토큰에 `z += MLP([z,e_task])`를 적용한다. 128→64→64 ReLU MLP를 네 layer가 공유하고 actor/critic은 독립이다. 명시적 actor endpoint를 토큰 순열에 맞춰 옮겨 task record·edge 순서와 무관하게 주입한다. 출력층은 전역 초기화 뒤 0으로 초기화하며 초기 주입은 0이다. 전체 모델은 4,155,202개 파라미터다.
+- 관련 CPU **103개 통과**: 실제 주입 위치·사람/padding 마스크·task 교체·토큰/edge/task 순열 출력 및 gradient·업데이트·SELF/NONE=0·checkpoint 격리·보상/샘플링/RSI/AMP·기존 실험 회귀. 전용 fusion metadata로 이전 실험 checkpoint 혼용을 거부한다.
+- **GPU 0·2048환경·MAX_ITERATIONS=1** 확인 학습 완료(저장 epoch 2, frame 262144). 기존 RSI 캐시 hit, scalar **257종/514값 모두 finite**, 물리 reset 실패·동료 보상 기여 0. Actor/critic의 네 embedding 행·task projection·새 MLP 전체 optimizer moment가 nonzero이며 SELF/NONE bias는 학습 후에도 0이다. 진단 CSV 16행/8개 그룹의 물체 binding·자기 보상 합산 오류 0.
+- 저장 모델의 carry_at/carry_ontop + carryWith **각 16환경·32-step headless 평가** 완료. ON_TOP은 `TASK_ROLE_SWAP=1`도 적용했다. 검증 산출물은 `output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_check/` 및 `_check_carry_at/`, `_check_carry_ontop/`다. 실행 중인 기존 학습은 유지했고 새 본학습·장기 성능·VNC 화면·학습된 task 입력 ablation은 검증하지 않았다.
+
 ## 2026-10-07
+
+### 보정 공동운반 RSI 인계 정리
+
+- 다음 Codex의 RSI 연결을 위해 공동운반 생성·보정·검사 코드를 `joint_carry/scripts/`로 모으고 보정 전 4개 산출물 폴더를 `joint_carry/archive/`로 분리했다. 보정본과 최종 물리 결과는 루트 바로 아래 유지하며 실행 경로·config·structure를 갱신했다.
+- `joint_carry/HANDOFF.md`에 319개 paired snapshot의 배열 계약, 공유 상자·두 사람 동시 reset, graph/binding·AMP 이력의 구현 진입점, 검증 범위와 후속 요청을 정리했다. 무결성 확인 코드·SHA256 manifest·코드/보정본/영상을 포함한 `joint_carry_handoff.zip`을 추가했다. 학습 연결은 미구현이며 연속 전문가 모션 승인을 뜻하지 않는다.
+- 이동 전후 바이너리 131개의 SHA256 보존, 전달 파일 79개·의존 파일 3개 무결성, ZIP 80개 항목 CRC 및 임시 위치 압축 해제 후 재검사를 통과했다. 이동한 검사 코드로 세 동작 각각 CPU PhysX 6-step smoke·FK 오차 <1e-6m·finite/충격 기준을 확인했다. 문서 링크·Python 문법·diff 검사 통과. 전체 물리 검사 재생성이나 학습은 실행하지 않았다.
+
+### 공동운반 산출물 joint_carry로 이동
+
+- 사용자 요청으로 이번 영상·관절 데이터·물리 검증·ZIP의 6개 폴더, 170파일을 `output/`에서 저장소 루트 `joint_carry/`로 이동했다. 최종 영상·데이터 링크를 `joint_carry/README.md`에 모으고 스크립트 기본 경로·실행 문서·기존 기록의 산출물 경로를 갱신했다. 생성 산출물의 기존 Git 제외 정책도 유지했다.
+- 파일 163개는 SHA256이 그대로이며, 나머지 7개는 메타데이터·로그·ZIP 내부 경로만 갱신했다. 이동 누락 없음·검증 보고서의 입력 SHA256 12개·ZIP 2개 CRC·안내 링크·Python 문법·diff 검사를 확인했다. 모션 생성·물리 검사·학습은 다시 실행하지 않았다.
+
+### 공동운반 실제 관절 보정·RSI snapshot 추출
+
+- 사용자 요청으로 `correct_carry_candidates.py`를 추가했다. 물리 캐릭터의 1축 팔꿈치·고정 손목으로 변환한 뒤 손 접촉·팔 capsule 관통을 함께 고려하는 IK를 적용한다. 상자 크기·15cm 안쪽 잡기 위치·다리/몸통/머리 관절각은 유지하고 root를 클립별 1.4~2.6cm 올렸다. 팔 DOF 최대 변화는 pickUp 42.0°·carryWith 29.4°·putDown 36.6°다. 수정 궤적에서 속도를 재계산했다.
+- 보정본을 같은 CPU PhysX 검사로 재검증했다. 원본 RSI 허용 구간 **pickUp 55/55·carryWith 129/129·putDown 135/135**가 0.1초 충격·관통 검사를 통과했다. carryWith는 두 사람이 6 step 중 최소 5 step에서 각각 손 접촉을 보였다. 운반 중 손/팔 최대 관통은 11.51/10.10cm→약 0.50/0cm, 실제 FK와 영상 자세의 최대 오차는 6.44e-7m 미만이다. 이는 단기 초기 상태 검사이며 연속 발 미끄러짐·장기 PD 균형은 해결하지 않았다.
+- `joint_carry/carry_joint_corrected/`에 보정 reference, 독립 `screened_rsi_snapshots.npz` 319개, `before_after/comparison_all_skills.mp4`, `corrected_rsi_bundle.zip`을 저장했다. 물리 보고서는 `joint_carry/carry_corrected_physics/`다. Finalize는 후보 SHA256 일치·원본 제외 마스크·충격/형상 통과를 확인하고 carryWith에는 양쪽 손 접촉 조건을 추가한다. `training_loader_integrated=false`, `continuous_motion_validated=false`이며 실제 학습/graph reset에는 연결하지 않았다.
+- 하체/몸통/머리 각도 보존(수치 오차 4.45e-16rad 이하)·clone 내부 관절 일치·속도 quaternion 차분·snapshot 원본 프레임 매칭·finite·ZIP 22파일 CRC를 확인했다. 영상 14개 전체 디코딩·세 동작 대표 화면·Python 문법·diff 검사 통과. 기존 학습·원본 데이터·앞선 후보는 수정하지 않았다.
+
+### 공동운반 후보의 실제 형상·PhysX 검사
+
+- 사용자 요청으로 `validate_carry_physics.py`를 추가하고 15cm 안쪽 합성본과 원본의 **728개 프레임**을 CPU PhysX에서 검사했다. 기존 asset/PD/마찰/중력/밀도·1/60초·2 substep으로 0.1초 RSI 충격 검사와 root를 강제 이동하지 않는 동작별 PD 추종을 실행했다. 학습 GPU는 사용하지 않았고 입력·캐시·checkpoint도 수정하지 않았다. 결과는 `joint_carry/archive/carry_physics_validation/`의 `report.json`, 프레임 CSV·마스크·실제 FK·rollout·요약 PNG다.
+- 원본 RSI 허용 구간에 0.1초 충격+관통 2cm 이하 기준을 적용하면 합성 **pickUp 29/55(집기 전 0~28)·carryWith 0/129·putDown 0/135**다. 충격만 보면 55/55·129/129·128/135다. 실제 형상에서 carryWith 손/팔 최대 관통 11.51/10.10cm를 확인했다. 원본도 동일한 엄격한 형상 기준에서 carryWith는 탈락하므로 기존 충격 캐시 통과와 접촉 타당성을 구분한다. RSI 승인이나 학습 연결은 하지 않았다.
+- 앞선 영상 재현 설명을 정정했다. 영상/NPZ의 full quaternion은 동일하지만 실제 팔꿈치는 Y축 1-DOF여서 기존 `MotionLib` 32-DOF 변환이 X/Z를 제외한다. 세 클립의 실제 손 위치 오차는 최대 8.45cm이고, 손을 제외한 body 원점은 전체 프레임에서 2e-5m 이내로 일치했다. 검사 형상은 **실제 시뮬레이터 FK**를 사용했다. 이후 생성기의 메타데이터/README와 실행 문서에 차이를 명시했다.
+- 실제 PD 추종에서 원본·합성 모두 장기 균형/운반 유지에 실패했다. 이는 학습된 제어기 없이 관절 target만 준 결과이며 학습 불가능의 증거가 아니다. 형상 거리의 수평 회전/이동 불변성(오차 7.8e-16m), 자유낙하 0.1초(5.31cm·-0.980m/s), 입력 SHA256 보존·Python 문법·diff 검사 통과. 캡슐 표본·사람 간 겹침 하한·CPU/GPU 차이 등 검사 범위는 보고서에 기록했다.
+
+### Carry 원본·공동운반 관절 비교 영상
+
+- 후속 요청에 따라 `--grip-inset 0.15`로 몸 전체만 각 15cm 안쪽으로 옮기고 `--skill all`로 pickUp B19·carryWith B20·putDown B21을 모두 생성했다. `joint_carry/archive/carry_joint_preview_all_inset15/`에 동작별 MP4/NPZ·약 12.13초 모음·데이터 ZIP을 저장한다. 세 클립은 별개이며 연속 궤적 합성은 아니다. 원본 RSI 제외 마스크를 보존하고 합성 물리 승인 마스크는 모두 false다.
+- 세 동작의 내부 관절각·뼈 길이 보존, 기존 영상 대비 15cm root 이동, 원본 FK 최대 오차 3.63e-7m 이하·finite·제외 마스크를 확인했다. 영상 16개 전체 디코딩과 세 동작 대표 화면을 확인했고 결과는 `validation.json`에 기록했다. 관절 데이터는 영상과 같으며, 실제 RSI 채택에는 root·상자 상태를 포함한 동시 reset과 물리 검증이 필요하다.
+- 사용자 요청으로 CPU 전용 `carry_joint_preview.py`를 추가했다. B20 carryWith 30fps·129프레임의 관절 FK를 재생하고, 상자 양 끝에 원본 자세와 180° 복제 자세를 배치한다. `joint_carry/archive/carry_joint_preview/`에 비교·개별·반속 MP4, 원본/공동운반 관절·속도 NPZ, 합성 방법·진단 JSON을 저장했다. 원본 데이터·학습 설정은 변경하지 않았다.
+- 원본 FK와 `SkeletonMotion`의 최대 오차 2.97e-7m, 32-DOF와 `MotionLib`의 각도 오차 1.27e-6rad를 확인했다. 속도 비교는 float32 입력의 작은 회전 차분에서 0.00234rad/s 오차가 보여 float64 입력으로 재확인했고, 전체 128구간 최대 오차는 2.37e-7rad/s다. 복제 FK·관절각 동일성·finite 검사, MP4 4개 전체 디코딩, 대표 3프레임 렌더, Python 문법·diff 검사 통과.
+- **RSI 후보이며 물리 검증·IK·reset 연결은 미완료**다. 낮은 발의 수평 속도 proxy가 원본 0.25m/s 대비 복제 사람 1.58m/s로 커서 단순 복제 클립의 발 미끄러짐을 확인했다. NPZ/JSON에 `rsi_ready=false`, `physics_validated=false`를 명시했다. GPU 학습·시뮬레이션은 실행하지 않았다.
 
 ### Task embedding·물리 타입 쌍별 projection 실험
 

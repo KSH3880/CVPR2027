@@ -9,9 +9,15 @@
 | `tokenhsi/run.py` | 학습·평가 태스크와 알고리즘 등록 |
 | `tokenhsi/box_cleanup_demo.py` | 지정 rescue checkpoint의 4명·16상자 정리 데모 평가 전용 진입점 |
 | `tokenhsi/scripts/multi_agent/` | 현재 실험별 train/test/VNC, `runtime_env.sh`, `run-gui.sh` |
+| `joint_carry/scripts/carry_joint_preview.py` | CPU 관절 FK로 pickUp/carryWith/putDown 원본·공동운반 MP4/NPZ 후보·모음 영상 생성, 관절각 유지한 안쪽 배치 옵션; 물리 검증·학습 reset 연결 없음 |
+| `joint_carry/scripts/validate_carry_physics.py` | 원본/합성 carry의 실제 32-DOF FK·형상 관통·CPU PhysX 0.1초 RSI 충격·free-root PD 추종 검사, 프레임별 CSV/마스크·보고서 저장 |
+| `joint_carry/scripts/correct_carry_candidates.py` | 실제 32-DOF arm IK·바닥 침범 보정, 검사 SHA256 확인 후 독립 RSI snapshot 추출·보정 전후 영상·ZIP; 학습 reset 연결 없음 |
+| `joint_carry/scripts/check_handoff.py`, `joint_carry/HANDOFF.md` | 보정본 319개 RSI snapshot의 계약·물리 입력 hash·전달 manifest 검사, 보정본 중심 ZIP 및 다음 구현 인계 |
 | `tokenhsi/data/cfg/multi_agent/` | 현재 실험 YAML과 평가 graph 예제 |
 | `tokenhsi/data/cfg/train/rlg/` | PPO/AMP/Transformer 학습 설정 |
 | `output/<실험>/<run>/` | checkpoint `nn/`, TensorBoard `summaries/`, 진단 `diagnostics/` |
+| `output_etc/` | 완료된 짧은 검증·평가·분석 보관본; `archive_manifest_20261010.json`은 이번 14폴더의 원래/현재 경로·파일 SHA256 |
+| `joint_carry/` | 전용 코드·인계 문서·보정 NPZ·물리 검사·전달 ZIP; `archive/`에는 보정 전 자료, `README.md`에는 최종 파일 안내 |
 
 ## 현재 실험이 사용하는 코드
 
@@ -51,6 +57,10 @@ Task MLP의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_stage1
 Task MLP split의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_mlp_split` 이름을 쓴다. `TaskRoleMLPFusion(split_tasks=True)`는 역할 embedding을 공유하고 task별 네 MLP·projection을 적용한다. `tests/test_task_role_mlp_split.py`는 task별 weight/gradient 독립성·공유 weight 복제 시 출력/gradient 동등성·순열·RSI/AMP/보상 동일성·checkpoint 격리를 검증한다.
 
 Task embedding의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_embedding` 이름을 쓴다. `task_role_encoder.py`의 `TaskTypeEmbeddingBias`는 task/NONE/SELF의 6개 embedding을 H/O/G 타입 쌍·layer/head별 공유 projection으로 변환한다. `TaskTypeEmbeddingFusion`은 canonical task 연결에 bias를 적용하며 이후 공통 토큰/GTA 순열 경로를 따른다. `tests/test_task_type_embedding.py`는 카테고리·타입 공유, 배경/역방향/padding, endpoint 재매핑·출력/gradient 순열, RSI/AMP/보상 동일성·checkpoint 격리를 검증한다.
+
+Task embedding action의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_embedding_action` 이름을 쓴다. `TaskTypeEmbeddingBias(zero_background=True)`는 4개 task만 인코딩하고 SELF/NONE bias를 0으로 고정한다. `TaskActionFusion`은 GTA 복귀·head concat 뒤 사람 토큰에 상태/task concat residual MLP를 적용한다. Actor endpoint를 토큰 순열에 맞게 재매핑하고 네 layer가 MLP를 공유한다. `tests/test_task_embedding_action.py`는 샘플링/RSI/AMP 계약, 주입 위치·padding·사람별 task binding·출력/gradient 순열·독립 업데이트·checkpoint 격리를 검증한다.
+
+Task/Role gate + Entmax의 전용 env/train YAML·train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax` 이름을 쓴다. `learning/multi_agent/task_role_gate.py`는 task embedding·layer별 4D block gate·sparse K/V correction·정확한 Entmax 1.5와 attention 진단을 제공한다. Gate 조회는 학습 시 one-hot GEMM gradient 합산, no-grad/frozen/FP32 TF32 시 compact index lookup을 사용하며 16D 조회 뒤 block을 확장한다. `RelationTransformerLayer`는 GTA 뒤 K/V 보정과 전체 scene 정규화를 적용하고, `ma_agent.py`는 task embedding/gate gradient norm을 추가 기록한다. `utils/task_role_spec.py`·`unified_training.py`는 bias/message 비활성화와 AMP/RSI 계약을, `relation_task_spec.py`는 checkpoint 격리를 검증한다. `tests/test_task_role_gate_entmax.py`는 dense/reference 수식·gradient·GTA 순서·role/padding·토큰/edge/task 순열·독립 업데이트·기존 runtime 계약을 확인한다.
 
 ## 작업별 확인
 

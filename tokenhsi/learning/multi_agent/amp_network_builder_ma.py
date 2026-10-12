@@ -41,6 +41,9 @@ import torch
 import torch.nn as nn
 
 from learning.amp_network_builder import AMPBuilder
+from learning.multi_agent.task_role_gate import (TaskRoleGate, BlockGate, entmax15,
+    gated_scores, gated_values, gate_diagnostics)
+from utils.task_role_spec import TASK_GATE_MODE, validate_task_gate_config
 
 # relation types between two tokens (non-learnable, derived from the assignment)
 REL_NONE = 0          # nothing ties the two entities together
@@ -66,8 +69,9 @@ RELATION_BIAS_TASK_ROLE = "task_role_lookup"
 RELATION_BIAS_TASK_MLP = "task_role_mlp"
 RELATION_BIAS_TASK_SPLIT_MLP = "task_role_mlp_split"
 RELATION_BIAS_TASK_EMBEDDING = "task_type_embedding"
+RELATION_BIAS_TASK_ACTION = "task_type_embedding_action"
 RELATION_BIAS_MODES = (RELATION_BIAS_LOOKUP, RELATION_BIAS_EDGE_MLP,
-                       RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING)
+                       RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION)
 
 
 def build_entity_type_ids(num_agents, num_objects, device=None):
@@ -146,7 +150,7 @@ from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
 from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE
 from learning.multi_agent.coordination_head import GroundedEdgeCoordination
 from learning.multi_agent.task_role_encoder import (TaskRoleFusion, TaskRoleMLPFusion,
-    TaskTypeEmbeddingBias, TaskTypeEmbeddingFusion)
+    TaskTypeEmbeddingBias, TaskTypeEmbeddingFusion, TaskActionFusion, task_action_condition)
 
 
 class EdgeEncoder(nn.Module):
@@ -217,13 +221,14 @@ class RelationTransformerLayer(nn.Module):
     nothing, whereas nn.MultiheadAttention would require a materialised (B*H, L, L) mask.
     """
 
-    def __init__(self, d_model, num_heads, dim_feedforward, activation=nn.ReLU):
+    def __init__(self, d_model, num_heads, dim_feedforward, activation=nn.ReLU, task_gate=False):
         super().__init__()
         assert d_model % num_heads == 0
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
         self.scale = 1.0 / math.sqrt(self.head_dim)
 
+        self.block_gate = BlockGate() if task_gate else None
         self.qkv = nn.Linear(d_model, 3 * d_model)
         self.proj = nn.Linear(d_model, d_model)
 
@@ -236,7 +241,8 @@ class RelationTransformerLayer(nn.Module):
 
     def forward(self, x, rel_bias=None, geo_score=None, geo_message=None,
                 gta_g=None, gta_ginv=None, diagnostics_label=None, collect_diagnostics=False,
-                relation_message=None, relation_message_alpha=1.):
+                relation_message=None, relation_message_alpha=1.,
+                task_condition=None, task_action_fusion=None, gate_condition=None):
         # x: (B,L,d), rel_bias: (H,L,L), geo_score: (B,H,L,L),
         # geo_message: (B,H,L,L,head_dim), gta matrices: (B,L,4,4)
         B, L, d = x.shape
@@ -253,7 +259,10 @@ class RelationTransformerLayer(nn.Module):
             k = apply_gta_transform(gta_ginv, k)
             v = apply_gta_transform(gta_ginv, v)
 
-        attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale            # (B, H, L, L)
+        gate_edges = self.block_gate(gate_condition) if self.block_gate is not None else None
+        if gate_edges is not None:
+            assert gta_active and rel_bias is None and relation_message is None
+        attn = gated_scores(q, k, gate_edges, self.scale) if gate_edges is not None else torch.matmul(q, k.transpose(-2, -1)) * self.scale            # (B, H, L, L)
         if collect_diagnostics:
             with torch.no_grad():
                 sampled = attn[:32].detach().float()
@@ -275,12 +284,15 @@ class RelationTransformerLayer(nn.Module):
                 v_norm = torch.linalg.vector_norm(v.detach().float(), dim=-1).mean()
                 p95 = torch.quantile(flat_logits, 0.95)
                 p99 = torch.quantile(flat_logits, 0.99)
-        attn = torch.softmax(attn, dim=-1)
+        attn = entmax15(attn, dim=-1) if gate_edges is not None else torch.softmax(attn, dim=-1)
         if collect_diagnostics:
             with torch.no_grad():
                 p = attn[:32].detach().float()
                 self.last_diagnostics = {'qk_row_rms': qk_rms,
                     'entropy': -(p * p.clamp_min(1e-12).log()).sum(-1).mean()}
+        if collect_diagnostics and gate_edges is not None:
+            self.last_diagnostics.update(gate_diagnostics(attn[:32],
+                tuple(t[:32] for t in gate_edges), gate_condition[3][:32]))
         if diagnostics_label is not None:
             with torch.no_grad():
                 probs = attn.detach().float()
@@ -290,7 +302,9 @@ class RelationTransformerLayer(nn.Module):
                           diagnostics_label, q_norm.item(), k_norm.item(), v_norm.item(),
                           p95.item(), p99.item(), entropy.item()))
 
-        if geo_message is None:
+        if gate_edges is not None:
+            out = gated_values(attn, v, gate_edges)
+        elif geo_message is None:
             out = torch.matmul(attn, v)                                     # (B,H,L,hd)
         else:
             # sum_j a_ij(V_j + g_ij), written without materialising a second
@@ -316,6 +330,11 @@ class RelationTransformerLayer(nn.Module):
                         relation_to_node_rms=message_rms / node_rms.clamp_min(1e-8))
             out = out + message
         out = out.transpose(1, 2).reshape(B, L, d)
+
+        if task_action_fusion is not None:
+            out = task_action_fusion(out, task_condition, collect_diagnostics)
+            if collect_diagnostics:
+                self.last_diagnostics.update(task_action_fusion.last_diagnostics)
 
         x = self.norm1(x + self.proj(out))
         x = self.norm2(x + self.linear2(self.act(self.linear1(x))))
@@ -527,7 +546,7 @@ class RelationEncoder(nn.Module):
                  relation_bias=True, relation_bias_mode=RELATION_BIAS_LOOKUP,
                  geometry_cfg=None, gta_cfg=None, diagnostics_name="encoder",
                  relation_reward_mode=LEGACY_MODE, diagnostics_interval=100, relation_graph_spec=None,
-                 relation_message_cfg=None):
+                 relation_message_cfg=None, relation_attention_mode=None):
         super().__init__()
         if relation_reward_mode not in (LEGACY_MODE, STATE_MODE, ONTOP_MODE, CONTEXT_MODE,
                                         ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
@@ -545,8 +564,10 @@ class RelationEncoder(nn.Module):
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
         self.semantic_only = self.stage1_context and bool(
             self.relation_graph_spec.get('semantic_only', False))
+        self.use_task_gate = relation_attention_mode == TASK_GATE_MODE
+        self.relation_attention_mode = relation_attention_mode
         self.task_role_input = bool(self.relation_graph_spec.get('policy_task_roles', False))
-        if self.task_role_input != (relation_bias_mode in (RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING)):
+        if self.task_role_input != (self.use_task_gate or relation_bias_mode in (RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION)):
             raise ValueError('Task-role packet and task-role bias mode must be paired')
         self.owner_holding_state = bool(self.relation_graph_spec.get('owner_holding_state', False))
         if self.owner_holding_state and not self.semantic_only:
@@ -560,15 +581,21 @@ class RelationEncoder(nn.Module):
         self.suffix_width = (9 * num_agents + (2 if self.ontop_mixed else 0)) if self.state_relation else 0
         self.diagnostics_interval = max(1, int(diagnostics_interval))
         self.last_diagnostics = {}
-        if self.state_relation and (observation_mode != 'clean_scene' or
-                relation_bias_mode not in (RELATION_BIAS_EDGE_MLP, RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING)
+        if self.state_relation and not self.use_task_gate and (observation_mode != 'clean_scene' or
+                relation_bias_mode not in (RELATION_BIAS_EDGE_MLP, RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION)
                 or not relation_bias):
             raise ValueError('State relation modes require clean_scene and enabled edge_mlp or typed_lookup relation bias')
-        if relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING) and (
+        if relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION) and (
                 relation_reward_mode != STAGE1_CONTEXT_MODE or not self.semantic_only
                 or self.owner_holding_state):
             raise ValueError('typed_lookup requires semantic-only Stage 1 without owner-HOLDING state')
-        if relation_bias_mode not in RELATION_BIAS_MODES:
+        if self.use_task_gate and (relation_bias or relation_bias_mode != 'none'
+                or not self.semantic_only or self.owner_holding_state
+                or relation_reward_mode != STAGE1_CONTEXT_MODE or observation_mode != 'clean_scene'
+                or (d_model, num_heads, num_layers) != (64, 2, 4)
+                or not (gta_cfg or {}).get('enable', False)):
+            raise ValueError('Task gate requires semantic-only Stage 1 GTA and disabled relation bias')
+        if relation_bias_mode not in RELATION_BIAS_MODES and not self.use_task_gate:
             raise ValueError("unknown relation_bias_mode {!r}; expected one of {}".format(
                 relation_bias_mode, RELATION_BIAS_MODES))
         self.entity_sizes = list(entity_sizes)
@@ -592,12 +619,15 @@ class RelationEncoder(nn.Module):
         self.type_embed = nn.Parameter(torch.zeros(len(self.entity_sizes), d_model))
         nn.init.trunc_normal_(self.type_embed, std=0.02)
 
-        if self.relation_bias_mode == RELATION_BIAS_LOOKUP:
+        if self.use_task_gate:
+            self.edge_encoder = None
+        elif self.relation_bias_mode == RELATION_BIAS_LOOKUP:
             # Preserve A1's parameter name and exact scalar-lookup implementation for
             # legacy checkpoints and clean-scene ablations.
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
-        elif self.relation_bias_mode == RELATION_BIAS_TASK_EMBEDDING:
-            self.edge_encoder = TaskTypeEmbeddingBias(num_layers, num_heads)
+        elif self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION):
+            self.edge_encoder = TaskTypeEmbeddingBias(num_layers, num_heads,
+                zero_background=self.relation_bias_mode == RELATION_BIAS_TASK_ACTION)
         elif self.relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE):
             self.edge_encoder = TypedEdgeBias(num_layers, num_heads, 2 if self.task_role_input else 11)
         else:
@@ -622,8 +652,8 @@ class RelationEncoder(nn.Module):
         if self.edge_context:
             compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
-            self.context_fusion = (TaskTypeEmbeddingFusion()
-                if self.relation_bias_mode == RELATION_BIAS_TASK_EMBEDDING else TaskRoleMLPFusion(num_layers, num_heads,
+            self.context_fusion = (TaskRoleGate() if self.use_task_gate else TaskTypeEmbeddingFusion()
+                if self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION) else TaskRoleMLPFusion(num_layers, num_heads,
                 split_tasks=self.relation_bias_mode == RELATION_BIAS_TASK_SPLIT_MLP)
                 if self.relation_bias_mode in (RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP) else
                 TaskRoleFusion(d_model, num_heads, num_layers,
@@ -642,8 +672,10 @@ class RelationEncoder(nn.Module):
             self.relation_message = PackedEdgeRelationMessage(
                 d_model, num_heads, float(relation_message_cfg.get('init_std', .02)))
 
+        self.task_action_fusion = TaskActionFusion() if relation_bias_mode == RELATION_BIAS_TASK_ACTION else None
+
         self.layers = nn.ModuleList([
-            RelationTransformerLayer(d_model, num_heads, dim_feedforward) for _ in range(num_layers)
+            RelationTransformerLayer(d_model, num_heads, dim_feedforward, task_gate=self.use_task_gate) for _ in range(num_layers)
         ])
 
         geometry_cfg = {} if geometry_cfg is None else geometry_cfg
@@ -761,6 +793,8 @@ class RelationEncoder(nn.Module):
         self.set_entity_counts(num_agents, num_agents)
 
     def _relation_device(self):
+        if self.use_task_gate:
+            return self.context_fusion.task_embed.weight.device
         if self.relation_bias_mode == RELATION_BIAS_LOOKUP:
             return self.rel_embed.device
         if self.relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE):
@@ -775,6 +809,8 @@ class RelationEncoder(nn.Module):
 
     def build_relation_bias(self):
         """Return semantic bias for every layer/head as (layers,heads,L,L)."""
+        if self.use_task_gate:
+            return None
         if self.relation_bias_mode == RELATION_BIAS_LOOKUP:
             return self.rel_embed[:, :, self.rel_matrix]
         return self.edge_encoder(self.entity_types, self.rel_matrix)
@@ -871,8 +907,11 @@ class RelationEncoder(nn.Module):
         relation_bias = self.build_relation_bias() if self.use_relation_bias and not self.ontop_mixed else None
         collect = self.state_relation and (self.forward_calls == 1 or
                                            self.forward_calls % self.diagnostics_interval == 0)
+        gate_condition = None
         if self.edge_context:
-            if self.relation_bias_mode == RELATION_BIAS_TASK_EMBEDDING:
+            if self.use_task_gate:
+                gate_condition = self.context_fusion(obs[:, -self.suffix_width:])
+            elif self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION):
                 relation_bias, relation_message = self.context_fusion(
                     obs[:, -self.suffix_width:], self.edge_encoder, self.entity_types, relation_bias)
             elif self.task_role_input:
@@ -899,6 +938,8 @@ class RelationEncoder(nn.Module):
             relation_bias = relation_bias.unsqueeze(1) + dynamic
         # Semantic indices stay canonical through edge construction. Permute every
         # token-indexed operand together, then restore before human/readout heads.
+        task_condition = (task_action_condition(obs[:, -self.suffix_width:],
+            self.edge_encoder.category_embed) if self.task_action_fusion is not None else None)
         inverse_order = None
         if self.relation_graph_spec.get('shuffle_token_order', False) or token_order is not None:
             if token_order is None:
@@ -907,6 +948,12 @@ class RelationEncoder(nn.Module):
                                  torch.arange(x.shape[1], device=x.device)):
                 raise ValueError('token_order must permute all entity slots')
             inverse_order = token_order.argsort()
+            if gate_condition is not None:
+                src, dst, valid, category, inputs = gate_condition
+                gate_condition = (inverse_order[src], inverse_order[dst], valid, category, inputs)
+            if task_condition is not None:
+                actors, vectors, valid = task_condition
+                task_condition = (inverse_order[actors], vectors, valid)
             x = x.index_select(1, token_order)
             if relation_bias is not None:
                 relation_bias = relation_bias.index_select(-2, token_order).index_select(-1, token_order)
@@ -929,7 +976,9 @@ class RelationEncoder(nn.Module):
             x = layer(x, rel_bias, geo_score, geo_message, gta_g, gta_ginv,
                       diagnostics_label=diagnostics_label, collect_diagnostics=collect,
                       relation_message=relation_message,
-                      relation_message_alpha=self.relation_message_alpha)
+                      relation_message_alpha=self.relation_message_alpha,
+                      task_condition=task_condition, task_action_fusion=self.task_action_fusion,
+                      gate_condition=gate_condition)
             if collect:
                 self.last_diagnostics.update({'layer{}/{}'.format(i, k): v
                                                for k, v in layer.last_diagnostics.items()})
@@ -1011,6 +1060,9 @@ class AMPMultiAgentBuilder(AMPBuilder):
             num_layers = tp["num_layers"]
             dim_ff = tp["layer_dim_feedforward"]
             tokenizer_units = tp["tokenizer_units"]
+            gate_enabled = validate_task_gate_config(tp)
+            if gate_enabled and (not params.get('separate', False) or self.stage2):
+                raise ValueError('Task gate requires separate actor/critic Stage 1')
             relation_bias = bool(tp.get("relation_bias", True))
             configured_relation_bias_mode = tp.get(
                 "relation_bias_mode", RELATION_BIAS_LOOKUP)
@@ -1066,6 +1118,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                        relation_reward_mode=self.relation_reward_mode,
                                        relation_graph_spec=self.relation_graph_spec,
                                        relation_message_cfg=tp.get('relation_message'),
+                                       relation_attention_mode=tp.get('relation_attention_mode'),
                                        diagnostics_interval=tp.get('relation_diagnostics_interval', 100),
                                        diagnostics_name=diagnostics_name)
 
@@ -1098,6 +1151,12 @@ class AMPMultiAgentBuilder(AMPBuilder):
                         mlp_init(m.weight)
                         if getattr(m, "bias", None) is not None:
                             torch.nn.init.zeros_(m.bias)
+            for enc in (self.actor_encoder, self.critic_encoder):
+                for layer in enc.layers:
+                    if layer.block_gate is not None:
+                        layer.block_gate.reset_output()
+                if enc.task_action_fusion is not None:
+                    enc.task_action_fusion.reset_output()
             if self.actor_encoder.owner_holding_state:
                 for branch in (self.actor_encoder.context_fusion.state_mlp,
                                self.critic_encoder.context_fusion.state_mlp):

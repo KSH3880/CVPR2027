@@ -1,7 +1,7 @@
 """Task-family AMP contracts for the independent unified Stage-1 experiment."""
 import torch
 import torch.nn.functional as F
-from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
+from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT, TASK_GATE_MODE, validate_task_gate_config, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
 
 FAMILIES = ('carry', 'sit', 'climb')
 SKILLS = ('loco', 'sit', 'climb', 'climbNoRSI', 'omomo', 'pickUp', 'carryWith', 'putDown')
@@ -107,20 +107,25 @@ def validate_typed_bias_config(env, train):
     transformer = train['params']['network'].get('transformer', {})
     if selected != (transformer.get('relation_bias_mode') == 'typed_lookup'):
         raise ValueError('Size RSI typed-bias variant and typed_lookup train config must be paired')
+    gated = validate_task_gate_config(transformer)
+    if gated != (variant == TASK_GATE_VARIANT):
+        raise ValueError('Task gate variant and attention mode must be paired')
     task_roles = variant in TASK_ROLE_VARIANTS
     task_modes = {TASK_ROLE_VARIANT: 'task_role_lookup', TASK_ROLE_MLP_VARIANT: 'task_role_mlp',
                   TASK_ROLE_SPLIT_MLP_VARIANT: 'task_role_mlp_split',
-                  TASK_EMBEDDING_VARIANT: 'task_type_embedding'}
-    mode = transformer.get('relation_bias_mode')
+                  TASK_EMBEDDING_VARIANT: 'task_type_embedding',
+                  TASK_EMBEDDING_ACTION_VARIANT: 'task_type_embedding_action',
+                  TASK_GATE_VARIANT: TASK_GATE_MODE}
+    mode = TASK_GATE_MODE if gated else transformer.get('relation_bias_mode')
     if (task_roles != (mode in task_modes.values())
             or task_roles and mode != task_modes[variant]
             or task_roles != bool(env.get('relationGraph', {}).get('policy_task_roles', False))):
         raise ValueError('Task-role variant, policy packet and bias mode must be paired')
     if (selected or task_roles) and (transformer.get('share_edge_encoder', False)
-                     or transformer.get('relation_bias') is not True):
+                     or transformer.get('relation_bias') is not (not gated)):
         raise ValueError('Typed bias requires enabled bias and separate actor/critic tables')
     message = transformer.get('relation_message', {})
-    if variant == TASK_EMBEDDING_VARIANT and (
+    if variant in (TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT) and (
             transformer.get('num_features') != 64
             or transformer.get('num_layers') != 4
             or transformer.get('layer_num_heads') != 2

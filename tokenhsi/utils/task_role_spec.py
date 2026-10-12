@@ -7,7 +7,10 @@ TASK_ROLE_VARIANT = SIZE_RSI_VARIANT + '_task_message'
 TASK_ROLE_MLP_VARIANT = SIZE_RSI_VARIANT + '_task_mlp'
 TASK_ROLE_SPLIT_MLP_VARIANT = SIZE_RSI_VARIANT + '_task_mlp_split'
 TASK_EMBEDDING_VARIANT = SIZE_RSI_VARIANT + '_task_embedding'
-TASK_ROLE_VARIANTS = (TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT)
+TASK_EMBEDDING_ACTION_VARIANT = SIZE_RSI_VARIANT + '_task_embedding_action'
+TASK_GATE_VARIANT = SIZE_RSI_VARIANT + '_task_role_gate_entmax'
+TASK_GATE_MODE = 'task_role_gate_entmax'
+TASK_ROLE_VARIANTS = (TASK_GATE_VARIANT, TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT)
 TASKS = ('sit', 'climb', 'carry_at', 'carry_ontop')
 TASK_FIELDS = ('valid', 'task', 'actor', 'payload', 'target')
 TASK_PROBS = (0., .10, .25, .325, .325)
@@ -56,3 +59,32 @@ def task_edges(packet):
     dst_role = torch.tensor([1, 2, 2], device=packet.device).expand_as(dst)
     task = task[..., None].expand_as(src)
     return tuple(x.flatten(1) for x in (active, src, dst, task, src_role, dst_role))
+
+
+def validate_task_gate_config(transformer):
+    """Reject partial attention switches, including accidentally enabled bias."""
+    mode = transformer.get('relation_attention_mode')
+    enabled = mode == TASK_GATE_MODE
+    if mode not in (None, TASK_GATE_MODE):
+        raise ValueError('Unknown relation_attention_mode')
+    if not enabled:
+        if transformer.get('task_role_gate', {}).get('enable', False) or transformer.get('attention_normalizer', 'softmax') != 'softmax':
+            raise ValueError('Task gate and entmax must be paired with the new attention mode')
+        return False
+    expected = dict(enable=True, task_embedding_dim=64, role_onehot_dim=3,
+                    hidden_dim=64, gta_block_size=4, shared_gate_for_key_value=True,
+                    zero_init_output=True)
+    if (transformer.get('relation_bias') is not False
+            or transformer.get('relation_bias_mode') != 'none'
+            or transformer.get('relation_message', {}).get('enable', False)
+            or transformer.get('share_edge_encoder', False)
+            or transformer.get('task_role_gate') != expected
+            or transformer.get('attention_normalizer') != 'entmax15'
+            or transformer.get('num_features') != 64
+            or transformer.get('num_layers') != 4
+            or transformer.get('layer_num_heads') != 2
+            or transformer.get('gta', {}).get('enable') is not True
+            or transformer.get('gta', {}).get('representation') != 'se3_direct_sum'
+            or transformer.get('geometry', {}).get('enable', False)):
+        raise ValueError('Task gate requires bias/message off, independent 64-D/2-head/4-layer GTA and entmax15')
+    return True

@@ -650,6 +650,17 @@ class MAAgent(amp_agent.AMPAgent):
         network = self.model.a2c_network
         for name in ('actor', 'critic'):
             encoder = getattr(network, name + '_encoder')
+            if getattr(encoder, 'use_task_gate', False):
+                task_grad = encoder.context_fusion.task_embed.weight.grad
+                if task_grad is not None:
+                    for task_id, task_name in enumerate(('sit', 'climb', 'carry_at', 'carry_ontop')):
+                        self.writer.add_scalar('relation_attention/{}/{}_embedding_grad_norm'.format(
+                            name, task_name), task_grad[task_id].norm().item(), frame)
+                for layer_id, layer in enumerate(encoder.layers):
+                    gradients = [p.grad.detach().square().sum() for p in layer.block_gate.parameters() if p.grad is not None]
+                    if gradients:
+                        self.writer.add_scalar('relation_attention/{}/layer{}/gate_grad_norm'.format(
+                            name, layer_id), torch.stack(gradients).sum().sqrt().item(), frame)
             for key, value in encoder.last_diagnostics.items():
                 self.writer.add_scalar('relation_attention/{}/{}'.format(name, key), value.item(), frame)
 

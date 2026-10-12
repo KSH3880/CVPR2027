@@ -5,15 +5,17 @@ from utils.task_role_spec import task_edges
 
 
 class TaskTypeEmbeddingBias(nn.Module):
-    """Six category vectors, projected by directed physical type pair/layer/head.
+    """Category vectors, projected by directed physical type pair/layer/head.
 
-    Categories 0..3 are sit/climb/carry_at/carry_ontop; 4=NONE, 5=SELF.
-    Both background and task edges use the same projection parameters. Entity
-    IDs and actor/payload/target roles never enter the embedding or projection.
+    Categories 0..3 are sit/climb/carry_at/carry_ontop. With zero_background=False,
+    4=NONE and 5=SELF share the task projection. Otherwise only four task vectors
+    exist and background bias is exactly zero. Entity IDs and actor/payload/target
+    roles never enter the embedding or projection.
     """
-    def __init__(self, num_layers, num_heads):
+    def __init__(self, num_layers, num_heads, zero_background=False):
         super().__init__()
-        self.category_embed = nn.Embedding(6, 64)
+        self.zero_background = zero_background
+        self.category_embed = nn.Embedding(4 if zero_background else 6, 64)
         nn.init.trunc_normal_(self.category_embed.weight, std=.02)
         self.bias_projection = nn.Parameter(torch.zeros(3, 3, num_layers, num_heads, 64))
 
@@ -23,9 +25,53 @@ class TaskTypeEmbeddingBias(nn.Module):
 
     def forward(self, entity_types, relations):
         # Background relations contain only NONE=0 and SELF=1.
+        if self.zero_background:
+            layers, heads = self.bias_projection.shape[2:4]
+            return self.bias_projection.new_zeros(layers, heads, len(entity_types), len(entity_types))
         table = self.bias_table()
         values = table[relations + 4, entity_types[:, None], entity_types[None, :]]
         return values.permute(2, 3, 0, 1)
+
+
+class TaskActionFusion(nn.Module):
+    """Shared across layers: z_H += MLP([z_H, e_task]), without attention weighting.
+
+    Explicit actor indices follow token permutations; packet record order never
+    determines which human receives the task. Only valid human records are added.
+    """
+    def __init__(self):
+        super().__init__()
+        self.mlp = nn.Sequential(nn.Linear(128, 64), nn.ReLU(), nn.Linear(64, 64))
+        self.reset_output()
+
+    def reset_output(self):
+        # Also called after the network builder's global Linear initialization.
+        nn.init.zeros_(self.mlp[-1].weight)
+        nn.init.zeros_(self.mlp[-1].bias)
+
+    def forward(self, tokens, condition, collect_diagnostics=False):
+        actors, task_vectors, valid = condition
+        indices = actors[..., None].expand(-1, -1, tokens.shape[-1])
+        humans = tokens.gather(1, indices)
+        delta = self.mlp(torch.cat((humans, task_vectors), -1)) * valid[..., None]
+        if collect_diagnostics:
+            with torch.no_grad():
+                mask = valid[:32, :, None].to(humans.dtype)
+                count = (mask.sum() * humans.shape[-1]).clamp_min(1)
+                state_rms = (humans[:32].detach().float().square() * mask).sum().div(count).sqrt()
+                delta_rms = delta[:32].detach().float().square().sum().div(count).sqrt()
+                self.last_diagnostics = dict(task_action_input_rms=state_rms,
+                    task_action_delta_rms=delta_rms,
+                    task_action_to_input_rms=delta_rms / state_rms.clamp_min(1e-8))
+        return tokens.scatter_add(1, indices, delta)
+
+
+def task_action_condition(packet, embedding):
+    valid, task, actor, _, _ = packet.reshape(packet.shape[0], -1, 5).long().unbind(-1)
+    valid = valid.bool()
+    actors = actor.masked_fill(~valid, 0)
+    vectors = embedding(task.masked_fill(~valid, 0)) * valid[..., None]
+    return actors, vectors, valid
 
 
 class TaskTypeEmbeddingFusion(nn.Module):
