@@ -41,5 +41,5 @@ def transfer_joint_push(agent, checkpoint):
     agent.model.load_state_dict(target,strict=True)
     for name,module in normalizers.items():module.load_state_dict(checkpoint[name],strict=True)
     return dict(source_epoch=int(checkpoint['epoch']),copied_tensors=copied,new_tensors=new,
-        freeze='actor_encoder_and_observation_rms',head_expansion=[64,64],rsi='loco_only',
+        freeze='actor_encoder_and_observation_rms',head_expansion=[64,64],rsi=task._joint_push_spec['rsi'],
         optimizer='fresh',counters='fresh')

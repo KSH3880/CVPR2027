@@ -21,6 +21,7 @@ def cpa_penalty(pos, vel, distance, discount, dt):
 
 
 class HumanoidMAJointPush(HumanoidMAOpenPush):
+    RSI_MODE = "loco_only"
     def __init__(self,cfg,*args,**kwargs):
         self._joint_push=True
         spec=cfg['env']['jointPush']
@@ -28,8 +29,12 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
             raise ValueError('Joint Push requires two agents and four observation object slots')
         if cfg['env'].get('openPushRSI') or cfg['env']['skillInitProb']!=[1.,0.,0.]:
             raise ValueError('Joint Push requires loco-only RSI')
-        if spec['rsi']!='loco_only' or spec['amp_history']!='repeat_reset_state':
+        if spec['rsi']!=self.RSI_MODE or spec['amp_history']!='repeat_reset_state':
             raise ValueError('Unsupported joint Push initialization')
+        if spec.get('goal_mode','goal360') not in ('goal360','box_forward'):
+            raise ValueError('Unsupported joint Push goal mode')
+        if spec.get("face_mode", "goal_dynamic") not in ("goal_dynamic", "reset_fixed"):
+            raise ValueError("Unsupported Push face mode")
         self._joint_push_spec=spec
         from env.tasks.multi_agent.joint_push_reward import validate_config
         validate_config(spec['reward'])
@@ -39,7 +44,7 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
             raise ValueError('Joint Push requires Carry CPA collision contract')
         super().__init__(cfg,*args,**kwargs)
         import os
-        if os.environ.get('JOINT_PUSH_AUDIT_PATH'):
+        if self.RSI_MODE=='loco_only' and os.environ.get('JOINT_PUSH_AUDIT_PATH'):
             from utils.joint_push_audit import audit_runtime
             audit_runtime(self,os.environ['JOINT_PUSH_AUDIT_PATH'])
 
@@ -77,11 +82,24 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         self._box_states[env_ids,:2,:2]=box.new_tensor([[5.,-5.],[-5.,5.]])
         self._push_reset_states[env_ids]=self._box_states[env_ids,2:]
         # All directions, matching Goal360; fixed goal survives contact changes.
-        angle=torch.rand(len(env_ids),device=self.device)*2*torch.pi
+        aligned=self._joint_push_spec.get('goal_mode','goal360')=='box_forward'
+        angle=None if aligned else torch.rand(len(env_ids),device=self.device)*2*torch.pi
         lo,hi=self._joint_push_spec['goal_distance']
         distance=lo+(hi-lo)*torch.rand(len(env_ids),device=self.device)
-        offset=torch.stack((distance*angle.cos(),distance*angle.sin(),torch.zeros_like(distance)),-1)
+        if aligned:
+            from env.tasks.multi_agent.joint_push_goal_geometry import aligned_goal_offset
+            offset=aligned_goal_offset(yaw,distance)
+        else:
+            offset=torch.stack((distance*angle.cos(),distance*angle.sin(),torch.zeros_like(distance)),-1)
         self._push_goal_offsets[env_ids]=offset[:,None]
+        # Store one box-local face for both agents; update only the reset subset.
+        if not hasattr(self, '_push_face_local_normal'):
+            self._push_face_local_normal=torch.zeros(self.num_envs,2,device=self.device)
+        c,s=yaw.cos(),yaw.sin()
+        local=torch.stack((c*offset[:,0]+s*offset[:,1],-s*offset[:,0]+c*offset[:,1]),-1)
+        axis=(local[:,1].abs()>=local[:,0].abs()).long()
+        sign=torch.where(local.gather(1,axis[:,None])>=0,1.,-1.)
+        self._push_face_local_normal[env_ids]=torch.zeros_like(local).scatter(1,axis[:,None],sign)
 
     def _reset_task(self,env_ids):
         target=self._box_states[env_ids,2,:3]+self._push_goal_offsets[env_ids,0]
@@ -133,9 +151,17 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
             self.render();self.gym.simulate(self.sim);self.gym.fetch_results(self.sim,True);self._refresh_sim_tensors()
             collect_foot_support(self)
 
+    def _joint_push_face_geometry(self):
+        if self._joint_push_spec.get('face_mode','goal_dynamic')!='reset_fixed':
+            return None
+        from env.tasks.multi_agent.joint_push_reward import push_face_geometry
+        return push_face_geometry(self._box_states[:,2],self._tar_pos[:,0],
+            self.cfg['env']['pushBox']['size'],self._joint_push_spec['reward'],
+            local_normal=self._push_face_local_normal)
+
     def _compute_reward(self,actions):
         r=joint_push_reward(self._humanoid_root_states,self._rigid_body_pos[:,:,self._key_body_ids[:2]],
-            self._box_states[:,2],self._tar_pos[:,0],self.cfg['env']['pushBox']['size'],self._joint_push_spec['reward'])
+            self._box_states[:,2],self._tar_pos[:,0],self.cfg['env']['pushBox']['size'],self._joint_push_spec['reward'],face_geometry=self._joint_push_face_geometry())
         runtime=self.relation_runtime
         runtime.phi.copy_(r['phi_raw'].reshape(self.num_envs,4))
         runtime.own_success.copy_(r['own_success'].reshape(self.num_envs,4));runtime.achieved.copy_(runtime.own_success)

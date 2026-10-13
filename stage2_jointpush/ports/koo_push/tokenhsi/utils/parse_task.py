@@ -65,6 +65,7 @@ from env.tasks.multi_agent.humanoid_ma_door import HumanoidMADoor
 from env.tasks.multi_agent.humanoid_ma_door_hold import HumanoidMADoorHold
 from env.tasks.multi_agent.humanoid_ma_open_push import HumanoidMAOpenPush
 from env.tasks.multi_agent.humanoid_ma_joint_push import HumanoidMAJointPush
+from env.tasks.multi_agent.humanoid_ma_joint_push_koo_rsi import HumanoidMAJointPushKooRSI
 from env.tasks.multi_agent.humanoid_ma_joint_push_virtual import HumanoidMAJointPushVirtual
 #########
 

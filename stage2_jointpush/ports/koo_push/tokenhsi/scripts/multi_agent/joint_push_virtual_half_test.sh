@@ -8,7 +8,7 @@ set -- --task_graph push
 if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then set -- "$@" --episode_length "$EPISODE_LENGTH"; fi
 exec python tokenhsi/run.py --task HumanoidMAJointPushVirtual \
- --cfg_env tokenhsi/data/cfg/multi_agent/joint_push_virtual_half_stage1.yaml \
+ --cfg_env "${VIRTUAL_CFG_ENV:-tokenhsi/data/cfg/multi_agent/joint_push_virtual_half_stage1.yaml}" \
  --cfg_train tokenhsi/data/cfg/train/rlg/joint_push_virtual_half_stage1.yaml \
  --motion_file tokenhsi/data/dataset_open_push_push180.yaml \
  --checkpoint "$CKPT" --num_agents 2 --num_envs "${NUM_ENVS:-16}" --num_objects 4 \

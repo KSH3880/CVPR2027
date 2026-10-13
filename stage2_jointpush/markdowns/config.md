@@ -1,3 +1,75 @@
+## 공동 Push 접촉면 고정 (2026-10-13)
+
+새 loco/koo RSI 및 정면 정렬 Stage2 설정은 `jointPush.face_mode: reset_fixed`를 사용한다. reset에서 목표 방향에 가장 가까운 뒷면을 한 번 선택해 상자 로컬 법선을 저장한다. 두 agent는 같은 면을 공유하고, 이후 목표 방향이 경계를 넘어도 재선택하지 않는다. 상자의 이동·yaw 회전에 따라 접촉면 중심과 법선은 갱신된다. 부분 reset은 해당 환경의 면만 갱신한다. 손의 lateral 대칭·간격·높이 보상은 유지한다.
+
+기존 checkpoint에서 복원한 설정에 face_mode가 없으면 이전 `goal_dynamic` 규칙을 유지한다. 이는 저장 모델의 보상 계약 보존을 위한 것이며, 면 고정 학습은 새 설정으로 시작해야 한다. 곡선 Stage1 비교는 기존처럼 local -Y 고정면을 사용한다. 정면 정렬 새 설정의 질량은40kg이다.
+
+## 정면 정렬 공동 Push (2026-10-13)
+
+상자 yaw는 랜덤으로 유지하되 초기 목표를 box local +Y에 정렬하는 `goal_mode: box_forward` 설정을 추가했다. 기존 목표 방향 독립 랜덤 설정은 보존한다. 새 설정의 상자는 2.6×2.6×2.6m, 40kg이다. 기존 본학습 checkpoint는 40kg이며 자동 변경되지 않는다. 보상·AMP·모델 구조는 기존 설정을 따른다.
+
+```bash
+# 기본 loco-only RSI, GPU6
+bash stage2_jointpush/scripts/joint_push_aligned_train.sh
+# koo Push/loco 혼합 RSI
+RSI=koo bash stage2_jointpush/scripts/joint_push_aligned_train.sh
+# 해당 정렬 설정에서 저장한 checkpoint 평가 / 로컬 viewer / 서버 VNC
+bash stage2_jointpush/scripts/joint_push_aligned_test.sh /absolute/path/checkpoint.pth
+HEADLESS=0 bash stage2_jointpush/scripts/joint_push_aligned_test.sh /absolute/path/checkpoint.pth
+PORT=6086 bash stage2_jointpush/scripts/joint_push_aligned_view.sh /absolute/path/checkpoint.pth
+```
+
+koo 모델 평가·뷰어에는 `RSI=koo`를 지정한다. 기존 goal360 checkpoint의 정렬 학습 재개 및 정렬 전용 평가를 거부한다. 새 학습은 기존 Stage1 전이에서 시작하며 동일 정렬 모델의 `RESUME_CHECKPOINT`만 재개한다. 새 본학습은 자동 실행하지 않았다.
+
+질량 변경 전 60kg 설정에서 CPU 관련 테스트11개 통과. GPU6 4환경120step Base 정책 검증 rc=0; 초기 목표/면 법선 cosine=1.0, 실측 질량59.999996kg, reset/AMP 유한성 확인. 이는 환경 검증이며 학습 성능 검증은 아니다. 산출물: `runs/jointpush/aligned_goal_check_20261013/`.
+
+## koo Push RSI 사용 (2026-10-13)
+
+별도 `HumanoidMAJointPushKooRSI` / `joint_push_koo_rsi_ca4.yaml`을 추가했다. 실행 중인 loco-only 학습은 바꾸지 않는다. koo `open_push_push180_contact_at_warmstart.yaml`의 값을 그대로 따른다.
+
+| 설정 | 값 |
+|---|---|
+| interaction/loco | 0.5 / 0.5 |
+| late 요청 비율 | 0.7 |
+| motion별 late 구간 | 후반0.3 |
+| 손 stand-off | 0.06m |
+| loco stateInit | Start |
+
+원본은 사람별 독립 RSI지만 공동 Push는 환경별로 두 사람의 interaction 여부·Push motion/frame·상자 진행률을 공유한다. 그렇지 않으면 한 상자를 서로 다른 진행률로 덮어쓴다. 손은 큰 상자 뒷면의 lateral±면반폭0.5에 각각 배치하고 koo의 `lower_push_arms`·`align_push_pose`를 재사용한다. 손별 lateral offset/height는 기존 koo push 명세를 따른다. source bank의 `box_progress`만큼 실제 공유 상자를 한 번 이동하며 최종 목표는 원래 위치에 고정한다. 초깃값은 실제 reset 상태를 반복한 AMP history로 유지하고, AMP expert 혼합0.33loco/0.67Push는 변경하지 않는다.
+
+복사본의 bank1048개 Push 후보와 PD_12_steps/source물리·reward·motion hash 계약을 검증한다. 이 bank는 작은 단독 상자의 검증 결과이며 큰 공유 상자의 전체 후보를 새로 PD screen한 bank로 주장하지 않는다. 공유 환경에서 실제 reset·손6cm 정렬·finite·학습/eval을 별도 검증한다.
+
+```bash
+# 신규 RSI 학습: 기본60kg, Stage1 epoch29000에서 전이
+bash stage2_jointpush/scripts/joint_push_rsi_train.sh
+# 저장 모델에 대해 RSI만 바꾸는 평가/뷰어: 물리·보상은 모델 설정 복원
+bash stage2_jointpush/scripts/joint_push_rsi_test.sh /absolute/path/checkpoint.pth
+PORT=6085 bash stage2_jointpush/scripts/joint_push_rsi_view.sh /absolute/path/checkpoint.pth
+```
+
+모든진입점GPU6고정. 짧은검증은MAX_ITERATIONS를양수로지정한다.0은CLI에서상한변경을하지않으므로새RSIwrapper에서거부한다. `OUTPUT_PATH`, `MAX_ITERATIONS`(학습), `SEED`, `NUM_ENVS`/`REPEATS`(평가), `STAGE1_CHECKPOINT`(신규학습)을 지원한다. RSI 모델끼리의 `RESUME_CHECKPOINT`는 동일 RSI 계약으로 재개한다. 기존 loco-only 모델의 optimizer를 그대로 RSI 학습으로 전환하는 재개는 지원하지 않으며 테스트/뷰어에서 RSI-only 진단만 허용한다. 진단은 기존40kg 모델이면40kg으로 수행하고 기본60kg과 구분한다. 엄격한 physics/reward 검증은 유지하며 초기화 항목만 명시적으로 허용한다.
+
+16환경600step·9000iter40kg모델 평가 rc=0, 초기9개 환경이Push RSI로시작, 손중점깊이약-0.06m 확인. 목표성공0/16·scene종료6.25%, 최종PUSH edge성공각18.75%. 초기위치/phase가달라loco-only평가와성과를직접비교하지않는다. 결과 `runs/jointpush/koo_rsi_check_20261013/`에기록했다. 2048환경60kg신규학습reset에서1040환경interaction·738late요청·손depth[-0.06000020,-0.05999976] 확인;검증산출물 `runs/jointpush/koo_rsi_train_check_20261013/`.
+
+## 60kg 곡선 Push 무학습 비교 (2026-10-12)
+
+`joint_push_curve_test.sh` / `joint_push_curve_view.sh`는 실제2.6m cube60kg, 기존 koo Stage1, 뒷면·바닥 정렬1.3m 가상 cube 두 개를 사용한다. 목표는 초기 box local+Y 방향에서 좌우20–30° 어긋나게 배치하고 거리2.2–2.8m를 유지한다. 사람이 사용하는 면은 local-Y로 고정하며 box 회전에 따라 움직인다. 곡선 경로를 강제로 추종하는 것이 아니라, 방향 오차가 있는 상황에서 같은 면을 밀어 조향하는지 보는 비교다. 추가 학습은 없다.
+
+agent별 초기 lateral 위치를 자기 가상 cube와 일치하도록 수정했다. 기존 carry tangent 방향을 그대로 썼을 때 일부방향의agent가자기cube반대쪽에서시작할수있던문제였다. 실제 reset 감사에서 lane오차<1e-4·뒷면뒤1–2m를 검증한다. 곡선 비교의 접촉 보상도 목표 방향 변화에 따라 옆면으로 바뀌지 않게 고정한다.
+
+```bash
+bash stage2_jointpush/scripts/joint_push_curve_test.sh
+PORT=6084 bash stage2_jointpush/scripts/joint_push_curve_view.sh
+```
+
+GPU6 고정. 뷰어는6084포트포워딩. `OUTPUT_PATH`, `NUM_ENVS`, `REPEATS`, `STAGE1_CHECKPOINT`, `SEED` 사용 가능. CPU14개 통과, GPU6 16환경600step 평가 rc=0. 실제질량59.999996kg·초기20–30°·lane최대오차2.4e-7m 확인. 공동목표성공0/16,scene종료43.75%. trace30→570step 평균실제목표거리2.325→1.548m. 단일시드작은표본으로곡선제어성공을입증하지않는다. 산출물은 `runs/jointpush/virtual_curve_aligned_check_20261012/`다. 수정전초기배치검사는 `virtual_curve_check_20261012/`에보존했다.
+
+Stage2 재개도 checkpoint 저장 env를 자동 복원하도록 변경했다. 따라서40kg 원본모델은40kg 그대로재개한다. 사용자실수로종료된본학습은2000itercheckpoint에서 `runs/jointpush/training_resume_20261012/`에재개했다. 곡선60kg비교와분리한다.
+
+## Stage2 평가 설정 복원 (2026-10-12)
+
+`joint_push_test.sh`와 `joint_push_view.sh`는 이제 checkpoint의 저장 env를 runs 아래 YAML로 복원한다. 따라서 기본 질량60kg과 달라도 기존40kg 모델을 원래40kg으로 평가한다. 엄격한 physics/reference 검증은 유지하며 무학습 가상 box 뷰어는별도 `joint_push_virtual_view.sh`로 실행한다. 학습 재개 스크립트도 checkpoint 저장 환경을 자동 복원한다.
+
 ## 현재 무학습 비교 관측: 뒷면 정렬1.3m cube (2026-10-12)
 
 이전 가로 폭만 절반인1.3×2.6×2.6m 관측은 잘못된 크기 해석이었다. 현재는 agent별 가상 box를 Stage1 학습 크기인1.3×1.3×1.3m로 수정했다. 실제2.6m cube의 미는 뒷면과 바닥에 정확히 맞추고 좌우로 배치한다. local offset은 가로±0.65m, 목표를 향하는 법선 반대 방향0.65m, 아래로0.65m이며 가상 중심 높이는 바닥에서0.65m다. 목표에도 같은 offset을 적용해 공유 실제 box와 동일한 이동량을 요구한다. 회전/속도/corners/goal pose를 함께 갱신한다.

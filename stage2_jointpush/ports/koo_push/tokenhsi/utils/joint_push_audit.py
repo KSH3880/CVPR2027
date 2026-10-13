@@ -16,6 +16,10 @@ def audit_runtime(task,path):
     assert set(task._reset_ref_motion_ids)=={'loco'}
     assert torch.allclose(task._hist_amp_obs_buf,task._curr_amp_obs_buf[:,:,None].expand_as(task._hist_amp_obs_buf))
     center,normal,tangent,half,_=push_face_geometry(task._box_states[:,2],task._tar_pos[:,0],task.cfg['env']['pushBox']['size'],task._joint_push_spec['reward'])
+    delta=task._tar_pos[:,0,:2]-task._box_states[:,2,:2]
+    goal_cosine=(delta*normal).sum(-1)/delta.norm(dim=-1)
+    if task._joint_push_spec.get('goal_mode')=='box_forward':
+        assert torch.allclose(goal_cosine,torch.ones_like(goal_cosine),atol=1e-6)
     relative=task._humanoid_root_states[...,:2]-center[:,None,:2]
     depth=(relative*normal[:,None]).sum(-1);lateral=(relative*tangent[:,None]).sum(-1)
     assert ((depth<=-1.)&(depth>=-2.)).all()
@@ -28,15 +32,27 @@ def audit_runtime(task,path):
     labels=demo.reshape(4096,task._num_amp_obs_steps,-1)[...,-2:]
     assert (labels[...,0]==0).all() and (labels[...,1]==1).all()
     assert torch.isfinite(demo).all()
+    saved_face=task._push_face_local_normal.clone()
+    fixed=task._joint_push_spec.get('face_mode')=='reset_fixed'
+    if fixed:
+        geometry=task._joint_push_face_geometry()
+        original_goal=task._tar_pos.clone()
+        task._tar_pos[:,:,:2]=task._box_states[:,2,None,:2]-delta[:,None]
+        changed=task._joint_push_face_geometry()
+        for old,new in zip(geometry,changed):assert torch.equal(old,new)
+        task._tar_pos.copy_(original_goal)
     before=task._humanoid_root_states[1:].clone();before_graph=graph.edge_src[1:].clone();before_goal=task._tar_pos[1:].clone()
     task._reset_envs(ids[:1])
     assert torch.equal(before,task._humanoid_root_states[1:])
     assert torch.equal(before_graph,graph.edge_src[1:]) and torch.equal(before_goal,task._tar_pos[1:])
+    assert torch.equal(saved_face[1:],task._push_face_local_normal[1:])
     task._compute_reward(None)
     assert torch.isfinite(task.rew_buf).all()
     report=dict(num_envs=task.num_envs,shared_box=2,shared_goal=0,size=task.cfg['env']['pushBox']['size'],
+        face_mode=task._joint_push_spec.get("face_mode","goal_dynamic"),fixed_face_goal_change_checked=fixed,
         measured_mass=mass,loco_only_rsi=True,repeat_reset_history=True,partial_reset_preserved=True,
-        conditioned_push_amp_finite=True,spawn_depth_range=[depth.min().item(),depth.max().item()],
+        conditioned_push_amp_finite=True,goal_mode=task._joint_push_spec.get('goal_mode','goal360'),
+        initial_goal_face_cosine_min=goal_cosine.min().item(),spawn_depth_range=[depth.min().item(),depth.max().item()],
         min_root_gap=(task._humanoid_root_states[:,0,:2]-task._humanoid_root_states[:,1,:2]).norm(dim=-1).min().item())
     target=Path(path);target.parent.mkdir(parents=True,exist_ok=True);target.write_text(json.dumps(report,indent=2)+'\n')
     print('[Joint Push runtime audit]',report,flush=True)

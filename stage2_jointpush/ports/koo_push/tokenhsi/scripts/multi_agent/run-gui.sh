@@ -90,6 +90,8 @@ fi
 DISPLAY_NUM=""
 for n in $(seq 99 130); do
     if [ ! -e "/tmp/.X11-unix/X$n" ] && [ ! -e "/tmp/.X$n-lock" ]; then
+        # The display may be free while an unrelated VNC service owns its port.
+        if ss -ltn 2>/dev/null | grep -q ":$((5900 + n)) "; then continue; fi
         DISPLAY_NUM=$n
         break
     fi

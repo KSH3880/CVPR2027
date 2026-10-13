@@ -2,7 +2,51 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-13
+
+### 공동 Push 에피소드 접촉면 고정
+
+- 목표 방향을 매 프레임 따라가며45도 경계에서 면이 바뀌던 새 Stage2 설정을 reset_fixed로 변경했다. reset에서 저장한 상자 로컬 법선 하나를 두 사람이 공유한다. 상자 회전/이동을 따르고 부분 reset은 해당 환경만 갱신한다. 이전 checkpoint는 저장된 goal_dynamic 계약을 보존한다.
+- CPU12개 통과: 목표 반전/각도 경계/상자 회전 및 두 사람 접촉 보상 확인. GPU6 4환경120step Base 정책 검사 rc=0,40kg 실측 및 목표 반전 시 고정 면 불변/부분reset 보존 확인. 산출물 runs/jointpush/fixed_face_check_20261013/. 새 학습은 실행하지 않았다.
+
+### 정렬 Push 상자 질량 40kg으로 변경
+
+- 사용자 요청으로 새 loco/koo 정렬 프로필의 mass를 모두40kg으로 변경했다. 크기2.6m cube 및 정렬/RSI/보상은 유지한다. 실행 중인 프로세스는 변경하지 않았다.
+- 두 YAML 질량40 및 goal_mode box_forward 확인, diff 공백 검사 통과. 이전60kg 시뮬레이션 검증은 당시 설정의 기록으로 보존한다.
+
+### 정면 정렬 60kg 학습 프로필
+
+- 초기 목표를 box local +Y에 정렬하는 loco/koo RSI 프로필과 전용 train/test/view 진입점 추가. yaw 랜덤과 기존 보상·AMP·모델 유지. 기존 goal360 checkpoint 혼용 거부. 기존 본학습40kg 및 MPS는 변경하지 않았다.
+- CPU11개 통과, GPU6 4환경120step 환경 검증 rc=0. 목표/면 cosine1.0 및 실제 질량59.999996kg 확인. 검증은 Base 정책이며 성능을 입증하지 않는다. 실행법은 config.md 상단.
+
+### 로컬 VNC 포트 선택 보완
+
+- X display가비어있어도해당VNC포트를다른서비스가사용하면후보다음display를선택하도록수정했다. 다른서비스는종료하지않는다.
+
+
+### koo screened Push RSI를 공동 환경에 연결
+
+- 검증에서 MAX_ITERATIONS=0이 상한 변경을 하지 않는 기존 CLI 동작을 발견했다. 새 RSI train wrapper는0을거부하도록수정했다. 검증의실제반복은TensorBoard를따르며1epoch종료로주장하지않는다. 검증산출물은삭제하지않는다.
+
+- 원본warmstart RSI와일치하는0.5interaction/0.7late/0.3late-tail/0.06mstand-off/Start 설정을 별도환경에추가했다. 두사람의scene/frame/box_progress를공유하고최종목표는고정한다. koo shoulder/양손정렬을재사용하고실제공유상자면의좌우에배치한다. AMP혼합및기존loco학습은유지한다.
+- sourcebank1048Push후보·PD12·원본physics/reward/motionhash 계약일치 확인. 큰상자의전체후보새PDscreen은아니다. 실제reset에서6cm정렬/finite를검증한다.
+- 9000iter 모델의40kg RSI-only평가16환경600step rc=0,목표0/16·scene종료6.25%·최종개인PUSH edge각18.75%. 60kg2048환경신규학습reset에서1040interaction/738late요청·6cm정렬확인. 로그 runs/jointpush/koo_rsi_check_20261013 및 koo_rsi_train_check_20261013.
+- 전용train/test/viewwrapper와RSI-only진단계약추가. 기존학습·MPS·원본koo/ksh저장소는중지/수정하지않았다. 실행법은markdowns/config.md상단.
+
 ## 2026-10-12
+
+### 60kg 곡선 Push 비교 및 중단된40kg 학습 재개
+
+- local+Y 정면에서±20–30° 목표를 생성하고 같은local-Y면을 유지하는60kg 무학습 비교를 추가했다. 가상box는뒷면·바닥에붙은1.3m cube. agent별spawn을자기virtualcube의lane과일치시키고실제reset감사를추가했다.
+- CPU14개 통과. GPU6 16환경600step rc=0, 실제60kg, lane오차2.4e-7m, 목표성공0/16·scene종료43.75%, trace평균goal거리2.325→1.548m(30→570step). 결과 runs/jointpush/virtual_curve_aligned_check_20261012. 초기spawn수정전결과도보존한다.
+- 재개 wrapper가 checkpoint env를 복원하도록 수정해 기본60kg과기존40kg의충돌을방지했다. 사용자가실수로종료한본학습의최신2000iter모델에서원래40kg·optimizer로GPU6재개. 산출물 runs/jointpush/training_resume_20261012. MPS/원본저장소는변경하지않았다.
+
+
+### Stage2 뷰어·평가에 checkpoint 환경 복원
+
+- 기본 box 질량60kg 변경 후 기존40kg 모델의 평가가 physics/reference 계약에서 거부되는 문제를 수정했다. test/view는 checkpoint의 relation_experiment_config.env를 runs 아래 임시 YAML로 복원해 동일 물리·보상·RSI로 평가한다. 계약 검사를 우회하지 않으며 저장 config와 box 계약 일치를 먼저 검증한다.
+- 실행 중인 학습·MPS는 변경하지 않았다. 검증 기록 runs/jointpush/checkpoint_env_fix_20261012.
+
 
 ### 무학습 가상 box를 Stage1 크기·실제 뒷면에 정렬
 

@@ -28,7 +28,7 @@ def validate_config(config):
         raise ValueError('Reward scales must be positive')
 
 
-def push_face_geometry(boxes, goals, sizes, config):
+def push_face_geometry(boxes, goals, sizes, config, local_normal=None):
     """Select a real rear face; return its center, normal, tangent and half width.
 
 Yaw-frame geometry, hand height measured above the box's bottom. At zero
@@ -58,6 +58,11 @@ remaining XY distance use local +Y as forward. Face ties prefer local Y.
     selected = local_direction.gather(1,axis[:,None]).squeeze(1)
     sign = torch.where(selected>=0,1.,-1.)
     normal = torch.zeros_like(local_direction).scatter(1,axis[:,None],sign[:,None])
+    if local_normal is not None:
+        if local_normal.shape != (n,2):
+            raise ValueError("Expected saved local face normal [N,2]")
+        normal = local_normal
+        axis = normal.abs().argmax(-1)
     tangent = torch.stack((-normal[:,1],normal[:,0]),-1)
     half = sizes[:,:2]/2
     center = -normal*half
@@ -71,9 +76,9 @@ remaining XY distance use local +Y as forward. Face ties prefer local Y.
     return face_center, world_normal, world_tangent, lateral_half, sizes
 
 
-def joint_push_reward(roots, hands, boxes, goals, sizes, config=None):
+def joint_push_reward(roots, hands, boxes, goals, sizes, config=None, face_geometry=None):
     config = dict(DEFAULT_CONFIG) if config is None else config
-    center,normal,tangent,half_width,sizes = push_face_geometry(boxes,goals,sizes,config)
+    center,normal,tangent,half_width,sizes = push_face_geometry(boxes,goals,sizes,config) if face_geometry is None else face_geometry
     n=boxes.shape[0]
     if roots.shape != (n,2,13) or hands.shape != (n,2,2,3):
         raise ValueError('Expected exactly two roots [N,2,13] and hands [N,2,2,3]')

@@ -96,3 +96,23 @@ def test_box_width_mass_density_and_scaled_separation():
     for width in (1.3,2.6,3.9):
         r=joint_push_reward(roots,hands,boxes,goals,[width,2.6,2.6])
         torch.testing.assert_close(r['minimum_separation'],torch.tensor([width*.25]))
+
+
+def test_fixed_face_survives_goal_crossing_and_box_rotation():
+    _,_,boxes,goals=scene()
+    saved=torch.tensor([[0.,1.]])
+    size=[2.6,2.6,2.6]
+    for theta in (0.,math.pi/3,math.pi,1.9*math.pi):
+        boxes[:,3:7]=torch.tensor([0.,0.,math.sin(theta/2),math.cos(theta/2)])
+        expected=torch.tensor([[-math.sin(theta),math.cos(theta)]])
+        for goal in ([3.,0.,1.3],[-3.,0.,1.3],[0.,-3.,1.3],[0.,0.,1.3]):
+            geom=push_face_geometry(boxes,torch.tensor([goal]),size,DEFAULT_CONFIG,local_normal=saved)
+            torch.testing.assert_close(geom[1],expected)
+            torch.testing.assert_close(geom[0][:,:2],boxes[:,:2]-1.3*expected)
+    # Both human contact rewards use this one shared geometry even across the boundary.
+    roots,hands,boxes,goals=scene()
+    fixed=push_face_geometry(boxes,goals,size,DEFAULT_CONFIG,local_normal=saved)
+    for goal in ([0.,3.,1.3],[3.,0.,1.3],[0.,-3.,1.3]):
+        result=joint_push_reward(roots,hands,boxes,torch.tensor([goal]),size,face_geometry=fixed)
+        assert result['coupled_contact'].all()
+        torch.testing.assert_close(result['phi_raw'][...,0],torch.ones(1,2))
