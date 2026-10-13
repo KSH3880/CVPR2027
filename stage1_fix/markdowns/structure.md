@@ -108,3 +108,9 @@ PUSH 방향 변환은 `utils/push_door_spec.py`의 `redirect_push_away`에서 �
 DOOR RSI 정면 및 모션 작업 손 필터는 `utils/task_rsi.py`의 `motion_contact_hand`, `safe_door_candidates`, `build_pool`에서 처리한다. 접촉 손은 preview의 `[RSI hand]` 로그에 표시한다.
 
 새 TaskRSI 정책 VNC는 `scripts/multi_agent/push_door_stage1_task_rsi_vnc.sh`이며, frozen RSI preview인 `push_door_stage1_task_rsi_view.sh`와 용도가 다르다.
+
+## 옛 box13 설정의 혼합 AMP 비교
+
+`data/cfg/multi_agent/push_door_stage1_box13_10500_baseline.yaml`은 옛 run의 환경 snapshot이며 `push_door_stage1_box13_10500_mixed_amp.yaml`은 AMP 라벨만 제거한 비교 설정이다(경로 앞 `tokenhsi/`). 전용 train YAML 및 `scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_train.sh`, `_test.sh`, `_vnc.sh`로 실행한다. `humanoid_ma_push_door.py`와 `utils/push_door_spec.py::amp_motion_sample`이 같은 모션 혼합 분포를 행동 라벨 없이 처리한다.
+
+관계 바이어스25kg + 혼합 AMP 전용 env/train과 train/test/VNC는 `push_door_stage1_semantic_25kg_mixed_amp` 이름을 쓴다. 기존25kg snapshot에서 AMP 라벨만 제거하며 별도 output으로 학습한다.

@@ -2,6 +2,31 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-13
+
+### DOOR 열기/유지 attention 관계 통합
+
+- `unified_door_relation: true`로 semantic 설정5개에서 OPEN/HOLD를 공통ID12로 통합했다. Agent↔door와door↔goal을 유지하고 PUSH/AT·물리·reward·AMP는유지한다. 옵션없는옛checkpoint는 기존12/13을 유지하며 ID13 embedding도호환용으로남긴다.
+- CPU40테스트(전과제쌍의 open/hold 동일관계·PUSH/AT 유지·구옵션호환), diff검사 통과. 현재25kg AMP Mix는통합관계설정으로처음부터재시작한다.
+
+### 관계 바이어스25kg 학습을 AMP Mix로 교체
+
+- 실행 중25kg snapshot에서 task_conditioning만false로 바꾼 전용 semantic_25kg_mixed_amp env/train 및 train/test/VNC를 추가했다. semantic 관계·정책·보상·물리·RSI와6종 expert 샘플 분포를 유지하며 판별기 라벨/family 매칭만 제거한다. 별도 output,2048env,max_epochs1000000으로 처음부터 학습한다.
+- CPU39테스트·snapshot 차이 검사·셸문법·diff검사 통과. 사용자 요청에 따라 기존25kg 학습을 종료하고 새학습을 시작했다. AMP129feature 정규화 및 학습 초기화를 확인했다. DOOR_HOLD는 담당agent↔door와door↔담당goal에 적용하며 각도 phase 기준이다.
+
+## 2026-10-12
+
+### 관계 바이어스 PUSH/DOOR 상자25kg
+
+- semantic 관계 바이어스의 fixed/random_start/task_rsi/variable_box 네 config의 상자 질량을30→25kg으로 낮췄다(1.3m cube density25/1.3³). 마찰0.5·보상·AMP를 유지하고 옛10500 iter baseline/혼합 AMP 비교는30kg 그대로다.
+- 기존 질량/크기 override 검증을25kg으로 갱신하고 variable_box도 포함했다. CPU39테스트·YAML 변경 범위·diff검사 통과. 학습 실행/중단 없이 다음 새 실행부터 적용한다. GPU 물리 개선은 미검증이다.
+
+### 옛 10500 iter 설정에서 처음부터 혼합 AMP 비교
+
+- 08-20-23-28 run의 저장 env/train을 전용 box13_10500 설정으로 복사했다. baseline snapshot도 추적하며 mixed env의 유일한 설정 차이는 `amp.task_conditioning: false`다. 기존 reward·물리(1.3m/30kg/마찰0.1)·RSI(PUSH0.8/DOOR0.5)·정책/PPO·seed9324를 유지한다.
+- Agent/demo AMP 관측에서 라벨을 제거해1350→1290 입력으로 만들고 기존 조건부 정규화·family 매칭은 적용하지 않는다. 6종 expert 샘플 분포·좌우손 필터·phase window·연속10시점은 그대로 유지한다. 기존 config는 조건부 AMP를 유지한다. 내부 접근/손 상태는 reset 보존용이며 혼합 AMP 판별기에는 전달하지 않는다.
+- 전용 train/test/VNC 스크립트와 실행 문서를 추가했다. 별도 output/실험명이며 train은 resume를 거부한다. CPU39테스트(실제 demo sampler의 source/hand/history·라벨 유무 동일 motion 포함), 셸문법·diff 검사 통과. GPU학습/시뮬레이션은 실행하지 않았으며 장기 학습 성능은 미검증이다.
+
 ## 2026-10-08
 
 ### TaskRSI DOOR 근거리 진입 시 가까운 손 AMP 선택

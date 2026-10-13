@@ -133,7 +133,7 @@ def advance_success(valid, elapsed, done, dt, duration):
     return elapsed, done | current, first
 
 
-def task_relation_matrix(tasks, holding=None, semantic=False):
+def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False):
     """Canonical H[M], boxes[M], doors[M], goals[M]; bind actual active object."""
     from utils.edge_context_spec import AT
     from utils.edge_interaction_spec import PUSH, DOOR_OPEN, DOOR_HOLD
@@ -151,13 +151,21 @@ def task_relation_matrix(tasks, holding=None, semantic=False):
         obj = M + owner + tasks[:, owner].long() * M
         goal = 3 * M + owner
         rows = torch.arange(B, device=tasks.device)
-        interaction=torch.where(tasks[:,owner].bool(),torch.where(holding[:,owner],DOOR_HOLD,DOOR_OPEN),PUSH) if semantic else 3
+        interaction=torch.where(tasks[:,owner].bool(),torch.where(holding[:,owner] & (not unified_door),DOOR_HOLD,DOOR_OPEN),PUSH) if semantic else 3
         matrix[rows, owner, obj] = interaction
         matrix[rows, obj, owner] = interaction
         matrix[:, owner, goal] = matrix[:, goal, owner] = 4
         placement=torch.where(tasks[:,owner].bool(),interaction,AT) if semantic else 5
         matrix[rows, obj, goal] = matrix[rows, goal, obj] = placement
     return matrix
+
+
+def amp_motion_sample(obs, family, family_count, conditioning=True):
+    """Keep the expert mixture unchanged; optionally omit discriminator labels."""
+    if not conditioning:
+        return obs
+    labels = torch.nn.functional.one_hot(family.long(), family_count).to(obs.dtype)
+    return torch.cat([obs, labels], dim=-1)
 
 
 def expert_time(lengths, history, phase_range, uniform=None):
@@ -210,6 +218,8 @@ def validate_interaction(config):
         if not math.isfinite(config[key]) or config[key] < 0:
             raise ValueError('Invalid reward weight: ' + key)
     push, door, amp = config['push'], config['door'], config['amp']
+    if not isinstance(amp.get('task_conditioning', True), bool):
+        raise ValueError('AMP task_conditioning must be boolean')
     bounds=push['box'].get('size_range')
     if bounds is not None:
         lo,hi=bounds

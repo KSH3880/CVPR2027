@@ -695,7 +695,7 @@ DOOR 손별 RSI checkpoint view: `HEADLESS=0 START_FROM_INITIAL=0 TASK_GRAPH=doo
 
 손별 평가에서 지정 손에 안전한 작은-angle RSI 후보가 없으면 작은-angle 비중을 강제하지 않고 안전한 전체 각도 후보로 시작한다. 기존 08-20 체크포인트 설정은 오른손 후보가 이에 해당한다.
 
-현재 PUSH 상자 마찰 계수는 fixed/random_start/task_rsi/variable_box 공통 0.5이다. 바닥 정지·운동 마찰 1.0과 상자 질량 30kg은 유지한다. 상자 전체 표면에 적용되므로 손 접촉에도 적용된다. 새 실행부터 적용되며 기존 checkpoint view는 저장된 relation_config.yaml의 당시 마찰을 사용한다.
+현재 PUSH 상자 마찰 계수는 fixed/random_start/task_rsi/variable_box 공통 0.5이다. 바닥 정지·운동 마찰 1.0은 유지하며 현재 관계 바이어스 실험의 상자 질량은25kg이다. 상자 전체 표면에 적용되므로 손 접촉에도 적용된다. 새 실행부터 적용되며 기존 checkpoint view는 저장된 relation_config.yaml의 당시 마찰을 사용한다.
 
 PUSH/DOOR 학습 그래프는 `relationGraph.semantic_relations: true`로 명시적 관계를 사용한다: agent↔box PUSH(11), box↔goal AT(7), agent↔door 및 door↔goal DOOR_OPEN(12)/DOOR_HOLD(13). 문 유지 단계에 따라 관계가 전환되며 edge_mlp attention bias의 embedding은 14개 타입을 지원한다. 기존 PUSH/DOOR 보상과 AMP는 유지한다. 새 관계는 체크포인트 계약에 기록되므로 새로 학습한다. 기존 run의 저장 config에 semantic_relations가 없으면 기존 ID3/5 및 embedding 크기를 사용해 view 호환성을 유지한다.
 
@@ -706,10 +706,69 @@ AT(상자–goal)는 state=exp(-(수평 거리/0.5m)^2)×0.3, progress=목표까
 
 PUSH 접근 AMP: 상자 중심이 아닌 회전된 상자 외곽과 agent root의 수평 간격으로 전환한다. 0.7m 이내면 PUSH(label0), 0.95m 밖으로 멀어지면 loco(label5)로 돌아간다. 근접한 두 손 접촉은 PUSH를 유지하며 RSI PUSH reset은 즉시 PUSH로 시작한다. 기존 6개 AMP 라벨과 loco reference를 재사용하고 전체 history를 현재 phase로 조건화한다. 새 거리 설정이 없는 구형 저장 config는 기존 PUSH 고정 AMP를 유지한다. 로그의 push_amp_fraction으로 PUSH 비중을 확인한다. 새 AMP 의미가 config 계약에 포함되므로 새 학습에 적용한다.
 
-현재 PUSH 설정 네 개 모두 상자를 1.3m 정육면체로 고정한다. variable_box.yaml 파일명은 기존 실행 명령 호환 때문에 유지하지만 size_range를 제거해 크기 랜덤화를 끈다. density=30/(1.3³)≈13.654984kg/m³, 질량30kg, 마찰0.5이며 거리2~4m/360° 목표/접근 loco→push AMP와 분리 보상은 해당 확장 실험에서 유지한다. 커진 상자에 맞춰 기존 random_start의 접근 최소 간격도 조정한다. 기존 run의 저장 설정을 사용하는 view는 당시 크기를 유지하며 새 학습부터 고정 크기가 적용된다.
+현재 PUSH 설정 네 개 모두 상자를 1.3m 정육면체로 고정한다. variable_box.yaml 파일명은 기존 실행 명령 호환 때문에 유지하지만 size_range를 제거해 크기 랜덤화를 끈다. density=25/(1.3³)≈11.379153kg/m³, 질량25kg, 마찰0.5이며 거리2~4m/360° 목표/접근 loco→push AMP와 분리 보상은 해당 확장 실험에서 유지한다. 커진 상자에 맞춰 기존 random_start의 접근 최소 간격도 조정한다. 기존 run의 저장 설정을 사용하는 view는 당시 크기를 유지하며 새 학습부터 고정 크기가 적용된다.
 
 PUSH 손 목표 높이를 1.3m 상자 기준 0.7~0.9m로 낮춘다. RSI 후보도 양손 높이 0.7~0.9m 및 모션 phase0.05~0.9로 필터링하고 맞는 후보가 없으면 접근 자세로 초기화한다. 5° 이상 기울기 감점(15°에서 최대0.2), 바닥에서 최저 꼭짓점이 뜨면 감점(4cm에서 최대0.2)을 추가한다. 진행/성공의 upright 조건은15° 미만, 바닥 허용오차2cm로 강화한다. 새 config로 새 학습부터 적용한다.
 
 들림 감점은 접촉 수치 오차를 고려해 최저 꼭짓점 높이1cm까지 면제하고 4cm에서 최대0.2를 적용한다.
 
 낮은 손 후보 RSI는10개뿐이고 실제 한-step 접촉 검증에서 최대9cm 어긋남이 발생해 현재 PUSH RSI probability=0.0으로 비활성화한다. PUSH는 접근 loco 자세에서 시작하며 새 낮은 손 목표로 접근·밀기를 학습한다. DOOR RSI 확률0.5는 유지한다. 손 위치에 맞는 안정적인 낮은 PUSH 모션을 확보하기 전에는 PUSH RSI를 다시 켜지 않는다.
+
+## 10500 iter 당시 설정의 혼합 AMP 비교 실험
+
+옛 run `push_door_task_rsi_box13/PushDoorStage1TaskRSI_08-20-23-28`의 저장된 env/train을 복사했다. 원본 snapshot은 `push_door_stage1_box13_10500_baseline.yaml`, 비교 env는 `push_door_stage1_box13_10500_mixed_amp.yaml`, train은 `amp_ma_push_door_stage1_box13_10500_mixed_amp.yaml`이다. 현재 기본 TaskRSI 설정과 별개다.
+
+AMP의 `task_conditioning: false`만 추가했다. 판별기에 행동 라벨을 주지 않고, demo/replay의 family 매칭도 하지 않는다. 6개 expert family의 비율·좌우손 필터·모션 구간·연속 10시점은 유지한다(Push 1/6, Door open 좌우 각1/6, Door tail 좌우 각1/6, Loco 1/6). 접근 거리 상태는 기존 reset/손 선택 보존을 위해 내부에서 계산하지만 AMP 데이터 선택/보상 조건으로 사용하지 않는다. 정책의 태스크 관측은 유지한다. AMP 입력은 1350→1290이며 기존 checkpoint와 호환되지 않는다.
+
+상자1.3m·30kg·마찰0.1, PUSH RSI0.8/DOOR RSI0.5, 기존 reward·시작 위치·목표 거리·정책 네트워크·PPO 설정을 보존했다. seed9324, 2048env, checkpoint 불러오기 없이 처음부터 시작한다. 판별기 첫 레이어 입력 크기만 라벨 제거에 맞춰 달라진다. 과거 run과 현재 코드는 일부 달라질 수 있으므로 엄밀한 동시 비교 시 동일 코드에서 baseline snapshot도 다시 학습해야 한다. 장기 학습은 자동 실행하지 않는다.
+
+| 실행 | 스크립트 |
+| --- | --- |
+| 처음부터 학습 | `tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_train.sh` |
+| 로컬 view/화면 없는 평가 | `tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_test.sh` |
+| 서버 VNC | `tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_vnc.sh` |
+
+로컬 학습:
+```bash
+bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_train.sh
+```
+서버 학습(GPU는 실제 할당된 번호로 변경):
+```bash
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_train.sh
+```
+로컬 창:
+```bash
+HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_test.sh CHECKPOINT.pth 1 1000
+```
+화면 없는 평가:
+```bash
+HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_test.sh CHECKPOINT.pth 16 3
+```
+서버 VNC:
+```bash
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_vnc.sh CHECKPOINT.pth 1 1000
+```
+
+체크포인트는 기본 `output/push_door_stage1_box13_10500_mixed_amp/<run>/nn/`, 이름은 `PushDoorBox13MixedAMP`. `MAX_ITERATIONS=10500`으로 기간을 맞출 수 있으며 기본 epoch 상한은 옛 설정1000000을 유지한다. `SEED`로 반복실험 seed를 지정할 수 있다. `RESUME_CHECKPOINT`는 이 비교 train launcher에서 거부한다.
+
+## 관계 바이어스 실험 상자 질량25kg (2026-10-12)
+
+현재 semantic 관계 바이어스 PUSH/DOOR의 fixed/random_start/task_rsi/variable_box 네 설정을30→25kg으로 조정했다. 1.3m 정육면체의 밀도는25/(1.3³)≈11.379153kg/m³이며 크기 override도25kg을 보존한다. 마찰0.5·reward·AMP는 유지한다. 옛10500 iter baseline 및 혼합 AMP 비교 설정은30kg/마찰0.1 그대로다. 실행 중 프로세스는 바뀌지 않으며 재시작한 학습부터25kg이다. 저장된 설정으로 보는 기존 checkpoint view는 당시 질량을 사용한다.
+
+## 관계 바이어스25kg + 혼합 AMP (2026-10-13)
+
+`push_door_stage1_semantic_25kg_mixed_amp.yaml`은 예약돼 실행 중이던25kg env snapshot에서 AMP task_conditioning만false로 바꾼다. semantic PUSH/AT/DOOR_OPEN/DOOR_HOLD 관계, reward·물리·RSI·정책은 동일하고 AMP 라벨/정규화 라벨복원/family 매칭만 제거한다.6종 demo 비율과 phase window는 유지한다. 기본 max_epochs1000000,2048env이며 새 output에 처음부터 학습한다. 기존 조건부 체크포인트 resume는 하지 않는다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_vnc.sh CHECKPOINT.pth 1 1000` |
+
+출력은 `output/push_door_stage1_semantic_25kg_mixed_amp/`, run 이름은PushDoorSemantic25kgMixedAMP다. DOOR_HOLD는 담당agent↔door와door↔담당goal 양방향에 붙고 agent↔goal은기존4를 유지한다.문각 phase는80도진입/65도복귀이며 실제 접촉/유지 성공 판정과는별개다.
+
+## Door 관계 통합 (2026-10-13)
+
+현재 semantic PUSH/DOOR 설정은 `relationGraph.unified_door_relation: true`를 사용한다. 열기/유지 모두 기존ID12를 공통DOOR 관계로 쓰며 agent↔door 및door↔goal 양방향에 적용한다. ID13은옛checkpoint 호환용으로만 남기고 새설정에서는사용하지 않는다. 각도 유지phase·관측·열기/유지 reward·AMP모션구간은유지한다. 옵션이없는옛savedconfig는 기존OPEN12/HOLD13 구분을유지한다. 신규metadata는통합옵션을포함하므로이전run과구분된다. 현재25kg AMP Mix는새설정으로다시시작한다.

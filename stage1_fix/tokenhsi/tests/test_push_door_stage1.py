@@ -139,13 +139,13 @@ def test_random_start_clearance_and_target_distribution():
 
 def test_push_cube_mass_and_spawn_clearance():
     from utils.push_door_spec import sample_start_layout, push_box_start_x
-    for name in ('push_door_stage1', 'push_door_stage1_random_start', 'push_door_stage1_task_rsi'):
+    for name in ('push_door_stage1', 'push_door_stage1_random_start', 'push_door_stage1_task_rsi', 'push_door_stage1_task_rsi_variable_box'):
         env=yaml.safe_load((ROOT/('tokenhsi/data/cfg/multi_agent/'+name+'.yaml')).read_text())['env']
         box=env['interaction']['push']['box']
         size=1.3
         assert 'size_range' not in box
         assert box['size']==[size]*3
-        assert abs(box['density']*size**3-30.)<1e-6
+        assert abs(box['density']*size**3-25.)<1e-6
         radius=(2*(size/2)**2)**.5
         start=push_box_start_x(box['size'],env['interaction']['push']['target_distance'][1])
         assert start+env['interaction']['push']['target_distance'][1]+radius<=-.2+1e-6
@@ -390,7 +390,7 @@ def test_push_box_size_override_preserves_mass_and_clearance():
     resize_push_box(env, 1.5)
     box=env['interaction']['push']['box']
     assert box['size']==[1.5]*3
-    assert abs(box['density']*1.5**3-30)<1e-6
+    assert abs(box['density']*1.5**3-25)<1e-6
     assert env['startRandomization']['push_distance'][0]>=2**.5*.75+.25
     sample_start_layout(torch.zeros(16,2,dtype=torch.long),env['startRandomization'],torch.tensor(box['size']),torch.tensor([-1.6,1.6]))
     for invalid in (-1, float('nan'), float('inf'), 0):
@@ -563,3 +563,92 @@ def test_low_push_hand_band_and_ground_contact_slack():
     assert good>.99 and bad<.2
     _,lift=push_stability_penalties(torch.ones(3),torch.tensor([.005,.01,.04]),cfg)
     torch.testing.assert_close(lift,torch.tensor([0.,0.,-.2]))
+
+
+def test_unconditioned_amp_keeps_motion_features_without_labels():
+    from utils.push_door_spec import amp_motion_sample
+    motion=torch.randn(12,129)
+    families=torch.arange(12)%6
+    mixed=amp_motion_sample(motion,families,6,False)
+    torch.testing.assert_close(mixed,motion)
+    assert mixed.shape==(12,129)
+    conditional=amp_motion_sample(motion,families,6)
+    torch.testing.assert_close(conditional[:,:129],motion)
+    torch.testing.assert_close(conditional[:,129:],torch.nn.functional.one_hot(families,6).float())
+
+
+def test_mixed_amp_snapshot_changes_only_amp_conditioning():
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    baseline=yaml.safe_load((folder/'push_door_stage1_box13_10500_baseline.yaml').read_text())
+    mixed=yaml.safe_load((folder/'push_door_stage1_box13_10500_mixed_amp.yaml').read_text())
+    assert mixed['env']['interaction']['amp'].pop('task_conditioning') is False
+    assert mixed==baseline
+    validate_interaction(baseline['env']['interaction'])
+    baseline['env']['interaction']['amp']['task_conditioning']=False
+    validate_interaction(baseline['env']['interaction'])
+    cfg=yaml.safe_load((ROOT/'tokenhsi/data/cfg/train/rlg/amp_ma_push_door_stage1_box13_10500_mixed_amp.yaml').read_text())
+    assert cfg['params']['load_checkpoint'] is False
+    assert cfg['params']['seed']==9324
+
+
+def test_mixed_demo_sampler_preserves_sources_and_temporal_history(monkeypatch):
+    from types import SimpleNamespace
+    import env.tasks.multi_agent.humanoid_ma_push_door as module
+    task=object.__new__(module.HumanoidMAPushDoor)
+    task.device='cpu';task.dt=1/30;task._amp_label_count=6
+    task._num_amp_obs_steps=10;task._num_amp_obs_per_step=129
+    task._amp_task_conditioning=False
+    task._interaction={'amp':{'push_phase':[0.,1.],'open_phase':[0.,.7],
+                             'hold_phase':[.7,1.],'hold_source':'door_tail'}}
+    task._door_reference_hands=torch.tensor([0,1])
+    task._local_root_obs=True;task._root_height_obs=True
+    task._dof_obs_size=0;task._dof_offsets=[]
+    calls=[]
+    def library(name):
+        def state(ids,times):
+            calls.append((name,ids.clone(),times.clone()))
+            obs=torch.zeros(len(ids),129);obs[:,0]=times;obs[:,1]=ids
+            return (obs,)*7
+        return SimpleNamespace(_motion_weights=torch.ones(2)/2,
+            sample_motions=lambda count:torch.randint(2,(count,)),
+            get_motion_length=lambda ids:torch.full_like(ids,4,dtype=torch.float),
+            get_motion_state=state)
+    task._motion_lib={name:library(name) for name in ('push','doorOpen','loco')}
+    monkeypatch.setattr(module,'build_amp_observations',lambda root,*args:root)
+    torch.manual_seed(19)
+    mixed=task.fetch_amp_obs_demo(12)
+    assert mixed.shape==(12,1290) and torch.isfinite(mixed).all()
+    assert [c[0] for c in calls]==['push','doorOpen','doorOpen','doorOpen','doorOpen','loco']
+    for family,(name,ids,times) in enumerate(calls):
+        ids=ids.view(2,10);times=times.view(2,10)
+        assert torch.all(ids==ids[:,:1])
+        torch.testing.assert_close(times[:,:-1]-times[:,1:],torch.full((2,9),task.dt))
+        lo,hi=task._expert_source(family)[1]
+        assert torch.all(times>=4*lo) and torch.all(times<=4*hi)
+        if 1<=family<=4:assert torch.all(ids==(family-1)%2)
+    task._amp_task_conditioning=True;task._num_amp_obs_per_step=135
+    torch.manual_seed(19)
+    conditional=task.fetch_amp_obs_demo(12).view(12,10,135)
+    torch.testing.assert_close(conditional[:,:,:129],mixed.view(12,10,129))
+
+
+def test_unified_door_bias_is_identical_for_open_and_hold():
+    tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]])
+    opening=task_relation_matrix(tasks,torch.zeros_like(tasks,dtype=torch.bool),True,True)
+    holding=task_relation_matrix(tasks,torch.ones_like(tasks,dtype=torch.bool),True,True)
+    torch.testing.assert_close(opening,holding)
+    for row in range(4):
+        for owner in range(2):
+            obj=2+owner+2*tasks[row,owner]
+            relation=12 if tasks[row,owner] else 11
+            assert opening[row,owner,obj]==relation and opening[row,obj,owner]==relation
+            assert opening[row,obj,6+owner]==(12 if tasks[row,owner] else 7)
+            assert opening[row,6+owner,obj]==opening[row,obj,6+owner]
+    assert not (opening==13).any()
+    legacy=task_relation_matrix(tasks,torch.ones_like(tasks,dtype=torch.bool),True)
+    assert (legacy==13).any()
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    for name in ('push_door_stage1','push_door_stage1_random_start','push_door_stage1_task_rsi',
+                 'push_door_stage1_task_rsi_variable_box','push_door_stage1_semantic_25kg_mixed_amp'):
+        env=yaml.safe_load((folder/(name+'.yaml')).read_text())['env']
+        assert env['relationGraph']['unified_door_relation'] is True

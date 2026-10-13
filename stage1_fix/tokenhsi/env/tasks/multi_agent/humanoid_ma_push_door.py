@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils.torch_utils import quat_mul, quat_rotate
 from utils.motion_lib import MotionLib
 from utils.push_door_spec import (phase_update, progress_reward, advance_success, door_shaping,
-                                 expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, rotate_push_layout, door_motion_hand, door_open_amp_phase, door_amp_family, push_surface_distance, push_hand_alignment, push_stability_penalties, push_relation_rewards, nearest_door_hand_on_entry)
+                                 amp_motion_sample, expert_time, interaction_metadata, hand_handle_contact, validate_interaction, sample_start_layout, push_box_start_x, door_motion_matches, redirect_push_away, rotate_push_layout, door_motion_hand, door_open_amp_phase, door_amp_family, push_surface_distance, push_hand_alignment, push_stability_penalties, push_relation_rewards, nearest_door_hand_on_entry)
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.humanoid_ma_carry import build_amp_observations, compute_agent_collision_penalty
 from env.tasks.multi_agent.door_scene import DoorFixture
@@ -29,7 +29,7 @@ class HumanoidMAPushDoor(HumanoidMA):
         self._relation_cfg = cfg['env']['relationReward']
         self._relation_graph_spec = cfg['env']['relationGraph']
         self._state_relation = self._edge_context = self._stage2 = False
-        self._amp_task_conditioning = True
+        self._amp_task_conditioning = self._interaction['amp'].get('task_conditioning', True)
         self._amp_label_count = 5 if self._interaction['amp'].get('hand_conditioning')=='user_hands_v1' else 3
         if self._interaction['amp'].get('approach_loco') is not None:
             self._amp_label_count=6
@@ -75,7 +75,7 @@ class HumanoidMAPushDoor(HumanoidMA):
             motion_filter=(lambda path: door_motion_matches(path,self._interaction['door'].get('motion_direction','all'))) if skill=='doorOpen' else None)
             for skill in self._skill}
         self._num_amp_motion_features = 13 + self._dof_obs_size + self.num_dof + 3 * len(self._key_body_ids)
-        self._num_amp_obs_per_step = self._num_amp_motion_features + self._amp_label_count
+        self._num_amp_obs_per_step = self._num_amp_motion_features + (self._amp_label_count if self._amp_task_conditioning else 0)
         self._amp_obs_buf = torch.zeros(N, M, self._num_amp_obs_steps, self._num_amp_obs_per_step, device=self.device)
         self._door_amp_hand = torch.zeros(N,M,dtype=torch.long,device=self.device)
         if self._amp_label_count>=5:
@@ -505,10 +505,11 @@ class HumanoidMAPushDoor(HumanoidMA):
             self._dof_pos[ids].reshape(B,-1),self._dof_vel[ids].reshape(B,-1),pos[:,:,self._key_body_ids].reshape(B,-1,3),
             self._local_root_obs,self._root_height_obs,self._dof_obs_size,self._dof_offsets)
         family=self._family(env_ids)
-        self._amp_obs_buf[ids,:,0]=torch.cat([obs,F.one_hot(family.flatten(),self._amp_label_count).float()],-1).view(*family.shape,-1)
+        self._amp_obs_buf[ids,:,0]=amp_motion_sample(obs,family.flatten(),self._amp_label_count,self._amp_task_conditioning).view(*family.shape,-1)
         # Whole physical history is conditioned on its CURRENT task/phase. Keeping
         # old labels would reveal transitions to the discriminator as a shortcut.
-        self._amp_obs_buf[ids,:,:, -self._amp_label_count:]=F.one_hot(family,self._amp_label_count).float()[:,:,None,:].expand(-1,-1,self._num_amp_obs_steps,-1)
+        if self._amp_task_conditioning:
+            self._amp_obs_buf[ids,:,:, -self._amp_label_count:]=F.one_hot(family,self._amp_label_count).float()[:,:,None,:].expand(-1,-1,self._num_amp_obs_steps,-1)
 
     def _expert_source(self, family):
         if self._amp_label_count==6 and family==5:return 'loco',[0.,1.]
@@ -543,8 +544,8 @@ class HumanoidMAPushDoor(HumanoidMA):
             motion_ids=mids[:,None].expand_as(times).reshape(-1)
             root,rot,dof,vel,ang,dofvel,key=lib.get_motion_state(motion_ids,times.flatten())
             obs=build_amp_observations(root,rot,vel,ang,dof,dofvel,key,self._local_root_obs,self._root_height_obs,self._dof_obs_size,self._dof_offsets)
-            labels=F.one_hot(torch.full((len(obs),),uid,device=self.device),self._amp_label_count).float()
-            result[inds]=torch.cat([obs,labels],-1).view(len(inds),-1)
+            labels=torch.full((len(obs),),uid,device=self.device,dtype=torch.long)
+            result[inds]=amp_motion_sample(obs,labels,self._amp_label_count,self._amp_task_conditioning).view(len(inds),-1)
         return result
 
     def render(self, sync_frame_time=False):

@@ -868,7 +868,8 @@ class RelationEncoder(nn.Module):
             start = self.num_agents*self.entity_sizes[0] + self.num_objects*self.entity_sizes[1]
             goals = obs[:, start:start+self.num_agents*9].view(B,self.num_agents,9)
             matrices = task_relation_matrix(goals[..., :2].argmax(-1),
-                holding=goals[...,2]>.5,semantic=self.relation_graph_spec.get('semantic_relations',False))
+                holding=goals[...,2]>.5,semantic=self.relation_graph_spec.get('semantic_relations',False),
+                unified_door=self.relation_graph_spec.get('unified_door_relation',False))
             if self.use_relation_bias:
                 if self.relation_bias_mode != RELATION_BIAS_EDGE_MLP:
                     raise ValueError('Push/door requires edge_mlp relation bias')

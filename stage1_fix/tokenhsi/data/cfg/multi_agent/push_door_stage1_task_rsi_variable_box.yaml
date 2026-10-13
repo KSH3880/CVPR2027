@@ -11,6 +11,7 @@ env:
   relationGraph:
     template: push_door_stage1_v1
     semantic_relations: true
+    unified_door_relation: true
   relationReward:
     mode: legacy_tokenhsi
     stage1_variant: push_door_stage1_v1
@@ -112,7 +113,7 @@ env:
         - 1.3
         - 1.3
         - 1.3
-        density: 13.654984069185252
+        density: 11.379153390987709
         friction: 0.5
       target_distance:
       - 2.0
