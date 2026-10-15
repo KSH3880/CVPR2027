@@ -114,3 +114,15 @@ DOOR RSI 정면 및 모션 작업 손 필터는 `utils/task_rsi.py`의 `motion_c
 `data/cfg/multi_agent/push_door_stage1_box13_10500_baseline.yaml`은 옛 run의 환경 snapshot이며 `push_door_stage1_box13_10500_mixed_amp.yaml`은 AMP 라벨만 제거한 비교 설정이다(경로 앞 `tokenhsi/`). 전용 train YAML 및 `scripts/multi_agent/push_door_stage1_box13_10500_mixed_amp_train.sh`, `_test.sh`, `_vnc.sh`로 실행한다. `humanoid_ma_push_door.py`와 `utils/push_door_spec.py::amp_motion_sample`이 같은 모션 혼합 분포를 행동 라벨 없이 처리한다.
 
 관계 바이어스25kg + 혼합 AMP 전용 env/train과 train/test/VNC는 `push_door_stage1_semantic_25kg_mixed_amp` 이름을 쓴다. 기존25kg snapshot에서 AMP 라벨만 제거하며 별도 output으로 학습한다.
+
+`utils/push_door_spec.py::stage2_push_hand_quality/stage2_contact_at_rewards`와전용 `push_door_stage1_semantic_25kg_mixed_amp_dense` env/train/train-test-VNC가stage2단독Push+AT 기반dense접근보상을제공한다.
+
+`push_door_stage1_semantic_25kg_conditional_amp_dense` 전용env/train과train/test/VNC는dense Push보상을유지하고6종조건부AMP를복구하는실험이다.
+
+`humanoid_ma_push_door.py::_fetch_task_mixed_demo`와 `push_door_stage1_semantic_25kg_task_mix_amp_dense` 전용env/train/train-test-VNC가koo과제별조건부AMP를제공한다. discriminator라벨수와물리손/phase taxonomy를분리한다.
+
+`push_door_stage1_semantic_25kg_legacy_amp_dense` 전용env/train/train-test-VNC는옛날성공run의AMP설정을정확복구하며나머지현재환경/보상을유지한다.
+
+`push_door_stage1_semantic_25kg_legacy_amp_rsi_dense` 전용env/train/train-test-VNC는옛AMP와옛TaskRSI 전체를복구하고25kg/dense보상/통합Door관계는유지한다.
+
+`push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal` 전용env/train/train-test-VNC와 `task_relation_matrix(...generic_door_goal=True)`가Door↔Goal만일반ID5로분리한다.

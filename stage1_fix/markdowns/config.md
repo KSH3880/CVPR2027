@@ -772,3 +772,91 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mi
 ## Door 관계 통합 (2026-10-13)
 
 현재 semantic PUSH/DOOR 설정은 `relationGraph.unified_door_relation: true`를 사용한다. 열기/유지 모두 기존ID12를 공통DOOR 관계로 쓰며 agent↔door 및door↔goal 양방향에 적용한다. ID13은옛checkpoint 호환용으로만 남기고 새설정에서는사용하지 않는다. 각도 유지phase·관측·열기/유지 reward·AMP모션구간은유지한다. 옵션이없는옛savedconfig는 기존OPEN12/HOLD13 구분을유지한다. 신규metadata는통합옵션을포함하므로이전run과구분된다. 현재25kg AMP Mix는새설정으로다시시작한다.
+
+## stage2 기반 dense PUSH+AT (2026-10-13)
+
+현재25kg/AMP Mix/통합Door관계 실험에서 PUSH relation_rewards만 `stage2_contact_at_dense_v1`로 교체한 별도 비교다. stage2_jointpush의 단독 contact_at_reward 기준으로 body→box 접근과 box→goal 거리점수는 `1/(1+max(distance-.5,0))`, 양손 미는면 XY오차 품질은 `exp(-10*worst_error²)`다. state계수는양edge각.2,progress각.2,result각.2이며매step합산한다. 접촉 또는AT성공이면PUSH항3개가각.2로포화되고, AT성공이면AT항도포화된다. AT progress는접촉gate가없다. contact는양손XY오차.18m+손/상자netforce proxy .5N이다.
+
+원본을그대로복사한것은아니다. 현재360도goal에맞춰미는면을선택하고AT거리는XY를사용한다. AT reward success는기존거리.15m/속도.15m/s/grounded/15도미만기울기를즉시판정하며성공로그는기존.5초유지판정을계속사용한다. 기존기울기/들림패널티와Door보상/RSI/AMP는유지한다. 손높이는새XY보상에서제약하지않는다. 반복접촉/result보상을받으므로기존처럼한번만주지않는다. 이전config/version은변경하지않는다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_dense_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_dense_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_dense_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_dense_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_dense_vnc.sh CHECKPOINT.pth 1 1000` |
+
+출력은 `output/push_door_stage1_semantic_25kg_mixed_amp_dense/`, 이름PushDoorSemantic25kgMixedAMPDense,2048env,max_epochs1000000이다. 기존보상run은보존하며새보상은처음부터학습한다.
+
+## dense Push 보상 + 조건부 AMP 복구 (2026-10-14)
+
+현재dense mixed 실험에서AMP만이전조건부방식으로복구한전용설정이다. `amp.task_conditioning: true`로6개행동라벨·거리전환·demo/replay family매칭·라벨정규화보존을사용한다. AMP입력1290→1350이다.25kg·통합Door관계·stage2_contact_at_dense_v1보상·RSI·물리는그대로이며옛mixed실험config/output은보존한다. mixed 체크포인트는이실험에resume하지않는다.2048env,max_epochs1000000으로처음부터시작하는설정이며사용자요청대로기존학습만종료하고새학습은실행하지않았다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_conditional_amp_dense_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_conditional_amp_dense_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_conditional_amp_dense_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_conditional_amp_dense_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_conditional_amp_dense_vnc.sh CHECKPOINT.pth 1 1000` |
+
+새출력은 `output/push_door_stage1_semantic_25kg_conditional_amp_dense/`, 이름은PushDoorSemantic25kgConditionalAMPDense이다.
+
+## koo 과제별 조건부 혼합 AMP (2026-10-14)
+
+전용 `push_door_stage1_semantic_25kg_task_mix_amp_dense` 설정은dense 조건부실험에서 AMP task_expert_mix만추가한다. PUSH라벨0은loco33%/push67%/door0%,OPEN라벨1은loco33%/push0%/door67%로expert를뽑는다. 각모션전체시간범위에서연속10시점이며각과제라벨은균등공급,clip별weight는유지한다.좌우손/거리/열기유지단계는AMP라벨을바꾸지않고모션선택gate도사용하지않는다. AMP는131feature×10=1310-D,정규화에서2개라벨을보존하고demo/replay도2개과제라벨에맞춘다. 물리reset의손바인딩·접근상태계산은기존유지하나판별기의source선택에는영향없다. Door모션의기존방향filter는유지한다.
+
+25kg·마찰0.5·dense Push보상·Door보상·RSI·통합Door관계·정책/PPO는동일하다. 기존6라벨/무라벨checkpoint는resume하지않고처음부터2048env,max_epochs1000000으로학습한다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_task_mix_amp_dense_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_task_mix_amp_dense_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_task_mix_amp_dense_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_task_mix_amp_dense_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_task_mix_amp_dense_vnc.sh CHECKPOINT.pth 1 1000` |
+
+출력은 `output/push_door_stage1_semantic_25kg_task_mix_amp_dense/`, run이름PushDoorSemantic25kgTaskMixAMPDense다.
+
+## 옛날 성공run AMP 정확복구 (2026-10-14)
+
+`push_door_stage1_semantic_25kg_legacy_amp_dense`는08-20-23-28 저장config의interaction.amp를그대로복사한다. Door는0.8m진입/1.0m복귀loco전환,근거리좌우손별OPEN/HOLD,hold_source=door_tail을사용한다. Push는옛날처럼항상PUSH AMP이며나중에추가한Push접근loco전환도제거한다.6종라벨/1350-D,expert phase와family 매칭은구현그대로다.25kg·dense Push보상·Door보상·통합Door관계·현재RSI는유지한다. 과제별Mix checkpoint는이식하지않고새로2048env,max_epochs1000000 학습한다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_dense_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_dense_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_dense_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_dense_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_dense_vnc.sh CHECKPOINT.pth 1 1000` |
+
+출력은 `output/push_door_stage1_semantic_25kg_legacy_amp_dense/`, 이름PushDoorSemantic25kgLegacyAMPDense다.
+
+## 옛 AMP + 옛 TaskRSI 복구 (2026-10-14)
+
+`push_door_stage1_semantic_25kg_legacy_amp_rsi_dense`는legacy_amp_dense에서08-20-23-28 저장task_rsi 전체를정확복사했다. Push확률.8,Door확률.5,Pushphase.35~.9,Push RSI남은거리.5~1.2m,손높이.75~1.08m,Doorphase.35~.7/문각5~79/early비율.75를복구한다. 옛AMP도유지한다. 나머지25kg·dense보상·통합Door관계·일반시작2~4m/360도목표는현행을유지하므로옛실험전체복제는아니다. 낮은손높이RSI불안정으로PushRSI를껐던이전설정과구분되며이번에는옛높이프레임풀을사용한다. 새run에서2048env,max_epochs1000000으로처음부터학습한다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_vnc.sh CHECKPOINT.pth 1 1000` |
+
+출력은 `output/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense/`, 이름PushDoorSemantic25kgLegacyAMPRSIDense이다.
+
+## Door 조작/Goal 관계 분리 (2026-10-15)
+
+`push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal`는현재legacy_amp_rsi_dense에서relationGraph.generic_door_goal=true만추가한다. Agent↔담당Door는공통Door ID12,Door↔담당Goal은옛일반OBJECT_GOAL ID5다. Push↔Agent11,box↔goalAT7,Agent↔goal4는유지한다. 옛AMP·RSI·25kg·물리·dense보상·정책구조를유지하며seed도기존run8427로맞춘다. 옵션없는기존config/checkpoint는Door↔goal12를유지한다. metadata구분으로옛run을새config로resume하지않는다.처음부터2048env/max_epochs1000000 학습한다.
+
+| 실행 | 명령 |
+| --- | --- |
+| 로컬 학습 | `bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_train.sh` |
+| 서버 학습 | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_train.sh` |
+| 로컬 창 | `HEADLESS=0 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_test.sh CHECKPOINT.pth 1 1000` |
+| 화면 없는 평가 | `HEADLESS=1 bash .local/run.sh bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_test.sh CHECKPOINT.pth 16 3` |
+| 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_vnc.sh CHECKPOINT.pth 1 1000` |
+
+출력은 `output/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal/`, 이름PushDoor25kgDoorGoalSplit이다.

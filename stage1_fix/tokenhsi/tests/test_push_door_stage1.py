@@ -652,3 +652,132 @@ def test_unified_door_bias_is_identical_for_open_and_hold():
                  'push_door_stage1_task_rsi_variable_box','push_door_stage1_semantic_25kg_mixed_amp'):
         env=yaml.safe_load((folder/(name+'.yaml')).read_text())['env']
         assert env['relationGraph']['unified_door_relation'] is True
+
+
+def test_stage2_dense_push_rewards_reach_distant_agents_without_contact():
+    from utils.push_door_spec import stage2_contact_at_rewards
+    cfg=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_semantic_25kg_mixed_amp_dense.yaml').read_text())['env']['interaction']['push']['relation_rewards']
+    quality=torch.zeros(2);no=torch.zeros(2,dtype=torch.bool)
+    far=stage2_contact_at_rewards(quality,no,torch.tensor([2.,1.]),torch.tensor([4.,2.]),no,cfg)
+    torch.testing.assert_close(far[:,1],torch.tensor([.08,.2/1.5]))
+    torch.testing.assert_close(far[:,4],torch.tensor([.2/4.5,.08]))
+    assert far[1,1]>far[0,1] and far[1,4]>far[0,4]
+    repeated=stage2_contact_at_rewards(quality,~no,torch.tensor([2.,1.]),torch.tensor([4.,2.]),no,cfg)
+    torch.testing.assert_close(repeated[:,:3],torch.full((2,3),.2))
+    torch.testing.assert_close(repeated[:,4],far[:,4])
+    finished=stage2_contact_at_rewards(quality,no,torch.tensor([2.,1.]),torch.tensor([0.,0.]),~no,cfg)
+    torch.testing.assert_close(finished,torch.full((2,6),.2))
+
+
+def test_stage2_push_xy_quality_is_broad_and_requires_both_hands():
+    from utils.push_door_spec import stage2_push_hand_quality
+    config={'hand_near_scale':10.}
+    direction=torch.tensor([[1.,0.,0.]])
+    half=torch.tensor([[.65,.65,.65]])
+    hands=torch.tensor([[[-.65,-.2,.1],[-.65,.2,.4]]])
+    torch.testing.assert_close(stage2_push_hand_quality(hands,direction,half,config),torch.ones(1))
+    far=hands.clone();far[:,1,0]-=.5
+    phi=stage2_push_hand_quality(far,direction,half,config)
+    torch.testing.assert_close(phi,torch.exp(torch.tensor([-2.5])))
+    assert phi>.08
+    opposite=hands.clone();opposite[...,0]=.65
+    assert stage2_push_hand_quality(opposite,direction,half,config)<1e-6
+
+
+def test_dense_push_experiment_only_changes_reward_configuration():
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    old=yaml.safe_load((folder/'push_door_stage1_semantic_25kg_mixed_amp.yaml').read_text())
+    new=yaml.safe_load((folder/'push_door_stage1_semantic_25kg_mixed_amp_dense.yaml').read_text())
+    validate_interaction(new['env']['interaction'])
+    new['env']['interaction']['push']['relation_rewards']=old['env']['interaction']['push']['relation_rewards']
+    assert new==old
+
+
+def test_task_conditioned_mixture_never_crosses_push_and_door(monkeypatch):
+    from types import SimpleNamespace
+    import env.tasks.multi_agent.humanoid_ma_push_door as module
+    task=object.__new__(module.HumanoidMAPushDoor)
+    task.device='cpu';task.dt=1/30;task._amp_label_count=2;task._amp_source_count=6
+    task._num_amp_obs_steps=10;task._num_amp_obs_per_step=131;task._amp_task_conditioning=True
+    task._amp_expert_mix={'push':[.33,.67,0.],'door':[.33,0.,.67]}
+    task._local_root_obs=True;task._root_height_obs=True;task._dof_obs_size=0;task._dof_offsets=[]
+    def library(code):
+        def state(ids,times):
+            obs=torch.zeros(len(ids),129);obs[:,0]=code;obs[:,1]=times
+            return (obs,)*7
+        return SimpleNamespace(sample_motions=lambda count:torch.zeros(count,dtype=torch.long),
+            get_motion_length=lambda ids:torch.full_like(ids,4,dtype=torch.float),get_motion_state=state)
+    task._motion_lib={name:library(code) for code,name in enumerate(('loco','push','doorOpen'))}
+    monkeypatch.setattr(module,'build_amp_observations',lambda root,*args:root)
+    torch.manual_seed(42)
+    demos=task.fetch_amp_obs_demo(4096).view(4096,10,131)
+    labels=demos[:,:,-2:].argmax(-1)
+    assert torch.all(labels==labels[:,:1])
+    codes=demos[:,:,0];assert torch.all(codes==codes[:,:1])
+    push=labels[:,0]==0;door=~push
+    assert not (codes[push]==2).any() and not (codes[door]==1).any()
+    for selected,code in ((push,1),(door,2)):
+        assert abs(float((codes[selected,0]==code).float().mean())-.67)<.04
+    torch.testing.assert_close(demos[:,:-1,1]-demos[:,1:,1],torch.full((4096,9),task.dt),atol=1e-6,rtol=1e-5)
+    task._tasks=torch.tensor([[0,1],[1,0]])
+    # Neither approaching nor holding changes task labels.
+    task._holding_phase=torch.ones(2,2,dtype=torch.bool)
+    torch.testing.assert_close(task._family(),task._tasks)
+    torch.testing.assert_close(task._family(torch.tensor([1])),task._tasks[1:])
+
+
+def test_task_mix_config_changes_only_amp_distribution():
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    old=yaml.safe_load((folder/'push_door_stage1_semantic_25kg_conditional_amp_dense.yaml').read_text())
+    new=yaml.safe_load((folder/'push_door_stage1_semantic_25kg_task_mix_amp_dense.yaml').read_text())
+    validate_interaction(new['env']['interaction'])
+    bad=copy.deepcopy(new);bad['env']['interaction']['amp']['task_expert_mix']['push']=[.33,.33,.34]
+    with pytest.raises(ValueError):validate_interaction(bad['env']['interaction'])
+    assert new['env']['interaction']['amp'].pop('task_expert_mix')=={'push':[.33,.67,0.],'door':[.33,0.,.67]}
+    assert new==old
+
+
+def test_door_goal_split_changes_only_door_goal_edges_and_preserves_old_mapping():
+    tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]])
+    for holding in (torch.zeros_like(tasks,dtype=torch.bool),torch.ones_like(tasks,dtype=torch.bool)):
+        old=task_relation_matrix(tasks,holding,True,True)
+        new=task_relation_matrix(tasks,holding,True,True,True)
+        changed=torch.zeros_like(old,dtype=torch.bool)
+        for row in range(4):
+            for owner in range(2):
+                if tasks[row,owner]:
+                    door=4+owner;goal=6+owner
+                    changed[row,door,goal]=changed[row,goal,door]=True
+                    assert new[row,owner,door]==12 and new[row,door,owner]==12
+                    assert new[row,door,goal]==5 and new[row,goal,door]==5
+        assert torch.equal(new!=old,changed)
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    base=yaml.safe_load((folder/'push_door_stage1_semantic_25kg_legacy_amp_rsi_dense.yaml').read_text())
+    split=yaml.safe_load((folder/'push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal.yaml').read_text())
+    assert split['env']['relationGraph'].pop('generic_door_goal') is True
+    assert split==base
+    changed=copy.deepcopy(base);changed['env']['relationGraph']['generic_door_goal']=True
+    with pytest.raises(ValueError):
+        check_interaction_checkpoint({'interaction_metadata':interaction_metadata(base['env'])},interaction_metadata(changed['env']))
+
+
+def test_split_door_goal_ids_reach_attention_encoder():
+    import torch.nn as nn
+    from learning.multi_agent.amp_network_builder_ma import RelationEncoder
+    encoder=RelationEncoder([223,34,9],2,4,16,2,2,32,
+        lambda size:nn.Sequential(nn.Linear(size,16),nn.ReLU()),
+        observation_mode='clean_scene',kinematic_size=7,relation_bias=True,
+        relation_bias_mode='edge_mlp',relation_graph_spec={'template':'push_door_stage1_v1',
+            'semantic_relations':True,'unified_door_relation':True,'generic_door_goal':True},
+        gta_cfg={'enable':True,'translation_scale':1.,'representation':'se3_direct_sum'})
+    tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]])
+    obs=torch.randn(4,656);goals=obs[:,582:600].view(4,2,9)
+    goals[...,:2]=torch.nn.functional.one_hot(tasks,2).float()
+    obs[:,600:].view(4,8,7)[...,3:]=torch.tensor([0.,0.,0.,1.])
+    seen=[]
+    hook=encoder.edge_encoder.register_forward_pre_hook(lambda module,args:seen.append(args[1].clone()))
+    with torch.no_grad():encoder.edge_encoder.bias_projection.normal_(std=.02)
+    encoder(obs).square().sum().backward();hook.remove()
+    torch.testing.assert_close(seen[-1],task_relation_matrix(tasks,semantic=True,unified_door=True,generic_door_goal=True))
+    grad=encoder.edge_encoder.relation_embed.weight.grad
+    assert grad[5].abs().sum()>0 and grad[12].abs().sum()>0

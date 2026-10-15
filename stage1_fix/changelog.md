@@ -2,7 +2,49 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-15
+
+### Door操作/Goal 관계bias 분리실험
+
+- legacy_amp_rsi_dense_split_goal 전용실험에generic_door_goal=true를추가했다. Agent↔Door는12,Door↔Goal은일반OBJECT_GOAL5를쓴다. 나머지관계·옛AMP/RSI·25kg·보상·물리를유지하고기존runseed8427을명시했다.옵션없는기존config는이전매핑을보존하며metadata는새매핑을구분한다.
+- CPU47테스트(4과제쌍·open/hold에서변경edge한정·기존회귀·checkpoint계약·실제encoder의ID5/12 gradient),셸문법·diff검사통과.사용자요청에따라기존학습을종료하고별도output에서2048env처음부터학습을시작했다(max_epochs1000000).장기성능은미검증이다.
+
+### 실제10500 checkpoint의 네트워크입력/관계bias 감사
+
+- 현재legacy_amp_rsi_dense의10500 checkpoint를별도1env평가에로드해4개과제쌍×reset/step후8case를검증했다.656-D슬롯순서·Door각도/타입·goal과제라벨·env-local pose·앞뒤손잡이의실제PhysX위치일치·정규화passthrough를확인했다(clip_obs=inf).
+- Actor/critic 관계행렬과4layer bias전달,별도CPU에서실제softmax입력=GTA QK+bias를검증했다.관계연결오류는발견하지못했다.학습된bias최대절댓값은actor9.49/critic15.53이며크기자체는오류나성능저하원인의증거가아니다.
+- 감사PASS. 보고서/스크립트는로컬 `.local/network_audit_10500/`에보관한다.학습/정책/reward설정은변경하지않았다.전체성공률이나bias의인과효과를검증한평가는아니다.
+
+## 2026-10-14
+
+### 사용자요청 옛TaskRSI 전체복구
+
+- 성공run08-20-23-28의task_rsi를정확복사해legacy_amp_rsi_dense 실험에복구했다. Push80%/Door50%,옛모션구간/손높이/RSI남은거리/문각mixture를유지한다.25kg·옛AMP·dense보상·통합Door관계·일반목표랜덤화는현행유지한다.
+- YAML유일차이·옛RSI정확일치·interaction검증·셸문법·diff검사통과.현재학습을종료하고새설정2048env처음부터재시작했다.장기성능은미검증이며이전run은보존한다.
+
+### 성공run의옛AMP 정확복구·학습교체
+
+- 사용자요청으로task별Mix학습을종료하고08-20-23-28 저장interaction.amp와정확히같은legacy_amp_dense 실험을처음부터시작했다. Door거리전환·좌우손·열기유지라벨을복구하며Push는항상Push AMP로되돌려나중에추가한Push접근전환도제거한다.25kg·통합Door관계·현재dense 보상·RSI는유지한다.
+- 전용env/train/train-test-VNC·문서추가.옛AMP YAML정확일치·interaction검증·셸문법·diff검사통과.직전CPU45회귀테스트에서legacy분기를포함해검증했다.2048env,max_epochs1000000이며장기성능은미검증이다.
+
+### koo 과제별 조건부 AMP 혼합 학습
+
+- task_mix_amp_dense 전용실험에서PUSH/OPEN 2라벨을사용한다. PUSH는loco33%+push67%,OPEN은loco33%+door67%이고전체모션구간연속10시점을뽑는다. 거리/손/열기유지단계는판별기라벨/source를바꾸지않는다. 기존물리reset/손바인딩source taxonomy와판별기라벨수를분리했다.
+- 기존25kg·마찰0.5·통합Door관계·dense Push/Door보상·RSI를유지하며AMP설정만변경했다.2라벨정규화보존과demo/replay family매칭을사용한다. 전용env/train/train-test-VNC와실행문서추가.
+- CPU45테스트(과제간모션차단·33/67분포·연속시점·라벨정규화입력·기존동작회귀),셸문법·diff검사통과. 사용자요청에따라2048env처음부터학습을시작하고2iter완료/3iter진입확인했다(max_epochs1000000). 장기성능은미검증이다.
+
+### dense Push 보상 유지·조건부 AMP 복구
+
+- 사용자요청에따라현재dense mixed AMP학습을종료했다. 새conditional_amp_dense 설정에서task_conditioning만true로복구해6종라벨·거리전환·family매칭을사용한다.25kg·통합Door관계·stage2보상·물리·RSI는유지하며옛mixedconfig/output을보존한다.
+- 전용train/test/VNC 및실행문서추가. YAML유일차이·interaction검증·셸문법·diff검사통과. 이전CPU43테스트에서조건부AMP회귀를포함해검증했으며이번설정전환후GPU학습은새로실행하지않았다.
+
 ## 2026-10-13
+
+### stage2 단독Push+AT 기반 dense 접근 보상
+
+- `stage2_contact_at_dense_v1`을 전용 semantic_25kg_mixed_amp_dense 실험에추가했다. body→box 및box→goal의유리함수거리보상을매step주고 손품질은높이제약없는최악양손XY미는면오차exp(-10*d²)로완화한다.AT progress 접촉gate를제거하고접촉/도달result를반복보상한다(state/progress/result각edge .2).contact거리.18m,netforce proxy .5N이다.
+- 통합DOOR관계·AMP Mix·25kg·물리·Door보상·기울기/들림패널티를유지한다.현재360도goal에맞는미는면과XY AT거리를사용하고기존물리목표유효조건을유지하므로stage2코드그대로의복제는아니다. reward 도달판정은즉시,기존성공로그는.5초유지판정이다.
+- CPU43테스트·설정격리·셸문법·diff검사통과.사용자요청에따라기존학습을종료하고새보상으로2048env처음부터시작했다(max_epochs1000000).새run초기화를확인했으며장기성능은미검증이다.이전보상config/run은보존했다.
 
 ### DOOR 열기/유지 attention 관계 통합
 

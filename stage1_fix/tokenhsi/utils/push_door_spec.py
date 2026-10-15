@@ -80,6 +80,40 @@ def push_hand_alignment(local_hands, local_direction, half_size, config):
     return torch.exp(-(error/config['hand_distance_scale']).square()).min(-1).values,error.mean(-1)
 
 
+def stage2_push_hand_quality(local_hands, local_direction, half_size, config):
+    """Stage2 contact-at rear-face XY quality, aligned to the actual goal face."""
+    axis=local_direction[...,:2].abs().argmax(-1)
+    sign=local_direction[...,:2].gather(-1,axis[...,None]).squeeze(-1).sign()
+    sign=torch.where(sign==0,torch.ones_like(sign),sign)
+    side=torch.nn.functional.one_hot(axis,2).to(local_hands.dtype)
+    half=half_size[...,:2]
+    point=torch.maximum(torch.minimum(local_hands[...,:2],half[...,None,:]),-half[...,None,:])
+    face=-sign[...,None]*side*half
+    point=torch.where(side[...,None,:].bool(),face[...,None,:],point)
+    error=(local_hands[...,:2]-point).norm(dim=-1).amax(-1)
+    return torch.exp(-config['hand_near_scale']*error.square())
+
+
+def stage2_contact_at_rewards(quality, contact, root_distance, goal_distance, at_success, config):
+    """Dense, recurring contact+AT terms from stage2 single-agent PUSH.
+
+    No record-improvement or contact gate on approach/AT progress. The caller
+    retains physical goal validity and independent tilt/lift penalties.
+    """
+    saturated=contact | at_success
+    approach=1/(1+(root_distance-config['approach_delta']).clamp_min(0)/config['approach_sigma'])
+    at_progress=1/(1+(goal_distance-config['approach_delta']).clamp_min(0)/config['approach_sigma'])
+    at_phi=torch.exp(-config['at_near_scale']*goal_distance.square())
+    one=torch.ones_like(quality)
+    return torch.stack([
+        config['hand_state_weight']*torch.where(saturated,one,quality),
+        config['hand_progress_weight']*torch.where(saturated,one,approach),
+        config['hand_result_weight']*saturated.float(),
+        config['at_state_weight']*torch.where(at_success,one,at_phi),
+        config['at_progress_weight']*torch.where(at_success,one,at_progress),
+        config['at_result_weight']*at_success.float()],-1)
+
+
 def push_stability_penalties(up_z, bottom, config):
     tilt=torch.acos(up_z.clamp(-1,1))
     free=math.radians(config['tilt_free_degrees'])
@@ -133,7 +167,7 @@ def advance_success(valid, elapsed, done, dt, duration):
     return elapsed, done | current, first
 
 
-def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False):
+def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False, generic_door_goal=False):
     """Canonical H[M], boxes[M], doors[M], goals[M]; bind actual active object."""
     from utils.edge_context_spec import AT
     from utils.edge_interaction_spec import PUSH, DOOR_OPEN, DOOR_HOLD
@@ -155,7 +189,7 @@ def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False
         matrix[rows, owner, obj] = interaction
         matrix[rows, obj, owner] = interaction
         matrix[:, owner, goal] = matrix[:, goal, owner] = 4
-        placement=torch.where(tasks[:,owner].bool(),interaction,AT) if semantic else 5
+        placement=torch.where(tasks[:,owner].bool(),5 if generic_door_goal else interaction,AT) if semantic else 5
         matrix[rows, obj, goal] = matrix[rows, goal, obj] = placement
     return matrix
 
@@ -218,6 +252,14 @@ def validate_interaction(config):
         if not math.isfinite(config[key]) or config[key] < 0:
             raise ValueError('Invalid reward weight: ' + key)
     push, door, amp = config['push'], config['door'], config['amp']
+    mix=amp.get('task_expert_mix')
+    if mix is not None:
+        if amp.get('task_conditioning',True) is not True or set(mix)!= {'push','door'}:
+            raise ValueError('Task expert mix requires conditional PUSH/OPEN labels')
+        for name,forbidden in (('push',2),('door',1)):
+            weights=mix[name]
+            if len(weights)!=3 or any(not math.isfinite(v) or v<0 for v in weights) or abs(sum(weights)-1)>1e-6 or weights[forbidden]!=0:
+                raise ValueError('Invalid task expert mix: '+name)
     if not isinstance(amp.get('task_conditioning', True), bool):
         raise ValueError('AMP task_conditioning must be boolean')
     bounds=push['box'].get('size_range')
@@ -250,12 +292,15 @@ def validate_interaction(config):
                 raise ValueError('Invalid PUSH stability parameter: '+key)
     split=push.get('relation_rewards')
     if split is not None:
-        if split.get('version')!='push_at_state_progress_result_v1':
+        if split.get('version') not in ('push_at_state_progress_result_v1','stage2_contact_at_dense_v1'):
             raise ValueError('Unsupported PUSH relation reward version')
         for key in ('hand_state_weight','hand_progress_weight','hand_result_weight','at_state_weight','at_progress_weight','at_result_weight'):
             if not math.isfinite(split[key]) or split[key]<0:
                 raise ValueError('Invalid PUSH relation reward weight: '+key)
-        for key in ('hand_progress_speed','hand_hold_seconds','hand_contact_distance','contact_force','at_distance_scale'):
+        parameters=('hand_contact_distance','contact_force','hand_near_scale','at_near_scale','approach_sigma') if split['version']=='stage2_contact_at_dense_v1' else ('hand_progress_speed','hand_hold_seconds','hand_contact_distance','contact_force','at_distance_scale')
+        if split['version']=='stage2_contact_at_dense_v1' and (not math.isfinite(split['approach_delta']) or split['approach_delta']<0):
+            raise ValueError('Invalid PUSH approach_delta')
+        for key in parameters:
             if not math.isfinite(split[key]) or split[key]<=0:
                 raise ValueError('Invalid PUSH relation reward parameter: '+key)
     if 'hand_reward_weight' in push or split is not None:
