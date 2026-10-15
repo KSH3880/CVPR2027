@@ -7,7 +7,8 @@ if [ $# -lt 1 ] || [ ! -f "$1" ]; then
   exit 1
 fi
 CKPT=$1
-OUTPUT_PATH=${OUTPUT_PATH:-output/stage1_v2_fixed}
+. "$TOKENHSI_ROOT/tokenhsi/scripts/multi_agent/output_paths.sh"
+tokenhsi_select_output stage1_v2_fixed eval
 if [ -n "${STAGE1_V2_FIXED_ENV_CONFIG:-}" ]; then
   ENV_CONFIG=$(python tokenhsi/utils/stage1_v2_fixed.py --config "$STAGE1_V2_FIXED_ENV_CONFIG" \
     --output-dir "$OUTPUT_PATH")
@@ -31,5 +32,5 @@ python ./tokenhsi/run.py --task HumanoidMACarry \
   --num_agents "$NUM_AGENTS" --num_envs "$NUM_ENVS" --num_objects "$NUM_OBJECTS" \
   --eval_repeats "$NUM_REPEATS" --eval_skills "${EVAL_SKILLS:-loco}" \
   --eval_skill_probs "${EVAL_SKILL_PROBS:-1.0}" \
-  --output_path "${OUTPUT_PATH:-output/stage1_v2_fixed}" \
+  --output_path "$OUTPUT_PATH" \
   --no_video --test --eval "$@"

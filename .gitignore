@@ -73,9 +73,6 @@ desktop.ini
 # Training artifacts (checkpoints, logs, renders)
 # ---------------------------------------------------------------------------
 /output/
-/joint_carry/carry_*/
-/joint_carry/archive/
-/joint_carry/joint_carry_handoff.zip
 /output_etc/
 runs/
 wandb/

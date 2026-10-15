@@ -20,7 +20,7 @@ source "$HOME/.local/share/gpu-mps/shell.sh"
 
 ```bash
 mps_start 6
-TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh 2 2048 3
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
 ```
 
 다른 프로젝트의 일반 프로그램은 그 프로그램의 실행 환경에 MPS 경로가 전달돼야 한다. 같은 터미널에서 `mps_start`/`mps_use` 후 실행하거나 `mps_run 6 <command>`를 쓴다. 이 레포의 자동 연결은 `runtime_env.sh` → `mps_auto_env.sh`에서 수행한다.
@@ -29,13 +29,13 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_
 
 보호 장치 검증은 `python mps/test_shell.py`로 실행한다. 가짜 NVIDIA 도구와 CPU 프로세스만 사용하며 실제 MPS/GPU에 접근하지 않는다.
 
-**다른 서버에는 [CODEX_SETUP.md](CODEX_SETUP.md) 하나를 전달한다.** 필요한 전체 코드와 Codex 설치 요청문이 들어 있다. 개인 `.bashrc` 자동 로드를 허용해 설치하면 그 서버의 새 Bash 터미널에서는 source 없이 단축 명령을 바로 쓸 수 있다.
+**다른 서버에는 [CODEX_SETUP.md](../markdowns/legacy/mps/CODEX_SETUP.md) 하나를 전달한다.** 필요한 전체 코드와 Codex 설치 요청문이 들어 있다. 개인 `.bashrc` 자동 로드를 허용해 설치하면 그 서버의 새 Bash 터미널에서는 source 없이 단축 명령을 바로 쓸 수 있다.
 
 `mps_start`·`mps_stop`은 기본 NVIDIA 명령이 아니라 [shell.sh](shell.sh)에 정의한 단축 함수다. 아래에는 단축 함수를 사용하지 않는 직접 명령도 남겨둔다.
 
 **시작·정상 종료·강제 종료 명령만 보려면 [GPU별 MPS 명령 모음](commands.md)을 사용한다.** GPU 번호만 바꾸는 형태이며 다른 서버에서의 사용 조건도 정리했다.
 
-GPU 4·6에서 계속 연산을 돌리고 GPU 4만 끊어보려면 [GPU 4·6 분리 테스트](gpu4_gpu6_test.md)를 따른다. 테스트 프로그램은 [heartbeat.py](heartbeat.py)다.
+GPU 4·6에서 계속 연산을 돌리고 GPU 4만 끊어보려면 [GPU 4·6 분리 테스트](../markdowns/legacy/mps/gpu4_gpu6_test.md)를 따른다. 테스트 프로그램은 [heartbeat.py](heartbeat.py)다.
 
 **MPS는 NVIDIA의 `nvidia-cuda-mps-control -d` 명령으로 켠다. 별도 `.sh`나 `mps_gpu` 함수는 필요 없다.**
 
@@ -63,10 +63,10 @@ nvidia-cuda-mps-control -d
 
 이 저장소에서는 기존 학습 스크립트 앞에 **GPU UUID와 MPS 접속 경로**를 붙이면 된다. 스크립트 파일은 수정하지 않는다.
 
-아래는 **2048환경·2회 학습 확인용**이다. 결과는 `mps/output/` 아래에 저장한다.
+아래는 **2048환경·2회 학습 확인용**이다. 결과는 `output_etc/check/mps/` 아래에 저장한다.
 
 ```bash
-cd /home/hwanhee/ksh/approach_clean_scenario_stage1
+cd /path/to/stage1_v2
 nvidia-smi -i 6
 MPS_UUID=$(nvidia-smi -i 6 --query-gpu=uuid --format=csv,noheader)
 
@@ -75,8 +75,8 @@ CUDA_MPS_PIPE_DIRECTORY="/tmp/mps-test-${UID}/gpu6/pipe" \
 TOKENHSI_CONDA_ENV=tokenhsi \
 RESUME_CHECKPOINT= \
 MAX_ITERATIONS=2 \
-OUTPUT_PATH="mps/output/gpu6_$(date +%Y%m%d_%H%M%S)_check" \
-bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh 2 2048 3
+OUTPUT_PATH="output_etc/check/mps/gpu6_$(date +%Y%m%d_%H%M%S)_check" \
+bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
 ```
 
 같은 GPU에서 여러 학습을 공유하려면 각 터미널에서 동일한 GPU UUID와 접속 경로를 사용한다. 작업마다 출력 폴더는 다르게 지정한다. SSH 연결 종료에도 학습을 유지하려면 학습을 `tmux` 안에서 실행한다.

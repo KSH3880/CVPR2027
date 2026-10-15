@@ -1,117 +1,29 @@
-# TokenHSI-MultiAgent
+# Stage1 Multi-Agent TokenHSI
 
-Multi-agent extension of [**TokenHSI**](https://github.com/liangpan99/TokenHSI) (CVPR 2025 Oral) —
-Pan et al., *Unified Synthesis of Physical Human-Scene Interactions through Task Tokenization*.
+`stage1`, `stage1_v2`, `stage1_v2_fixed` 세 multi-agent 실험을 유지한다. [TokenHSI](https://github.com/liangpan99/TokenHSI)의 데이터·AMP 기반 위에 다중 사람의 독립 SIT/CLIMB/AT/ON_TOP 과제를 학습한다.
 
-The original `carry` task places **one humanoid and one box** in a scene. This fork extends it to
-**M humanoids, O boxes (O ≥ M) and M goals**: each agent is randomly assigned a distinct box, and
-the remaining `O − M` boxes stay unassigned as distractors. Entities (humanoid / object / goal) are
-split into per-type tokenizers, and the assignment relation is injected as a non-learned relation
-matrix that becomes a learnable attention bias.
+공유 task bias·사람 토큰 residual MLP·GTA, 별도 actor/critic, CPA와 크기별 RSI를 사용한다. 기본 학습은 **2명·2048환경·4물체**다.
 
-> Everything from the upstream repo — datasets, checkpoints, single-task training paths — is left
-> untouched. Motion data is reused read-only and the multi-agent runs write to their own output paths.
+## 시작하기
 
-## What is added
-
-| Area | Files |
-|---|---|
-| Environment | `tokenhsi/env/tasks/multi_agent/` — `humanoid_ma.py`, `humanoid_ma_carry.py`, `vec_task_wrapper_ma.py` |
-| Learning | `tokenhsi/learning/multi_agent/` — `amp_network_builder_ma.py`, `ma_agent.py`, `ma_players.py` |
-| Configs | `tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml`, `tokenhsi/data/cfg/train/rlg/amp_ma_carry{,_watch}.yaml` |
-| Scripts | `tokenhsi/scripts/multi_agent/` — train / test / watch / remote-GUI helpers |
-
-Upstream files touched (registration and multi-agent plumbing only): `tokenhsi/run.py`,
-`tokenhsi/utils/config.py`, `tokenhsi/utils/parse_task.py`, `tokenhsi/learning/amp_players.py`.
-
-New algorithm keys registered in `run.py`: algo `ma`, player `ma`, network `amp_multi_agent`.
-
-## Documentation
-
-Start with the short current references (mostly in Korean):
-
-- [`AGENTS.md`](AGENTS.md) — Codex reading order and repository conventions
-- [`changelog.md`](changelog.md) — recent changes and validation results
-- [`structure.md`](markdowns/structure.md) — code map and task entry points
-- [`config.md`](markdowns/config.md) — current experiment configs, training, evaluation, and remote VNC
-
-Read detailed references as needed:
-
-- [`ma_clean_scene_gta.md`](markdowns/ma_clean_scene_gta.md) — current GTA policy architecture
-- [`relation_diagnostics.md`](tokenhsi/docs/relation_diagnostics.md) — placement metrics and traces
-- [`USAGE.md`](markdowns/USAGE.md), [`PORTING_GUIDE.md`](markdowns/PORTING_GUIDE.md) — installation and machine setup
-
-## Setup
-
-This checkout uses the existing `tokenhsi` environment on the RTX PRO 6000 server.
-Training uses **2048 environments**. See [`USAGE.md`](markdowns/USAGE.md) for the
-installed environment and data paths.
+- [실행과 config](markdowns/config.md): 현재 컨피그와 학습·로컬 추론·VNC 명령·추론 옵션
+- [코드 구조](markdowns/structure.md): 구현과 테스트 위치
+- [설치·추가 실행 옵션](markdowns/USAGE.md), [머신 포팅](markdowns/reference/PORTING_GUIDE.md)
+- [최근 변경](changelog.md), [작업 규칙](AGENTS.md)
+- [정책·환경 상세](markdowns/reference/ma_clean_scene_gta.md), [과거 기록](markdowns/legacy/README.md)
 
 ```bash
-conda activate tokenhsi
 nvidia-smi
+# output_etc/check/에 저장하는 짧은 확인 학습
+TOKENHSI_GPU=0 CHECK=1 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
+# CKPT에 fixed 또는 v2 checkpoint 경로 지정
+TOKENHSI_GPU=0 HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_test.sh "$CKPT" 2 32 4 3
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_vnc.sh "$CKPT" 2 1 4 10
 ```
 
-Assets that are **not** in this repository and must be fetched separately:
+실행 스크립트는 `runtime_env.sh`로 `tokenhsi` conda 환경과 CUDA를 준비한다. 원본 레포 `/home/cvlab/Desktop/CVPR2027/stage1_message`와 공유 데이터는 보존하고, 본학습은 `output/`, 모든 확인·평가 결과는 `output_etc/check/`에 저장한다.
 
-- [SMPL body models](https://smpl.is.tue.mpg.de/) → `body_models/smpl/`
-- Pre-processed motion & object data → [Hugging Face](https://huggingface.co/datasets/lianganimation/TokenHSI),
-  extracted into `tokenhsi/data/dataset_*/`
-- Pre-trained checkpoints → `output/` (see the upstream README)
-
-See [`markdowns/USAGE.md`](markdowns/USAGE.md) for a verified end-to-end setup, including remote GUI
-rendering over noVNC.
-
-## Usage
-
-The helper scripts contain no absolute paths: the repo root is derived from the script's own
-location, and everything else is auto-detected with an environment-variable override.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `TOKENHSI_CONDA_ENV` | the env you already activated, else `tokenhsi` | conda env to activate |
-| `CONDA_BASE` | `conda info --base`, then the usual install prefixes | conda installation prefix |
-| `TOKENHSI_GPU` | `0` | physical GPU for both CUDA and viewer rendering |
-| `X11VNC` / `VNC_DIR` | `x11vnc` on `PATH` | x11vnc binary, or the prefix of a user-local install |
-| `NOVNC_DIR` | `/usr/share/novnc`, `~/opt/novnc`, … | directory containing `vnc.html` |
-| `WEBSOCKIFY` | `PATH` → conda env → noVNC bundle | websockify executable |
-| `PORT` | `6080` | noVNC web port |
-
-So a machine whose env is named differently just needs, e.g.
-`TOKENHSI_CONDA_ENV=my-env sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 2048 3`.
-
-```bash
-# Train: <num_agents> <num_envs> <num_objects>
-sh tokenhsi/scripts/multi_agent/ma_carry_train.sh 2 2048 3
-
-# Test / evaluate a checkpoint
-sh tokenhsi/scripts/multi_agent/ma_carry_test.sh output/ma_carry/nn/xxx.pth 2 16 3
-
-# View a Stage 1 checkpoint through noVNC on GPU 6
-TOKENHSI_GPU=6 VNC_DIR="$HOME/opt/vnc" \
-  bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_vnc.sh /path/to/checkpoint.pth
-```
-
-Or invoke the runner directly:
-
-```bash
-python ./tokenhsi/run.py --task HumanoidMACarry \
-    --cfg_train tokenhsi/data/cfg/train/rlg/amp_ma_carry.yaml \
-    --cfg_env tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml \
-    --motion_file tokenhsi/data/dataset_carry/dataset_carry.yaml \
-    --num_envs 2048 --num_agents 2 --num_objects 3 \
-    --output_path output/ma_carry --headless
-```
-
-The multi-agent task now defaults to `policyObsMode: clean_scene`: one intrinsic H/O/T
-node set and one compact pose per token are stored per environment. A2 supplies typed
-semantic relation bias, GTA aligns Q/K/V through token-wise SE(3) transforms, and all
-humanoid actions/values are read from one scene encoding. Set
-`policyObsMode: legacy_multirow` in the task config for the exact ego-first A1 baseline.
-Semantic A1/A2 ablation is controlled by `relation_bias_mode` (`lookup|edge_mlp`).
-The GTA path uses `gta.enable: true` and requires historical `geometry.enable: false`.
-See [`markdowns/ma_clean_scene_gta.md`](markdowns/ma_clean_scene_gta.md) for the feature
-split, normalization, transform convention, and shape flow.
+원본 단일인 TokenHSI 태스크·데이터 전처리는 별도로 유지한다. 큰 모션·물체 데이터와 SMPL 모델은 Git에 포함되지 않으며 설치 안내를 따른다.
 
 ## Acknowledgements
 

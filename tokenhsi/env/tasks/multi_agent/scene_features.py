@@ -1,5 +1,6 @@
 """Small, simulator-independent helpers for clean-scene observations."""
 
+import math
 import torch
 
 
@@ -81,3 +82,11 @@ def build_gta_pose_records(human_positions, human_heading_quaternions,
         goal_quat,
     ], dim=-1)
     return torch.cat([human_pose, object_pose, target_pose], dim=1)
+
+
+def clip_scene_observation(obs, num_agents, num_objects, entity_sizes, clip):
+    """Clip intrinsic nodes while preserving literal targets, GTA poses and tasks."""
+    if math.isinf(clip):
+        return obs
+    width = num_agents * entity_sizes[0] + num_objects * entity_sizes[1]
+    return torch.cat((torch.clamp(obs[:, :width], -clip, clip), obs[:, width:]), -1)

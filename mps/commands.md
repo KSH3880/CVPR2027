@@ -1,6 +1,6 @@
 # GPU별 MPS 시작·종료 명령
 
-짧게 `mps_start 6`·`mps_stop 6`으로 쓰려면 [README의 단축 명령](README.md)을 따른다. 다른 서버에서 Codex에게 설치를 맡길 때는 전체 코드가 포함된 [CODEX_SETUP.md](CODEX_SETUP.md) 하나를 전달한다. 아래는 직접 실행하는 원래 NVIDIA 명령이다.
+짧게 `mps_start 6`·`mps_stop 6`으로 쓰려면 [README의 단축 명령](README.md)을 따른다. 다른 서버에서 Codex에게 설치를 맡길 때는 전체 코드가 포함된 [CODEX_SETUP.md](../markdowns/legacy/mps/CODEX_SETUP.md) 하나를 전달한다. 아래는 직접 실행하는 원래 NVIDIA 명령이다.
 
 **GPU 번호만 바꾸면 된다. 별도 `.sh`, 함수, 이 저장소 설치는 필요 없다.**
 
@@ -67,7 +67,7 @@ CUDA_MPS_PIPE_DIRECTORY="/tmp/mps-test-${UID}/gpu${MPS_GPU}/pipe" \
     python your_program.py
 ```
 
-이 저장소의 학습 스크립트는 `TOKENHSI_GPU`로 CUDA GPU를 설정하므로 학습 시에는 [README의 학습 예제](README.md)를 따른다. 복사해 실행할 수 있는 연산 테스트 명령은 [GPU 4·6 테스트](gpu4_gpu6_test.md)에 있다.
+이 저장소의 학습 스크립트는 `TOKENHSI_GPU`로 CUDA GPU를 설정하므로 학습 시에는 [README의 학습 예제](README.md)를 따른다. 복사해 실행할 수 있는 연산 테스트 명령은 [GPU 4·6 테스트](../markdowns/legacy/mps/gpu4_gpu6_test.md)에 있다.
 
 ## 무엇을 만든 건가
 

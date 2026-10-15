@@ -1,7 +1,6 @@
 from copy import deepcopy
 import torch
 
-SIZE_RSI_VARIANT = 'scenario_independent_stage1_unified_size_rsi'
 TASKS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')
 TASK_PROBS = (.05, .10, .25, .30, .30)
 SIZE_RANGES = {
@@ -65,25 +64,6 @@ def sample_sizes(n, device, preset='random_scenario', ranges=SIZE_RANGES,
     return sizes
 
 
-def sample_size_graph(sizes, spec, preset):
-    from utils.edge_scenario_spec import compose_graph
-    n = len(sizes)
-    if preset == 'random_scenario':
-        ids = torch.multinomial(task_probabilities(sizes[:, :2]).flatten(0, 1),
-                                1).reshape(n, 2)
-    elif preset == 'sit_climb':
-        ids = torch.tensor([TASKS.index('SIT'), TASKS.index('CLIMB')],
-                           device=sizes.device).expand(n, -1)
-    else:
-        name = {'holding': 'HOLDING', 'sit': 'SIT', 'climb': 'CLIMB',
-                'holding_at': 'HOLDING_AT', 'holding_ontop': 'HOLDING_ON_TOP'}[preset]
-        ids = torch.full((n, 2), TASKS.index(name), device=sizes.device)
-    rows = [[TASKS[i] for i in row] for row in ids.tolist()]
-    bindings = [[(a, a) if task == 'HOLDING_AT' else (a, 2+a)
-                 if task == 'HOLDING_ON_TOP' else (a,)
-                 for a, task in enumerate(row)] for row in rows]
-    return compose_graph(rows, bindings, shuffle=spec['shuffle_edge_order']
-                         and preset == 'random_scenario', device=sizes.device, num_objects=4)
 
 
 def interaction_phase(skill, roots, feet, box, size):
