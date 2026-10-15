@@ -4,9 +4,14 @@
 
 ## 진입점
 
+원본 단일 사람 Stage 1의 Carry·Sit·Climb 설정은 [TokenHSI 원본 상세](tokenhsi_original_carry_sit_climb.md)를 참조한다. 초기 배치·크기·보상·성공·평가 집계와 논문/로컬 데이터 차이, 평가 asset별 치수를 정리한 참고 문서다.
+
+새 `stage1_v2`의 적용 범위와 원본과의 학습/평가 차이는 [비교 문서](tokenhsi_vs_stage1_v2_train_eval.md)에 정리한다. 전용 env/train `stage1_v2.yaml`, `stage1_v2_{train,test,vnc}.sh`를 사용하며 기존 stage1과 checkpoint/RSI 캐시를 분리한다.
+
 | 경로 | 역할 |
 | --- | --- |
 | `tokenhsi/run.py` | 학습·평가 태스크와 알고리즘 등록 |
+| `tokenhsi/evaluate_action_tokenhsi.py` | 원본 1인 Carry/Sit/Climb 환경의 Action 관측 bridge·평가·물리 호환·출발 거리 제한 옵션; ON_TOP 확장, 학습/VNC 없음 |
 | `tokenhsi/box_cleanup_demo.py` | 지정 rescue checkpoint의 4명·16상자 정리 데모 평가 전용 진입점 |
 | `tokenhsi/scripts/multi_agent/` | 현재 실험별 train/test/VNC, `runtime_env.sh`, `run-gui.sh` |
 | `joint_carry/scripts/carry_joint_preview.py` | CPU 관절 FK로 pickUp/carryWith/putDown 원본·공동운반 MP4/NPZ 후보·모음 영상 생성, 관절각 유지한 안쪽 배치 옵션; 물리 검증·학습 reset 연결 없음 |
@@ -29,8 +34,16 @@
 | `tokenhsi/env/tasks/multi_agent/edge_ontop_task.py`, `edge_context_task.py` | graph reset, 가까운 시작, 물리 타당성·진단 |
 | `tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py` | Stage 1 edge 보상·포화·팀 공유 |
 | `tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py`, `edge_interaction_reward.py` | AT·ON_TOP·SIT·CLIMB state/progress와 plane 성공 |
-| `tokenhsi/utils/edge_scenario_spec.py` | 독립 물체·goal binding, 3물체·4물체 같은 과제 쌍 및 canonical 독립 5과제 sampler; size RSI의 GPU 배치 graph 생성 |
+| `tokenhsi/utils/edge_scenario_spec.py` | 독립 물체·goal binding, 3물체·4물체 같은 과제 쌍 및 canonical 독립 5과제 sampler; size RSI의 GPU 배치 graph 생성, task-role 가변 인원 추론·받침 부족 시 과제 재추첨 |
+| `tokenhsi/tests/test_generic_task_scenario.py` | M≥1·O≥M graph/과제 packet·받침 중복 방지·크기 적격·부분 reset·1물체 높이 검사 |
 | `tokenhsi/utils/size_rsi.py`, `tokenhsi/env/tasks/multi_agent/size_rsi_cache.py` | 행동별 실제 asset 크기·조건부 과제 배정·프레임별 초기 충격 캐시·후반 RSI 선택 |
+| `tokenhsi/utils/stage1_v2.py`, `tokenhsi/tests/test_stage1_v2.py` | v2 전용 RSI/기하 계약·역할별 적층 높이 검사·새 크기/AT 성공·AMP/토큰 셔플 검증; 구버전 범위는 유지 |
+| `tokenhsi/utils/stage1_v2_fixed.py`, `tokenhsi/tests/test_stage1_v2_fixed.py` | v2 고정 선반 opt-in 검증·저장 env/sim 복원·legacy v2 sim 보충 및 기존 실험 격리 검사 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage1_v2_fixed.yaml`, `tokenhsi/scripts/multi_agent/stage1_v2_fixed_{train,test,vnc}.sh` | 고정 선반 전용 실행 설정·2048환경 train·로컬/서버 viewer, 별도 output |
+| `output_etc/v2_fixed_validation_20261015/` | 운영 변경 전 후보 물리/RSI/AMP/학습·resume·속도 검사와 최종 실행 경로 검증; `validation.json`에 결과/제한 기록 |
+| `tokenhsi/tests/smoke_stage1_v2_training.py`, `output_etc/stage1_v2_check_20261014/` | 2048환경 실제 학습/resume에서 reset 모션·AMP 이력·정규화 라벨·PPO 행별 family 정렬 검사, 실행/캐시/시뮬레이션 검증 JSON |
+| `output_etc/stage1_rsi_height_audit_20261014/` | Climb 0.20~0.70m 확대 전 격리 물리 감사: `audit.py`, 독립 기하 `analyze.py`, 운영 helper 대조 `validate.py`, `validation.json`; 운영 config/캐시 미변경·정책 성능 실험 아님 |
+| `output_etc/action_climb_height_eval_20261014/` | Frozen Action 55k의 실제 Climb 높이 0.40~0.70m 평가: `evaluate.py`, 독립 trace 재집계 `analyze.py`, `summary.json`·`validation.json`; 높이당 XY 81조합·486시도, 출발 1~2m·운영 설정 미변경 |
 | `tokenhsi/utils/unified_training.py` | unified 과제별 AMP 전문가 분포·라벨·리플레이 매칭·설정 검증 |
 | `tokenhsi/utils/edge_stage1_spec.py` | Stage 1 variant·semantic/owner-HOLDING packet·후반 CLIMB/ON_TOP putDown RSI 검증 |
 | `tokenhsi/utils/edge_stage2_spec.py` | Stage 2 협력 graph·평가 preset |
@@ -61,6 +74,12 @@ Task embedding의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_
 Task embedding action의 전용 env/train YAML과 train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_embedding_action` 이름을 쓴다. `TaskTypeEmbeddingBias(zero_background=True)`는 4개 task만 인코딩하고 SELF/NONE bias를 0으로 고정한다. `TaskActionFusion`은 GTA 복귀·head concat 뒤 사람 토큰에 상태/task concat residual MLP를 적용한다. Actor endpoint를 토큰 순열에 맞게 재매핑하고 네 layer가 MLP를 공유한다. `tests/test_task_embedding_action.py`는 샘플링/RSI/AMP 계약, 주입 위치·padding·사람별 task binding·출력/gradient 순열·독립 업데이트·checkpoint 격리를 검증한다.
 
 Task/Role gate + Entmax의 전용 env/train YAML·train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax` 이름을 쓴다. `learning/multi_agent/task_role_gate.py`는 task embedding·layer별 4D block gate·sparse K/V correction·정확한 Entmax 1.5와 attention 진단을 제공한다. Gate 조회는 학습 시 one-hot GEMM gradient 합산, no-grad/frozen/FP32 TF32 시 compact index lookup을 사용하며 16D 조회 뒤 block을 확장한다. `RelationTransformerLayer`는 GTA 뒤 K/V 보정과 전체 scene 정규화를 적용하고, `ma_agent.py`는 task embedding/gate gradient norm을 추가 기록한다. `utils/task_role_spec.py`·`unified_training.py`는 bias/message 비활성화와 AMP/RSI 계약을, `relation_task_spec.py`는 checkpoint 격리를 검증한다. `tests/test_task_role_gate_entmax.py`는 dense/reference 수식·gradient·GTA 순서·role/padding·토큰/edge/task 순열·독립 업데이트·기존 runtime 계약을 확인한다.
+
+Action CPA의 전용 env/train YAML·train/test/VNC는 `approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa` 이름을 쓴다. `env/tasks/multi_agent/collision_reward.py`는 사람 간 CPA 위험·config 검증·checkpoint collision 계약을 제공하며 `humanoid_ma_carry.py`에서 static/CPA를 선택한다. `ma_agent.py`/`ma_players.py`는 저장·복원 시 계약을 확인하고, `tests/test_agent_cpa_collision.py`는 기하·보상 교체·기존 static 호환·실험 격리를 검증한다. 모델은 기존 Action과 같다.
+
+Stage1 전용 env/train YAML은 각각 `data/cfg/multi_agent/stage1.yaml`·`data/cfg/train/rlg/stage1.yaml`, 실행은 `scripts/multi_agent/stage1_{train,test,vnc}.sh`다. stage1/v2 test와 이를 호출하는 VNC는 checkpoint run의 `relation_config.yaml`을 기본 env로 선택하며 전용 `STAGE1_ENV_CONFIG`/`STAGE1_V2_ENV_CONFIG`로 재정의할 수 있다. `TaskTypeEmbeddingBias(shared_types=True)`와 기존 Action MLP/CPA를 사용한다. `utils/stage1_platforms.py`는 엄격한 실행 계약·TokenHSI 높이 추첨·graph에 따른 carry payload/AT 목적지 선반 reset을 담당하며 `edge_ontop_task.py`의 물리 장면 검사 전에 호출한다. `tests/test_stage1.py`는 공유 bias 수식/gradient·순열·checkpoint·RSI/선반 범위·부분 reset을, `tests/smoke_stage1_sim.py`는 저장 모델의 과제/RSI별 실제 reset·rollout·CPA 대조·GPU 선반 접촉/재배치를 검증한다. `utils/stage1_sampling.py`는 선택형 TokenHSI 접근 거리·공통 목표 XY·ON_TOP 받침 배치와 구/신 RSI resume 검사를 제공한다. `tests/test_stage1_sampling.py`는 분포·graph binding·부분 reset·구버전 계약을, simulator smoke는 실제 초기 거리까지 검사한다.
+
+`stage1_v2_fixed`는 `humanoid_ma_carry.py`의 opt-in asset/첫 reset 분기와 `ma_agent.py`의 sim snapshot 저장을 사용한다. `utils/stage1_v2_fixed.py`가 새 wrapper의 저장 env/sim 입력을 해석하며, 기존 v2 checkpoint를 새 고정 선반 환경에서 평가할 때는 고정 선반 선택을 명시적으로 적용한다. 기존 stage1/v2 config의 동작은 유지한다.
 
 ## 작업별 확인
 

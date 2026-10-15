@@ -4,6 +4,13 @@
 
 ## 빠른 확인
 
+- **[stage1_v2](#stage1-v2)**: 새 크기·성공 조건·RSI 검사 실험. Climb Z 0.2~0.7m, 받침/배경 XY 0.4~0.8·Z 0.25~0.5m, AT 20cm+높이 1mm, Climb 내부 80%. [TokenHSI 학습·평가 비교](tokenhsi_vs_stage1_v2_train_eval.md).
+- **[stage1_v2_fixed](#stage1-v2-fixed)**: v2 전용 고정 선반·첫 reset 전 물리 1회 초기화. 기존 stage1/v2와 output 분리, 저장 env+sim 복원.
+
+- **[Action → TokenHSI 원본 환경 평가](#action의-tokenhsi-원본-환경-평가)**: 원본 test mesh·1인 환경에서 frozen Action을 평가하는 별도 headless 진입점. ON_TOP은 별도 확장이다.
+
+- **[stage1](#stage1)**: Action 기반 CPA·타입 간 공유 bias·AT/ON_TOP payload 선반. `stage1_train.sh`/`stage1_test.sh`/`stage1_vnc.sh`, 기본 2명·2048환경·4물체이며 기존 Action/CPA checkpoint와 혼용하지 않는다.
+
 - 신규 **[Task/Role Gate + Entmax](#unified-size-rsi-task-role-gate-entmax)**는 `task_embedding` 기반 독립 실험이다. Additive bias/message 없이 task·role로 GTA K/V를 함께 조절하고 전체 scene에 Entmax 1.5를 적용한다. 기존 5종과 checkpoint를 섞지 않는다.
 
 - 최근 비교 대상은 **Task message / 공유 Task MLP / Task MLP split / Task embedding / Task embedding action**이다. [다섯 실험 공통 설정과 차이](#task-5종-공통-설정과-비교), [최근 확인 기록](#task-3종-최근-확인-기록)을 먼저 확인한다.
@@ -13,6 +20,30 @@
 - `task_embedding_action`은 task embedding 기반으로 SELF/NONE bias를 0으로 고정하고, GTA 복귀 후 사람 토큰에 `z + MLP([z, e_task])`를 적용한다. MLP는 128→64→64 ReLU·4개 layer 공유, actor/critic 독립이며 edge message는 없다.
 - 학습 중 HOLDING/AT/ON_TOP 성공률은 보상 primitive 지표다. 정책의 네 task 및 별도 평가의 운반 완수율과 구분한다. Bias는 원래 값과 같은 물리 타입의 NONE 대비 차이를 구분한다.
 - 현재 GPU/PID·epoch는 문서의 과거 기록으로 판단하지 않는다. 실행 전 `nvidia-smi`, 실행 중인 `tokenhsi/run.py` 인자와 해당 run의 `relation_config.yaml`·`summaries/`·`nn/`을 확인한다.
+
+## Action의 TokenHSI 원본 환경 평가
+
+`tokenhsi/evaluate_action_tokenhsi.py`는 학습하지 않는 headless 평가 전용 진입점이다. 기존 Action actor/normalizer를 strict-load하고 원본 `HumanoidTrajSitCarryClimb`의 1인 환경·test mesh·초기화·시간 제한·성공 누적 판정을 사용한다. 관측만 Action의 사람/물체 bbox/task packet으로 변환한다. 기존 multi-agent test와 분리하며, 원본 세팅은 [상세 문서](tokenhsi_original_carry_sit_climb.md)를 참조한다.
+
+```bash
+TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python tokenhsi/evaluate_action_tokenhsi.py \
+  --checkpoint output/approach_scenario_stage1_unified_size_rsi_task_embedding_action/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingAction_08-15-04-39/nn/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingAction_00055000.pth \
+  --task carry --num-envs 64 --repeats 3 --seed 0 \
+  --static-mode relocatable --output output_etc/action_tokenhsi_eval/carry'
+```
+
+출발 물체를 가까이 두는 대조 평가는 위 명령에 **`--approach-max-distance 2`**를 추가하고 `--output output_etc/action_tokenhsi_near2m_eval/carry`처럼 결과를 분리한다. 사람–담당 물체의 초기 XY 반경만 **U(1,2m)**로 제한한다. 원본 하한 1m를 유지하며 AT 도착 목표·ON_TOP 받침의 위치/높이 샘플링, 실제 mesh, 성공 기준과 시간 제한은 유지한다. 옵션을 생략하면 원본 Sit 1~5m·나머지 1~10m다.
+
+`--task`는 `carry`, `sit`, `climb`, `ontop` 중 선택한다. **Sit/Climb은 `--static-mode fixed_scene`, Carry/ON_TOP은 `--static-mode relocatable`**을 사용한다. `ontop`은 **원본에 없는 확장**으로, Carry의 도착 선반을 현재 ON_TOP 크기 규칙의 동적 받침상자로 대체한다. 받침의 현재 상판 중심에 payload가 놓였을 때의 중심점을 목표로 삼고 3D 20cm 도달을 누적한다. 출발 선반은 원본 Carry 규칙이며 안정적 적층/유지 지표는 아니다.
+
+`--static-mode original`은 원본 fixed actor다. 이 서버에서는 GPU reset 후 선반의 collision 위치가 따라오지 않아 낙하 접촉 검사를 통과하지 못했다. `relocatable`은 재배치 가능한 중력 비활성·고질량 선반으로 대체하는 Carry 호환 모드다. Sit/Climb의 `fixed_scene`은 **원본 fixed mesh**를 유지하고 장면 전체의 공통 XY 이동·yaw 회전으로 원본에서 샘플링한 상대 배치를 보존한다. 모델 관측은 다시 원래 좌표로 복원하므로 neutral goal의 위치·방향도 달라지지 않는다. 이 차이를 manifest에 기록하며 논문의 완전 동일 재현으로 부르지 않는다. `--probe-only`로 출발 선반에 상자를 떨어뜨려 충돌 위치를 확인할 수 있다.
+
+원본의 512환경 대신 간단 평가 기본값은 64환경×3회다. 로컬 Climb test는 논문의 26개와 달리 35개다. Action은 학습 당시 2명·4물체 대신 1명·과제 물체만 보며, 의자의 좌판 목표점은 모델 입력에 추가하지 않는다. `manifest.json`, `results.json`, `summary.json`, 회차별 초기 상태·거리 trace를 저장한다. 기존 Action/stage1 학습 설정과 성공 조건을 바꾸지 않는다.
+
+2026-10-14 Action 55k 간단 평가(각 192시도)의 Carry/Sit/Climb/ON_TOP ever는 **19.8/49.5/54.2/17.7%**, 종료 시는 **17.7/44.3/9.9/15.6%**다. 실행 조건·물리 검사·초기 디버깅 결과 제외 기준은 [평가 기록](../output_etc/action_tokenhsi_20261014/README.md), 독립 재집계는 [validation.json](../output_etc/action_tokenhsi_20261014/validation.json)에 있다.
+
+원본 환경의 **1~2m 제한 평가**(Action 55k·각 192시도)는 AT/ON_TOP/SIT/CLIMB ever **52.1/48.4/50.5/92.7%**, 종료 시 **45.8/46.4/44.3/7.8%**다. [평가 기록](../output_etc/action_tokenhsi_near2m_20261014/README.md)과 [검증 결과](../output_etc/action_tokenhsi_near2m_20261014/validation.json)에 저장했다.
 
 ## 공통 규칙
 
@@ -91,6 +122,9 @@ python joint_carry/scripts/correct_carry_candidates.py --finalize
 
 | 번호 | Config | 역할 |
 | ---: | --- | --- |
+| Stage1 | [stage1.yaml](../tokenhsi/data/cfg/multi_agent/stage1.yaml) | Action MLP 유지, 타입 간 공유 task bias·사람 CPA·carry payload/AT 목적지 선반 |
+| Stage1 v2 | [stage1_v2.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2.yaml) | Stage1 + Climb 0.2~0.7m·받침/배경 새 범위·AT 20cm/Climb 내부80%·별도 RSI 캐시 |
+| Stage1 v2 fixed | [stage1_v2_fixed.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml) | v2 크기·보상 유지, 고정 선반·일회 초기화·env/sim 복원 |
 | 1 | [amp_humanoid_ma_carry.yaml](../tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml) | 원본 multi-agent carry 기준 |
 | 27 | [approach_scenario_independent_with_climb.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_independent_with_climb.yaml) | 독립 물체·goal binding, 점 기준 성공 |
 | 28 | [approach_scenario_stage1_plane.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_plane.yaml) | 27번의 ON_TOP·CLIMB을 상판 영역 성공으로 변경; Stage 2 기본 출발점 |
@@ -118,6 +152,7 @@ python joint_carry/scripts/correct_carry_candidates.py --finalize
 | Unified size RSI task MLP split | [approach_scenario_stage1_unified_size_rsi_task_mlp_split.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_mlp_split.yaml) | Task MLP의 역할 embedding 공유, task별 MLP·projection 독립 |
 | Unified size RSI task embedding | [approach_scenario_stage1_unified_size_rsi_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding.yaml) | Task/NONE/SELF embedding과 H/O/G 타입 쌍별 projection, 중간 MLP·메시지 없음 |
 | Unified size RSI task embedding action | [approach_scenario_stage1_unified_size_rsi_task_embedding_action.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action.yaml) | SELF/NONE=0, task embedding bias + 사람 토큰의 concat/비선형 residual MLP |
+| Unified size RSI task embedding action CPA | [approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa.yaml) | Action 구조 유지, 사람 간 현재 거리 collision을 예측 최근접 거리 CPA로 교체 |
 | Unified size RSI task role gate entmax | [approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_role_gate_entmax.yaml) | Task64 + role3 → layer별 GTA block K/V gate, 전체 scene Entmax 1.5; bias/message 없음 |
 
 27~37번 Stage 1은 2-agent/3-object 독립 graph와 schema 9 semantic 관찰을 쓴다. ON_TOP 두 개를 동시에 샘플하지 않는다. 28~37번의 팀 보상은 자기 0.9, 동료 0.1이다. 30~33번은 유효 edge를 agent별로 평균 내어 단일 edge와 두 edge의 최대 task 보상을 0.6으로 맞춘다. 34~37번은 자기 edge를 합산하고 동료 edge만 평균 내며 state·progress·성공 식은 33번과 같다.
@@ -650,8 +685,154 @@ TOKENHSI_GPU=0 MAX_ITERATIONS=1 RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach
 TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=carry_at EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 1 4 10
 TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 16 4 3
 TOKENHSI_GPU=0 TASK_GRAPH=carry_ontop EVAL_SKILLS=carryWith EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_vnc.sh "$CKPT" 2 1 4 10
+# 한 명씩 SIT / CLIMB 고정: 첫 번째 사람 SIT, 두 번째 사람 CLIMB, loco 시작
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=sit_climb bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 TASK_GRAPH=sit_climb bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_vnc.sh "$CKPT" 2 1 4 10
+# 가변 인원 추론 예시: M>=1, O>=M이면 원하는 수 지정 가능
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 9 1 14 10
+TOKENHSI_GPU=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_vnc.sh "$CKPT" 9 1 14 10
 # 같은 새 실험 checkpoint 재개
 TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_train.sh 2 2048 4
+```
+
+Action의 `random_scenario` 평가는 **사람 M≥1·물체 O≥M**를 지원한다. 인자는 `<checkpoint> M 환경수 O 반복수`다. 각 사람에게 서로 다른 주물체를 배정하고, 남는 O−M개는 받침/배경으로 쓴다. ON_TOP이 받침보다 많이 뽑히면 무작위로 초과 담당자를 골라 실제 크기에 적격인 다른 과제로 재추첨한다. O=M이면 ON_TOP 없이 나머지 과제를 수행한다. 모두 ON_TOP으로 고정하는 `carry_ontop`은 과제 정의상 O≥2M이 필요하며, `sit_climb`은 사람 순서대로 SIT/CLIMB를 번갈아 배정한다. 가변 인원 평가에서는 사람 간 출발 간격과 장면 반경을 늘려 밀집 reset 실패를 줄인다. 기존 2명·4물체 학습/평가의 샘플링 및 checkpoint 계약은 유지한다. 기존 2명 정책의 가변 인원 **실행 지원**이며 동일한 성공률을 보장하는 것은 아니다.
+
+Action의 반복 평가는 기존 `_test.sh`의 마지막 인자로 횟수를 지정한다. 다음은 저장본 하나를 64환경·3회·600 step·loco 시작으로 평가하는 명령이다. 저장본별 `CKPT`와 `OUTPUT_PATH`를 바꾸면 최근 checkpoint들을 비교할 수 있다. 결과는 `<OUTPUT_PATH>/metrics/edge_context_*.json`의 `repeat_0..2`에 저장되며 `final_agent_goal_success`는 종료 시 개인 목표 성공률, `ever_agent_goal_success`는 평가 중 한 번이라도 성공한 비율이다. `final_edge_own_success`에는 SIT/CLIMB/AT/ON_TOP별 종료 비율이 있다. 과제별 회차 평균은 표본 수로 가중한 합산 성공률과 구분한다.
+
+```bash
+TOKENHSI_GPU=0 HEADLESS=1 SEED=42 EPISODE_LENGTH=600 TASK_GRAPH=random_scenario EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0 OUTPUT_PATH=output_etc/action_eval_repeat3 bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_test.sh "$CKPT" 2 64 4 3
+```
+
+### Action 시작 거리 대조 평가
+
+[거리 평가 스크립트](../output_etc/action_distance_eval_20261014/evaluate.py)는 Action 55k·2명·4물체·64환경·3회·600 step·loco 시작·seed 42·기존 성공/낙상 조건을 유지하고, 평가 시 `box.reset.ownerLocoDistanceRange`만 바꾼다. 표준 config/checkpoint 검사를 통과한 뒤 측정 episode reset 전에 메모리에서만 적용하며 학습 YAML은 수정하지 않는다.
+
+```bash
+TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python output_etc/action_distance_eval_20261014/evaluate.py --range 1 2
+python output_etc/action_distance_eval_20261014/evaluate.py --range 3 5
+python output_etc/action_distance_eval_20261014/evaluate.py --range 5 10
+python output_etc/action_distance_eval_20261014/analyze.py'
+```
+
+각 구간의 `initial_*.pt`·`trace_*.pt`·`results.json`과 통합 `summary.json`을 별도 보관한다. 실제 시작 거리 범위·finite·성공/접근/낙상 재집계와 1~2m 기준의 기존 표준 평가 재현을 검사한다. 접근 지표는 **담당 물체 중심 XY 1m 이내 도달**이며 과제 성공과 구분한다. 두 사람 중 한 명이 넘어지면 장면이 끝나는 기존 규칙을 유지한다. 같은 seed라도 배치 거절·종료 후 reset 때문에 구간 간 개별 장면은 정확히 짝지어지지 않는다.
+
+2026-10-14의 구간별 384시도 합산 종료 성공은 **93.2/76.8/9.9%**, 물체 접근은 **100/86.2/12.2%**, 낙상 종료 장면은 **1.0/14.1/88.0%**다. [전체 결과와 해석](../output_etc/action_distance_eval_20261014/README.md), [독립 재집계](../output_etc/action_distance_eval_20261014/summary.json)를 참조한다.
+
+## Stage1 v2 fixed
+
+고정 선반 검증을 반영한 별도 실험 **`stage1_v2_fixed`**다. [Env](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml)·[train](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed.yaml), 전용 `stage1_v2_fixed_{train,test,vnc}.sh`를 사용한다. 기본 2명·2048환경·4물체, output `output/stage1_v2_fixed`, run `Stage1V2Fixed_*`다. 본학습은 자동 실행하지 않는다.
+
+- v2의 크기·샘플링·성공 조건·보상·모델·AMP를 유지하고 `box.reset.platformPhysics: fixed_warmup_v1`만 선택한다. 기존 stage1/v2 YAML에는 이 옵션이 없어 기존 동적 선반 경로를 유지한다.
+- 선반은 `fix_base_link=True`이며 에피소드 reset마다 다시 배치한다. **위치가 에피소드 간 고정이라는 뜻은 아니다.** GPU PhysX의 최초 재배치를 위해 프로세스의 첫 전체 reset 전에 물리 계산을 한 번 한다. 이후 일반 reset이 사람·상자·진행 상태·AMP 이력을 초기화한다.
+- AT는 상자 **중심** 목표다. 목표 Z = 선반 상판 Z + 상자 높이/2, 선반 중심 Z = 목표 Z − 상자 높이/2 − 0.01m다. 바닥 목표는 상판 Z=0이다. 고정 선반은 바닥과 겹쳐도 떠밀리지 않는다.
+- 새 run의 `relation_config.yaml`과 checkpoint metadata에 env와 **sim을 함께 저장**한다. test/VNC는 checkpoint의 저장 env를 읽고 고정 선반 모드를 명시적으로 적용한다. `STAGE1_V2_FIXED_ENV_CONFIG`가 있으면 그 파일을 우선한다. 옛 v2 snapshot에 sim이 없을 때만 새 실험 YAML의 전체 sim을 보충하고 출처를 출력한다. `rest_offset=0`을 요구하며 불완전한 sim은 거부한다. 해석된 입력은 output의 `fixed_env_*.yaml`에 보관한다.
+- 기존 **v2** checkpoint는 새 물리 환경에서 평가하거나 명시적 resume할 수 있다. 이는 물리 환경을 바꾸는 후속 실험이며 이전 실험의 동일 조건 재현이 아니다. stage1 checkpoint는 v2 보상/크기 계약과 달라 혼용하지 않는다.
+- RSI 캐시는 기존 v2 디렉터리를 사용한다. 이번 재검사 6,413개 profile의 프레임/phase mask는 기존 캐시와 모두 일치했다. 코드·입력 조건으로 cache key가 달라지면 최초 screening 시간이 필요하다.
+
+```bash
+# 새 본학습: 직접 실행할 때만 시작
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/stage1_v2_fixed bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
+# 짧은 확인 학습
+TOKENHSI_GPU=0 MAX_ITERATIONS=1 OUTPUT_PATH=output/stage1_v2_fixed_check bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
+# CKPT: 기존 v2 또는 새 fixed 실험의 checkpoint
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_test.sh "$CKPT" 2 32 4 3
+TOKENHSI_GPU=0 TASK_GRAPH=holding_at bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_vnc.sh "$CKPT" 2 1 4 10
+# 저장 상태에서 새 output으로 계속 학습
+TOKENHSI_GPU=0 RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/stage1_v2_fixed_resume bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
+```
+
+검증 자료: [결과 JSON](../output_etc/v2_fixed_validation_20261015/validation.json). 격리 후보에서 CPU 86개, 32환경의 13과제/초기 skill·부분 reset·AT 마커 및 바닥/0.005/0.02/0.25/0.75m 선반 접촉, 2048환경 epoch3 및 resume epoch4를 확인했다. 선반 정지 오차0·상자 밑면 오차≤0.0043mm, 추가 초기 물리 계산 약21ms였다. 세 epoch 속도 비교는 비슷한 범위이며 장기 성능 보장은 아니다. 테스트의 연속 reset 호출과 float32 XY 허용 오차 오류는 격리 검사 코드에서 바로잡았고 최초 실패 로그도 보관했다. GUI/VNC 화면은 기존 NVML 버전 불일치 때문에 미검증이다.
+최종 연결 후 CPU **97개**, 새 train wrapper의 **2048환경 epoch2/frame262144**·514 scalar finite·reset 실패0을 확인했다. 운영 코드로도 동일13과제·다섯 높이 접촉 검사를 통과했다. 새 checkpoint 및 기존 v2 8k의 표준 headless32환경32step 평가도 통과했다. VNC wrapper는 GPU 선택 단계에서 기존 NVML 오류로 종료됐다.
+
+## Stage1 v2
+
+새 실험은 **`stage1_v2`**다. [Env](../tokenhsi/data/cfg/multi_agent/stage1_v2.yaml)·[train](../tokenhsi/data/cfg/train/rlg/stage1_v2.yaml), 전용 `stage1_v2_train.sh`/`stage1_v2_test.sh`/`stage1_v2_vnc.sh`를 사용한다. 기본 2명·2048환경·4물체, output `output/stage1_v2`, run 이름 `Stage1V2_*`다. 기존 stage1/Action checkpoint와 직접 resume/eval을 혼용하지 않는다.
+
+- stage1의 공유 task bias·Action MLP·CPA·원본 규칙 출발/AT 목적지 선반·TokenHSI 거리·운반 RSI 50/10/30/10을 유지한다.
+- 크기는 축별 0.05m 간격. Climb XY 0.4~0.8·Z 0.2~0.7m, 받침/배경 XY 0.4~0.8·Z 0.25~0.5m다. Carry XYZ 0.2~0.6, Sit XY 0.25~0.8·Z 0.35~0.5m는 유지한다. 적격 과제 계산과 실제 asset 생성에 같은 범위를 사용한다.
+- AT는 3D 20cm+높이 오차1mm, Climb은 내부80%+root/양발 평균 높이 조건이다. HOLDING·SIT·ONTOP 조건과 dense state 곡선은 유지한다. 학습 성공 보너스와 eval 순간 성공은 같은 함수를 사용한다.
+- RSI는 `output/rsi_cache_stage1_v2`에 별도 생성한다. 처음 실행할 때 실제 물리 screening에 시간이 걸린다. 크기별 관통·바닥 침범·초기 충격·낙상을 검사하고, 실제 상자 높이로 SIT/CLIMB phase를 계산한다. 모션을 수직 이동시키지 않는다. 유효 프레임이 없는 skill의 fallback과 명목/실행 비율을 구분한다. 새 seed·환경 수가 새 크기 조합을 만들면 추가 검사가 필요하다.
+- AMP family/과거 이력은 담당 task/실제 선택 motion에 연결한다. 모델 토큰·edge/task 셔플 및 PPO 행별 demo/replay 매칭을 유지한다. 상세 비교와 해석은 [학습·평가 비교 문서](tokenhsi_vs_stage1_v2_train_eval.md)를 따른다.
+
+```bash
+# 본학습 — 실행 전에 GPU 점유 확인
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/stage1_v2 bash tokenhsi/scripts/multi_agent/stage1_v2_train.sh 2 2048 4
+# 별도 확인 학습
+TOKENHSI_GPU=0 MAX_ITERATIONS=1 OUTPUT_PATH=output/stage1_v2_check bash tokenhsi/scripts/multi_agent/stage1_v2_train.sh 2 2048 4
+# CKPT는 stage1_v2에서 생성한 checkpoint
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage1_v2_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage1_v2_test.sh "$CKPT" 2 32 4 3
+TOKENHSI_GPU=0 TASK_GRAPH=climb bash tokenhsi/scripts/multi_agent/stage1_v2_vnc.sh "$CKPT" 2 1 4 10
+# 같은 실험 재개
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/stage1_v2 bash tokenhsi/scripts/multi_agent/stage1_v2_train.sh 2 2048 4
+```
+
+`TASK_GRAPH=sit|climb|carry_at|carry_ontop|random_scenario`, `TASK_ROLE_SWAP`, `EVAL_SKILLS`, `EVAL_SKILL_PROBS`, `EPISODE_LENGTH`, `SEED`를 지원한다. test/VNC는 기본적으로 checkpoint의 `<run>/relation_config.yaml`을 자동 선택한다. 다른 동일 실험 env를 의도적으로 사용하려면 `STAGE1_V2_ENV_CONFIG`를 지정한다. 저장 config가 없으면 명시적 지정을 요청하며 종료한다. 서로 다른 크기/RSI 설정으로의 resume는 거부한다.
+
+2026-10-14 검증: CPU **70개**, GPU 0·**2048환경** 확인 학습 epoch2와 resume epoch3·771 scalar finite·물리 reset 실패0 통과. 새 캐시6,413 profile, 실제 RSI10,570개/AMP 과거95,130프레임·PPO48 minibatch/786,432행 정렬·actor/critic 관련 파라미터 업데이트를 확인했다. 표준 headless32환경32step, 별도13과제/RSI416step·310reset·772거리·CPA·선반 접촉도 통과했다. [검증 결과](../output_etc/stage1_v2_check_20261014/validation.json). 확인 output은 `output/stage1_v2_check/`·`output/stage1_v2_resume_check/`이며 본학습은 실행하지 않았다. VNC는 wrapper를 실제 호출했지만 기존 NVML 불일치로 GPU 선택에서 막혀 화면 미검증이다. CarryWith35/712 profile은 fallback, Climb129/715 profile은 phase 공백으로 전체 valid 프레임 선택이므로 명목 RSI 비율과 실제 실행 분포를 구분한다.
+
+## stage1
+
+`stage1`은 `approach_scenario_stage1_unified_size_rsi_task_embedding_action` 기반의 별도 scratch 실험이다. Env/train YAML 모두 `stage1.yaml`, 전용 실행은 `stage1_train.sh`·`stage1_test.sh`·`stage1_vnc.sh`, 기본 output은 `output/stage1`이다. 기존 Action/CPA checkpoint와 직접 resume/eval을 섞지 않는다.
+
+- **Bias:** actor/critic 각각 `Embedding(4,64)`와 `[layer=4,head=2,64]` projection을 사용한다. 같은 task·layer·head면 H/O/G 타입·역할과 무관하게 같은 additive bias다. AT와 ON_TOP의 세 방향 task 연결 모두 동일한 값을 받는다. NONE/SELF=0, softmax/GTA, 사람 토큰의 `z += MLP([z,e_task])` 및 layer 공유·actor/critic 독립성은 유지한다. Branch당 bias encoder 768개, 전체 모델 4,147,010개 파라미터다. 선반 actor는 추가하지만 H/O/G 토큰과 634-D packet은 유지한다.
+- **CPA:** 사람 root XY 상대 위치/속도의 접근도 × 최근접 거리 위험 × `0.99^(t/control_dt)`, 거리 0.7m·계수 0.5다. 기존 현재 거리 충돌항을 교체하며 중복 합산하지 않는다.
+- **출발 선반:** AT/ON_TOP의 loco/default 초기화 payload만 적용한다. 50% 확률로 밑면 높이 U(0,1m)를 더하고 payload 윗면 1.2m로 clamp한다. 0.4×0.4×0.02m 판을 밑면에 맞추고 출발 상자만 접촉 초기화 여유 5cm를 추가한다(일시적으로 윗면 1.25m 가능). 바닥을 선택해도 원본처럼 판 윗면을 z=0에 둔다. `pickUp/carryWith/putDown` RSI 출발 상자는 모션을 따르며 선반을 비활성화한다.
+- **도착 선반:** AT의 loco/pickUp/carryWith 시작에서 목적지 높이를 출발과 독립적으로 같은 규칙으로 추첨한다. putDown AT는 원본 마지막 프레임 XY·바닥 높이를 유지한다. ON_TOP은 기존 받침 상자가 도착지이며 별도 도착 선반을 두지 않는다. SIT/CLIMB·받침·배경 상자는 높이지 않는다.
+- GPU PhysX에서 reset 위치에 실제 충돌 형상이 따라가도록 기존 중력 비활성·고질량 dynamic 판을 재사용한다. 원본 고정 받침의 동작을 근사하며 발 충돌 필터도 기존 repo 설정을 유지한다. 비활성 판은 20m 위로 이동한다.
+- **거리·RSI (2026-10-14 변경):** `box.reset.samplingMode: tokenhsi`에서 loco 사람→물체 XY 반경은 SIT U(1,5m), CLIMB/AT/ON_TOP U(1,10m)다. AT 목표와 ON_TOP 받침 XY는 공통 환경 원점 기준 각 축 U(-4.5,4.5m), 사람·payload와 각각 최소 1m로 뽑는다. 사람별 spawn offset으로 목표 영역을 옮기거나 축소하지 않는다. loco/pickUp/carryWith에 적용하며 putDown은 기존 모션 마지막 위치를 유지한다. 다중 물체의 관통/간섭 재추첨은 유지하므로 최종 수락 분포가 원본 1인 장면과 완전히 같지는 않다. ON_TOP 받침 높이는 기존 크기에 따른 바닥 배치를 유지한다.
+- **운반 RSI:** AT/ON_TOP 모두 loco/pickUp/carryWith/putDown **50/10/30/10**. SIT·CLIMB 50/50, 크기 분포·과제/성공 보상·AMP·후반 프레임 우대·물리 캐시는 유지한다. 과제 prior도 10/25/32.5/32.5%다.
+- 새 학습 run 이름은 `Stage1TokenHSISampling_*`, config와 output 루트는 `stage1`을 유지한다. 이미 실행 중인 구버전 근거리 학습에는 적용되지 않는다. 구버전 config는 `samplingMode` 없음·1~2m·40/10/40/10으로 계속 지원하며, 다른 거리/RSI 설정으로의 암묵적 학습 resume는 거부한다. 평가에서는 모델 구조가 같아 기존 stage1 checkpoint도 사용할 수 있으며 결과 JSON의 `stage1_sampling_mode`로 평가 분포를 구분한다.
+- test/VNC는 기본적으로 checkpoint의 `<run>/relation_config.yaml`을 자동 선택하므로 구버전 checkpoint는 학습 당시 1~2m 분포를 사용한다. 다른 평가 분포를 의도적으로 사용하려면 `STAGE1_ENV_CONFIG`를 지정한다(최신 분포: `tokenhsi/data/cfg/multi_agent/stage1.yaml`). 저장 config가 없으면 명시적 지정을 요청하며 종료한다. 기존 분포로 학습을 재개할 때는 여전히 `STAGE1_ENV_CONFIG=output/stage1/<기존_run>/relation_config.yaml`을 train 명령 앞에 지정한다. 새로운 기본 설정과 기존 Action/CPA checkpoint는 혼용하지 않는다.
+
+```bash
+# 본학습: 실행 전 GPU 점유 확인. GPU 번호는 사용할 장치로 변경.
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/stage1 bash tokenhsi/scripts/multi_agent/stage1_train.sh 2 2048 4
+# 확인 학습: 환경 수 유지, 반복 횟수만 축소
+TOKENHSI_GPU=0 MAX_ITERATIONS=1 RESUME_CHECKPOINT='' OUTPUT_PATH=output/stage1_check bash tokenhsi/scripts/multi_agent/stage1_train.sh 2 2048 4
+# CKPT에는 stage1에서 생성한 checkpoint 경로 지정
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage1_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage1_test.sh "$CKPT" 2 32 4 3
+TOKENHSI_GPU=0 TASK_GRAPH=carry_at bash tokenhsi/scripts/multi_agent/stage1_vnc.sh "$CKPT" 2 1 4 10
+# 기존 stage1 학습 재개
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/stage1 bash tokenhsi/scripts/multi_agent/stage1_train.sh 2 2048 4
+```
+
+`TASK_GRAPH=sit|climb|carry_at|carry_ontop|random_scenario`, `EVAL_SKILLS`/`EVAL_SKILL_PROBS`, `TASK_ROLE_SWAP`, `EPISODE_LENGTH`, `SEED`를 기존 wrapper와 동일하게 지원한다. 선반 규칙은 학습·평가에 공통 적용한다. 저장 env의 거리·크기·보상 설정을 사용하되, viewer의 인원/환경/물체 수·graph·초기 skill(기본 loco) 등 평가 인자는 계속 우선한다. 이미 실행 중인 viewer는 다음 실행부터 새 config 선택이 적용된다.
+
+2026-10-14 **RSI 사전 감사·아직 미적용인 제안:** 현재 Climb 높이는 0.25~0.50m, 성공 XY 내부 90%, AT 성공은 기존 phi≥0.9·높이 1mm다. 논의한 Climb 0.20~0.70m·내부 80%, AT 3D 20cm·높이 1mm는 아직 운영 설정에 적용하지 않았다. [감사 결과](../output_etc/stage1_rsi_height_audit_20261014/validation.json), [높이별 분석](../output_etc/stage1_rsi_height_audit_20261014/geometry_summary.json)을 참조한다. 독립된 높은 Climb 상자 둘을 적층으로 잘못 제한하는 검사와, 0.60~0.70m 상판의 성공 자세를 제공하지 못하는 기존 RSI를 먼저 다뤄야 한다. 초기 성공 자세가 없다는 사실만으로 정책 학습 불가능을 뜻하지는 않는다. 기존 캐시는 초기 충격 검사이며 장기 안정성 보장이 아니다. Carry의 빈 profile은 다른 skill로 대체되고, 현재 SIT late pool은 phase가 비어 전체 valid로 대체되므로 명목 비율과 실제 선택 분포를 구분한다. 받침·배경 크기 변경은 미정이다.
+
+2026-10-14 **Action 55k 높이 대조 평가:** 실제 Climb 상자 Z=0.40/0.50/0.55/0.60/0.65/0.70m, 각 높이 XY 81조합·486 agent 시도, loco 출발 1~2m·20초에서 제안 내부 80% final **99.8/99.4/98.6/96.7/91.6/53.9%**. 상자 기울기≤15°·상판 높이 오차≤5cm를 추가한 final은 **99.8/99.4/98.6/96.3/90.1/43.4%**다. [결과](../output_etc/action_climb_height_eval_20261014/summary.json)·[검증](../output_etc/action_climb_height_eval_20261014/validation.json). 높은 상자에서 동작 수행 사례가 확인됐지만 1~10m·새 학습·RSI 안정성은 이 실험의 검증 대상이 아니다. 운영 설정은 유지하고, 평가 프로세스에서만 실제 asset 크기와 Climb 전용 높이 검사를 적용했다. 재현: `TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh; python output_etc/action_climb_height_eval_20261014/evaluate.py'`, 이후 `python output_etc/action_climb_height_eval_20261014/analyze.py`. 동일 경로로 재실행하면 기존 평가 산출물을 덮어쓴다.
+
+2026-10-14 거리/RSI 변경 검증: CPU 67개, 2048환경 확인 학습 epoch 2·514 scalar finite·물리 reset 실패 0, 실제 초기 거리 765건·13개 과제/RSI·416 step·부분 reset·선반 접촉 통과. 신/구 config의 표준 test 각 16환경·32 step도 통과했다. [검증 결과](../output_etc/stage1_tokenhsi_sampling_check_20261014/validation.json). 확인 학습만 수행했으며 장기 성능 측정은 아니다.
+
+2026-10-13 검증: **CPU 168개**, GPU 0·**2048환경** 확인 학습 epoch 2/frame 262144 및 checkpoint resume epoch 3/frame 393216 통과. 총 771 scalar finite·물리 reset 실패 0, actor/critic 공유 projection·네 task embedding·Action MLP의 optimizer 업데이트와 step 96→144를 확인했다. 네 과제 각각 전용 test wrapper의 **32환경·64-step headless 평가** 완료. 별도 시뮬레이터는 **13개 과제/RSI 조합·416 rollout step·319 reset 호출**에서 선반 범위/graph binding/부분 reset 및 CPA를 검증했고, source/target 판을 0.25m→0.75m로 재배치해 실접촉 지지·높이 오차 최대 1.28e-5m를 확인했다. 이는 실행 검증이며 장기 성능 평가가 아니다.
+
+검증 자료: `output_etc/stage1_check_20261013/validation.json` 및 로그·평가 metrics. 확인 checkpoint는 `output/stage1_check/`, resume 확인은 `output/stage1_resume_check/`다. 본학습은 시작하지 않았다. VNC wrapper는 실제 호출했으나 현재 머신의 **NVML 580.178.04 / 로드된 드라이버 580.173.02 불일치**로 GPU 선택 단계에서 종료돼 화면 검증은 미완료다. Headless CUDA 경로는 정상이며 기존 학습/시스템 드라이버는 변경하지 않았다.
+
+## Unified size RSI task embedding action CPA
+
+`approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa`는 Action의 별도 scratch 실험이다. 모델·타입별 bias projection·task concat MLP·과제/성공 조건·AMP·RSI·토큰 셔플은 유지하고 사람 간 collision 보상만 변경한다. Env의 Action variant와 모델 구조는 같지만 collision checkpoint 계약으로 기존 static/CPA checkpoint의 직접 resume/eval 혼용을 거부한다. 기존 Action weight를 CPA에 이식하는 기능은 추가하지 않았다.
+
+- Git `595688e`의 `collision_reward.py` 및 `approach_stage2_rescue_shared9_cpa.yaml`을 참고했다. `agentCollisionMode: cpa`, `agentCollisionTTCDiscount: 0.99`, 계수 0.5·기준 거리 0.7m다.
+- 사람 root XY 상대 위치/속도로 등속 운동의 최근접 시각 `t=max(-p·v/|v|²,0)`과 거리를 계산한다. 접근 정렬도 × 최근접 거리 위험 × `0.99^(t/control_dt)`를 사람 쌍별로 계산하고 최댓값에 -0.5를 곱한다. 정지·동일 속도 평행 이동·멀어지는 경우는 0이며, 기존 거리 페널티를 중복해서 더하지 않는다. 사람–물체 CPA는 포함하지 않는다.
+- Train YAML·train/test/VNC·output을 분리했다. 기존 설정에서 mode를 생략하면 static으로 유지된다. 과거 checkpoint는 저장된 env를 통해 static 계약을 복원한다.
+
+2026-10-13 검증: CPU 37개 통과, GPU 0·2048환경 확인 학습 epoch 2 저장·514 scalar finite·물리 reset 실패 0. 저장본 16환경·32-step 평가에서 31회 collision reward와 독립 CPA 계산의 차이 0을 확인했다. 자료는 `output_etc/action_cpa_check_20261013/`, 확인 학습은 `output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_check/`다. 본학습·장기 성능·VNC 화면 검증은 하지 않았다.
+
+```bash
+# 새 본학습 (2명·2048환경·4물체)
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_train.sh 2 2048 4
+# 짧은 확인은 별도 output
+TOKENHSI_GPU=0 MAX_ITERATIONS=1 RESUME_CHECKPOINT='' OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_check bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_train.sh 2 2048 4
+# CKPT에는 CPA 실험의 checkpoint 경로 지정
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_test.sh "$CKPT" 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_test.sh "$CKPT" 2 16 4 3
+TOKENHSI_GPU=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_vnc.sh "$CKPT" 2 1 4 10
+# 같은 CPA 실험에서 재개
+TOKENHSI_GPU=0 MAX_ITERATIONS='' RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH=output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa bash tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_train.sh 2 2048 4
 ```
 
 ## Unified size RSI task role gate entmax

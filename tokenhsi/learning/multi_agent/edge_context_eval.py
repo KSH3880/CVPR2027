@@ -48,6 +48,9 @@ def run_edge_context_eval(player):
             final_scene_goal_success=final_scene.float().mean().item(), ever_scene_goal_success=ever_scene.float().mean().item(),
             final_edge_own_success={name: (final_edges & edge_valid & (edge_relation == rel)).sum().item() / max(1, (edge_valid & (edge_relation == rel)).sum().item()) for rel,name in ([(6,'holding'),(7,'at'),(8,'ontop'),(9,'sit'),(10,'climb')] if getattr(task,'_edge_interaction',False) else [(6,'holding'),(7,'at'),(8,'ontop')])} if getattr(task,'_edge_ontop',False) else dict(zip(graph.ids,final_edges.float().mean(0).tolist())),
             scene_termination_rate=terminated.float().mean().item())
+        if task.cfg['env'].get('relationReward', {}).get('stage1_variant') in ('stage1', 'stage1_v2'):
+            metrics['stage1_sampling_mode'] = task.cfg['env']['box']['reset'].get(
+                'samplingMode', 'legacy_near')
         results['repeat_' + str(repeat)] = metrics
         print('[edge context evaluation]', metrics, flush=True)
     directory = os.path.join(task.cfg['args'].output_path, 'metrics'); os.makedirs(directory, exist_ok=True)

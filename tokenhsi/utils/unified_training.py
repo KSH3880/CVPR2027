@@ -1,7 +1,8 @@
 """Task-family AMP contracts for the independent unified Stage-1 experiment."""
 import torch
+from utils.stage1_platforms import validate_stage1_platform_config
 import torch.nn.functional as F
-from utils.task_role_spec import TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT, TASK_GATE_MODE, validate_task_gate_config, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
+from utils.task_role_spec import STAGE1_VARIANT, STAGE1_V2_VARIANT, TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT, TASK_GATE_MODE, validate_task_gate_config, TASK_ROLE_VARIANTS, TASK_PROBS as ROLE_TASK_PROBS
 
 FAMILIES = ('carry', 'sit', 'climb')
 SKILLS = ('loco', 'sit', 'climb', 'climbNoRSI', 'omomo', 'pickUp', 'carryWith', 'putDown')
@@ -66,6 +67,7 @@ def validate_unified_env(env):
     """Fail early if the new sampler, AMP, geometry and reward contracts diverge."""
     from utils.edge_scenario_spec import UNIFIED_SAMPLER
     from utils.edge_stage1_spec import UNIFIED_VARIANTS, SIZE_RSI_VARIANTS
+    validate_stage1_platform_config(env)
     unified = env['relationGraph'].get('sampler') == UNIFIED_SAMPLER
     enabled = env.get('ampTaskConditioning', False)
     variant = env['relationReward'].get('stage1_variant')
@@ -75,9 +77,17 @@ def validate_unified_env(env):
         return
     if tuple(env['skill']) != SKILLS or env.get('goalRotation') != 'identity':
         raise ValueError('Unified requires unified skills and identity goal rotation')
-    if env['box']['reset'].get('ownerLocoDistanceRange') != [1., 2.]:
+    from utils.stage1_sampling import uses_tokenhsi_sampling
+    native_sampling = uses_tokenhsi_sampling(env)
+    mode = env['box']['reset'].get('samplingMode')
+    if mode not in (None, 'tokenhsi') or native_sampling and variant not in (STAGE1_VARIANT, STAGE1_V2_VARIANT):
+        raise ValueError('TokenHSI sampling mode is reserved for stage1')
+    distance_range = [1., 10.] if native_sampling else [1., 2.]
+    if env['box']['reset'].get('ownerLocoDistanceRange') != distance_range:
+        if native_sampling:
+            raise ValueError('TokenHSI sources require 1..10m (SIT overrides to 1..5m)')
         raise ValueError('Unified loco sources must start 1..2m from owner')
-    from utils.size_rsi import TASK_PROBS, SIZE_RANGES, SCREEN
+    from utils.size_rsi import TASK_PROBS, SIZE_RANGES, STAGE1_V2_RANGES, SCREEN
     task_roles = variant in TASK_ROLE_VARIANTS
     if task_roles != bool(env['relationGraph'].get('policy_task_roles', False)):
         raise ValueError('Task-role packet and reward variant must be paired')
@@ -89,15 +99,21 @@ def validate_unified_env(env):
     if (variant in SIZE_RSI_VARIANTS) != (sized is not None):
         raise ValueError('Size-aware assets and RSI must use their dedicated variant')
     if sized is not None:
-        if (env['box']['build'].get('taskSizeRanges') != SIZE_RANGES
+        from utils.stage1_v2 import RSI_SPEC
+        expected_ranges = STAGE1_V2_RANGES if variant == STAGE1_V2_VARIANT else SIZE_RANGES
+        expected_rsi_spec = RSI_SPEC if variant == STAGE1_V2_VARIANT else {
+            'cacheDirectory': 'output/rsi_cache', 'lateProbability': .7, 'lateFraction': .3, 'screen': SCREEN}
+        if (env['box']['build'].get('taskSizeRanges') != expected_ranges
                 or env['box']['build'].get('sizeInterval') != .05
                 or env['box']['reset'].get('randomAssignment') is not False
-                or sized != {'cacheDirectory': 'output/rsi_cache', 'lateProbability': .7,
-                             'lateFraction': .3, 'screen': SCREEN}):
+                or sized != expected_rsi_spec):
             raise ValueError('Invalid size-aware asset / RSI contract')
         for name in ('HOLDING_AT', 'HOLDING_ON_TOP'):
-            if env['templateRsi'][name] != [.4, 0., 0., 0., 0., .1, .4, .1]:
-                raise ValueError('Size-aware placement RSI requires 40/10/40/10')
+            expected_rsi = ([.5, 0., 0., 0., 0., .1, .3, .1] if native_sampling
+                            else [.4, 0., 0., 0., 0., .1, .4, .1])
+            if env['templateRsi'][name] != expected_rsi:
+                ratios = '50/10/30/10' if native_sampling else '40/10/40/10'
+                raise ValueError('Size-aware placement RSI requires ' + ratios)
 
 
 def validate_typed_bias_config(env, train):
@@ -111,7 +127,7 @@ def validate_typed_bias_config(env, train):
     if gated != (variant == TASK_GATE_VARIANT):
         raise ValueError('Task gate variant and attention mode must be paired')
     task_roles = variant in TASK_ROLE_VARIANTS
-    task_modes = {TASK_ROLE_VARIANT: 'task_role_lookup', TASK_ROLE_MLP_VARIANT: 'task_role_mlp',
+    task_modes = {STAGE1_V2_VARIANT: 'task_shared_embedding_action', STAGE1_VARIANT: 'task_shared_embedding_action', TASK_ROLE_VARIANT: 'task_role_lookup', TASK_ROLE_MLP_VARIANT: 'task_role_mlp',
                   TASK_ROLE_SPLIT_MLP_VARIANT: 'task_role_mlp_split',
                   TASK_EMBEDDING_VARIANT: 'task_type_embedding',
                   TASK_EMBEDDING_ACTION_VARIANT: 'task_type_embedding_action',
@@ -125,7 +141,7 @@ def validate_typed_bias_config(env, train):
                      or transformer.get('relation_bias') is not (not gated)):
         raise ValueError('Typed bias requires enabled bias and separate actor/critic tables')
     message = transformer.get('relation_message', {})
-    if variant in (TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT) and (
+    if variant in (STAGE1_VARIANT, STAGE1_V2_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT) and (
             transformer.get('num_features') != 64
             or transformer.get('num_layers') != 4
             or transformer.get('layer_num_heads') != 2

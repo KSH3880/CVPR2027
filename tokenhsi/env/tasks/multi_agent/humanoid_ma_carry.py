@@ -37,6 +37,7 @@ from isaacgym.torch_utils import *
 from utils import torch_utils
 
 
+from env.tasks.multi_agent.collision_reward import agent_collision_config, compute_agent_cpa_collision_penalty
 from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
 from utils.edge_context_spec import (CONTEXT_MODE, compile_edge_context_graph,
     context_suffix_size, at_goal_marker_slots)
@@ -165,6 +166,17 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects
         assert self.num_objects >= num_agents, \
             "numObjects ({}) must be >= numAgents ({})".format(self.num_objects, num_agents)
+        # A larger inference scene needs space as well as variable token counts.
+        # Keep the trained two-human/four-object layout exactly unchanged.
+        self._generic_scenario_eval = (self._policy_task_roles and cfg['args'].eval
+                                      and (num_agents, self.num_objects) != (2, 4))
+        if self._generic_scenario_eval:
+            radius = float(cfg['env'].get('agentSpawnRadius', 2.5))
+            if num_agents > 2:
+                radius = max(radius, 2.5 / np.sin(np.pi / num_agents))
+            cfg['env']['agentSpawnRadius'] = radius
+            cfg['env']['envSpacing'] = max(float(cfg['env']['envSpacing']),
+                radius + 3., .5 + 4.5 * np.sqrt(self.num_objects / 4.))
 
         if self._edge_context:
             compiler = compile_stage1_graph if self._edge_stage1 else (compile_interaction_graph if self._edge_interaction else (compile_ontop_graph if self._edge_ontop else compile_edge_context_graph))
@@ -185,9 +197,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._box_vel_pen_coeff = cfg["env"]["box_vel_pen_coeff"]
         self._box_vel_pen_thre = cfg["env"]["box_vel_pen_threshold"]
 
-        self._agent_collision_penalty = cfg["env"].get("agentCollisionPenalty", True)
-        self._agent_collision_coeff = cfg["env"].get("agentCollisionCoeff", 0.5)
-        self._agent_collision_dist = cfg["env"].get("agentCollisionDist", 0.7)
+        self._agent_collision_config = agent_collision_config(cfg["env"])
+        self._agent_collision_penalty = self._agent_collision_config["enabled"]
+        self._agent_collision_coeff = self._agent_collision_config["coefficient"]
+        self._agent_collision_dist = self._agent_collision_config["distance"]
 
         self._mode = cfg["env"]["mode"]
         assert self._mode in ["train", "test"]
@@ -212,6 +225,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         self._reset_random_rot = box_cfg["reset"]["randomRot"]
         self._reset_random_height = box_cfg["reset"]["randomHeight"]
+        self._stage1_platforms = box_cfg['reset'].get('platformMode') == 'carry_payload_tokenhsi'
+        from utils.stage1_v2_fixed import uses_fixed_platforms
+        self._fixed_platforms = uses_fixed_platforms(cfg['env'])
+        self._platform_warmup_done = False
         self._reset_random_height_prob = box_cfg["reset"]["randomHeightProb"]
         self._ground_standalone_sit_climb = box_cfg["reset"].get("groundStandaloneSitClimb", False)
         if type(self._ground_standalone_sit_climb) is not bool or (
@@ -346,7 +363,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             if self._policy_task_roles:
                 from utils.task_role_spec import task_size_probabilities
                 task_probabilities = task_size_probabilities
-            self._size_template_probabilities = task_probabilities(self._box_size[:, :2])
+            self._size_template_probabilities = task_probabilities(
+                self._box_size[:, :M], cfg['env']['box']['build']['taskSizeRanges'])
         if self._state_relation:
             self._init_relation_runtime()
         if self._size_aware_rsi and not self._is_eval:
@@ -465,11 +483,12 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         asset_options = gymapi.AssetOptions()
         asset_options.angular_damping = 0.01
         asset_options.linear_damping = 0.01
-        asset_options.max_angular_velocity = 0.0
-        # GPU PhysX does not move fixed collision shapes with root-state updates.
-        asset_options.density = 1.0e10
-        asset_options.fix_base_link = False
-        asset_options.disable_gravity = True
+        # Legacy runs retain their dynamic shelves. The opt-in v2 experiment
+        # initializes GPU PhysX once before relocating fixed shelves on reset.
+        asset_options.max_angular_velocity = 100.0 if self._fixed_platforms else 0.0
+        asset_options.density = 1.0 if self._fixed_platforms else 1.0e10
+        asset_options.fix_base_link = self._fixed_platforms
+        asset_options.disable_gravity = not self._fixed_platforms
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
 
         self._platform_height = 0.02
@@ -534,7 +553,11 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale
         if self._size_aware_rsi:
             from utils.size_rsi import sample_sizes
-            self._box_size = sample_sizes(N, self.device, self._task_graph_preset).reshape(num_boxes, 3)
+            size_args = ((self.cfg['env']['box']['build']['taskSizeRanges'],)
+                         if self._relation_cfg.get('stage1_variant') == 'stage1_v2' else ())
+            self._box_size = sample_sizes(N, self.device, self._task_graph_preset,
+                                          *size_args, num_agents=self.num_agents,
+                                          num_objects=O).reshape(num_boxes, 3)
             self._box_scale = self._box_size / torch.tensor(self._build_base_size, device=self.device)
 
         if self._edge_ontop:
@@ -543,6 +566,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             # Earlier sampled OnTop graphs can contain a three-box chain.
             stack_height = (max_stage1_stack_height(self._box_size.reshape(N, O, 3))
                             if self._edge_stage1 else heights.sum(-1))
+            if self._relation_cfg.get('stage1_variant') == 'stage1_v2':
+                from utils.stage1_v2 import max_bound_stack_height
+                stack_height = max_bound_stack_height(self._box_size.reshape(N, O, 3))
             if (stack_height > self._reset_max_top_surface_height + 1e-6).any():
                 raise ValueError('Actual box assets exceed the configured stack height limit')
 
@@ -1009,9 +1035,16 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
     # ------------------------------------------------------------------ reward / reset
 
+    def _compute_agent_collision_violation(self, root_pos, min_dist):
+        if self._agent_collision_config['mode'] == 'cpa':
+            return compute_agent_cpa_collision_penalty(
+                root_pos, self._humanoid_root_states[..., 7:10], min_dist,
+                self._agent_collision_config['ttc_discount'], self.dt)
+        return compute_agent_collision_penalty(root_pos, min_dist)
+
     def _compute_reward(self, actions):
         if self._state_relation:
-            return self._compute_relation_reward(compute_agent_collision_penalty)
+            return self._compute_relation_reward(self._compute_agent_collision_violation)
         N, M, nb = self.num_envs, self.num_agents, self.num_bodies
         B = N * M
 
@@ -1042,7 +1075,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             reward = reward + power_r
 
         if self._agent_collision_penalty and M > 1:
-            collision_r = -self._agent_collision_coeff * compute_agent_collision_penalty(
+            collision_r = -self._agent_collision_coeff * self._compute_agent_collision_violation(
                 self._humanoid_root_states[..., 0:3], self._agent_collision_dist).reshape(B)
             reward = reward + collision_r
 
@@ -1144,6 +1177,17 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
     # ------------------------------------------------------------------ resets
 
     def _reset_envs(self, env_ids):
+        if self._fixed_platforms and not self._platform_warmup_done and len(env_ids):
+            if len(env_ids) != self.num_envs:
+                raise ValueError('Fixed platforms require a full first reset')
+            # The first GPU simulate must precede the first fixed-actor move.
+            # The normal reset below then restores all actors, progress and AMP
+            # history; initial-state templates and the random generator stay intact.
+            self.gym.simulate(self.sim)
+            self.gym.fetch_results(self.sim, True)
+            self._refresh_sim_tensors()
+            self._platform_warmup_done = True
+            print('[stage1_v2_fixed] Initial platform physics step complete', flush=True)
         if self._edge_ontop:
             return self._reset_ontop_context_envs(env_ids)
         if self._state_relation:
@@ -1419,7 +1463,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._box_states[env_ids, :, 0:2] = positions
         self._box_states[env_ids, :, 2] = self._box_size[env_ids, :, 2] / 2.0
 
-        if self._reset_random_height:
+        if self._reset_random_height and not self._stage1_platforms:
             M = self.num_agents
             batch = torch.arange(K, device=self.device).unsqueeze(-1)
             world_env = env_ids.unsqueeze(-1).expand(-1, M)
@@ -1573,14 +1617,21 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             curr_box = (self._scenario_physical_object(curr_env, curr_agent)
                         if self._scenario_no_climb else self._agent_box_assignment[curr_env, curr_agent])
 
-            root_pos_xy = torch.randn(K, 2, device=self.device)
-            root_pos_xy /= torch.linalg.norm(root_pos_xy, dim=-1, keepdim=True)
-            lo, hi = owner_range if owner_range is not None else (1., self._tar_reach)
-            root_pos_xy *= torch.rand(K, 1, device=self.device) * (hi - lo) + lo
-            root_pos_xy += self._humanoid_root_states[curr_env, curr_agent, :2]
+            from utils.stage1_sampling import uses_tokenhsi_sampling, sample_source_xy
+            if uses_tokenhsi_sampling(self.cfg['env']):
+                templates = classify_templates(self.relation_runtime.graph,
+                    curr_env, curr_agent, self._scenario_with_climb)
+                root_pos_xy = sample_source_xy(
+                    self._humanoid_root_states[curr_env, curr_agent, :2], templates)
+            else:
+                root_pos_xy = torch.randn(K, 2, device=self.device)
+                root_pos_xy /= torch.linalg.norm(root_pos_xy, dim=-1, keepdim=True)
+                lo, hi = owner_range if owner_range is not None else (1., self._tar_reach)
+                root_pos_xy *= torch.rand(K, 1, device=self.device) * (hi - lo) + lo
+                root_pos_xy += self._humanoid_root_states[curr_env, curr_agent, :2]
 
             root_pos_z = self._box_size[curr_env, curr_box, 2] / 2
-            if self._reset_random_height:
+            if self._reset_random_height and not self._stage1_platforms:
                 height_mask = torch.rand(K, device=self.device) < self._reset_random_height_prob
                 height_offset = torch.zeros_like(root_pos_z)
                 height_offset[height_mask] = torch.rand(height_mask.sum(), device=self.device)
@@ -1600,7 +1651,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._box_states[curr_env, curr_box, 3:7] = root_rot
             self._box_states[curr_env, curr_box, 7:13] = 0.0
 
-            if self._reset_random_height:
+            if self._reset_random_height and not self._stage1_platforms:
                 if height_mask.sum() > 0:
                     active_env = curr_env[height_mask]
                     active_agent = curr_agent[height_mask]
@@ -1688,7 +1739,12 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 xy = (torch.rand(n, 2, device=self.device) * 2.0 - 1.0) * self._tar_reach
                 return xy
 
-            new_xy = sample(K) + center
+            from utils.stage1_sampling import uses_tokenhsi_sampling, sample_goal_xy
+            native_sampling = uses_tokenhsi_sampling(self.cfg['env'])
+            new_xy = (sample_goal_xy(
+                self._humanoid_root_states[curr_env, curr_agent, :2],
+                self._box_states[curr_env, curr_box, :2], self._env_origins[curr_env, :2])
+                if native_sampling else sample(K) + center)
             new_z = self._box_size[curr_env, curr_box, 2] / 2
             new_target_pos = torch.cat([new_xy, new_z.unsqueeze(-1)], dim=-1)
 
@@ -1705,7 +1761,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                     torch.sum((new_target_pos[..., :2] - self._box_states[curr_env, curr_box, :2]) ** 2, dim=-1) < min_dist)
                 tries += 1
 
-            if self._reset_random_height:
+            if self._reset_random_height and not self._stage1_platforms:
                 height_mask = torch.rand(K, device=self.device) < self._reset_random_height_prob
                 height_offset = torch.zeros_like(new_target_pos[:, 2])
                 height_offset[height_mask] = torch.rand(height_mask.sum(), device=self.device)
@@ -1717,7 +1773,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                         self._box_size[curr_env[height_mask], curr_box[height_mask]])
 
             self._tar_pos[curr_env, goal_index] = new_target_pos
-            if self._reset_random_height:
+            if self._reset_random_height and not self._stage1_platforms:
                 if height_mask.sum() > 0:
                     active_env = curr_env[height_mask]
                     active_agent = curr_agent[height_mask]

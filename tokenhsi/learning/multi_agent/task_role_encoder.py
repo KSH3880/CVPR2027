@@ -10,23 +10,29 @@ class TaskTypeEmbeddingBias(nn.Module):
     Categories 0..3 are sit/climb/carry_at/carry_ontop. With zero_background=False,
     4=NONE and 5=SELF share the task projection. Otherwise only four task vectors
     exist and background bias is exactly zero. Entity IDs and actor/payload/target
-    roles never enter the embedding or projection.
+    roles never enter the embedding or projection. With shared_types=True,
+    one projection per layer/head is expanded across all directed type pairs.
     """
-    def __init__(self, num_layers, num_heads, zero_background=False):
+    def __init__(self, num_layers, num_heads, zero_background=False, shared_types=False):
         super().__init__()
         self.zero_background = zero_background
+        self.shared_types = shared_types
         self.category_embed = nn.Embedding(4 if zero_background else 6, 64)
         nn.init.trunc_normal_(self.category_embed.weight, std=.02)
-        self.bias_projection = nn.Parameter(torch.zeros(3, 3, num_layers, num_heads, 64))
+        shape = (num_layers, num_heads, 64) if shared_types else (3, 3, num_layers, num_heads, 64)
+        self.bias_projection = nn.Parameter(torch.zeros(shape))
 
     def bias_table(self):
         # Only 6 * 3 * 3 categories, independent of the rollout batch size.
+        if self.shared_types:
+            table = torch.einsum('cd,lhd->clh', self.category_embed.weight, self.bias_projection)
+            return table[:, None, None].expand(-1, 3, 3, -1, -1)
         return torch.einsum('cd,stlhd->cstlh', self.category_embed.weight, self.bias_projection)
 
     def forward(self, entity_types, relations):
         # Background relations contain only NONE=0 and SELF=1.
         if self.zero_background:
-            layers, heads = self.bias_projection.shape[2:4]
+            layers, heads = self.bias_projection.shape[-3:-1]
             return self.bias_projection.new_zeros(layers, heads, len(entity_types), len(entity_types))
         table = self.bias_table()
         values = table[relations + 4, entity_types[:, None], entity_types[None, :]]

@@ -1,3 +1,4 @@
+from copy import deepcopy
 import torch
 
 SIZE_RSI_VARIANT = 'scenario_independent_stage1_unified_size_rsi'
@@ -11,6 +12,9 @@ SIZE_RANGES = {
     'HOLDING_ON_TOP': [[.20, .60], [.20, .60], [.20, .60]],
     'SUPPORT': [[.50, .80], [.50, .80], [.25, .45]],
 }
+STAGE1_V2_RANGES = deepcopy(SIZE_RANGES)
+STAGE1_V2_RANGES['CLIMB'][2] = [.20, .70]
+STAGE1_V2_RANGES['SUPPORT'] = [[.40, .80], [.40, .80], [.25, .50]]
 PROGRESS = {'kind': 'distance', 'sigma': 1., 'bbox_buffers': {
     'HOLDING': .20, 'SIT': .30, 'CLIMB': .30, 'AT': .10, 'ON_TOP': .10}}
 SCREEN = {'seconds': .10, 'root_velocity_change': 3., 'box_speed': 5.,
@@ -35,22 +39,29 @@ def task_probabilities(sizes, ranges=SIZE_RANGES):
     return weights / weights.sum(-1, keepdim=True)
 
 
-def sample_sizes(n, device, preset='random_scenario'):
-    seeds = torch.multinomial(torch.tensor(TASK_PROBS, device=device), 2*n,
-                              replacement=True).reshape(n, 2)
-    if preset != 'random_scenario':
+def sample_sizes(n, device, preset='random_scenario', ranges=SIZE_RANGES,
+                 num_agents=2, num_objects=4):
+    if num_agents < 1 or num_objects < num_agents:
+        raise ValueError('Independent tasks require at least one object per human')
+    if preset == 'holding_ontop' and num_objects < 2 * num_agents:
+        raise ValueError('All-ON_TOP preset requires at least two objects per human')
+    seeds = torch.multinomial(torch.tensor(TASK_PROBS, device=device), num_agents*n,
+                              replacement=True).reshape(n, num_agents)
+    if preset == 'sit_climb':
+        seeds[:] = 1 + torch.arange(num_agents, device=device) % 2
+    elif preset != 'random_scenario':
         name = {'holding': 'HOLDING', 'sit': 'SIT', 'climb': 'CLIMB',
                 'holding_at': 'HOLDING_AT', 'holding_ontop': 'HOLDING_ON_TOP'}[preset]
         seeds.fill_(TASKS.index(name))
-    sizes = torch.empty(n, 4, 3, device=device)
+    sizes = torch.empty(n, num_objects, 3, device=device)
     for task_id, name in enumerate(TASKS):
         rows, owners = (seeds == task_id).nonzero(as_tuple=True)
-        for axis, (lo, hi) in enumerate(SIZE_RANGES[name]):
+        for axis, (lo, hi) in enumerate(ranges[name]):
             sizes[rows, owners, axis] = torch.randint(round(lo*20), round(hi*20)+1,
                                                       (len(rows),), device=device) / 20.
-    for axis, (lo, hi) in enumerate(SIZE_RANGES['SUPPORT']):
-        sizes[:, 2:, axis] = torch.randint(round(lo*20), round(hi*20)+1,
-                                           (n, 2), device=device) / 20.
+    for axis, (lo, hi) in enumerate(ranges['SUPPORT']):
+        sizes[:, num_agents:, axis] = torch.randint(round(lo*20), round(hi*20)+1,
+                                           (n, num_objects-num_agents), device=device) / 20.
     return sizes
 
 
@@ -60,6 +71,9 @@ def sample_size_graph(sizes, spec, preset):
     if preset == 'random_scenario':
         ids = torch.multinomial(task_probabilities(sizes[:, :2]).flatten(0, 1),
                                 1).reshape(n, 2)
+    elif preset == 'sit_climb':
+        ids = torch.tensor([TASKS.index('SIT'), TASKS.index('CLIMB')],
+                           device=sizes.device).expand(n, -1)
     else:
         name = {'holding': 'HOLDING', 'sit': 'SIT', 'climb': 'CLIMB',
                 'holding_at': 'HOLDING_AT', 'holding_ontop': 'HOLDING_ON_TOP'}[preset]

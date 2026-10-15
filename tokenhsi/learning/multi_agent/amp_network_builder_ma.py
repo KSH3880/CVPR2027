@@ -70,8 +70,9 @@ RELATION_BIAS_TASK_MLP = "task_role_mlp"
 RELATION_BIAS_TASK_SPLIT_MLP = "task_role_mlp_split"
 RELATION_BIAS_TASK_EMBEDDING = "task_type_embedding"
 RELATION_BIAS_TASK_ACTION = "task_type_embedding_action"
+RELATION_BIAS_STAGE1 = "task_shared_embedding_action"
 RELATION_BIAS_MODES = (RELATION_BIAS_LOOKUP, RELATION_BIAS_EDGE_MLP,
-                       RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION)
+                       RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1)
 
 
 def build_entity_type_ids(num_agents, num_objects, device=None):
@@ -567,7 +568,7 @@ class RelationEncoder(nn.Module):
         self.use_task_gate = relation_attention_mode == TASK_GATE_MODE
         self.relation_attention_mode = relation_attention_mode
         self.task_role_input = bool(self.relation_graph_spec.get('policy_task_roles', False))
-        if self.task_role_input != (self.use_task_gate or relation_bias_mode in (RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION)):
+        if self.task_role_input != (self.use_task_gate or relation_bias_mode in (RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1)):
             raise ValueError('Task-role packet and task-role bias mode must be paired')
         self.owner_holding_state = bool(self.relation_graph_spec.get('owner_holding_state', False))
         if self.owner_holding_state and not self.semantic_only:
@@ -582,10 +583,10 @@ class RelationEncoder(nn.Module):
         self.diagnostics_interval = max(1, int(diagnostics_interval))
         self.last_diagnostics = {}
         if self.state_relation and not self.use_task_gate and (observation_mode != 'clean_scene' or
-                relation_bias_mode not in (RELATION_BIAS_EDGE_MLP, RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION)
+                relation_bias_mode not in (RELATION_BIAS_EDGE_MLP, RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1)
                 or not relation_bias):
             raise ValueError('State relation modes require clean_scene and enabled edge_mlp or typed_lookup relation bias')
-        if relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION) and (
+        if relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE, RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP, RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1) and (
                 relation_reward_mode != STAGE1_CONTEXT_MODE or not self.semantic_only
                 or self.owner_holding_state):
             raise ValueError('typed_lookup requires semantic-only Stage 1 without owner-HOLDING state')
@@ -625,9 +626,10 @@ class RelationEncoder(nn.Module):
             # Preserve A1's parameter name and exact scalar-lookup implementation for
             # legacy checkpoints and clean-scene ablations.
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
-        elif self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION):
+        elif self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1):
             self.edge_encoder = TaskTypeEmbeddingBias(num_layers, num_heads,
-                zero_background=self.relation_bias_mode == RELATION_BIAS_TASK_ACTION)
+                zero_background=self.relation_bias_mode in (RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1),
+                shared_types=self.relation_bias_mode == RELATION_BIAS_STAGE1)
         elif self.relation_bias_mode in (RELATION_BIAS_TYPED_LOOKUP, RELATION_BIAS_TASK_ROLE):
             self.edge_encoder = TypedEdgeBias(num_layers, num_heads, 2 if self.task_role_input else 11)
         else:
@@ -653,7 +655,7 @@ class RelationEncoder(nn.Module):
             compiler = compile_stage1_graph if self.stage1_context else (compile_interaction_graph if self.interaction_context else (compile_ontop_graph if self.packed_context else compile_edge_context_graph))
             graph = compiler(self.relation_graph_spec, num_agents, num_objects)
             self.context_fusion = (TaskRoleGate() if self.use_task_gate else TaskTypeEmbeddingFusion()
-                if self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION) else TaskRoleMLPFusion(num_layers, num_heads,
+                if self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1) else TaskRoleMLPFusion(num_layers, num_heads,
                 split_tasks=self.relation_bias_mode == RELATION_BIAS_TASK_SPLIT_MLP)
                 if self.relation_bias_mode in (RELATION_BIAS_TASK_MLP, RELATION_BIAS_TASK_SPLIT_MLP) else
                 TaskRoleFusion(d_model, num_heads, num_layers,
@@ -672,7 +674,7 @@ class RelationEncoder(nn.Module):
             self.relation_message = PackedEdgeRelationMessage(
                 d_model, num_heads, float(relation_message_cfg.get('init_std', .02)))
 
-        self.task_action_fusion = TaskActionFusion() if relation_bias_mode == RELATION_BIAS_TASK_ACTION else None
+        self.task_action_fusion = TaskActionFusion() if relation_bias_mode in (RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1) else None
 
         self.layers = nn.ModuleList([
             RelationTransformerLayer(d_model, num_heads, dim_feedforward, task_gate=self.use_task_gate) for _ in range(num_layers)
@@ -911,7 +913,7 @@ class RelationEncoder(nn.Module):
         if self.edge_context:
             if self.use_task_gate:
                 gate_condition = self.context_fusion(obs[:, -self.suffix_width:])
-            elif self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION):
+            elif self.relation_bias_mode in (RELATION_BIAS_TASK_EMBEDDING, RELATION_BIAS_TASK_ACTION, RELATION_BIAS_STAGE1):
                 relation_bias, relation_message = self.context_fusion(
                     obs[:, -self.suffix_width:], self.edge_encoder, self.entity_types, relation_bias)
             elif self.task_role_input:

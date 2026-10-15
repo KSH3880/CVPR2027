@@ -12,7 +12,7 @@ INDEPENDENT_CLIMB_SAMPLER = 'two_agent_three_object_independent_with_climb'
 UNIFIED_SAMPLER = 'two_agent_four_object_independent_unified'
 PAIRED_PLACEMENT_SAMPLER = 'two_agent_four_object_paired_placement'
 CLIMB_TEMPLATES = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')
-PRESETS = ('random_scenario', 'holding', 'sit', 'climb', 'holding_at', 'holding_ontop')
+PRESETS = ('random_scenario', 'holding', 'sit', 'climb', 'holding_at', 'holding_ontop', 'sit_climb')
 
 
 def scenario_templates(spec):
@@ -78,7 +78,9 @@ def validate_sampler(spec, m=2, o=None):
     required_objects = 4 if sampler in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER) else 3
     if o is None:
         o = required_objects
-    if (m, o) != (2, required_objects) or spec['edge_capacity'] != 4 or \
+    generic = sampler == UNIFIED_SAMPLER and spec.get('policy_task_roles', False)
+    valid_counts = (m >= 1 and o >= m) if generic else (m, o) == (2, required_objects)
+    if not valid_counts or spec['edge_capacity'] != 4 or \
             spec['max_edges_per_agent'] != 2 or spec['semantic_only'] is not True or \
             spec['random_binding'] != binding or \
             type(spec['shuffle_edge_order']) is not bool:
@@ -141,14 +143,21 @@ def compose_graph(templates, bindings, shuffle=False, generator=None, device='cp
     return graph
 
 
-def compose_canonical_graph(template_ids, shuffle=False):
-    n = len(template_ids)
+def compose_canonical_graph(template_ids, shuffle=False, num_objects=None):
+    n, m = template_ids.shape
+    o = 2 * m if num_objects is None else num_objects
+    if m < 1 or o < m:
+        raise ValueError('Independent tasks require at least one object per human')
     device = template_ids.device
-    owners = torch.arange(2, device=device)[None].expand(n, -1)
+    owners = torch.arange(m, device=device)[None].expand(n, -1)
+    ontop = template_ids == 4
+    if (ontop.sum(-1) > o - m).any():
+        raise ValueError('ON_TOP tasks require one distinct spare support object per human')
+    support = owners + m if o >= 2 * m else m + ontop.long().cumsum(-1) - 1
     placement = template_ids >= 3
-    src = torch.stack((owners, owners + 2), -1).flatten(1)
-    dst = torch.stack((owners + 2,
-        torch.where(template_ids == 3, owners + 6, owners + 4)), -1).flatten(1)
+    src = torch.stack((owners, owners + m), -1).flatten(1)
+    dst = torch.stack((owners + m,
+        torch.where(template_ids == 3, owners + m + o, support + m)), -1).flatten(1)
     base_relations = torch.tensor([HOLDING, SIT, CLIMB, HOLDING, HOLDING], device=device)
     relation = torch.stack((base_relations[template_ids],
         torch.where(template_ids == 3, AT, ON_TOP)), -1).flatten(1)
@@ -158,26 +167,46 @@ def compose_canonical_graph(template_ids, shuffle=False):
     order = valid.long().argsort(dim=-1, descending=True, stable=True)
     values = [value.masked_fill(~valid, 0).gather(1, order)
               for value in (src, dst, relation, owner, valid, required)]
-    graph = EdgeContextGraph(('slot0', 'slot1', 'slot2', 'slot3'), 2, 4, *values,
-        torch.zeros(n, 4, 4, dtype=torch.bool, device=device),
-        torch.full((n, 4), -1, dtype=torch.long, device=device))
+    e = 2 * m
+    graph = EdgeContextGraph(tuple('slot{}'.format(i) for i in range(e)), m, o, *values,
+        torch.zeros(n, e, e, dtype=torch.bool, device=device),
+        torch.full((n, e), -1, dtype=torch.long, device=device))
     if shuffle:
-        graph = permute_graph(graph, torch.rand(n, 4, device=device).argsort(-1))
+        graph = permute_graph(graph, torch.rand(n, e, device=device).argsort(-1))
     return graph
 
 
-def sample_size_conditioned_graph(probabilities, spec, preset):
+def sample_size_conditioned_graph(probabilities, spec, preset, num_objects=None):
     if spec.get('policy_task_roles', False):
         from utils.task_role_spec import task_preset
         preset = task_preset(preset)
-    n = len(probabilities)
+    n, m = probabilities.shape[:2]
+    o = 2 * m if num_objects is None else num_objects
+    if m < 1 or o < m:
+        raise ValueError('Independent tasks require at least one object per human')
     if preset == 'random_scenario':
-        template_ids = torch.multinomial(probabilities.flatten(0, 1), 1).reshape(n, 2)
+        template_ids = torch.multinomial(probabilities.flatten(0, 1), 1).reshape(n, m)
+        # Preserve independent draws exactly when every human has a spare support.
+        # Otherwise keep a random subset of ON_TOP owners and redraw the rest
+        # from their size-eligible non-ON_TOP tasks.
+        if o < 2 * m:
+            ontop = template_ids == 4
+            priority = torch.rand(n, m, device=probabilities.device).masked_fill(~ontop, 2.)
+            rank = priority.argsort(-1).argsort(-1)
+            redraw = ontop & (rank >= o - m)
+            if redraw.any():
+                alternatives = probabilities[redraw].clone()
+                alternatives[:, 4] = 0
+                if (alternatives.sum(-1) <= 0).any():
+                    raise ValueError('Not enough supports for the eligible ON_TOP-only tasks')
+                template_ids[redraw] = torch.multinomial(alternatives, 1).flatten()
+    elif preset == 'sit_climb':
+        template_ids = (1 + torch.arange(m, device=probabilities.device) % 2).expand(n, -1)
     else:
-        template_ids = torch.full((n, 2), PRESETS.index(preset) - 1,
+        template_ids = torch.full((n, m), PRESETS.index(preset) - 1,
                                   dtype=torch.long, device=probabilities.device)
     return compose_canonical_graph(template_ids,
-        shuffle=spec['shuffle_edge_order'] and preset == 'random_scenario')
+        shuffle=spec['shuffle_edge_order'] and preset == 'random_scenario', num_objects=o)
 
 
 def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=False,
@@ -224,6 +253,8 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
             else:
                 ids = pair_ids[row] if unified else divmod(pair_ids[row], len(templates_available))
                 templates = (templates_available[ids[0]], templates_available[ids[1]])
+        elif preset == 'sit_climb':
+            templates = ('SIT', 'CLIMB')
         else:
             templates = (fixed[preset], fixed[preset] if paired or unified else 'HOLDING')
             if role_swap and not (paired or unified):
@@ -241,6 +272,9 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
 
 def compile_graph(spec, m, o, device=None):
     validate_sampler(spec, m, o)
+    if spec['sampler'] == UNIFIED_SAMPLER and spec.get('policy_task_roles', False) and (m, o) != (2, 4):
+        return select_graph(compose_canonical_graph(
+            torch.full((1, m), 3, dtype=torch.long, device=device or 'cpu'), num_objects=o), 0)
     preset = ('holding_at' if spec['sampler'] == PAIRED_PLACEMENT_SAMPLER
               or spec.get('policy_task_roles', False) else 'holding')
     return select_graph(sample_graph(1, spec, device or 'cpu', preset=preset), 0)
@@ -254,7 +288,7 @@ def validate_graph(graph):
         return
     if graph.prereq_mask.any() or (graph.term_index >= 0).any():
         raise ValueError('Independent scenarios cannot contain temporal context')
-    for agent in range(2):
+    for agent in range(graph.num_agents):
         ids = (graph.edge_valid & (graph.edge_owner == agent)).nonzero().flatten()
         if not 1 <= len(ids) <= 2:
             raise ValueError('Each scenario owner requires one or two edges')

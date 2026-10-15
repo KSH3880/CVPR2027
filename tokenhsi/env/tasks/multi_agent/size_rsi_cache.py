@@ -16,6 +16,7 @@ class SizeRsiCache:
     def __init__(self, env):
         self.env = env
         self.spec = env.cfg['env']['sizeAwareRsi']
+        self.strict_geometry = self.spec.get('geometryFilter') == 'body_points_v1'
         digest = hashlib.sha256()
         settings = {'version': 1, 'sim': env.cfg['sim'], 'dt': env.sim_params.dt,
                     'screen': SCREEN, 'spec': self.spec, 'density': 100.,
@@ -35,15 +36,28 @@ class SizeRsiCache:
                 digest.update(lib.obj_grs.cpu().numpy().tobytes())
         for file in (Path(__file__), Path('tokenhsi/utils/size_rsi.py')):
             digest.update(file.read_bytes())
+        if self.strict_geometry:
+            digest.update(Path('tokenhsi/utils/stage1_v2.py').read_bytes())
+            digest.update(json.dumps(env.cfg['env']['box']['build']['taskSizeRanges'], sort_keys=True).encode())
         self.path = Path(self.spec['cacheDirectory']) / (digest.hexdigest()[:24] + '.pkl.gz')
         self.entries = {}
         if self.path.exists():
             with gzip.open(self.path, 'rb') as stream:
                 self.entries = pickle.load(stream)
         self.sizes = env._box_size.cpu().tolist()
-        self.eligible = task_probabilities(env._box_size[:, :2]).cpu()
+        self.eligible = task_probabilities(env._box_size[:, :2],
+            env.cfg['env']['box']['build']['taskSizeRanges']).cpu()
         self._build_missing()
         self._prepare_sampling()
+        if self.strict_geometry:
+            summary = {}
+            for kind in ('sit', 'climb', 'pickUp', 'carryWith', 'putDown', 'putDownOnTop'):
+                records = [v for k,v in self.entries.items() if k[0] == kind]
+                summary[kind] = dict(profiles=len(records),
+                    empty_profiles=sum(not any(mask.any() for mask,phase in v) for v in records),
+                    no_phase_profiles=sum(not any((mask & phase).any() for mask,phase in v) for v in records))
+            self.path.with_suffix('.summary.json').write_text(json.dumps(summary, indent=2))
+            print('[size RSI v2] availability:', json.dumps(summary), flush=True)
 
     def _key(self, kind, row, owner):
         source = size_key(self.sizes[row][owner])
@@ -90,6 +104,9 @@ class SizeRsiCache:
     def _screen_profiles(self, kind, owner, profiles, original_roots, original_dofs):
         from isaacgym import gymtorch
         env = self.env
+        strict = self.spec.get('geometryFilter') == 'body_points_v1'
+        if strict:
+            from utils.stage1_v2 import pose_geometry_valid, sampled_phase
         skill = 'putDown' if kind == 'putDownOnTop' else kind
         lib = env._motion_lib[skill]
         rows = torch.tensor(list(profiles.values()), device=env.device)
@@ -103,6 +120,8 @@ class SizeRsiCache:
             ids = torch.full((frames,), clip, device=env.device, dtype=torch.long)
             times = torch.arange(frames, device=env.device) * lib._motion_dt[clip]
             root, rot, dofs, vel, ang, dof_vel, feet = lib.get_motion_state(ids, times)
+            if strict:
+                bodies = lib.get_motion_state_max(ids, times)[0]
             if skill in ('sit', 'climb'):
                 pos, quat = lib.get_obj_motion_state_single_frame(ids[:1])
                 box_pos = pos.expand(frames, -1)
@@ -114,6 +133,9 @@ class SizeRsiCache:
             else:
                 box_pos, box_rot = lib.get_obj_motion_state(ids, times)
                 phase = torch.ones(frames, dtype=torch.bool, device=env.device)
+            phases = (sampled_phase(skill, root, feet[:, -2:], box_pos[0, :2], sizes)
+                      if strict and skill in ('sit', 'climb')
+                      else phase[None].expand(len(rows), -1))
             end = lib.get_obj_motion_state(ids[:1], lib.get_motion_length(ids[:1]))[0] if kind == 'putDownOnTop' else None
             valid = torch.zeros(len(rows), frames, dtype=torch.bool, device=env.device)
             for frame in range(frames):
@@ -143,6 +165,10 @@ class SizeRsiCache:
                 targets = env._dof_pos.contiguous().clone()
                 env.gym.set_dof_position_target_tensor(env.sim, gymtorch.unwrap_tensor(targets))
                 ok = torch.ones(len(rows), dtype=torch.bool, device=env.device)
+                if strict:
+                    ok &= pose_geometry_valid(bodies[frame]+offset[:, None],
+                        feet[frame, -2:]+offset[:, None], initial_boxes,
+                        env._box_size[rows][:, checked])
                 for _ in range(steps):
                     env.gym.simulate(env.sim)
                     env.gym.fetch_results(env.sim, True)
@@ -150,15 +176,31 @@ class SizeRsiCache:
                     ok &= screen_states(env._humanoid_root_states[rows, owner],
                                         env._box_states[rows][:, checked], initial_root, initial_boxes)
                     ok &= torch.isfinite(env._dof_state.view(env.num_envs, env.num_agents, -1)[rows, owner]).all(-1)
+                    if strict:
+                        body = env._rigid_body_pos[rows, owner]
+                        ok &= pose_geometry_valid(body, body[:, env._key_body_ids[-2:]],
+                            env._box_states[rows][:, checked], env._box_size[rows][:, checked])
+                        # The cache is also used at progress=0, where runtime fall
+                        # termination has a grace period. Screen fallen poses now.
+                        low = body[..., 2] < env._termination_heights
+                        low[:, env._contact_body_ids] = False
+                        contact = env._contact_forces[rows, owner].clone()
+                        contact[:, env._contact_body_ids] = 0
+                        fallen = low.any(-1) & (contact.abs().sum(-1)>.1).any(-1)
+                        ok &= ~fallen
                 valid[:, frame] = ok
                 if frame % 300 == 299:
                     print('[size RSI]', kind, 'owner', owner, 'clip', clip,
                           'frame', frame+1, '/', frames, flush=True)
-            if skill in ('sit', 'climb') and phase.any():
+            if strict and skill in ('sit', 'climb'):
+                index = torch.arange(frames, device=env.device)[None]
+                last = torch.where(phases, index, -1).amax(-1)
+                valid &= (last[:, None] < 0) | (index <= last[:, None])
+            elif skill in ('sit', 'climb') and phase.any():
                 last = int(phase.nonzero()[-1])
                 valid[:, last+1:] = False
-            for record, mask in zip(records, valid.cpu().numpy()):
-                record.append((mask, phase.cpu().numpy()))
+            for record, mask, row_phase in zip(records, valid.cpu().numpy(), phases.cpu().numpy()):
+                record.append((mask, row_phase))
             print('[size RSI]', kind, 'owner', owner, 'clip', clip,
                   'accepted', int(valid.sum()), '/', valid.numel(), flush=True)
         self.entries.update(zip(keys, records))

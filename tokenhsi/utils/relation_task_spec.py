@@ -199,13 +199,15 @@ def validate_relation_config(config):
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
     if mode in (STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
-        from utils.task_role_spec import TASK_ROLE_VARIANTS, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT, TASKS, TASK_FIELDS
+        from utils.task_role_spec import STAGE1_VARIANT, STAGE1_V2_VARIANT, TASK_ROLE_VARIANTS, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT, TASK_GATE_VARIANT, TASKS, TASK_FIELDS
         if config.get('stage1_variant') in TASK_ROLE_VARIANTS:
             return {'reward_mode': mode, 'schema_version': config['schema_version'],
                     'relation_taxonomy': dict(zip(TASKS, range(4))),
                     'suffix_fields': list(TASK_FIELDS), 'packet_version': 5,
                     'graph_record_width': 5, 'context_dim_per_edge': 0,
-                    'context_fusion': ('task64_role3_block4_shared_kv_gate_layer_mlp67_64_16_entmax15'
+                    'context_fusion': ('task_embedding4_shared_type_projection_action_tokenhsi_platforms_v1'
+                        if config['stage1_variant'] in (STAGE1_VARIANT, STAGE1_V2_VARIANT)
+                        else 'task64_role3_block4_shared_kv_gate_layer_mlp67_64_16_entmax15'
                         if config['stage1_variant'] == TASK_GATE_VARIANT
                         else 'task_embedding4_zero_background_human_residual_mlp128_64_64_shared_layers'
                         if config['stage1_variant'] == TASK_EMBEDDING_ACTION_VARIANT

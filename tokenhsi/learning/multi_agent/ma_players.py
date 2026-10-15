@@ -11,6 +11,7 @@ import learning.amp_players as amp_players
 from learning.multi_agent.ma_agent import EntityRunningMeanStd
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
+from env.tasks.multi_agent.collision_reward import agent_collision_config, check_agent_collision_checkpoint
 from utils.torch_utils import load_checkpoint
 
 
@@ -46,6 +47,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
+            check_agent_collision_checkpoint(checkpoint, self.env.task.cfg['env'])
         return super().restore(fn)
 
     def _build_net(self, config):

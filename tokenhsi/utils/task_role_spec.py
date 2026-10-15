@@ -1,16 +1,18 @@
 import torch
 
 from utils.edge_ontop_spec import batched
-from utils.size_rsi import SIZE_RSI_VARIANT, task_probabilities
+from utils.size_rsi import SIZE_RSI_VARIANT, SIZE_RANGES, task_probabilities
 
 TASK_ROLE_VARIANT = SIZE_RSI_VARIANT + '_task_message'
 TASK_ROLE_MLP_VARIANT = SIZE_RSI_VARIANT + '_task_mlp'
 TASK_ROLE_SPLIT_MLP_VARIANT = SIZE_RSI_VARIANT + '_task_mlp_split'
 TASK_EMBEDDING_VARIANT = SIZE_RSI_VARIANT + '_task_embedding'
 TASK_EMBEDDING_ACTION_VARIANT = SIZE_RSI_VARIANT + '_task_embedding_action'
+STAGE1_VARIANT = 'stage1'
+STAGE1_V2_VARIANT = 'stage1_v2'
 TASK_GATE_VARIANT = SIZE_RSI_VARIANT + '_task_role_gate_entmax'
 TASK_GATE_MODE = 'task_role_gate_entmax'
-TASK_ROLE_VARIANTS = (TASK_GATE_VARIANT, TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT)
+TASK_ROLE_VARIANTS = (STAGE1_VARIANT, STAGE1_V2_VARIANT, TASK_GATE_VARIANT, TASK_ROLE_VARIANT, TASK_ROLE_MLP_VARIANT, TASK_ROLE_SPLIT_MLP_VARIANT, TASK_EMBEDDING_VARIANT, TASK_EMBEDDING_ACTION_VARIANT)
 TASKS = ('sit', 'climb', 'carry_at', 'carry_ontop')
 TASK_FIELDS = ('valid', 'task', 'actor', 'payload', 'target')
 TASK_PROBS = (0., .10, .25, .325, .325)
@@ -22,10 +24,10 @@ def task_preset(preset):
     return {'carry_at': 'holding_at', 'carry_ontop': 'holding_ontop'}.get(preset, preset)
 
 
-def task_size_probabilities(sizes):
+def task_size_probabilities(sizes, ranges=SIZE_RANGES):
     # All three carry templates have identical size distributions. Their total
     # prior stays .65, preserving the asset distribution and existing RSI cache.
-    probs = task_probabilities(sizes)
+    probs = task_probabilities(sizes, ranges)
     probs[..., 3:] += probs[..., :1] / 2
     probs[..., 0] = 0
     return probs

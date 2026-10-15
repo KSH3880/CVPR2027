@@ -2,7 +2,187 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-15
+
+### Stage1 v2 fixed: 고정 선반 검증 후 별도 실행 연결
+
+- 동적 선반의 바닥 접촉 이동을 피하도록 새 `stage1_v2_fixed` env/train·train/test/VNC를 추가했다. v2에만 `platformPhysics: fixed_warmup_v1`을 선택해 고정 선반과 첫 전체 reset 전 물리1회 초기화를 사용한다. AT 중심 목표·크기·보상·AMP·기존 stage1/v2 YAML/스크립트는 유지한다. 새 output을 분리했으며 본학습은 실행하지 않았다.
+- 후보 검사를 통과한 뒤 적용했다. CPU **97개**, GPU0·2048환경 후보 epoch3/frame393216 및 resume epoch4/frame524288·actor/critic 관련12개 파라미터 업데이트·finite·물리 reset 실패0. 후보의 선반 이동0, 첫 물리 추가시간 약21ms, 기존/후보 각3epoch 속도는 비슷한 범위였다. RSI6,413 profile의 새 screening mask가 기존과 전부 같았다.
+- 최종 train wrapper도 2048환경 epoch2/frame262144·514 scalar finite·reset 실패0 통과. 실제 코드의 13과제/초기 skill·부분 reset·CPA416회·거리769건, 바닥/0.005/0.02/0.25/0.75m 선반 접촉을 확인했다. 밑면 오차≤0.0043mm. 별도 후보 검사에서 마커 좌표도 검증했다. 초기 검사 코드의 연속 reset 호출·float32 XY 오차 허용 문제는 격리 harness에서 수정하고 최초 실패 로그를 보관했다.
+- 새 snapshot/checkpoint에 sim도 저장하고 test에서 저장 env+sim을 복원한다. sim이 없는 구 v2 snapshot은 새 실험의 native sim을 명시적으로 보충해 기본 rest_offset 때문에 2mm 틈이 생기는 문제를 막는다. 새 checkpoint·기존 v2 8k의 표준 headless32환경32step 평가 통과. VNC 호출은 기존 NVML 버전 불일치로 GPU 선택에서 종료돼 화면 미검증이며 서버 설정은 수정하지 않았다.
+- [검증 결과](output_etc/v2_fixed_validation_20261015/validation.json), config/structure에 재현 명령과 범위·제한을 기록했다. 기존 학습 프로세스·checkpoint는 변경하지 않았다. 장기 수렴·성공률 개선을 입증한 검사는 아니다.
+
+### Stage1·v2 viewer: checkpoint 저장 환경 자동 선택
+
+- 실행 중인 구버전 stage1 checkpoint를 최신 YAML 거리 분포로 보여주던 혼동을 해소했다. stage1/v2 test와 이를 호출하는 VNC는 기본 env로 checkpoint run의 `relation_config.yaml`을 사용한다. 전용 환경변수의 명시적 override를 우선하며, 저장 config가 없으면 최신 YAML로 조용히 대체하지 않고 경로 지정 안내 후 종료한다. 평가 인원·환경 수·graph·초기 skill 옵션은 유지한다. 실행 중인 학습/viewer는 변경하지 않았다.
+- 경로 선택 10건(일반·심링크·이동 checkpoint·명시적 override·누락), 셸 문법·diff 확인. GPU 0 headless로 stage1 17k/v2 7.5k를 각각 2환경·32step 평가해 종료 코드 0·finite·`legacy_near`/`tokenhsi` 분포를 확인했다. 결과는 `output_etc/stage1_viewer_config_check_20261015/validation.json`. NVML 버전 불일치는 지속하며 GUI/VNC 화면은 이번에 검증하지 않았다. config/structure 문서를 갱신했다.
+
+## 2026-10-14
+
+### Action 평가: 가변 인원·물체 수 지원
+
+- 사용자 요청으로 task-role 시나리오의 추론 graph·과제 packet·크기 샘플링을 M명·O물체로 일반화했다. `random_scenario`는 M≥1·O≥M이며 각자 주물체 하나를 갖는다. ON_TOP이 O−M개 받침보다 많으면 초과 담당자를 무작위로 골라 크기 적격 다른 과제로 재추첨하고 받침은 중복 없이 연결한다. 기존 2명·4물체 경로·학습 계약은 유지한다.
+- 가변 인원 평가의 출발 간격/장면 반경을 확장했다. 첫 9명 검사에서 밀집 장면이 64회 reset에 실패한 문제를 해소했다. 1명·1물체 검사에서 발견한 `topk(2)`도 물체 수에 맞췄다. 과제 통계 분모는 실제 인원 수를 사용한다. config/structure에 실행법·검증 위치를 기록했다.
+- CPU **58개 통과**(1~32명·물체 부족 재추첨·크기 적격·binding·부분 reset·기존 Action 계약). 요청한 checkpoint의 GPU 0 headless 32step 평가를 사람/물체 **1/1, 3/3, 3/4, 4/16, 9/14, 12/12**에서 각각 2~3회 완료하고 trace의 담당자·받침 연결 및 평가 결과를 검사했다. 결과/로그는 `output_etc/generic_action_eval_20261014/validation.json`과 해당 폴더에 있다. 장기 성능·GUI/VNC 화면은 미검증이며 기존 학습 프로세스는 변경하지 않았다.
+
+### Action viewer: 한 명 SIT·한 명 CLIMB 고정
+
+- `TASK_GRAPH=sit_climb`을 추가했다. 첫 번째 사람→물체0 SIT, 두 번째 사람→물체1 CLIMB를 일반/크기 조건부 graph 및 reset에서 유지하고, 담당 상자 크기도 각 과제 범위로 생성한다. 기존 Action test/VNC wrapper로 사용하며 config에 명령을 추가했다.
+- `test_size_rsi.py` CPU 27개 통과. 요청한 Action 기본 checkpoint로 GPU 0·2명·1환경·4물체·32step headless 평가 종료 코드 0, 실제 graph의 SIT/CLIMB binding 확인. 결과는 `output/action_sit_climb_check/metrics/`다. `nvidia-smi`는 NVML 버전 불일치로 실패했으나 CUDA 시뮬레이션은 완료됐다. GUI/VNC 화면은 미검증이다.
+
+### stage1_v2: 새 크기·plane 성공·RSI 검사 적용 및 독립 실행 연결
+
+- 새 env/train `stage1_v2.yaml`과 train/test/VNC wrapper를 만들었다. stage1의 공유 task bias·Action MLP·CPA·TokenHSI 거리/선반·운반 RSI 50/10/30/10은 유지하며, Climb Z 0.20~0.70m·XY 내부80%, 받침/배경 XY 0.40~0.80·Z 0.25~0.50m, AT 3D20cm+높이1mm를 적용했다. 기존 stage1/Action 설정·본학습은 유지하고 checkpoint와 output을 분리했다.
+- 실제 asset 생성과 크기별 과제 적격 확률에 동일한 새 범위를 전달한다. Climb 두 상자를 적층으로 잘못 더하던 검사는 v2의 실제 payload→자기 받침 binding과 Carry 적격 크기로 제한했다. 기존 variant의 범위·성공 조건은 유지한다.
+- `output/rsi_cache_stage1_v2`에 6,413개 profile을 새로 물리 screening했다. 초기/진행 body point 관통·발 바닥 침범·finite·0.1초 충격·낙상 검사를 추가하고 SIT/CLIMB phase는 실제 크기로 계산한다. 모션/root/AMP 이력을 수직 retarget하지 않는다. SIT 487·Climb 715개 profile은 전부 nonempty, SIT phase 공백 0. Climb 129개는 phase가 없어 전체 valid, carryWith 35/712개는 skill fallback을 사용한다. 이를 실행 분포·장기 안정성 보장과 구분해 문서화했다.
+- CPU **70개 통과**, GPU 0·**2048환경** 확인 학습 epoch2/frame262144 및 resume epoch3/frame393216, 771 scalar finite·물리 reset 실패0·actor/critic embedding/projection/Action MLP 업데이트 확인. 실제 reset23회(부분21회)의 모션10,570개·AMP 이력95,130프레임·높은 Climb RSI521개, PPO minibatch48개/786,432행의 task/demo/replay family 정렬과 정규화 후 one-hot 유지 검사를 통과했다.
+- 표준 headless wrapper 32환경·32step 완료. 별도 13과제/초기 skill·416step·310reset·772거리 검사, CPA·선반 배치/재배치 접촉 통과. 첫 선반 검사의 마지막 한 프레임 접촉력 assertion은 실패해, 착지 중 최대 접촉력과 정지 높이/속도를 함께 검사하도록 테스트를 보완했다. 최종 두 높이의 밑면 오차≤7.01e-6m. VNC 실제 호출은 기존 NVML 불일치로 GPU 선택 단계에서 종료돼 화면은 미검증이다.
+- [학습·평가 비교](markdowns/tokenhsi_vs_stage1_v2_train_eval.md), config/structure를 갱신했다. 실행·분석 결과는 `output_etc/stage1_v2_check_20261014/validation.json`; 확인 학습은 `output/stage1_v2_check/`, resume는 `output/stage1_v2_resume_check/`다. 새 본학습/장기 성능 평가는 실행하지 않았다.
+
+### Action 55k: Climb 실제 높이 0.40~0.70m 정책 평가
+
+- 사용자 요청으로 frozen Action 55k를 0.40/0.50/0.55/0.60/0.65/0.70m 실제 상자 asset에서 평가했다. 높이마다 XY 0.40~0.80m의 81조합을 균등 배정하고 486환경·2명·4물체·CLIMB 두 과제·loco·1~2m·20초·3회를 실행했다. 높이당 486 agent 시도, 총 2,916시도다. 기존 체크포인트 검사를 유지하며 평가 프로세스에서만 asset/과제 적격 높이와 Climb 전용 개별 높이 검사를 사용했다. 일반 top-2 적층 검사의 운영 코드는 수정하지 않았다.
+- 제안 내부 80%·기존 root/발 높이 조건의 ever/final은 높이순 **100/99.8, 99.4/99.4, 99.0/98.6, 98.1/96.7, 96.7/91.6, 63.0/53.9%**. 추가로 상자 기울기≤15°·실제 상판 높이가 요청 높이±5cm인 상태의 final은 **99.8/99.4/98.6/96.3/90.1/43.4%**, 종료 직전 2초 연속 성공은 **99.6/99.4/98.6/95.5/88.1/38.3%**다. 높은 상자가 넘어져 낮아진 경우를 추가 진단에서 제외했다. 원래 내부 90% 및 중심점 20cm 지표도 별도 저장했다.
+- 세 회차 정상 완료·finite·매 step 운영 성공과 독립 기하 일치·trace 사후 재집계·XY 균등 배정·출발 거리·config/checkpoint hash 불변·재추첨 실패 0을 확인했다. `output_etc/action_climb_height_eval_20261014/`의 `evaluate.py`, `analyze.py`, `manifest.json`, `summary.json`, `validation.json`에 재현 코드와 결과가 있다. 이번 결과는 0.7m 동작 수행 가능성을 뒷받침하며, 1~10m·새 학습 수렴·높은 상자 RSI 안정성 검증은 아니다. 운영 크기/성공 조건·받침/배경 크기와 기존 학습은 변경하지 않았다.
+
+### stage1: Climb 높이 확대·RSI 사전 감사 (설정 미적용)
+
+- Climb Z 0.20~0.70m·XY 내부 80% 제안에 대해 기존 캐시 6,224개 profile을 분석하고, 2048환경의 격리 실행에서 Climb 891개 크기와 대표 payload 3종×받침 245종을 검사했다. 누락 Climb 433·ON_TOP 722개만 별도 캐시에 native 0.1초 screening으로 추가했다. 기존 캐시 SHA256·운영 YAML·본학습은 유지했다.
+- 독립적인 0.7m Climb 상자 둘을 1.4m 적층으로 취급하는 전역 top-2 높이 검사가 현재 1.2m 제한에 걸린다. 물리 감사에서는 두 번째 담당 상자를 0.4m로 고정해 첫 번째의 전 범위를 확인했으며, 실제 확대 적용 전 역할별 적층 검사 수정이 필요하다.
+- 모든 Climb 크기에 screening 통과 프레임이 있지만, 제안 성공 자세가 하나라도 있는 XY 크기는 Z=0.50/0.55/0.60/0.65/0.70m에서 각각 81/22/0/0/0개(높이별 81개)다. 참조 root 최대 1.32052m가 0.6m 상자 성공 최소 root 1.34m보다 낮다. 초기 성공 자세 부재는 정책의 학습 불가능을 뜻하지 않으며, 캐시 재생성만으로 높은 상판의 완성 자세를 만들지는 못한다. 단순 수직 이동·고정 PD의 추가 탐색도 안정적인 보정을 입증하지 못했다.
+- 기존 carryWith 34/713·ON_TOP putDown 2/3,119 profile이 비어 대체 skill 경로를 탄다. SIT 508개 profile은 valid∩phase가 없어 late pool이 전체 valid로 대체된다. 따라서 명목 RSI 비율·후반 프레임 우대를 실제 실행 비율/후반 자세 보장으로 해석하면 안 된다.
+- 9개 학습식 reset batch(총 6,144장면)는 finite·재추첨 실패 0·이번 표본 fallback 0. 다만 고정 PD 0.1초 후 SIT 29/1,266·ON_TOP 1/2,205장면에 낙상 종료가 있어 안정성 전부 통과로 판정하지 않는다. Climb 기하 분석 449,955건은 운영 성공 helper와 일치했다. `output_etc/stage1_rsi_height_audit_20261014/validation.json` 및 `geometry_summary.json`에 범위·제한·결과를 기록했다. 정책 학습/성능 평가가 아니며 config/structure에 적용 전 확인점을 연결했다.
+
+### stage1: TokenHSI 거리 분포·운반 RSI 정렬
+
+- 사용자 요청으로 stage1 기본 `samplingMode=tokenhsi`를 추가했다. loco 접근 반경은 SIT 1~5m, CLIMB/AT/ON_TOP 1~10m, AT 목표와 ON_TOP 받침 XY는 환경 원점 기준 ±4.5m·사람/payload와 최소 1m다. putDown 참조 목표와 ON_TOP 받침 높이, 선반·물체 크기·성공/보상·AMP는 유지한다. 다중 장면의 기존 간섭 재추첨은 유지하므로 원본 최종 분포와 완전 동일하다는 뜻은 아니다.
+- AT/ON_TOP 운반 RSI를 50/10/30/10으로 변경했다. 새 run은 `Stage1TokenHSISampling_*`; 실행 중인 기존 학습은 유지했다. 구버전 1~2m·40/10/40/10 config를 계속 지원하고, 서로 다른 설정의 암묵적 resume는 검사한다. train/test/VNC에 `STAGE1_ENV_CONFIG`로 저장 config를 지정할 수 있으며 평가 JSON에 분포를 기록한다.
+- CPU **67개 통과**, GPU 0·**2048환경** 확인 학습 epoch 2 저장·514 scalar finite·물리 reset 실패 0. 저장 정책의 13개 과제/RSI·416 step·341 reset·초기 거리 765건, 부분 reset·ON_TOP binding·CPA·선반 접촉 통과. 신/구 config의 표준 headless test 각 16환경·32 step도 종료 코드 0·분포 표시 확인. 문법·diff·원본 문서 링크 70개 검사 통과. 검증은 `output_etc/stage1_tokenhsi_sampling_check_20261014/validation.json`, 확인 학습은 `output/stage1_tokenhsi_sampling_check/`다. 장기 성능·VNC 화면 검증은 하지 않았다.
+- 원본 Sit/Climb train/test 8개 종류별 asset JSON을 재집계하고 `tokenhsi_original_carry_sit_climb.md`에 Climb Box 크기 조합·가구별 범위·Sit 좌면 대표 높이를 추가했다. 현재 물체 크기와 성공 조건은 변경하지 않았다. config/structure도 갱신했다.
+
+### Action 55k: 원본 TokenHSI 환경의 출발 거리 1~2m 평가
+
+- 사용자 요청으로 원본 물체·선반·목표·3D 20cm ever 조건과 앞선 ON_TOP 확장을 유지하고, 사람–담당 물체의 초기 XY 반경만 U(1,2m)로 제한했다. `evaluate_action_tokenhsi.py`에 `--approach-max-distance`를 추가하고 원본 태스크의 세 중복 XY sampler를 공통 메서드로 추출했다. 기본 Sit 1~5m·Carry/Climb 1~10m와 학습 YAML은 유지하며 AT 도착 목표·ON_TOP 받침 거리는 제한하지 않는다.
+- Action 55k·1인·64환경×3회·seed 0, 과제별 192시도: AT(Carry)/ON_TOP/SIT/CLIMB ever **52.1/48.4/50.5/92.7%**, 종료 시 **45.8/46.4/44.3/7.8%**. 이전 원본 거리 ever 19.8/17.7/49.5/54.2%와 비교한다. CLIMB 순간 도달과 종료 유지의 큰 차이가 있으며, Sit은 거리 축소만으로 거의 개선되지 않았다.
+- CPU sampler 6개 경우에서 원본 출력·RNG bitwise 일치, 제한 시 방향·RNG 소비 유지와 1~2m 범위 확인. 네 평가 종료 코드 0, 768시도 실제 초기 거리·finite·매 step 원본 성공/precision 일치·정적 mesh 이동 검사, trace 독립 재집계 통과. 이전 실행과 checkpoint·asset 목록/크기·시간·물리 모드 일치를 검증했다. Python 문법·문서 링크·diff 확인. 결과·검증·소스 snapshot은 `output_etc/action_tokenhsi_near2m_20261014/`에 보관하고 config/structure에 연결했다.
+
+### Action 55k: 기존 환경에서 시작 거리만 변경한 대조 평가
+
+- 사용자 요청으로 기존 2명·4물체·loco·600 step·seed 42·64환경×3회 평가에서 `ownerLocoDistanceRange`만 1~2/3~5/5~10m로 변경했다. 전용 `output_etc/action_distance_eval_20261014/evaluate.py`에서 표준 checkpoint/config 검사 후 평가 reset 전에 메모리로 적용하며 학습 YAML·기존 실행 코드는 변경하지 않았다.
+- 구간별 384 agent 시도 합산 종료 성공 **93.2/76.8/9.9%**, 담당 물체 XY 1m 이내 접근 **100/86.2/12.2%**, 낙상 종료 장면 **1.0/14.1/88.0%**. 5~10m의 본인 낙상 169명 중 168명은 접근 전에 넘어졌고 다른 163명은 접근 전에 동료 낙상으로 중단됐다. 평균 장면 길이는 19.87/17.50/4.40초다. 거리 증가만으로 접근 안정성이 저하되는 현상을 확인했으며 내부 보행 실패 원인은 확정하지 않았다.
+- 3프로세스 종료 코드 0·각 3회 완료, 실제 초기 거리 범위·finite·성공/접근/낙상 독립 재집계 검증 통과. 기준 1~2m 회차 성공 수 **117/120/121**이 기존 표준 55k와 정확히 일치했다. 같은 checkpoint SHA256·거리 외 env 설정 동일 검사, Python 문법·문서 경로·diff 확인. 개별 장면은 reset RNG 차이로 완전히 paired하지 않는다. 실행/검증/결과는 해당 폴더의 `README.md`, `summary.json`, `analyze.py`와 trace이며 config에 재현 명령을 추가했다.
+
+### Action 55k의 원본 TokenHSI 환경 간단 평가
+
+- 평가 전용 `tokenhsi/evaluate_action_tokenhsi.py`에서 frozen Action actor/normalizer를 원본 1인 Carry/Sit/Climb 환경에 연결했다. 원본 test mesh·시작 분포·시간·3D 20cm ever 판정을 사용하며, ON_TOP만 Carry 도착 선반을 현재 크기 규칙의 동적 받침상자로 바꾼 확장이다. 학습 설정·가중치·기존 eval은 변경하지 않았다.
+- GPU 0·seed 0·각 64환경×3회(192시도): Carry/Sit/Climb/ON_TOP ever **19.8/49.5/54.2/17.7%**, 종료 시 **17.7/44.3/9.9/15.6%**. 원본 환경으로 옮긴 일반화 평가이며 기존 장면에 성공식만 바꾼 AT 95.3%와 구분한다. Action에는 full bbox만 제공하며 별도 좌판 목표점은 추가하지 않는다.
+- 원본 fixed 선반의 GPU 재배치 후 collider 위치 불일치를 낙하 검사로 확인했다. Carry/ON_TOP은 중력 비활성·고질량 선반과 reset 속도 초기화를 사용한다. Sit/Climb은 원본 fixed mesh를 유지하고 전체 장면의 공통 SE(2) 변환·모델 관측 역변환으로 원본 상대 배치를 보존한다. 초기 호환 구현의 선반 발사·가구 이동/관측 좌표 문제로 나온 실행은 모두 최종 집계에서 제외했다.
+- 네 평가 종료 코드 0, strict weight load·finite·매 step 원본 누적 성공/precision 일치·trace 독립 재집계·출발 거리 범위 검증 통과. Action 관측 함수와 bridge 일치, 고정 장면 역변환 관측 오차 ≤2.21e-6·거리 ≤4.77e-7m. 출발 선반 낙하 검사 및 8cm probe 상자의 원본 의자/가구 접촉 각 64/64 통과, 평가 중 mesh drift <1.2e-7m. Python 문법·문서 경로·diff 확인.
+- `output_etc/action_tokenhsi_20261014/`에 승인된 네 과제 trace·초기 상태·manifest·검증·최종 실행 소스와 제외된 디버깅 결과를 구분 보관했다. 공식 512환경과 다른 소표본, 로컬 Climb test 35개, 물리 호환 처리가 있으므로 논문 표의 완전 동일 재현으로 부르지 않는다. config/structure에 재현법을 연결했다.
+
+### TokenHSI 원본 Carry·Sit·Climb 상세 문서
+
+- `markdowns/tokenhsi_original_carry_sit_climb.md`에 원본 세 과제의 크기·초기화·목표/선반 수식·보상·성공/종료·평가 집계·원본 명령 인터페이스를 정리하고 structure에서 연결했다. Carry의 putdown 보상(높이 1mm·XY 10cm)과 평가 성공(3D 20cm 도달)을 구분한다.
+- 로컬 Sit train/test 49/26개, Climb 38/35개를 확인하고 평가 asset 61개의 치수·목표 높이·JSON 링크를 수록했다. 논문 Climb test 26개와 로컬 35개, 공식 기본 학습 4096환경과 로컬 2048환경 등 차이를 명시했다. 문서 링크·asset 집계·수치·diff 검증만 수행하며 실행 설정/데이터 변경·학습/시뮬레이션 실행 없음.
+
+### TokenHSI 원본 성공 조건·현재 eval 비교
+
+- 공식 GitHub Stage 1 evaluator·논문 4.1·로컬 원본 및 현재 Action/stage1 실행 경로를 대조했다. 원본 SIT/CLIMB/Carry는 root/상자 중심의 3D 20cm 도달을 episode 내 누적하며 512환경×3회다. 현재는 relation runtime의 종료 edge 성공과 전체 agent/scene의 final·ever를 저장한다. YAML `eval.successThreshold: 0.2`는 현재 relation 판정에 사용되지 않는다.
+- 현재 AT는 phi≥0.9(3D 약 10.265cm)와 높이 1mm, SIT/CLIMB/ON_TOP은 상판 내부 영역과 각각의 높이 조건이다. CLIMB 발 조건은 양발 평균 높이이며 접촉·각 발의 XY·지속시간 검사가 아니다. 다중 사람 중 누구든 낙상하면 장면이 종료되며 원본과 물체/시간/시작 분포도 다르다.
+- 기존 Action 55k AT trace 107건을 재판정했다. 기존 조건 final/ever **84/86**, 3D 20cm 조건 final/ever **99/102**(92.5/95.3%)다. finite·alive mask·거리/phi·runtime 성공 일치·포함관계 검사 통과. `output_etc/action_at_diagnosis_20261014/compare_success_rules.py`와 `success_rule_comparison.json`에 재현 코드·입력 hash·결과를 보관한다. 성공 수식만 바꾼 사후 분석으로 원본 benchmark 재현이 아니며 학습/평가 설정·모델 변경 없음.
+
+### Action 55k AT 실패 단계 진단
+
+- 표준 평가와 같은 64환경·600 step·loco 시작·seed 42·3회에서 AT의 매 step XY/높이/phi/성공·HOLDING·상자 속도/기울기를 기록했다. 회차 AT 성공률 75.6/78.8/81.8%가 직전 평가와 일치했고, 총 107시도 중 종료 84·평가 중 86 성공이다. 실패 23건 중 21건은 한 번도 성공하지 못했고 2건은 성공 후 이탈했다.
+- 실패 23건의 거리 조건만 실패/높이만 실패/둘 다 실패는 4/5/14건이다. XY 오차 중앙값 10.6cm·절대 높이 오차 중앙값 7.1cm, 마지막 4초 평균 XY<30cm·속도<10cm/s 19건으로 목표 근처 마지막 배치 정체가 주로 관찰됐다. 종료 속도<5cm/s 19건·기울기>30도 18건·HOLDING 조건 만족 14건이다. HOLDING은 손 거리 조건이며 실제 grasp 판정을 뜻하지 않는다.
+- 저장 trace에 높이 허용치만 1mm→1cm로 완화해 재판정해도 성공 84건 그대로, 2cm는 85건이다. 실제 rollout을 바꾼 실험이 아니며 reward/구조의 인과 원인은 확정하지 않았다. 모든 활성 frame의 성공 수식과 runtime 일치·finite·최종/최초 성공 수 재계산 통과. `output_etc/action_at_diagnosis_20261014/`에 실행/분석 코드·3회 trace·summary를 보관한다. 기존 학습·성공 조건·보상 변경 없음.
+
+### Action 45k·50k·55k 표준 test 각 3회 평가
+
+- 요청한 Action 45,000/50,000/55,000을 기존 `_test.sh`로 각각 64환경·2명·4물체·600 step·loco 시작·random scenario·seed 42·3회, GPU 0에서 순차 평가했다. 저장본당 192장면/384 agent 시도이며 과제별 수치는 회차 성공률의 단순 평균이다. 같은 seed 설정이 후속 회차의 동일 장면을 보장하지는 않는다.
+- 종료 전체 성공 평균±회차 표준편차는 **90.4±1.2 / 91.9±3.5 / 93.2±1.6%**, SIT/CLIMB/AT/ON_TOP은 45k **97.0/95.2/74.4/98.6%**, 50k **100/98.0/80.3/96.1%**, 55k **96.3/100/78.7/98.5%**다. 이번 표본에서 55k 전체 평균이 가장 높으며, AT는 50k 평균이 높지만 회차 범위 68.3~89.7%로 55k의 75.6~81.8%보다 넓다. 장기 우열·망각의 원인은 검증하지 않았다.
+- 세 프로세스 종료 코드 0·각 3회/192장면·finite·성공 범위/최초-종료 관계·평균/표준편차 재계산 검증 통과. `output_etc/action_test_45k_50k_55k_repeat3_20261014/`에 실행 코드·manifest·원본 metrics·summary·검증을 보관한다. GPU의 NVML 조회는 버전 불일치로 실패했으나 CUDA 여유 메모리 약 54GB 확인 후 실행했다. 기존 Action/stage1 본학습은 유지했으며 설정 변경 없음.
+
+## 2026-10-13
+
+### stage1: Action + 공유 task bias + CPA + payload 선반
+
+- 사용자 합의대로 전용 `stage1` env/train YAML·train/test/VNC·output을 연결했다. Action MLP와 과제/보상/AMP/RSI/634-D packet을 유지하며 타입 쌍 projection을 layer/head당 하나로 공유한다. NONE/SELF=0·actor/critic 독립, 기존 CPA 충돌항을 사용하고 전용 variant/fusion·선반 설정 검사로 checkpoint를 격리했다.
+- `utils/stage1_platforms.py`에서 AT/ON_TOP loco 출발 payload 및 AT loco/pickUp/carryWith 도착지에 원본 TokenHSI 50%·U(0,1m)·상자 윗면 1.2m clamp·출발 5cm 여유 규칙을 적용한다. Carry RSI 시작·putDown AT 바닥 목표·ON_TOP 받침·SIT/CLIMB·배경은 유지하고 graph binding과 부분 reset을 따른다. 기존 GPU 재배치 가능한 선반 actor를 재사용한다.
+- **CPU 168개 통과**. GPU 0·**2048환경** 확인 학습 epoch 2 및 resume epoch 3 저장 완료, 771 scalar finite·물리 reset 실패 0, 양쪽 branch의 projection/embedding/MLP optimizer step 96→144 및 실제 업데이트 확인. 네 과제별 test wrapper **32환경·64 step** headless 평가 완료.
+- 실제 시뮬레이터 **13개 과제/RSI 조합·416 step·319 reset 호출**에서 선반 범위/부분 reset·CPA 보상 대조 통과. 출발/도착 선반을 0.25m·0.75m로 옮겨 물리 지지·양의 접촉력·높이 오차 <1.28e-5m를 확인했다. 초기 접촉 fixture는 앞선 rollout의 쓰러진 사람 간섭으로 실패해 사람을 분리하고 재검증했다. 자료는 `output_etc/stage1_check_20261013/validation.json`과 로그·metrics다.
+- Python/셸 문법·문서 경로·diff 확인. 본학습은 시작하지 않았고 기존 Action 학습은 유지했다. **VNC는 실제 호출했으나 NVML/로드된 드라이버 버전 불일치로 GPU 선택 단계에서 종료**, 화면 검증·장기 성능은 미완료다. 시스템 드라이버는 수정하지 않았다.
+
+### Action 46k·47k 표준 test 각 5회 평가
+
+- 기존 Action `_test.sh`로 46,000/47,000을 각각 64환경·2명·4물체·600 step·loco 시작·random scenario·seed 42·5회 평가했다. 저장본당 320장면/640 agent 시도이며 AT 높이 허용치 1mm 등 기존 성공 조건을 유지했다. 과제별 비율은 회차별 단순 평균이고 후속 회차 장면은 정확히 일치시킨 비교가 아니다.
+- SIT/CLIMB/AT/ON_TOP 종료 평균은 46k **90.2/98.0/76.3/98.4%**, 47k **87.1/88.1/76.8/98.6%**. 전체 종료는 **89.7/87.8%**, 평가 중 성공은 **91.4/92.7%**, scene 조기 종료는 **2.2/6.6%**다. AT는 두 저장본 모두 45k보다 높지만 앞서 44k의 82.1%보다 낮고, 47k는 CLIMB 종료 성공 감소가 보인다. 원인/망각은 검증하지 않았다.
+- 2프로세스 종료 코드 0·각 5회/320장면·finite·성공 범위·평균/표준편차 재계산 검증 통과. `output_etc/action_test_46k_47k_repeat5_20261013/`에 실행/검증 코드·manifest·원본 지표·summary를 보관한다. Action 본학습은 유지했으며 모델/학습 설정 변경 없음.
+
+### Action 43k·44k·45k 표준 test 각 5회 평가
+
+- 요청한 Action 43,000/44,000/45,000 저장본을 기존 `_test.sh`로 각각 64환경·2명·4물체·600 step·loco 시작·random scenario·seed 42·5회 평가했다. 저장본당 320장면/640 agent 시도, 총 15회이며 GPU 0에서 순차 실행했다. 과제별 값은 회차 성공률의 단순 평균이고, 같은 seed 설정이 모든 후속 회차의 동일 장면을 보장하지는 않는다.
+- SIT/CLIMB/AT/ON_TOP 종료 평균은 43k **76.5/98.0/66.6/97.7%**, 44k **92.8/97.7/82.1/97.6%**, 45k **96.6/96.5/69.1/96.7%**. 전체 종료 평균±회차 표준편차는 **86.3±2.1 / 91.9±2.1 / 88.0±3.4%**, 평가 중 성공 평균은 **89.1/93.4/89.4%**다. 이번 표본에서는 44k 전체/AT, 45k SIT가 가장 높다. 45k AT는 회차별 55.0~75.8%로 편차가 있으며 회귀/망각의 원인은 검증하지 않았다.
+- 3프로세스 종료 코드 0·각 5회/320장면·finite·성공 범위/최초-종료 관계·평균/표준편차 재계산 검증 통과. `output_etc/action_test_43k_44k_45k_repeat5_20261013/`에 실행 코드·환경 manifest·반복 원본·summary·검증을 보관한다. 기존 Action 본학습은 유지했으며 모델/학습 설정 변경 없음.
+
+### Action 최신 3개 checkpoint의 표준 test 3회 반복 평가
+
+- 사용자 요청으로 기존 Action `_test.sh`를 수정 없이 사용해 41,500/42,000/42,500을 각각 64환경·2명·4물체·600 step·loco 시작·random scenario·seed 42·3회 평가했다. 저장본당 192장면/384 agent 시도, 총 9회이며 GPU 0에서 순차 실행했다. 과제별 수치는 회차 성공률의 단순 평균으로 표본 수 가중 합산이 아니며, seed 설정은 같아도 모든 회차 장면을 동일하게 고정한 비교는 아니다.
+- 종료 개인 목표 성공 평균은 **84.1/86.5/90.6%**, 평가 중 성공은 **87.5/89.3/93.2%**다. SIT/CLIMB/AT/ON_TOP 평균은 41,500 **79.5/94.9/69.2/92.8%**, 42,000 **81.1/98.2/66.8/96.8%**, 42,500 **87.9/100/78.6/95.5%**. 최신 SIT 회차별 63.6/100/100%로 소표본 편차가 크며, 전체 종료는 89.1/91.4/91.4%다.
+- 3프로세스 종료 코드 0·각 3회/64장면·finite·지표 범위/최초-종료 성공 관계 확인. `output_etc/action_test_repeats_20261013/`에 실행/환경 manifest·반복 원본·평균/범위/표준편차 summary·검증을 보관하고 `markdowns/config.md`에 반복 평가법을 추가했다. 기존 두 본학습은 유지했다.
+
+### Action 기반 사람 간 CPA collision 실험 연결
+
+- Git `595688e`의 `collision_reward.py`·`approach_stage2_rescue_shared9_cpa.yaml`을 찾아 참고 CPA 식을 복원했다. Action 전용 `_cpa` env/train YAML·train/test/VNC·output을 분리하고 상대 root XY 위치/속도의 접근도×최근접 거리 위험×시간 할인(0.99)을 collision 항에 연결했다. 계수 0.5·거리 0.7m, 정지/평행/이탈 위험 0, 기존 거리 페널티 중복 없음. 모델·타입별 projection·concat MLP·AMP·RSI·과제/성공 조건·셔플은 그대로다. Bias 통합은 사용자 검토 단계로 구현하지 않았다.
+- 기본 static 경로를 유지하고 checkpoint에 collision 계약을 저장한다. 과거 저장 env의 static 계약을 읽으며 static/CPA 및 파라미터가 다른 checkpoint의 직접 resume/eval을 거부한다. 기존 Action→CPA weight 전이는 추가하지 않았다. 참고 Stage 2의 다른 모델/보상 변경은 가져오지 않았다.
+- **CPU 37개 통과**: CPA 접근/이탈/정지/교차·대칭/순열/공통 속도 불변·static 동등성·실제 dispatch·보상 1회 합산·checkpoint 격리·Action/상자 속도 회귀. **GPU 0·2048환경·MAX_ITERATIONS=1** 확인 학습 epoch 2 저장 완료, scalar 257종/514값 finite·물리 reset 실패 0. 저장본 **16환경·32-step headless 평가** 완료, 실제 reward 31회가 독립 CPA 계산과 차이 0(비영 위험 표본 14개). `output_etc/action_cpa_check_20261013/validation.json` 및 로그, `output/approach_scenario_stage1_unified_size_rsi_task_embedding_action_cpa_check/`에 보관한다.
+- 셸 문법·문서 링크·diff 검사 통과. 기존 Action/Gate 본학습을 유지했고 CPA 본학습·장기 성능·VNC 화면은 검증하지 않았다.
+
+### Action·Role gate 최신 간단 평가·밤사이 추세
+
+- 사용자 표현의 goal은 앞서 비교하던 실행 중인 Role gate로 해석하고 Action 42,000 / gate 23,500을 GPU 0에서 순차 평가했다. 이전과 동일한 64환경·2명·4물체·600 step·seed 42·loco 시작·random scenario 1회이며 초기 task/binding packet이 두 모델 및 전날 평가와 일치한다.
+- 종료 성공 수(SIT/CLIMB/AT/ON_TOP, 표본 11/37/45/35)는 Action **9/36/29/34**, gate **6/37/0/0**. 전날 36,000/17,500 대비 Action SIT 4→9·전체 개인 목표 성공 77.3→84.4%, gate CLIMB 0→37·SIT 2→6·전체 1.6→33.6%다. SIT 평가 중 성공은 Action 10/11, gate 7/11이며 gate 운반 목표는 평가 중 성공도 0이다.
+- 최근 200회 평균 학습 지표를 전날 저녁 저장한 200회 평균과 비교했다. Action SIT 성공 상태 54.2→82.3%·종료 개인 목표 80.6→84.8%; gate SIT 29.0→51.9%·CLIMB 21.2→80.8%·종료 개인 목표 23.5→44.7%. 조회 시 최신 로그는 Action 42,451 / gate 23,668이다. 학습 RSI 혼합 지표와 별도 loco 평가를 구분하며 단일 seed 소표본이다.
+- 두 평가 종료 코드 0·finite·성공 수 범위·표본 합·packet 검증 통과. TensorBoard 마지막 64MiB scalar 872,024/835,716개에서 비유한 값 0. `output_etc/rough_eval_20261013/`에 실행/검증 코드·manifest·summary·학습 추세·로그를 보관한다. NVML 조회는 기존 버전 불일치로 실패했으나 CUDA 여유 메모리 확인 후 실행했으며 두 본학습은 유지했다.
+
 ## 2026-10-12
+
+### Action 36,500 bias·embedding·직접 주입 MLP 분석
+
+- 최신 Action 36,500과 16,000/23,000의 actor·critic task embedding 및 타입 쌍별 bias를 추출했다. 최신 actor의 H→O bias(4층×2head) 과제 간 cosine은 0.9977~0.9998, task embedding은 0.8263~0.9651이다. AT/ON_TOP embedding cosine은 16,000의 0.9533→0.9651, SIT/CLIMB는 0.8653→0.8263이다. NONE/SELF=0인 현재 모델에서 실제 적용 타입 쌍과 미사용 표 항목을 구분한다.
+- 최신 actor의 loco 초기화 64장면·0/120/300/540 step 관측(512 agent 관측)에서 직접 주입 MLP 제거 시 정책 평균 출력 상대 RMS 변화는 전체 27.2%, SIT/CLIMB/AT/ON_TOP 39.2/34.9/20.8/20.8%다. Bias만 제거하면 전체 51.6%; bias를 유지하고 MLP의 AT↔ON_TOP task 입력만 바꾸는 해당 과제 출력 변화는 5.0/5.3%다. MLP 주입량/입력 RMS는 SIT에서 층별 312/88/82/35%이며 output projection·residual·normalization 전 값이다. 대체 행동 rollout이나 성공률 기여도 측정은 아니다.
+- 실제 player 출력과 CPU 재구축 출력 최대 차이 9.62e-7·정규화 차이 0·probe 복원 뒤 출력 차이 0·finite JSON 확인. `output_etc/action_components_20261012/`에 capture/분석 코드·원시 관측·actor/critic 전체 bias·유사도·probe 결과를 보관한다. 본학습·모델 설정은 변경하지 않았다.
+
+### Action 뷰어 체감과 SIT 평가 차이 확인
+
+- Action 최신 번호 저장본 36,000을 저녁 평가와 같은 조건으로 재실행하고 SIT 11명의 매 step XY 거리·높이 오차·안쪽 영역 이탈·성공을 기록했다. 초기 task packet 및 SIT 최초/종료 성공 **4/11**이 재현됐으며 활성 frame 전체에서 geometry 조건과 runtime 성공이 일치했다.
+- 종료 실패 7명 중 1명은 골반 높이 오차 +3.4cm로 통과하지만 안쪽 영역에서 3.46cm 벗어났다. 나머지 6명은 목표 상자 중심 XY 거리 76~94cm·목표 높이 대비 +26~45cm였고 해당 성공 영역에 진입하지 못했다. 영상 자세나 뷰어의 실제 장면은 확인하지 않았으므로 시각적 앉기/뷰어 차이의 원인은 단정하지 않는다.
+- 실행 종료 코드 0·trace finite·frame별 성공 조건 대조 통과. 비대상 AT 종료 성공은 재실행 시 30→29로 달랐으며 전체 rollout의 완전 재현은 주장하지 않는다. 자료는 `output_etc/action_sit_diagnosis_20261012/`; 모델·학습 설정 변경 없음.
+
+### Action·Role gate 저녁 재평가·학습 추세
+
+- Action **36,000** / role gate **17,500**을 직전과 동일한 64환경·2명·4물체·600 step·seed 42·loco 시작·random scenario 1회로 GPU 0에서 순차 평가했다. 초기 task/binding packet은 직전 및 두 모델 간 일치한다.
+- 종료 성공 수(SIT/CLIMB/AT/ON_TOP, 표본 11/37/45/35)는 Action **4/31/30/34**, gate **2/0/0/0**다. Action은 직전 34,500 대비 AT 21→30·전체 종료 성공 75.0→77.3%; CLIMB는 평가 중 37/37 성공하지만 종료 유지 37→31로 감소했다. Gate는 SIT 종료 1→2·평가 중 성공 1→7, HOLDING 상태 만족 32.5→53.8%이며 다른 과제 목표는 여전히 성공 0이다.
+- 최근 200회 학습 평균 종료 개인 성공은 직전 checkpoint 부근 대비 Action **76.5→80.6%**, gate **21.2→23.5%**다. Gate SIT 성공 상태 비율은 **17.1→29.0%**로 증가했다. 학습은 RSI 혼합 지표이며 별도 loco 평가·단일 seed 소표본과 구분한다.
+- 두 평가 종료 코드 0·finite·표본 합/성공 범위·초기 packet 일치 검증 통과. TensorBoard 파일별 마지막 64MiB의 scalar 872,024/835,752개에 비유한 값 0을 확인했다. `output_etc/rough_eval_20261012_evening/`에 실행 코드·manifest·summary·학습 추세·로그를 보관한다. NVML 조회는 버전 불일치로 실패했으며 CUDA 여유 메모리 확인 후 실행했다. 기존 두 본학습은 유지했다.
+
+### 동일 에포크·8~30토큰 attention 유지 비교
+
+- 사용자 요청에 따라 두 모델의 **16,500 epoch/frame 2,162,688,000**을 맞추고 행동 전 loco 초기 관측 64장면에 배경을 누적 추가했다. 최종 비교는 **8/10/12/16/20/24/30토큰**, 상자만 추가 및 사람·상자·목표 동시 추가, 배치 seed 17/42/73이다. 원래 객체·과제는 그대로이며 추가 사람은 과제가 없다. 최대 혼합 장면은 7H/16O/7G로 물리 rollout 없는 관측 probe다.
+- 8→30토큰의 과제 attention 합 유지율(원래 두 사람·4층·2head 평균)은 상자만 추가 시 Action **75.1%**, Entmax **87.2%**, 혼합 추가 시 **72.3%/80.9%**다. 혼합 마지막 층만 보면 **95.5%/90.2%**, 정책 평균 출력 상대 RMS 변화는 **5.2%/12.8%**이므로 전체 층 평균 희석 완화가 최종 행동 안정성 개선을 뜻하지 않는다. 같은 L1 점수에 정규화 함수만 바꾼 국소 비교도 별도 저장했다.
+- `output_etc/token_scaling_20261012/`에 코드·checkpoint hash·원시 확장 관측·attention·지표·한국어 PNG 4종을 보관한다. 동일 epoch/frame·두 모델 입력 동일·누적 추가 시 기존 feature/pose 보존·기존 토큰의 L1 logit 변화 0·계측 출력 동일·finite·행합 오차 <3.5e-6·문법·PNG 시각 확인 통과. 확장 행동 성공률과 재학습은 검증하지 않았으며 본학습·모델 코드는 변경하지 않았다.
+
+### Entmax·Action 실제 attention map 비교
+
+- Action 35,000의 64환경·loco 시작 rollout에서 0/60/120 step의 192개 장면 관측을 추출하고, 같은 원시 관측을 Action 35,000과 role gate/Entmax 16,500의 저장 정규화·actor에 입력했다. 사람 2명·상자 8개·목표 2개를 추가한 4H/12O/4G 관측도 비교했다. 추가 사람은 과제가 없는 배경 인물이며, 확장 장면의 물리 rollout·성공률 평가 및 동일 학습량 비교는 아니다.
+- 확장 관측의 원래 두 사람·4층·2head 평균: 과제 대상 attention 합 Action **80.3%** / Entmax **59.5%**, 추가 객체 합 **12.9% / 23.5%**, 정확한 0 비율 **0% / 57.1%**다. Entmax의 희소성이 더 높은 과제 집중을 뜻하지 않았으며, Action 궤적 표본·서로 다른 구조/학습량의 비교라 정규화 함수만의 인과 효과로 해석하지 않는다.
+- `output_etc/attention_comparison_20261012/`에 재현 코드·원시 관측·head별 attention/logit NPZ·summary와 한국어 PNG 5종을 보관한다. 네 과제 예시·전체 map·같은 Entmax logit에 Softmax만 적용한 국소 비교를 포함한다. 실제 player 대비 정규화 차이 0·정책 평균 출력 최대 차이 8.05e-7, 계측 전후 출력 동일·token 순열 map 오차 <1e-6·행합 오차 <1.5e-6·finite 검사 및 PNG 시각 확인 통과. 본학습·모델 코드는 변경하지 않았다.
+
+### Action·Role gate 최신 저장본 재평가 (16:12)
+
+- Action 34,500 / role gate 16,000을 이전과 같은 64환경·2명·4물체·600 step·seed 42·loco 시작·random scenario 1회로 순차 평가했다. 초기 task/binding packet이 이전 평가 및 두 모델 간 일치한다.
+- 종료 성공 수(SIT/CLIMB/AT/ON_TOP, 표본 11/37/45/35)는 action **5/37/21/33**, gate **1/0/0/0**. 직전 평가 대비 action AT는 14→21, 전체 개인 목표 성공은 70.3→75.0%; gate는 SIT 1건이 생겼고 나머지는 평가 중 성공도 0이다. Gate 종료 HOLDING 조건 만족은 32.5%로 같다. 단일 seed 소표본이며 학습량은 다르다.
+- 두 실행 종료 코드 0·finite 지표·표본 합·성공 수 범위를 확인했다. 실행 코드·manifest·검증·결과는 `output_etc/rough_eval_20261012_161156/`에 보관한다. 기존 두 학습 프로세스가 계속 실행 중임을 확인했으며 모델·학습 설정은 변경하지 않았다.
 
 ### Action·Role gate 간단 평가
 

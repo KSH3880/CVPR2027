@@ -84,7 +84,8 @@ class SampledOnTopTaskMixin:
             if getattr(self, '_size_aware_rsi', False):
                 from utils.edge_scenario_spec import sample_size_conditioned_graph
                 new = sample_size_conditioned_graph(self._size_template_probabilities[ids],
-                    self._relation_graph_spec, self._task_graph_preset)
+                    self._relation_graph_spec, self._task_graph_preset,
+                    num_objects=self.num_objects)
             else:
                 new=sampler(len(ids),self._relation_graph_spec,self.device,self._task_graph_preset,self._task_role_swap)
         else:
@@ -99,12 +100,12 @@ class SampledOnTopTaskMixin:
             family = classify_family(new)
             self._sampling_counts[1:5] += torch.stack(
                 [(family == index).sum() for index in range(4)])
-        elif self.num_agents==2 and getattr(self, '_scenario_no_climb', False):
+        elif getattr(self, '_scenario_no_climb', False):
             from utils.edge_scenario_spec import classify_templates, scenario_templates
             templates = scenario_templates(self._relation_graph_spec)
             with_climb = getattr(self, '_scenario_with_climb', False)
             objects=[]
-            for a in (0, 1):
+            for a in range(self.num_agents):
                 owned=(new.edge_owner==a)&new.edge_valid
                 env = torch.arange(len(ids), device=self.device)
                 agent = torch.full_like(env, a)
@@ -116,7 +117,8 @@ class SampledOnTopTaskMixin:
                     (owned&((new.edge_relation==6)|interaction))).amax(-1)
                 objects.append(primary)
             shared_index = 1 + len(templates)
-            self._sampling_counts[shared_index]+=(objects[0]==objects[1]).sum()
+            primary_objects = torch.stack(objects, -1).sort(-1).values
+            self._sampling_counts[shared_index]+=(primary_objects[:, 1:]==primary_objects[:, :-1]).any(-1).sum()
             relations = (6,AT,ON_TOP,SIT,CLIMB) if with_climb else (6,AT,ON_TOP,SIT)
             for offset,rel in enumerate(relations,shared_index+1):
                 self._sampling_counts[offset]+=((new.edge_relation==rel)&new.edge_valid).sum()
@@ -177,6 +179,9 @@ class SampledOnTopTaskMixin:
             self._reset_boxes(pending)
             self._reset_task(pending)
             self._configure_ontop_targets(pending)
+            if getattr(self, '_stage1_platforms', False):
+                from utils.stage1_platforms import reset_stage1_platforms
+                reset_stage1_platforms(self, pending)
             rejected=self._ontop_scene_infeasible(pending)
             if getattr(self, '_stage2', False):
                 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
@@ -270,6 +275,9 @@ class SampledOnTopTaskMixin:
 
     def _configure_ontop_targets(self, ids):
         if getattr(self, '_scenario_no_climb', False):
+            from utils.stage1_sampling import uses_tokenhsi_sampling, reset_ontop_support_xy
+            if uses_tokenhsi_sampling(self.cfg['env']):
+                reset_ontop_support_xy(self)
             if (self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS
                     or 'independent_training' in self._relation_cfg) and not self._is_eval:
                 self._configure_hard_skill_near_starts(ids)
@@ -502,7 +510,8 @@ class SampledOnTopTaskMixin:
                            (local_body[..., 2] < size[:, None, 2] / 2 - .06))
                 penetration = (inner_xy & inner_z).any(-1)
                 invalid = penetration | (feet[..., 2].amin(-1) < -.02)
-                if getattr(self, '_size_aware_rsi', False):
+                if (getattr(self, '_size_aware_rsi', False) and
+                        self.cfg['env']['sizeAwareRsi'].get('geometryFilter') != 'body_points_v1'):
                     invalid = ~torch.isfinite(body).all(-1).all(-1)
                 bad[row] |= invalid
                 self._rsi_attempts[skill_index] += len(slot_env)
@@ -623,13 +632,13 @@ class SampledOnTopTaskMixin:
                      if getattr(self, '_scenario_with_climb', False)
                      else ('holding','sit','holding_at','holding_ontop'))
             for i,name in enumerate(names,1):
-                out['sampling/template_'+name]=c[i]/(2*den)
+                out['sampling/template_'+name]=c[i]/(self.num_agents*den)
             shared_index = 1 + len(names)
             out['sampling/shared_primary_object']=c[shared_index]/den
             relations = ('holding','at','ontop','sit','climb') if \
                 getattr(self, '_scenario_with_climb', False) else ('holding','at','ontop','sit')
             for offset,name in enumerate(relations,shared_index+1):
-                out['sampling/relation_'+name]=c[offset]/(2*den)
+                out['sampling/relation_'+name]=c[offset]/(self.num_agents*den)
             out['sampling/rsi_sit_attempts']=self._rsi_attempts[0].clone()
             out['sampling/rsi_sit_rejection_rate']=self._rsi_rejected[0]/self._rsi_attempts[0].clamp_min(1)
             out['sampling/rsi_sit_start_target_distance']=self._rsi_start_distance[0]/self._rsi_attempts[0].clamp_min(1)

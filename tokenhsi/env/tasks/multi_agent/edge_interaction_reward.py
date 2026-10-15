@@ -1,7 +1,8 @@
 """SIT/CLIMB geometry and current-success rules on the shared edge runtime."""
 import torch
+import math
 
-from utils.edge_context_spec import HOLDING
+from utils.edge_context_spec import HOLDING, AT
 from utils.edge_ontop_spec import batched, graph_packet, select_graph
 from utils.edge_interaction_spec import SIT, CLIMB
 from env.tasks.multi_agent.edge_context_reward import edge_context, edge_context_reward, goal_success
@@ -103,6 +104,10 @@ def interaction_own_success(phi, z_error, feet_error, graph, config, region_erro
     threshold = config['satisfaction_threshold']
     success = (phi >= threshold) & ((relation == HOLDING) |
         (z_error.abs() <= config['success']['at_z_tolerance']))
+    if 'success_distance' in config['at']:
+        at_threshold = math.exp(-config['at']['near_distance_scale'] * config['at']['success_distance'] ** 2)
+        success = torch.where(relation == AT,
+            (phi >= at_threshold) & (z_error.abs() <= config['success']['at_z_tolerance']), success)
     success = torch.where(relation == SIT, phi >= threshold, success)
     if 'climb' in config:
         climb_threshold = config['climb'].get('success_phi_threshold', threshold)

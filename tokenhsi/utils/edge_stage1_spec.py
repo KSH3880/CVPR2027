@@ -3,7 +3,7 @@ import math
 
 import torch
 from utils.size_rsi import SIZE_RSI_VARIANT, PROGRESS
-from utils.task_role_spec import TASK_ROLE_VARIANTS, TASK_FIELDS
+from utils.task_role_spec import TASK_ROLE_VARIANTS, TASK_FIELDS, STAGE1_V2_VARIANT
 
 from utils.edge_context_spec import EdgeContextGraph, HOLDING, AT
 from utils.edge_ontop_spec import (ON_TOP, batched, permute_graph, select_graph,
@@ -170,7 +170,7 @@ def ground_standalone_interaction_targets(graph, env_ids, assignments,
 
 def max_stage1_stack_height(box_sizes):
     """Upper bound for the Stage-1 O_i -> O_X two-box stack in each environment."""
-    return box_sizes[..., 2].topk(2, dim=-1).values.sum(-1)
+    return box_sizes[..., 2].topk(min(2, box_sizes.shape[-2]), dim=-1).values.sum(-1)
 
 
 DEFAULT_GRAPH = dict(
@@ -253,7 +253,10 @@ def validate_stage1_context_config(config):
         raise ValueError('Stage-1 observation packet does not match its schema')
     if config['holding'] != {'hand_distance_scale': 10.}:
         raise ValueError('Unsupported Stage-1 HOLDING geometry')
-    if config['at'] != {'state_definition': 'box_near', 'near_distance_scale': 10.}:
+    expected_at = {'state_definition': 'box_near', 'near_distance_scale': 10.}
+    if variant == STAGE1_V2_VARIANT:
+        expected_at['success_distance'] = .2
+    if config['at'] != expected_at:
         raise ValueError('Unsupported Stage-1 AT geometry')
     expected_ontop = {'state_definition': 'centered_stack_world_z',
             'near_distance_scale': 10., 'z_tolerance': .001,
@@ -298,7 +301,7 @@ def validate_stage1_context_config(config):
         if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
                 or not math.isfinite(tolerance) or tolerance <= 0):
             raise ValueError('Stage-1 CLIMB feet tolerance must be finite and positive')
-        if plane and (climb['success_inner_margin_fraction'] != .05 or
+        if plane and (climb['success_inner_margin_fraction'] != (.1 if variant == STAGE1_V2_VARIANT else .05) or
                       climb['root_height_tolerance'] != .2 or tolerance != .07):
             raise ValueError('Plane CLIMB success requires 5% inset, root=0.2m and feet=0.07m')
         if schema in (7, 9) and not plane and (climb['success_phi_threshold'] != .6 or tolerance != .07):

@@ -77,7 +77,7 @@ def test_batched_canonical_graph_matches_all_task_pairs():
 
 
 @pytest.mark.parametrize('preset', ['random_scenario', 'holding', 'sit', 'climb',
-                                    'holding_at', 'holding_ontop'])
+                                    'holding_at', 'holding_ontop', 'sit_climb'])
 @pytest.mark.parametrize('shuffle', [False, True])
 def test_cached_probabilities_and_partial_reset_match_original_sampler(preset, shuffle):
     sizes = sample_sizes(128, 'cpu', preset)
@@ -92,6 +92,29 @@ def test_cached_probabilities_and_partial_reset_match_original_sampler(preset, s
     for name, value in vars(expected).items():
         if torch.is_tensor(value):
             assert torch.equal(getattr(actual, name), value), name
+
+
+def test_sit_climb_preset_keeps_owner_tasks_and_eligible_sizes():
+    from utils.edge_scenario_spec import sample_graph
+    from utils.task_role_spec import task_graph_packet
+
+    sizes = sample_sizes(128, 'cpu', 'sit_climb')
+    for owner, task in enumerate(('SIT', 'CLIMB')):
+        bounds = torch.tensor(SIZE_RANGES[task])
+        assert ((sizes[:, owner] >= bounds[:, 0] - 1e-6) &
+                (sizes[:, owner] <= bounds[:, 1] + 1e-6)).all()
+    spec = yaml.safe_load((ROOT / 'data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_embedding_action.yaml').read_text())['env']['relationGraph']
+    graphs = [sample_graph(128, spec, preset='sit_climb'),
+              sample_size_graph(sizes, spec, 'sit_climb'),
+              sample_size_conditioned_graph(task_probabilities(sizes[:, :2]),
+                                            spec, 'sit_climb')]
+    for graph in graphs:
+        validate_graph(graph)
+        packet = task_graph_packet(graph, 128).reshape(128, 2, 5)
+        assert (packet[..., 0] == 1).all()
+        assert torch.equal(packet[..., 1], torch.tensor([0., 1.]).expand(128, -1))
+        assert torch.equal(packet[..., 2], torch.tensor([0., 1.]).expand(128, -1))
+        assert torch.equal(packet[..., 4], torch.tensor([2., 3.]).expand(128, -1))
 
 
 @pytest.mark.parametrize('preset', ['holding', 'sit', 'climb', 'holding_at', 'holding_ontop'])

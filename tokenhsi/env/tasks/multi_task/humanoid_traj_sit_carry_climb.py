@@ -1396,6 +1396,14 @@ class HumanoidTrajSitCarryClimb(Humanoid):
         self._traj_gen.reset(env_ids, root_pos)
         return
     
+    def _sample_task_object_xy(self, ids, max_distance):
+        """Native radius-uniform loco placement; shared with evaluation subclasses."""
+        root_pos_xy = torch.randn(len(ids), 2, device=self.device)
+        root_pos_xy /= torch.linalg.norm(root_pos_xy, dim=-1, keepdim=True)
+        root_pos_xy *= torch.rand(len(ids), 1, device=self.device) * (max_distance - 1.0) + 1.0
+        root_pos_xy += self._humanoid_root_states[ids, :2]
+        return root_pos_xy
+
     def _reset_task_sit(self, env_ids):
 
         not_task_env_ids = env_ids[self._task_indicator[env_ids] != HumanoidTrajSitCarryClimb.TaskUID["sit"].value]
@@ -1429,10 +1437,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
             if len(random_env_ids) > 0:
                 ids = torch.cat(random_env_ids, dim=0)
 
-                root_pos_xy = torch.randn(len(ids), 2, device=self.device)
-                root_pos_xy /= torch.linalg.norm(root_pos_xy, dim=-1, keepdim=True)
-                root_pos_xy *= torch.rand(len(ids), 1, device=self.device) * 4.0 + 1.0 # randomize
-                root_pos_xy += self._humanoid_root_states[ids, :2] # get absolute pos, humanoid_root_state will be updated after set_env_state
+                root_pos_xy = self._sample_task_object_xy(ids, 5.0)
 
                 root_pos_z = torch.zeros((len(ids)), device=self.device, dtype=torch.float32)
                 root_pos_z[:] = self._sit_obj_lib._every_env_object_on_ground_trans[ids] # place the object on the ground
@@ -1512,10 +1517,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
             if len(random_env_ids) > 0:
                 ids = torch.cat(random_env_ids, dim=0)
 
-                root_pos_xy = torch.randn(len(ids), 2, device=self.device)
-                root_pos_xy /= torch.linalg.norm(root_pos_xy, dim=-1, keepdim=True)
-                root_pos_xy *= torch.rand(len(ids), 1, device=self.device) * 9.0 + 1.0 # randomize
-                root_pos_xy += self._humanoid_root_states[ids, :2] # get absolute pos, humanoid_root_state will be updated after set_env_state
+                root_pos_xy = self._sample_task_object_xy(ids, 10.0)
 
                 root_pos_z = self._box_lib._box_size[ids, 2] / 2 # place the box on the ground
                 if self._carry_reset_random_height:
@@ -1652,10 +1654,7 @@ class HumanoidTrajSitCarryClimb(Humanoid):
             if len(random_env_ids) > 0:
                 ids = torch.cat(random_env_ids, dim=0)
 
-                root_pos_xy = torch.randn(len(ids), 2, device=self.device)
-                root_pos_xy /= torch.linalg.norm(root_pos_xy, dim=-1, keepdim=True)
-                root_pos_xy *= torch.rand(len(ids), 1, device=self.device) * 9.0 + 1.0 # randomize
-                root_pos_xy += self._humanoid_root_states[ids, :2] # get absolute pos, humanoid_root_state will be updated after set_env_state
+                root_pos_xy = self._sample_task_object_xy(ids, 10.0)
 
                 root_pos_z = torch.zeros((len(ids)), device=self.device, dtype=torch.float32)
                 root_pos_z[:] = self._climb_obj_lib._every_env_object_on_ground_trans[ids] # place the object on the ground
