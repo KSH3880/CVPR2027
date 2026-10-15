@@ -1,3 +1,106 @@
+## Joint Push 상세 설정 문서 (2026-10-15)
+
+[JOINT_PUSH_SETTINGS.md](JOINT_PUSH_SETTINGS.md):현재60kg·360°시작·직선·softgate환경/초기화/모델/보상/AMP/PPO/실행법을정리한결과없는설정문서.
+
+## 12000iter60kg/40kg대응평가 (2026-10-15)
+
+동일60kg학습정책/seed3×64=192episode/600step.60kg엄격ever성공0%,40kg49.48%(95/192);종료시유지0%/23.96%(46/192).평균잔여거리2.583/0.645m,상자순변위1.076/3.086m.초기상태정확일치·공유상자질량만개입·미사용상자60kg유지·공식metrics대조통과. [기록](../../runs/jointpush/mass_comparison_20261015_final/RESULTS.md).별도40kg학습모델과의비교가아니다.
+
+## 질량 진단 적용 시점 보완 (2026-10-15)
+
+40kg진단은GPU sim 준비 전 asset밀도로적용한다. 실행중rigid-body setter방식에서root/reset이상발견으로이전진단결과는신뢰하지않는다. strictcheckpoint계약검사는유지하며복원후실제생성질량만검증한다. 기존mass40_view명령은그대로사용가능하다. 질량에맞는관성은같은boxgeometry에서자동계산된다.
+
+## softgate 모델40kg질량진단 (2026-10-14)
+
+`PORT=6086 bash stage2_jointpush/scripts/joint_push_softgate_mass40_view.sh /absolute/path/checkpoint.pth`. GPU6. 학습은원래60kg그대로유지하고뷰어만공유상자slot2의질량40kg/관성2/3배로개입한다. 모든checkpoint메타데이터/물리계약을먼저정상검증한뒤player에서적용한다. 설정·관측·목표·보상·마찰은변경없음. 이영상은60kg평가결과로보고하지않는다. Base/학습/3agentpreview에는적용불가.
+
+기본산출물 `runs/jointpush/softgate_mass40_view/`; `mass_preview.json`에원래checkpoint질량과실측질량저장. 명시적평가옵션 `JOINT_PUSH_VIEW_MASS=40`으로headless test에서도같은진단가능. 4500iter모델GPU6 4환경60step검증rc=0,실측40kg확인: `runs/jointpush/mass40_check_20261014/`.
+
+## 3명·60kg 추론 전용 뷰어 (2026-10-14)
+
+기존 2명·40kg `JointPushLocoRsiCa4_00009000.pth`를 그대로 불러와 3명·60kg 환경에서 추론한다. 상자 크기는 2.6×2.6×2.6m, friction/목표/RSI/접촉면 설정은 모델 저장값을 유지한다. 세 사람은 하나의 상자(slot2)와 목표(goal0)를 공유하고 시작 위치는 같은 면의 좌/중/우다. 3명에 맞춘 접촉 진단은 전체 손중점 대칭·인접 간격·양측 배치를 검사하며, 성공률 비교나 학습용 프로필이 아니다. 새 학습은 실행하지 않는다.
+
+```bash
+# GPU6 고정, 기본 원본9000iter 모델, noVNC6090
+bash stage2_jointpush/scripts/joint_push_three_agent_view.sh
+# 화면 없는 짧은 추론 / 로컬 화면
+NUM_ENVS=1 REPEATS=1 EPISODE_LENGTH=30 bash stage2_jointpush/scripts/joint_push_three_agent_test.sh
+HEADLESS=0 bash stage2_jointpush/scripts/joint_push_three_agent_test.sh
+```
+
+전용 명령은 GPU6만 사용한다. 산출물 `runs/jointpush/three_agent_60kg_preview/`; `three_agent_preview_runtime.json`에 실제 인원·질량·크기를 기록한다. 원본 모델/학습 설정은 보존하고 test 모드에서만 명시적인 환경 전환을 허용한다. 3명 학습용 train 명령은 의도적으로 제공하지 않는다.
+
+## 촬영뷰어 숨김·카메라 보완 검증 (2026-10-14)
+
+visual이없을때collision이대신렌더링되는경로를피하도록미사용asset에크기1e-6m의visual을명시한다. 기본_init_camera도카메라를재배치하지않도록override했다. 9000모델실제screen.png에서회색물체숨김과옆시점확인,reset전후카메라position/quaternion정확일치검증. `runs/jointpush/clean_scene_visual_check_20261014/`. 기존뷰어를종료하고재실행해야반영된다.
+
+## 옆쪽 카메라·reset시점보존 (2026-10-14)
+
+공동Push뷰어는처음에만미는방향의옆쪽에서시작한다. 높이3m/거리최소6m,agent·상자·목표중심을바라본다. agentfocus해제상태이며에피소드reset때카메라를재배치하지않아사용자가조절한위치가유지된다. 다음뷰어실행부터적용. 이전뒤쪽/reset재배치안내보다이설정이우선한다.
+
+## 공동 Push 촬영용 배경 물체 숨김 (2026-10-14)
+
+뷰어에서 미사용door슬롯0/1과box슬롯3의visual을제거한asset을사용한다. 슬롯2실제공유상자는표시한다. 관측슬롯/미사용물체의상태·collision및door관절구조는유지하며외부asset원본은수정하지않는다. headless학습asset은기존그대로다. 뷰어재실행후녹화해야적용된다.
+
+## 공동 Push 뷰어 카메라 (2026-10-14)
+
+reset마다 두agent중앙 뒤쪽에서 초기box진행방향을향해카메라를배치한다. 높이4m/뒤쪽거리최소6m,agent·상자·목표를포함하는중심을본다. 이후agentfocus는해제된자유카메라이며카메라는자동추적하지않는다. F키로수동추적전환가능. 다음뷰어실행부터적용.
+
+## 뷰어 노란 목표 표시 제거 (2026-10-14)
+
+사용자 요청으로 노란 목표 footprint/십자 overlay를 제거했다. 초기/현재 방향 화살표는 유지한다. 기존 작은 goal marker 및 실제 목표/관측/보상은 그대로다. 다음 뷰어 실행부터 적용된다.
+
+## AT 연속 gate 비교 (2026-10-14)
+
+별도 `joint_push_aligned_surround60_softgate_ca4.yaml`. 60kg/agent위치·heading360°/직선/동일면고정/목표거리2.2–5m는surround60과동일하다. `reward.at_gate_mode: soft_min`일때 AT state/progress에 `min(phi_push_agent0,phi_push_agent1) × opposite_side`를곱한다. phi_push에는손중점면거리·높이·면범위·팀대칭·간격연속점수가이미포함된다. 양쪽점수가0.9를살짝밑돌아도밀기보상을연속적으로유지한다. 두사람같은쪽이면0. 최종result/done는기존0.9양쪽손점수·반대편·간격·목표조건그대로이며PUSH보상도변경없다. 실제이동량보상은아직추가하지않는다. 기존설정은옵션없을때hard방식그대로다.
+
+```bash
+bash stage2_jointpush/scripts/joint_push_softgate_train.sh
+bash stage2_jointpush/scripts/joint_push_softgate_test.sh /absolute/path/checkpoint.pth
+HEADLESS=0 bash stage2_jointpush/scripts/joint_push_softgate_test.sh /absolute/path/checkpoint.pth
+PORT=6089 bash stage2_jointpush/scripts/joint_push_softgate_view.sh /absolute/path/checkpoint.pth
+```
+
+Stage1초기값에서새Stage2로시작,동일softgate프로필끼리resume. 산출물 `runs/jointpush/aligned_surround60_softgate_training/`. GPU6/2048환경. 사용자요청으로기존rear-only60kg학습을종료하고tmux `jointpush_softgate`에서새Stage2학습을실행했다. run: `runs/jointpush/aligned_surround60_softgate_training/JointPushAlignedSurround60SoftGateCa4_14-11-37-12/`. 효과비교는같은surround60 hard-gate 설정과같은초기분포에서한다. 현재rear-only7000모델과는시작분포/목표거리도달라softgate만의효과로직접비교하지않는다.
+
+## 60kg·상자 주변360° 시작 (2026-10-14)
+
+`joint_push_aligned_surround60_ca4.yaml`: 앞면·옆면·뒷면 모두 허용하는 surround_independent 위치와 독립360° heading. 각 root는 box XY 외접원 반경(2.6m cube에서약1.84m)에1–2m를 더한 반경으로 배치하고 방위각을 균등 샘플링한다. 따라서 상자와의 최소 XY 간격은1m 이상이나 모든 면까지의 거리가 정확히1–2m인 것은 아니다. 두 root XY 최소간격0.8m. 상자는60kg/2.6m cube/목표local+Y정렬/reset고정면 유지. 목표까지 미는 거리는 reset마다2.2–5m균등랜덤.
+
+```bash
+bash stage2_jointpush/scripts/joint_push_surround_train.sh
+bash stage2_jointpush/scripts/joint_push_surround_test.sh /absolute/path/checkpoint.pth
+HEADLESS=0 bash stage2_jointpush/scripts/joint_push_surround_test.sh /absolute/path/checkpoint.pth
+PORT=6088 bash stage2_jointpush/scripts/joint_push_surround_view.sh /absolute/path/checkpoint.pth
+```
+
+새 학습 산출물 `runs/jointpush/aligned_surround60_training/`. Stage1 전이에서 새 Stage2로 시작하고 동일surround60프로필끼리만resume한다. 현재 실행 중인 rear-only60kg학습을 자동 변경하지 않으며 새 본학습은 실행하지 않았다. 전용뷰어는 과거rear-only모델을 거부해 학습분포가360°였다고 오인하지 않게 한다. 다음curve설계에도360°위치·heading을 반영했다.
+
+## 다음 직선 Push 실험 설계 (2026-10-14)
+
+[확정 설계](joint_push_curve_plan.md): 곡선 제외,60kg·직선·agent위치/방향360°랜덤·동일면고정. 미는거리reset마다2.2–5m균등랜덤. 실행프로필surround60 준비 완료, 새본학습실행없음.
+
+## 공동 Push 뷰어 표시 (2026-10-14)
+
+공유 목표의 바닥 footprint(실제 box XY 크기)를 노란 윤곽/십자로 표시한다. 회색 화살표는 reset 시 agent 위치/heading으로 고정하고, 청록/분홍 화살표는 현재 heading을 따라간다. 랜덤 시작과 정책이 이후 상자 쪽으로 돌아서는 것을 구분할 수 있다. 표시만 추가하며 관측·초기화·보상·물리 계약은 바꾸지 않는다. 랜덤 시작 test/view wrapper는60kg/rear_independent checkpoint를 확인해 다른 모델을 거부한다. 기존뷰어를 재실행해야 새 표시가 적용된다.
+
+6500iter60kg모델·GPU6·4환경60step 실제VNC 검증 rc=0. reset heading [-118.65°,128.47°] 확인. 랜덤 위치/heading·부분reset·고정면·60kg runtime 감사 통과. CPU 표시/배치2개 통과. 결과 `runs/jointpush/view_fix_check_20261014/`.
+
+## 60kg·정렬 상자·독립 랜덤 agent 시작 (2026-10-13)
+
+별도 `joint_push_aligned_random_spawn60_ca4.yaml` 프로필이다. 상자2.6m cube/60kg, 초기 목표 box local+Y 정렬, 접촉면 reset_fixed를 유지한다. loco-only RSI에서 두 agent의 초기 뒷면 거리1–2m·lateral[-1.8,1.8]m·상자 전진방향 대비 heading[-π,π]를 독립 샘플링한다. 좌우 역할을 미리 지정하지 않으며 같은 쪽에서 시작할 수도 있다. 두 root의 XY 간격0.8m 미만 후보는 다시 샘플링한다. 상자 주변360도 위치 샘플링은 아니다.
+
+```bash
+# 신규 학습: GPU6/2048환경, Stage1 전이에서 시작
+bash stage2_jointpush/scripts/joint_push_random_spawn_train.sh
+# 이 프로필에서 저장한 checkpoint 평가 / 로컬 viewer / 서버 VNC
+bash stage2_jointpush/scripts/joint_push_random_spawn_test.sh /absolute/path/checkpoint.pth
+HEADLESS=0 bash stage2_jointpush/scripts/joint_push_random_spawn_test.sh /absolute/path/checkpoint.pth
+PORT=6087 bash stage2_jointpush/scripts/joint_push_random_spawn_view.sh /absolute/path/checkpoint.pth
+```
+
+학습 산출물은 `runs/jointpush/aligned_random_spawn60_training/`. 기존40kg run은 변경·중단하지 않는다. 사용자 요청으로 tmux `jointpush60`에서 GPU6/2048환경 신규 Stage2 학습을 시작했다. 기존 Stage2 checkpoint/optimizer/counter를 이어받지 않으며 Stage1 초기값 전이는 유지한다. 같은 프로필끼리만 RESUME_CHECKPOINT로 재개한다. 기존40kg 모델을 이60kg환경으로 전환하는 resume는 지원하지 않는다. test/view는 checkpoint 저장 설정을 복원하므로 과거 모델을 넣으면 과거 환경으로 실행된다.
+
 ## 공동 Push 접촉면 고정 (2026-10-13)
 
 새 loco/koo RSI 및 정면 정렬 Stage2 설정은 `jointPush.face_mode: reset_fixed`를 사용한다. reset에서 목표 방향에 가장 가까운 뒷면을 한 번 선택해 상자 로컬 법선을 저장한다. 두 agent는 같은 면을 공유하고, 이후 목표 방향이 경계를 넘어도 재선택하지 않는다. 상자의 이동·yaw 회전에 따라 접촉면 중심과 법선은 갱신된다. 부분 reset은 해당 환경의 면만 갱신한다. 손의 lateral 대칭·간격·높이 보상은 유지한다.

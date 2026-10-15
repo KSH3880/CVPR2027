@@ -116,3 +116,26 @@ def test_fixed_face_survives_goal_crossing_and_box_rotation():
         result=joint_push_reward(roots,hands,boxes,torch.tensor([goal]),size,face_geometry=fixed)
         assert result['coupled_contact'].all()
         torch.testing.assert_close(result['phi_raw'][...,0],torch.ones(1,2))
+
+
+def test_soft_min_dense_reward_retains_strict_result_and_uses_weaker_agent():
+    roots,hands,boxes,goals=scene()
+    config=dict(DEFAULT_CONFIG,at_gate_mode='soft_min')
+    hands[:,1,:,1]-=.12
+    hard=joint_push_reward(roots,hands,boxes,goals,[2.6]*3)
+    soft=joint_push_reward(roots,hands,boxes,goals,[2.6]*3,config)
+    assert not hard['coupled_contact'].any()
+    assert (hard['state_component'][...,1]==0).all()
+    assert (soft['state_component'][...,1]>0).all()
+    torch.testing.assert_close(soft['dense_at_gate'],soft['phi_raw'][...,0].amin(-1))
+    torch.testing.assert_close(soft['success_component'],hard['success_component'])
+    torch.testing.assert_close(soft['state_component'][...,0],hard['state_component'][...,0])
+    torch.testing.assert_close(soft['progress_component'][...,0],hard['progress_component'][...,0])
+    goals=boxes[:,:3].clone()
+    assert not joint_push_reward(roots,hands,boxes,goals,[2.6]*3,config)['done'].any()
+    # A weaker contact reduces reward continuously; same-side contacts give no AT credit.
+    previous=soft['dense_at_gate'].clone()
+    hands[:,1,:,1]-=.02
+    assert (joint_push_reward(roots,hands,boxes,goals,[2.6]*3,config)['dense_at_gate']<previous).all()
+    hands[:,:,:,0]=torch.tensor([.4,.8])[None,:,None]
+    assert not joint_push_reward(roots,hands,boxes,goals,[2.6]*3,config)['dense_at_gate'].any()

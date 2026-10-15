@@ -28,13 +28,21 @@ def scene_layout(env):
 
 
 def compile_graph(spec, m, o, device=None):
-    if (m,o)!=(2,4) or set(spec) not in ({'sampler','semantic_only','task_probabilities'}, {'sampler','semantic_only','task_probabilities','shuffle_token_order'}) or spec['sampler']!=SAMPLER or spec['semantic_only'] is not True:
+    if (m,o) not in ((2,4),(3,4)) or set(spec) not in ({'sampler','semantic_only','task_probabilities'}, {'sampler','semantic_only','task_probabilities','shuffle_token_order'}) or spec['sampler']!=SAMPLER or spec['semantic_only'] is not True:
         raise ValueError('Joint OPEN/PUSH requires 2 humans, 2 doors, 2 boxes')
     if type(spec.get('shuffle_token_order',False)) is not bool:
         raise ValueError('shuffle_token_order must be boolean')
     p=spec['task_probabilities']
     if set(p)!={'OPEN','PUSH'} or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in p.values()) or not math.isclose(sum(p.values()),1.):
         raise ValueError('Invalid OPEN/PUSH probabilities')
+    if m==3:
+        src=torch.tensor([0,5,1,5,2,5],device=device)
+        dst=torch.tensor([5,7,5,7,5,7],device=device)
+        rel=torch.tensor([PUSH,AT]*m,device=device)
+        owner=torch.arange(m,device=device).repeat_interleave(2)
+        valid=torch.ones(2*m,dtype=torch.bool,device=device)
+        return EdgeContextGraph(tuple(f'edge{i}' for i in range(2*m)),m,o,src,dst,rel,owner,valid,valid.clone(),
+            torch.zeros(2*m,2*m,dtype=torch.bool,device=device),torch.full_like(src,-1))
     src=torch.tensor([0,4,1,5],device=device)
     dst=torch.tensor([2,6,3,7],device=device)
     rel=torch.tensor([OPEN,AT,OPEN,AT],device=device)
@@ -45,6 +53,8 @@ def compile_graph(spec, m, o, device=None):
 
 
 def graph_for_tasks(spec, tasks):
+    if tasks.shape[1]==3:
+        return expand_graph(compile_graph(spec,3,4,tasks.device),len(tasks))
     g=expand_graph(compile_graph(spec,2,4,tasks.device),len(tasks))
     for a in range(2):
         e=2*a;push=tasks[:,a]==1
@@ -96,6 +106,8 @@ def validate_env(env):
     if type(env.get('openPushRandomizeLanes', False)) is not bool:
         raise ValueError('openPushRandomizeLanes must be boolean')
     scene_layout(env)
+    if env['numAgents']!=2 and not env.get('jointPushThreeAgentPreview',False):
+        raise ValueError('Variable team size is only supported by JointPush preview')
     compile_graph(env['relationGraph'],env['numAgents'],env['numObjects'])
     validate_reward(env['relationReward'])
     if env['policyObsMode']!='clean_scene' or env['ampTaskConditioning'] is not True or env['ampEnabled'] is not True:

@@ -15,9 +15,12 @@ DEFAULT_CONFIG = dict(state_reward_weight=.2, progress_reward_weight=.2,
 
 
 def validate_config(config):
-    if set(config) != set(DEFAULT_CONFIG):
+    if set(config)-{'at_gate_mode'} != set(DEFAULT_CONFIG):
         raise ValueError('Unexpected joint PUSH reward fields')
+    if config.get('at_gate_mode','hard') not in ('hard','soft_min'):
+        raise ValueError('Unsupported AT gate mode')
     for name, value in config.items():
+        if name=='at_gate_mode':continue
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             raise ValueError('Reward fields must be finite numbers')
         if value < 0:
@@ -80,7 +83,8 @@ def joint_push_reward(roots, hands, boxes, goals, sizes, config=None, face_geome
     config = dict(DEFAULT_CONFIG) if config is None else config
     center,normal,tangent,half_width,sizes = push_face_geometry(boxes,goals,sizes,config) if face_geometry is None else face_geometry
     n=boxes.shape[0]
-    if roots.shape != (n,2,13) or hands.shape != (n,2,2,3):
+    agents=roots.shape[1]
+    if agents not in (2,3) or roots.shape != (n,agents,13) or hands.shape != (n,agents,2,3):
         raise ValueError('Expected exactly two roots [N,2,13] and hands [N,2,2,3]')
     if not torch.isfinite(roots).all() or not torch.isfinite(hands).all():
         raise ValueError('Human states must be finite')
@@ -93,12 +97,13 @@ def joint_push_reward(roots, hands, boxes, goals, sizes, config=None, face_geome
     surface_phi=torch.exp(-config['hand_distance_scale']*surface_error_sq)
     symmetry_error=(midpoints.mean(1)-center).norm(dim=-1)
     symmetry_phi=torch.exp(-config['symmetry_distance_scale']*symmetry_error.square())
-    separation=(lateral[:,0]-lateral[:,1]).abs()
+    ordered=lateral.sort(-1).values
+    separation=(ordered[:,1:]-ordered[:,:-1]).amin(-1)
     minimum_separation=2*half_width*config['min_separation_fraction']
     separation_phi=(separation/minimum_separation).clamp(0,1)
     coordination_phi=symmetry_phi*separation_phi
     phi_push=surface_phi*coordination_phi[:,None]
-    opposite=lateral[:,0]*lateral[:,1]<0
+    opposite=(lateral.amin(-1)<0)&(lateral.amax(-1)>0)
     push_success=phi_push>=config['satisfaction_threshold']
     gate=push_success.all(-1)&opposite&(separation>=minimum_separation)
     delta=boxes[:,:3]-goals
@@ -110,18 +115,21 @@ def joint_push_reward(roots, hands, boxes, goals, sizes, config=None, face_geome
     push_progress=1/(1+(push_distance-radius[:,None]-config['push_bbox_buffer']).clamp_min(0)/config['progress_sigma'])
     at_distance=delta[:,:2].norm(dim=-1)
     at_progress=1/(1+(at_distance-config['at_bbox_buffer']).clamp_min(0)/config['progress_sigma'])
-    phi=torch.stack((phi_push,phi_at[:,None].expand(-1,2)),-1)
-    progress=torch.stack((push_progress,at_progress[:,None].expand(-1,2)),-1)
-    active=torch.stack((torch.ones_like(push_success),gate[:,None].expand(-1,2)),-1)
-    success=torch.stack((push_success,at_success[:,None].expand(-1,2)),-1)
-    state=phi*active*config['state_reward_weight']
-    prog=progress*active*config['progress_reward_weight']
+    phi=torch.stack((phi_push,phi_at[:,None].expand(-1,agents)),-1)
+    progress=torch.stack((push_progress,at_progress[:,None].expand(-1,agents)),-1)
+    active=torch.stack((torch.ones_like(push_success),gate[:,None].expand(-1,agents)),-1)
+    success=torch.stack((push_success,at_success[:,None].expand(-1,agents)),-1)
+    # Only dense AT rewards change; result/done retain the strict joint gate.
+    at_gate=phi_push.amin(-1)*opposite.to(phi.dtype) if config.get('at_gate_mode','hard')=='soft_min' else gate.to(phi.dtype)
+    dense_active=torch.stack((torch.ones_like(at_gate),at_gate),-1)[:,None].expand(-1,agents,-1)
+    state=phi*dense_active*config['state_reward_weight']
+    prog=progress*dense_active*config['progress_reward_weight']
     bonus=success.to(phi.dtype)*config['success_reward_weight']
     total=state+prog+bonus
     return dict(face_center=center,push_normal=normal,hand_midpoints=midpoints,
         lateral_offsets=lateral,surface_phi=surface_phi,symmetry_phi=symmetry_phi,
         separation=separation,minimum_separation=minimum_separation,coordination_phi=coordination_phi,
-        coupled_contact=gate,phi_raw=phi,progress_raw=progress,active_edges=active,own_success=success,
+        dense_at_gate=at_gate,coupled_contact=gate,phi_raw=phi,progress_raw=progress,active_edges=active,own_success=success,
         state_component=state,progress_component=prog,success_component=bonus,total=total,
         local_task_reward=total.sum(-1),agent_task_reward=total.sum(-1),
-        teammate_task_reward=torch.zeros_like(phi_push),done=at_success[:,None].expand(-1,2))
+        teammate_task_reward=torch.zeros_like(phi_push),done=at_success[:,None].expand(-1,agents))

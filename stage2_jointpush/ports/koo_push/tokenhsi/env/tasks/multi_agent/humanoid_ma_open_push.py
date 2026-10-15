@@ -32,7 +32,7 @@ class HumanoidMAOpenPush(HumanoidMACarry):
         # Gym simulation tensors are env-local on this runtime, as in Door.
         self._env_origins.zero_()
         self._amp_expert_skills=list(cfg['env']['skill'])
-        self._closing_forces=torch.zeros(self.num_envs,2*self.num_dof+2,device=self.device)
+        self._closing_forces=torch.zeros(self.num_envs,self.num_agents*self.num_dof+2,device=self.device)
         self._support_hits=torch.zeros(self.num_envs,2,dtype=torch.bool,device=self.device)
         self._push_hits=torch.zeros_like(self._support_hits)
         self._diag={};self._diag_steps=0
@@ -78,7 +78,7 @@ class HumanoidMAOpenPush(HumanoidMACarry):
         HumanoidMA._build_agent_spawn_offsets(self,device_type,device_id)
         layout=self._scene_layout
         self._agent_spawn_offsets[:]=self._agent_spawn_offsets.new_tensor([
-            [layout['door_x']+.78,(a-.5)*layout['lane_spacing']-2.,0.] for a in range(2)])
+            [layout['door_x']+.78,(a-.5)*layout['lane_spacing']-2.,0.] for a in range(self.num_agents)])
 
     def _load_box_asset(self):
         size=self.cfg['env']['pushBox']['size']
@@ -119,8 +119,8 @@ class HumanoidMAOpenPush(HumanoidMACarry):
 
     def _build_box_tensors(self):
         super()._build_box_tensors()
-        self._door_dof_state=self._dof_state.view(self.num_envs,-1,2)[:,2*self.num_dof:]
-        start=2*self.num_bodies;end=start+2*self._door_body_count
+        self._door_dof_state=self._dof_state.view(self.num_envs,-1,2)[:,self.num_agents*self.num_dof:]
+        start=self.num_agents*self.num_bodies;end=start+2*self._door_body_count
         bodies=self._rigid_body_state.view(self.num_envs,-1,13)
         self._door_bodies=bodies[:,start:end].view(self.num_envs,2,self._door_body_count,13)
         self._door_panel_states=self._door_bodies[:,:,self._door_leaf_index]
@@ -158,26 +158,26 @@ class HumanoidMAOpenPush(HumanoidMACarry):
     def _clean_object_features(self,object_local,env_ids):
         ids=slice(None) if env_ids is None else env_ids
         extra=object_local.new_zeros(*object_local.shape[:-1],10)
-        extra[:,:2,:2]=self._owner_values(self._door_dof_state,env_ids)
-        panel=self._owner_values(self._door_panel_states,env_ids);inv=panel[...,3:7].clone();inv[...,:3]*=-1
-        extra[:,:2,2:5]=rotate(inv,self._owner_values(self.door_handle_position,env_ids)-panel[...,:3])
+        extra[:,:2,:2]=self._owner_values(self._door_dof_state,env_ids)[:,:2]
+        panel=self._owner_values(self._door_panel_states,env_ids)[:,:2];inv=panel[...,3:7].clone();inv[...,:3]*=-1
+        extra[:,:2,2:5]=rotate(inv,self._owner_values(self.door_handle_position,env_ids)[:,:2]-panel[...,:3])
         runtime=getattr(self,'relation_runtime',None)
         if runtime is not None:
-            extra[:,:2,5]=runtime.elapsed[ids]/self._hold_spec['duration']
-            extra[:,:2,6]=runtime.contact[ids].float()
-            extra[:,:2,7]=runtime.contact_age[ids]/(self._hold_spec['contact_grace']+self.dt)
-            extra[:,2:,9]=runtime.push_eligible[ids].float()
+            extra[:,:2,5]=runtime.elapsed[ids,:2]/self._hold_spec['duration']
+            extra[:,:2,6]=runtime.contact[ids,:2].float()
+            extra[:,:2,7]=runtime.contact_age[ids,:2]/(self._hold_spec['contact_grace']+self.dt)
+            extra[:,2:,9]=runtime.push_eligible[ids,:2].float()
         extra[:,:2,8]=1. # distinguishes fixed door articulation from movable boxes
         return torch.cat((object_local,extra),-1)
 
     def _init_relation_runtime(self):
-        self._agent_lanes=torch.arange(2,device=self.device).expand(self.num_envs,2).clone()
+        self._agent_lanes=(torch.arange(self.num_agents,device=self.device)%2).expand(self.num_envs,self.num_agents).clone()
         self._push_binding=self._agent_lanes.clone()
         self._push_reset_states=self._box_states[:,2:].clone()
         self._push_directions=torch.zeros(self.num_envs,2,3,device=self.device);self._push_directions[...,1]=1
         self._push_goal_offsets=self._push_directions*self._relation_cfg['push']['target_distance']
         self.relation_runtime=OpenPushRuntime(self.num_envs,self._relation_graph_spec,
-            self._relation_cfg,self._hold_spec,self.dt,self.device,self.cfg['env']['pushBox']['size'])
+            self._relation_cfg,self._hold_spec,self.dt,self.device,self.cfg['env']['pushBox']['size'],num_agents=self.num_agents)
 
     def _sample_tasks(self,env_ids):
         preset=self._task_graph_preset
@@ -411,7 +411,7 @@ class HumanoidMAOpenPush(HumanoidMACarry):
         super().pre_physics_step(actions)
         self._posture_foot_forces.zero_()
         self._support_hits.zero_();self._push_hits.zero_();self._closing_forces.zero_()
-        if not self._pd_control:self._closing_forces[:,:2*self.num_dof]=(self.actions*self.motor_efforts.unsqueeze(0)*self.power_scale).reshape(self.num_envs,-1)
+        if not self._pd_control:self._closing_forces[:,:self.num_agents*self.num_dof]=(self.actions*self.motor_efforts.unsqueeze(0)*self.power_scale).reshape(self.num_envs,-1)
         self._closing_forces[:,-2:]=closing_torque(self.door_hinge_angle,self.door_hinge_velocity,self._door_cfg['autoClose'])
         self.gym.set_dof_actuation_force_tensor(self.sim,gymtorch.unwrap_tensor(self._closing_forces))
 

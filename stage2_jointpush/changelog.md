@@ -2,7 +2,100 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-15
+
+### 결과를 제외한 Joint Push 상세 설정 문서
+
+- markdowns/JOINT_PUSH_SETTINGS.md 추가. 저장된relation_config와실행코드기준으로60kg물리·마찰·밀도·360°초기화·RSI·관측·그래프·Stage1전이/동결·CA4·softgate보상식·AMP·PPO·종료/저장·실행법을정리. 평가성과수치는제외.
+- 저장설정/seed/motion수·문서링크·결과수치미포함/diff검사완료. 문서만변경하고새실행/학습변경없음.
+
+### 질량 진단 적용 시점 수정 및60kg/40kg대응평가
+
+- 실행중rigid-body setter진단에서root/reset이상을발견해이전readback만의검증결과를대체했다. 실제질량을GPU prepare_sim이전asset밀도로적용하고관성을자동계산,미사용box3은기존60kg보존. strictcheckpoint계약검사는유지한다. 기존mass40_view명령에자동적용.
+- 동일12000iter정책/GPU6/3seed×64=192episode/600step,초기human/box/goal SHA정확일치.공식metrics대조:60kg ever0/192/final0/192,40kg ever95/192(49.48%)/final46/192(23.96%).평균잔여거리2.583/0.645m,순변위1.076/3.086m. 결과 runs/jointpush/mass_comparison_20261015_final/summary.json 및 RESULTS.md.
+- 초기진단기록무효/대체사유보존. 모든최종trial에서asset단계질량/초기상태대응/공식metrics와수동집계일치검증. 학습/MPS유지. 정지마찰단독원인을확정하는실험은아니다.
+
+## 2026-10-14
+
+### 평가에서만40kg질량진단
+
+- strictcheckpoint복원후player의명시적옵션으로공유box2질량40kg/관성비례조정. 학습/모델/원래저장설정/마찰/보상/관측유지. 전용softgate_mass40_view및실측report추가.
+- 4500모델GPU6 4환경60step진단rc=0/실측40kg확인. runs/jointpush/mass40_check_20261014/.
+
+### 9000iter 2명 정책의 3명·60kg 추론 뷰어
+
+- 사용자 요청으로 기존40kg/2명9000iter정책을 그대로 로드하는 test전용3명 preview 추가. 상자2.6m cube 유지, 실제질량59.999996kg·3명·6개공유PUSH/AT edge assert확인. 시작좌/중/우,공유상자/목표,가변인원 attention/RMS사용. 학습모드거부,원본모델·실행학습보존.
+- OPEN/PUSH runtime/물리tensor offset/CPA를인원수기반으로확장하고기존2명경로보존. preview는원본40kg저장계약에서질량만60으로전환함을검증한다. 전용test/view명령과문서추가;3명학습프로필없음.
+- CPU보상·표시회귀10개와3명순열/graph2개통과. 3명30step headless rc=0,기존2명30step GPU6회귀rc=0. 최종GPU6 VNC6090실행및실제화면확인. 최초GPU1검증/뷰어는사용자GPU6전용지시후종료했으며전용명령도GPU6고정. 산출물 runs/jointpush/three_agent_60kg_preview/ 및 three_agent_60kg_gpu6_view.log. 성능성공률검증은아님.
+
+### 숨김 mesh fallback 및 기본 카메라 초기화 보완
+
+- 앞선실행완료검증만으로시각결과를충분히확인하지못한점보완. 미사용asset에1e-6mvisual을명시해collisionvisualfallback을피하고기본_init_camera재배치도차단.
+- GPU6 9000모델1환경2에피소드×30step VNCrc=0,실제screen.png에서회색배경물체없음/옆시점확인. reset전후camera위치·회전정확일치assert통과. runs/jointpush/clean_scene_visual_check_20261014/.
+
+### 옆쪽 촬영 카메라와 에피소드 reset 위치 보존
+
+- 초기camera를미는방향옆쪽/높이3m로배치하고한번만호출한다. 이후reset에서카메라/focus를덮어쓰지않는다. 사용자자유카메라조정유지.
+- 문법/diff검사와GPU6 9000iter모델1환경2에피소드×20step VNCrc=0. reset2회·카메라배치1회로그확인. runs/jointpush/side_camera_check_20261014/.
+
+### 촬영용 미사용 배경 물체 visual 제거
+
+- viewer에서door0/1및box3을visual없는임시URDF로생성. 공유box2는유지. door원본visual만제거하고collision/inertial/joint유지,미사용cube는같은크기/질량/inertia/collision로생성. 원본asset/관측슬롯/headless학습변경없음.
+- 문법/diff검사 및 GPU6 9000iter모델1환경30step VNC검증rc=0,doorbody/dof/index계약확인. runs/jointpush/clean_scene_check_20261014/.
+
+### 공동 Push 뒤쪽 자유 카메라
+
+- reset마다 초기box미는방향 기준 두agent뒤쪽에서agent/상자/목표를바라보도록배치. 이후cameraFollow해제해focus없는고정시점유지. 학습환경/보상변경없음.
+- 문법/diff검사 및 GPU6 9000iter모델1환경30step 실제VNC검증rc=0. runs/jointpush/rear_camera_check_20261014/.
+
+### 노란 목표 영역 overlay 제거
+
+- 사용자 요청으로 목표 footprint/십자선만 제거하고 방향화살표는 유지. 학습/물리/보상 변경 없음. 기존표시테스트를화살표만검증하도록갱신.
+
+### 기존60kg 종료 후 softgate 새 학습 실행
+
+- 사용자요청으로기존rear-only60kg학습PID4045659만종료. tmux jointpush_softgate/GPU6/2048환경에서Stage1초기값전이로새Stage2시작. 다른학습/MPS유지.
+- 저장설정60kg·surround_independent·goal_distance[2.2,5.0]·soft_min확인,TensorBoard iter2 기록확인. run: runs/jointpush/aligned_surround60_softgate_training/JointPushAlignedSurround60SoftGateCa4_14-11-37-12/.
+
+### AT state/progress soft-min 접촉 gate 비교
+
+- softgate별도프로필에ATdense보상=min(두사람phi_push)×반대편조건 적용. 기존PUSH와strictresult/done유지,실제이동량보상추가없음. hard기본계약보존하고새보상metadata로혼용방지. 같은surround60/2.2–5m조건과비교하도록문서화.
+- CPU11개통과(약한접촉/연속성/엄격성공/같은쪽차단), GPU6 16환경120step Base검사rc=0(60kg·360°spawn·고정면·부분reset·finite). runs/jointpush/softgate_check_20261014/. train/test/view제공,현재학습종료/새본학습실행없음.
+
+### 다음360°시작실험 목표거리 확대
+
+- surround60프로필의goal_distance를[2.2,5.0]m으로변경. reset별균등샘플링과초기정렬은유지. 기존실행학습/과거checkpoint설정은변경하지않았다. 설정값확인및diff검사완료.
+
+### 다음 실험 곡선 제외 및 랜덤 미는 거리 확인
+
+- 사용자 결정으로 곡선혼합설계를60kg직선/360°agent시작으로갱신. 목표거리는이미환경별reset마다2.2–2.8m균등샘플링하므로기능변경없이적용범위를확인하고문서화했다. 기존학습변경없음.
+
+### 앞/옆/뒤 모두 허용하는360°agent시작
+
+- 별도surround60프로필에 방위각360°·heading360°독립샘플링 추가. box XY외접원+1–2m반경 및 root최소간격0.8m로 실제상자/사람겹침을피한다. 미는면reset_fixed/60kg/초기box목표정렬은유지. 기존rear-only학습은변경하지않았다.
+- 전용train/test/view와동일프로필resume검사,다음curve설계360°시작갱신. CPU10개 및 GPU6 16환경120step Base검증rc=0. 실제spawn위치/heading·고정면·부분reset·60kg확인. runs/jointpush/surround60_check_20261014/. 새본학습실행없음.
+
+### 다음 직선·곡선 혼합 Push 실험 설계
+
+- 60kg/동일agent랜덤시작에 직선50%·좌/우±10–30°각25% 혼합 제안. 초기 면 선택도 목표방향에 의존하지 않고 local−Y로 고정한다. 상자 회전 시 같은 물리면을 따라가며 world 위치 고정으로 오인하지 않는다.
+- Stage1전이에서 새 Stage2 학습, 모델/보상 유지, 조건별 도달·접촉·실제이동/yaw 측정 계획과 검증 요건 기록. markdowns/joint_push_curve_plan.md. 설계만 요청되어 학습실행/실행용config생성/현재학습변경/큐편집 없음. 문서diff검사 완료.
+
+### 공동 Push 초기 방향/목표 뷰어 표시
+
+- 공유 목표 marker가 지름 약6cm이며 두 marker가 겹쳐 잘 안 보이는 문제를 목표 footprint와 십자 표시로 보완. reset 초기 방향 회색 화살표와 현재 방향 청록/분홍 화살표를 분리했다. 방향 랜덤화 자체는 이미 적용되어 있었으며 실제 reset 두 방향이 다름을 확인했다.
+- 랜덤 시작 전용 test/view에60kg/rear_independent 모델 검증 추가. CPU2개 및 실제6500iter VNC4환경60step rc=0, runtime 초기방향/부분reset/고정면/60kg 확인. runs/jointpush/view_fix_check_20261014/. 기존 학습은 변경·종료하지 않았다.
+
 ## 2026-10-13
+
+### 60kg 랜덤 시작 Stage2 신규 학습 실행
+
+- 사용자 요청으로 tmux jointpush60/GPU6/2048환경에서 신규 Stage2 실행. 기존 Stage2 checkpoint·optimizer·counter 없이 Stage1 29000 초기값과 fresh CA4로 시작한다. 기존40kg학습은 유지한다.
+- 초기화 보고서 및 TensorBoard iter6 기록 확인. run: runs/jointpush/aligned_random_spawn60_training/JointPushAlignedRandomSpawn60Ca4_13-16-53-40/. 로컬 Stage1 복사본 경로가 삭제되어 원본을 읽기 전용으로 runs/jointpush/stage1_sources에 복사하고 신규 wrapper 기본 경로를 갱신했다.
+
+### 60kg 상자와 독립 랜덤 agent 시작 프로필
+
+- 별도 aligned_random_spawn60 설정 추가. 상자/목표 초기 정렬 및 reset_fixed 유지, 두 agent의 뒤쪽 거리1–2m·lateral±1.8m·heading360도를 독립 샘플링한다. 최소 root 간격0.8m 후보 재샘플링. 기존40kg학습은 유지하고 새 본학습은 자동 실행하지 않았다.
+- 전용 train/test/view 및 동일60kg프로필만 resume 허용. CPU11개 통과, GPU6 16환경120step Base 검증 rc=0. 실측60kg·실제 독립 위치/heading 일치·고정면 목표 변경 불변·부분reset 보존 확인. 결과 runs/jointpush/random_spawn60_check_20261013/.
 
 ### 공동 Push 에피소드 접촉면 고정
 

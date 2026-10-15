@@ -22,9 +22,21 @@ def audit_runtime(task,path):
         assert torch.allclose(goal_cosine,torch.ones_like(goal_cosine),atol=1e-6)
     relative=task._humanoid_root_states[...,:2]-center[:,None,:2]
     depth=(relative*normal[:,None]).sum(-1);lateral=(relative*tangent[:,None]).sum(-1)
-    assert ((depth<=-1.)&(depth>=-2.)).all()
-    assert (lateral[:,0]*lateral[:,1]<0).all()
-    assert (task._humanoid_root_states[:,0,:2]-task._humanoid_root_states[:,1,:2]).norm(dim=-1).min()>=1.2
+    if task._joint_push_spec.get("random_spawn",{}).get("mode")!="surround_independent":
+        assert ((depth<=-1.)&(depth>=-2.)).all()
+    random_spawn=task._joint_push_spec.get('random_spawn')
+    root_gap=(task._humanoid_root_states[:,0,:2]-task._humanoid_root_states[:,1,:2]).norm(dim=-1)
+    if random_spawn:
+        from utils.door_reference import yaw_from_quat
+        torch.testing.assert_close(depth,-task._push_spawn_depth,atol=1e-5,rtol=1e-5)
+        torch.testing.assert_close(lateral,task._push_spawn_lateral,atol=1e-5,rtol=1e-5)
+        heading=yaw_from_quat(task._humanoid_root_states[...,3:7])-torch.atan2(normal[:,1],normal[:,0])[:,None]
+        error=heading-task._push_spawn_heading
+        assert torch.atan2(error.sin(),error.cos()).abs().max()<1e-5
+        assert root_gap.min()>=random_spawn['minimum_root_gap']-1e-5
+    else:
+        assert (lateral[:,0]*lateral[:,1]<0).all()
+        assert root_gap.min()>=1.2
     props=task.gym.get_actor_rigid_body_properties(task.envs[0],task._box_handles[2])
     mass=sum(x.mass for x in props)
     assert abs(mass-task.cfg['env']['pushBox']['mass'])<.001
@@ -33,6 +45,7 @@ def audit_runtime(task,path):
     assert (labels[...,0]==0).all() and (labels[...,1]==1).all()
     assert torch.isfinite(demo).all()
     saved_face=task._push_face_local_normal.clone()
+    saved_spawn=task._push_spawn_lateral.clone() if random_spawn else None
     fixed=task._joint_push_spec.get('face_mode')=='reset_fixed'
     if fixed:
         geometry=task._joint_push_face_geometry()
@@ -46,9 +59,11 @@ def audit_runtime(task,path):
     assert torch.equal(before,task._humanoid_root_states[1:])
     assert torch.equal(before_graph,graph.edge_src[1:]) and torch.equal(before_goal,task._tar_pos[1:])
     assert torch.equal(saved_face[1:],task._push_face_local_normal[1:])
+    if random_spawn:assert torch.equal(saved_spawn[1:],task._push_spawn_lateral[1:])
     task._compute_reward(None)
     assert torch.isfinite(task.rew_buf).all()
     report=dict(num_envs=task.num_envs,shared_box=2,shared_goal=0,size=task.cfg['env']['pushBox']['size'],
+        random_spawn_checked=bool(random_spawn),initial_min_root_gap=root_gap.min().item(),
         face_mode=task._joint_push_spec.get("face_mode","goal_dynamic"),fixed_face_goal_change_checked=fixed,
         measured_mass=mass,loco_only_rsi=True,repeat_reset_history=True,partial_reset_preserved=True,
         conditioned_push_amp_finite=True,goal_mode=task._joint_push_spec.get('goal_mode','goal360'),

@@ -164,13 +164,13 @@ def contact_at_reward(roots,hands,boxes,goals,config,size,contact):
 
 
 class OpenPushRuntime(EdgeContextRuntime):
-    def __init__(self,n,spec,config,hold,dt,device,size):
-        super().__init__(n,expand_graph(compile_graph(spec,2,4,device),n),config,device)
+    def __init__(self,n,spec,config,hold,dt,device,size,num_agents=2):
+        super().__init__(n,expand_graph(compile_graph(spec,num_agents,4,device),n),config,device)
         self.spec,self.hold,self.dt,self.size=spec,hold,dt,size
-        self.tasks=torch.zeros(n,2,dtype=torch.long,device=device)
-        self.elapsed=torch.zeros(n,2,device=device)
+        self.tasks=torch.zeros(n,num_agents,dtype=torch.long,device=device)
+        self.elapsed=torch.zeros(n,num_agents,device=device)
         self.contact_age=torch.full_like(self.elapsed,hold['contact_grace']+dt)
-        self.contact=torch.zeros(n,2,dtype=torch.bool,device=device)
+        self.contact=torch.zeros(n,num_agents,dtype=torch.bool,device=device)
         self.posture=torch.zeros_like(self.contact)
         self.push_contact=torch.zeros_like(self.contact)
         self.push_eligible=torch.zeros_like(self.contact)
@@ -181,8 +181,8 @@ class OpenPushRuntime(EdgeContextRuntime):
         self.push_credit=torch.zeros_like(self.elapsed)
         self.push_reset_distance=torch.full_like(self.elapsed,config['push']['target_distance'])
         self.push_previous_distance=self.push_reset_distance.clone()
-        self.start=torch.zeros(n,2,3,device=device)
-        self.error=torch.zeros(n,2,device=device)
+        self.start=torch.zeros(n,num_agents,3,device=device)
+        self.error=torch.zeros(n,num_agents,device=device)
 
     def reset(self,ids,tasks,boxes):
         self.tasks[ids]=tasks

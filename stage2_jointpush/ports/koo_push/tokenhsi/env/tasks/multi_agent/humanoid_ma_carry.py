@@ -90,7 +90,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 raise ValueError('Invalid OPEN/PUSH graph preset')
             self.num_objects = 4
             self._relation_graph_spec = cfg['env']['relationGraph']
-            self._context_suffix_width = semantic_packet_size(4)
+            self._context_suffix_width = semantic_packet_size(2*cfg['env']['numAgents'])
         elif self._door_open:
             if not hasattr(self, '_door_cfg'):
                 raise ValueError('Door config requires the HumanoidMADoor task')

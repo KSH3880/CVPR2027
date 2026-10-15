@@ -58,7 +58,13 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 raise ValueError('OPEN/PUSH checkpoint physics/reference contract differs')
             if getattr(self.env.task,'_door_open',False) and checkpoint.get('door_experiment_contract') != self.env.task.get_door_experiment_contract():
                 raise ValueError('Door checkpoint network/reference contract differs')
-        return super().restore(fn)
+        result=super().restore(fn)
+        mass=os.environ.get('JOINT_PUSH_VIEW_MASS')
+        if mass is not None:
+            if fn=='Base':raise ValueError('Mass diagnostic requires a restored checkpoint')
+            from utils.joint_push_mass_preview import apply_mass_preview
+            apply_mass_preview(self.env.task,mass)
+        return result
 
     def _build_net(self, config):
         super()._build_net(config)
