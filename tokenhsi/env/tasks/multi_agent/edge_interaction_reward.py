@@ -1,13 +1,16 @@
-"""SIT/CLIMB geometry and current-success rules on the shared edge runtime."""
 import torch
 
-from utils.edge_context_spec import HOLDING
-from utils.edge_ontop_spec import batched, graph_packet, select_graph
+
+from utils.edge_context_spec import HOLDING, AT
+
+
+from utils.edge_ontop_spec import batched
+
+
 from utils.edge_interaction_spec import SIT, CLIMB
-from env.tasks.multi_agent.edge_context_reward import edge_context, edge_context_reward, goal_success
-from env.tasks.multi_agent.edge_ontop_reward import (OnTopContextRuntime, evaluate_ontop_edges,
-    inner_xy_region_error, mix_task_reward, vertical_extent)
-from utils.edge_stage1_spec import CURRICULUM_VARIANT, PLANE_VARIANTS, SIT_PLANE_VARIANTS
+
+
+from env.tasks.multi_agent.edge_ontop_reward import evaluate_ontop_edges, inner_xy_region_error, vertical_extent
 
 
 def quat_rotate(q, v):
@@ -32,13 +35,8 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     sit = (relation == SIT) & valid
     climb = (relation == CLIMB) & valid
     top_z = support[..., 2] + vertical_extent(support[..., 3:7], support_size / 2)
-    if config['sit']['state_definition'] == 'box_top_plus_pelvis_clearance':
-        sit_target = support[..., :3].clone()
-        sit_target[..., 2] = top_z + float(config['sit']['pelvis_clearance'])
-    else:
-        local = torch.tensor(config['sit']['target_local_offset'], device=roots.device,
-                             dtype=roots.dtype).view(1, 1, 3).expand_as(human)
-        sit_target = support[..., :3] + quat_rotate(support[..., 3:7], local)
+    sit_target = support[..., :3].clone()
+    sit_target[..., 2] = top_z + float(config['sit']['pelvis_clearance'])
     climb_target = support[..., :3].clone()
     climb_target[..., 2] = top_z + float(char_h)
     target = torch.where(sit[..., None], sit_target, climb_target)
@@ -50,12 +48,6 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     interaction_phi = torch.exp(-scale * delta.square().sum(-1))
     feet_z = feet.mean(-2)[..., 2][batch, src.clamp(0, m - 1)]
     feet_error = (feet_z - top_z).abs()
-    if config.get('stage1_variant') == CURRICULUM_VARIANT:
-        dense = config['hard_skill_training']['climb_state']
-        xy_phi = torch.exp(-dense['xy_scale'] * delta[..., :2].square().sum(-1))
-        height_phi = (torch.exp(-dense['height_scale'] * delta[..., 2].square()) +
-                      torch.exp(-dense['height_scale'] * feet_error.square())) / 2
-        interaction_phi = torch.where(climb, xy_phi * height_phi, interaction_phi)
 
     # SIT approaches the transformed tarSitPos; CLIMB approaches the object XY.
     progress_target_xy = torch.where(sit[..., None], sit_target[..., :2], support[..., :2])
@@ -84,73 +76,42 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
     diag['feet_height_error'] = feet_error * climb
     diag['feet_individual_max_error'] = (
         individual_feet_z - top_z[..., None]).abs().amax(-1) * climb
-    if 'success_inner_margin_fraction' in config.get('climb', {}):
-        region = inner_xy_region_error(
-            human[..., :2], support, support_size,
-            config['climb']['success_inner_margin_fraction'])
-        diag['region_error'] = torch.where(climb, region, diag['region_error'])
-    if config.get('stage1_variant') in SIT_PLANE_VARIANTS:
-        region = inner_xy_region_error(
-            human[..., :2], support, support_size,
-            config['sit']['success_inner_margin_fraction'])
-        diag['region_error'] = torch.where(sit, region, diag['region_error'])
+    region = inner_xy_region_error(
+        human[..., :2], support, support_size,
+        config['climb']['success_inner_margin_fraction'])
+    diag['region_error'] = torch.where(climb, region, diag['region_error'])
+    region = inner_xy_region_error(
+        human[..., :2], support, support_size,
+        config['sit']['success_inner_margin_fraction'])
+    diag['region_error'] = torch.where(sit, region, diag['region_error'])
     return phi, diag
 
 
-def interaction_own_success(phi, z_error, feet_error, graph, config, region_error=None):
+def interaction_own_success(phi, z_error, feet_error, graph, config, region_error=None, distance=None):
     relation = batched(graph.edge_relation, phi.shape[0])
     valid = batched(graph.edge_valid, phi.shape[0])
     threshold = config['satisfaction_threshold']
     success = (phi >= threshold) & ((relation == HOLDING) |
         (z_error.abs() <= config['success']['at_z_tolerance']))
+    if 'at_distance_tolerance' in config['success']:
+        if distance is None:
+            raise ValueError('AT distance success requires 3D distance')
+        success = torch.where(relation == AT,
+            (distance <= config['success']['at_distance_tolerance']) &
+            (z_error.abs() <= config['success']['at_z_tolerance']), success)
     success = torch.where(relation == SIT, phi >= threshold, success)
-    if 'climb' in config:
-        climb_threshold = config['climb'].get('success_phi_threshold', threshold)
-        success = torch.where(relation == CLIMB,
-            (phi >= climb_threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
-    elif ((relation == CLIMB) & valid).any():
-        raise ValueError('CLIMB graph rejected by no-CLIMB reward runtime')
-    if config.get('stage1_variant') in PLANE_VARIANTS:
-        if region_error is None:
-            raise ValueError('Stage1 plane success requires region_error')
-        from utils.edge_ontop_spec import ON_TOP
-        success = torch.where(relation == ON_TOP,
-            (region_error <= 0) & (z_error.abs() <= config['ontop']['z_tolerance']), success)
-        success = torch.where(relation == CLIMB,
-            (region_error <= 0) &
-            (z_error.abs() <= config['climb']['root_height_tolerance']) &
-            (feet_error <= config['climb']['feet_height_tolerance']), success)
-        if config.get('stage1_variant') in SIT_PLANE_VARIANTS:
-            success = torch.where(relation == SIT,
-                (region_error <= 0) & (z_error.abs() <= config['sit']['z_tolerance']), success)
+    climb_threshold = config['climb'].get('success_phi_threshold', threshold)
+    success = torch.where(relation == CLIMB,
+        (phi >= climb_threshold) & (feet_error <= config['climb']['feet_height_tolerance']), success)
+    if region_error is None:
+        raise ValueError('Stage1 plane success requires region_error')
+    from utils.edge_ontop_spec import ON_TOP
+    success = torch.where(relation == ON_TOP,
+        (region_error <= 0) & (z_error.abs() <= config['ontop']['z_tolerance']), success)
+    success = torch.where(relation == CLIMB,
+        (region_error <= 0) &
+        (z_error.abs() <= config['climb']['root_height_tolerance']) &
+        (feet_error <= config['climb']['feet_height_tolerance']), success)
+    success = torch.where(relation == SIT,
+        (region_error <= 0) & (z_error.abs() <= config['sit']['z_tolerance']), success)
     return success & valid
-
-
-class InteractionContextRuntime(OnTopContextRuntime):
-    def reset(self, ids, phi, z_error, feet_error=None):
-        if feet_error is None:
-            feet_error = torch.zeros_like(phi)
-        graph = select_graph(self.graph, ids)
-        self.phi[ids] = phi
-        self.own_success[ids] = interaction_own_success(phi, z_error, feet_error, graph, self.config)
-        self.achieved[ids] = self.own_success[ids]
-        self.done[ids] = goal_success(self.own_success[ids], graph)
-
-    def step(self, phi, progress, z_error, feet_error=None):
-        if feet_error is None:
-            feet_error = torch.zeros_like(phi)
-        success = interaction_own_success(phi, z_error, feet_error, self.graph, self.config)
-        result = edge_context_reward(phi, progress, success, self.graph, self.config)
-        result['local_task_reward'] = result['agent_task_reward']
-        result['agent_task_reward'] = mix_task_reward(result['local_task_reward'])
-        self.phi.copy_(phi)
-        self.own_success.copy_(success)
-        self.achieved |= success
-        self.done.copy_(goal_success(success, self.graph))
-        self.last_result = result
-        return result
-
-    def suffix(self, ids=None):
-        graph = self.graph if ids is None else select_graph(self.graph, ids)
-        phi = self.phi if ids is None else self.phi[ids]
-        return graph_packet(graph, edge_context(phi, graph))

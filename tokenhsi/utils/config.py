@@ -27,7 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import sys
 import yaml
 
 from isaacgym import gymapi
@@ -84,7 +83,6 @@ def load_cfg(args):
     with open(os.path.join(os.getcwd(), args.cfg_env), 'r') as f:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
 
-    from utils.unified_training import validate_typed_bias_config
 
     graph_path = getattr(args, 'relation_graph', '')
     if graph_path:
@@ -93,9 +91,8 @@ def load_cfg(args):
         with open(graph_path) as f:
             cfg['env']['relationGraph'] = yaml.safe_load(f)
 
-    validate_typed_bias_config(cfg['env'], cfg_train)
-    from utils.joint_carry_amp import validate_ablation
-    validate_ablation(cfg['env'], cfg_train)
+    from utils.joint_carry_amp import validate_training
+    validate_training(cfg['env'], cfg_train)
 
     transfer = getattr(args, 'transfer_checkpoint', '')
     if transfer and (args.resume > 0 or args.test or args.eval):
@@ -181,37 +178,6 @@ def load_cfg(args):
         cfg_train["params"]["load_path"] = args.checkpoint
         cfg["env"]["checkpoint"] = args.checkpoint
         
-    if args.teacher_checkpoint:
-        if args.task != 'HumanoidMACarry' or args.test or args.eval:
-            raise ValueError('--teacher_checkpoint is for HumanoidMACarry training only')
-        cfg_train['params']['config']['teacher_distillation'] = dict(
-            checkpoint=args.teacher_checkpoint, kl_coef=args.teacher_kl_coef,
-            grad_checks=args.teacher_grad_checks)
-
-    if args.llc_checkpoint != "":
-        cfg_train["params"]["config"]["llc_checkpoint"] = args.llc_checkpoint
-
-        if args.llc_checkpoint_2 != "":
-            cfg_train["params"]["config"]["llc_checkpoint_2"] = args.llc_checkpoint_2
-        
-        if args.llc_checkpoint_3 != "":
-            cfg_train["params"]["config"]["llc_checkpoint_3"] = args.llc_checkpoint_3
-        
-        if args.llc_checkpoint_4 != "":
-            cfg_train["params"]["config"]["llc_checkpoint_4"] = args.llc_checkpoint_4
-        
-        if args.llc_checkpoint_5 != "":
-            cfg_train["params"]["config"]["llc_checkpoint_5"] = args.llc_checkpoint_5
-        
-        if args.llc_checkpoint_6 != "":
-            cfg_train["params"]["config"]["llc_checkpoint_6"] = args.llc_checkpoint_6
-        
-        if args.llc_checkpoint_7 != "":
-            cfg_train["params"]["config"]["llc_checkpoint_7"] = args.llc_checkpoint_7
-
-    if args.hrl_checkpoint != "":
-        cfg_train["params"]["config"]["hrl_checkpoint"] = args.hrl_checkpoint
-
     if args.eval and args.test:
         cfg_train["params"]["config"]["eval"] = True
         cfg_train["params"]["config"]["eval_task"] = args.eval_task
@@ -298,8 +264,8 @@ def get_args(benchmark=False):
             "help": "Force display off at all times"},
         {"name": "--horovod", "action": "store_true", "default": False,
             "help": "Use horovod for multi-gpu training, have effect only with rl_games RL library"},
-        {"name": "--task", "type": str, "default": "Humanoid",
-            "help": "Can be BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, Ingenuity"},
+        {"name": "--task", "type": str, "default": "HumanoidMACarry",
+            "help": "HumanoidMACarry"},
         {"name": "--task_type", "type": str,
             "default": "Python", "help": "Choose Python or C++"},
         {"name": "--rl_device", "type": str, "default": "cuda:0",
@@ -335,12 +301,6 @@ def get_args(benchmark=False):
         {"name": "--seed", "type": int, "help": "Random seed"},
         {"name": "--max_iterations", "type": int, "default": 0,
             "help": "Set a maximum number of training iterations"},
-        {"name": "--teacher_checkpoint", "type": str, "default": "",
-            "help": "Frozen TokenHSI Stage-1 checkpoint for graph-routed distillation"},
-        {"name": "--teacher_kl_coef", "type": float, "default": 1e-3,
-            "help": "Coefficient of joint-action KL(teacher || student)"},
-        {"name": "--teacher_grad_checks", "type": int, "default": 0,
-            "help": "Number of initial optimizer updates to check distillation gradients"},
         {"name": "--horizon_length", "type": int, "default": -1,
             "help": "Set number of simulation steps per 1 PPO iteration. Supported only by rl_games. If not -1 overrides the config settings."},
         {"name": "--minibatch_size", "type": int, "default": -1,
@@ -350,22 +310,6 @@ def get_args(benchmark=False):
         {"name": "--torch_deterministic", "action": "store_true", "default": False,
             "help": "Apply additional PyTorch settings for more deterministic behaviour"},
         {"name": "--output_path", "type": str, "default": "output/", "help": "Specify output directory"},
-        {"name": "--llc_checkpoint", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--llc_checkpoint_2", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--llc_checkpoint_3", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--llc_checkpoint_4", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--llc_checkpoint_5", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--llc_checkpoint_6", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--llc_checkpoint_7", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
-        {"name": "--hrl_checkpoint", "type": str, "default": "",
-            "help": "Path to the saved weights for the low-level controller of an HRL agent."},
 
         {"name": "--render_device", "type": str, "default": "",
             "help": "Choose GPU device for rendering height map"},

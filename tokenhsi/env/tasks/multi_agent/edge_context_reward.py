@@ -1,7 +1,10 @@
-"""Current edge success, scalar context and ungated reward kernels."""
 import torch
-from utils.edge_context_spec import HOLDING, AT
-from utils.edge_ontop_spec import batched, select_graph
+
+
+from utils.edge_context_spec import HOLDING
+
+
+from utils.edge_ontop_spec import batched
 
 
 def edge_context(phi, graph):
@@ -51,36 +54,6 @@ def edge_context_reward(phi, progress, success, graph, config):
                 success_component=bonus, total=total, agent_task_reward=owner_sum(total, graph))
 
 
-def evaluate_edge_geometry(hands, roots, objects, goals, graph, config):
-    """Positions in one world frame; objects already reordered into logical slots."""
-    N, E = roots.shape[0], graph.edge_src.numel()
-    phi = roots.new_zeros(N, E); progress = torch.zeros_like(phi); z = torch.zeros_like(phi)
-    distance = torch.zeros_like(phi); xy = torch.zeros_like(phi)
-    for relation in (HOLDING, AT):
-        ids = (graph.edge_relation == relation).nonzero(as_tuple=False).flatten()
-        if ids.numel() == 0:
-            continue
-        if relation == HOLDING:
-            src = hands[:, graph.edge_src[ids]].mean(-2)
-            dst = objects[:, graph.edge_dst[ids] - graph.num_agents]
-            approach_src = roots[:, graph.edge_src[ids]]
-            scale = config['holding']['hand_distance_scale']
-        else:
-            src = objects[:, graph.edge_src[ids] - graph.num_agents]
-            dst = goals[:, graph.edge_dst[ids] - graph.num_agents - graph.num_objects]
-            approach_src = src
-            scale = config['at']['near_distance_scale']
-        delta = src - dst
-        distance[:, ids] = delta.norm(dim=-1)
-        phi[:, ids] = torch.exp(-scale * delta.square().sum(-1))
-        z[:, ids] = delta[..., 2].abs()
-        dxy = (approach_src[..., :2] - dst[..., :2]).norm(dim=-1)
-        xy[:, ids] = dxy
-        p = config['progress']
-        progress[:, ids] = 1 / (1 + (dxy - p['delta']).clamp_min(0) / p['sigma'])
-    return phi, dict(progress=progress, z_error=z, distance=distance, distance_xy=xy)
-
-
 class EdgeContextRuntime:
     def __init__(self, num_envs, graph, config, device):
         self.graph, self.config = graph, config
@@ -89,24 +62,3 @@ class EdgeContextRuntime:
         self.achieved = torch.zeros_like(self.own_success)  # diagnostics only
         self.done = torch.zeros(num_envs, graph.num_agents, dtype=torch.bool, device=device)  # current goals
         self.last_result = None
-
-    def reset(self, ids, phi, z_error):
-        self.phi[ids] = phi
-        graph = select_graph(self.graph, ids)
-        self.own_success[ids] = own_success(phi, z_error, graph,
-            self.config['satisfaction_threshold'], self.config['success']['at_z_tolerance'])
-        self.achieved[ids] = self.own_success[ids]
-        self.done[ids] = goal_success(self.own_success[ids], graph)
-
-    def step(self, phi, progress, z_error):
-        success = own_success(phi, z_error, self.graph,
-            self.config['satisfaction_threshold'], self.config['success']['at_z_tolerance'])
-        result = edge_context_reward(phi, progress, success, self.graph, self.config)
-        self.phi.copy_(phi); self.own_success.copy_(success); self.achieved |= success
-        self.done.copy_(goal_success(success, self.graph))
-        self.last_result = result
-        return result
-
-    def suffix(self, ids=None):
-        phi = self.phi if ids is None else self.phi[ids]
-        return edge_context(phi, self.graph if ids is None else select_graph(self.graph, ids)).flatten(1)

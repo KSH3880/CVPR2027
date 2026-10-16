@@ -1,9 +1,10 @@
-"""World-Z stack geometry, ungated saturation, and same-scene task sharing."""
 import torch
+
+
 from utils.edge_context_spec import HOLDING, AT
-from utils.edge_ontop_spec import ON_TOP, batched, select_graph, graph_packet
-from utils.edge_stage1_spec import CURRICULUM_VARIANT
-from env.tasks.multi_agent.edge_context_reward import EdgeContextRuntime, edge_context
+
+
+from utils.edge_ontop_spec import ON_TOP, batched
 
 
 def vertical_extent(quaternion, half_size):
@@ -38,12 +39,6 @@ def ontop_geometry(source, support, source_size, support_size):
                        source_extent=hs, support_extent=ht, target=target, distance_xy=dxy)
 
 
-def mix_task_reward(local):
-    if local.ndim != 2 or local.shape[1] != 2:
-        raise ValueError('Reward sharing is defined only for same-scene [N,2] task rewards')
-    return .9*local + .1*local.flip(-1)
-
-
 def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     n=roots.shape[0];m=graph.num_agents;o=graph.num_objects
     src=batched(graph.edge_src,n);dst=batched(graph.edge_dst,n)
@@ -71,10 +66,6 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
                  torch.where(top, bbox_radius + buffers['ON_TOP'],
                              torch.full_like(xy, buffers['AT'])))
     progress=1/(1+(xy-radius).clamp_min(0)/p['sigma'])
-    if config.get('stage1_variant') == CURRICULUM_VARIANT:
-        max_distance = config['hard_skill_training']['progress']['max_distance']
-        linear = (1 - (xy - p['delta']).clamp_min(0) / max_distance).clamp_min(0)
-        progress = torch.where((at | top) & valid, linear, progress)
     diag['target']=torch.where(hold[...,None],dst_box[...,:3],torch.where(at[...,None],goal,diag['target']))
     for key in ('signed_gap','source_bottom_z','support_top_z','source_extent','support_extent'):
         diag[key]=diag[key]*top*valid
@@ -83,21 +74,7 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     diag['relative_speed']=(src_box[...,7:10]-dst_box[...,7:10]).norm(dim=-1)*top
     diag['source_tilt']=torch.acos((1-2*(src_box[...,3].square()+src_box[...,4].square())).clamp(-1,1))*top
     diag['support_tilt']=torch.acos((1-2*(dst_box[...,3].square()+dst_box[...,4].square())).clamp(-1,1))*top
-    if 'success_inner_margin_fraction' in config.get('ontop', {}):
-        diag['region_error'] = inner_xy_region_error(
-            src_box[..., :2], dst_box, dst_size,
-            config['ontop']['success_inner_margin_fraction']) * top
+    diag['region_error'] = inner_xy_region_error(
+        src_box[..., :2], dst_box, dst_size,
+        config['ontop']['success_inner_margin_fraction']) * top
     return phi,diag
-
-
-class OnTopContextRuntime(EdgeContextRuntime):
-    def suffix(self, ids=None):
-        graph=self.graph if ids is None else select_graph(self.graph,ids)
-        phi=self.phi if ids is None else self.phi[ids]
-        return graph_packet(graph,edge_context(phi,graph))
-
-    def step(self, phi, progress, z_error):
-        result=super().step(phi,progress,z_error)
-        result['local_task_reward']=result['agent_task_reward']
-        result['agent_task_reward']=mix_task_reward(result['local_task_reward'])
-        return result

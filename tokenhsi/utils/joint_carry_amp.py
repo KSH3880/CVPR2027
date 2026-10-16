@@ -11,66 +11,49 @@ def dataset_digest(records):
     return hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest()
 
 
-def validate_ablation(env, train=None):
+def validate_training(env, train=None):
     grasp = env.get('jointCarryGraspView')
     if grasp is not None:
         from learning.multi_agent.grasp_view import GRASP_VIEW
-        if grasp != GRASP_VIEW or env.get('jointCarryAblation', {}).get('policy') != 'human_sa4_actor_critic' or (env['numAgents'], env['numObjects']) != (2, 4):
+        if grasp != GRASP_VIEW or env.get('jointCarryTraining', {}).get('policy') != 'human_sa4_actor_critic' or (env['numAgents'], env['numObjects']) != (2, 4):
             raise ValueError('Grasp-view contract requires two-human SA4')
-    spec = env.get('jointCarryAblation')
-    if spec is None:
-        if train is not None and train['params']['network'].get('coordination', {}).get('mode') == 'stage1_head_only':
-            raise ValueError('Head-only policy requires the joint-carry ablation contract')
-        return
+    spec = env['jointCarryTraining']
     from utils.mixed_carry_spec import MIXED_SAMPLER
-    if env['relationGraph']['sampler'] != MIXED_SAMPLER or spec['policy'] not in ('task_ca', 'task_ca4', 'task_ca4_actor_critic', 'task_ca4_actor_critic_geometry', 'task_ca4_actor_critic_none_mask', 'human_sa4_actor_critic', 'stage1_head_only'):
-        raise ValueError('Locomotion AMP ablation requires Mixed80 and an explicit policy')
+    if env['relationGraph']['sampler'] != MIXED_SAMPLER or spec['policy'] != 'human_sa4_actor_critic':
+        raise ValueError('SA4 requires Mixed80 and the human-SA policy contract')
     amp = spec['amp']
     if (amp['probabilities'] != {'original': .8, 'backward': .1, 'sideways': .1}
             or amp['sampling'] != 'uniform_clip_then_uniform_time'
             or not env.get('ampTaskConditioning')):
         raise ValueError('Locomotion AMP requires conditioned original/backward/sideways 80/10/10')
     if train is not None:
-        expected = {'enabled': False, 'mode': 'stage1_head_only'} if spec['policy'] == 'stage1_head_only' else {
-            'enabled': True, 'mode': 'task_coupled', 'grounding_hidden': 128,
-            'num_heads': 2, 'shuffle_task_order': True}
-        if spec['policy'] in ('task_ca4', 'task_ca4_actor_critic', 'task_ca4_actor_critic_geometry', 'task_ca4_actor_critic_none_mask'):
-            expected.update(num_layers=4, feedforward_dim=128)
-        if spec['policy'] in ('task_ca4_actor_critic', 'task_ca4_actor_critic_geometry', 'task_ca4_actor_critic_none_mask'):
-            expected.update(head_input='ca_only', critic_ca=True)
-        if spec['policy'] == 'task_ca4_actor_critic_geometry':
-            expected.update(task_input='geometry')
-        if spec['policy'] == 'task_ca4_actor_critic_none_mask':
-            expected.update(mask_none=True)
-        if spec['policy'] == 'human_sa4_actor_critic':
-            expected = dict(enabled=True, mode='human_coupled', num_heads=2,
-                shuffle_human_order=True, num_layers=4, feedforward_dim=128,
-                head_input='ca_only', critic_ca=True)
-            if grasp is not None:
-                expected['grasp_view'] = True
+        expected = dict(enabled=True, mode='human_coupled', num_heads=2,
+            shuffle_human_order=True, num_layers=4, feedforward_dim=128,
+            head_input='ca_only', critic_ca=True)
+        if grasp is not None:
+            expected['grasp_view'] = True
         if train['params']['network'].get('coordination') != expected:
             raise ValueError('Joint-carry policy and network coordination config differ')
 
 
-def check_ablation_checkpoint(weights, env):
+def check_training_checkpoint(weights, env):
     if weights.get('joint_carry_grasp_view') != env.get('jointCarryGraspView'):
         raise ValueError('Checkpoint grasp-view observation contract differs')
     if weights.get('joint_carry_loco_platform') != env.get('jointCarryRsi', {}).get('locoPlatform'):
         raise ValueError('Checkpoint joint loco platform differs')
-    if weights.get('joint_carry_pickup_sampling') != env.get('jointCarryRsi', {}).get('pickupFrameSampling'):
-        raise ValueError('Checkpoint joint pickup frame sampling differs')
+    if weights.get('joint_carry_pickup_sampling') is not None:
+        raise ValueError('Checkpoint uses unsupported pickup frame sampling')
     if weights.get('joint_carry_rsi_dataset') != env.get('jointCarryRsi', {}).get('dataset_sha256'):
         raise ValueError('Checkpoint joint-carry RSI dataset differs')
     if weights.get('joint_carry_goal_sampling') != env.get('jointCarryRsi', {}).get('goalSampling'):
         raise ValueError('Checkpoint joint-carry goal sampling differs')
-    if weights.get('joint_carry_ablation') != env.get('jointCarryAblation'):
-        raise ValueError('Checkpoint joint-carry AMP/policy ablation differs')
+    saved = weights.get('joint_carry_training', weights.get('joint_carry_ablation'))
+    if saved != env['jointCarryTraining']:
+        raise ValueError('Checkpoint joint-carry training contract differs')
 
 
 def load_amp_libraries(task):
-    spec = task.cfg['env'].get('jointCarryAblation')
-    if spec is None:
-        return {}
+    spec = task.cfg['env']['jointCarryTraining']
     from utils.motion_lib import MotionLib
     path = Path(spec['amp']['motion_file'])
     manifest = json.loads((path.parent/'manifest.json').read_text())

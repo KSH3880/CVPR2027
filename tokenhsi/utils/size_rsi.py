@@ -1,8 +1,15 @@
 import torch
 
+
 SIZE_RSI_VARIANT = 'scenario_independent_stage1_unified_size_rsi'
+
+
 TASKS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')
+
+
 TASK_PROBS = (.05, .10, .25, .30, .30)
+
+
 SIZE_RANGES = {
     'HOLDING': [[.20, .60], [.20, .60], [.20, .60]],
     'SIT': [[.25, .80], [.25, .80], [.35, .50]],
@@ -11,8 +18,8 @@ SIZE_RANGES = {
     'HOLDING_ON_TOP': [[.20, .60], [.20, .60], [.20, .60]],
     'SUPPORT': [[.50, .80], [.50, .80], [.25, .45]],
 }
-PROGRESS = {'kind': 'distance', 'sigma': 1., 'bbox_buffers': {
-    'HOLDING': .20, 'SIT': .30, 'CLIMB': .30, 'AT': .10, 'ON_TOP': .10}}
+
+
 SCREEN = {'seconds': .10, 'root_velocity_change': 3., 'box_speed': 5.,
           'root_displacement': .30, 'box_displacement': .30}
 
@@ -52,24 +59,6 @@ def sample_sizes(n, device, preset='random_scenario'):
         sizes[:, 2:, axis] = torch.randint(round(lo*20), round(hi*20)+1,
                                            (n, 2), device=device) / 20.
     return sizes
-
-
-def sample_size_graph(sizes, spec, preset):
-    from utils.edge_scenario_spec import compose_graph
-    n = len(sizes)
-    if preset == 'random_scenario':
-        ids = torch.multinomial(task_probabilities(sizes[:, :2]).flatten(0, 1),
-                                1).reshape(n, 2)
-    else:
-        name = {'holding': 'HOLDING', 'sit': 'SIT', 'climb': 'CLIMB',
-                'holding_at': 'HOLDING_AT', 'holding_ontop': 'HOLDING_ON_TOP'}[preset]
-        ids = torch.full((n, 2), TASKS.index(name), device=sizes.device)
-    rows = [[TASKS[i] for i in row] for row in ids.tolist()]
-    bindings = [[(a, a) if task == 'HOLDING_AT' else (a, 2+a)
-                 if task == 'HOLDING_ON_TOP' else (a,)
-                 for a, task in enumerate(row)] for row in rows]
-    return compose_graph(rows, bindings, shuffle=spec['shuffle_edge_order']
-                         and preset == 'random_scenario', device=sizes.device, num_objects=4)
 
 
 def interaction_phase(skill, roots, feet, box, size):

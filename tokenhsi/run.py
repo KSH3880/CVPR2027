@@ -26,33 +26,18 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 
 from utils.config import set_np_formatting, set_seed, get_args, parse_sim_params, load_cfg
 from utils.parse_task import parse_task
 
-from rl_games.algos_torch import players
 from rl_games.algos_torch import torch_ext
-from rl_games.common import env_configurations, experiment, vecenv
+from rl_games.common import env_configurations, vecenv
 from rl_games.common.algo_observer import AlgoObserver
 from rl_games.torch_runner import Runner
 
-import numpy as np
-import copy
-import torch
 
-from learning import amp_agent
-from learning import amp_players
 from learning import amp_models
-from learning import amp_network_builder
 
-from learning.transformer import amp_network_builder_transformer
-from learning.transformer import amp_network_builder_transformer_comp
-from learning.transformer import amp_network_builder_transformer_adapt
-from learning.transformer import amp_network_builder_transformer_longterm
-
-from learning.transformer import trans_agent
-from learning.transformer import trans_players
 
 from learning.multi_agent import amp_network_builder_ma
 from learning.multi_agent import ma_agent
@@ -87,9 +72,6 @@ def create_rlgpu_env(**kwargs):
     print('num_obs: {:d}'.format(env.num_obs))
     print('num_states: {:d}'.format(env.num_states))
     
-    frames = kwargs.pop('frames', 1)
-    if frames > 1:
-        env = wrappers.FrameStack(env, frames, False)
     return env
 
 
@@ -184,18 +166,7 @@ env_configurations.register('rlgpu', {
 
 def build_alg_runner(algo_observer):
     runner = Runner(algo_observer)
-    runner.algo_factory.register_builder('amp', lambda **kwargs : amp_agent.AMPAgent(**kwargs))
-    runner.player_factory.register_builder('amp', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
-    runner.model_builder.model_factory.register_builder('amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))  
-    runner.model_builder.network_factory.register_builder('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
-
-    runner.algo_factory.register_builder('trans', lambda **kwargs : trans_agent.TransAgent(**kwargs))
-    runner.player_factory.register_builder('trans', lambda **kwargs : trans_players.TransPlayerContinuous(**kwargs))
-    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task', lambda **kwargs : amp_network_builder_transformer.AMPTransformerMultiTaskBuilder())
-    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_comp', lambda **kwargs : amp_network_builder_transformer_comp.AMPTransformerMultiTaskCompBuilder())
-    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_adapt', lambda **kwargs : amp_network_builder_transformer_adapt.AMPTransformerMultiTaskAdaptBuilder())
-    runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_longterm', lambda **kwargs : amp_network_builder_transformer_longterm.AMPTransformerMultiTaskLongTermTaskCompletionBuilder())
-
+    runner.model_builder.model_factory.register_builder('amp', lambda network, **kwargs: amp_models.ModelAMPContinuous(network))
     runner.algo_factory.register_builder('ma', lambda **kwargs : ma_agent.MAAgent(**kwargs))
     runner.player_factory.register_builder('ma', lambda **kwargs : ma_players.MAPlayerContinuous(**kwargs))
     runner.model_builder.network_factory.register_builder('amp_multi_agent', lambda **kwargs : amp_network_builder_ma.AMPMultiAgentBuilder())

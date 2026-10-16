@@ -27,7 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import torch
-import numpy as np
 from rl_games.algos_torch import torch_ext
 
 from isaacgym.torch_utils import *

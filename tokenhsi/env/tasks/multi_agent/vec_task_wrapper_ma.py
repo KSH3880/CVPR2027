@@ -9,7 +9,6 @@
 # flag stays per row so that GAE bootstraps correctly for agents that were reset by a
 # teammate falling rather than by falling themselves.
 
-from gym import spaces
 import numpy as np
 import torch
 

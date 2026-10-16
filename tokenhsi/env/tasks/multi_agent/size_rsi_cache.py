@@ -17,7 +17,7 @@ class SizeRsiCache:
         self.env = env
         self.spec = env.cfg['env']['sizeAwareRsi']
         digest = hashlib.sha256()
-        settings = {'version': 1, 'sim': env.cfg['sim'], 'dt': env.sim_params.dt,
+        settings = {'version': 2, 'scope': 'independent_carry', 'sim': env.cfg['sim'], 'dt': env.sim_params.dt,
                     'screen': SCREEN, 'spec': self.spec, 'density': 100.,
                     'env': {k: env.cfg['env'][k] for k in
                             ('asset', 'plane', 'powerScale', 'enableSelfCollisionDetection')}}
@@ -42,6 +42,8 @@ class SizeRsiCache:
                 self.entries = pickle.load(stream)
         self.sizes = env._box_size.cpu().tolist()
         self.eligible = task_probabilities(env._box_size[:, :2]).cpu()
+        self.eligible[env._joint_env_mask.cpu()] = 0
+        self.eligible[:, :, 1:3] = 0
         self._build_missing()
         self._prepare_sampling()
 

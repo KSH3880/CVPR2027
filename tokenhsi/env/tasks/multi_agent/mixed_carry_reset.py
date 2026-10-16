@@ -1,13 +1,3 @@
-from env.tasks.multi_agent.size_rsi_cache import SizeRsiCache
-
-
-class MixedSizeRsiCache(SizeRsiCache):
-    def _profiles(self, kind, owner, pending):
-        self.eligible[self.env._joint_env_mask.cpu()] = 0
-        self.eligible[:, :, 1:3] = 0
-        return super()._profiles(kind, owner, pending)
-
-
 def reset_mixed(task, ids):
     if not len(ids):
         return

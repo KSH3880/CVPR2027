@@ -17,7 +17,6 @@
 # Observations follow the ego-centric, ego-first convention: one row per (env, agent),
 # laid out env-major / agent-minor to match rl_games' num_agents contract.
 
-import math
 import os
 
 import numpy as np
@@ -55,35 +54,11 @@ class HumanoidMA(Humanoid):
         self.num_agents = cfg["env"].get("numAgents", 1)
         assert self.num_agents >= 1
 
-        # Keep the original row-per-agent policy available as an exact baseline.  The
-        # clean scene policy emits one observation per simulator environment and lets
-        # the network read all humanoid tokens out of one transformer pass.
-        self._policy_obs_mode = cfg["env"].get("policyObsMode", "legacy_multirow")
-        assert self._policy_obs_mode in ("legacy_multirow", "clean_scene")
+        if cfg['env'].get('policyObsMode') != 'clean_scene':
+            raise ValueError('SA policies require clean_scene observations')
+        self._policy_obs_mode = 'clean_scene'
 
-        # How each entity token is expressed:
-        #
-        # "global": one omniscient, centralized frame -- every entity is described relative
-        #           to the env centre, with global orientations, scaled by the env size.
-        #           There is no owner/self notion anywhere, cross-agent geometry is exact,
-        #           and because every row then holds the same tokens up to a permutation,
-        #           the transformer's equivariance makes row i's token 0 equal to row 0's
-        #           token i: one scene encoding really does yield all M actions.
-        #           Cost: the SE(2) (heading) invariance that AMP humanoid control relies on
-        #           is no longer free -- the policy must learn to map a world-frame scene to
-        #           body-frame PD targets.
-        # NOTE: "owner" has the same one-encoding-for-all-agents property as "global" (its
-        #       token contents also do not depend on who is observing), while keeping heading
-        #       invariance, which is why it is the default. Only "ego" gives that property up.
-        # "owner":  every entity is described in the frame of the agent that owns it. Keeps
-        #           heading invariance and puts every token in exactly the distribution a
-        #           single-agent policy would see, at the cost of cross-agent geometry being
-        #           carried only by the arena-pose features.
-        # "ego":    every entity re-expressed in the *observing* agent's frame. M times the
-        #           entity transforms; teammates' objects land in a frame the single-agent
-        #           tokenizer never saw.
-        self._obs_frame = cfg["env"].get("obsFrame", "owner")
-        assert self._obs_frame in ("global", "owner", "ego")
+        self._obs_frame = "owner"
 
         self._pd_control = self.cfg["env"]["pdControl"]
         self.power_scale = self.cfg["env"]["powerScale"]
@@ -102,11 +77,10 @@ class HumanoidMA(Humanoid):
             "cleanSceneLocalRootObsPolicy", True)
         self._clean_root_height_obs_policy = self.cfg["env"].get(
             "cleanSceneRootHeightObsPolicy", True)
-        if self.is_scene_policy():
-            assert self._clean_local_root_obs_policy, \
-                "GTA clean_scene requires heading-local Human root rotation"
-            assert self._clean_root_height_obs_policy, \
-                "GTA clean_scene requires the Human root-height observation"
+        assert self._clean_local_root_obs_policy, \
+            "GTA clean_scene requires heading-local Human root rotation"
+        assert self._clean_root_height_obs_policy, \
+            "GTA clean_scene requires the Human root-height observation"
         self._enable_early_termination = self.cfg["env"]["enableEarlyTermination"]
 
         key_bodies = self.cfg["env"]["keyBodies"]
@@ -206,7 +180,7 @@ class HumanoidMA(Humanoid):
         # ---- per-slot buffers --------------------------------------------------------
         # Clean policy observations are per scene. Rewards and termination remain
         # per-agent, preserving the existing PPO semantics.
-        obs_rows = N if self.is_scene_policy() else N * M
+        obs_rows = (N)
         self.obs_buf = torch.zeros((obs_rows, self.get_obs_size()), device=self.device, dtype=torch.float)
         self.rew_buf = torch.zeros(N * M, device=self.device, dtype=torch.float)
         self._terminate_buf = torch.ones(N * M, device=self.device, dtype=torch.long)
@@ -247,7 +221,7 @@ class HumanoidMA(Humanoid):
         return self._num_obs
 
     def is_scene_policy(self):
-        return self._policy_obs_mode == "clean_scene"
+        return True
 
     def get_policy_obs_mode(self):
         return self._policy_obs_mode
@@ -470,30 +444,7 @@ class HumanoidMA(Humanoid):
 
     # ------------------------------------------------------------------ observations
 
-    def _compute_observations(self, env_ids=None):
-        obs = self._compute_humanoid_obs(env_ids)
 
-        if (env_ids is None):
-            self.obs_buf[:] = obs.view(self.num_envs * self.num_agents, -1)
-        else:
-            self.obs_buf[self._flat_slot_ids(env_ids)] = obs.view(env_ids.shape[0] * self.num_agents, -1)
-        return
-
-    def _compute_humanoid_obs(self, env_ids=None):
-        """Returns (B, M, M * humanoid_obs_size): for every ego, every humanoid, ego-first."""
-        if (env_ids is None):
-            body_pos = self._rigid_body_pos
-            body_rot = self._rigid_body_rot
-            body_vel = self._rigid_body_vel
-            body_ang_vel = self._rigid_body_ang_vel
-        else:
-            kin = self._kinematic_humanoid_rigid_body_states[env_ids]
-            body_pos = kin[..., 0:3]
-            body_rot = kin[..., 3:7]
-            body_vel = kin[..., 7:10]
-            body_ang_vel = kin[..., 10:13]
-
-        return self._build_humanoid_tokens(body_pos, body_rot, body_vel, body_ang_vel, env_ids)
 
     def _build_humanoid_tokens(self, body_pos, body_rot, body_vel, body_ang_vel, env_ids=None):
         B = body_pos.shape[0]
@@ -506,47 +457,20 @@ class HumanoidMA(Humanoid):
 
         arena = self._arena_pose_feats(own_root_pos, own_root_rot, env_ids)     # (B*M, 4)
 
-        if self._obs_frame in ("global", "owner"):
-            # one transform per humanoid; a row is then a pure gather.
-            #   global -> everybody described in the env-centred world frame
-            #   owner  -> everybody described in its own heading frame
-            if self._obs_frame == "global":
-                frame_pos, frame_rot = self._global_frame(B * M, env_ids)
-            else:
-                frame_pos, frame_rot = own_root_pos, own_heading
-
-            obs = compute_humanoid_observations_rel_max(
-                body_pos.reshape(-1, nb, 3), body_rot.reshape(-1, nb, 4),
-                body_vel.reshape(-1, nb, 3), body_ang_vel.reshape(-1, nb, 3),
-                frame_pos, frame_rot,
-                self._local_root_obs_policy, self._root_height_obs_policy)
-
-            if self._obs_frame == "global":
-                # positions live in [-1, 1]-ish arena units; the entity-wise normaliser
-                # would rescale them anyway, this just keeps the raw obs readable
-                obs[:, 1:1 + 3 * nb] = obs[:, 1:1 + 3 * nb] / self._arena_scale
-
-            obs = torch.cat([obs, arena], dim=-1).view(B, M, -1)                # (B, M, size)
-            obs = obs[:, self._ego_perm]                                        # (B, M, M, size)
-            return obs.reshape(B, M, M * self.get_humanoid_obs_size())
-
-        # "ego": M transforms per humanoid, one per observer
-        perm = self._ego_perm
-        sub_pos = body_pos[:, perm].reshape(-1, nb, 3)                          # (B*M*M, nb, 3)
-        sub_rot = body_rot[:, perm].reshape(-1, nb, 4)
-        sub_vel = body_vel[:, perm].reshape(-1, nb, 3)
-        sub_ang_vel = body_ang_vel[:, perm].reshape(-1, nb, 3)
-
-        ego_pos = own_root_pos.view(B, M, 3).unsqueeze(2).expand(B, M, M, 3).reshape(-1, 3)
-        ego_rot = own_heading.view(B, M, 4).unsqueeze(2).expand(B, M, M, 4).reshape(-1, 4)
+        frame_pos, frame_rot = own_root_pos, own_heading
 
         obs = compute_humanoid_observations_rel_max(
-            sub_pos, sub_rot, sub_vel, sub_ang_vel, ego_pos, ego_rot,
+            body_pos.reshape(-1, nb, 3), body_rot.reshape(-1, nb, 4),
+            body_vel.reshape(-1, nb, 3), body_ang_vel.reshape(-1, nb, 3),
+            frame_pos, frame_rot,
             self._local_root_obs_policy, self._root_height_obs_policy)
 
-        sub_arena = arena.view(B, M, 4)[:, perm].reshape(-1, 4)
-        obs = torch.cat([obs, sub_arena], dim=-1)
-        return obs.view(B, M, M * self.get_humanoid_obs_size())
+
+        obs = torch.cat([obs, arena], dim=-1).view(B, M, -1)                # (B, M, size)
+        obs = obs[:, self._ego_perm]                                        # (B, M, M, size)
+        return obs.reshape(B, M, M * self.get_humanoid_obs_size())
+
+        # "ego": M transforms per humanoid, one per observer
 
     # ------------------------------------------------------------------ stepping
 

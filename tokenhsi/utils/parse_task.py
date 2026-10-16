@@ -26,86 +26,20 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from env.tasks.humanoid import Humanoid
-from env.tasks.humanoid_amp import HumanoidAMP
-
-######### basic interaction skills
-from env.tasks.basic_interaction_skills.humanoid_traj import HumanoidTraj
-from env.tasks.basic_interaction_skills.humanoid_sit import HumanoidSit
-from env.tasks.basic_interaction_skills.humanoid_carry import HumanoidCarry
-from env.tasks.basic_interaction_skills.humanoid_climb import HumanoidClimb
-#########
-
-######### multi task
-from tokenhsi.env.tasks.multi_task.humanoid_traj_sit_carry_climb import HumanoidTrajSitCarryClimb
-#########
-
-######### policy adaptation
-
-# skill composition
-from env.tasks.comp_interaction_skills.humanoid_comp_sit_carry import HumanoidCompSitCarry
-from env.tasks.comp_interaction_skills.humanoid_comp_climb_carry import HumanoidCompClimbCarry
-from env.tasks.comp_interaction_skills.humanoid_comp_traj_carry import HumanoidCompTrajCarry
-
-# object shape variation
-from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_box2objs import HumanoidAdaptCarryBox2Objs
-
-# terrain shape variation
-from env.tasks.adapt_interaction_skills.humanoid_adapt_traj_ground2terrain import HumanoidAdaptTrajGround2Terrain
-from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_ground2terrain import HumanoidAdaptCarryGround2Terrain
-
-# The long-horizon task imports optional PyTorch3D rendering dependencies. Import it
-# lazily in parse_task so unrelated tasks such as HumanoidMACarry do not require them.
-
-#########
-
-######### multi agent
-from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
-#########
-
-from env.tasks.vec_task_wrappers import VecTaskPythonWrapper
-from env.tasks.multi_agent.vec_task_wrapper_ma import VecTaskPythonWrapperMA
-
-from isaacgym import rlgpu
-
-import json
 import numpy as np
 
+from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
+from env.tasks.multi_agent.vec_task_wrapper_ma import VecTaskPythonWrapperMA
 
-def warn_task_name():
-    raise Exception(
-        "Unrecognized task!\nTask should be one of: [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]")
 
 def parse_task(args, cfg, cfg_train, sim_params):
-
-    # create native task and pass custom config
-    device_id = args.device_id
-    rl_device = args.rl_device
-
-    cfg["seed"] = cfg_train.get("seed", -1)
-    cfg_task = cfg["env"]
-    cfg_task["seed"] = cfg["seed"]
-
-    if args.task == "HumanoidLongTerm4BasicSkills":
-        from tokenhsi.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills \
-            import HumanoidLongTerm4BasicSkills
-        task_class = HumanoidLongTerm4BasicSkills
-    else:
-        task_class = globals().get(args.task)
-
-    if task_class is None:
-        warn_task_name()
-    task = task_class(
-        cfg=cfg,
-        sim_params=sim_params,
-        physics_engine=args.physics_engine,
-        device_type=args.device,
-        device_id=device_id,
-        headless=args.headless)
-    if hasattr(task, "num_agents"):
-        # multi-agent tasks emit one obs/reward row per (env, agent)
-        env = VecTaskPythonWrapperMA(task, rl_device, cfg_train.get("clip_observations", np.inf), cfg_train.get("clip_actions", 1.0))
-    else:
-        env = VecTaskPythonWrapper(task, rl_device, cfg_train.get("clip_observations", np.inf), cfg_train.get("clip_actions", 1.0))
-
+    if args.task != 'HumanoidMACarry':
+        raise ValueError('Only HumanoidMACarry is supported')
+    cfg['seed'] = cfg_train.get('seed', -1)
+    cfg['env']['seed'] = cfg['seed']
+    task = HumanoidMACarry(cfg=cfg, sim_params=sim_params,
+        physics_engine=args.physics_engine, device_type=args.device,
+        device_id=args.device_id, headless=args.headless)
+    env = VecTaskPythonWrapperMA(task, args.rl_device,
+        cfg_train.get('clip_observations', np.inf), cfg_train.get('clip_actions',1.))
     return task, env

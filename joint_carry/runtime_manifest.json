@@ -12,8 +12,6 @@
     "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_113_18_poses.npy": "da3cbd49ce4098d28bc89b8e6e06515e401db8e60b8e3de81addbe4e15845ebc",
     "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_141_33_poses.npy": "8b8e8e00c7c1300c5080682ecf3a2175178276d0cfdef37167012d42c577739b",
     "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_143_40_poses.npy": "edb00868dd9a73813fb0b7c25bcea5e2d9e211d691d6a19af4267d84a3e5d924",
-    "joint_carry/carry_joint_corrected/pickUp/cooperative_rsi_candidate.npz": "86ca0be79a155fcfbaecf642706a60703bb82798a0df5c5348cd8423e46a8fee",
-    "joint_carry/carry_joint_corrected/pickUp/screened_rsi_snapshots.npz": "b1877816b3e6b4d65eb93b152f7c7a1534ad22ab0417be15a27cd43718dea010",
     "joint_carry/carry_joint_corrected/carryWith/cooperative_rsi_candidate.npz": "a4807c9eb1d60626f23c4c1ccf637e9c711f756baf2fc8eaa387662e3f5ab2cc",
     "joint_carry/carry_joint_corrected/carryWith/screened_rsi_snapshots.npz": "97fc207bfe4101a553d6244e0fb52943072d0a3f182882d4d29110c0dde3f284",
     "joint_carry/carry_joint_corrected/putDown/cooperative_rsi_candidate.npz": "410f8e5fe8ba06dcb54fa552d9d7a5d9cc62c74e4ca440463e056a8fdc2ba913",
