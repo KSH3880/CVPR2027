@@ -81,6 +81,10 @@ def validate_relation_config(config):
     expected = REWARD
     if "at_distance_tolerance" in config["success"]:
         expected = dict(REWARD, success=dict(REWARD["success"], at_distance_tolerance=0.2))
+    if config['joint_carry']['independent'].get('group_sampler') == 'four_agent_random_groups':
+        independent = dict(placement_gate='own_current_holding', rsi='stage1_size_aware',
+            group_sampler='four_agent_random_groups')
+        expected = dict(expected, joint_carry=dict(expected['joint_carry'], independent=independent))
     if {k: v for k, v in config.items() if k != "diagnostics"} != expected:
         raise ValueError("Unsupported SA joint-carry reward contract")
 

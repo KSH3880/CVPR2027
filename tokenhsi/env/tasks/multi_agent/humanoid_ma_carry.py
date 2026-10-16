@@ -52,16 +52,19 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         self._joint_loco_platform = None
         self._relation_graph_spec = cfg['env']['relationGraph']
         from utils.mixed_carry_spec import MIXED_PRESETS
+        from utils.group_carry_spec import GROUP_PRESETS
         default = 'joint_carry_at' if cfg['args'].test or cfg['args'].eval else 'random_scenario'
         self._task_graph_preset = getattr(cfg['args'],'task_graph','') or default
         self._task_role_swap = bool(getattr(cfg['args'],'task_role_swap',False))
-        if self._task_graph_preset not in MIXED_PRESETS:
+        presets = GROUP_PRESETS if cfg['env']['numAgents'] == 4 else MIXED_PRESETS
+        if self._task_graph_preset not in presets:
             raise ValueError('Unknown carry task graph preset')
         if not (cfg['args'].test or cfg['args'].eval) and self._task_graph_preset != 'random_scenario':
             raise ValueError('Training requires random_scenario')
         self._relation_rsi = None
         self._template_rsi = cfg['env']['templateRsi']
         self.num_objects = int(cfg['env']['numObjects'])
+        self.num_physical_objects = int(cfg['env'].get('numPhysicalObjects', self.num_objects))
         self._context_suffix_width = 5*int(cfg['env']['numAgents'])
         self.REWARD_TERM_NAMES = ('edge_state','edge_progress','edge_success',
                                   'power','collision','box_speed','total')
@@ -203,7 +206,11 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         self._build_assignment_tensors()
         if self._joint_loco_platform_cfg is not None:
             from env.tasks.multi_agent.joint_carry_platform import JointCarryPlatform
-            self._joint_loco_platform = JointCarryPlatform(self)
+            if self.num_agents == 4:
+                from env.tasks.multi_agent.group_carry_platform import GroupCarryPlatform
+                self._joint_loco_platform = GroupCarryPlatform(self)
+            else:
+                self._joint_loco_platform = JointCarryPlatform(self)
 
         self._every_env_init_dof_pos = torch.zeros((N, M, self.num_dof), device=self.device, dtype=torch.float)
         if self._grasp_view:
@@ -291,7 +298,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                       + self.num_agents * self.get_clean_goal_obs_size())
         kinematic_width = self.get_scene_num_tokens() * self.get_scene_kinematic_size()
         width = node_width + kinematic_width + self.get_relation_suffix_size()
-        return width * (2 if self._grasp_view else 1)
+        return width * (self.num_agents if self._grasp_view else 1)
 
 
     def _validate_joint_carry_env(self, env):
@@ -450,7 +457,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         for humanoid_handle in self.humanoid_handles_all[env_id]:
             self._filter_platform_foot_collisions(env_ptr, humanoid_handle)
 
-        for object_id in range(self.num_objects):
+        for object_id in range(self.num_physical_objects):
             self._build_box(env_id, object_id, env_ptr)
 
         if self._reset_random_height:
@@ -462,7 +469,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 self._build_marker(env_id, a, env_ptr)
         if self._joint_loco_platform_cfg is not None:
             from env.tasks.multi_agent.joint_carry_platform import build_platform
-            build_platform(self, env_id, env_ptr)
+            for _ in range(2 if self.num_agents == 4 else 1):
+                build_platform(self, env_id, env_ptr)
         return
 
     def _filter_platform_foot_collisions(self, env_ptr, humanoid_handle):
@@ -483,7 +491,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         col_filter = 0
         segmentation_id = 0
 
-        box_idx = env_id * self.num_objects + object_id
+        box_idx = env_id * self.num_physical_objects + object_id
         # This pose only exists until the first reset.  Spread extra objects around the
         # arena so that actor creation itself never depends on an owner assignment.
         angle = 2.0 * np.pi * float(object_id) / float(max(1, self.num_objects))
@@ -538,7 +546,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         return
 
     def _build_box_tensors(self):
-        N, M, O = self.num_envs, self.num_agents, self.num_objects
+        N, M, O = self.num_envs, self.num_agents, self.num_physical_objects
         num_actors = self.get_num_actors_per_env()
 
         self._box_states = self._root_states.view(N, num_actors, self._root_states.shape[-1])[:, M:M + O, :]
@@ -629,8 +637,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                     self.relation_runtime.graph, env_id).items()
             }
 
-            for physical_box in range(self.num_objects):
-                box_handle = self._box_handles[env_id * self.num_objects + physical_box]
+            for physical_box in range(self.num_physical_objects):
+                box_handle = self._box_handles[env_id * self.num_physical_objects + physical_box]
                 owners = owners_by_box.get(physical_box, [])
                 color = (shared_color if len(owners) > 1 else
                          self._agent_color(next(iter(owners))) if owners else unassigned_color)
@@ -679,7 +687,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
     def _build_marker_state_tensors(self):
         N, M, O = self.num_envs, self.num_agents, self.num_objects
         num_actors = self._root_states.shape[0] // N
-        marker_start = M + O + (2 * M if self._reset_random_height else 0)
+        marker_start = M + self.num_physical_objects + (2 * M if self._reset_random_height else 0)
 
         self._marker_states = self._root_states.view(N, num_actors, self._root_states.shape[-1]) \
             [:, marker_start:marker_start + M, :]

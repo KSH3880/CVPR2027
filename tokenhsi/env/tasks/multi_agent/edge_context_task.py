@@ -56,7 +56,7 @@ class EdgeContextTaskMixin:
         if getattr(self, '_grasp_view', False):
             from learning.multi_agent.grasp_view import initial_grasp_sides
             raw = self._compute_clean_scene_obs(env_ids, grasp_view=False)
-            self._grasp_sides[env_ids] = initial_grasp_sides(raw)
+            self._grasp_sides[env_ids] = initial_grasp_sides(raw, self.num_agents, self.num_objects)
 
     @torch.no_grad()
     def _compute_relation_reward(self, collision_fn):
@@ -71,7 +71,15 @@ class EdgeContextTaskMixin:
             power = -self._power_coefficient * (self.dof_force_tensor * self._dof_vel).abs().sum(-1)
         if self._agent_collision_penalty and self.num_agents > 1:
             cpa = self._relation_cfg['joint_carry']['collision']
-            if cpa.get('mode') == 'cpa':
+            if self.num_agents == 4:
+                from env.tasks.multi_agent.group_carry_reward import group_cpa_release
+                from env.tasks.multi_agent.joint_carry_reward import cpa_collision_penalty
+                released = group_cpa_release(roots, self._logical_box_values(self._box_states),
+                    self._logical_box_values(self._box_size), graph, cpa['release_buffer'])
+                collision = -self._agent_collision_coeff*cpa_collision_penalty(
+                    roots, self._humanoid_root_states[..., 7:10], self._agent_collision_dist,
+                    cpa['ttc_discount'], self.dt, released)
+            elif cpa.get('mode') == 'cpa':
                 from env.tasks.multi_agent.joint_carry_reward import cpa_collision_penalty
                 collision = -self._agent_collision_coeff * cpa_collision_penalty(
                     roots, self._humanoid_root_states[..., 7:10], self._agent_collision_dist,

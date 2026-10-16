@@ -19,7 +19,7 @@ from env.tasks.multi_agent.edge_interaction_reward import interaction_own_succes
 from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
 
 
-def cpa_collision_penalty(root_pos, root_vel, min_distance, discount, dt):
+def cpa_collision_penalty(root_pos, root_vel, min_distance, discount, dt, released=None):
     relative_pos = root_pos[:, :, None, :2] - root_pos[:, None, :, :2]
     relative_vel = root_vel[:, :, None, :2] - root_vel[:, None, :, :2]
     dot = (relative_pos * relative_vel).sum(-1)
@@ -32,6 +32,8 @@ def cpa_collision_penalty(root_pos, root_vel, min_distance, discount, dt):
     urgency = torch.pow(torch.full_like(time, discount), time / dt)
     violation = closing * risk * urgency
     diagonal = torch.eye(root_pos.shape[1], device=root_pos.device, dtype=torch.bool)
+    if released is not None:
+        violation = violation.masked_fill(released, 0.)
     return violation.masked_fill(diagonal, 0.).amax(-1)
 
 
@@ -63,6 +65,9 @@ def opposite_gate(scores, threshold):
 
 
 def apply_joint_geometry(phi, diag, hands, objects, sizes, graph, config):
+    if graph.num_agents == 4:
+        from env.tasks.multi_agent.group_carry_reward import apply_group_geometry
+        return apply_group_geometry(phi, diag, hands, objects, sizes, graph, config)
     scores, anchors = anchor_scores(hands, objects[:, 0], sizes[:, 0],
         config['joint_carry']['anchor_inset'], config['holding']['hand_distance_scale'])
     relation = batched(graph.edge_relation, len(phi))
@@ -82,7 +87,7 @@ def apply_joint_geometry(phi, diag, hands, objects, sizes, graph, config):
 class JointCarryRuntime(Stage1ContextRuntime):
     def __init__(self, n, graph, config, device):
         super().__init__(n, graph, config, device)
-        self.coupled_holding = torch.zeros(n, dtype=torch.bool, device=device)
+        self.coupled_holding = torch.zeros((n, 4) if graph.num_agents == 4 else (n,), dtype=torch.bool, device=device)
 
     def current_success(self, phi, z_error, feet_error, graph, region_error, gate, distance=None):
         success = interaction_own_success(phi, z_error, feet_error, graph, self.config, region_error, distance)
@@ -93,6 +98,12 @@ class JointCarryRuntime(Stage1ContextRuntime):
         own_holding = owner_sum((holding & graph.edge_valid &
             (phi >= self.config['satisfaction_threshold'])).float(), graph) > 0
         owner = batched(graph.edge_owner, len(phi))
+        if graph.num_agents == 4:
+            from utils.task_role_spec import task_graph_packet
+            from learning.multi_agent.human_coordination import human_relations
+            joint = (human_relations(task_graph_packet(graph, len(phi)), 4) == 2).any(-1)
+            placement = torch.where(joint, gate, own_holding).gather(1, owner)
+            return graph.edge_valid & (holding | placement)
         placement = torch.where(joint_scenes(graph)[:, None], gate[:, None],
                                 own_holding.gather(1, owner))
         return graph.edge_valid & (holding | placement)

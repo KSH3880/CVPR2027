@@ -21,6 +21,7 @@ from env.tasks.multi_agent.relation_diagnostics import relation_tensorboard_tag
 
 
 class MAAgent(amp_agent.AMPAgent):
+    store_next_observations = False
 
     def _preproc_amp_obs(self, amp_obs):
         normalized = super()._preproc_amp_obs(amp_obs)
@@ -64,7 +65,7 @@ class MAAgent(amp_agent.AMPAgent):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
-                num_views=2 if getattr(task, '_grasp_view', False) else 1,
+                num_views=task.num_agents if getattr(task, '_grasp_view', False) else 1,
             ).to(self.ppo_device)
 
         assert not self.is_rnn, "clean_scene currently supports the feed-forward PPO path only"
@@ -76,6 +77,7 @@ class MAAgent(amp_agent.AMPAgent):
             scene_batch_size, scene_minibatch_size, self.is_discrete,
             self.is_rnn, self.ppo_device, self.seq_len)
         self._stage2_policy = getattr(task, '_stage2', False)
+        self._cache_frozen_actor = config.get('cache_frozen_actor', False)
         from learning.multi_agent.stage2_transfer import (
             freeze_stage2_encoder, transfer_stage1_weights)
         self._stage2_checkpoint_info = None
@@ -122,8 +124,6 @@ class MAAgent(amp_agent.AMPAgent):
         super().init_tensors()
         shape = (self.horizon_length, self.num_actors) + tuple(self.obs_shape)
         self.experience_buffer.tensor_dict['obses'] = torch.zeros(
-            shape, dtype=torch.float32, device=self.ppo_device)
-        self.experience_buffer.tensor_dict['next_obses'] = torch.zeros(
             shape, dtype=torch.float32, device=self.ppo_device)
         return
 
@@ -241,7 +241,6 @@ class MAAgent(amp_agent.AMPAgent):
                 relation_near_masks.append(infos['relation_near_unplaced_slow'].clone())
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', step_idx, shaped_rewards)
-            self.experience_buffer.update_data('next_obses', step_idx, self.obs['obs'])
             self.experience_buffer.update_data('dones', step_idx, self.dones)
             self.experience_buffer.update_data('amp_obs', step_idx, infos['amp_obs'])
             self.experience_buffer.update_data('rand_action_mask', step_idx,
@@ -299,7 +298,7 @@ class MAAgent(amp_agent.AMPAgent):
             value = self.experience_buffer.tensor_dict.get(key)
             if value is None:
                 continue
-            if key in ('obses', 'next_obses'):
+            if key == 'obses':
                 batch_dict[key] = self._flatten_scene_tensor(value)
             elif key == 'states':
                 batch_dict[key] = a2c_common.swap_and_flatten01(value)
@@ -343,6 +342,13 @@ class MAAgent(amp_agent.AMPAgent):
             'amp_obs_replay': batch_dict['amp_obs_replay'],
             'rand_action_mask': rand_action_mask,
         }
+        if self._cache_frozen_actor:
+            network = self.model.a2c_network
+            with torch.no_grad(), torch.cuda.amp.autocast(enabled=self.mixed_precision):
+                dataset_dict['actor_features'] = torch.cat([
+                    network.encode_actor(self._preproc_obs(chunk))
+                    for chunk in batch_dict['obses'].split(self.minibatch_size // self.num_agents)
+                ])
         self.dataset.update_values_dict(dataset_dict)
         return
 
@@ -467,6 +473,7 @@ class MAAgent(amp_agent.AMPAgent):
             'amp_obs': amp_obs,
             'amp_obs_replay': amp_obs_replay,
             'amp_obs_demo': amp_obs_demo,
+            'actor_features': input_dict.get('actor_features'),
         }
 
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):

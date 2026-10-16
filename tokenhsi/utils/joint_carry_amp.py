@@ -15,12 +15,20 @@ def validate_training(env, train=None):
     grasp = env.get('jointCarryGraspView')
     if grasp is not None:
         from learning.multi_agent.grasp_view import GRASP_VIEW
-        if grasp != GRASP_VIEW or env.get('jointCarryTraining', {}).get('policy') != 'human_sa4_actor_critic' or (env['numAgents'], env['numObjects']) != (2, 4):
-            raise ValueError('Grasp-view contract requires two-human SA4')
+        if grasp != GRASP_VIEW or env.get('jointCarryTraining', {}).get('policy') != 'human_sa4_actor_critic' or (env['numAgents'], env['numObjects']) not in ((2, 4), (4, 8)):
+            raise ValueError('Grasp-view contract requires supported human/object counts and SA4')
     spec = env['jointCarryTraining']
     from utils.mixed_carry_spec import MIXED_SAMPLER
-    if env['relationGraph']['sampler'] != MIXED_SAMPLER or spec['policy'] != 'human_sa4_actor_critic':
+    from utils.group_carry_spec import GROUP_SAMPLER
+    if env['relationGraph']['sampler'] not in (MIXED_SAMPLER, GROUP_SAMPLER) or spec['policy'] != 'human_sa4_actor_critic':
         raise ValueError('SA4 requires Mixed80 and the human-SA policy contract')
+    if env['relationGraph']['sampler'] == GROUP_SAMPLER:
+        expected_groups = dict(humans=4, physical_objects=12, logical_objects=8,
+            pairing_probability=.8, ontop_probability=.5, mask_unused_entities=True)
+        if spec.get('groups') != expected_groups:
+            raise ValueError('Four-agent group checkpoint contract is missing or inconsistent')
+    elif 'groups' in spec:
+        raise ValueError('Two-agent configuration cannot use the group contract')
     amp = spec['amp']
     if (amp['probabilities'] != {'original': .8, 'backward': .1, 'sideways': .1}
             or amp['sampling'] != 'uniform_clip_then_uniform_time'

@@ -41,7 +41,7 @@ class SizeRsiCache:
             with gzip.open(self.path, 'rb') as stream:
                 self.entries = pickle.load(stream)
         self.sizes = env._box_size.cpu().tolist()
-        self.eligible = task_probabilities(env._box_size[:, :2]).cpu()
+        self.eligible = task_probabilities(env._box_size[:, :env.num_agents]).cpu()
         self.eligible[env._joint_env_mask.cpu()] = 0
         self.eligible[:, :, 1:3] = 0
         self._build_missing()
@@ -49,7 +49,7 @@ class SizeRsiCache:
 
     def _key(self, kind, row, owner):
         source = size_key(self.sizes[row][owner])
-        return (kind, source, size_key(self.sizes[row][2+owner])) if kind == 'putDownOnTop' else (kind, source)
+        return (kind, source, size_key(self.sizes[row][self.env.num_agents+owner])) if kind == 'putDownOnTop' else (kind, source)
 
     def _profiles(self, kind, owner, pending):
         task = 1 if kind == 'sit' else 2 if kind == 'climb' else 4 if kind == 'putDownOnTop' else 0
@@ -67,7 +67,7 @@ class SizeRsiCache:
         pending = set()
         work = [(kind, owner, self._profiles(kind, owner, pending))
                 for kind in ('sit', 'climb', 'pickUp', 'carryWith', 'putDown', 'putDownOnTop')
-                for owner in (0, 1)]
+                for owner in range(env.num_agents)]
         if not any(profiles for _, _, profiles in work):
             print('[size RSI] cache hit:', self.path, flush=True)
             return
@@ -125,7 +125,7 @@ class SizeRsiCache:
                 env._humanoid_root_states[..., 0] += torch.arange(env.num_agents, device=env.device)*3
                 env._humanoid_root_states[..., 7:13] = 0.
                 env._box_states[..., :2] = env._env_origins[:, None, :2] - 15.
-                env._box_states[..., 0] -= torch.arange(env.num_objects, device=env.device)*2
+                env._box_states[..., 0] -= torch.arange(env._box_states.shape[1], device=env.device)*2
                 env._box_states[..., 2] = env._box_size[..., 2]/2
                 env._box_states[..., 3:7] = torch.tensor([0., 0., 0., 1.], device=env.device)
                 env._box_states[..., 7:13] = 0.
@@ -136,8 +136,8 @@ class SizeRsiCache:
                 env._box_states[rows, owner, 3:7] = box_rot[frame]
                 checked = [owner]
                 if end is not None:
-                    env._box_states[rows, 2+owner, :2] = end[0, :2]+offset[:, :2]
-                    checked.append(2+owner)
+                    env._box_states[rows, env.num_agents+owner, :2] = end[0, :2]+offset[:, :2]
+                    checked.append(env.num_agents+owner)
                 initial_root = env._humanoid_root_states[rows, owner].clone()
                 initial_boxes = env._box_states[rows][:, checked].clone()
                 env.gym.set_actor_root_state_tensor(env.sim, gymtorch.unwrap_tensor(env._root_states))
@@ -168,19 +168,19 @@ class SizeRsiCache:
     def _prepare_sampling(self):
         env = self.env
         self.pools = {}
-        self.available = torch.ones(env.num_envs, 2, len(env._skill), dtype=torch.bool, device=env.device)
+        self.available = torch.ones(env.num_envs, env.num_agents, len(env._skill), dtype=torch.bool, device=env.device)
         for skill in ('sit', 'climb', 'pickUp', 'carryWith', 'putDown'):
             lib = env._motion_lib[skill]
             kinds = ('putDown', 'putDownOnTop') if skill == 'putDown' else (skill,)
             for kind in kinds:
-                starts = torch.zeros(env.num_envs, 2, lib.num_motions(), 2, dtype=torch.long)
+                starts = torch.zeros(env.num_envs, env.num_agents, lib.num_motions(), 2, dtype=torch.long)
                 counts = torch.zeros_like(starts)
                 flat = []
-                weights = torch.zeros(env.num_envs, 2, lib.num_motions())
+                weights = torch.zeros(env.num_envs, env.num_agents, lib.num_motions())
                 offsets = {}
                 total = 0
                 for row in range(env.num_envs):
-                    for owner in (0, 1):
+                    for owner in range(env.num_agents):
                         key = self._key(kind, row, owner)
                         if key not in self.entries:
                             continue

@@ -55,7 +55,7 @@ class SampledOnTopTaskMixin:
         self._ontop_last_diag=None
         from isaacgym import gymtorch
         forces=gymtorch.wrap_tensor(self.gym.acquire_net_contact_force_tensor(self.sim))
-        self._ontop_box_contact=forces.view(self.num_envs,-1,3)[:,self.num_agents*self.num_bodies:self.num_agents*self.num_bodies+self.num_objects]
+        self._ontop_box_contact=forces.view(self.num_envs,-1,3)[:,self.num_agents*self.num_bodies:self.num_agents*self.num_bodies+self.num_physical_objects]
 
     def _evaluate_ontop_context(self, env_ids=None):
         bodies=self._rigid_body_pos if env_ids is None else self._kinematic_humanoid_rigid_body_states[env_ids,...,:3]

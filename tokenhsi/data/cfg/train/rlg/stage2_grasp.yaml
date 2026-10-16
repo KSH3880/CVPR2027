@@ -92,6 +92,7 @@ params:
     horizon_length: 32
     minibatch_size: 16384
     mini_epochs: 6
+    cache_frozen_actor: true
     critic_coef: 5
     clip_value: false
     seq_len: 4

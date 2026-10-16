@@ -127,7 +127,7 @@ class JointCarryReset:
         t = self.task
         actors = [t._humanoid_actor_ids[ids].flatten(), t._box_actor_ids[ids].flatten()]
         if t._joint_loco_platform is not None:
-            actors.append(t._joint_loco_platform.actor_ids[ids])
+            actors.append(t._joint_loco_platform.actor_ids[ids].flatten())
         if t._enable_markers:
             t._marker_pos[ids] = t._tar_pos[ids]
             graph = t.relation_runtime.graph

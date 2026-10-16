@@ -1,14 +1,14 @@
 # 레포 구조
 
-Human SA4와 SA4 GraspView에 기존 AT/AT20 총 네 설정을 제공한다. 실행법은 [config.md](config.md)에 있다.
+Human SA4와 SA4 GraspView에 기존 AT/AT20 및4명 랜덤 그룹 AT20까지 총 여섯 설정을 제공한다. 실행법은 [config.md](config.md)에 있다.
 
 | 경로 | 역할 |
 | --- | --- |
 | `tokenhsi/run.py`, `utils/parse_task.py` | HumanoidMACarry와 MA PPO/AMP 등록·실행 |
-| `tokenhsi/data/cfg/multi_agent/stage2*.yaml` | 네 설정의 환경 YAML |
-| `tokenhsi/data/cfg/train/rlg/stage2*.yaml` | 네 설정의 학습 YAML |
+| `tokenhsi/data/cfg/multi_agent/stage2*.yaml` | 여섯 설정의 환경 YAML |
+| `tokenhsi/data/cfg/train/rlg/stage2*.yaml` | 여섯 설정의 학습 YAML |
 | `tokenhsi/scripts/multi_agent/stage2*_{train,test,vnc}.sh` | 전용 학습·로컬 평가·서버 VNC |
-| `tokenhsi/scripts/multi_agent/runtime_env.sh`, `mps_auto_env.sh`, `run-gui.sh`, `mps/` | 공통 conda/GPU/MPS/VNC 실행 준비 |
+| `tokenhsi/scripts/multi_agent/runtime_env.sh`, `mps_auto_env.sh`, `run-gui.sh`, `gui_gpu_env.sh`, `mps/` | 공통 conda/GPU/MPS/VNC 실행 준비 |
 | `tokenhsi/learning/multi_agent/amp_network_builder_ma.py` | Stage1과 호환되는 task embedding/GTA encoder와64입력 head |
 | `tokenhsi/learning/multi_agent/human_coordination.py` | human SA4·SELF/COUPLED/NONE 관계·human 순열 |
 | `tokenhsi/learning/multi_agent/grasp_view.py` | GraspView 관측·고정 앵커 배정·자기 human 선택 |
@@ -16,6 +16,10 @@ Human SA4와 SA4 GraspView에 기존 AT/AT20 총 네 설정을 제공한다. 실
 | `tokenhsi/learning/multi_agent/ma_agent.py`, `ma_players.py`, `edge_context_eval.py` | scene 단위 PPO/AMP 학습과 평가 |
 | `tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py`, `edge_context_task.py`, `edge_ontop_task.py` | 관측·물리·공동/단독 reset·진단 |
 | `tokenhsi/env/tasks/multi_agent/joint_carry_{reward,reset,platform}.py` | 반대 앵커 보상·CPA 해제·paired RSI·받침 |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_group_carry.py`, `group_carry_{reset,reward,platform}.py` | 4명 asset bank·그룹별 RSI/배치/gate/CPA/받침·진단 |
+| `tokenhsi/utils/group_carry_spec.py` | 랜덤 pairing·8슬롯 graph·12물리 상자 매핑·비활성 토큰 mask |
+| `tokenhsi/tests/test_group_carry.py`, `check_group_physics.py`, `check_group_checkpoints.py` | 4명 순열/분포/격리 CPU 검사·실제 물리/부분 reset 검사 |
+| `tokenhsi/tests/test_actor_feature_cache.py` | 2/4명·GraspView별 encoder 캐시의 출력·gradient·6회 업데이트 비교 |
 | `tokenhsi/utils/mixed_carry_spec.py`, `joint_carry_spec.py`, `relation_task_spec.py` | 80/20 graph·실험 계약·체크포인트 검증 |
 | `tokenhsi/utils/size_rsi.py`, `env/tasks/multi_agent/size_rsi_cache.py` | 단독 size RSI와 초기 물리 검사 캐시 |
 | `tokenhsi/utils/edge_*`, `env/tasks/multi_agent/edge_*` | 현재 공동/단독 과제가 재사용하는 graph·geometry·보상 helper |

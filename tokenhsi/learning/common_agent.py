@@ -106,10 +106,10 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
     def init_tensors(self):
         super().init_tensors()
-        self.experience_buffer.tensor_dict['next_obses'] = torch.zeros_like(self.experience_buffer.tensor_dict['obses'])
+        if getattr(self, 'store_next_observations', True):
+            self.experience_buffer.tensor_dict['next_obses'] = torch.zeros_like(self.experience_buffer.tensor_dict['obses'])
+            self.tensor_list += ['next_obses']
         self.experience_buffer.tensor_dict['next_values'] = torch.zeros_like(self.experience_buffer.tensor_dict['values'])
-
-        self.tensor_list += ['next_obses']
         return
 
     def train(self):

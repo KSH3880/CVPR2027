@@ -19,6 +19,9 @@ def environment_mask(n, device, preset='random_scenario'):
 
 
 def validate_sampler(spec, m=2, o=4):
+    from utils.group_carry_spec import GROUP_SPEC
+    if spec == GROUP_SPEC and (m, o) == (4, 8):
+        return
     expected = dict(mode='edge_composition', sampler=MIXED_SAMPLER,
         semantic_only=True, policy_task_roles=True, max_edges_per_agent=2,
         edge_capacity=4, family_probabilities={'joint_carry_at': .4,
@@ -73,4 +76,7 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
 
 def compile_graph(spec, m, o, device=None):
     validate_sampler(spec, m, o)
+    if m == 4:
+        from utils.group_carry_spec import sample_graph as sample_groups
+        return select_graph(sample_groups(1, spec, device or 'cpu'), 0)
     return select_graph(sample_graph(1, spec, device or 'cpu', 'joint_carry_at'), 0)

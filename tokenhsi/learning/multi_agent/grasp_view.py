@@ -20,6 +20,8 @@ def joint_rows(packet):
 
 
 def make_grasp_views(obs, sides, inset):
+    if sides.shape[1] == 4:
+        return group_grasp_views(obs, sides, inset, sides.shape[1], (obs.shape[-1]-243*sides.shape[1])//37)
     views = obs[:, None].expand(-1, 2, -1).clone()
     n = len(obs)
     tasks = obs[:, -10:].reshape(n, 2, 5)
@@ -43,6 +45,11 @@ def make_grasp_views(obs, sides, inset):
 
 
 def encode_grasp_views(encoder, obs):
+    if encoder.num_agents == 4:
+        m = encoder.num_agents
+        humans = encoder(obs.reshape(-1, obs.shape[-1]//m)).reshape(len(obs), m, m, -1)
+        ids = torch.arange(m, device=obs.device)
+        return humans[:, ids, ids]
     views = obs.reshape(len(obs), 2, -1)
     joint = joint_rows(views[:, 0, -10:])
     paired = joint.nonzero().flatten()
@@ -56,7 +63,9 @@ def encode_grasp_views(encoder, obs):
     return result
 
 
-def initial_grasp_sides(obs):
+def initial_grasp_sides(obs, num_agents=2, num_objects=4):
+    if num_agents != 2:
+        return group_initial_sides(obs, num_agents, num_objects)
     poses = obs[:, 568:624].reshape(-1, 8, 7)
     payload = obs[:, -10:].reshape(-1, 2, 5)[:, 0, 3].long()
     box = poses[torch.arange(len(obs), device=obs.device), payload]
@@ -67,3 +76,50 @@ def initial_grasp_sides(obs):
     local = relative + q[..., 3:] * cross + torch.cross(q[..., :3], cross, dim=-1)
     first = torch.where(local[:, 0, 1] <= local[:, 1, 1], -1.0, 1.0)
     return torch.stack((first, -first), -1)
+
+
+def group_grasp_views(obs, sides, inset, m, o):
+    from utils.group_carry_spec import owner_tasks
+    from learning.multi_agent.human_coordination import human_relations
+    tasks = owner_tasks(obs[:, -5*m:], m)
+    coupled = (human_relations(obs[:, -5*m:], m) == 2).any(-1)
+    views = obs[:, None].expand(-1, m, -1).clone()
+    start = m*223
+    pose_start = start + o*30 + m
+    objects = views[:, :, start:start+o*30].reshape(len(obs), m, o, 30)
+    poses = views[:, :, pose_start:pose_start+(2*m+o)*7].reshape(len(obs), m, 2*m+o, 7)
+    row = torch.arange(len(obs), device=obs.device)[:, None]
+    human = torch.arange(m, device=obs.device)[None]
+    payload = tasks[..., 3].long()
+    box = objects[row, human, payload-m]
+    pose = poses[row, human, payload]
+    half_y = box[..., 6:].reshape(len(obs), m, 8, 3)[..., 1].abs().amax(-1)
+    delta = torch.zeros_like(pose[..., :3])
+    delta[..., 1] = (half_y-inset).clamp_min(0)*sides*coupled
+    q = pose[..., 3:7]
+    cross = 2*torch.cross(q[..., :3], delta, dim=-1)
+    pose[..., :3] += delta + q[..., 3:]*cross + torch.cross(q[..., :3], cross, dim=-1)
+    box[..., :3] += torch.cross(box[..., 3:6], delta, dim=-1)
+    poses[row, human, payload] = pose
+    objects[row, human, payload-m] = box
+    return views.flatten(1)
+
+
+def group_initial_sides(obs, m, o):
+    from utils.group_carry_spec import owner_tasks
+    from learning.multi_agent.human_coordination import human_relations
+    start = m*223+o*30+m
+    poses = obs[:, start:start+(2*m+o)*7].reshape(len(obs), 2*m+o, 7)
+    tasks = owner_tasks(obs[:, -5*m:], m)
+    coupled = human_relations(obs[:, -5*m:], m) == 2
+    box = poses[torch.arange(len(obs), device=obs.device)[:, None], tasks[..., 3].long()]
+    relative = poses[:, :m, :3] - box[..., :3]
+    q = box[..., 3:7].clone()
+    q[..., :3] *= -1
+    cross = 2*torch.cross(q[..., :3], relative, dim=-1)
+    y = (relative + q[..., 3:]*cross + torch.cross(q[..., :3], cross, dim=-1))[..., 1]
+    partner = (coupled*y[:, None]).sum(-1)
+    ids = torch.arange(m, device=obs.device)[None]
+    partner_id = (coupled*ids[:, None]).sum(-1)
+    negative = (y < partner) | ((y == partner) & (ids < partner_id))
+    return torch.where(negative, -1., 1.)*coupled.any(-1)

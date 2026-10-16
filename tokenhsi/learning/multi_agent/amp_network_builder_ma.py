@@ -230,6 +230,10 @@ class RelationEncoder(nn.Module):
             self.entity_types,
             self.build_relation_bias(),
         )
+        if self.relation_graph_spec.get('mask_unused_entities', False):
+            from utils.group_carry_spec import entity_validity
+            valid = entity_validity(obs[:, -self.suffix_width:], self.num_agents, self.num_objects)
+            bias = bias.masked_fill(~valid[None, :, None, None, :], float('-inf'))
         inverse = None
         if (
             self.relation_graph_spec.get("shuffle_token_order", False)
@@ -293,7 +297,7 @@ class AMPMultiAgentBuilder(AMPBuilder):
                 or cc.get("critic_ca") is not True
             ):
                 raise ValueError("Stage2 requires human SA4 actor/critic")
-            if self.grasp_view and (self.num_agents, self.num_objects) != (2, 4):
+            if self.grasp_view and (self.num_agents, self.num_objects) not in ((2, 4), (4, 8)):
                 raise ValueError("Grasp views require 2 humans / 4 objects")
             width = tp["num_features"]
 
@@ -396,15 +400,22 @@ class AMPMultiAgentBuilder(AMPBuilder):
                 humans = encoder(obs)
             return coordination(humans, None, obs[:, -encoder.suffix_width :], None)
 
-        def eval_actor(self, obs):
-            if self.stage2:
-                with torch.no_grad():
-                    if self.grasp_view:
-                        from learning.multi_agent.grasp_view import encode_grasp_views
+        def forward(self, obs_dict):
+            obs = obs_dict['obs']
+            actor = self.eval_actor(obs, obs_dict.get('actor_features'))
+            return actor + (self.eval_critic(obs), obs_dict.get('rnn_states'))
 
-                        humans = encode_grasp_views(self.actor_encoder, obs)
-                    else:
-                        humans = self.actor_encoder(obs)
+        @torch.no_grad()
+        def encode_actor(self, obs):
+            if self.grasp_view:
+                from learning.multi_agent.grasp_view import encode_grasp_views
+
+                return encode_grasp_views(self.actor_encoder, obs)
+            return self.actor_encoder(obs)
+
+        def eval_actor(self, obs, actor_features=None):
+            if self.stage2:
+                humans = self.encode_actor(obs) if actor_features is None else actor_features
                 encoded = self.coordination(
                     humans, None, obs[:, -self.actor_encoder.suffix_width :], None
                 )

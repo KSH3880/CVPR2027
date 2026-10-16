@@ -37,7 +37,11 @@ def parse_task(args, cfg, cfg_train, sim_params):
         raise ValueError('Only HumanoidMACarry is supported')
     cfg['seed'] = cfg_train.get('seed', -1)
     cfg['env']['seed'] = cfg['seed']
-    task = HumanoidMACarry(cfg=cfg, sim_params=sim_params,
+    task_class = HumanoidMACarry
+    if cfg['env']['relationGraph']['sampler'] == 'four_agent_random_groups':
+        from env.tasks.multi_agent.humanoid_ma_group_carry import HumanoidMAGroupCarry
+        task_class = HumanoidMAGroupCarry
+    task = task_class(cfg=cfg, sim_params=sim_params,
         physics_engine=args.physics_engine, device_type=args.device,
         device_id=args.device_id, headless=args.headless)
     env = VecTaskPythonWrapperMA(task, args.rl_device,

@@ -17,6 +17,11 @@ def validate_env(env):
     from utils.size_rsi import SCREEN
 
     validate_sampler(env["relationGraph"], env["numAgents"], env["numObjects"])
+    independent = dict(environment_fraction=.2, placement_gate='own_current_holding',
+        rsi='stage1_size_aware')
+    if env['numAgents'] == 4:
+        independent.pop('environment_fraction')
+        independent['group_sampler'] = 'four_agent_random_groups'
     if (
         env.get("sizeAwareRsi")
         != dict(
@@ -27,11 +32,7 @@ def validate_env(env):
         )
         or env.get("independentCarryRsi") != [0.4, 0.0, 0.0, 0.0, 0.0, 0.1, 0.4, 0.1]
         or env["relationReward"]["joint_carry"].get("independent")
-        != {
-            "environment_fraction": 0.2,
-            "placement_gate": "own_current_holding",
-            "rsi": "stage1_size_aware",
-        }
+        != independent
     ):
         raise ValueError(
             "Mixed carry requires size RSI and the independent holding gate"
