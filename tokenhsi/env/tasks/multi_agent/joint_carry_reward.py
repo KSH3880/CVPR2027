@@ -24,6 +24,20 @@ def cpa_collision_penalty(root_pos, root_vel, min_distance, discount, dt):
     return violation.masked_fill(diagonal, 0.).amax(-1)
 
 
+def joint_cpa_release(roots, objects, sizes, graph, buffer):
+    from utils.task_role_spec import task_graph_packet
+    n = len(roots)
+    valid, task, actor, payload, target = task_graph_packet(graph, n).reshape(n, 2, 5).long().unbind(-1)
+    coupled = (valid.bool().all(-1) & (task[:, 0] >= 2) & (task[:, 0] == task[:, 1])
+               & (actor[:, 0] != actor[:, 1]) & (payload[:, 0] == payload[:, 1])
+               & (target[:, 0] == target[:, 1]))
+    row = torch.arange(n, device=roots.device)
+    box = (payload[:, 0] - graph.num_agents).clamp(0, graph.num_objects - 1)
+    radius = sizes[row, box, :2].norm(dim=-1)/2 + buffer
+    distance = (roots[..., :2] - objects[row, box, None, :2]).norm(dim=-1)
+    return coupled & (distance <= radius[:, None]).all(-1)
+
+
 def anchor_scores(hands, box, size, inset, scale=10.):
     local = torch.zeros(box.shape[0], 2, 3, device=box.device, dtype=box.dtype)
     local[:, :, 1] = (size[:, 1:2] / 2 - inset) * box.new_tensor([-1., 1.])

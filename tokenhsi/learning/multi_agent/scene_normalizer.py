@@ -15,7 +15,7 @@ class SceneRunningMeanStd(nn.Module):
     """
 
     def __init__(self, entity_sizes, entity_counts, normalized_sizes=None,
-                 kinematic_size=13, extra_passthrough_size=0):
+                 kinematic_size=13, extra_passthrough_size=0, num_views=1):
         super().__init__()
         self.entity_sizes = list(entity_sizes)
         self.entity_counts = list(entity_counts)
@@ -23,6 +23,7 @@ class SceneRunningMeanStd(nn.Module):
                                  else list(normalized_sizes))
         self.kinematic_size = kinematic_size
         self.extra_passthrough_size = extra_passthrough_size
+        self.num_views = num_views
         assert len(self.normalized_sizes) == len(self.entity_sizes)
         assert all(0 <= norm_size <= size
                    for norm_size, size in zip(self.normalized_sizes, self.entity_sizes))
@@ -30,6 +31,11 @@ class SceneRunningMeanStd(nn.Module):
             [RunningMeanStd((sz,)) for sz in self.normalized_sizes if sz > 0])
 
     def forward(self, input, denorm=False, mask=None):
+        if self.num_views != 1:
+            return self._normalize(input.reshape(-1, input.shape[-1] // self.num_views), denorm).reshape(input.shape)
+        return self._normalize(input, denorm)
+
+    def _normalize(self, input, denorm):
         B = input.shape[0]
         out = []
         offset = 0

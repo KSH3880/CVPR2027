@@ -4,6 +4,36 @@
 
 ## 빠른 확인
 
+- **SA4 GraspView**: [설정·명령](#stage2-sa4-graspview). 공동에서 사람별 반대 앵커 관측→자기 human64→기존 SA4. 단독/AMP/RSI/보상 유지, Stage1 전이 후 새 학습.
+
+- Stage1 파지 중심 이동: [뷰어 명령](#stage1-grasp-shift). 두 사람이 같은 payload·목표를 공유하고 Stage1 CarryDistill30000으로 각각 추론한다. `SHIFT=0` 실제 중심 / `SHIFT=1` 각자 반대 앵커 관측; 학습 없음.
+
+- **LocoPlatform human SA4**: [설정·명령](#stage2-locoplatform-human-sa). task CA를 human SA4로 교체; SELF/COUPLED/NONE bias 모두 사용, Stage1 전이 후 새 Stage2 학습.
+
+- LocoPlatform 공동 query의 단독 task 차단 토이: [뷰어/명령](#locoplatform-ca-solo-mask). 기본 Platform22000·6명·GPU5, 공동 carryWith/단독 loco; `SOLO_MASK=0` baseline, `1`은 공동→단독 task만 차단한다.
+
+- **LocoPlatform NONE 차단 학습**: [실험/명령](#stage2-locoplatform-nonemask). Stage1 전이→새 Stage2; Actor/Critic CA4 모두 학습·추론에서 NONE 차단. 기존 추론 토이와 별도.
+
+- LocoPlatform NONE 차단 추론 토이: [설정/실행](#locoplatform-ca-none-mask). Actor CA4에서 NONE만 −∞; 기존 checkpoint, GPU5, 기본6명 혼합 장면. `NONE_MASK=0`으로 동일 설정 baseline 비교.
+
+- LocoPlatform geometry task CA: [실험/명령](#stage2-locoplatform-geometry). 행동64 + 사람 환경 pose7 + 사람 기준 payload7/target7 →85→128→64; Actor/Critic CA4, 기존 RSI·AMP·보상 유지.
+
+- 같은6명 전원 loco의 Stage1 SA: [QK/softmax/실제 SA 그림](../output_etc/platform_attention_check_20261014/sa_check/sa_layer4.png)·[결과](../output_etc/platform_attention_check_20261014/sa_check/report.json). Stage1 원본 encoder/RMS와 일치, human query는 자기 human/payload/target에95.6~98.3%. CA 쏠림과 구분한 초기 forward 진단.
+
+- Platform12500 6명 전원 loco CA: [bias 전 QK/softmax와 실제 attention](../output_etc/platform_attention_check_20261014/all_loco/qk/layer4_scene0.png)·[전체 수치](../output_etc/platform_attention_check_20261014/all_loco/qk/report.json). 공동 두 팀도 loco로 바꾼16초기 장면에서 공동 query의 단독 E/F task attention 평균72.2%; 기존 혼합 시작63.9%. 초기 forward 진단이며 별도 학습 config는 아니다.
+
+- 추론 전용 attention 희소화: [Entmax1.5 토이](#entmax-inference-toy). GPU4·CPA Release1 epoch19000·2명/6명 각각16장면, softmax/SA/CA/둘 다 비교. 6명 CA 안정성 개선과2명 악화를 함께 기록했다.
+- 촬영용 4명/6명·8물체·1환경: [공동/단독 혼합 VNC 데모](#joint-carry-mixed-scene-demo). `DEMO_AGENTS=4`는 공동 AT 한 팀 + 단독 AT·ON_TOP, 기본6명은 공동 두 팀. 공동 carryWith·단독 loco; CPA Release1/LocoPlatform checkpoint에 맞춰 YAML 자동 선택.
+- 촬영용 CA만 entmax: [6명 CA Entmax 뷰어](#joint-carry-ca-entmax-viewer). Actor CA4만 α=1.5, SA/Critic 유지; 기본 checkpoint19000·별도 output.
+
+- 손·팔 Masked AMP 토이: [비교 그래프](../output_etc/masked_amp_toy_20261014/amp_comparison.png)·[결과/해석 한계](../output_etc/masked_amp_toy_20261014/analysis.json). Platform8000 정책 동결·loco 장면의 일반/마스크 판별기만 같은 데이터로 재학습. 잡은 상태 점수는 높아졌으나 첫 HOLDING 전후 AMP 하락은 일반−0.098/마스크−0.164로 완화되지 않았다(최종 보상 기여 기준,12장면14개 이벤트). 바닥 집기 표본 없음; PPO 재학습 효과는 미검증. 재수집 인자는 `output_etc/masked_amp_toy_20261014/command.json`, 분석은 GPU5 runtime 설정 후 `python output_etc/masked_amp_toy_20261014/analyze.py`로 재현한다.
+- 같은 토이의 [잡기 전 숙임·손 접근 비교](../output_etc/masked_amp_toy_20261014/reach_phase/pre_grasp_amp.png)·[수치/선정 기준](../output_etc/masked_amp_toy_20261014/reach_phase/analysis.json): 바닥3건·받침5건에서 기존 AMP 기여−0.267/−0.134. 일반 재학습도 점수가 크게 달라져 마스크만의 개선으로 해석 불가. 정책/판별기 추가 학습 없이 저장된 토이 판별기로 점수를 계산했다. 재수집 `reach_phase/command.json`, 분석 `python output_etc/masked_amp_toy_20261014/reach_phase/analyze.py`.
+
+- 공동 loco payload 받침: [CPA Release1 LocoPlatform](#stage2-cparelease1-locoplatform). 공동 loco의50%만 받침 사용; payload 크기로 높이 상한 계산, 기존 RSI·AMP·보상 유지.
+
+- 공동 pickup 집중 샘플링: [CPA Release1 PickupFocus](#stage2-cparelease1-pickupfocus). pickup 안에서 집기25~39번35%·들기55~80번35%·전체30%; 단계 확률은 유지.
+- 공동집기 근처 CPA 해제: [FullPickup CPA Release1](#stage2-fullpickup-cparelease1). 공동 상대만, 두 사람 모두 상자 XY 반대각선+1m 안이면 CPA0. FullPickup 구조·RSI·AMP 유지.
+- 최신 CA-only·전체 pickup: [Goal360 FullPickup](#stage2-goal360-fullpickup). Actor/Critic 모두 CA4→64입력 head, critic 전체 학습·actor encoder 동결, 공동 pickup100프레임.
 - 공동 HOLDING state: [Goal360 TeamHold](#stage2-mixed80-locoamp-ca4-goal360-teamhold). 공동 개인 state만 반대 앵커 조합의 최소 점수로 교체; 개인 progress/success 유지, Move 없음.
 
 - 공동 목표 360°: [Mixed80 LocoAMP CA4 Goal360](#stage2-mixed80-locoamp-ca4-goal360). 공동 목표·받침 방향을 독립 샘플링하고 AT putDown은 보정 reference 끝점을 사용한다.
@@ -26,7 +56,7 @@
 - `task_embedding`은 역할 입력·중간 MLP·message 없이 task/NONE/SELF의 6개 embedding과 H/O/G 타입 쌍별 projection을 사용한다. Actor/critic은 독립이며 각 branch 안에서 모든 카테고리가 projection을 공유한다.
 - 학습 중 HOLDING/AT/ON_TOP 성공률은 보상 primitive 지표다. 정책의 네 task 및 별도 평가의 운반 완수율과 구분한다. Bias는 원래 값과 같은 물리 타입의 NONE 대비 차이를 구분한다.
 - 현재 GPU/PID·epoch는 문서의 과거 기록으로 판단하지 않는다. 실행 전 `nvidia-smi`, 실행 중인 `tokenhsi/run.py` 인자와 해당 run의 `relation_config.yaml`·`summaries/`·`nn/`을 확인한다.
-- 비활성 검증·분석·이전 영상은 `output_etc/`에 보관한다. 본학습 결과4개·`output/rsi_cache`·현재 `output/teamhoi_retarget_posture_all_check`는 유지한다. 이동 목록은 `output_etc/archive_20261009_cleanup.json`을 참조한다.
+- 완료된 검증·분석·영상은 `output_etc/`에 보관한다. `output/`에는 모든 본학습 결과와 `rsi_cache`를 유지한다. 2026-10-13 추가 이동15개(파일268개)는 [이동 목록](../output_etc/archive_20261013_cleanup.json)을 참조한다. 과거 로그/JSON 안의 경로는 당시 경로이며 이동 목록으로 대응한다.
 
 ## 공통 규칙
 
@@ -41,6 +71,59 @@
 
 ## 현재 실험
 
+**공동 loco payload 받침 선행 토이(현재 [LocoPlatform 실험](#stage2-cparelease1-locoplatform)에 연결):** GPU5·평가64환경에서 공동 AT/ON_TOP의 payload 아래에만40×40×2cm 받침을 추가했다. 바닥/20/40/60cm 높이를 비교하고, 높은 받침96장면의2초 지지 및 받침 제거 후 낙하를 확인했다. 기존 사람·목표·다른 상자·pickup/carryWith/putDown RSI·AMP 이력은 유지된다. CPA Release1 epoch7500의10초 추론에서 공동 HOLDING0/128이며, 재학습 개선 여부는 미검증이다. 학습·viewer용 실행 config가 아닌 별도 headless 검사다.
+
+[검사 결과](../output_etc/payload_platform_toy_20261013/report.json), [검사 코드](../output_etc/payload_platform_toy_20261013/check.py). 저장소 루트에서 재현:
+
+```bash
+TOKENHSI_GPU=5 bash output_etc/payload_platform_toy_20261013/run.sh
+```
+
+추가 높이 검사에서는 원본 규칙의 최대80cm·중간 랜덤 높이는 지지됐지만, 2cm 미만은 두께2cm 판이 바닥과 겹쳐 밀려 올라갔다. 높은 분기만 최소2cm로 제한한 토이는 AT/ON_TOP256장면 모두 지지·목표 높이를 유지했다. [원본 높이 결과](../output_etc/payload_platform_height_sweep_20261013/report.json), [최소2cm 보정 결과](../output_etc/payload_platform_height_sweep_20261013/report_min2cm.json). 이 하한 보정을 새 LocoPlatform config에 적용했다.
+
+```bash
+# 원본 높이 규칙 + 바닥 근처/최대 높이 경계 검사
+TOKENHSI_GPU=5 bash output_etc/payload_platform_height_sweep_20261013/run.sh
+# 같은 장면에서 받침 높이 하한2cm 보정
+TOY_MIN_HEIGHT=0.02 TOKENHSI_GPU=5 bash output_etc/payload_platform_height_sweep_20261013/run.sh
+```
+
+**CPA Release1 carryWith 힘·움직임 진단(2026-10-13):** epoch9500 고정 정책·GPU5·공동 AT/ON_TOP 각64장면·최대20초를 기록했다. 기존 Goal360/RSI 초기 속도를 유지하고 첫 종료 뒤 표본은 제외했다. 배치 조건 한 번 이상 만족은 AT24/64·ON_TOP48/64였으며 완전한 손 해제를 의미하지 않는다. 초록agent0/파랑agent1의 전진·후진·좌우 이동과 목표 방향별 결과는 [분석 JSON](../output_etc/cparel_carrywith_forces_20261013/analysis.json), [장면별 구간 수치](../output_etc/cparel_carrywith_forces_20261013/case_phases.json)이다.
+
+**추가 API 검사:** [접촉점·힘 센서 토이 결과와 재현 명령](../output_etc/contact_api_probe_20261013/summary.json). GPU pipeline 접촉점 목록 API는 실행 후 사용 불가. 별도 GPU force sensor는 자유 상자의 마찰을 읽지만 몸체 전체 합력/토크이며 상대별 분리는 없다. 실제 humanoid 손 센서는 비접촉 상태에서도 관절 반작용이 섞인다. 기존 contact tensor의 마찰 누락을 모든 센서의 한계로 일반화하지 않는다. 정확한 사람별 payload 힘 보상은 아직 미구현이며 학습 속도는 측정하지 않았다.
+
+힘은 손뿐 아니라 상체(골반/몸통/팔/손)의 접촉 벡터를 합산한 반작용 추정이며, 두 physics step을 평균한다. 상자가 공중에 있고 다른 물체/사람과의 보수적 거리 검사 및 상자 접촉력 합 일치(<5%)를 통과한 구간만 강조한다. **미끄러지는 상자 토이에서 감속에 필요한 수평 힘−63.43N인데 텐서 수평 성분은약0N이었다. 따라서 마찰이 빠진 법선 접촉 성분이며 전체 추진력·제동력·개별 지지 하중으로 해석하지 않는다.** [교정 토이](../output_etc/cparel_carrywith_forces_20261013/calibration.json). 정지 장면에서도 목표 반대 법선 성분이 클 수 있다. NVIDIA 포럼의 [마찰력 누락 관련 보고](https://forums.developer.nvidia.com/t/recovering-frictional-forces-from-gym-get-env-rigid-contacts/264682)와도 구분해, 이 실행 환경에서 직접 확인한 제한이다.
+
+대표 기록 영상/그래프: AT 정면 접근 후 놓기 [영상](../output_etc/cparel_carrywith_forces_20261013/AT_scene0.mp4)·[그래프](../output_etc/cparel_carrywith_forces_20261013/AT_scene0.png), AT 뒤쪽 목표에서 반대로 가다 정지 [영상](../output_etc/cparel_carrywith_forces_20261013/AT_scene2.mp4)·[그래프](../output_etc/cparel_carrywith_forces_20261013/AT_scene2.png), 왼쪽 목표 [영상](../output_etc/cparel_carrywith_forces_20261013/AT_scene8.mp4), ON_TOP 배치 [영상](../output_etc/cparel_carrywith_forces_20261013/ONTOP_scene3.mp4)·[그래프](../output_etc/cparel_carrywith_forces_20261013/ONTOP_scene3.png), ON_TOP 반대 방향 이동/집기 이탈 [영상](../output_etc/cparel_carrywith_forces_20261013/ONTOP_scene46.mp4)·[그래프](../output_etc/cparel_carrywith_forces_20261013/ONTOP_scene46.png). 실제 정책의 물리 궤적을 skeleton으로 다시 그린 영상이다. 재현: `TOKENHSI_GPU=5 bash output_etc/cparel_carrywith_forces_20261013/run.sh`. 학습 모델/RMS·학습 config는 변경하지 않았다.
+
+**단독 원본 ↔ 현재 공동 RSI 비교 영상(2026-10-13):** 왼쪽은 공동 생성에 사용한 단독 B19/B20/B21 원본의32-DOF 자세, 오른쪽은 현재 `carry_joint_full_pickup` 보정본이다. 같은 프레임·30fps로 사선/상단 시점을 비교한다. Pickup100·carryWith129·putDown135프레임 전체를 재생하며, 단독 환경의 크기별 RSI 선별 분포나 정책 rollout을 나타내지는 않는다. 공동 영상 입력은 실제 snapshot의 root/DOF/상자 위치와 일치하는지 확인했다.
+
+| 동작 | 기본 속도 | 0.5배속 |
+| --- | --- | --- |
+| 전체 모아보기 | [전체](../output_etc/solo_joint_rsi_comparison_20261013/all.mp4) | [전체 느리게](../output_etc/solo_joint_rsi_comparison_20261013/all_half_speed.mp4) |
+| Pickup | [비교](../output_etc/solo_joint_rsi_comparison_20261013/pickUp/comparison.mp4) | [느리게](../output_etc/solo_joint_rsi_comparison_20261013/pickUp/comparison_half_speed.mp4) |
+| CarryWith | [비교](../output_etc/solo_joint_rsi_comparison_20261013/carryWith/comparison.mp4) | [느리게](../output_etc/solo_joint_rsi_comparison_20261013/carryWith/comparison_half_speed.mp4) |
+| PutDown | [비교](../output_etc/solo_joint_rsi_comparison_20261013/putDown/comparison.mp4) | [느리게](../output_etc/solo_joint_rsi_comparison_20261013/putDown/comparison_half_speed.mp4) |
+
+재생성: `python output_etc/solo_joint_rsi_comparison_20261013/render_comparison.py` (`tokenhsi` 환경). [데이터 출처·해시](../output_etc/solo_joint_rsi_comparison_20261013/report.json).
+
+**공동 pickup 전체 프레임 보정:** `output/joint_pickup_full_20261012/pickUp/`에 무릎 제한 내 다리 IK·접지·손 재보정100프레임을 저장했다. 상자52×80×40cm와 궤적은 유지한다. CPU geometry/초기0.1s100/100, GPU6·2048환경 및 부분 reset 통과. 검증본을 `joint_carry/carry_joint_full_pickup/`에 복사해 [새 FullPickup config](#stage2-goal360-fullpickup)에 연결했다. 기존 config의 pickup55개는 유지한다. CarryWith129/putDown135개는 기존 데이터를 재사용한다.
+
+[전체 동작 비교](../output_etc/joint_pickup_full_20261012/comparison.mp4), [느린 비교](../output_etc/joint_pickup_full_20261012/comparison_half_speed.mp4), [100프레임 각각의 물리 reset 비교](../output_etc/joint_pickup_full_20261012/physics_all_frames.mp4), [검증 범위·결과](../output_etc/joint_pickup_full_20261012/validation.json). 기구학 영상은 정책 실행이 아니며, 물리 영상도 매 source frame을 독립 초기화한0.1s 검사다. 연속 native-PD 추종 성공이나 전체 Stage2 정책 성공은 검증하지 않았다.
+
+후보·영상 재생성(학습 실행 아님):
+
+```bash
+TOKENHSI_GPU=6 bash -c '
+  source tokenhsi/scripts/multi_agent/runtime_env.sh
+  python joint_carry/scripts/retarget_joint_pickup.py &&
+  python joint_carry/scripts/preview_joint_pickup.py &&
+  python joint_carry/scripts/preview_joint_pickup.py --physics
+'
+```
+
+후보를 다시 만들면 해당 파일 해시로 CPU/GPU 물리 검사를 다시 수행한 뒤 snapshots를 생성해야 한다. 이번 검사 실행기는 결과 폴더의 `check_gpu.py`, `finalize.py`이고, CPU 검사는 기존 `validate_carry_physics.audit`를 사용했다. 실행 데이터의 SHA256은 config·checkpoint·`runtime_manifest.json`으로 검사한다.
+
 TeamHOI 보행 reference 미리보기: `joint_carry/teamhoi_reference/`에 공식 `near_table.yaml`의 후진9개·옆걸음3개와 출처·해시를 보관한다. [후진 영상](../output_etc/teamhoi_reference_preview/backward.mp4), [옆걸음 영상](../output_etc/teamhoi_reference_preview/sideways.mp4)은 원본 skeleton 재생이며 짧은 클립은 마지막 프레임에서 멈춘다. 현재 학습 AMP에는 연결하지 않았다. 재생성은 `tokenhsi` 환경에서 `python joint_carry/scripts/preview_teamhoi_reference.py`로 한다.
 
 원본 호환성 검사: 로더·10-frame carry AMP 입력 생성은 통과했지만 현재 asset과 다리 skeleton이 달라 발 위치 평균5.4–7.6cm 불일치가 있다. GPU5·2048환경의 0.1초 초기 충격 검사는2064/3721프레임 통과(기존 모션238/238). **원본 직접 연결은 보류**, 체형·접지·속도 보정 후 재검증한다. [물리 검사 결과](../output_etc/teamhoi_reference_compatibility_20261009/report.json), [AMP 입력 검사](../output_etc/teamhoi_reference_compatibility_20261009/amp_history.json). 자유 root PD 재생은 기존 모션도 넘어지므로 학습 가능성이나 성능 평가로 해석하지 않는다.
@@ -53,7 +136,7 @@ TeamHOI 보행 reference 미리보기: `joint_carry/teamhoi_reference/`에 공�
 
 **현재 학습용 전체 세트:** `joint_carry/teamhoi_retarget_posture_all/`에 같은 자세 보존 방식으로 후진9개·옆걸음3개를 생성했다. 보간 중 작은 관절 한계 초과를 막기 위해 IK 범위 안쪽에0.001rad 여유를 둔다. Male2 B9/B11/B13/B15는60fps, 나머지는30fps이며 원본3721프레임과 같은 길이/경로를 총4458프레임으로 표현한다. 모든4458프레임이 초기0.1초 검사 및 프레임/중간 시점 관절·접지·FK 검사를 통과했고, 실제 CPU/GPU AMP3200×1320 입력은 finite다. 무릎 중앙값의 원본 대비 변화는 클립별 최대약3.2°다. 이는 연속 보행 안정성·미끄러짐0의 보장이 아니다.
 
-[후진9개 모아보기](../output/teamhoi_retarget_posture_all_check/backward_all.mp4), [옆걸음3개 모아보기](../output/teamhoi_retarget_posture_all_check/sideways_all.mp4), [물리 검사](../output/teamhoi_retarget_posture_all_check/report.json), [자세 비교](../output/teamhoi_retarget_posture_all_check/gait_comparison.json). 클립별4열 비교12개와 모아보기2개, MP4 총14개의 전체 decode를 확인했다. 이 세트가 아래 두 LocoAMP config에 연결되며 기존 Mixed80·Stage1 RSI는 그대로다.
+[후진9개 모아보기](../output_etc/teamhoi_retarget_posture_all_check/backward_all.mp4), [옆걸음3개 모아보기](../output_etc/teamhoi_retarget_posture_all_check/sideways_all.mp4), [물리 검사](../output_etc/teamhoi_retarget_posture_all_check/report.json), [자세 비교](../output_etc/teamhoi_retarget_posture_all_check/gait_comparison.json). 클립별4열 비교12개와 모아보기2개, MP4 총14개의 전체 decode를 확인했다. 이 세트가 아래 두 LocoAMP config에 연결되며 기존 Mixed80·Stage1 RSI는 그대로다.
 
 두 클립 pilot만 재현하려면 아래 명령에서 `--all`을 빼고 자세 비교 스크립트도 인자 없이 실행한다.
 
@@ -72,6 +155,11 @@ TOKENHSI_GPU=5 bash -c '
 
 | 번호 | Config | 역할 |
 | ---: | --- | --- |
+| SA4 GraspView | [approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding.yaml) | LocoPlatform SA4와 동일 파라미터; 공동에서만 사람별 앵커 중심 관측, 전용 train/test/VNC |
+| LocoPlatform human SA4 | [approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml) | task MLP 없이 human 간 SA4; 세 관계 bias·AMP/RSI/보상 유지 |
+| Stage1 파지 중심 이동 토이 | [전용 VNC](../tokenhsi/scripts/multi_agent/stage1_grasp_shift_vnc.sh) | LocoPlatform 공동 환경·Stage1 원본30000 모델, 공유2명·loco·joint_carry_at; 사람별 관측 두 벌로 반대 앵커 비교, 학습 없음 |
+| Stage 2 LocoPlatform NONE mask | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding.yaml) | Actor/Critic CA4에서 학습부터 NONE 차단, 기존 SA feature task·RSI/AMP/보상 유지 |
+| 추론 토이 | [locoplatform_ca_none_mask.yaml](../tokenhsi/data/cfg/inference/locoplatform_ca_none_mask.yaml) | 기존 LocoPlatform Actor CA의 NONE만 차단; 학습 없음 |
 | 1 | [amp_humanoid_ma_carry.yaml](../tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml) | 원본 multi-agent carry 기준 |
 | 27 | [approach_scenario_independent_with_climb.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_independent_with_climb.yaml) | 독립 물체·goal binding, 점 기준 성공 |
 | 28 | [approach_scenario_stage1_plane.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_plane.yaml) | 27번의 ON_TOP·CLIMB을 상판 영역 성공으로 변경; Stage 2 기본 출발점 |
@@ -81,6 +169,15 @@ TOKENHSI_GPU=5 bash -c '
 | Stage 2 Mixed80 | [approach_stage2_joint_carry_mixed80_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_task_embedding.yaml) | 공동 80%·단독 20%, 단독 Stage 1 크기·RSI와 SELF/NONE CA |
 | Mixed80 LocoAMP CA | [approach_stage2_joint_carry_mixed80_locoamp_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_task_embedding.yaml) | 보행 AMP 보강, 기존 task CA·128입력 head |
 | Mixed80 LocoAMP CA4 | [approach_stage2_joint_carry_mixed80_locoamp_ca4_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_task_embedding.yaml) | 같은 보상·AMP·RSI, CA+FFN+LayerNorm+residual 4층·128입력 head |
+| Mixed80 LocoAMP CA4 Goal360 FullPickup CPA Release1 | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding.yaml) | FullPickup 기반 공동 상대 CPA만 상자 반대각선+1m 안에서 해제; 두 사람 모두 근접 필요 |
+| CPA Release1 혼합 장면 데모 | CPA Release1/LocoPlatform config 자동 선택·[전용 진입점](../tokenhsi/joint_carry_demo.py) | 평가 전용4명/6명·8물체·1환경, 공동 AT 한 팀/두 팀 carryWith + 단독 AT/ON_TOP loco; 학습 스크립트 없음 |
+| LocoPlatform 공동→단독 task 차단 | [전용 VNC](../tokenhsi/scripts/multi_agent/locoplatform_ca_solo_mask_vnc.sh) | 추론 전용 Platform22000·6명; 기존 모델로 baseline/공동 query의 단독 task 차단 비교, 학습 스크립트 없음 |
+| CPA Release1 혼합 장면 CA Entmax | 위 CPA Release1 config 재사용·[전용 VNC](../tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_ca_entmax_vnc.sh) | 같은6명 장면, Actor CA4만 entmax1.5로 추론; 기본19000·학습 스크립트 없음 |
+| Entmax1.5 추론 토이 | 위 CPA Release1 config 재사용·[격리된 실행](../output_etc/entmax_inference_toy_20261014/rollout.py) | GPU4·2명/6명 각각16장면, Actor SA/CA 정규화만 변경; 학습/기존 viewer 미연결 |
+| LocoPlatform Geometry task CA | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding.yaml) | LocoPlatform 기반85차원 pose task 입력; Stage1 전이 후 Stage2 새 학습 |
+| CPA Release1 LocoPlatform | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml) | 공동 loco의50%에서 payload만 받침 사용; 크기 기반 높이 제한, CPA Release1 기반 |
+| CPA Release1 PickupFocus | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding.yaml) | CPA Release1 기반 공동 pickup 프레임 집중35/35/30; 전체100프레임 유지 |
+| Mixed80 LocoAMP CA4 Goal360 FullPickup | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding.yaml) | Actor/Critic CA4→64입력 head·critic 전체 학습, 공동 pickup100프레임; 기본 Goal360 보상 |
 | Mixed80 LocoAMP CA4 Goal360 TeamHold | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_teamhold_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_teamhold_task_embedding.yaml) | Goal360 기반, 공동 HOLDING state만 공유 bottleneck 점수로 교체; Move 없음 |
 | Mixed80 LocoAMP CA4 Goal360 | [approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding.yaml) | CA4 기반 공동 목표360°·2.2~2.8m, AT putDown reference 끝점; Move/Align 없음 |
 | Mixed80 LocoAMP CA4 Move | [approach_stage2_joint_carry_mixed80_locoamp_ca4_move_task_embedding.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_move_task_embedding.yaml) | CA4 기반, 두 사람 실제 이동 방향 min 팀 보상0.2·목표 근처 pinning |
@@ -851,6 +948,448 @@ TOKENHSI_GPU=6 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh; PYTH
   --output_path output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding_check --headless --no_video'
 ```
 
+### Goal360 loco 공동집기 CPA 진단
+
+`toy_joint_carry_cpa.py`는 고정된 Goal360 정책으로 공동 AT/ON_TOP을 각각 loco에서20초 실행한다. 실제 지급된 CPA와 재계산 값을 비교하고, 같은 상태·행동에서 CPA 보상만 제거한 결과를 별도 계산한다. 정책/관찰 통계·물리 충돌은 바꾸지 않으며 첫 종료 이후 표본은 제외한다. 접근 구간은 미집기 에이전트의 상자 방향 world root 속도>0.15m/s, 근처는 root–상자 XY<1.5m, 정지는 root XY 속도<0.1m/s다.
+
+```bash
+TOKENHSI_GPU=5 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh; PYTHONPATH=tokenhsi python tokenhsi/tests/toy_joint_carry_cpa.py \
+  --task HumanoidMACarry \
+  --cfg_train tokenhsi/data/cfg/train/rlg/amp_ma_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding.yaml \
+  --cfg_env tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding.yaml \
+  --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+  --checkpoint output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_task_embedding/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360TaskEmbedding_11-14-48-50/nn/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360TaskEmbedding_00013000.pth \
+  --num_envs 128 --num_agents 2 --num_objects 4 --task_graph joint_carry_at \
+  --eval_skills loco --eval_skill_probs 1.0 --episode_length 600 --eval_repeats 1 \
+  --output_path output/joint_carry_cpa_toy_20261012 --headless --no_video --test --eval --seed 4242'
+```
+
+2026-10-12: 각128환경에서 공동/개인 HOLDING 달성0. 접근 CPA 평균 크기 AT0.0146·ON_TOP0.0179, 최대0.372·0.403이며 HOLDING state+progress 초과 비율5.01·5.67%다. 근처 정지 시 progress약0.2·state약0.0005·CPA거의0으로 머무는 현상도 관찰했다. [보고서](../output_etc/joint_carry_cpa_toy_20261012/report.json)와 과제별 NPZ에 기록했다. 계산/성분 합·모델/RMS 불변·finite를 확인했으며 **CPA 제거 재학습이나 원인 확정 실험은 아니다**.
+
+<a id="stage2-goal360-fullpickup"></a>
+## Mixed80 LocoAMP CA4 Goal360 FullPickup · CA-only Actor/Critic
+
+`approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding`은 기본 Goal360에서 다음 두 부분을 바꾼 별도 실험이다.
+
+- Actor: Stage1 encoder 동결 → CA4 → 64입력 action head. Critic: Stage1 critic encoder → 독립 CA4 → 64입력 value head. Critic은 encoder/task embedding/CA/head 모두 학습한다. 두 branch는 구조만 같고 가중치는 공유하지 않는다.
+- `[human, CA]` concat을 제거했다. 각 CA 블록은 human residual을 포함하며 attention output projection·FFN 마지막 층을0으로 초기화해 최초 출력은 Stage1 human과 같다. Stage1 action/value head는 확장 없이 그대로 복사한다. Stage1 critic/AMP weight·관찰 RMS도 전이하고 actor encoder/RMS만 동결한다. Reward/value 통계는 기존 Stage2처럼 새로 시작한다.
+- 공동 pickup RSI만 보정100프레임으로 교체한다. `joint_carry/carry_joint_full_pickup/`에서 pickup100/carryWith129/putDown135개를 읽는다. 단독 Stage1 RSI·공동 단계별 샘플링 확률·AMP 원래80/후진10/옆걸음10은 유지한다. 보정 pickup은 RSI용이며 AMP reference를 바꾸지 않는다.
+
+공동80/단독20·상자 크기·Goal360 샘플링과 AT putDown 끝점·보상/CPA·SA/CA 순서 셔플은 기존 Goal360과 같다. Move/Align/TeamHold는 없다. 새 구조와 RSI SHA256을 checkpoint 계약으로 분리했으므로 기존 Stage2 checkpoint를 직접 resume/eval하지 않는다.
+
+학습은 Stage1 epoch30000에서 새 Stage2로 시작한다. GPU는 명령 앞 한 곳에서 지정한다.
+
+```bash
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS \
+TOKENHSI_GPU=6 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_train.sh 2 2048 4
+
+# 생성된 checkpoint 경로로 교체
+FULLPICKUP_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer
+TOKENHSI_GPU=6 HEADLESS=0 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_test.sh "$FULLPICKUP_CHECKPOINT" 2 16 4 1
+
+# 화면 없는 평가
+TOKENHSI_GPU=6 HEADLESS=1 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_test.sh "$FULLPICKUP_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC
+TOKENHSI_GPU=6 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_vnc.sh "$FULLPICKUP_CHECKPOINT" 2 10 4 10
+```
+
+`EVAL_SKILLS=pickUp` 또는 `carryWith`로 시작 단계를 지정할 수 있다. 공동 putDown은 `TASK_GRAPH=joint_carry_at EVAL_SKILLS=putDown`이다. 같은 실험 재개만 `RESUME_CHECKPOINT="$FULLPICKUP_CHECKPOINT"`를 사용한다. 확인용 학습은 `MAX_ITERATIONS=2`·별도 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_check`로 실행한다.
+
+검증: CPU48개 통과·기존 공동 ON_TOP putDown1개 skip. GPU6·2048환경에서 Stage1 30000 전이→epoch3 저장→epoch4 재개, Actor69개 tensor/RMS 보존·Critic encoder/양쪽 CA4/head 갱신과133종 scalar finite를 확인했다. 실제 공동1638/단독410, AMP30000개80.09/10.24/9.67%, 부분 reset1024/32/32와 Goal360 모든 지원 단계 검사를 통과했다. 공동 AT/ON_TOP 모두 pickup0~99 전체가 실제 선택되고 pose/velocity가 보존된다. 전체4,480,754개·학습3,954,258개 파라미터다.
+
+저장본16환경32-step pickup 시작 혼합 headless 평가도 정상 종료했다. 결과: [전이/재개](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_check/saved_check.json), [RSI/AMP reset](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_check/reset_check.json), [Goal360/전체 pickup](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_task_embedding_check/goal360_runtime_check.json). 본학습·실제 VNC 화면·장기 공동집기/운반 개선은 미검증이다.
+
+<a id="stage2-fullpickup-cparelease1"></a>
+## FullPickup 공동 상대 CPA Release1
+
+`approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding`은 FullPickup에 `relationReward.joint_carry.collision.release_buffer: 1.0`만 추가한 별도 env/train·train/test/VNC 실험이다. 같은 carry task·payload·target을 공유하는 두 사람 모두 운반 상자 중심에서 XY 반대각선+1m 안이면 두 사람 사이 CPA를0으로 한다. 현재52×80cm 상자는 반경약1.477m다. HOLDING 성공 전부터 적용하며 한 명이라도 밖으로 나가면 기존 CPA가 다시 적용된다. 단독·다른 payload/goal/task에는 적용하지 않는다.
+
+CPA 계수0.5·예측 안전거리0.7m·할인0.99와 물리 충돌은 유지한다. 기존 HOLDING progress 반경(반대각선+0.2m)도 유지한다. Actor/Critic CA4→64입력 head·Stage1 전이/actor encoder/RMS 동결·Critic 전체 학습·pickup100/carryWith129/putDown135 RSI·AMP80/10/10·Goal360·공동80/단독20·SA/CA/edge 셔플은 FullPickup과 같다. Move/Align/TeamHold는 추가하지 않는다.
+
+Reward metadata가 달라 기존 FullPickup checkpoint의 직접 resume/eval은 거부한다. Stage1에서 새 Stage2로 시작하고, 이후에는 이 실험 checkpoint만 재개한다.
+
+```bash
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS \
+TOKENHSI_GPU=5 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_train.sh 2 2048 4
+
+CPA_RELEASE_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_test.sh "$CPA_RELEASE_CHECKPOINT" 2 16 4 1
+
+# 화면 없는 평가
+TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_test.sh "$CPA_RELEASE_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_vnc.sh "$CPA_RELEASE_CHECKPOINT" 2 10 4 10
+```
+
+Viewer 시작 단계는 `EVAL_SKILLS=loco`(기본)·`pickUp`·`carryWith`로 지정한다. 공동 putDown은 `TASK_GRAPH=joint_carry_at EVAL_SKILLS=putDown`이다. 같은 실험 재개는 `RESUME_CHECKPOINT="$CPA_RELEASE_CHECKPOINT"`를 train에 전달한다. 짧은 확인은 별도 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_check`와 `MAX_ITERATIONS=1`을 사용한다.
+
+검증: CPU43개·Python/셸 문법, GPU5·2048환경 Stage1 30000 전이→epoch2 저장→epoch3 재개,16환경32-step pickup 시작 headless 평가 통과. Actor69개 tensor/RMS 동결·Critic encoder/양쪽 CA4/head 갱신·133종 scalar finite를 확인했다. 별도64환경64-step에서 공동 AT839/ON_TOP843 scene-step의 비영 CPA 제거, 단독832 scene-step CPA 불변과 기존 task 보상 성분 일치를 확인했다. 결과는 [전이/재개](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_check/saved_check.json), [CPA 실제 적용](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding_check/cpa_release_runtime_check.json)이다. 본학습·실제 VNC 화면·공동집기 개선은 미검증이다.
+
+<a id="joint-carry-mixed-scene-demo"></a>
+<a id="locoplatform-ca-solo-mask"></a>
+## LocoPlatform 공동 query의 단독 task 차단 · 추론 토이
+
+기본 Platform22000 checkpoint·GPU5·6명·seed42·최대300-step(10초)·10회다. 공동 AT 두 팀은 carryWith, 단독 AT/ON_TOP은 loco로 시작한다. `SOLO_MASK=1`은 Actor CA4에서 공동 담당 query가 단독 task를 보는 경로만 차단하고 나머지 확률을 재정규화한다. 다른 공동 팀의 NONE task는 유지하며, 단독 query·SA·Critic·학습에는 적용하지 않는다. 관계 행렬의 COUPLED 여부로 query/task를 구분하므로 순서 셔플과 무관하다. 기본 checkpoint를 바꾸려면 마지막 인자로 PTH를 지정한다.
+
+```bash
+# 서버 VNC: 기존 / 단독 task 차단 (하나씩 실행)
+TOKENHSI_GPU=5 SOLO_MASK=0 bash tokenhsi/scripts/multi_agent/locoplatform_ca_solo_mask_vnc.sh
+TOKENHSI_GPU=5 SOLO_MASK=1 bash tokenhsi/scripts/multi_agent/locoplatform_ca_solo_mask_vnc.sh
+
+# 로컬 viewer / 화면 없는 짧은 확인
+TOKENHSI_GPU=5 SOLO_MASK=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/locoplatform_ca_solo_mask_test.sh
+TOKENHSI_GPU=5 SOLO_MASK=1 HEADLESS=1 REPEATS=1 EPISODE_LENGTH=32 bash tokenhsi/scripts/multi_agent/locoplatform_ca_solo_mask_test.sh
+```
+
+출력은 `output/locoplatform_ca_solo_mask/{baseline,masked}`로 분리한다. 전체 NONE 차단 토이/학습과 다르며 학습 스크립트는 없다. CPU4개(토이와 동일한 마스크·단독 query 불변·query/task 순열·기존 NONE 회귀), GPU5 baseline headless/차단 실제VNC 각각31-step timeout 종료·동일 초기 장면·6명 화면을 확인했다. [뷰어 검증](../output_etc/locoplatform_solo_mask_viewer_check_20261015/).
+
+선행16장면·32팀·10초 비교에서 holding 유지 시간은62.0→94.2%, 끝 XY 거리는0.386→0.181m였지만 배치 성공 조건은 양쪽0/32였다. [토이 결과](../output_etc/platform_solo_task_mask_toy_20261015/analysis.json). 1환경 viewer는 배치16환경 토이의 개별 장면을 그대로 재생하는 것은 아니며, baseline/차단 첫 초기 장면은 동일하다.
+
+## 공동/단독 혼합 장면 VNC 데모
+
+CPA Release1 FullPickup의 기존 env/train YAML과 checkpoint를 재사용하는 **추론 전용** 경로다. 학습 config·보상·데이터·checkpoint는 변경하지 않는다. 기본 한 환경에6명·8물체가 있고(`DEMO_AGENTS=4`로4명), 전체 사람/8물체/각 사람의 task packet을 같은 정책에 입력한다. 두 사람씩 묶은 정책을 따로 호출하는 방식은 아니다. 기존 metadata·AMP/RSI/Goal360 계약과 model/RMS tensor를 그대로 검사·로드한다.
+
+Checkpoint의 `joint_carry_loco_platform`과 `joint_carry_ablation.policy`로 일반 CPA Release1, LocoPlatform, Geo, NONE-mask env/train YAML을 자동 선택한다. 파일명과 무관하며 기존 호환성 검사는 유지한다. 아래 명령의 `CKPT`만 교체하면 로컬/headless/VNC 데모에서 사용할 수 있다. 장면은 기존 공동 carryWith·단독 loco 시작을 유지하며 학습의 공동 loco 받침 샘플링을 재현하지 않는다. NONE-mask 모델은 자체 config의 NONE 차단을 유지한다.
+
+```bash
+# 세 모델 각각의 최신 기본 checkpoint로 6명 VNC (하나씩 실행)
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_vnc.sh output/*locoplatform_task_embedding/*/nn/*TaskEmbedding.pth
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_vnc.sh output/*locoplatform_geometry_task_embedding/*/nn/*TaskEmbedding.pth
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_vnc.sh output/*locoplatform_nonemask_task_embedding/*/nn/*TaskEmbedding.pth
+```
+
+같은 실험에 본학습 run이 여러 개 있으면 wildcard 대신 원하는 PTH 경로를 지정한다. 로컬 viewer는 같은 PTH로 `HEADLESS=0 ..._test.sh`, 화면 없는 평가는 `HEADLESS=1 ..._test.sh`를 사용한다.
+
+2026-10-14 자동 선택 검증: CPU11개 통과. GPU5에서 LocoPlatform checkpoint headless/VNC·일반 CPA Release1 epoch19000 CA Entmax를 각각2회·63-step 실행해 로드/reset/finite를 확인했다. [결과·화면·로그](../output_etc/joint_carry_demo_checkpoint_config_check_20261014/).
+
+- H0/H1 → O0 → G0, H2/H3 → O1 → G2: 공동 AT 두 팀, 독립 샘플링한 paired carryWith 자세·속도로 시작.
+- H4 → O2 → G4: 단독 AT loco; H5 → O3 → O4: 단독 ON_TOP loco. 단독 상자40cm 큐브·받침52×80×30cm, 상자까지1.5m 앞에서 시작.
+- O5/O6/O7은 주변 회색 상자. 네 과제는2.8m 간격으로 배치하고 목표는+X로2.5m 떨어져 있다. 사람6색·공동 상자/AT 목표 노란색·단독 대상 담당 사람 색. 초기 사선 시점 이후 카메라는 자유롭게 조정할 수 있다.
+
+기본600-step(약20초)·10회 재생하며 넘어지면 다음 장면을 시작한다. 마지막 장면은 `KEEP_OPEN=1`(기본)로 유지한다. `REPEATS`, `EPISODE_LENGTH`, `SEED`, `PORT`, `OUTPUT_PATH`를 지정할 수 있고 `SAVE_FRAMES=1`은 일부 VNC 화면 PNG를 저장한다. `demo_results.json`은 시작/끝 위치·RSI 프레임·재생 종료 사유를 남기며 성공률 평가는 하지 않는다. 새 학습용 config가 아니므로 train wrapper는 없다.
+
+`DEMO_AGENTS=4`는 두 번째 공동 팀을 제외한다. H0/H1→O0→G0 공동 AT carryWith, H2→O2→G2 단독 AT loco, H3→O3→O4 단독 ON_TOP loco다. 물체8개·기존 경로 위치를 유지하고 O1은 바닥의 주변 상자로 남긴다. 4명 전체를 한 번에 추론하며 attention은 기존softmax다. 기본 output은 `output/joint_carry_mixed_scene_demo_4agents`; 원래6명은 옵션 생략 시 그대로다.
+
+```bash
+PLATFORM_CKPT=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360FullPickupCpaRelease1LocoPlatformTaskEmbedding_13-16-32-42/nn/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360FullPickupCpaRelease1LocoPlatformTaskEmbedding.pth
+
+# 4명 서버 VNC
+TOKENHSI_GPU=5 DEMO_AGENTS=4 PORT=6081 REPEATS=10 \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_vnc.sh "$PLATFORM_CKPT"
+
+# 4명 로컬 viewer
+TOKENHSI_GPU=5 DEMO_AGENTS=4 HEADLESS=0 REPEATS=10 \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_test.sh "$PLATFORM_CKPT"
+```
+
+4명 검증: CPU8개·GPU5 사용자LocoPlatform checkpoint headless2회×63-step finite/reset·실제VNC 시작 화면을 확인했다. [추론 기록](../output_etc/joint_carry_mixed_scene_demo_4agents_check_20261014/headless/demo_results.json)·[4명 시작 화면](../output/joint_carry_mixed_scene_demo_4agents/repeat_0_frame_0.png). 운반 완수율은 미검증이다.
+
+저장소 루트에서 실행한다. 아래19000은 검증에 사용한 고정 checkpoint이며 같은 CPA Release1 실험의 다른 checkpoint로 교체할 수 있다.
+
+```bash
+CKPT=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_task_embedding/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360FullPickupCpaRelease1TaskEmbedding_12-20-50-28/nn/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360FullPickupCpaRelease1TaskEmbedding_00019000.pth
+
+# 서버 VNC: 접속 주소는 wrapper가 출력한다. 사용 중이면 PORT 변경.
+TOKENHSI_GPU=5 PORT=6094 REPEATS=10 \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_vnc.sh "$CKPT"
+
+# 로컬 viewer
+TOKENHSI_GPU=5 HEADLESS=0 REPEATS=10 \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_test.sh "$CKPT"
+
+# 화면 없는 짧은 추론 확인
+TOKENHSI_GPU=5 HEADLESS=1 REPEATS=2 EPISODE_LENGTH=64 \
+OUTPUT_PATH=output/joint_carry_mixed_scene_demo_check \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_test.sh "$CKPT"
+```
+
+검증: CPU12개·GPU5 epoch19000 headless64-step2회 reset/finite 추론 및 실제 VNC3회를 확인했다. VNC191/599/54-step은 넘어짐/시간 만료/넘어짐으로 끝났으며6명 운반 완수율은 미검증이다. [시작 화면](../output_etc/joint_carry_mixed_scene_demo_vnc_check_20261014/repeat_0_frame_0.png)·[재생 기록](../output_etc/joint_carry_mixed_scene_demo_vnc_check_20261014/demo_results.json).
+
+<a id="joint-carry-ca-entmax-viewer"></a>
+## 6명 공동/단독 혼합 장면 · CA Entmax 뷰어
+
+기존 혼합 장면의6명·8물체·1환경, 공동 AT 두 팀 carryWith·단독 AT/ON_TOP loco·자유 카메라·최대20초/10회 반복을 재사용한다. 전용 wrapper는 `DEMO_CA_ENTMAX=1`로 **Actor CA4만 entmax(α=1.5)**를 사용한다. Actor SA·Critic·checkpoint/model/RMS는 기존 설정이며 기존 wrapper 기본값은 softmax다. Entmax 연산은 `learning/multi_agent/ca_entmax_inference.py`에 있어 토이 산출물 폴더에 의존하지 않는다.
+
+Checkpoint 인자는 생략할 수 있으며 토이와 같은 CPA Release1 epoch19000을 사용한다. CPA Release1 또는 LocoPlatform checkpoint는 마지막 인자로 지정한다. 기본 output은 `output/joint_carry_mixed_scene_demo_ca_entmax`이며 촬영 이미지는 그 아래 `imgs/`, `demo_results.json`에 `actor_ca_attention: entmax15`를 기록한다. 새 학습 config가 아닌 추론 옵션이므로 train wrapper는 없다.
+
+저장소 루트에서:
+
+```bash
+# 서버 VNC; 접속 주소는 터미널 출력
+TOKENHSI_GPU=4 PORT=6095 REPEATS=10 \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_ca_entmax_vnc.sh
+
+# 로컬 viewer
+TOKENHSI_GPU=4 HEADLESS=0 REPEATS=10 \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_ca_entmax_test.sh
+
+# 짧은 화면 없는 추론 확인
+TOKENHSI_GPU=4 HEADLESS=1 REPEATS=2 EPISODE_LENGTH=64 \
+OUTPUT_PATH=output/joint_carry_mixed_scene_demo_ca_entmax_check \
+bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_ca_entmax_test.sh
+```
+
+검증: CPU7개·토이 CA 출력 최대오차0·GPU4 epoch19000 실제 VNC2회64-step의 entmax 적용/finite/reset을 확인했다. 결과는 `output_etc/joint_carry_mixed_scene_demo_ca_entmax_check_20261014/`이다.
+
+<a id="entmax-inference-toy"></a>
+## 추론 전용 Entmax1.5 attention 비교
+
+[실험 코드/산출물](../output_etc/entmax_inference_toy_20261014/)은 CPA Release1 epoch19000의 Actor SA·CA 정규화만 실행 중 교체한다. Critic·모델 파라미터·scene/AMP RMS·학습/기존 viewer는 유지한다. Entmax 패키지를 설치하지 않고 α=1.5의 정렬 해법을 사용하며 독립 이분법으로 검증했다([공식 구현](https://github.com/deep-spin/entmax/blob/master/entmax/activations.py)). CA의 수동 Q/K/V 계산은 기존 softmax 전체 행동 출력과 최대3e−7 이내로 일치한다.
+
+평가 환경은 각각16개다. 2명은 기존 공동 AT·carryWith·Goal360,6명은 기존 혼합 데모 배치를 평가 실행 안에서만 복제한다(각 장면6명·8물체, 공동 AT 두 팀 carryWith·단독 AT/ON_TOP loco). 조건별 초기 관측/root/DOF/상자/목표 해시는 동일하며 최대600-step/20초·첫 넘어짐 이후는 지표에서 제외한다. 2명/6명 사이 초기 장면 분포는 다르므로 성능은 각 설정 안에서 비교한다. 6명 두 공동 팀은 같은 장면에 묶어 대응 bootstrap을 계산한다.
+
+6명 결과: softmax/SA만/CA만/둘 다의 넘어짐11/5/2/7개(각16장면), 공동 마지막 유효 XY 오차1.345/1.495/0.640/1.589m. CA의 넘어짐 개선은9개/악화0개, 대응 McNemar의3개 조건 보정 p=0.0117이다. 같은 경과 시간 오차 차이는−0.344m·95% CI[−0.780,+0.049]로0을 포함하며, 마지막 오차 개선에는 더 오래 살아 있는 효과가 섞인다. 기존 배치 조건 충족은 전부0/32이며 손 해제/운반 완수 평가가 아니다.
+
+CA만 교체한6명에서 CA 정확한0 비율은53%지만 다른 task의 NONE mass는78.8→79.7%이며 같은 상태2명/6명 공동 행동 차이도0.0346→0.0382로 줄지 않았다. 다른 팀 정보 차단이 개선의 원인이라고 결론내릴 수 없다. 2명 CA는 넘어짐0→1/16·오차0.109→0.435m였으므로 기본 viewer에 일괄 적용하지 않았다. 표본16장면·단일 checkpoint·α=1.5·재학습 없음이라는 한계가 있다.
+
+[전체 결과](../output_etc/entmax_inference_toy_20261014/analysis.json)·[재생 성능 그래프](../output_etc/entmax_inference_toy_20261014/rollout_comparison.png)·[attention 그래프](../output_etc/entmax_inference_toy_20261014/attention_comparison.png)·[대응 차이/95% CI](../output_etc/entmax_inference_toy_20261014/paired_effects.png). `results_{2,6}.json`은 동결·초기 상태·조건별 결과, `agents*_trial0_*.npz`는 원시 궤적이다. `repeat/`의 새 프로세스 softmax 반복은 root/상자 궤적 오차0·넘어짐/배치 결과 동일했고,6명2장면의 종료 검출만1-step 차이가 있었다.
+
+저장소 루트에서 재현(기존 결과를 보존하려면 별도 `TOY_OUTPUT` 지정):
+
+```bash
+TOKENHSI_GPU=4 TOY_OUTPUT=output_etc/entmax_inference_toy_20261014_repro \
+bash output_etc/entmax_inference_toy_20261014/run.sh
+
+# 같은 조건의 softmax만 새 프로세스에서 반복
+TOKENHSI_GPU=4 TOY_VARIANTS=softmax \
+TOY_OUTPUT=output_etc/entmax_inference_toy_20261014_repro/repeat \
+bash output_etc/entmax_inference_toy_20261014/run.sh
+
+# 분석/그래프
+TOKENHSI_GPU=4 bash -c '
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+python output_etc/entmax_inference_toy_20261014/report.py output_etc/entmax_inference_toy_20261014_repro
+'
+```
+
+`TOY_SAMPLES`(기본16), `TOY_STEPS`(기본600), `TOY_AGENTS=2` 또는`6`으로 검사 범위를 지정할 수 있다. 전용 학습 config/train/VNC wrapper가 아닌 추론 토이다.
+
+**동일 상태 attention map:** [CA 마지막 layer/head](../output_etc/entmax_inference_toy_20261014/maps/ca_last_layer_scene0.png)·[CA 모든 layer/head](../output_etc/entmax_inference_toy_20261014/maps/ca_all_layers_scene0.png)·[SA 마지막 layer/head](../output_etc/entmax_inference_toy_20261014/maps/sa_last_layer_scene0.png)·[16장면 CA category 평균](../output_etc/entmax_inference_toy_20261014/maps/ca_categories_16scenes.png). 기존 토이와 해시가 같은 초기16장면에서 같은H0/H1 공동팀의2명 관측과6명 softmax/CA entmax를 비교한다. 2명 칼럼은H0/H1·O0/O5/O7/O6·G0/G1을 재매핑한 관측이며 별도2명 rollout은 아니다. Token/task 순서는 map 표시를 위해 canonical로 고정했고 행동 오차는≤2.4e−7,model/scene RMS 불변이다. 6명 두 조건의SA map은 동일하다.
+
+해당 팀·16초기 장면·전체 CA layer/head 평균 자기/파트너/다른 task mass는2명31.3/68.7/0%,6명 softmax3.4/12.7/83.9%,6명 entmax0.7/13.2/86.0%다. 앞의 전체6명·유효 재생 시간 평균과 집계 범위가 다르다. Scene0 마지막 head2에서H0→파트너는95.1→12.6→1.4%, entmax의단독 AT/ON_TOP은67.6/31.0%다. Sparse해져도 자기 팀을 선택한다는 보장은 없으며 가중치는 최종 행동 기여율이 아니다. 실제 각 forward를 기록했으므로 후반CA layer에는 앞선layer 변경 효과도 포함된다.
+
+전체 query 그림: [CA 사람6×task6](../output_etc/entmax_inference_toy_20261014/maps/ca_last_layer_full_scene0.png)·[SA 전체20×20](../output_etc/entmax_inference_toy_20261014/maps/sa_last_layer_full_scene0.png). 위의 기존 그림은 비교 대상 H0/H1 query 행만 표시했다. 실제6명 입력에는 사람 토큰6개가 있으며 SA의 나머지 토큰은 물체8개·목표6개다.
+
+단독2명(loco AT·ON_TOP): [2명 CA 마지막layer](../output_etc/entmax_inference_toy_20261014/solo_maps/ca_two_solo_last_scene0.png)·[2명/6명 비교](../output_etc/entmax_inference_toy_20261014/solo_maps/ca_last_layer_scene0.png)·[CA 모든layer](../output_etc/entmax_inference_toy_20261014/solo_maps/ca_all_layers_scene0.png)·[SA](../output_etc/entmax_inference_toy_20261014/solo_maps/sa_last_layer_scene0.png). 동일 초기H4/H5·O2/O3/O5/O4·G4/G5 입력을2명으로 재매핑하며 별도2명 물리 rollout은 아니다. 16장면·전체CA 평균 자기/다른 단독task softmax48.1/51.9%, entmax47.4/52.6%. H0 기준T4/T5는정상NONE관계이나 마지막head2 QK 점수가파트너보다커서 유한관계bias를넘는다. 점수분해는 `solo_maps/analysis.json`. GPU4 runtime 설정 후 `MAP_VIEW=solo python output_etc/entmax_inference_toy_20261014/map_collect.py`, `python output_etc/entmax_inference_toy_20261014/solo_map_plot.py`로 재현한다.
+
+재현(위토이16장면 결과 필요): `TOKENHSI_GPU=4`로 runtime 환경을 준비한 뒤 `python output_etc/entmax_inference_toy_20261014/map_collect.py`, `python output_etc/entmax_inference_toy_20261014/map_plot.py`를 차례로 실행한다. 원시확률/logit/초기관측은 `maps/maps.npz`, 검증/집계는 `maps/maps_summary.json`·`maps/category_means.json`이다.
+
+<a id="stage2-locoplatform-human-sa"></a>
+## LocoPlatform human SA4
+
+`approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding`는 LocoPlatform의 Stage2 task CA만 human self-attention으로 바꾸는 별도 실험이다. Stage1 SA 최종 human64만 추출하고, Actor/Critic 각각 SA+residual+FFN+LayerNorm 4층·2head·FFN128을 통과시켜64입력 action/value head에 넣는다. 매 층 갱신된 human을 정규화해 Q/K/V 모두에 사용한다. task 토큰·grounding MLP는 없으며 packet은 SELF(자기), COUPLED(동일 carry task/payload/target의 상대), NONE(그 외) 관계 판정에만 사용한다. 세 learnable head별 bias를 모두 더하고 NONE을 차단하지 않는다.
+
+Stage1 entity/token 셔플을 유지하며 Stage2는 human과 관계 행·열을 함께 섞고 출력 순서를 복원한다. packet 순서에는 무관하다. Actor encoder/scene RMS 동결·새 SA 및 action head 학습, Critic encoder/SA/value head 전체 학습이다. 기존 Stage1 전이 규칙으로 encoder/head를 초기화하고 새 SA residual 추가분을0으로 초기화해 초기 행동·가치를 보존한다. `head_input: ca_only`, `critic_ca: true`는 기존64입력/양쪽 coordination 설정 키이며 이 실험에서는 실제 모듈이 human SA다.
+
+환경은 기존 LocoPlatform과 동일하다: 공동80/단독20, AMP 원본80/후진10/옆걸음10, paired full pickup RSI·Goal360·CPA release+1m·공동 loco 받침·보상·물체 크기 유지. `human_sa4_actor_critic` 정책 계약으로 기존 CA/Geo/NONE checkpoint와 resume/eval 혼용을 차단한다. 전용 test는 추론용 NONE override를 제거한다. 기본GPU5이며 장기 학습은 직접 실행한다.
+
+```bash
+# Stage1 전이로 새 Stage2 학습 (기존 Stage2 resume 아님)
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS \
+TOKENHSI_GPU=5 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_train.sh 2 2048 4
+
+HUMAN_SA_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer; 화면 없는 평가는 HEADLESS=1
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=random_scenario EVAL_SKILLS=carryWith \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_test.sh "$HUMAN_SA_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=random_scenario EVAL_SKILLS=carryWith \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_vnc.sh "$HUMAN_SA_CHECKPOINT" 2 1 4 10
+```
+
+짧은 검증은 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check MAX_ITERATIONS=2`로 분리한다. 학습2048환경, 평가 환경 수는 별도 지정한다.
+
+검증(2026-10-15): CPU10개 통과. GPU5·2048환경 epoch3 저장본에서 Stage1 Actor encoder/scene RMS 동결·새 SA/세 bias/head/Critic 갱신을 확인했다. AMP79.83/10.03/10.14%, 공동1638/단독410·full pickup/paired RSI·Goal360·부분 reset·짧은 physics 통과. 2명16환경 및6명1환경 headless 추론 정상 종료. [저장본 검사](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check/saved_check.json)·[AMP/reset](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check/reset_check.json)·[RSI/목표](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check/goal360_runtime_check.json). 본학습 성능·실제 VNC 화면은 미검증이다.
+
+기존6명 혼합 뷰어도 checkpoint metadata로 이 SA config를 자동 선택한다(공동 두 팀 carryWith + 단독 AT/ON_TOP loco):
+
+```bash
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/joint_carry_mixed_scene_demo_vnc.sh "$HUMAN_SA_CHECKPOINT"
+```
+
+<a id="stage2-locoplatform-nonemask"></a>
+## LocoPlatform NONE 차단 학습
+
+`approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding`는 기존 LocoPlatform 기반의 **별도 학습 실험**이다. Geometry 실험이 아니며 task 입력은 원래 `[행동64; SA human64; SA payload64; SA target64]`256→128→64다. `coordination.mask_none: true`가 Actor/Critic의 CA4 전 층에서 NONE logit을 −∞로 만든다. SELF/COUPLED에는 원래 QK와 학습 bias를 사용한다. 단독은 SELF100%, 공동은 SELF/COUPLED만 볼 수 있으며 유효한 관련 task가 없는 query는 residual human을 유지한다. 마스크는 packet relation을 따라가므로 SA/edge/task 순서 셔플과 함께 재정렬된다. 마스크는 한 forward에서 한 번 만들고4층이 재사용한다. NONE bias 파라미터는 shape 호환상 남지만 gradient0이므로 초기0으로 유지된다.
+
+Scratch는 Stage2 checkpoint resume 없이 Stage1 CarryDistill30000에서 encoder/head·기존 전이 항목을 초기화하고 새 CA를 학습한다는 뜻이다. Actor encoder 동결·CA-only64입력 action head, Critic 전체 학습, 공동80/단독20, AMP80/10/10, full pickup RSI, Goal360, CPA release+1m, loco 받침, 보상·물체 크기는 LocoPlatform과 같다. 정책 계약 `task_ca4_actor_critic_none_mask`로 기존 Platform/Geo와 resume/eval 혼용을 차단한다. **추론 토이의 `NONE_MASK=0`으로 이 학습 모델의 마스크를 끌 수 없다.** 전용 wrapper는 추론 override 환경변수를 제거하고 학습 YAML의 구조를 사용한다.
+
+```bash
+# GPU5: Stage1 전이, 새 Stage2 본학습
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS \
+TOKENHSI_GPU=5 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_train.sh 2 2048 4
+
+NONE_MASK_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer: 화면 없는 평가는 HEADLESS=1
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=random_scenario EVAL_SKILLS=carryWith \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_test.sh "$NONE_MASK_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=random_scenario EVAL_SKILLS=carryWith \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_vnc.sh "$NONE_MASK_CHECKPOINT" 2 10 4 10
+```
+
+짧은 검증은 별도 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_check`와 `MAX_ITERATIONS=2`를 사용한다. 실제 학습은2048환경이며 viewer 환경 수는 별도 지정한다. 위 전용 VNC는 원래2명 평가 장면이며 기존6명 추론 토이 wrapper와 구분한다.
+
+검증(2026-10-15): CPU12개·GPU5 2048환경 Stage1 전이→epoch3 저장, Actor encoder69개/scene RMS 동결·Critic/head 갱신·NONE bias0·399개 scalar finite. AMP 실측79.83/10.03/10.14%, 공동1638/단독410·paired RSI/Goal360·부분 reset 유지. 저장본16환경64-step 설정 전용test 정상 종료. 재로드 Actor/Critic8개 block에서 NONE0·단독 SELF100%, 계측 행동 오차≤2.2e−7 확인. [저장본 검사](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_check/saved_check.json)·[AMP/reset](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_check/reset_check.json)·[RSI/목표](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_nonemask_task_embedding_check/goal360_runtime_check.json). 본학습 성능·실제 VNC 화면은 미검증.
+
+<a id="locoplatform-ca-none-mask"></a>
+## LocoPlatform NONE 차단 · 추론 전용
+
+[설정](../tokenhsi/data/cfg/inference/locoplatform_ca_none_mask.yaml)의 `actor_ca_none_mask: true`는 Actor CA4의 softmax 직전 NONE logit만 −∞로 만든다. SELF/COUPLED QK·bias와 residual·FFN, Stage1 SA, Critic, checkpoint, 기존 RSI/AMP 설정은 유지한다. 단독은 SELF100%, 공동은 SELF/COUPLED 안에서 기존 점수로 attention을 계산한다. 유효한 관련 task가 없는 query는 해당 block의 human 입력을 그대로 반환한다. 기존 player의 기본 동작과 학습 경로에는 적용하지 않는다. 별도 학습 config/train wrapper는 없는 추론 토이다.
+
+기본 checkpoint는 기존 분석에 사용한 **LocoPlatform12500**이며 첫 인자로 다른 LocoPlatform checkpoint를 지정할 수 있다. Geo checkpoint는 이 wrapper 대상이 아니다. 기본 `SCENE=mixed`는 기존6명 데모(공동 AT 두 팀 carryWith + 단독 AT/ON_TOP 두 명 loco,8물체,1환경)를 재사용한다. `DEMO_AGENTS=4`는 공동 한 팀+단독 두 명이다. 기존 데모의 고정 목표 배치를 사용하므로 학습 Goal360 분포 평가와 구분한다. `SCENE=two_agents`는 원래 LocoPlatform 평가 환경/Goal360를 사용하며 기본16환경·random_scenario·carryWith다.
+
+```bash
+# 서버 VNC: NONE만 차단, GPU5, 기본6명
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/locoplatform_ca_none_mask_vnc.sh
+
+# 같은 checkpoint/seed/장면의 기존 baseline
+TOKENHSI_GPU=5 NONE_MASK=0 bash tokenhsi/scripts/multi_agent/locoplatform_ca_none_mask_vnc.sh
+
+# 로컬 viewer / 화면 없는 짧은 확인
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/locoplatform_ca_none_mask_test.sh
+TOKENHSI_GPU=5 HEADLESS=1 REPEATS=2 EPISODE_LENGTH=64 \
+bash tokenhsi/scripts/multi_agent/locoplatform_ca_none_mask_test.sh
+
+# 2명 혼합 과제: 단독 NONE 차단 + 공동 원본 동작 확인
+TOKENHSI_GPU=5 SCENE=two_agents NUM_ENVS=16 EVAL_SKILLS=carryWith \
+bash tokenhsi/scripts/multi_agent/locoplatform_ca_none_mask_vnc.sh
+```
+
+기본 output은 `output/locoplatform_ca_none_mask/<mixed|two_agents>/<masked|baseline>`이며 `OUTPUT_PATH`로 변경 가능하다. 두 조건은 SEED42/같은 checkpoint를 사용하고 첫 초기 장면을 맞추되, 이후 물리 상태는 행동에 따라 달라진다. `inference_override.json`에 실제 적용 config/checkpoint를 남기고 혼합 데모의 `demo_results.json`에도 mask 여부를 기록한다. `DEMO_CA_ENTMAX`는 wrapper에서0으로 고정하며, 직접 두 기법을 동시에 요청하면 거부한다. 혼합 데모는 성공률 집계가 없는 viewer이며 성능 개선을 보장하지 않는다.
+
+검증(2026-10-15): CPU10개, GPU5의2명16환경/6명1환경32-step에서 NONE0·단독 SELF100%·가중치/RMS 불변. 2명 공동 action 차이≤2.6e−7. 전용6명 mask/baseline 각각2회×63-step 정상 종료·초기 장면 일치,2명16환경 wrapper도64-step 설정 평가 정상 종료. [2명 검사](../output_etc/locoplatform_none_mask_check_20261015/native/mask_check.json)·[6명 검사](../output_etc/locoplatform_none_mask_check_20261015/mixed/mask_check.json). 실제 VNC 화면과 운반 개선 여부는 미검증.
+
+<a id="stage2-locoplatform-geometry"></a>
+## LocoPlatform Geometry task CA
+
+`approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding`는 LocoPlatform의 task 토큰 입력만 geometry로 교체한 별도 실험이다. `[행동 embedding64; 담당 사람 env-local pose7; 사람 기준 payload pose7; 사람 기준 target pose7]`를85→128→64 MLP로 인코딩한다. Pose는 `(x,y,z,qx,qy,qz,qw)`이며 기존 GTA 관측을 재사용한다. 사람은 root 위치와 yaw quaternion, 물체는 전체 회전이다. 상대 위치는 `R_Hᵀ(p_X−p_H)`, 상대 회전은 `q_H⁻¹⊗q_X`; quaternion을 정규화하고 w≥0 표현을 사용한다. AT는 task가 참조하는 G, ON_TOP은 받침 물체를 target으로 사용한다. 손/관절·속도·크기는 geometry 입력에 추가하지 않는다. 사람의 환경 좌표가 포함되므로 전체 회전/이동 불변성을 보장하지 않는다.
+
+Actor query는 동결된 Stage1 SA human feature다. task K/V 입력에서만 최종 SA 사람/물체/목표 feature를 제거한다. Critic도 같은 geometry CA 구조를 사용하되 encoder·embedding·CA·value head 전체를 학습한다. CA4·2head·FFN128·CA-only64입력 head와 identity 초기화를 유지한다. SELF/COUPLED/NONE은 기존 learnable bias이며 hard mask를 추가하지 않는다. task 토큰은 한 번 만들고4층에서 재사용한다.
+
+공동80/단독20, paired 전체 pickup RSI·Goal360, 단독 Stage1 크기/RSI, AMP original/backward/sideways80/10/10, CPA release+1m, 공동 loco50% payload 받침, 보상·SA/CA/task 순서 셔플은 LocoPlatform과 같다. `task_ca4_actor_critic_geometry` 계약으로 기존 feature-task checkpoint와 resume/eval 혼용을 차단한다. **Scratch는 Stage2 resume 없이 Stage1 encoder/head를 전이하고 새 geometry MLP·CA를 학습한다는 뜻**이다.
+
+```bash
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS \
+TOKENHSI_GPU=5 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_train.sh 2 2048 4
+
+GEOMETRY_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer (화면 없는 평가는 HEADLESS=1)
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_test.sh "$GEOMETRY_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC viewer
+TOKENHSI_GPU=5 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_vnc.sh "$GEOMETRY_CHECKPOINT" 2 10 4 10
+```
+
+Stage1 source는 LocoPlatform과 같은 CarryDistill30000을 예시로 썼으며 `STAGE1_CHECKPOINT`로 지정한다. 짧은 확인은 별도 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_check`, `MAX_ITERATIONS=2`를 사용한다. 본학습은 자동 실행하지 않는다.
+
+검증(2026-10-14): CPU18개·최종 wrapper 경로 포함 geometry4개 재확인 통과. GPU5·2048환경 epoch3 저장,85입력 양쪽 MLP·Actor encoder/RMS 동결·Critic/head 갱신·399개 scalar finite 확인. AMP 실측79.83/10.03/10.14%, 공동1638/단독410·paired RSI/Goal360·부분 reset 유지, 저장본16환경64-step 설정 carryWith headless 추론 정상 종료. [학습/동결](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_check/saved_check.json)·[AMP/reset](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_check/reset_check.json)·[paired RSI/목표](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_geometry_task_embedding_check/goal360_runtime_check.json). 장기 학습 성능과 실제 VNC 화면은 미검증이다.
+
+<a id="stage2-cparelease1-locoplatform"></a>
+## CPA Release1 LocoPlatform · 공동 loco payload 받침
+
+`approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding`은 CPA Release1 기반 별도 env/train·train/test/VNC 실험이다. **공동 AT/ON_TOP의 loco 초기화만** 바꾼다. Loco 중50%는 기존 바닥 시작,50%는 payload 아래40×40×2cm 받침을 둔다. 단독·pickup/carryWith/putDown·목표 ON_TOP 받침·다른 상자는 그대로다. PickupFocus·Move·TeamHold는 추가하지 않았다.
+
+받침 윗면 높이는 `min(max(U(0,1m),0.02m),1.2m−payload 높이)`다. 현재 payload 높이40cm이면2~80cm이며, 높은 분기의 약20%가 상한80cm에 모인다. 안정화 후 payload 윗면은 최대1.2m다. 초기에는 원본처럼 받침 위5cm 간격을 두어 떨어뜨리므로 첫 순간 윗면은 최대1.25m다. 상한은 실제 payload 크기로 계산한다. 받침이 바닥과 겹치지 않도록 높은 분기만 최소2cm로 제한한다.
+
+받침은 기존 고질량·중력 비활성 물리 actor를 재사용하고 사람/상자/marker 다음에 하나 추가한다. 과제 물체·관찰 token에는 포함하지 않는다. reset 시 사람·상자·받침·marker를 한 번에 갱신한다. 공동80/단독20·Goal360·full pickup100프레임·단계 확률·AMP80/10/10·CA4 CA-only Actor/Critic·CPA Release1·보상·SA/CA/edge 셔플은 기반과 같다.
+
+`joint_carry_loco_platform` checkpoint 계약으로 받침 유무가 다른 실험과 직접 resume/eval 혼용을 막는다. Stage1 epoch30000에서 새로 시작하며 같은 실험 checkpoint만 재개한다.
+
+```bash
+# 학습: Stage1에서 새로 시작
+TOKENHSI_GPU=5 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_train.sh 2 2048 4
+
+LOCO_PLATFORM_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=random_scenario EVAL_SKILLS=loco \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_test.sh "$LOCO_PLATFORM_CHECKPOINT" 2 16 4 1
+
+# 화면 없는 평가
+TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=random_scenario EVAL_SKILLS=loco \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_test.sh "$LOCO_PLATFORM_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC viewer
+TOKENHSI_GPU=5 TASK_GRAPH=joint_carry_at EVAL_SKILLS=loco \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_vnc.sh "$LOCO_PLATFORM_CHECKPOINT" 2 10 4 10
+```
+
+공동 ON_TOP만 보려면 `TASK_GRAPH=joint_carry_ontop`, 혼합은 `random_scenario`다. `EVAL_SKILLS=pickUp`·`carryWith` 및 AT `putDown`에는 시작 받침이 없다. 같은 실험 재개는 `RESUME_CHECKPOINT="$LOCO_PLATFORM_CHECKPOINT"`, 짧은 확인은 별도 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check`와 `MAX_ITERATIONS=1`을 사용한다.
+
+검증(2026-10-13): CPU25개 통과·기존 ON_TOP putDown1개 skip, Python/셸 문법 통과. GPU5·2048환경에서 공동1638/단독410, 공동 AT/ON_TOP loco 받침831/1638개(50.73%)·높이2~80cm, paired RSI·단독·목표·AMP 초기 이력 불변과 부분 reset을 확인했다. AT832/ON_TOP816장면의2초 지지·받침 제거 후 낙하 검사를 통과했다. Stage1 epoch30000 전이→epoch2 저장→epoch3 재개, actor69개 tensor/RMS 동결·critic/양쪽 CA4/head 갱신·133종 scalar finite를 확인했다. 저장본16환경32-step의 loco VNC viewer 실행과 pickup headless 평가도 정상 종료했다. [받침 물리/초기화](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check/platform_runtime_check.json), [RSI/AMP](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check/reset_check.json), [전이/재개/평가](../output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_check/saved_check.json). 본학습·공동집기 개선·바닥 시작으로의 전이는 아직 미검증이다.
+
+<a id="stage2-cparelease1-pickupfocus"></a>
+## CPA Release1 PickupFocus · 집기/들기 프레임 집중
+
+`approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding`은 CPA Release1에서 공동 pickup 프레임 분포만 바꾼 별도 실험이다. `jointCarryRsi.pickupFrameSampling`의 inclusive source frame 범위25~39에서35%,55~80에서35%,전체0~99에서30%를 균등 샘플링한다. 전체 분기와 집중 구간이 겹치므로 실제 구간별 확률은39.5/42.8/17.7%다. 프레임 번호는0부터이며 두 사람·상자·속도를 같은 paired snapshot에서 읽는다. 가중치는 로드 시 한 번 계산하고 reset마다 한 번의 multinomial로 선택한다.
+
+Epoch에 따른 스케줄은 없다. 공동 AT의 loco/pickUp/carryWith/putDown40/10/40/10%, ON_TOP50/10/40/0%, 단독 Stage1 RSI는 유지한다. Pickup 자체는 여전히10%다. RSI 전체100프레임·Goal360·AMP80/10/10·CA4 Actor/Critic·CPA Release1·리워드·크기·공동80/단독20·SA/CA/edge 셔플은 기준 실험과 동일하다.
+
+새 `joint_carry_pickup_sampling` checkpoint 계약으로 기존 CPA Release1과 직접 resume/eval 혼용을 차단한다. Stage1 전이로 새로 시작하며 같은 실험 checkpoint만 재개한다. Viewer/평가에서도 `EVAL_SKILLS=pickUp`이면 위 분포가 적용된다. Loco/carryWith/putDown 프레임 분포는 기존과 같다.
+
+```bash
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS \
+TOKENHSI_GPU=5 \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_train.sh 2 2048 4
+
+PICKUP_FOCUS_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_test.sh "$PICKUP_FOCUS_CHECKPOINT" 2 16 4 1
+
+# 화면 없는 평가
+TOKENHSI_GPU=5 HEADLESS=1 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_test.sh "$PICKUP_FOCUS_CHECKPOINT" 2 16 4 1
+
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=random_scenario \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_vnc.sh "$PICKUP_FOCUS_CHECKPOINT" 2 10 4 10
+```
+
+공동 pickup만 보려면 `TASK_GRAPH=joint_carry_at EVAL_SKILLS=pickUp`을 지정한다. 기본 viewer 시작은 loco다. 재개는 `RESUME_CHECKPOINT="$PICKUP_FOCUS_CHECKPOINT"`, 짧은 확인은 별도 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_check`와 `MAX_ITERATIONS=1`을 사용한다.
+
+검증: CPU25개 통과·기존 ON_TOP putDown1개 skip, GPU5·2048환경 reset/AMP/Goal360·부분 reset 검사 통과. 실제 pickup 집기/들기/기타 비율은 AT39.56/42.61/17.83%, ON_TOP39.26/44.63/16.12%였다. Stage1 epoch30000 전이→epoch2 저장→epoch3 재개,16환경32-step pickup headless 평가 통과. Actor69개 tensor/RMS 동결·Critic/양쪽 CA4/head 갱신·133종 scalar finite를 확인했다. [전이/재개/평가](../output_etc/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_check/saved_check.json), [RSI/AMP](../output_etc/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_check/reset_check.json), [프레임 분포/Goal360](../output_etc/approach_stage2_joint_carry_mixed80_locoamp_ca4_goal360_fullpickup_cparelease1_pickupfocus_task_embedding_check/goal360_runtime_check.json). 본학습·실제 VNC 화면·장기 개선은 미검증이다.
+
 <a id="stage2-mixed80-locoamp-ca4-goal360-teamhold"></a>
 ## Mixed80 LocoAMP CA4 Goal360 공동 HOLDING state
 
@@ -1084,3 +1623,73 @@ TOKENHSI_GPU=5 TASK_GRAPH=before_sit bash tokenhsi/scripts/multi_agent/approach_
 2026-10-08 검증: 관련 CPU94개와 GPU5·2048환경 짧은 학습/epoch2 저장·epoch3 재개를 통과했다. Actor69개 tensor·관찰 RMS6개 불변, NONE/SELF/BEFORE bias 갱신·COUPLED0, scalar182종/364값 finite를 확인했다. 환경 분할은 독립410·각 BEFORE546이며 첫 reset의 RSI fallback은0이었다. AMP family/demo 대응·reference history와 1024개 혼합/각32개 그룹 부분 reset에서 미선택 상태 보존을 확인했다. 최종 모델의 BEFORE-climb에서 agent별 loco/climb reference 선택·16환경32-step headless 평가가 완료됐다. 초기 연결 모델의 나머지 sit/stack/독립 평가 경로도 각각16환경32-step으로 확인했다.
 
 **남은 제한:** 고정 PD target으로 초기 자세를0.1초 유지하는 별도 물리 진단은1575/2048개만 통과했다(473개 미통과, 최대 box 속도14.42m/s·변위1.21m). 따라서 코드의 geometry 재시도 실패0을 물리 안정성 통과로 해석하면 안 된다. 더 엄격한 단일-agent 캐시를 시험했지만 skill fallback이 증가했고 모든 장면을 안정화하지 못해 기본 설정에 적용하지 않았다. Stage 1 RSI 비율은 유지했으며 합성 초기화의 물리 안정성 보완은 남아 있다. 결과는 `output/approach_stage2_before_task_embedding_check_final/{saved_check,reset_check,resume_check}.json`; 본학습·장기 성능·VNC 화면은 미검증이다.
+
+
+<a id="stage1-grasp-shift"></a>
+## Stage1 공유물체 파지 중심 이동 · 추론 토이
+
+두 사람이 **같은 payload 하나·같은 목표 하나**를 공유한다. 환경은 기존 LocoPlatform(52×80×40cm payload·Goal360·공동 RSI·loco의50% 받침)을 사용하고, 정책은 `stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth` 원본 Stage1이다. 전용 진입점에서 환경 설정 검증 후 네트워크 설정만 원본 Stage1으로 선택하며 source metadata/strict state_dict 검사를 한다. Stage2 CA/SA나 학습은 사용하지 않는다.
+
+시작 시 사람 위치를 상자 로컬 좌표로 변환해 반대 Y측 앵커를 배정하고 episode 동안 유지한다. 사람 번호에 고정하지 않는다. 앵커는 기존 보상과 같은 `±(Y반폭−0.15m)`이며 현재 상자에서 ±0.25m다. 매 step 같은 물리 장면의 관측 두 벌을 만들어 A용에는 A 앵커, B용에는 B 앵커가 payload 중심으로 보이게 한다. 두 벌을 같은 Stage1 모델에 배치로 넣고 A-view의 A행동/B-view의 B행동만 선택해 **동일한 물리 환경**에 적용한다.
+
+`SHIFT=0`은 둘 다 실제 중심, `SHIFT=1`은 각각 배정된 앵커, `SHIFT=0.5`는 중심→앵커의 절반이다. `SHIFT=-1`은 두 사람의 앵커를 뒤바꾸는 진단용이며 기본 비교에는 필요 없다. 이전 독립 단독 토이의 SHIFT 정의/명령을 대체한다.
+
+관측 위치 `p+Rδ` 및 object-local 속도 `v_local+ω_local×δ`만 변경한다. 실제 물체·크기·목표·task packet·보상/RSI/AMP는 유지하며, 관측 변화는 상자↔목표 관계에도 영향을 준다. 배정은 관측 실험용으로, 보상이 앵커를 강제 배정하는 것은 아니다. 공동집기 개선 여부는 뷰어에서 판단한다. 가상 상자는 따로 그리지 않는다.
+
+서버 VNC — 기본GPU5·포트6080·1환경·SEED42·loco·300-step·10회. 하나씩 실행하고 다음 비교 전에 기존 viewer를 닫는다.
+
+기존 중심을 보는 공유물체 baseline:
+```bash
+TOKENHSI_GPU=5 SHIFT=0 bash tokenhsi/scripts/multi_agent/stage1_grasp_shift_vnc.sh
+```
+
+각자 반대 앵커를 중심으로 보는 공유물체:
+```bash
+TOKENHSI_GPU=5 SHIFT=1 bash tokenhsi/scripts/multi_agent/stage1_grasp_shift_vnc.sh
+```
+
+로컬 viewer / headless:
+```bash
+TOKENHSI_GPU=5 SHIFT=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_grasp_shift_test.sh
+TOKENHSI_GPU=5 SHIFT=1 HEADLESS=1 REPEATS=1 bash tokenhsi/scripts/multi_agent/stage1_grasp_shift_test.sh
+```
+
+`TASK_GRAPH=joint_carry_ontop`, `EVAL_SKILLS=carryWith`로 변경 가능. 단독/random graph는 거부한다. 첫 위치 인자로 호환 Stage1 checkpoint를 교체한다. `SAVE_TRACE=1`은 관측/행동/손 위치 및 zero-shift 두-view 행동 복원 오차를 기록하고, `SAVE_FRAMES=1`은 실제 viewer 스크린샷을 저장한다. 결과는 `output_etc/stage1_shared_grasp_shift_<SHIFT>/`. 비교 시 동일 시드의 첫 장면을 기준으로 보며, 정책에 따른 종료 시점이 달라 이후 reset 장면까지 일치한다고 보장하지 않는다. 여러 환경은 첫 종료 시 함께 중단하므로 성공률 평가용이 아니다. 학습 명령은 없다.
+
+
+<a id="stage2-sa4-graspview"></a>
+## SA4 LocoPlatform GraspView · 공동 파지 관측
+
+기반은 `approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding`. 새 실험 `approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding`는 **공동80%에서만 사람별 payload 중심 관측을 변경**한다. 실제 상자·목표·bbox·물리/보상·AMP 원본80/후진10/옆걸음10·공동 RSI/full pickup·Goal360·CPA release+1m·loco 받침 및 단독20%는 유지한다.
+
+reset 때 원본 사람/상자 pose로 로컬 Y 순서를 정하고 반대 앵커를 배정한다. 앵커는 기존 HOLDING과 같은 `±(Y반폭−0.15m)`, 현재 상자에서 ±0.25m다. 배정을 episode 동안 유지하고 매 step 상자 회전에 따라 위치/선속도만 갱신한다. 실제 회전과 크기는 그대로 둔다. 리워드에 배정을 강제하지 않는다.
+
+관측은 원본634차원의 A-view/B-view를 묶어1268차원으로 rollout/replay에 저장한다. 정규화는 Stage1 통계로 각634차원 view에 따로 적용하고 pose/packet은 통과시킨다. 공동에서는 각 view에서 담당 human64를 선택해 `[h_A,h_B]`로 SA4에 전달하며 단독에서는 두 view가 동일하여 encoder를 한 번만 실행한다. 80/20에서 encoder 처리 장면 수는 대략1.8배, 파라미터/SA4/action64/value64/AMP1320은 그대로다. Critic도 같은 view 구성을 사용한다.
+
+Actor Stage1 encoder·scene RMS 동결, SA4/action head 학습, Critic 전체 학습. 초기 SA 추가 출력은0이어서 초기 Actor 행동은 Stage1에 각자 앵커 관측을 넣은 행동과 일치한다. Actor/Critic encoder와 head는 Stage1 checkpoint에서 전이한다. 사람·task·token 셔플 후 canonical human ID를 따라 자기 feature를 선택한다. 단독은 기존 실제 중심이며 SELF/COUPLED/NONE bias 모두 유지한다.
+
+`jointCarryGraspView`/checkpoint `joint_carry_grasp_view` 계약으로 기존 SA4 checkpoint와 resume/eval 혼용을 차단한다. 이 실험은 현재2명·4물체 전용이며 기존6명 demo에 넣지 않는다. 새 학습은 Stage1에서 시작한다.
+
+```bash
+# 새 Stage2 학습: 기존 Stage2 resume가 아님
+TOKENHSI_GPU=5 \
+RESUME_CHECKPOINT= \
+STAGE1_CHECKPOINT=stage1/ApproachScenarioStage1UnifiedSizeRsiTaskEmbeddingCarryDistill_00030000.pth \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_train.sh 2 2048 4
+```
+
+```bash
+GRASP_CHECKPOINT="output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding/<run>/nn/<checkpoint>.pth"
+
+# 로컬 viewer (화면 없는 평가는 HEADLESS=1)
+TOKENHSI_GPU=5 HEADLESS=0 TASK_GRAPH=joint_carry_at EVAL_SKILLS=loco \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_test.sh "$GRASP_CHECKPOINT" 2 1 4 10
+
+# 서버 VNC
+TOKENHSI_GPU=5 TASK_GRAPH=joint_carry_at EVAL_SKILLS=loco \
+bash tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_vnc.sh "$GRASP_CHECKPOINT" 2 1 4 10
+```
+
+`TASK_GRAPH=joint_carry_ontop`, `EVAL_SKILLS=carryWith/pickUp`도 지원한다. 단독 확인은 `TASK_GRAPH=independent`. ON_TOP의 지상 putDown RSI는 기존처럼 지원하지 않는다. 짧은 학습은 `OUTPUT_PATH=output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_check MAX_ITERATIONS=2`로 별도 경로를 사용하며2048환경은 유지한다. 본학습 시 `MAX_ITERATIONS`를 설정해 둔 셸이면 해제한다.
+
+검증(2026-10-16): CPU16개 통과, GPU5·2048환경 epoch3 저장/재로드 확인. Actor encoder69개·scene RMS 불변, Critic69개/action head6개/8개 SA bias 갱신, 모델 파라미터4,398,450개로 기존 SA4와 동일. 공동1638/단독410·AMP79.83/10.03/10.14%·full pickup100프레임·7가지 RSI/Goal360·부분 reset·배정 유지·physics 통과. 16환경·loco/carryWith·64-step 설정 headless 추론 정상 종료. [저장본](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_check/saved_check.json)·[AMP/reset](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_check/reset_check.json)·[RSI/목표](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_check/goal360_runtime_check.json)·[앵커/reset](../output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_check/grasp_view_runtime.json). 실제 VNC 화면·장기 성능은 미검증이다.

@@ -146,6 +146,7 @@ from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
 from utils.edge_stage2_spec import STAGE2_CONTEXT_MODE
 from learning.multi_agent.coordination_head import GroundedEdgeCoordination
 from learning.multi_agent.task_coordination import TaskCoordination
+from learning.multi_agent.human_coordination import HumanCoordination
 from learning.multi_agent.task_role_encoder import (TaskRoleFusion, TaskRoleMLPFusion,
     TaskTypeEmbeddingBias, TaskTypeEmbeddingFusion)
 
@@ -1006,8 +1007,26 @@ class AMPMultiAgentBuilder(AMPBuilder):
             tp = params["transformer"]
             d_model = tp["num_features"]
             coordination_cfg = params.get('coordination', {})
+            self.grasp_view = coordination_cfg.get('grasp_view', False)
+            if self.grasp_view and (coordination_cfg.get('mode') != 'human_coupled'
+                    or (self.num_agents, self.num_objects) != (2, 4)):
+                raise ValueError('Grasp views require human SA with 2 humans / 4 objects')
+            self.task_geometry = coordination_cfg.get('task_input', 'sa_features') == 'geometry'
+            if self.task_geometry and (not self.stage2 or
+                    coordination_cfg.get('mode') != 'task_coupled' or
+                    kwargs.get('scene_kinematic_size') != 7):
+                raise ValueError('Geometry task CA requires Stage2 task_coupled and 7-D poses')
             head_only = coordination_cfg == {'enabled': False, 'mode': 'stage1_head_only'}
             self.use_coordination = self.stage2 and coordination_cfg.get('enabled') is True
+            self.ca_only = coordination_cfg.get('head_input', 'concat') == 'ca_only'
+            if coordination_cfg.get('head_input', 'concat') not in ('concat', 'ca_only') or \
+                    self.ca_only != coordination_cfg.get('critic_ca', False):
+                raise ValueError('CA-only heads require matching actor/critic CA')
+            if self.ca_only and (not self.use_coordination or
+                    coordination_cfg.get('mode') not in ('task_coupled', 'task_before', 'human_coupled') or
+                    coordination_cfg.get('num_layers') != 4 or
+                    coordination_cfg.get('feedforward_dim') != 128):
+                raise ValueError('CA-only actor/critic requires four residual task CA blocks')
             if self.stage2 and (not (self.use_coordination or head_only) or d_model != 64):
                 raise ValueError('Stage 2 requires 64-D coordination or explicit head-only ablation')
             if not self.stage2 and coordination_cfg.get('enabled', False):
@@ -1087,19 +1106,42 @@ class AMPMultiAgentBuilder(AMPBuilder):
             if self.use_coordination:
                 task_ca = self.actor_encoder.task_role_input
                 before = self.relation_graph_spec.get('sampler') == 'two_agent_before_task_embedding'
-                expected_mode = 'task_before' if before else 'task_coupled' if task_ca else 'grounded_edge'
+                human_sa = coordination_cfg.get('mode') == 'human_coupled'
+                if human_sa and (not task_ca or before or not self.ca_only):
+                    raise ValueError('Human SA requires the coupled task packet and 64-D actor/critic heads')
+                expected_mode = 'human_coupled' if human_sa else 'task_before' if before else 'task_coupled' if task_ca else 'grounded_edge'
                 if coordination_cfg.get('mode', 'grounded_edge') != expected_mode:
                     raise ValueError('Stage-2 coordination mode must match its policy packet')
                 coordination = TaskCoordination if task_ca else GroundedEdgeCoordination
-                self.coordination = coordination(
+                self.coordination = HumanCoordination(
+                    width=d_model, heads=coordination_cfg.get('num_heads', 2),
+                    num_layers=4, feedforward_dim=128,
+                    shuffle_human_order=coordination_cfg.get('shuffle_human_order', False)
+                ) if human_sa else coordination(
                     d_model, coordination_cfg.get('grounding_hidden', 128),
                     coordination_cfg.get('num_heads', 2),
                     **({'shuffle_task_order': coordination_cfg.get('shuffle_task_order', False),
                         'before': before, 'num_layers': coordination_cfg.get('num_layers', 1),
-                        'feedforward_dim': coordination_cfg.get('feedforward_dim')}
+                        'feedforward_dim': coordination_cfg.get('feedforward_dim'),
+                        'residual_output': self.ca_only,
+                        'task_input': coordination_cfg.get('task_input', 'sa_features'),
+                        'mask_none': coordination_cfg.get('mask_none', False)}
                        if task_ca else {}))
+                if self.ca_only:
+                    self.critic_coordination = HumanCoordination(
+                        width=d_model, heads=coordination_cfg.get('num_heads', 2),
+                        num_layers=4, feedforward_dim=128,
+                        shuffle_human_order=coordination_cfg.get('shuffle_human_order', False)
+                    ) if human_sa else TaskCoordination(
+                        d_model, coordination_cfg.get('grounding_hidden', 128),
+                        coordination_cfg.get('num_heads', 2),
+                        shuffle_task_order=coordination_cfg.get('shuffle_task_order', False),
+                        before=before, num_layers=4, feedforward_dim=128,
+                        residual_output=True, detach_task_embedding=False,
+                        task_input=coordination_cfg.get('task_input', 'sa_features'),
+                        mask_none=coordination_cfg.get('mask_none', False))
             self.action_head = head(kwargs['actions_num'], tp["extra_mlp_units"],
-                                    2 * d_model if self.use_coordination else d_model)
+                                    2 * d_model if self.use_coordination and not self.ca_only else d_model)
             self.value_head = head(self.value_size, tp["extra_mlp_units"])
 
             mlp_init = self.init_factory.create(**{"name": "default"})
@@ -1107,12 +1149,17 @@ class AMPMultiAgentBuilder(AMPBuilder):
                        self.action_head, self.value_head]
             if self.use_coordination:
                 modules.append(self.coordination)
+            if self.ca_only:
+                modules.append(self.critic_coordination)
             for net in modules:
                 for m in net.modules():
                     if isinstance(m, nn.Linear):
                         mlp_init(m.weight)
                         if getattr(m, "bias", None) is not None:
                             torch.nn.init.zeros_(m.bias)
+            if self.ca_only:
+                self.coordination.init_identity()
+                self.critic_coordination.init_identity()
             if self.actor_encoder.owner_holding_state:
                 for branch in (self.actor_encoder.context_fusion.state_mlp,
                                self.critic_encoder.context_fusion.state_mlp):
@@ -1146,19 +1193,30 @@ class AMPMultiAgentBuilder(AMPBuilder):
             """Backward-compatible shorthand for the old 1:1:1 entity layout."""
             return self.set_entity_counts(num_agents, num_agents)
 
+        def _coordination_poses(self, obs, encoder):
+            count = sum(encoder.entity_counts)
+            end = obs.shape[-1] - encoder.suffix_width
+            return obs[:, end - 7 * count:end].reshape(obs.shape[0], count, 7)
+
         def eval_actor(self, obs):
             if self.is_continuous and self.space_config['fixed_sigma']:
                 if self.stage2:
                     with torch.no_grad():
                         if self.use_coordination:
-                            humans, nodes = self.actor_encoder(obs, return_all=True)
+                            if self.grasp_view:
+                                from learning.multi_agent.grasp_view import encode_grasp_views
+                                humans, nodes = encode_grasp_views(self.actor_encoder, obs), None
+                            else:
+                                humans, nodes = self.actor_encoder(obs, return_all=True)
                         else:
                             encoded = self.actor_encoder(obs)
                     if self.use_coordination:
                         context = self.coordination(
                             humans, nodes, obs[:, -self.actor_encoder.suffix_width:],
-                            self.actor_encoder.edge_encoder, self.actor_encoder.entity_types)
-                        encoded = torch.cat((humans, context), -1)
+                            self.actor_encoder.edge_encoder, self.actor_encoder.entity_types,
+                            **({'entity_poses': self._coordination_poses(obs, self.actor_encoder)}
+                               if self.task_geometry else {}))
+                        encoded = context if self.ca_only else torch.cat((humans, context), -1)
                 else:
                     encoded = self.actor_encoder(obs)
                 mu = self.action_head(encoded)
@@ -1169,7 +1227,19 @@ class AMPMultiAgentBuilder(AMPBuilder):
             raise NotImplementedError
 
         def eval_critic(self, obs):
-            encoded = self.critic_encoder(obs)
+            if self.ca_only:
+                if self.grasp_view:
+                    from learning.multi_agent.grasp_view import encode_grasp_views
+                    humans, nodes = encode_grasp_views(self.critic_encoder, obs), None
+                else:
+                    humans, nodes = self.critic_encoder(obs, return_all=True)
+                encoded = self.critic_coordination(
+                    humans, nodes, obs[:, -self.critic_encoder.suffix_width:],
+                    self.critic_encoder.edge_encoder, self.critic_encoder.entity_types,
+                    entity_poses=self._coordination_poses(obs, self.critic_encoder)
+                    if self.task_geometry else None)
+            else:
+                encoded = self.critic_encoder(obs)
             value = self.value_head(encoded)
             if self.observation_mode == "clean_scene":
                 value = value.reshape(obs.shape[0] * self.num_agents, -1)

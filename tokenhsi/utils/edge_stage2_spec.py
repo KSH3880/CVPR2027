@@ -31,6 +31,11 @@ def validate_stage2_config(config):
     if 'joint_carry' in config:
         from utils.task_role_spec import TASK_EMBEDDING_VARIANT
         joint = dict(config['joint_carry'])
+        collision = dict(joint.get('collision', {}))
+        release_buffer = collision.pop('release_buffer', None)
+        if release_buffer is not None and (type(release_buffer) not in (int, float) or release_buffer != 1.):
+            raise ValueError('Joint CPA release requires bbox radius plus 1 metre')
+        joint['collision'] = collision
         independent = joint.pop('independent', None)
         if joint.pop('holding_state', None) not in (None, 'opposite_anchor_min'):
             raise ValueError('Unsupported joint-carry holding state contract')

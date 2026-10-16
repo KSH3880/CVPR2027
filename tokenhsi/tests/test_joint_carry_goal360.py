@@ -32,7 +32,7 @@ def fake_task(env, skill, preset, n=512):
         _dof_vel=torch.zeros(n,2,dofs), _every_env_init_dof_pos=torch.zeros(n,2,dofs),
         _kinematic_humanoid_rigid_body_states=torch.zeros(n,2,bodies,13),
         _box_states=torch.zeros(n,4,13), _tar_pos=torch.zeros(n,2,3),
-        _stage2_rsi_counts=torch.zeros(1),
+        _stage2_rsi_counts=torch.zeros(1), _joint_loco_platform=None,
         _sample_episode_graph=lambda ids:None, _sample_box_assignments=lambda ids:None,
         relation_runtime=SimpleNamespace(graph=sample_graph(n,env['relationGraph'],preset=preset)))
     task._env_origins[:,2] = 0

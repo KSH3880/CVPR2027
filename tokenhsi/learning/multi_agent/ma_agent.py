@@ -118,6 +118,7 @@ class MAAgent(amp_agent.AMPAgent):
                     normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
                     extra_passthrough_size=task.get_relation_suffix_size(),
+                    num_views=2 if getattr(task, '_grasp_view', False) else 1,
                 ).to(self.ppo_device)
             else:
                 self.running_mean_std = EntityRunningMeanStd(
@@ -174,6 +175,8 @@ class MAAgent(amp_agent.AMPAgent):
                     'stage': 2, 'coordination': ('stage1_head_only' if not self.model.a2c_network.use_coordination else 'before_task_cross_attention' if getattr(task, '_before', False) else 'coupled_task_cross_attention'
                         if getattr(task, '_joint_carry', False) else 'grounded_edge_cross_attention'),
                     'edge_width': 64, 'context_width': report['head_expansion']['context_columns'],
+                    'head_input': 'ca_only' if self.model.a2c_network.ca_only else 'concat' if self.model.a2c_network.use_coordination else 'human',
+                    'critic_coordination': self.model.a2c_network.ca_only,
                     'source_checkpoint': path,
                     'source_config': checkpoint.get('relation_experiment_config'),
                     'source_reward_config': checkpoint['relation_metadata']['relation_reward_config'],
@@ -270,11 +273,22 @@ class MAAgent(amp_agent.AMPAgent):
         weights = super().get_stats_weights()
         task = self.vec_env.env.task
         weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        rsi_digest = task.cfg['env'].get('jointCarryRsi', {}).get('dataset_sha256')
+        if rsi_digest is not None:
+            weights['joint_carry_rsi_dataset'] = rsi_digest
         goals = task.cfg['env'].get('jointCarryRsi', {}).get('goalSampling')
+        platform = task.cfg['env'].get('jointCarryRsi', {}).get('locoPlatform')
+        if platform is not None:
+            weights['joint_carry_loco_platform'] = copy.deepcopy(platform)
         if goals is not None:
             weights['joint_carry_goal_sampling'] = copy.deepcopy(goals)
+        pickup_sampling = task.cfg['env'].get('jointCarryRsi', {}).get('pickupFrameSampling')
+        if pickup_sampling is not None:
+            weights['joint_carry_pickup_sampling'] = copy.deepcopy(pickup_sampling)
         if task.cfg['env'].get('jointCarryAblation'):
             weights['joint_carry_ablation'] = copy.deepcopy(task.cfg['env']['jointCarryAblation'])
+        if task.cfg['env'].get('jointCarryGraspView'):
+            weights['joint_carry_grasp_view'] = copy.deepcopy(task.cfg['env']['jointCarryGraspView'])
         if getattr(task, '_edge_context', False):
             from utils.edge_context_spec import task_instance
             weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)

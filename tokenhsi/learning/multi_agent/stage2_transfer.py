@@ -28,11 +28,12 @@ def transfer_stage1_weights(model, checkpoint):
     if not isinstance(source, dict) or FIRST_HEAD_WEIGHT not in source:
         raise ValueError('Stage-1 checkpoint has no compatible model state')
     target = model.state_dict()
-    context_width = 64 if hasattr(model.a2c_network, 'coordination') else 0
+    context_width = 64 if hasattr(model.a2c_network, 'coordination') and not \
+        getattr(model.a2c_network, 'ca_only', False) else 0
     copied = []
     new = []
     for key, value in target.items():
-        if key.startswith(COORDINATION_PREFIX):
+        if key.startswith((COORDINATION_PREFIX, 'a2c_network.critic_coordination.')):
             new.append(key)
             continue
         if key not in source:

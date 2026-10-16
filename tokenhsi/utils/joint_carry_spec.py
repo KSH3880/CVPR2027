@@ -10,6 +10,12 @@ JOINT_PRESETS = ('random_scenario', 'joint_carry_at', 'joint_carry_ontop')
 
 
 def validate_env(env):
+    from utils.joint_carry_platform import LOCO_PLATFORM
+    if env['jointCarryRsi'].get('locoPlatform') not in (None, LOCO_PLATFORM):
+        raise ValueError('Unsupported joint loco platform contract')
+    from utils.joint_carry_rsi import PICKUP_FRAME_SAMPLING
+    if env['jointCarryRsi'].get('pickupFrameSampling') not in (None, PICKUP_FRAME_SAMPLING):
+        raise ValueError('Unsupported joint pickup frame sampling contract')
     from utils.joint_carry_goals import GOAL360
     if env['jointCarryRsi'].get('goalSampling') not in (None, GOAL360):
         raise ValueError('Unsupported joint goal sampling contract')

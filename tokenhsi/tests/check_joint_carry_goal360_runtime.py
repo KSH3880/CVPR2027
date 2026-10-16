@@ -59,6 +59,21 @@ try:
                       distance_max=distance.max().item())
             if skill!='loco':
                 pool=task._joint_reset.pools[skill]
+                item['rsi_pool_size']=len(pool['source_frame'])
+                item['sampled_source_frames']=task._joint_reset.source_frame[ids].unique().tolist()
+                if skill=='pickUp' and context['cfg']['env']['jointCarryRsi'].get('dataset_sha256'):
+                    assert pool['source_frame'].tolist()==list(range(100))
+                    if context['cfg']['env']['jointCarryRsi'].get('pickupFrameSampling'):
+                        frames=task._joint_reset.source_frame[ids]
+                        grasp=(frames>=25)&(frames<=39)
+                        lift=(frames>=55)&(frames<=80)
+                        fractions=torch.stack([grasp.float().mean(),lift.float().mean(),
+                                               (~(grasp|lift)).float().mean()])
+                        torch.testing.assert_close(fractions,frames.new_tensor([.395,.428,.177],dtype=torch.float),
+                                                   atol=.04,rtol=0)
+                        item['pickup_frame_fractions']=fractions.tolist()
+                    else:
+                        assert item['sampled_source_frames']==list(range(100))
                 rows=torch.searchsorted(pool['source_frame'],task._joint_reset.source_frame[ids])
                 reference=pool['box_state'][rows,0]
                 center=reference[:,:3].clone();center[:,2]=0

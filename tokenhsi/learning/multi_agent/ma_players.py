@@ -48,7 +48,10 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             from utils.joint_carry_amp import check_ablation_checkpoint
             check_ablation_checkpoint(checkpoint, self.env.task.cfg['env'])
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
-        return super().restore(fn)
+        result = super().restore(fn)
+        from learning.multi_agent.ca_none_mask_inference import configure_ca_none_mask
+        self._ca_none_mask = configure_ca_none_mask(self)
+        return result
 
     def _build_net(self, config):
         super()._build_net(config)
@@ -62,6 +65,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                     normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
                     extra_passthrough_size=task.get_relation_suffix_size(),
+                    num_views=2 if getattr(task, '_grasp_view', False) else 1,
                 ).to(self.device)
             else:
                 self.running_mean_std = EntityRunningMeanStd(

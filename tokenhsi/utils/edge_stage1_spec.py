@@ -478,6 +478,9 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get('mode') == 'joint_carry_viewer_demo':
+        from utils.joint_carry_demo import compile_demo_graph
+        return compile_demo_graph(spec, m, o, device)
     from utils.before_spec import SAMPLER as BEFORE_SAMPLER, compile_graph as compile_before
     if spec.get('sampler') == BEFORE_SAMPLER:
         return compile_before(spec, m, o, device)

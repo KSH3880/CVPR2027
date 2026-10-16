@@ -1,10 +1,39 @@
 from pathlib import Path
+import hashlib
 
 import numpy as np
 import torch
 
 
-def load_paired_snapshots(directory, device, terminal_targets=False):
+PICKUP_FRAME_SAMPLING = dict(ranges=[[25, 39], [55, 80]], probabilities=[.35, .35, .30])
+
+
+def pickup_frame_weights(frames, spec):
+    if spec is None:
+        return None
+    if spec != PICKUP_FRAME_SAMPLING:
+        raise ValueError('Unsupported joint pickup frame sampling contract')
+    weights = torch.full_like(frames, spec['probabilities'][-1]/len(frames), dtype=torch.float)
+    for (start, end), probability in zip(spec['ranges'], spec['probabilities']):
+        selected = (frames >= start) & (frames <= end)
+        if selected.sum().item() != end-start+1:
+            raise ValueError('Joint pickup sampling requires every frame in its focus ranges')
+        weights[selected] += probability/selected.sum()
+    return weights
+
+
+def snapshot_digest(directory):
+    digest = hashlib.sha256()
+    for skill in ('pickUp', 'carryWith', 'putDown'):
+        for name in ('cooperative_rsi_candidate.npz', 'screened_rsi_snapshots.npz'):
+            digest.update((skill+'/'+name).encode())
+            digest.update((Path(directory)/skill/name).read_bytes())
+    return digest.hexdigest()
+
+
+def load_paired_snapshots(directory, device, terminal_targets=False, expected_digest=None):
+    if expected_digest is not None and snapshot_digest(directory) != expected_digest:
+        raise ValueError('Joint RSI data differs from its config digest')
     pools = {}
     for skill in ('pickUp', 'carryWith', 'putDown'):
         path = Path(directory) / skill

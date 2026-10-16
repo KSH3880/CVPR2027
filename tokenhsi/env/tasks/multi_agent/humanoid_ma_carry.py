@@ -78,9 +78,12 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             validate_env(cfg['env'])
         self._joint_carry = self._stage2 and 'joint_carry' in self._relation_cfg
         self._mixed_carry = self._joint_carry and 'independent' in self._relation_cfg['joint_carry']
+        self._grasp_view = cfg['env'].get('jointCarryGraspView') is not None
         if self._joint_carry:
-            from utils.joint_carry_spec import validate_env
-            validate_env(cfg['env'])
+            self._validate_joint_carry_env(cfg['env'])
+        self._joint_loco_platform_cfg = (cfg['env']['jointCarryRsi'].get('locoPlatform')
+                                         if self._joint_carry else None)
+        self._joint_loco_platform = None
         self._edge_stage1 = self._relation_cfg.get('mode') in (STAGE1_CONTEXT_MODE,
                                                                STAGE2_CONTEXT_MODE)
         self._edge_interaction = self._relation_cfg.get('mode') in (INTERACTION_CONTEXT_MODE,
@@ -359,8 +362,13 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._reset_random_height:
             self._build_platform_state_tensors()
         self._build_assignment_tensors()
+        if self._joint_loco_platform_cfg is not None:
+            from env.tasks.multi_agent.joint_carry_platform import JointCarryPlatform
+            self._joint_loco_platform = JointCarryPlatform(self)
 
         self._every_env_init_dof_pos = torch.zeros((N, M, self.num_dof), device=self.device, dtype=torch.float)
+        if self._grasp_view:
+            self._grasp_sides = torch.zeros(N, M, device=self.device)
         self._kinematic_humanoid_rigid_body_states = torch.zeros((N, M, self.num_bodies, 13),
                                                                  device=self.device, dtype=torch.float)
 
@@ -468,12 +476,17 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                           + self.num_objects * self.get_clean_object_obs_size()
                           + self.num_agents * self.get_clean_goal_obs_size())
             kinematic_width = self.get_scene_num_tokens() * self.get_scene_kinematic_size()
-            return node_width + kinematic_width + self.get_relation_suffix_size()
+            width = node_width + kinematic_width + self.get_relation_suffix_size()
+            return width * (2 if self._grasp_view else 1)
 
         obs_size = self.num_agents * self.get_humanoid_obs_size()
         if self._enable_task_obs:
             obs_size += self.get_task_obs_size()
         return obs_size
+
+    def _validate_joint_carry_env(self, env):
+        from utils.joint_carry_spec import validate_env
+        validate_env(env)
 
     # ------------------------------------------------------------------ assets / envs
 
@@ -488,6 +501,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._reset_random_height:
             self._platform_handles = []
             self._tar_platform_handles = []
+        if self._reset_random_height or self._joint_loco_platform_cfg is not None:
             self._load_platform_asset()
 
         self._box_handles = []
@@ -655,6 +669,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._enable_markers:
             for a in range(self.num_agents):
                 self._build_marker(env_id, a, env_ptr)
+        if self._joint_loco_platform_cfg is not None:
+            from env.tasks.multi_agent.joint_carry_platform import build_platform
+            build_platform(self, env_id, env_ptr)
         return
 
     def _filter_platform_foot_collisions(self, env_ptr, humanoid_handle):
@@ -923,7 +940,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self.obs_buf[self._flat_slot_ids(env_ids)] = obs
         return
 
-    def _compute_clean_scene_obs(self, env_ids=None):
+    def _compute_clean_scene_obs(self, env_ids=None, grasp_view=True):
         """Build one clean, compact scene observation per environment.
 
         Layout: [M*H223 | O*O30 | M*T1 | (2M+O)*pose7].  Pose records are
@@ -990,7 +1007,12 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 suffix = torch.cat([suffix, self._ontop_scenario[ids, None].float(),
                                     self._ontop_base_agent[ids, None].float()], -1)
             parts.append(suffix)
-        return torch.cat(parts, dim=-1)
+        obs = torch.cat(parts, dim=-1)
+        if self._grasp_view and grasp_view:
+            from learning.multi_agent.grasp_view import make_grasp_views
+            sides = self._grasp_sides if env_ids is None else self._grasp_sides[env_ids]
+            obs = make_grasp_views(obs, sides, self._relation_cfg['joint_carry']['anchor_inset'])
+        return obs
 
     def _compute_task_obs(self, env_ids=None):
         if (env_ids is None):

@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from learning.multi_agent.task_geometry import canonical_pose, relative_pose
+
 
 def task_relations(packet, num_agents, before=False):
     valid, task, actor, payload, target = packet.reshape(packet.shape[0], -1, 5).long().unbind(-1)
@@ -39,7 +41,10 @@ class CoordinationBlock(nn.Module):
     def forward(self, humans, tokens, relations, padding):
         bias = self.relation_bias[:, relations].permute(1, 0, 2, 3)
         bias = bias.masked_fill(padding, float('-inf')).flatten(0, 1)
-        context, _ = self.attention(self.query_norm(humans), tokens, tokens,
+        query = self.query_norm(humans)
+        if tokens is None:
+            tokens = query
+        context, _ = self.attention(query, tokens, tokens,
                                     attn_mask=bias, need_weights=False)
         humans = humans + context
         return humans + self.ffn(self.ffn_norm(humans))
@@ -47,11 +52,21 @@ class CoordinationBlock(nn.Module):
 
 class TaskCoordination(nn.Module):
     def __init__(self, width=64, hidden=128, heads=2, shuffle_task_order=False, before=False,
-                 num_layers=1, feedforward_dim=None):
+                 num_layers=1, feedforward_dim=None, residual_output=False,
+                 detach_task_embedding=True, task_input='sa_features', mask_none=False):
         super().__init__()
         self.shuffle_task_order = shuffle_task_order
         self.before = before
-        self.grounding = nn.Sequential(nn.Linear(4 * width, hidden), nn.ReLU(),
+        self.residual_output = residual_output
+        self.detach_task_embedding = detach_task_embedding
+        self.mask_none = mask_none
+        if mask_none and feedforward_dim is None:
+            raise ValueError('NONE masking requires stacked task CA')
+        if task_input not in ('sa_features', 'geometry'):
+            raise ValueError('Unknown task token input: ' + task_input)
+        self.task_input = task_input
+        input_width = width + 21 if task_input == 'geometry' else 4 * width
+        self.grounding = nn.Sequential(nn.Linear(input_width, hidden), nn.ReLU(),
                                        nn.Linear(hidden, width))
         if feedforward_dim is None:
             if num_layers != 1:
@@ -65,32 +80,58 @@ class TaskCoordination(nn.Module):
                 CoordinationBlock(width, heads, feedforward_dim, 4 if before else 3)
                 for _ in range(num_layers)])
 
-    def task_tokens(self, nodes, packet, edge_encoder):
+    def init_identity(self):
+        for block in self.blocks:
+            nn.init.zeros_(block.attention.out_proj.weight)
+            nn.init.zeros_(block.attention.out_proj.bias)
+            nn.init.zeros_(block.ffn[-1].weight)
+            nn.init.zeros_(block.ffn[-1].bias)
+
+    def task_tokens(self, nodes, packet, edge_encoder, entity_poses=None):
         valid, task, actor, payload, target = packet.reshape(packet.shape[0], -1, 5).long().unbind(-1)
         valid = valid.bool()
         task, actor, payload, target = [x.masked_fill(~valid, 0)
                                        for x in (task, actor, payload, target)]
         row = torch.arange(nodes.shape[0], device=nodes.device)[:, None]
-        embedding = edge_encoder.category_embed(task).detach()
-        carried = nodes[row, payload] * (task >= 2)[..., None]
-        tokens = self.grounding(torch.cat((embedding, nodes[row, actor],
-                                          carried, nodes[row, target]), -1))
+        embedding = edge_encoder.category_embed(task)
+        if self.detach_task_embedding:
+            embedding = embedding.detach()
+        if self.task_input == 'geometry':
+            if entity_poses is None or entity_poses.shape != (*nodes.shape[:2], 7):
+                raise ValueError('Geometry task tokens require canonical entity poses [B,L,7]')
+            human = canonical_pose(entity_poses[row, actor])
+            carried = relative_pose(human, entity_poses[row, payload]) * (task >= 2)[..., None]
+            target_feature = relative_pose(human, entity_poses[row, target])
+        else:
+            human = nodes[row, actor]
+            carried = nodes[row, payload] * (task >= 2)[..., None]
+            target_feature = nodes[row, target]
+        tokens = self.grounding(torch.cat((embedding, human, carried, target_feature), -1))
         return tokens.masked_fill(~valid[..., None], 0), valid
 
-    def forward(self, humans, nodes, packet, edge_encoder, entity_types=None):
+    def forward(self, humans, nodes, packet, edge_encoder, entity_types=None, entity_poses=None):
         if self.shuffle_task_order:
             packet = packet.reshape(packet.shape[0], -1, 5)
             packet = packet[:, torch.randperm(packet.shape[1], device=packet.device)]
-        tokens, valid = self.task_tokens(nodes, packet, edge_encoder)
+        tokens, valid = self.task_tokens(nodes, packet, edge_encoder, entity_poses)
         relations = task_relations(packet, humans.shape[1], self.before)
         has_task = valid.any(-1)
         safe_valid = valid.clone()
         safe_valid[~has_task, 0] = True
         if hasattr(self, 'blocks'):
             padding = ~safe_valid[:, None, None]
+            if self.mask_none:
+                padding = padding | (relations == 0)[:, None]
+                has_related = (~padding).any(-1).squeeze(1)
+                padding[..., 0] &= has_related[:, None]
             context = humans
             for block in self.blocks:
                 context = block(context, tokens, relations, padding)
+            if self.mask_none:
+                context = torch.where(has_related[..., None], context,
+                                      humans if self.residual_output else torch.zeros_like(context))
+            if self.residual_output:
+                return torch.where(has_task[:, None, None], context, humans)
             return context * has_task[:, None, None]
         bias = self.relation_bias[:, relations].permute(1, 0, 2, 3)
         bias = bias.masked_fill(~safe_valid[:, None, None], float('-inf'))

@@ -124,6 +124,7 @@ nn/
 !/joint_carry/teamhoi_retarget_posture_all/*_targets.npz
 !/joint_carry/carry_joint_corrected/*/cooperative_rsi_candidate.npz
 !/joint_carry/carry_joint_corrected/*/screened_rsi_snapshots.npz
+!/joint_carry/carry_joint_full_pickup/pickUp/*.npz
 /joint_carry/carry_joint_corrected/before_after/
 /joint_carry/carry_corrected_physics/
 

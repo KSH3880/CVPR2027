@@ -1,7 +1,7 @@
 import torch
 
 from utils.edge_ontop_spec import ON_TOP
-from utils.joint_carry_rsi import load_paired_snapshots, rotate_vectors, transform_states
+from utils.joint_carry_rsi import load_paired_snapshots, pickup_frame_weights, rotate_vectors, transform_states
 
 
 class JointCarryReset:
@@ -9,7 +9,10 @@ class JointCarryReset:
         self.task = task
         self.goal_sampling = task.cfg['env']['jointCarryRsi'].get('goalSampling')
         self.pools = load_paired_snapshots(task.cfg['env']['jointCarryRsi']['directory'],
-                                          task.device, terminal_targets=self.goal_sampling is not None)
+                                          task.device, terminal_targets=self.goal_sampling is not None,
+                                          expected_digest=task.cfg['env']['jointCarryRsi'].get('dataset_sha256'))
+        self.pickup_weights = pickup_frame_weights(self.pools['pickUp']['source_frame'],
+            task.cfg['env']['jointCarryRsi'].get('pickupFrameSampling'))
         self.source_frame = torch.full((task.num_envs,), -1, device=task.device, dtype=torch.long)
         self.skill_index = torch.zeros(task.num_envs, device=task.device, dtype=torch.long)
 
@@ -59,7 +62,9 @@ class JointCarryReset:
                 root, dof, vel, body = self.locomotion(len(selected))
             else:
                 pool = self.pools[name]
-                row = torch.randint(len(pool['root_state']), (len(selected),), device=t.device)
+                row = (torch.multinomial(self.pickup_weights, len(selected), replacement=True)
+                       if name == 'pickUp' and self.pickup_weights is not None else
+                       torch.randint(len(pool['root_state']), (len(selected),), device=t.device))
                 root, dof, vel, body = [pool[key][row] for key in
                     ('root_state', 'dof_position', 'dof_velocity', 'body_state')]
                 box = pool['box_state'][row, 0].clone()
@@ -92,6 +97,8 @@ class JointCarryReset:
         t._box_states[ids] = transform_states(boxes, yaw, shift)
         goal = rotate_vectors(destination, yaw) + shift
         t._tar_pos[ids] = goal[:, None]
+        if t._joint_loco_platform is not None:
+            t._joint_loco_platform.reset(ids)
         if not finalize:
             return
         self.commit(ids)
@@ -123,6 +130,8 @@ class JointCarryReset:
         from isaacgym import gymtorch
         t = self.task
         actors = [t._humanoid_actor_ids[ids].flatten(), t._box_actor_ids[ids].flatten()]
+        if t._joint_loco_platform is not None:
+            actors.append(t._joint_loco_platform.actor_ids[ids])
         if t._enable_markers:
             t._marker_pos[ids] = t._tar_pos[ids]
             graph = t.relation_runtime.graph

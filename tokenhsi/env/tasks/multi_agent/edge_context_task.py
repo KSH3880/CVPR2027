@@ -80,6 +80,10 @@ class EdgeContextTaskMixin:
         self._relation_episode_id[env_ids] += 1
         self._edge_ever_goal[env_ids] = self.relation_runtime.done[env_ids]
         self._edge_ever_scene[env_ids] = scene_success(self.relation_runtime.own_success[env_ids], select_graph(self.relation_runtime.graph, env_ids))
+        if getattr(self, '_grasp_view', False):
+            from utils.stage1_grasp_shift import initial_grasp_sides
+            raw = self._compute_clean_scene_obs(env_ids, grasp_view=False)
+            self._grasp_sides[env_ids] = initial_grasp_sides(raw)
 
     @torch.no_grad()
     def _compute_relation_reward(self, collision_fn):
@@ -116,6 +120,11 @@ class EdgeContextTaskMixin:
                 collision = -self._agent_collision_coeff * cpa_collision_penalty(
                     roots, self._humanoid_root_states[..., 7:10], self._agent_collision_dist,
                     cpa['ttc_discount'], self.dt)
+                if 'release_buffer' in cpa:
+                    from env.tasks.multi_agent.joint_carry_reward import joint_cpa_release
+                    released = joint_cpa_release(roots, self._logical_box_values(self._box_states),
+                        self._logical_box_values(self._box_size), graph, cpa['release_buffer'])
+                    collision = collision.masked_fill(released[:, None], 0.)
             else:
                 collision = -self._agent_collision_coeff * collision_fn(roots, self._agent_collision_dist)
         if self._box_vel_penalty:
