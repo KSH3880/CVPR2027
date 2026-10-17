@@ -142,6 +142,14 @@ def validate_stage1_context_config(config):
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get("sampler") == "stage2_random_groups":
+        from utils.stage2_spec import sample_graph
+        probabilities = torch.ones(1, m, 5, device=device)
+        probabilities[..., 0] = 0
+        from dataclasses import replace, fields
+        graph = sample_graph(probabilities, spec)[0]
+        return replace(graph, **{field.name: getattr(graph, field.name)[0]
+                                 for field in fields(graph) if isinstance(getattr(graph, field.name), torch.Tensor)})
     from utils.edge_scenario_spec import compile_graph
 
     return compile_graph(spec, m, o, device)

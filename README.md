@@ -1,6 +1,6 @@
 # Stage1 Multi-Agent TokenHSI
 
-`stage1`, `stage1_v2`, `stage1_v2_fixed` 세 multi-agent 실험을 유지한다. [TokenHSI](https://github.com/liangpan99/TokenHSI)의 데이터·AMP 기반 위에 다중 사람의 독립 SIT/CLIMB/AT/ON_TOP 과제를 학습한다.
+`stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2` 네 multi-agent 실험을 유지한다. [TokenHSI](https://github.com/liangpan99/TokenHSI)의 데이터·AMP 기반 위에 다중 사람의 독립 SIT/CLIMB/AT/ON_TOP 과제를 학습하며, stage2는 fixed 위에 공동 운반을 추가한다.
 
 공유 task bias·사람 토큰 residual MLP·GTA, 별도 actor/critic, CPA와 크기별 RSI를 사용한다. 기본 학습은 **2명·2048환경·4물체**다.
 

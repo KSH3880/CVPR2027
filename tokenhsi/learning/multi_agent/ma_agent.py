@@ -68,6 +68,7 @@ class MAAgent(amp_agent.AMPAgent):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
+                num_views=task.num_agents if getattr(task, "_stage2", False) else 1,
             ).to(self.ppo_device)
         assert (
             not self.is_rnn
@@ -85,10 +86,32 @@ class MAAgent(amp_agent.AMPAgent):
             self.ppo_device,
             self.seq_len,
         )
+        if getattr(task, "_stage2", False):
+            self._init_stage2(task)
         return
+
+    def _init_stage2(self, task):
+        import json
+        from learning.multi_agent.stage2_network_builder import transfer_stage1, freeze_actor
+        args = task.cfg["args"]
+        if args.resume <= 0 and not (args.test or args.eval):
+            path = task.cfg["experiment"]["transfer"]["checkpoint"]
+            checkpoint = torch.load(path, map_location=self.ppo_device, weights_only=False)
+            report = transfer_stage1(self.model, checkpoint)
+            self.running_mean_std.load_state_dict(checkpoint["running_mean_std"], strict=True)
+            self._amp_input_mean_std.load_state_dict(checkpoint["amp_input_mean_std"], strict=True)
+            with open(os.path.join(self.experiment_dir, "stage2_transfer_report.json"), "w") as stream:
+                json.dump(dict(report, checkpoint=path), stream, indent=2)
+        freeze_actor(self.model)
+        for group in self.optimizer.param_groups:
+            group["params"] = [p for p in group["params"] if p.requires_grad]
+        self.running_mean_std.eval()
 
     def set_train(self):
         super().set_train()
+        if getattr(self.vec_env.env.task, "_stage2", False):
+            self.model.a2c_network.actor_encoder.eval()
+            self.running_mean_std.eval()
 
     def init_tensors(self):
         super().init_tensors()
@@ -112,11 +135,20 @@ class MAAgent(amp_agent.AMPAgent):
             task._relation_graph_spec, task.num_agents, task.num_objects
         )
         weights["relation_experiment_config"] = self._relation_experiment_config
+        if getattr(task, "_stage2", False):
+            weights["stage2_contract"] = copy.deepcopy(task.cfg["env"]["stage2"])
+            from joint_carry.artifacts import contract_digest
+            weights["stage2_rsi_contract"] = contract_digest()
         return weights
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
-        if not (task.cfg["args"].test or task.cfg["args"].eval):
+        if getattr(task, "_stage2", False):
+            from utils.stage2_spec import check_checkpoint
+            check_checkpoint(weights, task.cfg["env"])
+            if weights.get("validation_only") and not (task.cfg["args"].test or task.cfg["args"].eval):
+                raise ValueError("Validation transfer snapshots cannot resume training")
+        if not getattr(task, "_stage2", False) and not (task.cfg["args"].test or task.cfg["args"].eval):
             from utils.stage1_sampling import check_sampling_resume
 
             check_sampling_resume(weights, task.cfg["env"])

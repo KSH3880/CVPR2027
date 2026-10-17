@@ -1,23 +1,23 @@
 # 현재 서버 실행 환경
 
-RTX PRO 6000 Blackwell에서 학습은 **2048환경**을 사용한다. 기본 명령은 [config.md](config.md), 코드 위치는 [structure.md](structure.md)를 따른다.
+RTX PRO 6000 Blackwell에서 stage1 학습은 **2048환경**, 4명 stage2는 **1024환경**을 사용한다. 기본 명령은 [config.md](config.md), 코드 위치는 [structure.md](structure.md)를 따른다.
 
 ## 환경과 데이터
 
-- 작업 레포: `/home/cvlab/Desktop/CVPR2027/stage1_v2`
+- 작업 레포: `/home/hwanhee/ksh/stage1_stage2`
 - 원본 코드·결과 보관 레포: `/home/cvlab/Desktop/CVPR2027/stage1_message` (보존)
 - conda: `tokenhsi`, Python3.8. `runtime_env.sh`로 활성화한다.
 - 데이터: `tokenhsi/data/dataset_*/` 심링크를 통해 읽는다. 이 checkout의 실제 링크 대상은 `/home/cvlab/Desktop/CVPR2027/TokenHSI` 아래이며, 다른 서버의 `/home/hwanhee/CVPR2027/TokenHSI`를 포함한 공유 원본도 읽기 전용으로 취급한다.
 - SMPL: `body_models/smpl/`에 별도 설치한다. Isaac Gym은 활성 conda 환경의 설치본을 사용한다.
 
 ```bash
-cd /home/cvlab/Desktop/CVPR2027/stage1_v2
+cd /home/hwanhee/ksh/stage1_stage2
 nvidia-smi
 TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
 python -c "import isaacgym, torch; print(torch.cuda.get_device_name(0))"'
 ```
 
-짧은 학습도 2048환경을 유지하고 `CHECK=1`(기본 `MAX_ITERATIONS=1`) 또는 `MAX_ITERATIONS`를 지정한다. 확인 결과는 `output_etc/check/`로 제한한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 값을 확인한다. 평가·VNC 환경 수는 별도다.
+짧은 학습도 각 실험의 환경 수(stage1 2048·stage2 1024)를 유지하고 `CHECK=1`(기본 `MAX_ITERATIONS=1`) 또는 `MAX_ITERATIONS`를 지정한다. 확인 결과는 `output_etc/check/`로 제한한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 값을 확인한다. 평가·VNC 환경 수는 별도다.
 
 ## Viewer와 문제 확인
 
@@ -26,7 +26,7 @@ python -c "import isaacgym, torch; print(torch.cuda.get_device_name(0))"'
 | 증상 | 확인 |
 | --- | --- |
 | NVML 불일치 | `nvidia-smi`의 드라이버/라이브러리 오류; headless와 GUI 검증을 구분 |
-| CUDA 메모리 부족 | 선택 GPU의 기존 프로세스·실제 actor/object 수·batch; 학습 환경 수는2048 유지 |
+| CUDA 메모리 부족 | 선택 GPU의 기존 프로세스·실제 actor/object 수·batch; 실험별 지정 환경 수 유지 |
 | 모션 파일 누락 | 데이터 심링크·YAML 상대 경로 |
 | `libpython3.8.so.1.0` 로드 실패 | `runtime_env.sh`와 conda 환경 |
 | VNC 실패·검은 화면 | `VNC_DIR`, `NOVNC_DIR`, 포트 점유·viewer 생성 로그 |
@@ -63,3 +63,7 @@ TOKENHSI_GPU=0 RESUME_CHECKPOINT="$CKPT" OUTPUT_PATH="output/${EXP}_resume" bash
 TOKENHSI_GPU=0 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
 PYTHONPATH=tokenhsi:tokenhsi/tests pytest -q tokenhsi/tests'
 ```
+
+## Stage2 전이와 RSI 준비
+
+기본 전이는 `stage1/Stage1V2Fixed_00030500.pth`다. 새 stage1 파일은 `STAGE1_CHECKPOINT`, 재개는 `RESUME_CHECKPOINT`, 저장 환경 재정의는 `STAGE2_ENV_CONFIG`로 지정한다. Stage2는4명·1024환경·8장면 물체다. 기본 실행 명령은 [config](config.md), 크기별 공동 RSI 생성·검증과 새 모델 계약은 [Stage2 참고](reference/stage2.md)에 있다. 검증용 전이 PTH는 학습한 모델이 아니다. 공동 RSI·GTA·리워드는 Y 끝면에서15cm를 사용한다. 기본 캐시는 `joint_carry/stage2_size_rsi/inset15_single`이며 누락·생성 조건 변경 시15cm로 자동 생성한다.

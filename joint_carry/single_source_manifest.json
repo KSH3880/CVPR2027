@@ -1,0 +1,14 @@
+{
+  "pickUp": {
+    "tokenhsi/data/dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii/phys_humanoid_v3/ref_motion.npy": "a1f3ed21725030190a9ccf64a10eb2c7fa330c96b4a23c1b272a0080ec544e46",
+    "tokenhsi/data/dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii/phys_humanoid_v3/box_motion.npy": "2141e735c8cb527f798056be2de0c7418a6e9251b7c1dd21b28734b908b73769"
+  },
+  "carryWith": {
+    "tokenhsi/data/dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii/phys_humanoid_v3/ref_motion.npy": "4f8d8cea72c694fdd5096c98b431e9302df478e11ac68102cb7aee680105e309",
+    "tokenhsi/data/dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii/phys_humanoid_v3/box_motion.npy": "e5ae0b54821fcc0fd000d678540a521a23a113c0c7996259dba8409608c95af4"
+  },
+  "putDown": {
+    "tokenhsi/data/dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B21_-_put_down_box_to_walk_stageii/phys_humanoid_v3/ref_motion.npy": "64ed3e538465d961aa5e2a0e9022a7d63a1d30c0b27f1a6bdef6b25867aa9d0c",
+    "tokenhsi/data/dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B21_-_put_down_box_to_walk_stageii/phys_humanoid_v3/box_motion.npy": "5dff7aebca51bbcf620357ff902fbc8d1004885c864d80abdf37e574bd97d07f"
+  }
+}

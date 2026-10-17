@@ -73,6 +73,9 @@ def preserve_amp_labels(raw, normalized, steps):
 
 
 def validate_unified_env(env):
+    if env.get("stage2") is not None:
+        from utils.stage2_spec import validate_env
+        return validate_env(env)
     from utils.edge_scenario_spec import validate_sampler
     from utils.stage1_sampling import uses_tokenhsi_sampling
     from utils.size_rsi import SIZE_RANGES, STAGE1_V2_RANGES, SCREEN

@@ -134,3 +134,10 @@ nn/
 *.zip
 tmp/
 scratch/
+
+# Stage2 bundled input motions; regenerated size caches stay local.
+!/joint_carry/source_rsi/**/cooperative_rsi_candidate.npz
+!/joint_carry/source_rsi/**/screened_rsi_snapshots.npz
+!/joint_carry/teamhoi_retarget_posture_all/**/*.npy
+/joint_carry/source_corrected/
+/joint_carry/stage2_size_rsi/

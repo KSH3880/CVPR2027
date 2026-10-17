@@ -1,6 +1,6 @@
 # 레포 구조
 
-Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed` 세 개다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
+Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2` 네 개다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
 
 ## 실행과 설정
 
@@ -56,3 +56,19 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed` 세 개다. 컨�
 설치·추가 실행 옵션은 [USAGE.md](USAGE.md), 머신 이관은 [PORTING_GUIDE.md](reference/PORTING_GUIDE.md), 지표는 [relation_diagnostics.md](reference/relation_diagnostics.md)를 확인한다.
 
 일상 안내는 `README.md`, `changelog.md`, `AGENTS.md`와 `markdowns/{config,structure,USAGE}.md`다. 상세 모델·진단·포팅은 `markdowns/reference/`, 과거 변경·분석은 [legacy](legacy/README.md)에 보관한다. MPS 운영 안내는 [mps/README.md](../mps/README.md)를 따른다.
+
+## Stage2 추가 구현
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2.py`, `stage2_scene.py` | fixed 기반 4명 그룹·8개 장면 상자·공동 파지·GraspView·CPA 예외 |
+| `tokenhsi/utils/stage2_spec.py`, `stage2_amp.py`, `stage2_rsi.py` | 그룹 graph·task별 AMP·15cm 공동 RSI 캐시와 누락 시 자동 생성 |
+| `tokenhsi/env/tasks/multi_agent/stage2_solo_rsi_cache.py` | 단독 RSI의 4명 asset bank 연결 |
+| `tokenhsi/learning/multi_agent/stage2_network_builder.py`, `human_coordination.py`, `grasp_view.py` | 현재 stage1 가중치 전이·동결·human SA4·사람별 앵커 관측 |
+| `joint_carry/` | 복사한 공동 reference·보정·크기별 RSI 생성과 물리 screening |
+| `joint_carry/render_size_rsi.py` | 원본/대표27크기의 native asset RSI 영상·검사 통과 프레임 표시 |
+| `joint_carry/single_source.py`, `single_source_manifest.json` | 1인 원본 B19/B20/B21과 공통 다리 보정·공동 배치 생성 |
+| `joint_carry/audit_size_rsi.py`, `tokenhsi/utils/grasp_geometry.py` | 생성 범위의 데이터 검사·RSI/GTA/리워드 공통 앵커 |
+| `tokenhsi/tests/test_stage2.py`, `check_stage2.py` | CPU 계약·전이·gradient와 GPU reset/추론·부분 reset 검증 |
+
+세부 계약과 데이터 준비는 [Stage2 참고](reference/stage2.md)에 있다.

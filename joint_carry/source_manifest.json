@@ -1,0 +1,11 @@
+{
+  "source": "stage2_coupled/joint_carry/carry_joint_full_pickup",
+  "sha256": {
+    "joint_carry/source_rsi/carryWith/cooperative_rsi_candidate.npz": "a4807c9eb1d60626f23c4c1ccf637e9c711f756baf2fc8eaa387662e3f5ab2cc",
+    "joint_carry/source_rsi/carryWith/screened_rsi_snapshots.npz": "97fc207bfe4101a553d6244e0fb52943072d0a3f182882d4d29110c0dde3f284",
+    "joint_carry/source_rsi/pickUp/cooperative_rsi_candidate.npz": "204888954f5333c9c820eef034e08bd8bd5ff1f7534c59184d342d9ab59d2fb7",
+    "joint_carry/source_rsi/pickUp/screened_rsi_snapshots.npz": "9b4a8871edcc7d55bb9b78030a586ba43daf49386b461fa783c86396d090e33a",
+    "joint_carry/source_rsi/putDown/cooperative_rsi_candidate.npz": "410f8e5fe8ba06dcb54fa552d9d7a5d9cc62c74e4ca440463e056a8fdc2ba913",
+    "joint_carry/source_rsi/putDown/screened_rsi_snapshots.npz": "2e4fcf15cc28767100047a31a271ce4fddb5396521d588ff606cfef02a079675"
+  }
+}

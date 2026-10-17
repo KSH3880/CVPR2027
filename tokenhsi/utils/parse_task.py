@@ -86,7 +86,10 @@ def parse_task(args, cfg, cfg_train, sim_params):
     cfg_task = cfg["env"]
     cfg_task["seed"] = cfg["seed"]
 
-    if args.task == "HumanoidLongTerm4BasicSkills":
+    if args.task == "HumanoidMAStage2":
+        from env.tasks.multi_agent.humanoid_ma_stage2 import HumanoidMAStage2
+        task_class = HumanoidMAStage2
+    elif args.task == "HumanoidLongTerm4BasicSkills":
         from tokenhsi.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills \
             import HumanoidLongTerm4BasicSkills
         task_class = HumanoidLongTerm4BasicSkills

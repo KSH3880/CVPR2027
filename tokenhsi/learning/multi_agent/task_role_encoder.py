@@ -76,6 +76,10 @@ def task_action_condition(packet, embedding):
 class TaskTypeEmbeddingFusion(nn.Module):
     """Replace background on task edges before the common token/GTA permutation."""
 
+    def __init__(self, merge_shared=False):
+        super().__init__()
+        self.merge_shared = merge_shared
+
     def forward(self, suffix, edge_encoder, entity_types, background_bias):
         valid, src, dst, task = task_edges(suffix)
         table = edge_encoder.bias_table()
@@ -86,6 +90,9 @@ class TaskTypeEmbeddingFusion(nn.Module):
         dense = values.new_zeros(*values.shape[:-1], length * length).scatter_add(
             -1, indices[None, :, None].expand_as(values), values
         )
+        if self.merge_shared:
+            counts = torch.zeros(suffix.shape[0], length*length, device=src.device, dtype=torch.long).scatter_add(1, indices, valid.long())
+            dense = dense / counts.clamp_min(1)[None, :, None]
         occupied = (
             torch.zeros(
                 suffix.shape[0], length * length, device=src.device, dtype=torch.long

@@ -87,7 +87,7 @@ def load_cfg(args):
     from utils.unified_training import validate_stage1_network
 
     validate_stage1_network(cfg["env"], cfg_train)
-    if args.task == "HumanoidMACarry":
+    if args.task in ("HumanoidMACarry", "HumanoidMAStage2"):
         from utils.output_paths import resolve_output_path
 
         is_eval = args.test or args.eval or getattr(args, "play", False)
@@ -135,6 +135,8 @@ def load_cfg(args):
         cfg["env"]["eval"]["skillInitProb"] = eval_skill_probs
     if getattr(args, "no_video", False) and "video" in cfg["env"]:
         cfg["env"]["video"]["enable"] = False
+    if getattr(args, "transfer_checkpoint", ""):
+        cfg["experiment"]["transfer"]["checkpoint"] = args.transfer_checkpoint
     cfg["name"] = args.task
     cfg["headless"] = args.headless
     if "task" in cfg:
@@ -232,6 +234,8 @@ def parse_sim_params(args, cfg, cfg_train):
 
 def get_args(benchmark=False):
     custom_parameters = [
+        {"name": "--transfer_checkpoint", "type": str, "default": "",
+         "help": "Initialize Stage2 from a Stage1 checkpoint"},
         {"name": "--check", "action": "store_true", "default": False,
          "help": "Short Stage1 training check; write under output_etc/check"},
         {

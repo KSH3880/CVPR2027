@@ -71,7 +71,7 @@ class SampledOnTopTaskMixin:
         self._ontop_box_contact = forces.view(self.num_envs, -1, 3)[
             :,
             self.num_agents * self.num_bodies : self.num_agents * self.num_bodies
-            + self.num_objects,
+            + self.num_physical_objects,
         ]
 
     def _evaluate_ontop_context(self, env_ids=None):

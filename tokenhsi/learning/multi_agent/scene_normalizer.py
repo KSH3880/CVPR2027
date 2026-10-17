@@ -15,8 +15,9 @@ class SceneRunningMeanStd(nn.Module):
     """
 
     def __init__(self, entity_sizes, entity_counts, normalized_sizes=None,
-                 kinematic_size=13, extra_passthrough_size=0):
+                 kinematic_size=13, extra_passthrough_size=0, num_views=1):
         super().__init__()
+        self.num_views = num_views
         self.entity_sizes = list(entity_sizes)
         self.entity_counts = list(entity_counts)
         self.normalized_sizes = (list(entity_sizes) if normalized_sizes is None
@@ -30,6 +31,8 @@ class SceneRunningMeanStd(nn.Module):
             [RunningMeanStd((sz,)) for sz in self.normalized_sizes if sz > 0])
 
     def forward(self, input, denorm=False, mask=None):
+        original_shape = input.shape
+        input = input.reshape(-1, input.shape[-1] // self.num_views)
         B = input.shape[0]
         out = []
         offset = 0
@@ -50,4 +53,4 @@ class SceneRunningMeanStd(nn.Module):
         assert input.shape[1] == expected, \
             "scene obs is {} wide, expected {}".format(input.shape[1], expected)
         out.append(input[:, offset:])
-        return torch.cat(out, dim=-1)
+        return torch.cat(out, dim=-1).reshape(original_shape)

@@ -59,6 +59,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
     def __init__(
         self, cfg, sim_params, physics_engine, device_type, device_id, headless
     ):
+        self._stage2 = cfg["env"].get("stage2") is not None
         self._relation_cfg = cfg["env"]["relationReward"]
         validate_relation_config(self._relation_cfg)
         from utils.unified_training import validate_unified_env
@@ -82,7 +83,11 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             getattr(cfg["args"], "task_graph", "") or default_preset
         )
         self._task_role_swap = bool(getattr(cfg["args"], "task_role_swap", False))
-        if self._task_graph_preset not in SCENARIO_PRESETS or getattr(
+        allowed_presets = SCENARIO_PRESETS
+        if self._stage2:
+            from utils.stage2_spec import PRESETS
+            allowed_presets = PRESETS
+        if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
         ) not in ("stack", "agent"):
             raise ValueError("Unknown Stage1 graph preset or camera mode")
@@ -90,7 +95,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             if self._task_graph_preset != "random_scenario" or (
                 cfg["env"]["numAgents"],
                 cfg["env"]["numObjects"],
-            ) != (2, 4):
+            ) != ((4, 8) if self._stage2 else (2, 4)):
                 raise ValueError(
                     "Stage1 training requires random_scenario, 2 agents and 4 objects"
                 )
@@ -99,12 +104,13 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         num_agents = int(cfg["env"].get("numAgents", 1))
         configured_objects = int(cfg["env"].get("numObjects", 0))
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects
+        self.num_physical_objects = 12 if self._stage2 else self.num_objects
         assert (
             self.num_objects >= num_agents
         ), "numObjects ({}) must be >= numAgents ({})".format(
             self.num_objects, num_agents
         )
-        self._generic_scenario_eval = cfg["args"].eval and (
+        self._generic_scenario_eval = (not self._stage2) and cfg["args"].eval and (
             num_agents,
             self.num_objects,
         ) != (2, 4)
@@ -315,7 +321,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if not self._is_eval:
             from env.tasks.multi_agent.size_rsi_cache import SizeRsiCache
 
-            self._size_rsi_cache = SizeRsiCache(self)
+            cache_class = getattr(self, "_solo_cache_class", SizeRsiCache)
+            self._size_rsi_cache = cache_class(self)
             self._size_rsi_requested = torch.zeros(
                 5, len(self._skill), device=self.device
             )
@@ -489,7 +496,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         super()._build_env(env_id, env_ptr, humanoid_asset)
         for humanoid_handle in self.humanoid_handles_all[env_id]:
             self._filter_platform_foot_collisions(env_ptr, humanoid_handle)
-        for object_id in range(self.num_objects):
+        for object_id in range(self.num_physical_objects):
             self._build_box(env_id, object_id, env_ptr)
         for agent_id in range(self.num_agents):
             self._build_platforms(env_id, agent_id, env_ptr)
@@ -519,7 +526,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         col_group = env_id
         col_filter = 0
         segmentation_id = 0
-        box_idx = env_id * self.num_objects + object_id
+        box_idx = env_id * self.num_physical_objects + object_id
         angle = 2.0 * np.pi * float(object_id) / float(max(1, self.num_objects))
         radius = min(self._box_spawn_radius, 1.0 + 0.5 * float(object_id))
         default_pose = gymapi.Transform()
@@ -604,7 +611,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         return
 
     def _build_box_tensors(self):
-        N, M, O = (self.num_envs, self.num_agents, self.num_objects)
+        N, M, O = (self.num_envs, self.num_agents, self.num_physical_objects)
         num_actors = self.get_num_actors_per_env()
         self._box_states = self._root_states.view(
             N, num_actors, self._root_states.shape[-1]
@@ -641,7 +648,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         return
 
     def _build_platform_state_tensors(self):
-        N, M, O = (self.num_envs, self.num_agents, self.num_objects)
+        N, M, O = (self.num_envs, self.num_agents, self.num_physical_objects)
         num_actors = self.get_num_actors_per_env()
         actor_base = num_actors * torch.arange(
             N, device=self.device, dtype=torch.int32
@@ -728,8 +735,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             owners_by_box = {}
             for agent_id, physical_box in enumerate(assignment):
                 owners_by_box.setdefault(physical_box, []).append(agent_id)
-            for physical_box in range(self.num_objects):
-                box_handle = self._box_handles[env_id * self.num_objects + physical_box]
+            for physical_box in range(self.num_physical_objects):
+                box_handle = self._box_handles[env_id * self.num_physical_objects + physical_box]
                 owners = owners_by_box.get(physical_box, [])
                 color = (
                     shared_color
@@ -780,7 +787,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         )
 
     def _build_marker_state_tensors(self):
-        N, M, O = (self.num_envs, self.num_agents, self.num_objects)
+        N, M, O = (self.num_envs, self.num_agents, self.num_physical_objects)
         num_actors = self._root_states.shape[0] // N
         marker_start = M + O + 2 * M
         self._marker_states = self._root_states.view(
@@ -1660,7 +1667,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
 
     def _reset_all_boxes_random_arena(self, env_ids):
         """Inference reset: every physical box is independent of every agent owner."""
-        K, O = (env_ids.shape[0], self.num_objects)
+        K, O = (env_ids.shape[0], self.num_physical_objects)
         centers = self._env_origins[env_ids, 0:2]
         agent_xy = self._humanoid_root_states[env_ids, :, 0:2]
         positions = torch.zeros(K, O, 2, device=self.device)

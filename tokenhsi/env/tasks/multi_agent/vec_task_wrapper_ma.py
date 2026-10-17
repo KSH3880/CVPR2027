@@ -22,6 +22,11 @@ class VecTaskPythonWrapperMA(VecTaskPythonWrapper):
         return self.num_agents
 
     def _policy_observation(self):
+        if getattr(self.task, "_stage2", False):
+            obs = self.task.obs_buf
+            views = obs.reshape(-1, obs.shape[-1]//self.num_agents)
+            return clip_scene_observation(views, self.num_agents, self.task.num_objects,
+                self.task.get_scene_entity_sizes(), self.clip_obs).reshape_as(obs).to(self.rl_device)
         return clip_scene_observation(self.task.obs_buf, self.num_agents,
             self.task.num_objects, self.task.get_scene_entity_sizes(), self.clip_obs).to(self.rl_device)
 

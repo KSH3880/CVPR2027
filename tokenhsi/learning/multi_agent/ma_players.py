@@ -42,6 +42,9 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 checkpoint, checkpoint_metadata(self.env.task._relation_cfg)
             )
             check_agent_collision_checkpoint(checkpoint, self.env.task.cfg["env"])
+            if getattr(self.env.task, "_stage2", False):
+                from utils.stage2_spec import check_checkpoint
+                check_checkpoint(checkpoint, self.env.task.cfg["env"])
         return super().restore(fn)
 
     def _build_net(self, config):
@@ -54,6 +57,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
+                num_views=task.num_agents if getattr(task, "_stage2", False) else 1,
             ).to(self.device)
             self.running_mean_std.eval()
         return
