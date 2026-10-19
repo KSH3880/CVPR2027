@@ -132,6 +132,32 @@ def test_assigned_anchor_matches_grasp_view_under_rotation():
     assert (wrong[holding & (g.edge_owner == 0)] < .9).all()
 
 
+def test_viewer_camera_ignores_parked_physical_boxes(monkeypatch):
+    import sys
+    from env.tasks.multi_agent.edge_ontop_task import SampledOnTopTaskMixin
+    monkeypatch.setitem(sys.modules, 'isaacgym', SimpleNamespace(
+        gymapi=SimpleNamespace(Vec3=lambda *coordinates: coordinates)))
+    visible = torch.tensor([0, 3, 5, 6, 8, 9, 10, 11])
+    parked = torch.tensor([1, 2, 4, 7])
+    boxes = torch.zeros(1, 12, 13)
+    boxes[0, visible, 0] = torch.linspace(-2, 2, 8)
+    boxes[0, visible, 1] = torch.linspace(-3, 3, 8)
+    boxes[0, visible, 2] = .4
+    humans = torch.zeros(1, 4, 13)
+    humans[..., 2] = 1.
+    views = []
+    task = SimpleNamespace(cfg={'args': SimpleNamespace(task_camera='stack')},
+        _box_states=boxes, _humanoid_root_states=humans, _camera_follow_flag=True,
+        _cam_prev_char_pos=torch.zeros(3).numpy(), viewer=object(),
+        _logical_box_values=lambda values: values[:, visible],
+        gym=SimpleNamespace(viewer_camera_look_at=lambda viewer, env, camera, target: views.append((camera, target))))
+    for distance in (1000., 1000000.):
+        boxes[0, parked, :2] = distance
+        SampledOnTopTaskMixin._update_camera(task)
+    assert views[0] == views[1]
+    assert views[0][1] == pytest.approx((0., 0., .8))
+
+
 def test_empty_rsi_profile_triggers_regeneration(tmp_path, monkeypatch):
     import json
     monkeypatch.syspath_prepend(str(ROOT))

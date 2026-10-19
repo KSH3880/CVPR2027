@@ -90,6 +90,9 @@ fi
 DISPLAY_NUM=""
 for n in $(seq 99 130); do
     if [ ! -e "/tmp/.X11-unix/X$n" ] && [ ! -e "/tmp/.X$n-lock" ]; then
+        if ss -ltn 2>/dev/null | grep -q ":$((5900 + n)) "; then
+            continue
+        fi
         DISPLAY_NUM=$n
         break
     fi
@@ -103,9 +106,11 @@ if ss -ltn 2>/dev/null | grep -q ":$VNC_PORT "; then
     exit 1
 fi
 
-XVFB_LOG=/tmp/tokenhsi_gui_${WEB_PORT}_xvfb.log
-VNC_LOG=/tmp/tokenhsi_gui_${WEB_PORT}_x11vnc.log
-WEB_LOG=/tmp/tokenhsi_gui_${WEB_PORT}_websockify.log
+GUI_LOG_DIR=${GUI_LOG_DIR:-$ROOT/output_etc/check/gui}
+mkdir -p "$GUI_LOG_DIR"
+XVFB_LOG=$GUI_LOG_DIR/tokenhsi_gui_${WEB_PORT}_xvfb.log
+VNC_LOG=$GUI_LOG_DIR/tokenhsi_gui_${WEB_PORT}_x11vnc.log
+WEB_LOG=$GUI_LOG_DIR/tokenhsi_gui_${WEB_PORT}_websockify.log
 
 cleanup() {
     kill ${XVFB_PID:-} ${VNC_PID:-} ${WEB_PID:-} 2>/dev/null || true

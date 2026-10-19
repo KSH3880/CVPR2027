@@ -68,7 +68,7 @@ class MAAgent(amp_agent.AMPAgent):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
-                num_views=task.num_agents if getattr(task, "_stage2", False) else 1,
+                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) else 1,
             ).to(self.ppo_device)
         assert (
             not self.is_rnn
@@ -135,7 +135,10 @@ class MAAgent(amp_agent.AMPAgent):
             task._relation_graph_spec, task.num_agents, task.num_objects
         )
         weights["relation_experiment_config"] = self._relation_experiment_config
-        if getattr(task, "_stage2", False):
+        if getattr(task, "_shared_support", False):
+            from utils.shared_support import checkpoint_contract
+            weights["shared_support_contract"] = checkpoint_contract(task.cfg["env"])
+        elif getattr(task, "_stage2", False):
             weights["stage2_contract"] = copy.deepcopy(task.cfg["env"]["stage2"])
             from joint_carry.artifacts import contract_digest
             weights["stage2_rsi_contract"] = contract_digest()

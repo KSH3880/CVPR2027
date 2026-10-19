@@ -1,6 +1,6 @@
 # 레포 구조
 
-Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2` 네 개다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
+Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공유 받침 성공 기준 비교 두 개다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
 
 ## 실행과 설정
 
@@ -72,3 +72,17 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2` 네 개
 | `tokenhsi/tests/test_stage2.py`, `check_stage2.py` | CPU 계약·전이·gradient와 GPU reset/추론·부분 reset 검증 |
 
 세부 계약과 데이터 준비는 [Stage2 참고](reference/stage2.md)에 있다.
+
+## 공유 받침 비교 실험
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_shared_{full_success,region_success}.yaml` | 전체 받침/선택 구역 성공 비교, 4명·1024환경 |
+| `tokenhsi/scripts/multi_agent/stage2_shared_*_{train,test,vnc}.sh` | 두 실험 전용 실행, 기본 GPU5 |
+| `tokenhsi/utils/shared_support.py` | 순차 그룹 sampler·최소 토큰 수·구역/distractor 압축 배치·강체 변환·checkpoint 계약 |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_shared_support.py` | 물리 bank·공유 관측·loco reset·현재 최근접 구역 선택 |
+| `tokenhsi/env/tasks/multi_agent/shared_support_{reward,scene}.py` | 성공 영역 비교·원본 물리 높이·실제 물체 배치 검사 |
+| `tokenhsi/learning/multi_agent/shared_support_network.py` | padding 없는 공통 장면 encoder·물리 ID 기반 coordination |
+| `tokenhsi/tests/{test,check}_shared_support.py` | CPU 계약·보상·전이와 GPU 추론/부분 reset 검사 |
+
+설정·관측·초기화 계약은 [공유 받침 참고](reference/shared_support.md)에 있다.

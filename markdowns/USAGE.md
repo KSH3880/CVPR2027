@@ -21,7 +21,7 @@ python -c "import isaacgym, torch; print(torch.cuda.get_device_name(0))"'
 
 ## Viewer와 문제 확인
 
-전용 `*_vnc.sh`는 Xvfb·x11vnc·noVNC를 준비한다. `TOKENHSI_GPU`는 CUDA와 viewer에 함께 전달한다. GPU 내부의 `cuda:0`은 선택한 물리 GPU의 로컬 번호다.
+전용 `*_vnc.sh`는 Xvfb·x11vnc·noVNC를 준비한다. `TOKENHSI_GPU`는 CUDA와 viewer에 함께 전달한다. GPU 내부의 `cuda:0`은 선택한 물리 GPU의 로컬 번호다. 화면 번호를 고를 때 기존 VNC 포트도 건너뛴다. 서비스 로그는 기본 `output_etc/check/gui/`에 저장하며 `GUI_LOG_DIR`로 변경한다.
 
 | 증상 | 확인 |
 | --- | --- |
@@ -67,3 +67,30 @@ PYTHONPATH=tokenhsi:tokenhsi/tests pytest -q tokenhsi/tests'
 ## Stage2 전이와 RSI 준비
 
 기본 전이는 `stage1/Stage1V2Fixed_00030500.pth`다. 새 stage1 파일은 `STAGE1_CHECKPOINT`, 재개는 `RESUME_CHECKPOINT`, 저장 환경 재정의는 `STAGE2_ENV_CONFIG`로 지정한다. Stage2는4명·1024환경·8장면 물체다. 기본 실행 명령은 [config](config.md), 크기별 공동 RSI 생성·검증과 새 모델 계약은 [Stage2 참고](reference/stage2.md)에 있다. 검증용 전이 PTH는 학습한 모델이 아니다. 공동 RSI·GTA·리워드는 Y 끝면에서15cm를 사용한다. 기본 캐시는 `joint_carry/stage2_size_rsi/inset15_single`이며 누락·생성 조건 변경 시15cm로 자동 생성한다.
+
+### Stage1 가중치로 미학습 Stage2 viewer 보기
+
+Stage1 fixed45000을 전이하고 짧은 추론으로 검증용 Stage2 checkpoint를 만든다. 추가 협력 모듈은 항등 초기화 상태이며 optimizer 학습을 실행하지 않는다. 생성 파일은 추론 확인용으로 사용하고, 실제 Stage2 학습은 `STAGE1_CHECKPOINT`로 Stage1 원본을 지정해 새로 시작한다.
+
+```bash
+export TOKENHSI_GPU=5
+. tokenhsi/scripts/multi_agent/runtime_env.sh
+STAGE2_PRESETS=all_solo,one_pair_at,one_pair_ontop,two_pairs_at,two_pairs_ontop STAGE2_SKILL=loco STAGE2_STEPS=16 \
+python tokenhsi/tests/check_stage2.py --task HumanoidMAStage2 \
+  --cfg_env tokenhsi/data/cfg/multi_agent/stage2.yaml \
+  --cfg_train tokenhsi/data/cfg/train/rlg/stage2.yaml \
+  --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
+  --transfer_checkpoint stage1/Stage1V2Fixed_00045000.pth \
+  --num_envs 2 --num_agents 4 --num_objects 8 --headless --no_video \
+  --output_path output_etc/check/stage2_from_stage1_45000/transfer
+```
+
+4명·1환경 viewer에서 무작위 과제를 반복한다. 6081 포트를 포워딩한 뒤 `http://localhost:6081/vnc.html`로 접속한다. `F`는 카메라 추적, `K`는 보조선, `Esc`는 종료다.
+
+```bash
+TOKENHSI_GPU=5 PORT=6081 TASK_GRAPH=random_scenario EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0 EPISODE_LENGTH=600 \
+GUI_LOG_DIR=output_etc/check/stage2_from_stage1_45000/services \
+OUTPUT_PATH=output_etc/check/stage2_from_stage1_45000/viewer \
+bash tokenhsi/scripts/multi_agent/stage2_vnc.sh \
+  output_etc/check/stage2_from_stage1_45000/transfer/nn/Stage2Transfer.pth 4 1 8 1000000
+```

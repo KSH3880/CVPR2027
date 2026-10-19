@@ -73,6 +73,9 @@ def preserve_amp_labels(raw, normalized, steps):
 
 
 def validate_unified_env(env):
+    if env.get("sharedSupport") is not None:
+        from utils.shared_support import validate_env
+        return validate_env(env)
     if env.get("stage2") is not None:
         from utils.stage2_spec import validate_env
         return validate_env(env)

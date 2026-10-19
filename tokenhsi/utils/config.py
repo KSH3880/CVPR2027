@@ -87,7 +87,7 @@ def load_cfg(args):
     from utils.unified_training import validate_stage1_network
 
     validate_stage1_network(cfg["env"], cfg_train)
-    if args.task in ("HumanoidMACarry", "HumanoidMAStage2"):
+    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport"):
         from utils.output_paths import resolve_output_path
 
         is_eval = args.test or args.eval or getattr(args, "play", False)
@@ -358,7 +358,7 @@ def get_args(benchmark=False):
             "name": "--num_objects",
             "type": int,
             "default": 0,
-            "help": "Number of objects per environment (must be >= num_agents; 0 means one per agent)",
+            "help": "Object slots per environment (0 keeps config; shared support counts region and distractor tokens)",
         },
         {
             "name": "--eval_repeats",

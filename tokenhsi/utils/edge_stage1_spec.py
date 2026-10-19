@@ -142,6 +142,9 @@ def validate_stage1_context_config(config):
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get("sampler") == "shared_support_groups":
+        from utils.shared_support import compile_graph
+        return compile_graph(spec, m, o, device)
     if spec.get("sampler") == "stage2_random_groups":
         from utils.stage2_spec import sample_graph
         probabilities = torch.ones(1, m, 5, device=device)

@@ -331,7 +331,7 @@ class RelationEncoder(nn.Module):
     def build_relation_bias(self):
         return self.edge_encoder(self.entity_types, self.rel_matrix)
 
-    def forward(self, obs, return_all=False, token_order=None):
+    def forward(self, obs, return_all=False, token_order=None, object_valid=None):
         self.forward_calls += 1
         B = obs.shape[0]
         tokens = []
@@ -401,6 +401,10 @@ class RelationEncoder(nn.Module):
             if self.task_action_fusion is not None
             else None
         )
+        if object_valid is not None:
+            valid = torch.ones(B, L, device=obs.device, dtype=torch.bool)
+            valid[:, self.num_agents:self.num_agents+self.num_objects] = object_valid
+            relation_bias = relation_bias.masked_fill(~valid[None, :, None, None, :], float("-inf"))
         inverse_order = None
         if (
             self.relation_graph_spec.get("shuffle_token_order", False)

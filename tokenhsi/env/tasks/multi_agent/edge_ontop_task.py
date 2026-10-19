@@ -760,7 +760,7 @@ class SampledOnTopTaskMixin:
         from isaacgym import gymapi
 
         points = torch.cat(
-            [self._humanoid_root_states[0, :, :3], self._box_states[0, :, :3]], 0
+            [self._humanoid_root_states[0, :, :3], self._logical_box_values(self._box_states)[0, :, :3]], 0
         )
         low = points.amin(0)
         high = points.amax(0)

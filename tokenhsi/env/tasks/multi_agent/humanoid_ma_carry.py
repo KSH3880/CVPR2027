@@ -59,7 +59,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
     def __init__(
         self, cfg, sim_params, physics_engine, device_type, device_id, headless
     ):
-        self._stage2 = cfg["env"].get("stage2") is not None
+        self._shared_support = cfg["env"].get("sharedSupport") is not None
+        self._stage2 = cfg["env"].get("stage2") is not None or self._shared_support
         self._relation_cfg = cfg["env"]["relationReward"]
         validate_relation_config(self._relation_cfg)
         from utils.unified_training import validate_unified_env
@@ -87,17 +88,23 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if self._stage2:
             from utils.stage2_spec import PRESETS
             allowed_presets = PRESETS
+        if self._shared_support:
+            from utils.shared_support import PRESETS
+            allowed_presets = PRESETS
         if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
         ) not in ("stack", "agent"):
             raise ValueError("Unknown Stage1 graph preset or camera mode")
         if not (cfg["args"].test or cfg["args"].eval):
+            expected_shape = (4, 8) if self._stage2 else (2, 4)
+            if self._shared_support:
+                expected_shape = (4, cfg["env"]["numObjects"])
             if self._task_graph_preset != "random_scenario" or (
                 cfg["env"]["numAgents"],
                 cfg["env"]["numObjects"],
-            ) != ((4, 8) if self._stage2 else (2, 4)):
+            ) != expected_shape:
                 raise ValueError(
-                    "Stage1 training requires random_scenario, 2 agents and 4 objects"
+                    "Training requires random_scenario and the configured experiment entity counts"
                 )
         self._relation_graph_spec = cfg["env"]["relationGraph"]
         self._template_rsi = cfg["env"]["templateRsi"]
@@ -105,6 +112,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         configured_objects = int(cfg["env"].get("numObjects", 0))
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects
         self.num_physical_objects = 12 if self._stage2 else self.num_objects
+        if self._shared_support:
+            from utils.shared_support import capacities
+            self.num_physical_objects = capacities(cfg["env"])[1]
         assert (
             self.num_objects >= num_agents
         ), "numObjects ({}) must be >= numAgents ({})".format(
@@ -1485,7 +1495,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         weights = torch.tensor(EXPERT_PROBS, device=self.device)[family]
         skills = torch.multinomial(weights, 1).squeeze(-1)
         result = torch.empty(num_samples, self.get_num_amp_obs(), device=self.device)
-        for uid, name in enumerate(self._skill):
+        for uid, name in enumerate(self.cfg["env"]["skill"]):
             indices = (skills == uid).nonzero(as_tuple=False).flatten()
             if not len(indices):
                 continue

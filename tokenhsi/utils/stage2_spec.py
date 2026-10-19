@@ -101,6 +101,11 @@ def validate_env(env):
 
 
 def check_checkpoint(weights, env):
+    if "sharedSupport" in env:
+        from utils.shared_support import checkpoint_contract
+        if weights.get("shared_support_contract") != checkpoint_contract(env):
+            raise ValueError("Shared support checkpoint contract differs")
+        return
     from joint_carry.artifacts import contract_digest
     if weights.get('stage2_rsi_contract') != contract_digest():
         raise ValueError('Stage2 checkpoint RSI preparation contract differs')
