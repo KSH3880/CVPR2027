@@ -11,7 +11,9 @@ from utils.edge_ontop_spec import (ON_TOP, PACKET_FIELDS,
 
 INTERACTION_CONTEXT_MODE = 'state_relation_edge_interaction_v1'
 SIT, CLIMB = 9, 10
-PUSH, DOOR_OPEN, DOOR_HOLD = 11, 12, 13
+PUSH = 11
+# 12/13 are reserved for historical checkpoints; current Door uses HAND/OPEN.
+HAND, OPEN = 14, 15
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_CLIMB', 'HOLDING_SIT')
 PRESETS = ('random', 'sit_only', 'climb_only', 'hold_sit', 'hold_climb',

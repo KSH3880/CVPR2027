@@ -145,6 +145,57 @@ def push_relation_rewards(quality, contact, distance, stable, at_progress, at_re
     return components,new_best,elapsed,achieved
 
 
+def door_contact_open_rewards(hands, handles, hand_forces, handle_forces, angle, angular_velocity,
+                              contact_elapsed, open_elapsed, dt, config, body_position=None, door_position=None):
+    """Two independent SPR groups; current satisfaction, not record deltas.
+
+    A single SAME hand/handle pair must satisfy distance and both force tests.
+    Reference: HOLDING+AT dense progress, recurring success and saturation.
+    """
+    relation=config['relation_rewards']
+    if config.get('working_hand', 'any') == 'right':
+        hands=hands[..., :1, :]
+        hand_forces=hand_forces[..., :1]
+    distances=(hands[..., :, None, :]-handles[..., None, :, :]).norm(dim=-1)
+    hand_distance=distances.amin(dim=(-1,-2))
+    paired=(distances<config['contact_distance']) & (hand_forces[..., :, None]>config['contact_force']) & (handle_forces[..., None, :]>config['contact_force'])
+    contact=paired.any(-1).any(-1)
+    paired_phi=(torch.exp(-relation['hand_distance_scale']*distances.square())*paired.float()).amax(dim=(-1,-2))
+    score_success='contact_success_threshold' in relation
+    if score_success:
+        contact_success=contact & (paired_phi>=relation['contact_success_threshold'])
+        contact_elapsed=torch.zeros_like(contact_elapsed)  # No contact-duration requirement.
+    else:
+        contact_elapsed=torch.where(contact,contact_elapsed+dt,torch.zeros_like(contact_elapsed))
+        contact_success=contact_elapsed>=relation['contact_hold_seconds']
+    if relation.get('progress_reference', 'hand_handle') == 'body_door_xy':
+        if body_position is None or door_position is None:
+            raise ValueError('Body/door positions required for body_door_xy progress')
+        progress_distance=(body_position[..., :2]-door_position[..., :2]).norm(dim=-1)
+    else:
+        progress_distance=hand_distance
+    approach=1/(1+progress_distance/relation['approach_sigma'])
+    target=angle.new_tensor(math.radians(config['open_degrees']))
+    angle_progress=(angle/target).clamp(0,1)*contact.float()
+    open_valid=contact & (angle>=target) & (angular_velocity.abs()<config['hold_max_speed'])
+    open_elapsed=torch.where(open_valid,open_elapsed+dt,torch.zeros_like(open_elapsed))
+    open_success=open_elapsed>=config['hold_seconds']
+    # Like HOLDING+AT, saturation is current success, not a permanent episode latch.
+    contact_satisfied=contact_success if score_success else (contact_success | open_success)
+    one=torch.ones_like(hand_distance)
+    components=torch.stack([
+        relation['contact_state_weight']*torch.where(contact_satisfied,one,paired_phi),
+        relation['contact_progress_weight']*torch.where(contact_satisfied,one,approach),
+        relation['contact_success_weight']*contact_satisfied.float(),
+        relation['open_state_weight']*(torch.exp(-relation['hand_distance_scale']*hand_distance.square())
+            if relation.get('open_state_mode', 'contact')=='distance' else contact.float()),
+        relation['open_progress_weight']*torch.where(open_success,one,angle_progress),
+        relation['open_success_weight']*open_success.float()],-1)
+    return dict(components=components,contact=contact,contact_elapsed=contact_elapsed,
+                contact_success=contact_success,open_elapsed=open_elapsed,open_success=open_success,
+                hand_distance=hand_distance,paired_phi=paired_phi)
+
+
 def door_shaping(angle, best_angle, previous_angle, hand_distance, best_distance, contact, dt, config):
     """Contact-gated opening, non-repeatable approach, and actual closing penalty."""
     target=math.radians(config['open_degrees'])
@@ -167,10 +218,11 @@ def advance_success(valid, elapsed, done, dt, duration):
     return elapsed, done | current, first
 
 
-def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False, generic_door_goal=False):
+def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False, generic_door_goal=False, hand_open=False):
     """Canonical H[M], boxes[M], doors[M], goals[M]; bind actual active object."""
     from utils.edge_context_spec import AT
-    from utils.edge_interaction_spec import PUSH, DOOR_OPEN, DOOR_HOLD
+    from utils.edge_interaction_spec import PUSH, HAND, OPEN
+    legacy_open,legacy_hold=12,13  # Only used by historical relation schemas.
     if holding is None:
         holding=torch.zeros_like(tasks,dtype=torch.bool)
     B, M = tasks.shape
@@ -185,11 +237,15 @@ def task_relation_matrix(tasks, holding=None, semantic=False, unified_door=False
         obj = M + owner + tasks[:, owner].long() * M
         goal = 3 * M + owner
         rows = torch.arange(B, device=tasks.device)
-        interaction=torch.where(tasks[:,owner].bool(),torch.where(holding[:,owner] & (not unified_door),DOOR_HOLD,DOOR_OPEN),PUSH) if semantic else 3
+        interaction=torch.where(tasks[:,owner].bool(),torch.where(holding[:,owner] & (not unified_door),legacy_hold,legacy_open),PUSH) if semantic else 3
+        if semantic and hand_open:
+            interaction=torch.where(tasks[:,owner].bool(),HAND,PUSH)
         matrix[rows, owner, obj] = interaction
         matrix[rows, obj, owner] = interaction
         matrix[:, owner, goal] = matrix[:, goal, owner] = 4
         placement=torch.where(tasks[:,owner].bool(),5 if generic_door_goal else interaction,AT) if semantic else 5
+        if semantic and hand_open:
+            placement=torch.where(tasks[:,owner].bool(),OPEN,AT)
         matrix[rows, obj, goal] = matrix[rows, goal, obj] = placement
     return matrix
 
@@ -223,7 +279,10 @@ def interaction_metadata(env):
             'entity_sizes': [223, 34, 9], 'pose_size': 7}
     if env.get('relationGraph',{}).get('semantic_relations',False):
         metadata['relation_graph']=env['relationGraph']
-        metadata['relation_taxonomy']={'AT':7,'PUSH':11,'DOOR_OPEN':12,'DOOR_HOLD':13}
+        if env['relationGraph'].get('door_hand_open_relations',False):
+            metadata['relation_taxonomy']={'AT':7,'PUSH':11,'HAND':14,'OPEN':15}
+        else:
+            metadata['relation_taxonomy']={'AT':7,'PUSH':11,'DOOR_OPEN':12,'DOOR_HOLD':13}
     if 'startRandomization' in env:
         metadata['start_randomization'] = env['startRandomization']
     if env.get('agentCollisionPenalty', False):
@@ -234,7 +293,13 @@ def interaction_metadata(env):
 
 
 def check_interaction_checkpoint(weights, expected):
-    if weights.get('interaction_metadata') != expected:
+    actual=weights.get('interaction_metadata')
+    def active_metadata(value):
+        if value is not None and value.get('relation_graph',{}).get('door_hand_open_relations',False):
+            value=dict(value)
+            value['relation_taxonomy']={k:v for k,v in value.get('relation_taxonomy',{}).items() if k not in ('DOOR_OPEN','DOOR_HOLD')}
+        return value
+    if active_metadata(actual) != active_metadata(expected):
         raise ValueError('Push/door checkpoint contract mismatch; use its dedicated checkpoint/config')
 
 
@@ -268,11 +333,32 @@ def validate_interaction(config):
         if not all(math.isfinite(x) for x in bounds) or not 0<lo<=hi:
             raise ValueError('Invalid PUSH box size range')
 
-    if door.get('reward_version') != 'handle_gated_v2':
-        raise ValueError('Door reward requires handle_gated_v2 configuration')
+    if door.get('reward_version') not in ('handle_gated_v2','contact_open_spr_v1'):
+        raise ValueError('Unsupported Door reward version')
+    if door['reward_version']=='contact_open_spr_v1':
+        relation=door.get('relation_rewards',{})
+        for key in ('contact_state_weight','contact_progress_weight','contact_success_weight','open_state_weight','open_progress_weight','open_success_weight'):
+            value=relation.get(key,-1)
+            if not math.isfinite(value) or value<0:raise ValueError('Invalid Door relation weight: '+key)
+        if 'contact_success_threshold' in relation:
+            threshold=relation['contact_success_threshold']
+            if not math.isfinite(threshold) or not 0<threshold<=1:
+                raise ValueError('Invalid Door contact success threshold')
+        if relation.get('open_state_mode', 'contact') not in ('contact', 'distance'):
+            raise ValueError('Invalid Door open state mode')
+        if relation.get('progress_reference', 'hand_handle') not in ('hand_handle', 'body_door_xy'):
+            raise ValueError('Invalid Door progress reference')
+        parameters=('hand_distance_scale','approach_sigma') if 'contact_success_threshold' in relation else ('hand_distance_scale','approach_sigma','contact_hold_seconds')
+        for key in parameters:
+            value=relation.get(key,0)
+            if not math.isfinite(value) or value<=0:raise ValueError('Invalid Door relation parameter: '+key)
     for key in ('approach_weight','closing_weight','approach_speed','closing_speed','approach_angle_tolerance','closing_deadband'):
         if not math.isfinite(door[key]) or door[key]<=0:
             raise ValueError('Invalid door reward parameter: '+key)
+    if door.get('working_hand', 'any') not in ('any', 'right'):
+        raise ValueError('Door working_hand must be any or right')
+    if door.get('working_hand', 'any')=='right' and door.get('motion_direction')!='left_open':
+        raise ValueError('Fixed right hand requires left_open labeled motions')
     if door.get('motion_direction','all') not in ('all','left_open'):
         raise ValueError('Invalid door motion direction')
     if not 0 < door['reopen_degrees'] < door['open_degrees'] < 110:
@@ -313,6 +399,9 @@ def validate_interaction(config):
         raise ValueError('Invalid DOOR handle height')
     rsi=config.get('task_rsi')
     if rsi is not None:
+        offsets=rsi.get('door_alignment_yaw_degrees',[0.])
+        if not offsets or any(not math.isfinite(v) or abs(v)>90 for v in offsets):
+            raise ValueError('Invalid Door RSI alignment yaw offsets')
         if 'door_rsi_probability' in rsi and (not math.isfinite(rsi['door_rsi_probability']) or not 0 <= rsi['door_rsi_probability'] <= 1):
             raise ValueError('Invalid DOOR RSI probability')
         for name in ('probability','late_fraction','door_early_fraction'):
@@ -449,12 +538,17 @@ def door_motion_hand(path):
     raise ValueError('No user-confirmed working-hand label for DOOR clip: '+clip)
 
 
-def door_motion_matches(path, direction):
+def door_motion_matches(path, direction, working_hand="any"):
     """BONES left-opening references: left-side original or right-side mirror."""
+    if working_hand not in ('any', 'right'):
+        raise ValueError('Door working_hand must be any or right')
     if direction == 'all':
+        if working_hand != 'any':
+            raise ValueError('Fixed hand requires left_open labeled motions')
         return True
     if direction != 'left_open':
         raise ValueError('door motion_direction must be all or left_open')
     clip = str(path).replace('\\','/').split('/')[-3]
     mirrored = clip.endswith('_M')
-    return ('inside_door_handle_left_side_open_' in clip and not mirrored) or ('inside_door_handle_right_side_open_' in clip and mirrored)
+    direction_matches = ('inside_door_handle_left_side_open_' in clip and not mirrored) or ('inside_door_handle_right_side_open_' in clip and mirrored)
+    return direction_matches and (working_hand=='any' or door_motion_hand(path)==0)

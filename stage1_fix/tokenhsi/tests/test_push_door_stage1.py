@@ -289,6 +289,12 @@ def test_door_rsi_rejects_backwards_pelvis_or_torso_and_forces_motion_hand():
     hand=torch.tensor([0])
     angles,q,origins,safe=safe_door_candidates(task,root,body,identity,identity,hand)
     assert safe.any()
+    cfg['door_alignment_yaw_degrees']=[-45.,0.,45.]
+    multi=safe_door_candidates(task,root,body,identity,identity,hand)
+    assert multi[0].numel()==64*3 and multi[3].any()
+    chunked=safe_door_candidates(task,root.expand(65,-1),body.expand(65,-1,-1),identity.expand(65,-1),identity.expand(65,-1),hand.expand(65))
+    torch.testing.assert_close(chunked[3],multi[3].expand(65,-1))
+    cfg.pop('door_alignment_yaw_degrees')
     for pelvis,torso in ((back,identity),(identity,back),(back,back)):
         assert not safe_door_candidates(task,root,body,pelvis,torso,hand)[3].any()
     assert not safe_door_candidates(task,root,body,identity,identity,torch.tensor([-1]))[3].any()
@@ -693,13 +699,14 @@ def test_dense_push_experiment_only_changes_reward_configuration():
     assert new==old
 
 
-def test_task_conditioned_mixture_never_crosses_push_and_door(monkeypatch):
+@pytest.mark.parametrize('push_mix,push_fraction', [([.33,.67,0.],.67),([0.,1.,0.],1.)])
+def test_task_conditioned_mixture_never_crosses_push_and_door(monkeypatch,push_mix,push_fraction):
     from types import SimpleNamespace
     import env.tasks.multi_agent.humanoid_ma_push_door as module
     task=object.__new__(module.HumanoidMAPushDoor)
     task.device='cpu';task.dt=1/30;task._amp_label_count=2;task._amp_source_count=6
     task._num_amp_obs_steps=10;task._num_amp_obs_per_step=131;task._amp_task_conditioning=True
-    task._amp_expert_mix={'push':[.33,.67,0.],'door':[.33,0.,.67]}
+    task._amp_expert_mix={'push':push_mix,'door':[.33,0.,.67]}
     task._local_root_obs=True;task._root_height_obs=True;task._dof_obs_size=0;task._dof_offsets=[]
     def library(code):
         def state(ids,times):
@@ -716,8 +723,9 @@ def test_task_conditioned_mixture_never_crosses_push_and_door(monkeypatch):
     codes=demos[:,:,0];assert torch.all(codes==codes[:,:1])
     push=labels[:,0]==0;door=~push
     assert not (codes[push]==2).any() and not (codes[door]==1).any()
-    for selected,code in ((push,1),(door,2)):
-        assert abs(float((codes[selected,0]==code).float().mean())-.67)<.04
+    for selected,code,expected in ((push,1,push_fraction),(door,2,.67)):
+        assert abs(float((codes[selected,0]==code).float().mean())-expected)<.04
+    if push_fraction==1.:assert torch.all(codes[push]==1)
     torch.testing.assert_close(demos[:,:-1,1]-demos[:,1:,1],torch.full((4096,9),task.dt),atol=1e-6,rtol=1e-5)
     task._tasks=torch.tensor([[0,1],[1,0]])
     # Neither approaching nor holding changes task labels.
@@ -781,3 +789,289 @@ def test_split_door_goal_ids_reach_attention_encoder():
     torch.testing.assert_close(seen[-1],task_relation_matrix(tasks,semantic=True,unified_door=True,generic_door_goal=True))
     grad=encoder.edge_encoder.relation_embed.weight.grad
     assert grad[5].abs().sum()>0 and grad[12].abs().sum()>0
+
+
+def test_old_arch_experiment_keeps_current_push_and_door_rewards():
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    before=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_old_spacing.yaml').read_text())
+    after=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_dense.yaml').read_text())
+    original=yaml.safe_load((folder/'push_door_stage1_box13_10500_baseline.yaml').read_text())
+    assert after['env']['relationGraph']==original['env']['relationGraph']
+    assert after['env']['interaction']==before['env']['interaction']
+    after['env']['relationGraph']=before['env']['relationGraph']
+    assert after==before
+
+
+def door_spr_inputs(n=1):
+    import math
+    cfg=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr.yaml').read_text())['env']['interaction']['door']
+    hands=torch.tensor([[[.02,0.,0.],[3.,0.,0.]]]).expand(n,-1,-1).clone()
+    handles=torch.tensor([[[0.,0.,0.],[4.,0.,0.]]]).expand(n,-1,-1).clone()
+    forces=torch.tensor([[1.,0.]]).expand(n,-1).clone()
+    return cfg,hands,handles,forces,torch.zeros(n)
+
+
+def test_door_spr_approach_dense_and_exact_contact_state_requires_same_pair():
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs(3)
+    h[:,0,0]=torch.tensor([.05,.5,1.])
+    r=door_contact_open_rewards(h,g,z[:,None].expand(-1,2),f,z,z,z,z,.1,c)
+    progress=r['components'][:,1]
+    assert progress[0]>progress[1]>progress[2]>0
+    assert not r['contact'].any() and torch.all(r['components'][:,0]==0)
+    c,h,g,f,z=door_spr_inputs()
+    mismatch=torch.tensor([[0.,1.]])
+    bad=door_contact_open_rewards(h,g,mismatch,f,z,z,z,z,.1,c)
+    assert not bad['contact'].item()
+    good=door_contact_open_rewards(h,g,f,f,z,z,z,z,.1,c)
+    assert good['contact'].item() and good['components'][0,0]>0
+
+
+def test_door_spr_angle_progress_requires_contact_and_decreases_when_closing():
+    import math
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs(3)
+    angles=torch.deg2rad(torch.tensor([0.,40.,80.]))
+    r=door_contact_open_rewards(h,g,f,f,angles,z,z,z,.1,c)
+    torch.testing.assert_close(r['components'][:,4],torch.tensor([0.,.1,.2]))
+    torch.testing.assert_close(r['components'][:,3],torch.full((3,),.2))
+    lost=door_contact_open_rewards(h,g,torch.zeros_like(f),f,angles,z,z,z,.1,c)
+    assert torch.all(lost['components'][:,3:]==0)
+
+
+def test_door_spr_continuous_hold_recurring_success_and_release_reset():
+    import math
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs();contact_time=z.clone();open_time=z.clone()
+    angle=torch.full_like(z,math.radians(85))
+    for step in range(21):
+        r=door_contact_open_rewards(h,g,f,f,angle,z,contact_time,open_time,.1,c)
+        contact_time=r['contact_elapsed'];open_time=r['open_elapsed']
+        if step==0:assert not r['contact_success'].item()
+        if step==1:assert r['contact_success'].item()
+        if step<18:assert not r['open_success'].item()
+    assert r['open_success'].item()
+    torch.testing.assert_close(r['components'],torch.full((1,6),.2))
+    lost=door_contact_open_rewards(h,g,torch.zeros_like(f),f,angle,z,contact_time,open_time,.1,c)
+    assert not lost['open_success'].item() and not lost['contact_success'].item()
+    assert lost['open_elapsed'].item()==0 and lost['contact_elapsed'].item()==0
+    reacquired=door_contact_open_rewards(h,g,f,f,angle,z,lost['contact_elapsed'],lost['open_elapsed'],.1,c)
+    assert not reacquired['open_success'].item() and not reacquired['contact_success'].item()
+
+
+def test_door_spr_hold_rejects_fast_or_under_angle_and_preserves_push_config():
+    import math
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs(2)
+    angles=torch.deg2rad(torch.tensor([79.,85.]))
+    result=door_contact_open_rewards(h,g,f,f,angles,torch.tensor([0.,.31]),z,torch.ones(2),.1,c)
+    assert torch.all(result['open_elapsed']==0) and not result['open_success'].any()
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    old=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_dense.yaml').read_text())
+    new=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr.yaml').read_text())
+    validate_interaction(new['env']['interaction'])
+    bad=copy.deepcopy(new);bad['env']['interaction']['door']['relation_rewards']['approach_sigma']=0
+    with pytest.raises(ValueError):validate_interaction(bad['env']['interaction'])
+    with pytest.raises(ValueError):check_interaction_checkpoint({'interaction_metadata':interaction_metadata(old['env'])},interaction_metadata(new['env']))
+    new['env']['interaction']['door']=old['env']['interaction']['door']
+    assert new==old
+
+
+def test_door_spr_walk_open_only_changes_amp_and_keeps_push_reference_pure():
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    before=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr.yaml').read_text())
+    after=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr_walk_open.yaml').read_text())
+    validate_interaction(after['env']['interaction'])
+    amp=after['env']['interaction']['amp']
+    assert amp.pop('task_conditioning') is True
+    assert amp.pop('task_expert_mix')=={'push':[0.,1.,0.],'door':[.33,0.,.67]}
+    assert after==before
+
+
+def test_door_contact_score_success_is_immediate_and_not_duration_based():
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs(2)
+    c['relation_rewards'].pop('contact_hold_seconds')
+    c['relation_rewards']['contact_success_threshold']=.9
+    h[:,0,0]=torch.tensor([.02,.04])
+    r=door_contact_open_rewards(h,g,f,f,z,z,torch.full_like(z,100),z,.001,c)
+    assert r['contact_success'].tolist()==[True,False]
+    assert torch.all(r['contact_elapsed']==0)
+    torch.testing.assert_close(r['components'][:,2],torch.tensor([.2,0.]))
+    lost=door_contact_open_rewards(h,g,torch.zeros_like(f),f,z,z,z,z,.1,c)
+    assert not lost['contact_success'].any()
+    regained=door_contact_open_rewards(h,g,f,f,z,z,z,z,.001,c)
+    assert regained['contact_success'][0]
+
+
+def test_door_score_open_success_cannot_override_low_hand_score():
+    import math
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs()
+    c['relation_rewards'].pop('contact_hold_seconds');c['relation_rewards']['contact_success_threshold']=.9
+    h[:,0,0]=.07
+    r=door_contact_open_rewards(h,g,f,f,torch.full_like(z,math.radians(85)),z,z,torch.full_like(z,2),.1,c)
+    assert r['open_success'].item() and not r['contact_success'].item()
+    assert r['components'][0,2]==0 and r['components'][0,5]==.2
+
+
+def test_door_score_config_changes_only_contact_success_rule():
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    before=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr_walk_open.yaml').read_text())
+    after=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr_walk_open_score.yaml').read_text())
+    validate_interaction(after['env']['interaction'])
+    invalid=copy.deepcopy(after);invalid['env']['interaction']['door']['relation_rewards']['contact_success_threshold']=1.1
+    with pytest.raises(ValueError):validate_interaction(invalid['env']['interaction'])
+    relation=after['env']['interaction']['door']['relation_rewards']
+    assert relation.pop('contact_success_threshold')==.9
+    relation['contact_hold_seconds']=.2
+    assert after==before
+
+
+def test_final_door_spr_experiment_uses_split_bias_without_changing_reward_amp():
+    import torch.nn as nn
+    from learning.multi_agent.amp_network_builder_ma import RelationEncoder
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    before=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_old_arch_25kg_door_spr_walk_open_score.yaml').read_text())
+    after=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_split_bias_25kg_door_spr_walk_open_score.yaml').read_text())
+    graph=after['env']['relationGraph']
+    assert all(graph.get(k) is True for k in ('semantic_relations','unified_door_relation','generic_door_goal'))
+    encoder=RelationEncoder([223,34,9],2,4,16,2,2,32,
+        lambda size:nn.Sequential(nn.Linear(size,16),nn.ReLU()),
+        observation_mode='clean_scene',kinematic_size=7,relation_bias=True,
+        relation_bias_mode='edge_mlp',relation_graph_spec=graph,
+        gta_cfg={'enable':True,'translation_scale':1.,'representation':'se3_direct_sum'})
+    assert encoder.edge_encoder.relation_embed.num_embeddings==14
+    after['env']['relationGraph']=before['env']['relationGraph']
+    assert after==before
+
+
+def test_hand_open_relations_bind_only_correct_door_pairs():
+    tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]])
+    for held in (torch.zeros_like(tasks,dtype=torch.bool),torch.ones_like(tasks,dtype=torch.bool)):
+        matrix=task_relation_matrix(tasks,held,semantic=True,hand_open=True)
+        for row in range(4):
+            for owner in range(2):
+                obj=2+owner+2*tasks[row,owner];goal=6+owner
+                assert matrix[row,owner,obj]==(14 if tasks[row,owner] else 11)
+                assert matrix[row,obj,owner]==matrix[row,owner,obj]
+                assert matrix[row,obj,goal]==(15 if tasks[row,owner] else 7)
+                assert matrix[row,goal,obj]==matrix[row,obj,goal]
+                assert matrix[row,owner,goal]==4
+        assert not (matrix==5).any() and not (matrix==12).any() and not (matrix==13).any()
+
+
+def test_hand_open_config_reaches_attention_and_preserves_reward_amp():
+    import torch.nn as nn
+    from learning.multi_agent.amp_network_builder_ma import RelationEncoder
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    old=yaml.safe_load((ROOT/'tokenhsi/tests/fixtures/push_door/push_door_stage1_split_bias_25kg_door_spr_walk_open_score.yaml').read_text())
+    new=yaml.safe_load((folder/'push_door_stage1_hand_open_25kg_spr_walk_open_score.yaml').read_text())
+    graph=new['env']['relationGraph']
+    encoder=RelationEncoder([223,34,9],2,4,16,2,2,32,
+        lambda size:nn.Sequential(nn.Linear(size,16),nn.ReLU()),
+        observation_mode='clean_scene',kinematic_size=7,relation_bias=True,
+        relation_bias_mode='edge_mlp',relation_graph_spec=graph,
+        gta_cfg={'enable':True,'translation_scale':1.,'representation':'se3_direct_sum'})
+    assert encoder.edge_encoder.relation_embed.num_embeddings==16
+    tasks=torch.tensor([[0,0],[0,1],[1,0],[1,1]])
+    obs=torch.randn(4,656);obs[:,582:600].view(4,2,9)[...,:2]=torch.nn.functional.one_hot(tasks,2).float()
+    obs[:,600:].view(4,8,7)[...,3:]=torch.tensor([0.,0.,0.,1.])
+    seen=[];hook=encoder.edge_encoder.register_forward_pre_hook(lambda module,args:seen.append(args[1].clone()))
+    with torch.no_grad():encoder.edge_encoder.bias_projection.normal_(std=.02)
+    encoder(obs).square().sum().backward();hook.remove()
+    torch.testing.assert_close(seen[-1],task_relation_matrix(tasks,semantic=True,hand_open=True))
+    gradient=encoder.edge_encoder.relation_embed.weight.grad
+    assert all(gradient[i].abs().sum()>0 for i in (7,11,14,15))
+    assert interaction_metadata(new['env'])['relation_taxonomy']['HAND']==14
+    assert interaction_metadata(new['env'])['relation_taxonomy']['OPEN']==15
+    assert new['env']['interaction']['door']['relation_rewards'].pop('open_state_mode')=='distance'
+    assert new['env']['interaction']['door']['relation_rewards'].pop('progress_reference')=='body_door_xy'
+    assert new['env']['interaction']['door']['relation_rewards']['open_state_weight']==0.2
+    new['env']['interaction']['door']['relation_rewards']['open_state_weight']=old['env']['interaction']['door']['relation_rewards']['open_state_weight']
+    assert 'task_expert_mix' not in new['env']['interaction']['amp']
+    new['env']['interaction']['amp']['task_expert_mix']=old['env']['interaction']['amp']['task_expert_mix']
+    new['env']['relationGraph']=old['env']['relationGraph']
+    assert new==old
+
+
+def test_current_door_taxonomy_removes_old_names_without_breaking_checkpoint_ids():
+    import utils.edge_interaction_spec as relations
+    assert not hasattr(relations,'DOOR_OPEN') and not hasattr(relations,'DOOR_HOLD')
+    assert relations.HAND==14 and relations.OPEN==15
+    path=ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_hand_open_25kg_spr_walk_open_score.yaml'
+    env=yaml.safe_load(path.read_text())['env'];metadata=interaction_metadata(env)
+    assert metadata['relation_taxonomy']=={'AT':7,'PUSH':11,'HAND':14,'OPEN':15}
+    historical=copy.deepcopy(metadata);historical['relation_taxonomy'].update(DOOR_OPEN=12,DOOR_HOLD=13)
+    check_interaction_checkpoint({'interaction_metadata':historical},metadata)
+    wrong=copy.deepcopy(historical);wrong['relation_taxonomy']['HAND']=12
+    with pytest.raises(ValueError):check_interaction_checkpoint({'interaction_metadata':wrong},metadata)
+
+
+def test_door_body_progress_uses_xy_and_ignores_hand_noise():
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs(3)
+    c['relation_rewards']['progress_reference']='body_door_xy'
+    body=torch.tensor([[.5,0.,0.],[.5,0.,2.],[2.,0.,0.]])
+    door=torch.zeros_like(body)
+    h[:,0,2]=torch.tensor([0.,1.,1.])
+    r=door_contact_open_rewards(h,g,f,f,z,z,z,z,.01,c,body,door)
+    assert torch.allclose(r['components'][0,1],r['components'][1,1])
+    assert r['components'][1,1]>r['components'][2,1]
+    assert r['contact'].tolist()==[True,False,False]
+    assert r['components'][0,0]>0 and r['components'][1,0]==0
+    with pytest.raises(ValueError):
+        door_contact_open_rewards(h,g,f,f,z,z,z,z,.01,c)
+
+
+def test_current_door_open_state_is_soft_distance_without_contact_gate():
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs(3)
+    path=ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1_hand_open_25kg_spr_walk_open_score.yaml'
+    c=yaml.safe_load(path.read_text())['env']['interaction']['door']
+    h[:,0,0]=torch.tensor([0.,.05,.1])
+    pos=torch.zeros(3,3)
+    r=door_contact_open_rewards(h,g,torch.zeros_like(f),f,z,z,z,z,.1,c,pos,pos)
+    expected=.2*torch.exp(-100*torch.tensor([0.,.05,.1]).square())
+    torch.testing.assert_close(r['components'][:,3],expected)
+    assert not r['contact'].any()
+    assert (r['components'][:,4:]==0).all()
+    assert r['components'][0,3]>r['components'][1,3]>r['components'][2,3]>0
+    h[:,0,2]=.1
+    lower=door_contact_open_rewards(h,g,torch.zeros_like(f),f,z,z,z,z,.1,c,pos,pos)
+    assert (lower['components'][:,3]<r['components'][:,3]).all()
+
+
+def test_right_hand_door_filters_data_and_keeps_push_amp_separate():
+    from utils.push_door_spec import door_motion_matches,door_motion_hand
+    folder=ROOT/'tokenhsi/data/cfg/multi_agent'
+    old=yaml.safe_load((folder/'push_door_stage1_hand_open_25kg_spr_walk_open_score.yaml').read_text())
+    new=yaml.safe_load((folder/'push_door_stage1_right_hand_25kg_spr_task_mix.yaml').read_text())
+    interaction=new['env']['interaction'];validate_interaction(interaction)
+    assert interaction['task_rsi'].pop('door_alignment_yaw_degrees')==[-45.,-22.5,0.,22.5,45.]
+    assert interaction['door'].pop('working_hand')=='right'
+    assert interaction['amp'].pop('task_expert_mix')=={'push':[0.,1.,0.],'door':[.33,0.,.67]}
+    assert interaction['amp']['door_hand_selection']=='fixed_right_v1'
+    interaction['amp']['door_hand_selection']=old['env']['interaction']['amp']['door_hand_selection']
+    assert new==old
+    dataset=yaml.safe_load((ROOT/'tokenhsi/data/dataset_push_door_stage1.yaml').read_text())
+    # Check actual dataset entries rather than hand labels inferred from filenames alone.
+    entries=dataset['motions']['doorOpen']
+    selected=[v['file'] for v in entries if v['weight']>0 and door_motion_matches(v['file'],'left_open','right')]
+    assert selected and all(door_motion_hand(p)==0 for p in selected)
+    assert not door_motion_matches('motions/inside_door_handle_right_side_open_walk_R_001__A512_M/phys_humanoid_v3/ref_motion.npy','left_open','right')
+
+
+def test_right_hand_door_rewards_reject_left_hand_only_contact():
+    from utils.push_door_spec import door_contact_open_rewards
+    c,h,g,f,z=door_spr_inputs()
+    h[:,0]=torch.tensor([2.,0.,0.]);h[:,1]=torch.tensor([.02,0.,0.])
+    f=torch.ones_like(f)
+    any_hand=door_contact_open_rewards(h,g,f,f,z,z,z,z,.01,c)
+    assert any_hand['contact'].item()
+    c['working_hand']='right'
+    right_only=door_contact_open_rewards(h,g,f,f,z,z,z,z,.01,c)
+    assert not right_only['contact'].item() and right_only['components'][0,0]==0
+    h[:,0]=torch.tensor([.02,0.,0.])
+    right=door_contact_open_rewards(h,g,f,f,z,z,z,z,.01,c)
+    assert right['contact'].item() and right['components'][0,0]>0

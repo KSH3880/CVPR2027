@@ -85,6 +85,16 @@ def motion_contact_hand(extension, motion_ids, num_motions, margin):
 def safe_door_candidates(task, root, body, root_rotation=None, torso_rotation=None, contact_hand=None):
     """Return aligned transforms and safe angle masks before sampling a reset."""
     cfg=task._interaction['task_rsi'];dev=body.device
+    offsets=cfg.get('door_alignment_yaw_degrees',[0.])
+    if len(offsets)>1 and len(root)>64:
+        parts=[]
+        for start in range(0,len(root),64):
+            sl=slice(start,start+64)
+            parts.append(safe_door_candidates(task,root[sl],body[sl],
+                None if root_rotation is None else root_rotation[sl],
+                None if torso_rotation is None else torso_rotation[sl],
+                None if contact_hand is None else contact_hand[sl]))
+        return parts[0][0],torch.cat([p[1] for p in parts]),torch.cat([p[2] for p in parts]),torch.cat([p[3] for p in parts])
     rel=body-root[:,None,:]
     hands=rel[:,task._key_body_ids[:2]]
     heights=body[:,task._key_body_ids[:2],2]
@@ -96,8 +106,9 @@ def safe_door_candidates(task, root, body, root_rotation=None, torso_rotation=No
     if contact_hand is not None: chosen_ok &= contact_hand>=0
     hand=hands[torch.arange(len(root),device=dev),pick]
     low,high=cfg['door_angle_degrees']
-    angles=torch.deg2rad(torch.linspace(low,high,64,device=dev))
-    yaw=angles[None,:]-torch.atan2(hand[:,1],hand[:,0])[:,None]
+    angles=torch.deg2rad(torch.linspace(low,high,64,device=dev)).repeat_interleave(len(offsets))
+    yaw_offsets=torch.deg2rad(body.new_tensor(offsets)).repeat(64)
+    yaw=angles[None,:]-torch.atan2(hand[:,1],hand[:,0])[:,None]+yaw_offsets[None,:]
     q=torch.zeros(len(root),len(angles),4,device=dev);q[...,2]=torch.sin(yaw/2);q[...,3]=torch.cos(yaw/2)
     rotated=quat_rotate(q[:,:,None,:].expand(-1,-1,body.shape[1],-1).reshape(-1,4),rel[:,None,:,:].expand(-1,len(angles),-1,-1).reshape(-1,3)).view(len(root),len(angles),body.shape[1],3)
     hand_rotated=rotated[torch.arange(len(root),device=dev)[:,None],torch.arange(len(angles),device=dev)[None,:],task._key_body_ids[:2][pick][:,None]]

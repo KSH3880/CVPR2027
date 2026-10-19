@@ -601,7 +601,7 @@ class RelationEncoder(nn.Module):
         else:
             relation_types = 11 if self.interaction_context else 9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES
             if self.relation_graph_spec.get("template")=="push_door_stage1_v1" and self.relation_graph_spec.get("semantic_relations",False):
-                relation_types=14
+                relation_types=16 if self.relation_graph_spec.get("door_hand_open_relations",False) else 14
             if self.relation_graph_spec.get('template') == 'support_lift_v1':
                 relation_types = 8
             self.edge_encoder = EdgeEncoder(num_layers, num_heads, num_relation_types=relation_types)

@@ -1,0 +1,268 @@
+env:
+  numEnvs: 2048
+  envSpacing: 5
+  episodeLength: 600
+  isFlagrun: false
+  enableDebugVis: false
+  cameraFollow: true
+  video:
+    enable: false
+    focus: stack
+  relationGraph:
+    template: push_door_stage1_v1
+    semantic_relations: true
+    unified_door_relation: true
+    generic_door_goal: true
+  relationReward:
+    mode: legacy_tokenhsi
+    stage1_variant: push_door_stage1_v1
+  numAgents: 2
+  numObjects: 4
+  agentSpawnRadius: 2.5
+  agentCollisionPenalty: true
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
+  policyObsMode: clean_scene
+  obsFrame: owner
+  pdControl: true
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: Random
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  localRootObs: true
+  localRootObsPolicy: false
+  rootHeightObs: false
+  rootHeightObsPolicy: false
+  cleanSceneLocalRootObsPolicy: true
+  cleanSceneRootHeightObsPolicy: true
+  keyBodies:
+  - right_hand
+  - left_hand
+  - right_foot
+  - left_foot
+  contactBodies:
+  - right_foot
+  - left_foot
+  terminationHeight: 0.15
+  enableEarlyTermination: true
+  enableSelfCollisionDetection: true
+  enableTrackInitState: false
+  power_reward: false
+  power_coefficient: 0.0005
+  skill:
+  - loco
+  - push
+  - doorOpen
+  skillInitProb:
+  - 1.0
+  - 0.0
+  - 0.0
+  skillDiscProb:
+  - 0.0
+  - 0.5
+  - 0.5
+  enableTaskObs: true
+  mode: train
+  debug:
+    reward: false
+  eval:
+    successThreshold: 0.2
+    skill:
+    - loco
+    skillInitProb:
+    - 1.0
+  asset:
+    assetRoot: tokenhsi/data/assets
+    assetFileName: mjcf/phys_humanoid_v3.xml
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+  ampTaskConditioning: true
+  goalRotation: identity
+  motion_file: tokenhsi/data/dataset_push_door_stage1.yaml
+  interaction:
+    lane_spacing: 3.2
+    door_probability: 0.5
+    progress_weight: 0.4
+    maintain_weight: 0.6
+    success_weight: 0.2
+    push:
+      relation_rewards:
+        version: stage2_contact_at_dense_v1
+        hand_state_weight: 0.2
+        hand_progress_weight: 0.2
+        hand_result_weight: 0.2
+        at_state_weight: 0.2
+        at_progress_weight: 0.2
+        at_result_weight: 0.2
+        hand_contact_distance: 0.18
+        contact_force: 0.5
+        hand_near_scale: 10.0
+        at_near_scale: 10.0
+        approach_delta: 0.5
+        approach_sigma: 1.0
+      direction: away_from_door
+      full_circle_start: true
+      hand_radius: 0.04
+      hand_distance_scale: 0.15
+      hand_height_fraction:
+      - 0.5384615384615384
+      - 0.6923076923076923
+      box:
+        size:
+        - 1.3
+        - 1.3
+        - 1.3
+        density: 11.379153390987709
+        friction: 0.5
+      target_distance:
+      - 2.0
+      - 4.0
+      goal_tolerance: 0.15
+      settle_speed: 0.15
+      settle_seconds: 0.5
+      progress_speed: 0.5
+      ground_tolerance: 0.02
+      max_tilt_degrees: 15.0
+      tilt_free_degrees: 5.0
+      tilt_penalty_weight: 0.2
+      lift_penalty_weight: 0.2
+      lift_free_height: 0.01
+      lift_penalty_scale: 0.03
+    door:
+      handle_height: 0.95
+      spring:
+        spring_stiffness: 6.0
+        spring_damping: 3.0
+      open_degrees: 80.0
+      reopen_degrees: 65.0
+      hold_seconds: 2.0
+      hold_max_speed: 0.3
+      contact_distance: 0.08
+      contact_force: 0.5
+      progress_speed: 0.6
+      motion_direction: left_open
+      reward_version: contact_open_spr_v1
+      approach_weight: 0.15
+      approach_speed: 0.5
+      approach_angle_tolerance: 0.01
+      closing_weight: 0.2
+      closing_speed: 0.6
+      closing_deadband: 0.005
+      relation_rewards:
+        contact_state_weight: 0.2
+        contact_progress_weight: 0.2
+        contact_success_weight: 0.2
+        open_state_weight: 0.2
+        open_progress_weight: 0.2
+        open_success_weight: 0.2
+        hand_distance_scale: 100.0
+        approach_sigma: 0.5
+        contact_success_threshold: 0.9
+    amp:
+      hand_conditioning: user_hands_v1
+      door_hand_selection: nearest_on_entry_v1
+      approach_loco:
+        enter_door_distance: 0.8
+        return_loco_distance: 1.0
+      push_phase:
+      - 0.0
+      - 1.0
+      open_phase:
+      - 0.0
+      - 0.7
+      hold_phase:
+      - 0.7
+      - 1.0
+      hold_source: door_tail
+      task_conditioning: true
+      task_expert_mix:
+        push:
+        - 0.0
+        - 1.0
+        - 0.0
+        door:
+        - 0.33
+        - 0.0
+        - 0.67
+    task_rsi:
+      door_rsi_probability: 0.5
+      door_facing_degrees: 60.0
+      door_hand_binding: user_paths_v1
+      probability: 0.8
+      push_phase:
+      - 0.35
+      - 0.9
+      door_phase:
+      - 0.35
+      - 0.7
+      late_fraction: 0.7
+      push_remaining:
+      - 0.5
+      - 1.2
+      door_angle_degrees:
+      - 5.0
+      - 79.0
+      frame_clearance: 0.03
+      push_hand_radius: 0.04
+      push_surface_gap: 0.001
+      hand_gap: 0.03
+      min_extension: 0.2
+      door_height_tolerance: 0.1
+      push_hand_height:
+      - 0.75
+      - 1.08
+      version: task_door_loco_approach_v8
+      door_early_max_degrees: 25.0
+      door_early_fraction: 0.75
+  startRandomization:
+    scene_x:
+    - -0.2
+    - 0.2
+    scene_y:
+    - -0.15
+    - 0.15
+    box_x:
+    - -0.15
+    - 0.15
+    box_y:
+    - -0.15
+    - 0.15
+    box_yaw_degrees:
+    - -30
+    - 30
+    push_distance:
+    - 1.3
+    - 1.6000000000000003
+    door_distance:
+    - 1.2
+    - 1.8
+    human_lateral:
+    - -0.2
+    - 0.2
+    human_yaw_degrees:
+    - -25
+    - 25
+    target_yaw_degrees:
+    - -60
+    - 60
+    target_distance:
+    - 2.0
+    - 4.0
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
