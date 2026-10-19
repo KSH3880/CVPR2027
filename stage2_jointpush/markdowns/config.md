@@ -1,3 +1,16 @@
+## 4-agent 가변 그룹 직선 Push
+
+[설정·로컬 준비·ablation](PARTITION_PUSH.md). 사람은항상4명이며순차coupled80%/NONE20%로1~4명그룹을샘플링한다. 그룹상자는X=n×(1~1.3m), 질량=n×(20~30kg), Y1.8~2.2/Z1.2~1.5m이며n등분한다. 남는일반4개도1인분포에서독립랜덤생성한다. 과제4구역+일반4개로8토큰유지, 손높이Z×0.5, loco-only. version2로컬설정이며GPU실행은하지않았다.
+
+```bash
+# partition_push_ca4 학습
+STAGE1_CHECKPOINT=/local/path/stage1.pth bash stage2_jointpush/scripts/partition_push_train.sh
+# partition_push_ca4 로컬 추론
+HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_test.sh /local/path/stage2.pth
+# partition_push_ca4 기존 VNC desktop에서 추론
+NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_vnc.sh /local/path/stage2.pth
+```
+
 ## 4명·대형100kg viewer (2026-10-16)
 
 `TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_four_agent_100kg_view.sh /absolute/path/random_checkpoint.pth`. 기존 랜덤 모델 가중치를 4명으로 실행하고 shared box2만3×1.5×1.5m/100kg로 생성한다. 전용 `_test.sh`로 headless 검증 가능. 크기/질량은 이 preview에서 고정이며 실제asset/bbox/관성/reset/spawn을 연결한다. 저장된 원래 물리 계약 검증 후 명시적 추론 override를 적용하고 runtime JSON에 실측값을 남긴다. 학습분포 밖 조건으로 성능은 미검증.

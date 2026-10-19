@@ -88,7 +88,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or 'random_open_push'
             if self._task_graph_preset not in ('random_open_push','open','push','open_push','push_open'):
                 raise ValueError('Invalid OPEN/PUSH graph preset')
-            self.num_objects = 4
+            self.num_objects = cfg['env']['numObjects'] if getattr(self, '_partition_push', False) else 4
             self._relation_graph_spec = cfg['env']['relationGraph']
             self._context_suffix_width = semantic_packet_size(2*cfg['env']['numAgents'])
         elif self._door_open:

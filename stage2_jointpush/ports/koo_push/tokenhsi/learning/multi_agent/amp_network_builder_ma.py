@@ -1029,6 +1029,8 @@ class AMPMultiAgentBuilder(AMPBuilder):
             if coordination_cfg.get('mode') == 'push_at_ca4':
                 from learning.multi_agent.push_at_coordination import attach_push_at_coordination
                 attach_push_at_coordination(self)
+                self.push_at_coordination.partition_count = coordination_cfg.get('partition_count', 1)
+                self.push_at_coordination.group_by_goal = coordination_cfg.get('group_by_goal', False)
             return
 
         def set_entity_counts(self, num_agents, num_objects=None):

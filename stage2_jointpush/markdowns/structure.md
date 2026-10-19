@@ -369,3 +369,13 @@ BEFORE Stage 2는 `approach_stage2_before_task_embedding` env YAML·train/test/V
 - `ports/koo_push/tokenhsi/data/cfg/{multi_agent,train/rlg}/joint_push_assigned_faces_ca4.yaml`: 높이1.6~2.6m/각도25° 경계 전용 프로필.
 - `scripts/joint_push_assigned_faces_{train,test,view}.sh`: train/test/noVNC 진입점. 내부 `joint_push_assigned_faces_ca4_{train,test,vnc}.sh` 연결.
 - `ports/koo_push/tokenhsi/tests/test_assigned_faces_push.py`: 각도 경계·인접 면·교환 불변성·box pose 추종·잘못된 접근·개별 손·부분reset·높이 격자 검사.
+
+## 공유 상자 분할 Push
+
+- `ports/koo_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_partition_push.py`: 순차coupled80%/NONE20% 가변그룹, 인원비례상자/n분할+랜덤일반4개로8토큰, 최근접구역·손point·그룹별보상.
+- `ports/koo_push/tokenhsi/utils/partition_push.py`: CPU 그룹샘플러·24후보asset크기/질량·가변분할기하·최근접할당·그룹보상.
+- `ports/koo_push/tokenhsi/data/cfg/{multi_agent,train/rlg}/partition_push_ca4.yaml`: 환경/학습 프로필.
+- `ports/koo_push/tokenhsi/data/partition_push_motions.yaml`: raw Push+loco AMP.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/partition_push_setup.py`: source 경로 선택, checkpoint 환경 복원·추론 ablation.
+- `scripts/partition_push_{train,test,vnc}.sh`: 로컬 진입점.
+- [PARTITION_PUSH.md](PARTITION_PUSH.md): 설정·로컬 데이터 준비·실행법.

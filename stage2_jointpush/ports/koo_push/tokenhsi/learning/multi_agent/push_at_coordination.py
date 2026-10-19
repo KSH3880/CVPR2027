@@ -90,7 +90,10 @@ class PushAtCoordination(nn.Module):
         tokens, valid, bundles = tokens[:, order], valid[:, order], bundles[:, order]
         _, actor, box, goal = bundles.unbind(-1)
         own = actor[:, None] == torch.arange(humans.shape[1], device=nodes.device)[None, :, None]
-        shared = valid[:, :, None] & valid[:, None, :] & (box[:, :, None] == box[:, None, :]) & (goal[:, :, None] == goal[:, None, :])
+        physical = (box - humans.shape[1]) // getattr(self, 'partition_count', 1)
+        same_goal = goal[:, :, None] == goal[:, None, :]
+        same_payload = same_goal if getattr(self, 'group_by_goal', False) else (physical[:, :, None] == physical[:, None, :])
+        shared = valid[:, :, None] & valid[:, None, :] & same_payload & same_goal
         partner = (own[..., None] & shared[:, None]).any(-2) & ~own
         relations = torch.where(own, 1, torch.where(partner, 2, 0))
         has_task = valid.any(-1)

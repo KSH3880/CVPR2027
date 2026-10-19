@@ -10,7 +10,8 @@ def transfer_joint_push(agent, checkpoint):
         raise ValueError('Use resume for a Joint Push checkpoint')
     task=agent.vec_env.env.task
     old=checkpoint.get('relation_experiment_config',{})
-    if (old.get('num_agents'),old.get('num_objects'),old.get('observation_size'))!=(2,4,task.get_obs_size()):
+    source_counts = (old.get('num_agents'), old.get('num_objects'))
+    if source_counts != (2, 4) or (not getattr(task, '_partition_push', False) and old.get('observation_size') != task.get_obs_size()):
         raise ValueError('Stage1 observation contract differs')
     source_network=dict(old['train']['params']['network'])
     target_network=dict(agent._relation_experiment_config['train']['params']['network']);target_network.pop('coordination',None)

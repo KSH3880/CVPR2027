@@ -28,7 +28,7 @@ def scene_layout(env):
 
 
 def compile_graph(spec, m, o, device=None):
-    if (m,o) not in ((2,4),(3,4),(4,4)) or set(spec) not in ({'sampler','semantic_only','task_probabilities'}, {'sampler','semantic_only','task_probabilities','shuffle_token_order'}) or spec['sampler']!=SAMPLER or spec['semantic_only'] is not True:
+    if (m,o) not in ((2,4),(3,4),(4,4),(4,8)) or set(spec) not in ({'sampler','semantic_only','task_probabilities'}, {'sampler','semantic_only','task_probabilities','shuffle_token_order'}) or spec['sampler']!=SAMPLER or spec['semantic_only'] is not True:
         raise ValueError('Joint OPEN/PUSH requires 2 humans, 2 doors, 2 boxes')
     if type(spec.get('shuffle_token_order',False)) is not bool:
         raise ValueError('shuffle_token_order must be boolean')
@@ -36,8 +36,8 @@ def compile_graph(spec, m, o, device=None):
     if set(p)!={'OPEN','PUSH'} or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in p.values()) or not math.isclose(sum(p.values()),1.):
         raise ValueError('Invalid OPEN/PUSH probabilities')
     if m>=3:
-        src=torch.tensor([v for a in range(m) for v in (a,m+2)],device=device)
-        dst=torch.tensor([v for a in range(m) for v in (m+2,m+4)],device=device)
+        src=torch.tensor([v for a in range(m) for v in (a,m+(0 if o==8 else 2))],device=device)
+        dst=torch.tensor([v for a in range(m) for v in (m+(0 if o==8 else 2),m+o)],device=device)
         rel=torch.tensor([PUSH,AT]*m,device=device)
         owner=torch.arange(m,device=device).repeat_interleave(2)
         valid=torch.ones(2*m,dtype=torch.bool,device=device)
@@ -101,6 +101,26 @@ def validate_reward(c):
 
 
 def validate_env(env):
+    if 'partitionPush' in env:
+        from copy import deepcopy
+        spec = env['partitionPush']
+        if (env['numAgents'], env['numObjects']) != (4, 8) or spec['physical_boxes'] != 8 or spec['max_group_size'] != 4:
+            raise ValueError('Partition Push needs 4 agents, 8 physical boxes, 8 object tokens')
+        if spec['version'] != 2 or not 0 <= spec['coupled_probability'] <= 1:
+            raise ValueError('Expected variable-group Push version2 and a valid probability')
+        if spec['group_preset'] not in ('random_scenario','all_solo','all_shared'):
+            raise ValueError('Unknown Push group preset')
+        for lo, hi in zip(spec['size_min'], spec['size_max']):
+            if not 0 < lo <= hi: raise ValueError('Invalid partition box range')
+        if not 0 < spec['mass_per_agent'][0] <= spec['mass_per_agent'][1]:
+            raise ValueError('Invalid mass range')
+        if env['stateInit'] != 'Random' or env.get('openPushRSI') or env['skillInitProb'] != [1.,0.,0.]:
+            raise ValueError('Partition Push uses loco-only reset')
+        proxy = deepcopy(env)
+        proxy.pop('partitionPush')
+        proxy['numAgents'], proxy['numObjects'] = 2, 4
+        validate_env(proxy)
+        return
     from utils.open_push_scene import validate_scene
     validate_scene(env)
     if type(env.get('openPushRandomizeLanes', False)) is not bool:

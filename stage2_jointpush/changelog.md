@@ -4,6 +4,24 @@
 
 ## 2026-10-19
 
+### 직선 Push 목표 거리 2~6m
+
+- 사용자 요청으로 `partitionPush.goal_distance`를2.2~5m에서2~6m 균등 샘플링으로 변경하고 설정 문서를 갱신했다. YAML 값과 diff를 확인했으며 학습·GPU 실행은 하지 않았다.
+
+### 가변 Push 그룹과1인 기준 랜덤 일반 상자
+
+- 사용자 확인에 따라사람4명고정·순차coupled80%/NONE20% 그룹샘플링을연결했다. 각그룹n명에X=n×U(1,1.3)m, 질량=n×U(20,30)kg를적용하고X를n등분한다. Y=U(1.8,2.2)m/Z=U(1.2,1.5)m는공통이다. 남는일반4개도1인기준크기/질량에서독립추첨한다.
+- 과제구역합계4+일반4로8토큰을유지하고, 물리상자는그룹수+4개다. 형상/질량setter변경없이reset에서그룹을바꾸도록24actor후보bank를사용한다. canonicalgoal로동일그룹coupled를식별하고다른그룹의접촉이자기보상gate에들어가지않도록유지한다.
+- 프로필version2·저장설정복원·1인기준추론ablation및[문서](markdowns/PARTITION_PUSH.md)를갱신했다. 이전4인고정version1은직접resume하지않는다.
+- CPU19개통과: 그룹5종실제reset메서드/부분reset/8토큰·일반4개보존/인원비례크기·질량/샘플링통계/CA4그룹구분과기존shape회귀. GPU·학습·시뮬레이션은실행하지않았다.
+
+### 공유 상자 4구역·일반 상자 대체 Push 로컬 프로필
+
+- 사용자 지정 Stage1 contact-at warmstart를 전이하는4-agent `partition_push_ca4`를 추가했다. 초기 일반 상자8개 중4개를 격리하고, 큰 공유 물체1개의 X4분할 토큰4개+일반4개로8토큰을 유지한다. 잘못 해석한 전 상자4분할/32토큰 방식은 적용하지 않는다.
+- 공유 크기X4~5.2/Y1.8~2.2/Z1.2~1.5m·총80~120kg, 손 높이Z×0.5 point, 최근접 구역·같은 물리 상자 coupled, aligned goal, loco-only, raw Push+loco AMP. 기존 Push CA4와 entity RMS를 재사용하며 기존 실험은 유지한다.
+- 로컬 train/test/VNC-desktop 진입점·source 디렉터리 해석·저장 설정 복원·추론 크기/총질량 ablation과 [실행 문서](markdowns/PARTITION_PUSH.md)를 추가했다. 외부 `/home/hwanhee/ksh`, `/home/hwanhee/koo_cvpr`는 읽기만 했다.
+- CPU10개 테스트 및 Python10파일/셸6파일 구문 검사 통과. 부분reset 검사에서 발견한 parked actor 좌표 dtype 오류를 수정 후 재통과했다. source29000의 network 설정 일치를 CPU로 확인했다. GPU·학습·시뮬레이션·실제 전이 forward는 사용자 요청에 따라 실행하지 않았다.
+
 ### 각도별 면·손 목표점 고정 및 높은 박스 프로필
 
 - 사용자 요청으로 `assigned_faces` Contact를 분리했다. reset 시 가장 가까운 box 수평축 대비 목표각도가25°이하면 한 면 좌우, 초과면 인접 두 면 중심에 배치한다. 초기 총 접근거리가 짧은 agent 배정을 선택하고, 각 오른손·왼손 target(간격0.3m/바닥기준0.8m)과 면 바깥 접근점(0.8m)을 box 로컬좌표에 고정한다. box pose를 따라가며 면·역할은 reset 전 바꾸지 않는다. 부분reset은 해당 env 버퍼만 갱신한다.

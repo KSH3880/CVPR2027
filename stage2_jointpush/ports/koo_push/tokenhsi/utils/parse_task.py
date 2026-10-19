@@ -116,3 +116,5 @@ def parse_task(args, cfg, cfg_train, sim_params):
         env = VecTaskPythonWrapper(task, rl_device, cfg_train.get("clip_observations", np.inf), cfg_train.get("clip_actions", 1.0))
 
     return task, env
+
+from env.tasks.multi_agent.humanoid_ma_partition_push import HumanoidMAPartitionPush
