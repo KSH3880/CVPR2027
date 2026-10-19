@@ -11,6 +11,8 @@ p.add_argument('--require-random-spawn60',action='store_true')
 p.add_argument('--require-surround60',action='store_true')
 p.add_argument('--require-softgate',action='store_true')
 p.add_argument('--three-agent-preview',action='store_true')
+p.add_argument('--require-random-shape',action='store_true')
+p.add_argument('--preview-agents',type=int,choices=[3,4],default=3)
 a=p.parse_args()
 checkpoint=torch.load(a.checkpoint,map_location='cpu',weights_only=False)
 contract=checkpoint.get('open_push_contract',{})
@@ -25,6 +27,8 @@ if a.require_surround60 and (saved['pushBox']['mass']!=60 or saved['jointPush'].
     raise ValueError('Expected a 60kg surround-start checkpoint')
 if a.require_softgate and saved['jointPush']['reward'].get('at_gate_mode')!='soft_min':
     raise ValueError('Expected a soft-gate checkpoint')
+if a.require_random_shape and not saved['jointPush'].get('shape_randomization'):
+    raise ValueError('Expected a random-shape/mass JointPush checkpoint')
 if saved.get('pushBox')!=contract.get('push_box'):
     raise ValueError('Saved environment and checkpoint box contract disagree')
 config=yaml.safe_load(Path(a.template).read_text())
@@ -35,10 +39,13 @@ if a.koo_rsi:
     config['env']['jointPush']['rsi']=template['jointPush']['rsi']
     config['env']['jointPush']['koo_rsi']=template['jointPush']['koo_rsi']
 if a.three_agent_preview:
-    if saved['pushBox']['mass']!=40 or saved['numAgents']!=2 or saved['jointPush'].get('random_spawn'):
+    if saved['numAgents']!=2 or (not a.require_random_shape and (saved['pushBox']['mass']!=40 or saved['jointPush'].get('random_spawn'))):
         raise ValueError('Three-agent preview requires original fixed-lane 2-person/40kg checkpoint')
-    config['env']['numAgents']=3
-    config['env']['pushBox']['mass']=60
+    if a.preview_agents==4 and not a.require_random_shape:
+        raise ValueError('Four-agent preview requires random-shape source')
+    config['env']['numAgents']=a.preview_agents
+    config['env']['jointPushPreviewAgents']=a.preview_agents
+    if not a.require_random_shape: config['env']['pushBox']['mass']=60
     config['env']['jointPushThreeAgentPreview']=True
 config.pop('experiment',None)
 directory=Path(a.directory);directory.mkdir(parents=True,exist_ok=True)

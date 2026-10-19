@@ -2,7 +2,74 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-19
+
+### 각도별 면·손 목표점 고정 및 높은 박스 프로필
+
+- 사용자 요청으로 `assigned_faces` Contact를 분리했다. reset 시 가장 가까운 box 수평축 대비 목표각도가25°이하면 한 면 좌우, 초과면 인접 두 면 중심에 배치한다. 초기 총 접근거리가 짧은 agent 배정을 선택하고, 각 오른손·왼손 target(간격0.3m/바닥기준0.8m)과 면 바깥 접근점(0.8m)을 box 로컬좌표에 고정한다. box pose를 따라가며 면·역할은 reset 전 바꾸지 않는다. 부분reset은 해당 env 버퍼만 갱신한다.
+- Contact State/Success는 배정된 두 손 중 나쁜 쪽의3D오차, Progress는 자기 접근점까지 XY거리로 계산한다. AT 거리식·가중치는 유지하고 새 Contact gate에 연결했다. 실제 손/접근점과 한면·두면 모드를 extras로 노출했다. 손바닥/힘 방향 검증은 추가하지 않았다.
+- 별도 `joint_push_assigned_faces_ca4` config/train/test/view에 높이1.6~2.6m(step0.2) 적용. 가로2~3m/깊이1~2.6m/질량40~60kg 유지,1620개격자. 이전 실험 설정·checkpoint는 보존하며 이전 프로필 resume/test를 거부한다.
+- CPU 회귀39개 및 셸 문법 통과. GPU6/2048환경/MAX_ITERATIONS=2 학습·저장 rc=0, 저장 checkpoint의16환경/30step/2회 복원·reset 평가 rc=0. 검증 산출물 `runs/jointpush/assigned_faces_check_20261019/`. 장기 본학습은 시작하지 않았다.
+
+## 2026-10-17
+
+### 비정렬 자유 표면 Contact 본학습 시작
+
+- 사용자 요청으로 기존 28000 랜덤 박스 viewer만 종료하고 GPU6/2048환경/2명/seed6397로 전용 본학습을 시작했다. 기존 Stage1 원본29000에서 새 Stage2 초기화이며 aligned Stage2 resume가 아니다. tmux `jointpush_directional_gpu6`, 산출물 `runs/jointpush/directional_surface_training/`. MPS와 별도 Stage1 학습은 유지했다.
+
+### 비정렬 목표·자유 표면 Contact 프로필
+
+- 기존 직선/대칭 프로필을 보존하고 `directional_surface` Contact를 추가했다. 각 손의 실제 유한 옆면 거리·높이·목표 방향에 유효한 안쪽 법선·agent 손중점 XY 간격을 평가한다. 손 중점만 맞추는 우회와 동일 면 배정·중심 대칭 조건을 제거했다. Direction은 내적/0.7을 포화시켜 대각선의 인접 두 면도 Success를 달성할 수 있다.
+- Contact State/Progress/Success 가중치0.2 유지, Progress는 회전된 실제 XY 외곽까지 거리다. AT 거리식·가중치를 유지하고 새 min-φ soft gate와 모두 Contact Success인 최종 gate로 연결했다. 상자와 목표 방향을 독립 360° 샘플링하는 랜덤 크기·질량 전용 config/train/test/view를 분리했다. 기존 aligned checkpoint의 실험 간 resume/test는 거부한다.
+- CPU 회귀23개 통과(import 경로 수정 후), 셸 문법 통과. GPU6/2048환경/MAX_ITERATIONS=2의 초기화·업데이트·checkpoint 저장 rc=0, 저장 checkpoint의 2환경/30step 복원·평가 rc=0. 검증 산출물 `runs/jointpush/directional_surface_check_20261017/`. 장기 학습과 기존 viewer는 변경하지 않았다.
+
+### 2인 랜덤 박스 viewer 학습 격자 선택
+
+- test 전용 `JOINT_PUSH_VIEW_GRID_INDEX`로 checkpoint 학습 격자의 특정 크기·질량을 선택한다. 범위 검사 및 학습 모드 거부를 적용했다. 기본 랜덤화는 유지한다. 사용자 요청으로 GPU6 viewer를 최대 격자(3×2.6×1.5m/60kg)로 재실행했다. Python 문법 검사 및 실제 GPU6 viewer 선택 로그·6086 포트 확인 통과.
+
+## 2026-10-16
+
+### 4명 viewer 박스 깊이 1.5m
+
+- 사용자 요청으로 전용 test/view 박스 깊이를3m에서1.5m로 변경했다. 가로3m/높이1.5m/질량100kg 유지. 현재 설정 문서 갱신 및 셸 문법·diff 검사 통과. viewer 재실행 시 적용된다.
+
+### 4명 viewer 박스 가로 3m
+
+- 사용자 요청으로 전용 test/view 박스를 4×3×1.5m에서 3×3×1.5m로 변경했다. 질량100kg 유지. 현재 설정 문서 갱신 및 셸 문법·diff 검사 통과. 실행 중 viewer는 재시작 시 적용된다.
+
+### 4명·대형100kg 박스 추론
+
+- 사용자 요청으로 랜덤 모델의 공유 tokenizer/Transformer를 4명 추론에 확장했다. 팀 그래프를 인원 기반 payload/goal 인덱스로 구성하고 8개edge를 사용한다. 대형payload override는 명시적 test preview에서만 허용하며 원래 checkpoint 계약을 먼저 검증한다. 전용 four_agent_100kg test/view는 4×3×1.5m/100kg, GPU6 기본이다. 학습 분포와 실행 중 학습은 변경하지 않는다.
+- CPU 회귀5개·셸문법·diff 검사 통과. GPU6/10000 checkpoint/2환경/4명/30step rc=0. 실제100kg,bbox4×3×1.5m,관성오차<0.00001,부분reset보존,8edge 확인. 첫 그래프 인원제한 실패로그 보존 후 수정·재검증했다. 성공 성능 검증은 아니다. runs/jointpush/four_agent_100kg_check/.
+
+### 랜덤 크기·질량 체크포인트 3명 추론
+
+- 공유 tokenizer/Transformer 가중치를 유지하고 test 전용 3명 경로를 확장했다. 랜덤 shape/mass 계약은 유지하며 기존 고정40→60kg preview는 보존한다. surround spawn을 N명 쌍별 거리 검사로 확장하고 2명 기본값을 유지한다. 전용 test/view wrapper와 실행 문서를 추가했다.
+- CPU shape/spawn 회귀 3개 및 셸 문법 검사 통과. GPU6에서 10000 checkpoint/2환경/3명/30step 추론 rc=0,6개 관계edge와 checkpoint 복원 확인. 학습은 변경하지 않았다. 성공 성능 검증은 아니다.
+
+### 랜덤 크기·질량 viewer GPU 지정
+
+- 사용자 요청으로 랜덤 모델 전용 test/VNC의 GPU0 고정을 제거하고 GPU6 기본값과 TOKENHSI_GPU override를 적용했다. 기존 checkpoint 분포 복원과 실제 형상·질량 랜덤 샘플링을 유지한다.
+- 셸 문법 검사 통과. GPU viewer는 실행하지 않았다.
+
 ## 2026-10-15
+
+### 랜덤 형상·질량 학습 GPU6 재개
+
+- 사용자 요청으로 고정 크기 JointPush를 종료하고, 기존 랜덤 형상·질량 2500 checkpoint에서 2048환경/seed6397로 GPU6 MPS 재개. train GPU는 TOKENHSI_GPU로 지정 가능하게 변경했다.
+- 산출물: runs/jointpush/random_shape_resume_gpu6_20261015_223106/. 체크포인트 복원 후 6회 이상 학습 업데이트 진행과 finite fps(약2만 frames/s)를 확인했다.
+
+### 원본 Push Stage1 설정 설명 추가
+
+- JOINT_PUSH_SETTINGS.md15절에source29000checkpoint저장설정(seed42/1.3m20kg/OPEN-PUSH혼합/독립물체/목표2m)과RSI/warmstart/embedding/조건부AMP/보상식/Stage2차이추가. 원본contact_at는각손뒷면XY거리/force조건을쓰며현재JointPush중점대칭/높이보상과구분한다.
+- 외부원본은읽기만하고실제전이checkpoint메타데이터와대조. 결과수치제외/문서링크/diff검사완료. 학습변경없음.
+
+### GPU0 독립 랜덤 형상·질량 공동 Push
+
+- 새RandomShape task/profile/전용train/test/view추가. X2–3(step.2)/Y1–2.6(step.2)/Z1–1.5(step.25)m,질량40–60(step5)kg,810조합을env생성시독립배정하고reset간유지한다. 사용자추가지시로GPU1에서GPU0으로전환. 기존GPU6/MPS유지.
+- 실제asset밀도/관성·관측bbox·reset높이·고정면·손간격·접근보상·360°spawn반경을실제크기에연결했다. 이전고정크기/3agent/mass진단경로는보존.랜덤형상은단일mass/3agent진단과혼용거부.
+- CPU13개통과,GPU1 64환경120step후자연종료.GPU0 2048환경2iter학습/저장/16환경60step복원rc=0.740조합배정/실제질량·관성오차<.001/bbox·부분reset일치확인. 첫2048검증의audit초기화순서는수정하고실패로그보존.
+- GPU0본학습tmux jointpush_randomshape_gpu0에서새Stage2로시작.실행법/범위는markdowns/JOINT_PUSH_RANDOM_SHAPE_SETTINGS.md. 산출물runs/jointpush/random_shape_mass_softgate_training/.
 
 ### 결과를 제외한 Joint Push 상세 설정 문서
 

@@ -1,0 +1,65 @@
+{
+  "source": "/home/hwanhee/ksh/stage2_jointcarry",
+  "created": "2026-10-15T14:50:10.824369",
+  "checkpoint": "checkpoints/ApproachStage2JointCarryMixed80LocoAmpCa4Goal360FullPickupCpaRelease1LocoPlatformTaskEmbedding_00021500.pth",
+  "checkpoint_sha256": "4703f55957ef6582f78db30d15266f26268f9342c44987d39cb4b316c2aef4bf",
+  "shared_links": [
+    {
+      "path": "joint_carry/carry_joint_full_pickup/putDown",
+      "target": "/home/hwanhee/juan/CVPR2027/stage2_jointcarry/joint_carry/carry_joint_corrected/putDown"
+    },
+    {
+      "path": "joint_carry/carry_joint_full_pickup/carryWith",
+      "target": "/home/hwanhee/juan/CVPR2027/stage2_jointcarry/joint_carry/carry_joint_corrected/carryWith"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_carry/motions"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_sit/motions"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/objects",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_sit/objects"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_climb/motions"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/smpl_params",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_climb/smpl_params"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/objects",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_climb/objects"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco_stairs/motions"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/smpl_params",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco_stairs/smpl_params"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/motions"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/smpl_params",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/smpl_params"
+    },
+    {
+      "path": "tokenhsi/data/dataset_dynamic_objects/train",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_dynamic_objects/train"
+    },
+    {
+      "path": "tokenhsi/data/dataset_dynamic_objects/test",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_dynamic_objects/test"
+    }
+  ],
+  "gpu_launched": false
+}

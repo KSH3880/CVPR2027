@@ -12,6 +12,8 @@
 
 이 문서의 코드·config 경로는 별도 표시가 없으면 `stage2_jointpush/` 기준이다. 실행 명령은 `/home/hwanhee/juan/CVPR2027`에서 사용한다.
 
+랜덤 형상·질량 GPU0 실험은 [별도 설정](JOINT_PUSH_RANDOM_SHAPE_SETTINGS.md)을 참고한다. 이 문서는 기존 고정 크기·60kg 설정이다.
+
 ## 1. 태스크와 학습 범위
 
 두 humanoid가 동일한 상자의 같은 면에 접근해 자리를 나누고, 함께 상자를 하나의 목표 위치까지 미는 태스크다. 목표 방향은 초기 상자 정면과 정렬한다. 의도적으로 목표 방향을 틀어 놓는 곡선 Push 조건은 포함하지 않는다.
@@ -501,3 +503,190 @@ YAML에 남아 있는 단독 Push용 `relationReward.push`의 hand force, box fo
 - Stage1 전이: [joint_push_transfer.py](../ports/koo_push/tokenhsi/learning/multi_agent/joint_push_transfer.py)
 - 조건부 AMP: [humanoid_ma_open_push.py](../ports/koo_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_open_push.py)
 - 질량 진단: [joint_push_mass_preview.py](../ports/koo_push/tokenhsi/utils/joint_push_mass_preview.py)
+
+## 15. 원본 Push Stage1: OPEN/PUSH contact+AT warmstart
+
+### 15.1 원본과 기준 checkpoint
+
+현재 Stage2가 전이한 원본은 koo의 `open_push_push180_contact_at_warmstart`다. 이름에 push가 있지만 **OPEN과 PUSH를 함께 학습한 Stage1**이다.
+
+- 원본 저장소: `/home/hwanhee/koo_cvpr/stage1_fix/` — 읽기 전용으로 참조.
+- 원본 env: `tokenhsi/data/cfg/multi_agent/open_push_push180_contact_at_warmstart.yaml`
+- 원본 train: `tokenhsi/data/cfg/train/rlg/open_push_unified_amp.yaml`
+- task: `HumanoidMAOpenPush`
+- 사용한 checkpoint: `OpenPushPush180ContactAtWarmstart_00029000.pth`
+- 원본 파일: `output/open_push_push180_contact_at_warmstart/OpenPushPush180ContactAtWarmstart_09-17-51-36/nn/OpenPushPush180ContactAtWarmstart_00029000.pth`
+- Stage2 전이용 로컬 복사본: `runs/jointpush/stage1_sources/OpenPushPush180ContactAtWarmstart_00029000.pth`
+- 저장된 학습 seed: **42**.
+
+이 절은 실제 source checkpoint의 `relation_experiment_config`를 우선 기준으로 한다. 원본 저장소에 나중에 추가된 any-surface 접촉, 랜덤 크기, 랜덤 목표 방향 등의 다른 실험 설정을 이 checkpoint의 설정으로 해석하지 않는다.
+
+### 15.2 Stage1에서 두 agent가 하는 일
+
+각 agent의 task를 독립적으로 `OPEN 0.5 / PUSH 0.5`에서 뽑는다. 따라서 OPEN/OPEN, OPEN/PUSH, PUSH/OPEN, PUSH/PUSH 조합이 모두 가능하다. 항상 한 명은 문을 열고 다른 한 명은 미는 식으로 고정하지 않는다.
+
+환경에는 human 2명, door 2개, push box 2개가 있다. 각 agent가 **자기 물체와 자기 목표**를 사용하며, 두 사람이 하나의 상자를 공동으로 미는 구조가 아니다. lane/물체 할당은 reset에서 랜덤화한다.
+
+- OPEN: `human → 자기 door`, relation ID **11**.
+- PUSH: `human → 자기 box`, relation ID **12**.
+- AT: `자기 box → 자기 goal`, relation ID **7**.
+
+PUSH일 때는 PUSH와 AT 두 edge를 함께 사용한다. 원본 Stage1의 policy가 PUSH만이 아니라 상자를 목표로 옮기는 AT 관계도 같이 학습한 이유다.
+
+### 15.3 원본 환경·물리·목표
+
+| 항목 | Stage1 값 |
+|---|---|
+| 환경 수 / agent 수 | 2048 / 환경당2명 |
+| `envSpacing` | **14** |
+| observation / action | 장면684 / agent당32 |
+| episode / 제어주기 | 600step / 약30Hz |
+| Push box 크기 | **1.3 × 1.3 × 1.3m** |
+| box 총질량 | **20kg** |
+| 밀도 | 약 **9.10kg/m³** |
+| box 마찰 / 반발 | 0.6 / 0 |
+| plane static / dynamic friction | 1.0 / 1.0 |
+| 상자 크기·질량 랜덤화 | 없음 |
+| Push 목표 거리 | **2.0m 고정** |
+| Push 목표 방향 | 각 상자 초기 local+Y와 정렬 |
+| 독립적인 목표 방향 랜덤화 | 없음: `pushGoalRandomization` 미설정 |
+| 상자 초기 yaw | 0–360° 랜덤 |
+| Push station 중심 영역 | 중심(-4,0), 반경4.5m 원판 |
+| 두 Push station 최소 간격 | 6m |
+| loco 접근 거리 범위 | 1–2m |
+| door station | X=4, Y=±5 |
+| 문 목표 열림 각도 | π/2, 약90° |
+
+Push station의 원판 위치는 면적 기준 균등 샘플링하며, 두 station 사이 거리 제약으로 재샘플링한다. 목표 방향은 상자 yaw를 따라 회전하므로, world 기준 방향은 다양하지만 처음부터 상자와 목표를 비틀어 놓는 곡선 조건은 아니다.
+
+### 15.4 Stage1 RSI와 warmstart
+
+| 항목 | 값 |
+|---|---:|
+| `stateInit` | **Start** |
+| 기본 `skillInitProb` | loco1 / doorOpen0 / push0 |
+| 학습 중 interaction RSI 확률 | **0.5** |
+| interaction 대신 loco 초기화 확률 | **0.5** |
+| interaction에서 late 요청 확률 | **0.7** |
+| late motion 구간 | motion 후반 **0.3** |
+| 손 stand-off | **0.06m** |
+| RSI bank | `tokenhsi/data/open_push_push180_random_scene_bank.json` |
+
+기본 skillInitProb가 loco-only여도, 학습에서는 `openPushRSI`가 agent별 interaction 여부를 추가로 샘플링한다. interaction이면 현재 OPEN/PUSH task에 맞는 motion/frame과 물체 진행 상태를 bank에서 가져온다. 기본 평가 경로에서는 interaction RSI를 사용하지 않고 loco 초기화 경로를 사용한다.
+
+원본 contact+AT run 자체도 완전한 scratch는 아니다. `OpenPushPush180RandomScene_00004500.pth`에서 warmstart한다. actor encoder·action head·discriminator·관측/AMP 정규화 통계를 가져오고, critic·optimizer·counter 등은 새로 시작한다. **Stage1에서는 encoder를 동결하지 않는다.** 그 뒤 Stage2가 이 Stage1의29000 checkpoint를 가져와 actor encoder를 동결하는 것이다.
+
+### 15.5 Stage1 네트워크와 embedding
+
+Stage1은 clean-scene token을 attention으로 처리한 후, human feature에 action head를 연결한다. 별도 Stage2 task grounding/CA4는 없다.
+
+```text
+human/object/goal 관측 + semantic graph
+                  ↓
+         Stage1 scene encoder
+                  ↓
+        agent별 human feature64D
+                  ↓
+       action head64→1024→512→32
+```
+
+공통 네트워크는 width64, attention4층/2heads, FFN512, tokenizer hidden256/128, GTA 활성화다. actor와 critic encoder는 별도이며 Stage1에서 모두 학습한다.
+
+semantic feature는 source type embedding, relation embedding, target type embedding을 edge MLP에 넣어 만든다. Stage1 scene attention의 semantic bias 경로에 사용된다. 따라서 **PUSH/AT relation embedding과 해당 MLP도 Stage1에서 학습**된다.
+
+Stage2에서는 그 동결된 semantic feature와 사람·상자·목표 feature를 묶어 task token을 만든다. Stage2의 자기/파트너/기타 scalar bias를 embedding MLP가 생성하는 것은 아니다. 두 단계의 bias 경로를 구분해야 한다.
+
+### 15.6 Stage1 Push 보상: 현재 JointPush와 다른 부분
+
+실제 source에는 `contact_at` 설정이 있으므로 `contact_at_reward` 분기를 사용한다. 과거 별도 `push_reward` 분기의 인증 이동량·안정 속도 조건을 이 checkpoint의 보상으로 해석하지 않는다.
+
+**손 위치 점수**
+
+```text
+d_right = 오른손의 box local−Y 뒷면까지의 수평거리
+d_left = 왼손의 box local−Y 뒷면까지의 수평거리
+d_hand = max(d_right, d_left)
+φ_contact = exp(−10 × d_hand²)
+```
+
+여기서 수평거리는 각 손이 면의 가로 범위를 벗어난 오차와 면에 대한 깊이 오차로 계산한다. 양손 중 멀리 있는 손을 사용하므로 한 손만 붙어서 점수가 높아지는 것을 줄인다.
+
+**이 source의 contact State는 양손 중점 대칭 점수가 아니며, 손 높이0.8m에 대한 직접 penalty도 아니다.** 0.8m와 lateral±0.2m의 손 목표 설정은 RSI 정렬·진단 등에 사용한다. 현재 JointPush의 손 중점 높이·팀 대칭·최소 간격 보상과 구분한다.
+
+**물리 접촉 조건 `C`**
+
+- 양손 모두 뒷면 수평거리 **0.18m 이하**.
+- 각 손의 미는 방향 반작용 성분 **0.5N 이상**.
+- 상자 net contact force의 전진 방향 성분 **0.5N 이상**.
+
+이 조건이 Stage1의 contact 성공에 사용된다. 현재 JointPush의 기하학적 φ 기반 contact와 달리 실제 force 성분을 참조한다.
+
+**AT 점수와 성공 `A`**
+
+```text
+D_3D = ||box_center − goal||
+D_XY = ||box_center_XY − goal_XY||
+φ_AT = exp(−10 × D_3D²)
+p_contact = 1 / [1 + max(root_box_XY_distance − 0.5, 0)]
+p_AT = 1 / [1 + max(D_XY − 0.5, 0)]
+A = (φ_AT ≥ 0.9) AND (높이차 ≤ 0.001m)
+```
+
+source의 이 AT 성공식에는 두 사람의 공동 contact gate가 없다. 같은 상자를 공유하지 않으며, 자기 AT 성공 시 contact edge까지 포화 처리한다.
+
+**포화와 가중치**
+
+```text
+S_contact = C OR A
+R_state = 0.5 × 0.4 × [(S_contact ? 1 : φ_contact) + (A ? 1 : φ_AT)]
+R_progress = 0.2 × [(S_contact ? 1 : p_contact) + (A ? 1 : p_AT)]
+R_success = 0.2 × [1[S_contact] + 1[A]]
+```
+
+YAML의 State 가중치는0.4이지만 식에0.5가 있으므로 contact/AT 각각의 최대 State 기여는0.2다. Progress와 Success도 edge별 최대0.2다. 보상은 조건을 만족하는 매 step에 지급한다.
+
+task sharing은 `0.9 × 자기 local task reward + 0.1 × 상대 local task reward`다. 이후 power/CPA와 AMP 혼합이 적용된다. 상대 보상을 일부 공유한다고 해서 공동 상자를 미는 환경이라는 뜻은 아니다.
+
+### 15.7 Stage1 AMP와 PPO
+
+하나의 task-conditioned discriminator를 사용한다.
+
+| task label | expert reference 분포 |
+|---|---|
+| OPEN | loco0.33 + doorOpen0.67 |
+| PUSH | loco0.33 + push0.67 |
+
+각 motion frame의129차원 feature에 OPEN/PUSH2차원 one-hot을 붙이고10frame을 사용한다. 최종 입력은1310차원이다. label은 replay/expert 관측에도 포함하며 정규화 후 one-hot 값을 보존한다.
+
+task가 다른 reference가 같은 minibatch에 들어가도 label을 포함한 조건부 분포로 학습한다. 단, 해당 task 안에 포함한 loco와 interaction motion은 의도적으로 혼합한다.
+
+PPO와 AMP optimizer 관련 기본값은 위 Stage2 표와 동일하다. LR2e-5, horizon32, minibatch16384, mini_epochs6, task/AMP0.5/0.5, checkpoint500iter 주기를 사용한다. 별도 Stage2 coordination 블록이 없는 점과, Stage1 actor encoder도 학습하는 점이 다르다.
+
+### 15.8 Stage1 → 현재 JointPush 변화 요약
+
+| 항목 | source Stage1 | 현재 JointPush Stage2 |
+|---|---|---|
+| 두 사람의 물체 | 각자 자기 door/box | 같은 box와 goal 공유 |
+| task | OPEN/PUSH 독립 혼합 | PUSH+AT만 사용 |
+| 상자 | 1.3m cube,20kg | 기본2.6m cube,60kg 또는 별도 랜덤 형상/질량 profile |
+| 목표 | 자기 상자 정면2m | 공유 상자 정면2.2–5m |
+| actor encoder | 학습 | Stage1에서 가져와 동결 |
+| action head 입력 | human64D | human64D + CA context64D |
+| 별도 협동 CA4 | 없음 | 있음 |
+| 손 State | 각 손의 뒷면XY거리 중 큰 값 | 양손 중점의 면·높이 + 팀 대칭·간격 |
+| contact 성공 | 거리와 실제 force 조건 | 기하학적 φ와 팀 배치 조건 |
+| AT dense reward gate | 공동 gate 없음 | 두 사람 φ의 soft-min × 좌우 조건 |
+| AT 최종 성공 | 자기 상자 위치·높이 | 공유 위치·높이 + 엄격한 공동 접촉 |
+| 상대 task reward 가중치 | 0.1 | 0 |
+| RSI | 학습에서 loco/interaction 혼합 | 현재 profile은 loco-only |
+| AMP | OPEN/PUSH 조건부 혼합 | PUSH label, loco/push reference 혼합 |
+
+Stage1은 원본 Push 동작과 장면 관계 표현을 제공하고, Stage2는 공유 상자의 관계 token·접근 배치·동시 contact를 학습한다. Stage1과 Stage2의 접촉 보상·초기화가 완전히 같은 것은 아니다.
+
+## 비정렬 상자 Contact 실험 프로필
+
+2026-10-17 추가한 `joint_push_directional_surface_ca4`의 별도 보상·실행 설정은 [config.md](config.md)의 “비정렬 상자·자유 표면 Contact”를 참조한다. 이 문서 본문의 기존 동일 면·대칭 보상은 기존 프로필에 해당한다. 새 프로필은 AT 거리 보상을 유지하고, 개별 손의 표면 거리·높이·면 방향·agent 간격으로 Contact를 계산하며 상자 yaw와 목표 방향을 독립 샘플링한다.
+
+## 각도별 고정 손 목표점 실험
+
+2026-10-19의 `joint_push_assigned_faces_ca4`는 기존 프로필과 분리된 실험이다. 높이1.6~2.6m, reset 각도차25° 기준 한 면/인접 두 면, 최소 초기 접근거리 agent 배정 및 에피소드 고정 로컬 손 목표점을 사용한다. Contact의 state/progress/success를 해당 target에 맞추고 AT 거리식은 유지한다. 상세 설정과 실행법은 [config.md](config.md)의 “각도별 고정 면·손 목표점 + 높은 박스”를 참조한다.

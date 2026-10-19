@@ -15,7 +15,7 @@ def audit_runtime(task,path):
     assert (task._tar_pos[:,0]==task._tar_pos[:,1]).all()
     assert set(task._reset_ref_motion_ids)=={'loco'}
     assert torch.allclose(task._hist_amp_obs_buf,task._curr_amp_obs_buf[:,:,None].expand_as(task._hist_amp_obs_buf))
-    center,normal,tangent,half,_=push_face_geometry(task._box_states[:,2],task._tar_pos[:,0],task.cfg['env']['pushBox']['size'],task._joint_push_spec['reward'])
+    center,normal,tangent,half,_=push_face_geometry(task._box_states[:,2],task._tar_pos[:,0],task._box_size[:,2],task._joint_push_spec['reward'])
     delta=task._tar_pos[:,0,:2]-task._box_states[:,2,:2]
     goal_cosine=(delta*normal).sum(-1)/delta.norm(dim=-1)
     if task._joint_push_spec.get('goal_mode')=='box_forward':
@@ -37,9 +37,11 @@ def audit_runtime(task,path):
     else:
         assert (lateral[:,0]*lateral[:,1]<0).all()
         assert root_gap.min()>=1.2
+    sizes_before=task._box_size.clone()
     props=task.gym.get_actor_rigid_body_properties(task.envs[0],task._box_handles[2])
     mass=sum(x.mass for x in props)
-    assert abs(mass-task.cfg['env']['pushBox']['mass'])<.001
+    expected_mass=task._payload_masses[0].item() if hasattr(task,'_payload_masses') else task.cfg['env']['pushBox']['mass']
+    assert abs(mass-expected_mass)<.001
     demo=task._fetch_conditioned_amp_demo(4096)
     labels=demo.reshape(4096,task._num_amp_obs_steps,-1)[...,-2:]
     assert (labels[...,0]==0).all() and (labels[...,1]==1).all()
@@ -60,6 +62,7 @@ def audit_runtime(task,path):
     assert torch.equal(before_graph,graph.edge_src[1:]) and torch.equal(before_goal,task._tar_pos[1:])
     assert torch.equal(saved_face[1:],task._push_face_local_normal[1:])
     if random_spawn:assert torch.equal(saved_spawn[1:],task._push_spawn_lateral[1:])
+    assert torch.equal(sizes_before,task._box_size)
     task._compute_reward(None)
     assert torch.isfinite(task.rew_buf).all()
     report=dict(num_envs=task.num_envs,shared_box=2,shared_goal=0,size=task.cfg['env']['pushBox']['size'],

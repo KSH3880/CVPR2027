@@ -1,0 +1,48 @@
+{
+  "asset": "tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml",
+  "asset_sha256": "ee3c898fa22993f15525afcd10ca3ccd614fb5ee3a9f10df46576f970b7aba56",
+  "method": "Bounded leg IK preserves source foot XY/orientation and root XY; velocity-based swing clearance; smooth minimum sole height grounds root Z; recomputed FK velocities",
+  "clips": [
+    {
+      "kind": "backward",
+      "source": "loco_reverse/ACCAD_Male1Walking_c3d_Walk_B10_-_Walk_turn_left_45_stageii.npy",
+      "source_sha256": "720dab1607d697de8dfef240cfc582a7a4baf2c45397225bb1ce8b7617844020",
+      "output": "joint_carry/teamhoi_retarget_pilot/backward.npy",
+      "output_sha256": "cb5f7829157cf4f3317ab26e0d635546876b656bfc701006529d55462517d341",
+      "frames": 253,
+      "fps": 30,
+      "root_xy_path_changed": false,
+      "root_height_adjustment_max_m": 0.09464729822582493,
+      "swing_clearance_adjustment_max_m": 0.09318923368639816,
+      "source_floor_offset_m": -0.0599708278198155,
+      "upper_joint_clipping_max_rad": 0.0,
+      "foot_target_error_max_m": 1.394962508082549e-06,
+      "floor_min_m": 0.005000004533350422,
+      "source_contact_samples": 110,
+      "contact_foot_origin_speed_mean_mps": 0.09897444383704986,
+      "contact_foot_origin_speed_p95_mps": 0.2817346185237265
+    },
+    {
+      "kind": "sideways",
+      "source": "sidewalk/cmu_sidewalk_141_33_poses.npy",
+      "source_sha256": "41be0831e7e02e22ae69a0091aa6b95eaa1115888fd9886c70e93055e59ca1a4",
+      "output": "joint_carry/teamhoi_retarget_pilot/sideways.npy",
+      "output_sha256": "3f9a7d5fef8d9d255f7e592f7f120ac317b732501ae66c14f043501df1bf4d9a",
+      "frames": 530,
+      "fps": 30,
+      "root_xy_path_changed": false,
+      "root_height_adjustment_max_m": 0.060316762678999596,
+      "swing_clearance_adjustment_max_m": 0.09296075400660939,
+      "source_floor_offset_m": -0.05966663898529437,
+      "upper_joint_clipping_max_rad": 0.0,
+      "foot_target_error_max_m": 1.217565154033375e-06,
+      "floor_min_m": 0.005000003390749658,
+      "source_contact_samples": 628,
+      "contact_foot_origin_speed_mean_mps": 0.08577188332310313,
+      "contact_foot_origin_speed_p95_mps": 0.20811251428589778
+    }
+  ],
+  "training_connected": false,
+  "validation_status": "interface_and_short_physics_pass",
+  "validation_report": "output_etc/teamhoi_retarget_pilot_check/report.json"
+}

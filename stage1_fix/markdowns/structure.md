@@ -126,3 +126,33 @@ DOOR RSI 정면 및 모션 작업 손 필터는 `utils/task_rsi.py`의 `motion_c
 `push_door_stage1_semantic_25kg_legacy_amp_rsi_dense` 전용env/train/train-test-VNC는옛AMP와옛TaskRSI 전체를복구하고25kg/dense보상/통합Door관계는유지한다.
 
 `push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal` 전용env/train/train-test-VNC와 `task_relation_matrix(...generic_door_goal=True)`가Door↔Goal만일반ID5로분리한다.
+
+## OMOMO lift 후보 데이터
+
+`hhtools_omomo/`에 full 원본·압축 해제본·3개 후보 상대 심링크와 manifest를 둔다(Git 제외). 변환 결과는 `tokenhsi/data/dataset_omomo_lift/`, 목록은 `tokenhsi/data/dataset_omomo_lift_{full,lift}_{train,test,all}.yaml`이다. 변환기/검증기는 `tokenhsi/scripts/multi_agent/{convert,validate}_omomo_lift.py`다. 상세 경로·구간·검증 범위는 [OMOMO_LIFT_DATA.md](OMOMO_LIFT_DATA.md)를 참조한다.
+
+- `tokenhsi/scripts/multi_agent/omomo_lift_preview.py`, `omomo_lift_view.sh`, `omomo_lift_vnc.sh`: GPU6 전용, 정책 없이 사람 root/DOF와 상자 pose/scale을 정지·재생하는 RSI 방식 뷰어.
+
+## 독립 SUPPORT + LIFT
+
+- `tokenhsi/env/tasks/multi_agent/humanoid_ma_lift.py`: 두 agent/두 상자의 접근 reset·rail·lift goal·masked AMP·보상 통합.
+- `tokenhsi/utils/lift_spec.py`: SUPPORT/LIFT 관계, 네 점 밑받침 geometry·거리/안정 gate·유지 성공·38차원 AMP mask.
+- `tokenhsi/learning/multi_agent/lift_eval.py`: 전용 checkpoint 유한 평가. 기존 player가 새 태스크만 이 경로로 보낸다.
+- `tokenhsi/data/cfg/multi_agent/lift_stage1.yaml`, `tokenhsi/data/cfg/train/rlg/amp_ma_lift_stage1.yaml`, `tokenhsi/data/dataset_lift_stage1.yaml`: 별도 설정·train reference 목록.
+- `tokenhsi/scripts/multi_agent/lift_stage1_{train,test,vnc}.sh`, `check_lift_stage1.py`: GPU6/MPS 실행·검증.
+- `tokenhsi/tests/test_lift_spec.py`: geometry/보상/마스크/관계 gradient 검증.
+
+보상식과 실행 명령은 [LIFT_STAGE1.md](LIFT_STAGE1.md)를 참조한다.
+
+- `tokenhsi/scripts/multi_agent/lift_stage1_preview.py`, `lift_stage1_view.sh`, `lift_stage1_preview_vnc.sh`: 두 agent lift 실제 초기 배치를 정책 없이 정지 표시, GPU6·6082, R reset/N camera/S screenshot.
+
+## Lift TeamHOI dual AMP
+
+- `tokenhsi/learning/multi_agent/dual_amp_model.py`, `dual_amp_agent.py`, `dual_amp_player.py`: 독립 full/masked discriminator, 별도window RMS·reference buffer, paired 거리replay, 유한평가·복원.
+- `tokenhsi/utils/dual_amp.py`: native129-D history mask·거리sigmoid·rim geometry·판별기loss/계약.
+- `tokenhsi/data/cfg/multi_agent/lift_stage1_teamhoi.yaml`, `tokenhsi/data/cfg/train/rlg/amp_ma_lift_stage1_teamhoi.yaml`, `scripts/multi_agent/lift_stage1_teamhoi_{train,test,vnc}.sh`(앞에 tokenhsi/): 새 별도 실행 설정.
+- `tokenhsi/tests/test_dual_amp.py`, `third_party/teamhoi/`: 회귀 및 공식출처/라이선스.
+
+현재 권장 명령·공식 대응·확인 범위는 [LIFT_TEAMHOI_AMP.md](LIFT_TEAMHOI_AMP.md)를 따른다.
+
+- `tokenhsi/scripts/multi_agent/lift_support_pose.py`, `lift_support_pose_{view,vnc}.sh`: 관절 제한 양팔 IK로1.7m 받치기 자세를 설계하는 별도 preview/CPU 물리 검사. 루트고정/자유 장면을 구분하며 학습설정은 변경하지 않는다. 산출물은 root runs/lift_support_pose_170.

@@ -1,0 +1,25 @@
+{
+  "pickUp": {
+    "selected": 55,
+    "lower_body_joint_max_delta_rad": 4.440892098500626e-16,
+    "simulator_fk_error_m": 6.242658193883435e-07
+  },
+  "carryWith": {
+    "selected": 129,
+    "lower_body_joint_max_delta_rad": 2.220446049250313e-16,
+    "simulator_fk_error_m": 6.246623824147785e-07
+  },
+  "putDown": {
+    "selected": 135,
+    "lower_body_joint_max_delta_rad": 4.440892098500626e-16,
+    "simulator_fk_error_m": 6.43205464109993e-07
+  },
+  "zip_files": 22,
+  "videos_decoded": 14,
+  "montage": {
+    "width": 1600,
+    "height": 1000,
+    "duration": "12.133333",
+    "nb_frames": "364"
+  }
+}

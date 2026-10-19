@@ -116,3 +116,6 @@ TokenHSI-masteer/tokenhsi/data/dataset_sit
 
 TokenHSI-masteer/metrics
 TokenHSI-coord/output
+
+# Generated per-run carry evaluation metrics (keep local files)
+/metrics/carry/metrics_*.json

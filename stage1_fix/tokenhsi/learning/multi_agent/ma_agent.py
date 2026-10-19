@@ -327,6 +327,7 @@ class MAAgent(amp_agent.AMPAgent):
             self.experience_buffer.update_data('next_obses', step_idx, self.obs['obs'])
             self.experience_buffer.update_data('dones', step_idx, self.dones)
             self.experience_buffer.update_data('amp_obs', step_idx, infos['amp_obs'])
+            self._record_extra_amp_step(step_idx, infos)
             self.experience_buffer.update_data('rand_action_mask', step_idx,
                                                res_dict['rand_action_mask'])
 
@@ -365,7 +366,7 @@ class MAAgent(amp_agent.AMPAgent):
         mb_rewards = self.experience_buffer.tensor_dict['rewards']
         mb_amp_obs = self.experience_buffer.tensor_dict['amp_obs']
 
-        amp_rewards = self._calc_amp_rewards(mb_amp_obs)
+        amp_rewards = self._rollout_amp_rewards(mb_amp_obs)
         mb_rewards = self._combine_rewards(mb_rewards, amp_rewards)
         mb_advs = self.discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
         mb_returns = mb_advs + mb_values
@@ -428,6 +429,7 @@ class MAAgent(amp_agent.AMPAgent):
             'amp_obs_replay': batch_dict['amp_obs_replay'],
             'rand_action_mask': rand_action_mask,
         }
+        dataset_dict.update(self._extra_amp_dataset(batch_dict))
         self.dataset.update_values_dict(dataset_dict)
         return
 
@@ -453,11 +455,9 @@ class MAAgent(amp_agent.AMPAgent):
         amp_obs_demo = self._amp_obs_demo_buffer.sample(num_agent_samples)['amp_obs']
         batch_dict['amp_obs_demo'] = amp_obs_demo.view(scene_count, M, amp_dim)
 
-        if self._amp_replay_buffer.get_total_count() == 0:
-            batch_dict['amp_obs_replay'] = batch_dict['amp_obs']
-        else:
-            replay = self._amp_replay_buffer.sample(num_agent_samples)['amp_obs']
-            batch_dict['amp_obs_replay'] = replay.view(scene_count, M, amp_dim)
+        replay = self._sample_amp_replay(batch_dict, num_agent_samples)
+        batch_dict['amp_obs_replay'] = replay['amp_obs'].view(scene_count, M, amp_dim)
+        self._prepare_extra_amp_batch(batch_dict, replay)
 
         task = self.vec_env.env.task
         if getattr(task, '_amp_task_conditioning', False):
@@ -512,8 +512,7 @@ class MAAgent(amp_agent.AMPAgent):
             self.update_lr(self.last_lr)
 
         update_time_end = time.time()
-        flat_amp_obs = batch_dict['amp_obs'].reshape(num_agent_samples, amp_dim)
-        self._store_replay_amp_obs(flat_amp_obs)
+        self._store_amp_batch_replay(batch_dict)
 
         train_info['play_time'] = play_time_end - play_time_start
         train_info['update_time'] = update_time_end - update_time_start
@@ -547,10 +546,7 @@ class MAAgent(amp_agent.AMPAgent):
             input_dict['amp_obs_replay'])[:self._amp_minibatch_size]
         amp_obs_demo = flatten_agents(
             input_dict['amp_obs_demo'])[:self._amp_minibatch_size]
-        amp_obs = self._preproc_amp_obs(amp_obs)
-        amp_obs_replay = self._preproc_amp_obs(amp_obs_replay)
-        amp_obs_demo = self._preproc_amp_obs(amp_obs_demo)
-        amp_obs_demo.requires_grad_(True)
+        amp_inputs = self._prepare_amp_training_inputs(amp_obs, amp_obs_replay, amp_obs_demo, input_dict)
 
         rand_action_sum = torch.sum(rand_action_mask)
         curr_e_clip = self.e_clip
@@ -558,9 +554,7 @@ class MAAgent(amp_agent.AMPAgent):
             'is_train': True,
             'prev_actions': actions_batch,
             'obs': obs_batch,
-            'amp_obs': amp_obs,
-            'amp_obs_replay': amp_obs_replay,
-            'amp_obs_demo': amp_obs_demo,
+            **amp_inputs,
         }
 
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
@@ -584,10 +578,7 @@ class MAAgent(amp_agent.AMPAgent):
             a_clip_frac = torch.sum(
                 rand_action_mask * a_info['actor_clipped'].float()) / rand_action_sum
 
-            disc_agent_cat_logit = torch.cat([
-                res_dict['disc_agent_logit'], res_dict['disc_agent_replay_logit']], dim=0)
-            disc_info = self._disc_loss(
-                disc_agent_cat_logit, res_dict['disc_demo_logit'], amp_obs_demo)
+            disc_info = self._compute_discriminator_loss(res_dict, amp_inputs)
             disc_loss = disc_info['disc_loss']
             loss = (a_loss + self.critic_coef * c_loss
                     - self.entropy_coef * entropy
@@ -667,3 +658,34 @@ class MAAgent(amp_agent.AMPAgent):
             combined = self._task_reward_w * means[-1] + self._disc_reward_w * disc_reward_mean
             self.writer.add_scalar("reward_terms/combined", combined.item(), frame)
         return
+
+    def _record_extra_amp_step(self,step,infos):
+        pass
+
+    def _rollout_amp_rewards(self,obs):
+        return self._calc_amp_rewards(obs)
+
+    def _extra_amp_dataset(self,batch):
+        return {}
+
+    def _sample_amp_replay(self,batch,count):
+        if self._amp_replay_buffer.get_total_count()==0:
+            return {'amp_obs':batch['amp_obs'].reshape(count,-1)}
+        return self._amp_replay_buffer.sample(count)
+
+    def _prepare_extra_amp_batch(self,batch,replay):
+        pass
+
+    def _store_amp_batch_replay(self,batch):
+        obs=batch['amp_obs']
+        self._store_replay_amp_obs(obs.reshape(-1,obs.shape[-1]))
+
+    def _prepare_amp_training_inputs(self,obs,replay,demo,batch):
+        obs=self._preproc_amp_obs(obs)
+        replay=self._preproc_amp_obs(replay)
+        demo=self._preproc_amp_obs(demo).requires_grad_(True)
+        return dict(amp_obs=obs,amp_obs_replay=replay,amp_obs_demo=demo)
+
+    def _compute_discriminator_loss(self,result,inputs):
+        logits=torch.cat((result['disc_agent_logit'],result['disc_agent_replay_logit']),0)
+        return self._disc_loss(logits,result['disc_demo_logit'],inputs['amp_obs_demo'])

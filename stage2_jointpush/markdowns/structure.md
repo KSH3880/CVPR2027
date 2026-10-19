@@ -1,3 +1,19 @@
+## 4명·100kg 추론 (2026-10-16)
+
+`scripts/joint_push_four_agent_100kg_{test,view}.sh`: 4명/3×1.5×1.5m/100kg/GPU6 전용 preview 진입점. `open_push_spec.py`는 3·4명 shared graph의 인덱스를 인원으로 계산한다.
+
+## 랜덤 모델 3명 추론 (2026-10-16)
+
+`scripts/joint_push_random_shape_three_agent_{test,view}.sh`: GPU6 기본, 기존 랜덤 모델을 3명으로 추론. `joint_push_spawn.py`는 전원 쌍별 간격을 검사한다.
+
+## 원본 Push Stage1 설명 추가 (2026-10-15)
+
+[JOINT_PUSH_SETTINGS.md](JOINT_PUSH_SETTINGS.md)의15절에실제source29000checkpoint기준OPEN/PUSH원본환경·1.3m/20kg·독립task·warmstart/RSI·contact+AT·embedding/AMP·Stage2차이를추가했다. 평가결과없음.
+
+## GPU0 랜덤 형상·질량 학습 (2026-10-15)
+
+[JOINT_PUSH_RANDOM_SHAPE_SETTINGS.md](JOINT_PUSH_RANDOM_SHAPE_SETTINGS.md): 폭X2–3m/깊이Y1–2.6m/높이Z1–1.5m, 질량40–60kg 독립 격자 샘플링. 실제asset/bbox/reset/손간격/spawn반경연결. GPU0/2048환경/새Stage2,tmux `jointpush_randomshape_gpu0`. `bash stage2_jointpush/scripts/joint_push_random_shape_train.sh`,test/view도같은prefix. 기존GPU6학습유지.
+
 ## Joint Push 상세 설정 문서 (2026-10-15)
 
 [JOINT_PUSH_SETTINGS.md](JOINT_PUSH_SETTINGS.md):현재60kg·360°시작·직선·softgate환경/초기화/모델/보상/AMP/PPO/실행법을정리한결과없는설정문서.
@@ -338,3 +354,18 @@ Joint carry Stage 2는 `approach_stage2_joint_carry_task_embedding` env YAML·tr
 Mixed80 공동/단독 운반은 `approach_stage2_joint_carry_mixed80_task_embedding` env YAML·train/test/VNC와 `amp_ma_stage2_joint_carry_mixed80_task_embedding` train YAML을 쓴다. `utils/mixed_carry_spec.py`는 고정 환경 분할·독립 graph를, `env/tasks/multi_agent/mixed_carry_reset.py`는 공동/단독 reset의 단일 commit과 Stage 1 크기별 RSI cache 재사용을 담당한다. `joint_carry_reward.py`가 공유 여부에 따라 반대 앵커 또는 자기 HOLDING gate를 적용한다. CPU 검사는 `tests/test_mixed_carry.py`, GPU 결과는 `output/approach_stage2_joint_carry_mixed80_task_embedding_check/`에 있다.
 
 BEFORE Stage 2는 `approach_stage2_before_task_embedding` env YAML·train/test/VNC와 `amp_ma_stage2_before_task_embedding` train YAML을 쓴다. `utils/before_spec.py`는 공통 크기·고정 80/20 환경·세 dependency graph·AMP family 분포를, `env/tasks/multi_agent/before_reward.py`는 현재 AT prerequisite과 gated success/포화를 담당한다. `before_reset.py`는 공유 물체 reference 정렬·속도/AMP history 변환·단일 물리 commit을, `before_rsi_cache.py`는 실제 source/support 크기의 물리 RSI 선별을 담당한다. 기존 `task_coordination.py`의 별도 BEFORE 모드에 비대칭 bias를 추가하며 joint checkpoint 형식은 유지한다. CPU 검증은 `tests/test_before.py`, GPU 초기 물리/부분 reset·AMP 검사는 `tests/check_before_runtime.py`이며 최종 결과는 `output/approach_stage2_before_task_embedding_check_final/`에 저장한다. 물리 안정성 진단은 pass 수를 별도로 기록하며 모든 장면 통과를 의미하지 않는다.
+
+### 비정렬 자유 표면 Contact
+
+- `ports/koo_push/tokenhsi/env/tasks/multi_agent/joint_push_reward.py`: `directional_surface_contact`, 실제 옆면·개별 손·목표 방향·간격 기반 Contact와 기존 fixed-face 분기.
+- `ports/koo_push/tokenhsi/data/cfg/{multi_agent,train/rlg}/joint_push_directional_surface_ca4.yaml`: 독립 목표 방향과 새 Contact 전용 설정.
+- `scripts/joint_push_directional_surface_{train,test,view}.sh`: 전용 실행 진입점. port 내부 동명 `ca4_{train,test,vnc}.sh`로 연결.
+- `ports/koo_push/tokenhsi/tests/test_directional_surface_push.py`: 인접 면 접촉, 손 중점 악용, 잘못된 방향, 간격·높이, yaw 불변성, AT gate 회귀.
+
+### 각도별 고정 면·손 목표점 실험
+
+- `ports/koo_push/tokenhsi/env/tasks/multi_agent/joint_push_assigned_contact.py`: reset-time 각도별 면 선택·최소 접근거리 agent 배정·로컬 손/접근 target·실제 box pose 변환.
+- `humanoid_ma_joint_push.py`: reset subset 배정 버퍼, step마다 box pose로 목표 변환. `joint_push_reward.py`: `assigned_faces` Contact/AT gate 분기.
+- `ports/koo_push/tokenhsi/data/cfg/{multi_agent,train/rlg}/joint_push_assigned_faces_ca4.yaml`: 높이1.6~2.6m/각도25° 경계 전용 프로필.
+- `scripts/joint_push_assigned_faces_{train,test,view}.sh`: train/test/noVNC 진입점. 내부 `joint_push_assigned_faces_ca4_{train,test,vnc}.sh` 연결.
+- `ports/koo_push/tokenhsi/tests/test_assigned_faces_push.py`: 각도 경계·인접 면·교환 불변성·box pose 추종·잘못된 접근·개별 손·부분reset·높이 격자 검사.

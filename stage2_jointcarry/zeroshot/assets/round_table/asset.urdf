@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="zero_shot_payload"><link name="payload"><inertial><mass value="16.64" /><inertia ixx="1.1093333333333335" iyy="0.5968213333333334" izz="1.2624213333333334" ixy="0" ixz="0" iyz="0" /></inertial><visual><geometry><mesh filename="mesh.obj" /></geometry></visual><collision><geometry><mesh filename="mesh.obj" /></geometry></collision></link></robot>

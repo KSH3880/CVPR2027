@@ -539,6 +539,10 @@ class RelationEncoder(nn.Module):
         self.edge_context = relation_reward_mode in (CONTEXT_MODE, ONTOP_CONTEXT_MODE,
             INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
         self.relation_graph_spec = relation_graph_spec or {'template': 'independent_carry'}
+        if self.relation_graph_spec.get('template') == 'support_lift_v1' and (
+                relation_bias_mode != RELATION_BIAS_EDGE_MLP or observation_mode != 'clean_scene'
+                or relation_reward_mode != LEGACY_MODE or not relation_bias):
+            raise ValueError('Support/lift requires enabled edge_mlp in clean_scene legacy layout')
         self.semantic_only = self.stage1_context and bool(
             self.relation_graph_spec.get('semantic_only', False))
         self.task_role_input = bool(self.relation_graph_spec.get('policy_task_roles', False))
@@ -598,11 +602,16 @@ class RelationEncoder(nn.Module):
             relation_types = 11 if self.interaction_context else 9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES
             if self.relation_graph_spec.get("template")=="push_door_stage1_v1" and self.relation_graph_spec.get("semantic_relations",False):
                 relation_types=14
+            if self.relation_graph_spec.get('template') == 'support_lift_v1':
+                relation_types = 8
             self.edge_encoder = EdgeEncoder(num_layers, num_heads, num_relation_types=relation_types)
 
         # non-persistent: derived from entity counts, so it must NOT end up in the
         # checkpoint -- otherwise loading M=2,O=2 into M=2,O=3 would fail on shape.
         self.register_buffer("rel_matrix", build_relation_matrix(num_agents, num_objects), persistent=False)
+        if self.relation_graph_spec.get('template') == 'support_lift_v1':
+            from utils.lift_spec import relation_matrix
+            self.rel_matrix = relation_matrix(num_agents, num_objects)
         self.register_buffer("entity_types", build_entity_type_ids(num_agents, num_objects),
                              persistent=False)
         if self.state_relation and not self.edge_context:
@@ -711,6 +720,9 @@ class RelationEncoder(nn.Module):
         self.entity_counts = [num_agents, num_objects, num_agents]
         device = self._relation_device()
         self.rel_matrix = build_relation_matrix(num_agents, num_objects).to(device)
+        if self.relation_graph_spec.get('template') == 'support_lift_v1':
+            from utils.lift_spec import relation_matrix
+            self.rel_matrix = relation_matrix(num_agents, num_objects, device)
         self.entity_types = build_entity_type_ids(
             num_agents, num_objects, device=device)
         if self.state_relation and not self.edge_context:

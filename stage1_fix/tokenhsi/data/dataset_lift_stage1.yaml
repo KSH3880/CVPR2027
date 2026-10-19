@@ -1,0 +1,34 @@
+# Locomotion + OMOMO lift TRAIN only; task masks both shoulders/elbows and hand positions.
+motions:
+  loco:
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B11_-_walk_turn_left_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B12_-_walk_turn_right_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B13_-_walk_turn_right_(45)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B14_-_walk_turn_right_(135)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B15_-_walk_turn_around_(same_direction)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B16_-_walk_turn_change_direction_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  lift:
+  - file: dataset_omomo_lift/motions/sub7_smallbox_014__train_full/lift/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_omomo_lift/motions/sub7_smallbox_014__train_full/lift/phys_humanoid_v3/box_motion.npy
+    weight: 1.0
+  - file: dataset_omomo_lift/motions/sub8_plasticbox_017__train_full/lift/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_omomo_lift/motions/sub8_plasticbox_017__train_full/lift/phys_humanoid_v3/box_motion.npy
+    weight: 1.0

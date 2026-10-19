@@ -1,0 +1,304 @@
+env:
+  numEnvs: 2048
+  envSpacing: 5
+  episodeLength: 600
+  isFlagrun: false
+  enableDebugVis: false
+  cameraFollow: true
+  video:
+    enable: false
+    focus: stack
+  relationGraph:
+    mode: edge_composition
+    sampler: two_agent_joint_carry_task_embedding
+    semantic_only: true
+    policy_task_roles: true
+    max_edges_per_agent: 2
+    edge_capacity: 4
+    family_probabilities:
+      joint_carry_at: 0.5
+      joint_carry_ontop: 0.5
+    shuffle_edge_order: true
+    shuffle_token_order: true
+    coupling: same_carry_task_payload_target
+  relationReward:
+    mode: state_relation_edge_stage2_v1
+    schema_version: 10
+    stage1_variant: scenario_independent_stage1_unified_size_rsi_task_embedding
+    state_reward_weight: 0.2
+    progress_reward_weight: 0.2
+    success_reward_weight: 0.2
+    satisfaction_threshold: 0.9
+    holding:
+      hand_distance_scale: 10.0
+    at:
+      state_definition: box_near
+      near_distance_scale: 10.0
+    ontop:
+      state_definition: centered_stack_world_z
+      near_distance_scale: 10.0
+      z_tolerance: 0.001
+      vertical_extent: rotated_bbox
+      success_inner_margin_fraction: 0.1
+    sit:
+      state_definition: box_top_plus_pelvis_clearance
+      near_distance_scale: 10.0
+      pelvis_clearance: 0.12
+      success_inner_margin_fraction: 0.1
+      z_tolerance: 0.07
+    climb:
+      state_definition: root_target
+      near_distance_scale: 10.0
+      target_height: rotated_bbox_top_plus_char_h
+      success_inner_margin_fraction: 0.05
+      root_height_tolerance: 0.2
+      feet_height_tolerance: 0.07
+    progress:
+      kind: distance
+      sigma: 1.0
+      bbox_buffers:
+        HOLDING: 0.2
+        SIT: 0.3
+        CLIMB: 0.3
+        AT: 0.1
+        ON_TOP: 0.1
+    success:
+      at_z_tolerance: 0.001
+      saturation: none
+      terminate_when_all_subgoals_done: false
+    task_sharing:
+      self: 1.0
+      teammate: 0.0
+    edge_aggregation: self_sum
+    hard_skill_training:
+      near_start:
+        probability_start: 0.0
+        probability_end: 0.0
+        anneal_steps: 300000
+        at_xy_range:
+        - 0.75
+        - 1.5
+        ontop_xy_range:
+        - 1.1
+        - 1.8
+      climb_rsi:
+        late_fraction: 0.0
+        phase_range:
+        - 0.65
+        - 0.98
+    observation:
+      graph_packet_fields:
+      - valid
+      - task
+      - actor
+      - payload
+      - target
+    diagnostics:
+      enabled: true
+      sample_envs: 2
+      log_interval: 30
+    joint_carry:
+      anchor_inset: 0.15
+      placement_gate: opposite_current_holding
+      collision:
+        mode: cpa
+        ttc_discount: 0.99
+  numAgents: 2
+  numObjects: 4
+  agentSpawnRadius: 2.5
+  policyObsMode: clean_scene
+  obsFrame: owner
+  agentCollisionPenalty: true
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
+  pdControl: true
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: Random
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  localRootObs: true
+  localRootObsPolicy: false
+  rootHeightObs: false
+  rootHeightObsPolicy: false
+  cleanSceneLocalRootObsPolicy: true
+  cleanSceneRootHeightObsPolicy: true
+  keyBodies:
+  - right_hand
+  - left_hand
+  - right_foot
+  - left_foot
+  contactBodies:
+  - right_foot
+  - left_foot
+  terminationHeight: 0.15
+  enableEarlyTermination: true
+  enableSelfCollisionDetection: true
+  enableTrackInitState: false
+  power_reward: true
+  power_coefficient: 0.0005
+  skill:
+  - loco
+  - sit
+  - climb
+  - climbNoRSI
+  - omomo
+  - pickUp
+  - carryWith
+  - putDown
+  skillInitProb:
+  - 1.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  templateRsi:
+    HOLDING:
+    - 0.5
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.5
+    - 0.0
+    - 0.0
+    SIT:
+    - 0.5
+    - 0.5
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    CLIMB:
+    - 0.5
+    - 0.0
+    - 0.5
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    HOLDING_AT:
+    - 0.4
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.1
+    - 0.4
+    - 0.1
+    HOLDING_ON_TOP:
+    - 0.5
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.1
+    - 0.4
+    - 0.0
+  skillDiscProb:
+  - 0.3333333333333333
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.3333333333333333
+  - 0.16666666666666666
+  - 0.0
+  - 0.16666666666666666
+  enableTaskObs: true
+  onlyVelReward: true
+  onlyHeightHandHeldReward: false
+  box_vel_penalty: true
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.5
+  mode: train
+  box:
+    build:
+      baseSize:
+      - 0.52
+      - 0.8
+      - 0.4
+      randomSize: false
+      randomModeEqualProportion: false
+      scaleRangeX:
+      - 1.0
+      - 1.0
+      scaleRangeY:
+      - 1.0
+      - 1.0
+      scaleRangeZ:
+      - 0.75
+      - 1.25
+      scaleSampleInterval: 0.125
+      randomDensity: false
+      testSizes:
+      - - 0.52
+        - 0.8
+        - 0.4
+      jointSupportSize:
+      - 0.52
+      - 0.8
+      - 0.3
+    reset:
+      randomRot: true
+      randomAssignment: false
+      testRandomArenaSpawn: false
+      arenaSpawnRadius: 0.0
+      minAgentDistance: 1.0
+      minBoxDistance: 0.7
+      randomHeight: false
+      randomHeightProb: 0.0
+      groundStandaloneSitClimb: true
+      minPlatformHeight: 0.05
+      maxTopSurfaceHeight: 1.2
+      ownerLocoDistanceRange:
+      - 1.0
+      - 2.0
+    obs:
+      enableBboxObs: true
+  debug:
+    vel: false
+    reward: true
+    rewardInterval: 30
+  eval:
+    successThreshold: 0.2
+    skill:
+    - loco
+    skillInitProb:
+    - 1.0
+  asset:
+    assetRoot: tokenhsi/data/assets
+    assetFileName: mjcf/phys_humanoid_v3.xml
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+  ampTaskConditioning: true
+  goalRotation: identity
+  jointCarryRsi:
+    directory: joint_carry/carry_joint_corrected
+    ampHistory: repeat_reset_state
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
+experiment:
+  name: ApproachStage2JointCarryTaskEmbedding
+  transfer:
+    checkpoint: null

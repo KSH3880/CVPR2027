@@ -196,6 +196,13 @@ def build_alg_runner(algo_observer):
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_adapt', lambda **kwargs : amp_network_builder_transformer_adapt.AMPTransformerMultiTaskAdaptBuilder())
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_longterm', lambda **kwargs : amp_network_builder_transformer_longterm.AMPTransformerMultiTaskLongTermTaskCompletionBuilder())
 
+    from learning.multi_agent.dual_amp_agent import DualAMPAgent
+    from learning.multi_agent.dual_amp_player import DualAMPPlayer
+    from learning.multi_agent.dual_amp_model import DualAMPBuilder, DualAMPModel
+    runner.algo_factory.register_builder('ma_dual_amp', lambda **kwargs: DualAMPAgent(**kwargs))
+    runner.player_factory.register_builder('ma_dual_amp', lambda **kwargs: DualAMPPlayer(**kwargs))
+    runner.model_builder.model_factory.register_builder('amp_dual', lambda network, **kwargs: DualAMPModel(network))
+    runner.model_builder.network_factory.register_builder('amp_multi_agent_dual', lambda **kwargs: DualAMPBuilder())
     runner.algo_factory.register_builder('ma', lambda **kwargs : ma_agent.MAAgent(**kwargs))
     runner.player_factory.register_builder('ma', lambda **kwargs : ma_players.MAPlayerContinuous(**kwargs))
     runner.model_builder.network_factory.register_builder('amp_multi_agent', lambda **kwargs : amp_network_builder_ma.AMPMultiAgentBuilder())

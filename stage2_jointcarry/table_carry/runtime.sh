@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+TABLE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+export TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi
+export TORCH_EXTENSIONS_DIR="$TABLE_ROOT/.torch_extensions"
+source "$TABLE_ROOT/tokenhsi/scripts/multi_agent/runtime_env.sh"
+set -eu
+export CUDA_MPS_PIPE_DIRECTORY=''
+unset CUDA_MPS_LOG_DIRECTORY CUDA_MPS_ACTIVE_THREAD_PERCENTAGE JOINT_ZERO_SHOT_GPU_PHYSX JOINT_ZERO_SHOT_URDF JOINT_ZERO_SHOT_NATIVE_CONFIG TOKENHSI_INFERENCE_CONFIG
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+export PYTHONPATH="$TABLE_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export OUTPUT_PATH=${OUTPUT_PATH:-$TABLE_ROOT/../runs/table_carry/train_$(date +%Y%m%d_%H%M%S)}
+mkdir -p "$OUTPUT_PATH"

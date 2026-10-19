@@ -26,9 +26,11 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         self._joint_push=True
         spec=cfg['env']['jointPush']
         self._three_agent_preview=cfg['env'].get('jointPushThreeAgentPreview',False)
-        if self._three_agent_preview and (not cfg['args'].test or cfg['env']['numAgents']!=3 or cfg['env']['pushBox']['mass']!=60 or spec.get('random_spawn')):
+        preview_agents=cfg['env'].get('jointPushPreviewAgents',3)
+        random_preview=self._three_agent_preview and bool(spec.get('shape_randomization'))
+        if self._three_agent_preview and (not cfg['args'].test or cfg['env']['numAgents']!=preview_agents or preview_agents not in (3,4) or (not random_preview and (cfg['env']['pushBox']['mass']!=60 or spec.get('random_spawn')))):
             raise ValueError('Three-agent preview requires test mode, 3 humans, 60kg and fixed lanes')
-        if cfg['env']['numAgents']!=(3 if self._three_agent_preview else 2) or cfg['env']['numObjects']!=4:
+        if cfg['env']['numAgents']!=(preview_agents if self._three_agent_preview else 2) or cfg['env']['numObjects']!=4:
             raise ValueError('Joint Push requires two agents and four observation object slots')
         if cfg['env'].get('openPushRSI') or cfg['env']['skillInitProb']!=[1.,0.,0.]:
             raise ValueError('Joint Push requires loco-only RSI')
@@ -54,9 +56,9 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         if self._three_agent_preview:
             import json
             mass=sum(p.mass for p in self.gym.get_actor_rigid_body_properties(self.envs[0],self._box_handles[2]))
-            assert abs(mass-60)<1e-3 and self._humanoid_root_states.shape[1]==3
-            assert self.relation_runtime.graph.edge_src.shape[-1]==6
-            report=dict(agents=self.num_agents,actual_mass_kg=mass,size=self.cfg['env']['pushBox']['size'],edges=6)
+            assert (random_preview or abs(mass-60)<1e-3) and self._humanoid_root_states.shape[1]==preview_agents
+            assert self.relation_runtime.graph.edge_src.shape[-1]==2*preview_agents
+            report=dict(agents=self.num_agents,actual_mass_kg=mass,size=self._box_size[0,2].tolist(),edges=2*preview_agents)
             directory=Path(self.cfg['args'].output_path);directory.mkdir(parents=True,exist_ok=True)
             (directory/'three_agent_preview_runtime.json').write_text(json.dumps(report,indent=2))
             print('[Joint Push preview runtime]',report,flush=True)
@@ -74,6 +76,11 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
             return
         import copy
         saved=copy.deepcopy(checkpoint.get('relation_experiment_config',{}).get('env',{}))
+        if self._joint_push_spec.get('shape_randomization'):
+            if saved.get('numAgents')!=2 or saved.get('pushBox')!=self.cfg['env']['pushBox'] or saved.get('jointPush')!=self._joint_push_spec or checkpoint.get('open_push_contract')!=self.get_open_push_contract():
+                raise ValueError('Random preview must preserve the source physics/reward contract')
+            print(f'[Joint Push preview] shared 2-person policy -> {self.num_agents}-person; inference only',flush=True)
+            return
         if saved.get('pushBox',{}).get('mass')!=40 or checkpoint.get('open_push_contract',{}).get('policy')!='push_at_ca4':
             raise ValueError('Preview requires the original 40kg Stage2 policy')
         saved['pushBox']['mass']=60
@@ -164,7 +171,7 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
     def _reset_boxes(self,env_ids):
         super()._reset_boxes(env_ids)
         yaw=torch.rand(len(env_ids),device=self.device)*2*torch.pi
-        box=self._box_states[env_ids,2].clone();box[:,:2]=0;box[:,2]=self.cfg['env']['pushBox']['size'][2]/2
+        box=self._box_states[env_ids,2].clone();box[:,:2]=0;box[:,2]=self._box_size[env_ids,2,2]/2
         box[:,3:7]=0;box[:,5]=torch.sin(yaw/2);box[:,6]=torch.cos(yaw/2);box[:,7:]=0
         self._box_states[env_ids,2]=box
         self._box_states[env_ids,3,:2]=box.new_tensor([5.,5.])
@@ -193,15 +200,15 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
             from env.tasks.multi_agent.joint_push_spawn import sample_rear_spawn
             spawn=self._joint_push_spec['random_spawn']
             if not hasattr(self,'_push_spawn_depth'):
-                self._push_spawn_depth=torch.zeros(self.num_envs,2,device=self.device)
+                self._push_spawn_depth=torch.zeros(self.num_envs,self.num_agents,device=self.device)
                 self._push_spawn_lateral=torch.zeros_like(self._push_spawn_depth)
                 self._push_spawn_heading=torch.zeros_like(self._push_spawn_depth)
             if spawn['mode']=='surround_independent':
                 from env.tasks.multi_agent.joint_push_spawn import sample_surround_spawn
-                if self._joint_push_spec.get('goal_mode')!='box_forward':
+                if self._joint_push_spec.get('goal_mode')!='box_forward' and self._joint_push_spec['reward'].get('contact_mode') not in ('directional_surface','assigned_faces'):
                     raise ValueError('Surround profile currently requires local +Y initial forward')
                 depth,lateral,heading=sample_surround_spawn(len(env_ids),self.device,
-                    self.cfg['env']['pushBox']['size'],self._joint_push_spec['spawn_distance'],spawn['minimum_root_gap'])
+                    self._box_size[env_ids,2],self._joint_push_spec['spawn_distance'],spawn['minimum_root_gap'],num_agents=self.num_agents)
             else:
                 depth,lateral,heading=sample_rear_spawn(len(env_ids),self.device,
                     self._joint_push_spec['spawn_distance'],spawn['lateral_limit'],spawn['minimum_root_gap'])
@@ -220,7 +227,7 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         from env.tasks.multi_agent.joint_push_reward import push_face_geometry
         boxes=self._box_states[slot_env,2]
         goals=boxes[:,:3]+self._push_goal_offsets[slot_env,0]
-        center,normal,tangent,half_width,_=push_face_geometry(boxes,goals,self.cfg['env']['pushBox']['size'],self._joint_push_spec['reward'])
+        center,normal,tangent,half_width,_=push_face_geometry(boxes,goals,self._box_size[slot_env,2],self._joint_push_spec['reward'])
         facing=torch.atan2(normal[:,1],normal[:,0])
         if self._joint_push_spec.get('random_spawn'):
             facing=facing+self._push_spawn_heading[slot_env,slot_agent]
@@ -246,6 +253,15 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         self._reset_boxes(env_ids);self._agent_lanes[env_ids]=torch.arange(self.num_agents,device=self.device)%2;self._push_binding[env_ids]=0
         self.relation_runtime.reset(env_ids,self._sample_tasks(env_ids),self._owner_push_boxes(env_ids))
         self._sample_box_assignments(env_ids);self._reset_actors(env_ids);self._reset_task(env_ids)
+        if self._joint_push_spec['reward'].get('contact_mode')=='assigned_faces':
+            from env.tasks.multi_agent.joint_push_assigned_contact import assign_contact_targets
+            spec=self._joint_push_spec['assigned_contact']
+            assignment=assign_contact_targets(self._box_states[env_ids,2],self._tar_pos[env_ids,0],
+                self._box_size[env_ids,2],self._humanoid_root_states[env_ids],spec,
+                self._joint_push_spec['reward']['hand_target_height'])
+            if not hasattr(self,'_assigned_contact_buffers'):
+                self._assigned_contact_buffers={k:torch.zeros((self.num_envs,)+v.shape[1:],device=v.device,dtype=v.dtype) for k,v in assignment.items()}
+            for key,value in assignment.items():self._assigned_contact_buffers[key][env_ids]=value
         if self.viewer is not None:
             if not hasattr(self,'_push_visual_initial_roots'):
                 self._push_visual_initial_roots=self._humanoid_root_states.clone()
@@ -320,12 +336,17 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
             return None
         from env.tasks.multi_agent.joint_push_reward import push_face_geometry
         return push_face_geometry(self._box_states[:,2],self._tar_pos[:,0],
-            self.cfg['env']['pushBox']['size'],self._joint_push_spec['reward'],
+            self._box_size[:,2],self._joint_push_spec['reward'],
             local_normal=self._push_face_local_normal)
 
     def _compute_reward(self,actions):
+        assigned_targets=None
+        if self._joint_push_spec['reward'].get('contact_mode')=='assigned_faces':
+            from env.tasks.multi_agent.joint_push_assigned_contact import world_targets
+            assigned_targets=tuple(world_targets(self._box_states[:,2],self._assigned_contact_buffers[k])
+                for k in ('local_hands','local_approach'))
         r=joint_push_reward(self._humanoid_root_states,self._rigid_body_pos[:,:,self._key_body_ids[:2]],
-            self._box_states[:,2],self._tar_pos[:,0],self.cfg['env']['pushBox']['size'],self._joint_push_spec['reward'],face_geometry=self._joint_push_face_geometry())
+            self._box_states[:,2],self._tar_pos[:,0],self._box_size[:,2],self._joint_push_spec['reward'],face_geometry=self._joint_push_face_geometry(),assigned_targets=assigned_targets)
         runtime=self.relation_runtime
         runtime.phi.copy_(r['phi_raw'].reshape(self.num_envs,2*self.num_agents))
         runtime.own_success.copy_(r['own_success'].reshape(self.num_envs,2*self.num_agents));runtime.achieved.copy_(runtime.own_success)
@@ -340,6 +361,10 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         self.extras['joint_push_symmetry']=r['symmetry_phi'].clone()
         self.extras['joint_push_separation']=r['separation'].clone()
         self.extras['joint_push_box_pos']=self._box_states[:,2,:3].clone()
+        if assigned_targets is not None:
+            self.extras['joint_push_hand_targets']=assigned_targets[0].clone()
+            self.extras['joint_push_approach_targets']=assigned_targets[1].clone()
+            self.extras['joint_push_two_faces']=self._assigned_contact_buffers['two_faces'].clone()
 
     def consume_relation_diagnostics(self):
         return {}

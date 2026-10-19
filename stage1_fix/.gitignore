@@ -140,3 +140,19 @@ scratch/
 /tokenhsi/data/dataset_bones_push/motions/
 /tokenhsi/data/dataset_bones_*/conversion_summary*.json
 /tokenhsi/data/dataset_bones_*_amp_selected.yaml
+
+# Downloaded OMOMO source data and local lift candidate links
+/hhtools_omomo/
+
+# Generated OMOMO lift retarget data
+/tokenhsi/data/dataset_omomo_lift/motions/
+/tokenhsi/data/dataset_omomo_lift/conversion_summary.json
+/tokenhsi/data/dataset_omomo_lift/validation.json
+
+# Track OMOMO manifests/docs despite the root dataset wildcard.
+!/tokenhsi/data/dataset_omomo_lift_*.yaml
+!/tokenhsi/data/dataset_omomo_lift/
+/tokenhsi/data/dataset_omomo_lift/*
+!/tokenhsi/data/dataset_omomo_lift/README.md
+
+!/tokenhsi/data/dataset_lift_stage1.yaml

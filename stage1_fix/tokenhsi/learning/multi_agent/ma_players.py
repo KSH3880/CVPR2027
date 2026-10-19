@@ -138,7 +138,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         amp_reward = self._calc_amp_rewards(info["amp_obs"][0:1])["disc_rewards"][0, 0].item()
         combined = self._task_reward_w * terms[-1] + self._disc_reward_w * amp_reward
         values = dict(zip(self.env.task.REWARD_TERM_NAMES, terms))
-        if self.env.task._state_relation:
+        if self.env.task._state_relation or hasattr(task, '_lift_cfg'):
             print('reward step={} {} amp={:.4f} combined={:.4f}'.format(
                 self._reward_debug_step, values, amp_reward, combined), flush=True)
             return
@@ -156,6 +156,9 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     @torch.no_grad()
     def run_eval(self):
         task = self.env.task
+        if hasattr(task, '_lift_cfg'):
+            from learning.multi_agent.lift_eval import run_lift_eval
+            return run_lift_eval(self)
         if hasattr(task, '_interaction_checkpoint_metadata'):
             from learning.multi_agent.push_door_eval import run_push_door_eval
             return run_push_door_eval(self)

@@ -1,0 +1,12 @@
+# Converted candidates; review before training. all includes original test split.
+motions:
+  lift:
+  - file: dataset_omomo_lift/motions/sub7_smallbox_014__train_full/full/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_omomo_lift/motions/sub7_smallbox_014__train_full/full/phys_humanoid_v3/box_motion.npy
+    weight: 1.0
+  - file: dataset_omomo_lift/motions/sub16_largebox_026__test_full/full/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_omomo_lift/motions/sub16_largebox_026__test_full/full/phys_humanoid_v3/box_motion.npy
+    weight: 1.0
+  - file: dataset_omomo_lift/motions/sub8_plasticbox_017__train_full/full/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_omomo_lift/motions/sub8_plasticbox_017__train_full/full/phys_humanoid_v3/box_motion.npy
+    weight: 1.0

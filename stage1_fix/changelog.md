@@ -2,6 +2,70 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-16
+
+### 1.7m 상자 받치기 자세 설계와 물리 뷰어
+
+- 손목 없는 현재 asset에서 어깨/팔꿈치8DOF와 상자X 위치를 최적화해 수평 전완/밑받침 자세를 구성했다. 별도 preview/view/VNC 도구로 루트고정/자유 장면을 비교한다. 학습목표1.6m/모션/보상은 변경하지 않았다.
+- 관절범위/IK오차/실제 PhysX FK 일치(<1mm), 5kg 자유상자3초 검사 완료. 루트고정은 중심1.6705m/각도3.904도/수직지지48.81N, 자유루트는 전방낙상으로 균형제어 필요. 초기 fixed-root setter 및 임시 PD target 버퍼 문제를 수정하고 headless/GUI 결과 일치 확인. 증거는 root runs/lift_support_pose_170. Python AST/셸문법/수치assert 통과.
+- GPU6 CPU PhysX+Vulkan 뷰어만 사용했으며 기존 학습·MPS는 건드리지 않았다.
+
+### OMOMO lift RSI 접촉 적합성 점검
+
+- Default 초기화와 원본 크기 preview 경로, 손목 DOF 부재를 확인했다. 세 lift crop의 원본 scaled 크기/현재 상자 크기를 대상으로 손·전완 distal의 바닥 지지면 오차를 CPU FK로 측정했다. 현재 상자에서는 네 점 모두4cm 이내인 프레임이0개로, 직접 RSI 재사용은 부적합하다. 일반 grasp 오차/물리 안정성 측정과 구분한다.
+- root runs/lift_rsi_audit에 원시 JSON/재현 스크립트를 보존하고 LIFT_STAGE1.md에 해석을 기록했다. 학습 초기화·데이터·GPU·MPS는 변경하지 않았다.
+
+### Lift 전완 접촉점을 손 쪽 캡슐 끝으로 변경
+
+- 사용자 의도에 맞춰 기본/TeamHOI 설정의 전완 proxy를 elbow→hand 46%에서 실제 캡슐 축 끝인72.4086%로 변경했다. 손 중심과 거리는7.1447cm이며 반지름4cm 표면 보정은 유지한다.
+- 실제 MJCF 양팔 치수 및 두 설정을 대조하고7.14cm 폭의 받치기 성공 가능성을 검증했다. 관련 CPU12tests 통과. 기존 면적0.015m²/COM여유2.5cm 기준은 충족 가능하여 유지했다. 학습·뷰어·MPS는 실행/변경하지 않았다.
+
+### Lift에 TeamHOI full/masked dual AMP 이식
+
+- 공식 TeamHOI commit6fdc988의 독립2판별기·각window RMS·두reference buffer·거리history sigmoid 혼합·outside-only full updates와paired replay를 native129-D/고정2-agent scene PPO로 이식했다. Full=loco12개, masked=loco+OMOMO train2개. 마스크는양팔/손38feature이며 raw/live/demo/history는 보존한 뒤 masked 입력만 가린다. MIT 출처를third_party/teamhoi에 보관한다.
+- 별도 lift_stage1_teamhoi env/train/train-test-VNC와algo/model/player를 등록했다. 기존단일 AMP·보상·폭0.65m·goal중심1.6m는 유지한다. dual checkpoint는 두RMS·설정metadata로 구분하며 기존checkpoint의무시/자동변환은하지않는다.
+- CPU37tests, GPU6 MPS4env reset/부분reset/거리history 검증,2048env 유한2updates 저장(두loss/full_updated 확인),4env checkpoint평가(8trials/성공0, 성능측정아님),optimizer+두RMS 재개1update 완료. 실행기복사중 잘못된모션목록명으로첫점검이시작전실패해경로수정후재검증했다. 로그는runs/lift_teamhoi에보존하며 본학습·MPS변경·기존작업중단은하지않았다. 상세수식/공식차이/명령은markdowns/LIFT_TEAMHOI_AMP.md.
+
+### Lift 목표 중심 높이1.6m 확정
+
+- 사용자 요청으로 target_height를1.7→1.6m로 조정하고 현재 설정 문서를 맞췄다. YAML 목표값·diff 확인. 학습/뷰어는 실행하지 않았다.
+
+### Lift 목표 중심 높이1.7m
+
+- 사용자 요청으로 target_height를1.5→1.7m로 변경했다. 통합 검증은 고정1.5 대신 설정값을 확인하도록 수정하고 현재 설정 문서를 갱신했다.
+- YAML 목표값·상자 높이 기준 산술·diff 확인. 학습/뷰어는 실행하지 않았다.
+
+### Lift 상자 좌우폭 확대
+
+- 사용자 요청으로 lift 전용 상자의Y폭0.55→0.65m를 liftTask.box_size와box.build.baseSize에 반영했다. 앞뒤0.55m·높이0.35m·질량5kg 유지, 기존 배치식에 따라 양쪽rail이각5cm 바깥으로 이동한다.
+- 설정/rail 산술 및 기존lift CPU검증 확인. 뷰어·학습·MPS를 실행하거나 변경하지 않았다. 기존 폭 checkpoint는 당시 저장 config와 함께 사용한다.
+
+### Lift 실제 초기 장면의 RSI 방식 정지 뷰어
+
+- 정책/checkpoint 없이 두 agent·자기 상자·rail·1.5m 목표점을 표시하는 전용 preview/view/preview_vnc 실행기를 추가했다. R로 실제 접근 초기 배치를 재추첨하고 N 카메라/S 스크린샷을 지원한다. 기존 reference/다른뷰어의6080/6081은 유지하고6082를 쓴다.
+- GPU6의 기존 MPS 연결에서3frame GUI 점검·스크린샷으로 색/배치/목표점 표시 확인. 학습/reward/reset 정책·MPS daemon·기존프로세스는 변경하지 않았다.
+
+### 두 agent 독립 SUPPORT+LIFT와 OMOMO masked AMP
+
+- 각자 rail 위 상자로1.3–2m 접근→밑받침→고정 goal Z1.5m lift를 수행하는 별도 HumanoidMALift/env/train/data/train-test-VNC를 추가했다. H↔O SUPPORT, O↔G LIFT 관계의 actor/critic semantic bias를 별도 template에 한정해 연결했다.
+- 받치기는 양손·전완4개 표면점의 바닥근접·사각형중심/COM포함·면적·contact-force proxy를 곱한다. HOLDING식 rootXY progress, state>.9 현재 성공/포화. Lift 거리 progress/fine state에 현재 포화 받치기와 초기 orientation/각속도 안정 점수를 곱하고 목표근처 연속.5초 유지에 최초 성공bonus를 준다. OMOMO train2개+loco12개를 쓰며 어깨/팔꿈치 자세·속도와 양손위치38feature를 demo/live/history에서 동일 마스킹한다.
+- CPU신규11+기존회귀12=23 통과. GPU6 MPS 기존연결에서4env reset/step/부분reset·AMP 검증,2048env 유한 학습(요청 max_epochs1, 기존 종료계약상 실제2updates)·checkpoint 저장 및4env 유한 평가 완료(8trials/성공0, 성능측정아님). MPS daemon·기존학습/뷰어 미변경, 본학습 미시작. 정확한 수식/명령/한계는 `markdowns/LIFT_STAGE1.md`.
+
+### OMOMO lift 사람·상자 RSI 방식 프리뷰
+
+- 세 후보의 변환된 humanoid와 원본 bbox 크기/pose/scale 상자를 같이 표시하는 정책 없는 정지/재생 뷰어를 추가했다. Space/R/방향키/N/Home/S로 재생·임의 자세·프레임·카메라·처음·스크린샷을 조작한다. full/lift 구간을 선택한다.
+- 사용자 지정 GPU6만 허용하며 기존 runtime의 MPS 자동 연결만 사용한다. MPS daemon lifecycle/설정과 기존 학습은 변경하지 않았다. GPU6에서 시작/80% phase 각각3-frame GUI 점검, 스크린샷으로 세 사람·상자의 배치/자세 갱신을 확인했다. 물리 접촉 안정성 검증은 아니다.
+
+### OMOMO lift → native TokenHSI 모션 변환
+
+- 세 후보를 기존 carry global-rotation/T-pose 매핑과 팔꿈치 투영·고정 손으로 phys_humanoid_v3에 변환했다. `tokenhsi/data/dataset_omomo_lift/`에 전체본/lift 구간 6개, 상자 pose·scale·중심 보정 mesh와 보고서를 저장하고 train/test/all YAML을 분리했다. 원본과 기존 학습 설정을 보존한다.
+- 실제 CPU MotionLib·32 DOF·129-D AMP/10-frame history·전프레임/중간 보간·full/lift 일치·quaternion·원본 hash·상자 world geometry 검증 통과. native 변환의 손 위치 평균 오차 약7–11cm 및 관절 제한 초과(최대 약0.327rad)를 기록했다. 접촉 IK·물리 검증·밑받침 합성·학습 연결은 하지 않았다. 자세한 명령/한계: `markdowns/OMOMO_LIFT_DATA.md`.
+
+### OMOMO lift 후보 원본 다운로드·정리
+
+- 사용자 지정 hhtools OMOMO full 아카이브를 `hhtools_omomo/`에 받고 전체 압축 해제했다. 세 lift 후보는 상대 심링크와 JSON manifest로 분류하고 원본 split을 보존했다. 데이터·캐시는 Git 제외한다.
+- SHA-256 배포값 일치, tar 해제 성공, 후보 3개 PKL/mesh 및 배열 shape 확인. 제공 상승량과 raw obj_trans ΔZ가 앞의 두 시퀀스에서 달라 별도로 기록했다. 30fps·프레임 기준·좌표/단위는 미검증이며 retargeting·학습은 수행하지 않았다. 상세: `markdowns/OMOMO_LIFT_DATA.md`.
+
 ## 2026-10-15
 
 ### Door操作/Goal 관계bias 분리실험

@@ -1,0 +1,19 @@
+{
+  "source": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_dynamic_objects/test/Table_Circle/e446e818-363d-4bf5-b7dd-7e70bfca0b87/geom/mesh.obj",
+  "source_sha256": "48be401b5500667b89d79e16e8c378164df0951cbd59962224afa73ea13df024",
+  "source_extent": [
+    0.65,
+    0.65,
+    0.669157
+  ],
+  "size": [
+    0.52,
+    0.8,
+    0.4
+  ],
+  "mass": 16.64,
+  "normalization": "anisotropic_bbox_fit",
+  "observation": "original_8_bbox_corners",
+  "reward": "original_box_anchor_proxy",
+  "physics_validated": false
+}

@@ -1,0 +1,3 @@
+file 'pickUp/comparison_half_speed.mp4'
+file 'carryWith/comparison_half_speed.mp4'
+file 'putDown/comparison_half_speed.mp4'

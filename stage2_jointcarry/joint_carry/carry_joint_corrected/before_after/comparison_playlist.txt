@@ -1,0 +1,3 @@
+file 'pickUp/comparison.mp4'
+file 'carryWith/comparison.mp4'
+file 'putDown/comparison.mp4'

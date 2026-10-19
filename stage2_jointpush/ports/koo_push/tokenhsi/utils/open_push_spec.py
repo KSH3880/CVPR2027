@@ -28,16 +28,16 @@ def scene_layout(env):
 
 
 def compile_graph(spec, m, o, device=None):
-    if (m,o) not in ((2,4),(3,4)) or set(spec) not in ({'sampler','semantic_only','task_probabilities'}, {'sampler','semantic_only','task_probabilities','shuffle_token_order'}) or spec['sampler']!=SAMPLER or spec['semantic_only'] is not True:
+    if (m,o) not in ((2,4),(3,4),(4,4)) or set(spec) not in ({'sampler','semantic_only','task_probabilities'}, {'sampler','semantic_only','task_probabilities','shuffle_token_order'}) or spec['sampler']!=SAMPLER or spec['semantic_only'] is not True:
         raise ValueError('Joint OPEN/PUSH requires 2 humans, 2 doors, 2 boxes')
     if type(spec.get('shuffle_token_order',False)) is not bool:
         raise ValueError('shuffle_token_order must be boolean')
     p=spec['task_probabilities']
     if set(p)!={'OPEN','PUSH'} or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<0 for v in p.values()) or not math.isclose(sum(p.values()),1.):
         raise ValueError('Invalid OPEN/PUSH probabilities')
-    if m==3:
-        src=torch.tensor([0,5,1,5,2,5],device=device)
-        dst=torch.tensor([5,7,5,7,5,7],device=device)
+    if m>=3:
+        src=torch.tensor([v for a in range(m) for v in (a,m+2)],device=device)
+        dst=torch.tensor([v for a in range(m) for v in (m+2,m+4)],device=device)
         rel=torch.tensor([PUSH,AT]*m,device=device)
         owner=torch.arange(m,device=device).repeat_interleave(2)
         valid=torch.ones(2*m,dtype=torch.bool,device=device)
@@ -53,8 +53,8 @@ def compile_graph(spec, m, o, device=None):
 
 
 def graph_for_tasks(spec, tasks):
-    if tasks.shape[1]==3:
-        return expand_graph(compile_graph(spec,3,4,tasks.device),len(tasks))
+    if tasks.shape[1]>=3:
+        return expand_graph(compile_graph(spec,tasks.shape[1],4,tasks.device),len(tasks))
     g=expand_graph(compile_graph(spec,2,4,tasks.device),len(tasks))
     for a in range(2):
         e=2*a;push=tasks[:,a]==1

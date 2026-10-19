@@ -1,0 +1,33 @@
+{
+  "frames": 100,
+  "source_allowed_frames": 55,
+  "box_mass_kg": 16.639999389648438,
+  "reset_fk_max_error_m": 6.242658193883435e-07,
+  "preview_geometry_maximum": {
+    "hand_box_penetration_m": 0.005337049260926902,
+    "nonhand_box_penetration_m": 0.0006461633753006152,
+    "floor_penetration_m": 0.0,
+    "interperson_penetration_lower_bound_m": 0.0
+  },
+  "shock_pass_all": 67,
+  "shock_pass_source_allowed": 55,
+  "geometry_pass_source_allowed": 55,
+  "conservative_pass_source_allowed": 55,
+  "maximum": {
+    "hand_box_penetration_m": 0.005336972831776837,
+    "nonhand_box_penetration_m": 0.0006461131244571705,
+    "floor_penetration_m": 0.0,
+    "interperson_penetration_lower_bound_m": 0.0,
+    "root_delta_speed_max_mps": 6.90197229385376,
+    "box_speed_max_mps": 2.085935354232788,
+    "physx_overlap_max_m": 0.03997579962015152,
+    "box_contact_force_peak_N": 1601.74658203125
+  },
+  "pd_rollout": {
+    "duration_s": 3.3,
+    "box_final_error_m": 1.0189236562353274,
+    "box_max_error_m": 1.0189236562353274,
+    "all_carriers_hand_contact_fraction": 0.15151515151515152,
+    "min_root_height_m": 0.09395250678062439
+  }
+}

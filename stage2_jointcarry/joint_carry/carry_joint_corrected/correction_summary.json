@@ -1,0 +1,17 @@
+{
+  "pickUp": {
+    "root_height_lift_m": 0.01817752585097951,
+    "maximum_arm_dof_change_deg": 42.02274225702327,
+    "maximum_hand_target_error_m": 0.01840464504262834
+  },
+  "carryWith": {
+    "root_height_lift_m": 0.014386267243417919,
+    "maximum_arm_dof_change_deg": 29.39149926203542,
+    "maximum_hand_target_error_m": 0.00018853206503163707
+  },
+  "putDown": {
+    "root_height_lift_m": 0.02592029336573723,
+    "maximum_arm_dof_change_deg": 36.60934350859391,
+    "maximum_hand_target_error_m": 0.02277754290790835
+  }
+}

@@ -1,3 +1,27 @@
+## 4명·대형100kg viewer (2026-10-16)
+
+`TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_four_agent_100kg_view.sh /absolute/path/random_checkpoint.pth`. 기존 랜덤 모델 가중치를 4명으로 실행하고 shared box2만3×1.5×1.5m/100kg로 생성한다. 전용 `_test.sh`로 headless 검증 가능. 크기/질량은 이 preview에서 고정이며 실제asset/bbox/관성/reset/spawn을 연결한다. 저장된 원래 물리 계약 검증 후 명시적 추론 override를 적용하고 runtime JSON에 실측값을 남긴다. 학습분포 밖 조건으로 성능은 미검증.
+
+## 랜덤 모델 3명 추론 (2026-10-16)
+
+`TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_random_shape_three_agent_view.sh /absolute/path/checkpoint.pth`. 화면 없는 검증은 같은 prefix의 `_test.sh`. 기존 2명 체크포인트의 공유 tokenizer/Transformer 가중치를 그대로 사용하고, 크기·질량 분포와 물리·보상을 유지한다. 3명용 6-edge graph와 전원 간 0.8m 이상 랜덤 시작을 사용한다. 학습용이 아닌 인원 일반화 추론이며 성공 성능은 별도 검증 대상이다.
+
+## 랜덤 크기·질량 viewer GPU6 (2026-10-16)
+
+`TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_random_shape_view.sh /absolute/path/checkpoint.pth`. 랜덤 모델의 저장된 크기·질량 분포를 복원하며 환경 생성 때 샘플링한다. 1환경 viewer에서는 재실행할 때 다시 뽑고 episode reset 동안 유지한다. test/VNC 기본 GPU6이며 TOKENHSI_GPU로 변경 가능하다.
+
+## 랜덤 형상·질량 GPU6 재개 (2026-10-15)
+
+사용자 요청으로 고정 크기 학습을 종료하고 기존 랜덤 모델 2500 checkpoint에서 재개한다. `TOKENHSI_GPU=6 RESUME_CHECKPOINT=/absolute/path/checkpoint.pth OUTPUT_PATH=/absolute/path/new_run bash stage2_jointpush/scripts/joint_push_random_shape_train.sh`. 2048환경, seed6397, 기존 GPU6 MPS 사용. 산출물 `runs/jointpush/random_shape_resume_gpu6_20261015_223106/`.
+
+## 원본 Push Stage1 설명 추가 (2026-10-15)
+
+[JOINT_PUSH_SETTINGS.md](JOINT_PUSH_SETTINGS.md)의15절에실제source29000checkpoint기준OPEN/PUSH원본환경·1.3m/20kg·독립task·warmstart/RSI·contact+AT·embedding/AMP·Stage2차이를추가했다. 평가결과없음.
+
+## GPU0 랜덤 형상·질량 학습 (2026-10-15)
+
+[JOINT_PUSH_RANDOM_SHAPE_SETTINGS.md](JOINT_PUSH_RANDOM_SHAPE_SETTINGS.md): 폭X2–3m/깊이Y1–2.6m/높이Z1–1.5m, 질량40–60kg 독립 격자 샘플링. 실제asset/bbox/reset/손간격/spawn반경연결. GPU0/2048환경/새Stage2,tmux `jointpush_randomshape_gpu0`. `bash stage2_jointpush/scripts/joint_push_random_shape_train.sh`,test/view도같은prefix. 기존GPU6학습유지.
+
 ## Joint Push 상세 설정 문서 (2026-10-15)
 
 [JOINT_PUSH_SETTINGS.md](JOINT_PUSH_SETTINGS.md):현재60kg·360°시작·직선·softgate환경/초기화/모델/보상/AMP/PPO/실행법을정리한결과없는설정문서.
@@ -1342,3 +1366,52 @@ TOKENHSI_GPU=5 TASK_GRAPH=before_sit bash tokenhsi/scripts/multi_agent/approach_
 2026-10-08 검증: 관련 CPU94개와 GPU5·2048환경 짧은 학습/epoch2 저장·epoch3 재개를 통과했다. Actor69개 tensor·관찰 RMS6개 불변, NONE/SELF/BEFORE bias 갱신·COUPLED0, scalar182종/364값 finite를 확인했다. 환경 분할은 독립410·각 BEFORE546이며 첫 reset의 RSI fallback은0이었다. AMP family/demo 대응·reference history와 1024개 혼합/각32개 그룹 부분 reset에서 미선택 상태 보존을 확인했다. 최종 모델의 BEFORE-climb에서 agent별 loco/climb reference 선택·16환경32-step headless 평가가 완료됐다. 초기 연결 모델의 나머지 sit/stack/독립 평가 경로도 각각16환경32-step으로 확인했다.
 
 **남은 제한:** 고정 PD target으로 초기 자세를0.1초 유지하는 별도 물리 진단은1575/2048개만 통과했다(473개 미통과, 최대 box 속도14.42m/s·변위1.21m). 따라서 코드의 geometry 재시도 실패0을 물리 안정성 통과로 해석하면 안 된다. 더 엄격한 단일-agent 캐시를 시험했지만 skill fallback이 증가했고 모든 장면을 안정화하지 못해 기본 설정에 적용하지 않았다. Stage 1 RSI 비율은 유지했으며 합성 초기화의 물리 안정성 보완은 남아 있다. 결과는 `output/approach_stage2_before_task_embedding_check_final/{saved_check,reset_check,resume_check}.json`; 본학습·장기 성능·VNC 화면은 미검증이다.
+
+### 2인 랜덤 박스 viewer 크기 선택 (2026-10-17)
+
+`JOINT_PUSH_VIEW_GRID_INDEX=809 TOKENHSI_GPU=6 PORT=6086 bash stage2_jointpush/scripts/joint_push_random_shape_view.sh <checkpoint>`: 현재 810개 학습 격자의 마지막 항목인 3×2.6×1.5m/60kg를 선택한다. test 전용이며 미지정 시 원래 랜덤 샘플링한다.
+
+## 비정렬 상자·자유 표면 Contact (2026-10-17)
+
+전용 프로필 `joint_push_directional_surface_ca4`: 2명, 랜덤 크기·질량과 loco RSI/조건부 AMP/CA4/PPO는 랜덤 박스 모델을 따른다. 상자 yaw와 목표 방향을 독립 360° 샘플링한다. 손의 면·역할을 배정하지 않는다. 기존 aligned checkpoint는 이 프로필의 resume/test에서 거부한다.
+
+Contact φ는 각 손의 가장 가까운 실제 옆면 거리, 높이 0.8m, 해당 면의 안쪽 법선과 목표 방향 내적을 0.7로 정규화한 점수, agent 손중점 XY 간격을 곱한다. 두 손의 나쁜 쪽을 사용하며, 최소 간격은 실제 가로×0.25다. 기존 중심 대칭·같은 면 좌우 조건은 사용하지 않는다. 회전은 upright box의 yaw 기준이며 접촉력 검증은 아니다.
+
+State=0.2φ, Progress=0.2/(1+max(몸통에서 실제 XY 외곽까지 거리−0.2,0)), Success=0.2×[φ≥0.9]. AT 거리식·가중치는 유지하고 soft gate=min(φ), 최종 접촉 gate=모두 φ≥0.9로 연결한다. 면 방향은 현재 상자→목표 기준이다. 목표와 상자 중심이 정확히 같을 때는 box local +Y를 사용한다.
+
+```bash
+# 장기 학습은 별도로 실행한다. 기본 GPU6, 2048환경, 원본 Stage1에서 새 Stage2 초기화.
+TOKENHSI_GPU=6 bash stage2_jointpush/scripts/joint_push_directional_surface_train.sh
+# 같은 프로필 checkpoint에서만 optimizer/counter를 이어받는다.
+TOKENHSI_GPU=6 RESUME_CHECKPOINT=/absolute/path/checkpoint.pth bash stage2_jointpush/scripts/joint_push_directional_surface_train.sh
+# 화면 없는 평가 / 로컬 화면 / 서버 noVNC (각각 새 프로필 checkpoint 필요)
+TOKENHSI_GPU=6 HEADLESS=1 bash stage2_jointpush/scripts/joint_push_directional_surface_test.sh /absolute/path/checkpoint.pth
+TOKENHSI_GPU=6 HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/joint_push_directional_surface_test.sh /absolute/path/checkpoint.pth
+TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_directional_surface_view.sh /absolute/path/checkpoint.pth
+```
+
+기본 산출물: `runs/jointpush/directional_surface_training/`, `directional_surface_evaluation/`. 기존 랜덤 박스 viewer·checkpoint 설정은 유지한다.
+
+## 각도별 고정 면·손 목표점 + 높은 박스 (2026-10-19)
+
+전용 프로필 `joint_push_assigned_faces_ca4`. 모델 입력/CA4/원본 Stage1 전이/loco RSI/AMP/PPO/질량40~60kg/360°spawn/목표거리2.2~5m는 유지한다. 가로2~3m(step0.2),깊이1~2.6m(step0.2), **높이1.6~2.6m(step0.2)**, 질량step5kg의1620조합을 환경마다 생성 시 샘플링하고 reset 간 유지한다. 상자 yaw와 목표 방향은 독립이다.
+
+- 리셋 때 목표 방향과 가장 가까운 상자 수평 축의 각도차(0~45°)가25°이하면 목표 반대편 한 면에 두 명을 배정한다. 두 agent 목표 중점은 그 면 중심에서 가로폭의±0.25 위치다.
+- 25°초과면 목표 방향에 기여하는 인접 두 뒷면의 중심에 한 명씩 배정한다. 오른손/왼손은 각 중점에서 접선 방향±0.15m, 바닥 기준 높이0.8m다. 모서리 밖 목표를 거부한다.
+- 접근점은 손 중점에서 면 바깥으로0.8m다. 두 agent 초기 몸통 XY에서 접근점까지 총 거리가 짧은 배정으로 정한다. 25°/손간격0.3m/한면오프셋0.25/접근점거리0.8m는 `jointPush.assigned_contact`에서 조정한다.
+- **배정과 목표점은 에피소드 동안 상자 로컬 좌표에 고정**한다. 상자 이동·전체 quaternion 회전에는 따라가지만 목표 방향 변화로 면이나 담당 agent를 바꾸지 않는다. reset된 환경만 배정을 갱신한다. 보상용 target이며 추가 정책 입력은 없다.
+- Contact State=0.2×exp(−10×max(오른손3D목표오차²,왼손3D목표오차²)). Progress=0.2/(1+max(몸통XY→자기접근점거리−0.2,0)). Success=0.2×[Contact φ≥0.9]로 양손 모두 약10.3cm 이내를 요구한다. 기존 자유 표면 모드의 임의 면 접근 보상은 쓰지 않는다.
+- AT 거리식·가중치는 그대로, soft gate=min(두 agent Contact φ), AT Success는 기존 목표 조건+두 Contact Success다. 목표점 성공은 기하학적 배치이며 접촉력·손바닥 방향·실제 밀기 힘을 보증하지 않는다.
+
+```bash
+# 새 Stage2 초기화 (기존 directional/직선 checkpoint의 resume는 거부)
+TOKENHSI_GPU=6 bash stage2_jointpush/scripts/joint_push_assigned_faces_train.sh
+# 같은 assigned_faces 프로필 checkpoint에서만 재개
+TOKENHSI_GPU=6 RESUME_CHECKPOINT=/absolute/path/checkpoint.pth bash stage2_jointpush/scripts/joint_push_assigned_faces_train.sh
+# 평가 / 로컬 화면 / 서버 noVNC
+TOKENHSI_GPU=6 HEADLESS=1 bash stage2_jointpush/scripts/joint_push_assigned_faces_test.sh /absolute/path/checkpoint.pth
+TOKENHSI_GPU=6 HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/joint_push_assigned_faces_test.sh /absolute/path/checkpoint.pth
+TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_assigned_faces_view.sh /absolute/path/checkpoint.pth
+```
+
+산출물 기본값은 `runs/jointpush/assigned_faces_training/`, `assigned_faces_evaluation/`. 이전 실험 설정·checkpoint는 변경하지 않았다. 장기 학습은 별도 실행한다.

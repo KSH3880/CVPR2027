@@ -1,0 +1,57 @@
+{
+  "imported_at": "2026-10-16T19:57:58.099202",
+  "source": "/home/hwanhee/ksh/stage2_jointcarry",
+  "models": {
+    "basic": {
+      "source_output": "/home/hwanhee/ksh/stage2_jointcarry/output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding",
+      "source_checkpoint": "/home/hwanhee/ksh/stage2_jointcarry/output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding/ApproachStage2JointCarryMixed80LocoAmpSa4Goal360FullPickupCpaRelease1LocoPlatformTaskEmbedding_15-23-17-54/nn/ApproachStage2JointCarryMixed80LocoAmpSa4Goal360FullPickupCpaRelease1LocoPlatformTaskEmbedding_00010000.pth",
+      "checkpoint": "checkpoints/ApproachStage2JointCarryMixed80LocoAmpSa4Goal360FullPickupCpaRelease1LocoPlatformTaskEmbedding_00010000.pth",
+      "epoch": 10000,
+      "sha256": "ac658aba9458ce095789abbdfa683a25858db1e938f5c38144c4b7e382d9da6b",
+      "env_config": "tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml",
+      "train_config": "tokenhsi/data/cfg/train/rlg/amp_ma_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml",
+      "test_script": "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_test.sh",
+      "vnc_script": "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_vnc.sh",
+      "training_snapshot": "/home/hwanhee/juan/CVPR2027/runs/jointcarry_import_20261016/basic/relation_config.yaml"
+    },
+    "anchor": {
+      "source_output": "/home/hwanhee/ksh/stage2_jointcarry/output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding",
+      "source_checkpoint": "/home/hwanhee/ksh/stage2_jointcarry/output/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding/ApproachStage2JointCarryMixed80LocoAmpSa4Goal360FullPickupCpaRelease1LocoPlatformGraspViewTaskEmbedding_16-12-42-21/nn/ApproachStage2JointCarryMixed80LocoAmpSa4Goal360FullPickupCpaRelease1LocoPlatformGraspViewTaskEmbedding_00002500.pth",
+      "checkpoint": "checkpoints/ApproachStage2JointCarryMixed80LocoAmpSa4Goal360FullPickupCpaRelease1LocoPlatformGraspViewTaskEmbedding_00002500.pth",
+      "epoch": 2500,
+      "sha256": "540c2b0d86c66c05a1a17792284b33591cf11e20236af95bd08b5d787eab6249",
+      "env_config": "tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding.yaml",
+      "train_config": "tokenhsi/data/cfg/train/rlg/amp_ma_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding.yaml",
+      "test_script": "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_test.sh",
+      "vnc_script": "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_vnc.sh",
+      "training_snapshot": "/home/hwanhee/juan/CVPR2027/runs/jointcarry_import_20261016/anchor/relation_config.yaml"
+    }
+  },
+  "imported_files": [
+    "tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding.yaml",
+    "tokenhsi/data/cfg/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml",
+    "tokenhsi/data/cfg/train/rlg/amp_ma_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding.yaml",
+    "tokenhsi/data/cfg/train/rlg/amp_ma_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding.yaml",
+    "tokenhsi/env/tasks/multi_agent/edge_context_task.py",
+    "tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py",
+    "tokenhsi/learning/multi_agent/amp_network_builder_ma.py",
+    "tokenhsi/learning/multi_agent/grasp_view.py",
+    "tokenhsi/learning/multi_agent/human_coordination.py",
+    "tokenhsi/learning/multi_agent/ma_agent.py",
+    "tokenhsi/learning/multi_agent/ma_players.py",
+    "tokenhsi/learning/multi_agent/scene_normalizer.py",
+    "tokenhsi/learning/multi_agent/task_coordination.py",
+    "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_test.sh",
+    "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_train.sh",
+    "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_graspview_task_embedding_vnc.sh",
+    "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_test.sh",
+    "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_train.sh",
+    "tokenhsi/scripts/multi_agent/approach_stage2_joint_carry_mixed80_locoamp_sa4_goal360_fullpickup_cparelease1_locoplatform_task_embedding_vnc.sh",
+    "tokenhsi/tests/check_joint_carry_grasp_view_runtime.py",
+    "tokenhsi/tests/test_joint_carry_grasp_view.py",
+    "tokenhsi/tests/test_joint_carry_human_sa.py",
+    "tokenhsi/tests/test_stage1_grasp_shift.py",
+    "tokenhsi/utils/joint_carry_amp.py",
+    "tokenhsi/utils/stage1_grasp_shift.py"
+  ]
+}

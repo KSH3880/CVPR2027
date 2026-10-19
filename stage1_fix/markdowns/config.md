@@ -23,6 +23,8 @@
 
 | 번호 | Config | 역할 |
 | ---: | --- | --- |
+| Lift TeamHOI AMP | [lift_stage1_teamhoi.yaml](../tokenhsi/data/cfg/multi_agent/lift_stage1_teamhoi.yaml) | 현재 권장 full/masked dual AMP ([설명](LIFT_TEAMHOI_AMP.md)) |
+| Lift | [lift_stage1.yaml](../tokenhsi/data/cfg/multi_agent/lift_stage1.yaml) | 두 agent 독립 받치기+lift, OMOMO masked AMP ([설명](LIFT_STAGE1.md)) |
 | Push/Door | [push_door_stage1.yaml](../tokenhsi/data/cfg/multi_agent/push_door_stage1.yaml) | 독립 PUSH/문 개방·유지, task/phase AMP, grounded 진행도·유지 보상 |
 | Push/Door random start | [push_door_stage1_random_start.yaml](../tokenhsi/data/cfg/multi_agent/push_door_stage1_random_start.yaml) | ZIP 기반 독립 랜덤 시작·유지 AMP door_tail·별도 checkpoint |
 | 1 | [amp_humanoid_ma_carry.yaml](../tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml) | 원본 multi-agent carry 기준 |
@@ -860,3 +862,74 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_box13_10500_mi
 | 서버 VNC | `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal_vnc.sh CHECKPOINT.pth 1 1000` |
 
 출력은 `output/push_door_stage1_semantic_25kg_legacy_amp_rsi_dense_split_goal/`, 이름PushDoor25kgDoorGoalSplit이다.
+
+## OMOMO lift 데이터 변환 (학습 미연결)
+
+세 후보를 전체본/lift 구간으로 변환했다. 형식 검증은 통과했고 접촉·관절 제한 보정은 미완료다. [배치·목록·명령·한계](OMOMO_LIFT_DATA.md)를 참조한다.
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+python tokenhsi/scripts/multi_agent/convert_omomo_lift.py
+python tokenhsi/scripts/multi_agent/validate_omomo_lift.py
+```
+
+### OMOMO lift 사람·상자 RSI 뷰어
+
+```bash
+TOKENHSI_GPU=6 PORT=6080 bash tokenhsi/scripts/multi_agent/omomo_lift_vnc.sh
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/omomo_lift_view.sh
+```
+
+정지 시작, Space 재생, R 랜덤 정지 자세, 방향키 프레임, N 카메라, Home 처음. `--variant full`, `--play` 옵션 가능. 정책 없이 참조를 재생하며 MPS 데몬은 변경하지 않는다. [상세](OMOMO_LIFT_DATA.md#rsi-방식-사람상자-뷰어).
+
+## 독립 SUPPORT + LIFT Stage 1
+
+두 agent가 각자 낮은 rail 위의 상자로 걸어와 밑받침·상자 중심 높이1.6m lift·0.5초 유지를 수행한다. 별도 `HumanoidMALift`, SUPPORT/LIFT 관계, OMOMO masked AMP다. 구현·짧은 학습/평가 확인 완료이며 성능은 미검증이다. 전체 보상식·마스크·물리·판정·검증 범위는 [LIFT_STAGE1.md](LIFT_STAGE1.md)를 따른다.
+
+```bash
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/lift_stage1_train.sh
+TOKENHSI_GPU=6 HEADLESS=1 bash tokenhsi/scripts/multi_agent/lift_stage1_test.sh CHECKPOINT.pth 16 3
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/lift_stage1_test.sh CHECKPOINT.pth 1 1
+TOKENHSI_GPU=6 PORT=6081 bash tokenhsi/scripts/multi_agent/lift_stage1_vnc.sh CHECKPOINT.pth 1 1
+```
+
+2048env 고정·별도 `output/lift_stage1/`, GPU6만 허용. MPS는 기존 자동 연결만 사용한다. 장기 본학습은 자동 시작하지 않았다.
+
+## 정책 없는 RSI 방식 초기 장면 보기
+
+```bash
+TOKENHSI_GPU=6 PORT=6082 bash tokenhsi/scripts/multi_agent/lift_stage1_preview_vnc.sh
+# DISPLAY가 있는 로컬 창
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/lift_stage1_view.sh
+```
+
+http://localhost:6082/vnc.html?autoconnect=1&resize=remote 에 접속한다(원격이면6082 포트 포워딩). 두 agent·자기 색 상자·고정 rail·1.6m 목표 wireframe 구를 함께 보여 준다. 실제 학습의 접근 초기 상태를 reset하고 물리1step 후 정지한다. 모션 reference RSI나 학습된 policy rollout은 아니다. R 배치 재추첨, N 전체/agent0/agent1 카메라, S 스크린샷. 기존6080/6081 뷰어는 유지한다.
+
+`lift_stage1_preview.py` + `{lift_stage1_view,lift_stage1_preview_vnc}.sh`가 전용 진입점이다. GPU6·기존 MPS만 사용하며3frame GUI 점검과 스크린샷 확인을 마쳤다. 학습/reward/reset 로직은 바꾸지 않았다.
+
+Lift 상자의 현재 크기는 X/Y/Z=0.55/0.65/0.35m다. 좌우폭만10cm 확대했으며 rail은 새 폭에 맞춰 자동 이동하고 질량5kg은 유지한다.
+
+## Lift TeamHOI full/masked AMP (현재 권장)
+
+기존 lift 보상·폭0.65m·목표중심1.6m를 유지하며 full/masked 판별기·각1290-D RMS·거리history sigmoid 혼합·outside-only full updates를 추가했다. 기존 단일 AMP checkpoint와는 호환되지 않는다. [정확한 공식 구현 대응·차이·검증](LIFT_TEAMHOI_AMP.md).
+
+```bash
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/lift_stage1_teamhoi_train.sh
+TOKENHSI_GPU=6 HEADLESS=1 bash tokenhsi/scripts/multi_agent/lift_stage1_teamhoi_test.sh CHECKPOINT.pth 16 3
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/lift_stage1_teamhoi_test.sh CHECKPOINT.pth 1 1
+TOKENHSI_GPU=6 PORT=6081 bash tokenhsi/scripts/multi_agent/lift_stage1_teamhoi_vnc.sh CHECKPOINT.pth 1 1
+```
+
+2048env·GPU6·기존 MPS 연결. 본학습은 자동 시작하지 않았다. 현재 기본 `lift_stage1_train.sh`는 단일 AMP 비교용으로 유지한다.
+
+## Lift 1.7m 받치기 자세 검사 (정책 없는 preview)
+
+학습 설정을 변경하지 않는 별도 IK/물리 검사다. 파랑=루트고정, 초록=자유루트. 기본 정지 화면이며 Space 중력재생, R 복원, N 장면전환, S 저장. [설계와 한계](LIFT_STAGE1.md).
+
+```bash
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/lift_support_pose_view.sh --height 1.7
+TOKENHSI_GPU=6 PORT=6082 bash tokenhsi/scripts/multi_agent/lift_support_pose_vnc.sh --height 1.7 --probe
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/lift_support_pose_view.sh --height 1.7 --headless --probe
+```
+
+기본 산출물은 root `runs/lift_support_pose_170/`이며 `--output`으로 분리 가능하다. 학습/train config 또는 checkpoint는 사용하지 않는다.
