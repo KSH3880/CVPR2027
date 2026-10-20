@@ -2,7 +2,7 @@ from pathlib import Path
 import torch
 import yaml
 import pytest
-from utils.partition_push import strip_geometry, nearest_boxes, partition_reward, group_tokens, group_layout, sample_groups, sample_asset_bank
+from utils.partition_push import strip_geometry, nearest_boxes, partition_reward, group_tokens, group_layout, sample_groups, sample_asset_bank, sample_surround_spawn
 from utils.open_push_spec import compile_graph, validate_env
 from utils.edge_stage1_spec import semantic_graph_packet
 from utils.edge_ontop_spec import expand_graph
@@ -58,7 +58,8 @@ def test_contact_height_and_group_gate():
 
 
 @pytest.mark.parametrize('leaders', [(0,0,0,0),(0,0,2,2),(0,0,0,3),(0,1,2,3),(0,1,1,1)])
-def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders):
+@pytest.mark.parametrize('spawn_mode', [None, 'surround_independent'])
+def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spawn_mode):
     """Exercise actual task reset without importing Isaac Gym or creating a sim."""
     import ast
     from types import SimpleNamespace
@@ -68,7 +69,8 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders):
     methods = [node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in
                ('_reset_envs', '_select_regions', '_logical_box_values')]
     namespace = dict(torch=torch, rotate=rotate, nearest_boxes=nearest_boxes, group_tokens=group_tokens, group_layout=group_layout,
-                     sample_groups=lambda n,*args: torch.tensor(leaders)[None].expand(n,-1))
+                     sample_groups=lambda n,*args: torch.tensor(leaders)[None].expand(n,-1),
+                     sample_surround_spawn=sample_surround_spawn)
     for method in methods:
         exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
     class Fake:
@@ -77,6 +79,8 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders):
         setattr(Fake, name, namespace[name])
     task = Fake(); task.num_envs = 3; task.device = 'cpu'
     task._joint_push_spec = dict(spawn_distance=[1.,2.], goal_distance=[2.2,5.],coupled_probability=.8)
+    if spawn_mode is not None:
+        task._joint_push_spec['spawn_mode'] = spawn_mode
     task._initial_box_states = torch.zeros(3,24,13); task._initial_box_states[...,6] = 1
     task._box_states = task._initial_box_states.clone()
     task._box_size, task._payload_masses = sample_asset_bank(3,dict(size_min=[1.,1.8,1.2],size_max=[1.3,2.2,1.5],mass_per_agent=[20.,30.]))
@@ -119,6 +123,27 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders):
     untouched_assignment = task._agent_box_assignment[2].clone()
     task._reset_envs(torch.tensor([0]))
     assert torch.equal(task._agent_box_assignment[2],untouched_assignment)
+
+
+def test_surround_spawn_clearance_separation_and_independent_heading():
+    torch.manual_seed(513)
+    boxes = torch.zeros(10000,4,13)
+    boxes[..., :2] = torch.tensor([4.,-7.])
+    sizes = torch.tensor([5.2,2.2,1.5]).expand(10000,4,3)
+    positions, heading = sample_surround_spawn(boxes,sizes,[1.,2.],1.2)
+    delta = positions-boxes[...,:2]
+    clearance = delta.norm(dim=-1)-sizes[...,:2].norm(dim=-1)/2
+    assert ((clearance>=.99999)&(clearance<=2.00001)).all()
+    distances = torch.cdist(positions,positions)
+    distances[:,torch.arange(4),torch.arange(4)] = float('inf')
+    assert distances.min()>=1.19999
+    angle = torch.atan2(delta[...,1],delta[...,0])
+    for values in (angle,heading,heading-angle):
+        # Reject half-circle/fixed/box-facing heading regressions.
+        assert values.cos().mean().abs()<.025
+        assert values.sin().mean().abs()<.025
+    quadrants = ((angle+torch.pi)/(torch.pi/2)).long().clamp_max(3)
+    assert torch.bincount(quadrants.flatten(),minlength=4).min()>9000
 
 
 def test_different_strips_are_coupled_in_coordination():

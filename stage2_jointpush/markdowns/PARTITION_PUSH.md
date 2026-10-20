@@ -1,6 +1,6 @@
 # 4-agent 가변 그룹 직선 Joint Push
 
-현재 프로필은 `partitionPush.version: 2`다. 로컬 실행용 설정이며 GPU·학습·시뮬레이션은 서버에서 실행하지 않았다.
+현재 프로필은 `partitionPush.version: 2`다. 로컬 GPU 실행을 지원하며 현재 검증 기록은 문서 하단과 changelog를 따른다.
 
 ## 관계 샘플링
 
@@ -26,7 +26,12 @@
 
 Isaac Gym 생성 후 실제 형상·질량 setter를 바꾸지 않도록 일반8개+후보leader4명×가능그룹크기4종의24-actor bank를 사전 생성한다. reset마다 해당 그룹 크기의 후보를 사용하고, 제외한 일반4개 및 미사용 후보는 장면 밖으로 격리한다. 이들은 관측·할당에 들어가지 않는다. bank actor 수와 활성 장면 상자 수를 구분한다.
 
-과제 그룹은 서로 떨어진 네 station 중 그룹 leader의 station에 배치하며 장면 yaw는 무작위다. 일반8개 후보 위치는 반경24~30m의 여덟 부채꼴 영역에서 샘플링한 뒤4개를 남긴다. 네 사람은 해당 과제 상자 뒷면에서 loco로 시작하고, 남은 활성 물체 중 실제 최근접 상자를 계산해 물리 할당을 확인한다. 이후에는 자기 그룹 상자를 유지하고, 그 상자의 구역 중 root XY에서 가장 가까운 구역 중심을 매 시점 선택한다. 구역 독점 소유권은 없어서 두 사람이 같은 구역을 선택할 수도 있다.
+과제 그룹은 서로 떨어진 네 station 중 그룹 leader의 station에 배치하며 장면 yaw는 무작위다. 일반8개 후보 위치는 반경24~30m의 여덟 부채꼴 영역에서 샘플링한 뒤4개를 남긴다. 신규 학습의 네 사람은 각자 배정 상자 주변 360° 임의 위치에서 loco로 시작하고, 남은 활성 물체 중 실제 최근접 상자를 계산해 물리 할당을 확인한다. 이후에는 자기 그룹 상자를 유지하고, 그 상자의 구역 중 root XY에서 가장 가까운 구역 중심을 매 시점 선택한다. 구역 독점 소유권은 없어서 두 사람이 같은 구역을 선택할 수도 있다.
+
+신규 기본 `spawn_mode: surround_independent`는 각 상자의 XY 외접원 반경에 U(1,2)m를 더한 거리에서 사람별 방위각을 독립 U(0,2π)로 샘플링한다. 초기 몸 heading도 위치·상자 방향과 독립 U(0,2π)이며, 사람 root 간 거리는 최소 1.2m다. 상자와 초기 겹침을 피하면서 앞·뒤·양옆 어느 쪽에서도 접근하도록 학습한다. 사람 4명, 그룹 샘플링, 상자 분포, 목표, 손 contact point와 보상은 기존 설정을 유지한다.
+
+`spawn_mode`가 없는 기존 checkpoint는 `rear_lanes`로 해석하여 예전 뒷면 정렬 시작을 재현한다. 재개·평가는 저장 환경을 복원하므로 기존 checkpoint를 resume하는 것만으로 새 spawn 설정이 적용되지 않는다. 현재 실행 중인 학습은 기존 분포로 계속 실행되며, 변경된 기본 YAML은 새 학습을 시작할 때 적용된다.
+
 
 ## 크기·질량 분포
 
@@ -49,22 +54,23 @@ Contact는 양손 중 큰3D오차의 `exp(-10*d²)`이고 AT는 실제 물리 �
 
 물체 수가 다른 Stage1의 entity tokenizer/Transformer 및 entity별 RMS를 재사용한다. 현재 저장소의 koo Push CA4에서 actor encoder·관측 RMS를 동결하고 action head/CA4/critic/AMP를 학습한다. 서로 다른 구역 토큰도 같은 물리그룹의 canonical goal이면 coupled로 처리하며 다른 그룹은NONE이다. 승현 코드의 관측 분할·그룹 샘플링 방식을 적용하되, 네트워크는 koo Push Stage1 호환 CA4다.
 
-초기화는loco-only이며 interaction RSI는 없다. AMP history는reset 상태를 반복한다. `partition_push_motions.yaml`의 raw Push180/Push와loco를 PUSH조건부0.67/0.33으로 사용한다. door expert 확률은0이며 unused doorOpen manifest자리도loco를 가리켜door데이터를 요구하지 않는다.
+초기화는loco-only이며 interaction RSI는 없다. AMP history는reset 상태를 반복한다. `partition_push_motions.yaml`의 변환된 Push180 19개와 loco를 PUSH조건부0.67/0.33으로 사용한다. door expert 확률은0이며 unused doorOpen manifest자리도loco를 가리켜door데이터를 요구하지 않는다.
 
 ## Stage1 경로와 로컬 준비
 
-기본 source는 `/home/hwanhee/koo_cvpr/stage1_fix/output/open_push_push180_contact_at_warmstart`다. 디렉터리를 주면 가장 높은 번호의contact-at warmstart를 고르고, 같은 번호의run이 여럿이면 정확한파일을 요구한다. 확인 당시 최신은 `OpenPushPush180ContactAtWarmstart_09-17-51-36/nn/OpenPushPush180ContactAtWarmstart_00029000.pth`다.
+기본 source는 이 checkout의 `stage2_jointpush/output/OpenPushPush180ContactAtWarmstart_00029000.pth`다. `STAGE1_CHECKPOINT`로 다른 파일이나 디렉터리를 지정할 수 있다. 디렉터리에서는 가장 높은 번호를 선택하며 같은 번호의 run이 여러 개면 정확한 파일이 필요하다.
 
-로컬에는 `stage2_jointpush/ports/koo_push` 코드·assets, 위Stage1파일과 다음 데이터를 준비한다. 서버 절대경로의symlink는로컬 위치로 연결해야 한다. 외부 원본은 수정하지 않는다.
+변환된 학습 데이터는 `stage2_jointpush/motiondata/dataset_bones_push180/`에 보관하고, 실행 포트의 `tokenhsi/data/dataset_bones_push180`에서 상대 심링크로 참조한다. `dataset_amass_loco`는 기존 로컬 Stage1 데이터에 연결한다. `output/raw_push_amp`의 raw NPZ는 사용하지 않는다.
 
-- `tokenhsi/data/dataset_amass_loco`
-- `tokenhsi/data/dataset_bones_push180`
-- `tokenhsi/data/dataset_bones_push`
+`partition_push_motions.yaml`은 Push180 19개와 loco 4개를 사용한다. 이전 목록의 별도 `dataset_bones_push` 2개(`003__A342`, `101__A341`)는 제외했다. 따라서 이전 21개 혼합 목록과 AMP 분포가 다르다. doorOpen 자리에는 기존처럼 loco 하나를 사용하고 door expert 확률은 0이다.
 
-Isaac Gym/PyTorch/rl_games가 준비된 conda환경을 활성화한다. 스크립트는현재 활성환경을 사용하며로컬 기본GPU는0이다. 기존 프로세스를 시작·종료하지 않는다.
+Isaac Gym/PyTorch/rl_games가 설치된 conda 환경에서 실행한다(기본 `tokenhsi`, 다른 활성 환경은 유지). 로컬 기본 GPU는 0이며 RTX 5090에서는 구형 TorchScript fusion을 비활성화한다. conda 활성화 hook의 unset 변수와 compiler 선택도 처리한다.
 
 ```bash
-# 신규 학습: 로컬 Stage1 파일
+# 신규 학습: 받은 기본 Stage1 파일
+bash stage2_jointpush/scripts/partition_push_train.sh
+
+# 다른 로컬 Stage1 파일
 TOKENHSI_GPU=0 STAGE1_CHECKPOINT=/local/path/OpenPushPush180ContactAtWarmstart_00029000.pth \
   bash stage2_jointpush/scripts/partition_push_train.sh
 
@@ -83,6 +89,9 @@ HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_test.sh /loca
 # 기존 VNC desktop 안에서 viewer (VNC 서버를 만들지는 않음)
 NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_vnc.sh /local/path/partition_stage2.pth
 
+# 로컬 viewer 전용 진입점 (기본 1환경, GPU0)
+TOKENHSI_GPU=0 bash stage2_jointpush/scripts/partition_push_view.sh /local/path/partition_stage2.pth
+
 # 추론 ablation: X와 질량 모두 1인 기준. 3명 그룹이면 X3.6m/75kg.
 ABLATION_SIZE='1.2 2.0 1.35' ABLATION_MASS=25 \
   OUTPUT_PATH=/local/path/ablation_1p2_25kg \
@@ -93,4 +102,27 @@ ABLATION_SIZE='1.2 2.0 1.35' ABLATION_MASS=25 \
 
 ## 확인 범위
 
-CPU로분할기하·그룹gate·5종그룹실제reset메서드·4개제외/8토큰·부분reset·인원비례형상/질량·랜덤일반상자·서로다른구역의같은그룹coupled/다른그룹NONE·샘플링통계를검사했다. 기존shape회귀포함19개통과. source29000network설정일치는이전CPU검사에서확인했다. Isaac Gym생성·실제전이forward·GPU메모리·학습·추론성능은실행하지않았다.
+로컬 CPU 테스트 14개 통과. AMP manifest의 loco 4개/doorOpen 자리 1개/Push180 19개 파일 경로, NPY 로드와 rotation/root translation 유한값을 확인했다. 이동한 모션·보고서 57개는 이동 전후 SHA-256이 같다.
+
+RTX 5090/GPU0에서 기본 1024환경·`MAX_ITERATIONS=2`로 받은 Stage1 29000 전이, 학습 업데이트, checkpoint 저장까지 rc=0을 확인했다. 저장 모델의 16환경·30step·2회 복원 평가도 rc=0이다. 성공 성능을 평가한 장기 학습은 아니다. 로그와 checkpoint는 `runs/jointpush/partition_local_check_20261019/`에 있다.
+
+```bash
+# 독립된 출력 경로로 짧은 실행 검증
+TOKENHSI_GPU=0 MAX_ITERATIONS=2 OUTPUT_PATH="$PWD/runs/jointpush/partition_push_new_check" \
+  bash stage2_jointpush/scripts/partition_push_train.sh
+# 저장 checkpoint를 화면 없이 복원 검증
+NUM_ENVS=16 EPISODE_LENGTH=30 REPEATS=2 \
+  bash stage2_jointpush/scripts/partition_push_test.sh /absolute/path/PartitionPushCa4.pth
+```
+
+## 로컬 viewer 화면 표시
+
+`partition_push_view.sh`는 Isaac Gym 기본 viewer를 사용한다. 별도의 센서 영상 창과 Tk/Pillow 확대 표시는 제거했다. reset마다 사람·배정 상자·목표의 범위로 카메라를 맞추며, 이후 Isaac Gym 기본 카메라 조작을 사용한다. 기본 1환경이고 Esc 또는 창 닫기로 종료한다.
+
+이 로컬 호스트에서는 Vulkan ICD 자동 탐색 시 네이티브 framebuffer가 검게 출력된다. view wrapper는 기존 `VK_ICD_FILENAMES`/`VK_DRIVER_FILES` 지정이 없고 NVIDIA manifest가 있으면 NVIDIA ICD를 선택한다. 다른 Vulkan 드라이버를 명시한 경우에는 사용자 설정을 유지한다. 학습 환경과 드라이버 설치는 변경하지 않는다.
+
+1000iter checkpoint의 1환경/30step 네이티브 실행 rc=0 및 1600×900 실제 프레임을 확인했다: `runs/jointpush/partition_view_check_20261019/native_partition_nvidia_icd.png`.
+
+## 이전 뒷면 정렬 학습 이어가기 (2026-10-20)
+
+기존 3,000iter checkpoint의 `RESUME_CHECKPOINT` 경로를 사용해 이어 학습한다. 저장 환경에서 spawn_mode가 없으면 코드의 rear_lanes 기본값으로 복원되어 상자 뒷면·구역별 정렬 시작을 유지한다. 신규 기본 YAML의 surround 설정은 이 재개 실행에 적용되지 않는다. 실제 실행 명령·원본 checkpoint는 `runs/jointpush/partition_push_rear_resume_20261020/launch.sh`와 `launch.json`에 기록했다. 결과는 같은 디렉터리의 새 run에 저장한다.

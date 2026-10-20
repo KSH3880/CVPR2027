@@ -48,7 +48,13 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
             if hasattr(self.env.task, '_interaction_checkpoint_metadata'):
                 from utils.push_door_spec import check_interaction_checkpoint
-                check_interaction_checkpoint(checkpoint, self.env.task._interaction_checkpoint_metadata)
+                allow_mass=os.environ.get('PUSH_EVAL_ALLOW_MASS_OVERRIDE','0')=='1'
+                if allow_mass and self.env.task._mode=='train':
+                    raise ValueError('PUSH mass override is evaluation-only')
+                check_interaction_checkpoint(checkpoint, self.env.task._interaction_checkpoint_metadata,
+                                             allow_box_density_override=allow_mass)
+                if allow_mass:
+                    print('[eval] PUSH box mass override: {} kg'.format(self.env.task._box_mass),flush=True)
         return super().restore(fn)
 
     def _build_net(self, config):

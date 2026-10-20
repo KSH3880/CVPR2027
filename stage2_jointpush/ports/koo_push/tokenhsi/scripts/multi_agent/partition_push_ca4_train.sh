@@ -12,7 +12,7 @@ if [ "$MODE" = train ]; then
     CFG_ENV=$(python tokenhsi/scripts/multi_agent/partition_push_setup.py config "$RESUME_CHECKPOINT" "$OUT/configs/partition_push.yaml")
     set -- "$@" --checkpoint "$RESUME_CHECKPOINT" --resume 1
   else
-    SOURCE=${STAGE1_CHECKPOINT:-/home/hwanhee/koo_cvpr/stage1_fix/output/open_push_push180_contact_at_warmstart}
+    SOURCE=${STAGE1_CHECKPOINT:-$PROJECT_ROOT/stage2_jointpush/output/OpenPushPush180ContactAtWarmstart_00029000.pth}
     SOURCE=$(python tokenhsi/scripts/multi_agent/partition_push_setup.py checkpoint "$SOURCE")
     set -- "$@" --transfer_checkpoint "$SOURCE"
   fi
@@ -32,7 +32,10 @@ else
   if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
 fi
 if [ -n "${SEED:-}" ]; then set -- "$@" --seed "$SEED"; fi
-exec python tokenhsi/run.py --task HumanoidMAPartitionPush \
+if [ -n "${EPISODE_LENGTH:-}" ]; then set -- "$@" --episode_length "$EPISODE_LENGTH"; fi
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [ -x /usr/bin/g++-11 ]; then export CXX=${TOKENHSI_CXX:-/usr/bin/g++-11}; fi
+exec python tokenhsi/scripts/multi_agent/partition_push_launch.py --task HumanoidMAPartitionPush \
  --cfg_env "$CFG_ENV" --cfg_train "$CFG_TRAIN" \
  --motion_file "${PARTITION_PUSH_MOTION_FILE:-tokenhsi/data/partition_push_motions.yaml}" \
  --num_agents 4 --num_envs "${NUM_ENVS:-1024}" --num_objects 8 \

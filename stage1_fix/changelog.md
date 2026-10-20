@@ -2,6 +2,13 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-19
+
+### PUSH view 전용 질량 override
+
+- `PUSH_EVAL_ALLOW_MASS_OVERRIDE=1`을 지정한 평가 player에서만 box density 차이를 허용한다. 기본 checkpoint 계약 및 크기·마찰·보상·AMP 검사는 유지하며 학습에는 허용하지 않는다. 원본 checkpoint는 변경하지 않는다.
+- 관련 CPU 계약 테스트 2개 통과, GPU0에서 20kg 확인·18500 checkpoint 로드·1env/3step 평가 정상 종료. 전체 테스트는57통과/9실패(Isaac Gym import 순서 및 별도 taxonomy 기대값 등)로 전체 회귀 통과를 주장하지 않는다. 증거: root `runs/push_view_20kg/check.log`.
+
 ## 2026-10-16
 
 ### 1.7m 상자 받치기 자세 설계와 물리 뷰어

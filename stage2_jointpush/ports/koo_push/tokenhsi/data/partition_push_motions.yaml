@@ -22,15 +22,11 @@ motions:
     weight: 1.0
   - file: dataset_bones_push180/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/ref_motion.npy
     weight: 1.0
-  - file: dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/ref_motion.npy
-    weight: 1.0
   - file: dataset_bones_push180/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/ref_motion.npy
     weight: 1.0
   - file: dataset_bones_push180/motions/push_obstacle_180_003__A344/phys_humanoid_v3/ref_motion.npy
     weight: 1.0
   - file: dataset_bones_push180/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/ref_motion.npy
-    weight: 1.0
-  - file: dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/ref_motion.npy
     weight: 1.0
   - file: dataset_bones_push180/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/ref_motion.npy
     weight: 1.0

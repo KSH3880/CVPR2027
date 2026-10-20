@@ -1,12 +1,38 @@
+## 현재 RSI/AMP 모션 영상 출력
+
+RSI는 loco 4개에서 허용 시점을 샘플링한다. AMP는 PUSH 조건에서 loco 0.33/Push 0.67이며, source는 같은 loco 4개와 변환된 Push180 19개다. 아래 명령은 정책 실행 없이 학습 저장 환경의 원본 모션을 재생한다.
+
+```bash
+bash stage2_jointpush/scripts/export_partition_reference_videos.sh \
+  --env-config "$PWD/runs/jointpush/partition_push_rear_resume_20261020/configs/partition_push.yaml" \
+  --output "$PWD/runs/jointpush/reference_video_export"
+```
+
+기본 1920×1080/30fps. 개별 23개와 `RSI_loco_all.mp4`, `AMP_push_all.mp4`, `AMP_all.mp4`, 원본 경로·SHA-256·적용 좌표 오차를 기록한 `manifest.json`을 생성한다. 합본은 클립별 전체 재생이며 학습 샘플링 비율을 재현한 영상이 아니다. 원본에는 물체 궤적이 없어 인체만 재생한다.
+
+## 이전 뒷면 정렬 방식 학습 재개 (2026-10-20)
+
+사용자 승인으로 랜덤 출발 학습을 종료하고 기존 `partition_push_train/PartitionPushCa4_19-16-41-15/nn/PartitionPushCa4_00003000.pth`에서 GPU0/1024환경으로 재개했다. 저장 env와 optimizer/iteration 상태를 복원한다. 현재 YAML의 신규 surround 기본값을 적용하지 않는다.
+
+- 출력: `runs/jointpush/partition_push_rear_resume_20261020/`
+- 실행 명세: 위 경로의 `launch.sh`, `launch.json`
+- 로그: 위 경로의 `train.log`
+- tmux: `partition_rear_resume_20261020` (실제 실행 여부는 프로세스로 확인)
+- 다음 정기 저장은 3,500 iter이며 이후에도 500 iter 간격이다.
+
 ## 4-agent 가변 그룹 직선 Push
 
-[설정·로컬 준비·ablation](PARTITION_PUSH.md). 사람은항상4명이며순차coupled80%/NONE20%로1~4명그룹을샘플링한다. 그룹상자는X=n×(1~1.3m), 질량=n×(20~30kg), Y1.8~2.2/Z1.2~1.5m이며n등분한다. 남는일반4개도1인분포에서독립랜덤생성한다. 과제4구역+일반4개로8토큰유지, 손높이Z×0.5, loco-only. version2로컬설정이며GPU실행은하지않았다.
+신규 학습은 상자 주변 360° 임의 위치·독립 360° heading에서 시작한다. 외접원 바깥 1~2m, 사람 간 최소 1.2m. 기존 checkpoint 재개·평가는 저장된 이전 시작 분포를 복원한다.
+
+[설정·로컬 준비·ablation](PARTITION_PUSH.md). 사람은항상4명이며순차coupled80%/NONE20%로1~4명그룹을샘플링한다. 그룹상자는X=n×(1~1.3m), 질량=n×(20~30kg), Y1.8~2.2/Z1.2~1.5m이며n등분한다. 남는일반4개도1인분포에서독립랜덤생성한다. 과제4구역+일반4개로8토큰유지, 손높이Z×0.5, loco-only. version2 로컬 설정. 변환된 Push180 19개는 `motiondata/dataset_bones_push180`에서 연결하며 raw NPZ는 사용하지 않는다. 기본 Stage1은 `output/OpenPushPush180ContactAtWarmstart_00029000.pth`다.
 
 ```bash
 # partition_push_ca4 학습
 STAGE1_CHECKPOINT=/local/path/stage1.pth bash stage2_jointpush/scripts/partition_push_train.sh
 # partition_push_ca4 로컬 추론
 HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_test.sh /local/path/stage2.pth
+# partition_push_ca4 Isaac Gym 기본 viewer (기본 1환경)
+TOKENHSI_GPU=0 bash stage2_jointpush/scripts/partition_push_view.sh /local/path/stage2.pth
 # partition_push_ca4 기존 VNC desktop에서 추론
 NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_vnc.sh /local/path/stage2.pth
 ```

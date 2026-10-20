@@ -107,6 +107,7 @@ nn/
 /tokenhsi/data/dataset_dynamic_objects/test/
 
 # Raw motion / mesh blobs anywhere in the tree
+/motiondata/dataset_*/
 *.npz
 *.npy
 *.pkl

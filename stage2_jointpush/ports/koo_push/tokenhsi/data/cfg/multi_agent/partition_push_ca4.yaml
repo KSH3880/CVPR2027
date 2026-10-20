@@ -256,6 +256,8 @@ env:
     spawn_distance:
     - 1.0
     - 2.0
+    spawn_mode: surround_independent
+    spawn_min_agent_distance: 1.2
     goal_distance:
     - 2.0
     - 6.0

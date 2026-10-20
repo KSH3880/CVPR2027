@@ -79,6 +79,23 @@ def test_all_four_task_pairs_bind_correct_object_and_goal():
         assert torch.all(matrices[row].diag()==1)
 
 
+def test_eval_density_override_only_allows_density():
+    env=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1.yaml').read_text())['env']
+    original=interaction_metadata(env)
+    changed=copy.deepcopy(original)
+    changed['interaction']['push']['box']['density']*=.8
+    weights={'interaction_metadata':original}
+    with pytest.raises(ValueError):check_interaction_checkpoint(weights,changed)
+    check_interaction_checkpoint(weights,changed,allow_box_density_override=True)
+    assert original['interaction']['push']['box']['density']!=changed['interaction']['push']['box']['density']
+    for section,key,value in [('push','goal_tolerance',.23),('door','hold_seconds',3.)]:
+        bad=copy.deepcopy(changed);bad['interaction'][section][key]=value
+        with pytest.raises(ValueError):check_interaction_checkpoint(weights,bad,allow_box_density_override=True)
+    bad=copy.deepcopy(changed);bad['interaction']['push']['box']['size']=[1.,1.,1.]
+    with pytest.raises(ValueError):check_interaction_checkpoint(weights,bad,allow_box_density_override=True)
+    with pytest.raises(ValueError):check_interaction_checkpoint({},changed,allow_box_density_override=True)
+
+
 def test_config_and_checkpoint_reject_changed_physics_reward_or_amp():
     env=yaml.safe_load((ROOT/'tokenhsi/data/cfg/multi_agent/push_door_stage1.yaml').read_text())['env']
     validate_interaction(env['interaction'])

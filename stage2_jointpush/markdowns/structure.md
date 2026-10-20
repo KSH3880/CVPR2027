@@ -1,3 +1,16 @@
+## 로컬 Partition Push 모션 데이터 (2026-10-19)
+
+- `scripts/export_partition_reference_videos.sh`: 학습 저장 환경에서 RSI/AMP 원본 모션의 1080p MP4를 생성하는 진입점.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/export_partition_reference_videos.py`: 학습 MotionLib·humanoid asset을 재사용한 kinematic 재생, 프레임별 적용 포즈 검사, 개별 영상/합본/원본 해시 목록 생성.
+
+- `ports/koo_push/tokenhsi/utils/partition_push.py`: 그룹 샘플링·구역 관측·360° 위치/heading 샘플링과 최소 사람 간격 검사.
+
+- `scripts/partition_push_view.sh`: 로컬 화면의 Stage2 checkpoint viewer. 기본 1환경, Isaac Gym 기본 viewer와 기존 test 복원 경로를 사용한다.
+- `motiondata/dataset_bones_push180/`: 변환된 Push180 모션 19개와 변환 보고서. 실행 포트의 `ports/koo_push/tokenhsi/data/dataset_bones_push180`에서 상대 심링크로 참조한다.
+- `motiondata/README.md`: 데이터 위치·목록·사용 범위.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/partition_push_launch.py`: Isaac Gym 선행 import와 RTX 5090 TorchScript 호환 실행.
+- Stage1 checkpoint는 `output/OpenPushPush180ContactAtWarmstart_00029000.pth`에 유지한다.
+
 ## 4명·100kg 추론 (2026-10-16)
 
 `scripts/joint_push_four_agent_100kg_{test,view}.sh`: 4명/3×1.5×1.5m/100kg/GPU6 전용 preview 진입점. `open_push_spec.py`는 3·4명 shared graph의 인덱스를 인원으로 계산한다.

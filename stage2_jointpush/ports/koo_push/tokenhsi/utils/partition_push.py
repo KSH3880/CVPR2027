@@ -2,6 +2,32 @@
 import torch
 
 
+def sample_surround_spawn(boxes, sizes, distance_range, min_separation=1.2):
+    """Independent full-circle positions/headings outside each assigned box."""
+    lo, hi = distance_range
+    if not 0 <= lo <= hi or min_separation <= 0:
+        raise ValueError('Invalid surround spawn distance/separation')
+    n, agents = boxes.shape[:2]
+    positions = boxes.new_empty(n, agents, 2)
+    boundary = sizes[..., :2].norm(dim=-1) / 2
+    for agent in range(agents):
+        pending = torch.arange(n, device=boxes.device)
+        for _ in range(128):
+            angle = torch.rand(len(pending), device=boxes.device) * (2*torch.pi)
+            radius = boundary[pending, agent] + lo + (hi-lo)*torch.rand(len(pending), device=boxes.device)
+            candidate = boxes[pending, agent, :2] + radius[:, None]*torch.stack((angle.cos(), angle.sin()), -1)
+            valid = ((candidate[:, None] - positions[pending, :agent]).norm(dim=-1)
+                     >= min_separation).all(-1)
+            positions[pending[valid], agent] = candidate[valid]
+            pending = pending[~valid]
+            if not len(pending):
+                break
+        else:
+            raise RuntimeError('Could not sample separated surround spawns')
+    heading = torch.rand(n, agents, device=boxes.device) * (2*torch.pi)
+    return positions, heading
+
+
 def sample_groups(n, probability, device='cpu', preset='random_scenario'):
     """Shared-support sampling: shuffle humans, then consume 1 or 2..remaining."""
     order = torch.rand(n, 4, device=device).argsort(-1)

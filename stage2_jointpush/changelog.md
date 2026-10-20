@@ -2,7 +2,52 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-20
+
+### 기존 뒷면 정렬 3,000iter 학습 재개
+
+- 사용자 승인으로 랜덤 출발 학습만 SIGTERM 종료했다. 해당 뷰어는 종료 직전 확인에서 이미 종료된 상태였다. 기존 랜덤 출발 결과·로그는 보존했다.
+- `partition_push_train/PartitionPushCa4_19-16-41-15/nn/PartitionPushCa4_00003000.pth`에서 GPU0/1024환경으로 resume했다. checkpoint epoch3000/frame393216000/optimizer를 확인했고, 생성 env가 저장 env와 정확히 동일하며 rear_lanes/모션 manifest SHA가 일치함을 검사했다.
+- tmux `partition_rear_resume_20261020`, 출력 `runs/jointpush/partition_push_rear_resume_20261020/`. launch.sh/launch.json에 재개 명령과 원본을 기록했다. 실제 epoch3001~3003 업데이트, finite 보상, 약 2.1만 frames/s 진행을 확인했다. 다음 정기 저장은 3500iter다.
+
 ## 2026-10-19
+
+### Partition Push 신규 학습의 360° 독립 접근 시작
+
+- 사용자 요청으로 신규 기본 spawn을 `surround_independent`로 변경했다. 각 사람은 배정 상자의 XY 외접원 밖 1~2m에서 독립 360° 위치·독립 360° heading으로 시작하고 root 간 최소 1.2m를 만족하도록 재추첨한다. 그룹·4명 인원·목표·contact point·보상·기존 CPA 회피 항은 유지한다.
+- `spawn_mode`가 없는 기존 checkpoint는 `rear_lanes`를 기본으로 유지하여 재개/평가의 초기화 분포를 보존한다. 현재 학습·뷰어는 종료하거나 재시작하지 않았다. 새 YAML은 신규 학습에 적용되며 기존 resume는 저장된 spawn 설정을 복원한다.
+- CPU 20개 통과: 기존/신규 5종 그룹 실제 reset·부분 reset·할당/8토큰 보존, 1만 환경 360° 위치·heading 독립성·상자 clearance·사람 최소 간격 검사. GPU0/2환경 64 physics step 및 반복/부분 reset, finite obs/reward, 모든 그룹 구성 검증 rc=0. 별도 진단 CLI의 필수 인자 누락 로그를 보존 후 보완해 통과했다. 로그: `runs/jointpush/partition_surround_check_20261019/smoke_final.log`.
+
+### Isaac Gym 네이티브 viewer 복원과 Vulkan 드라이버 선택 수정
+
+- 사용자 요청대로 센서/Tk 우회 창과 관련 분기·모듈을 제거하고 `partition_push_view.sh`를 기본 Isaac Gym viewer로 되돌렸다.
+- 동일한 단일 상자 최소 예제의 native framebuffer는 Vulkan ICD 자동 탐색에서 전부 0, NVIDIA ICD 지정 시 정상 RGB/불투명 alpha였다. 카메라 조정·visual mesh 전환·OpenGL dispatcher 변경으로는 해결되지 않았다.
+- view wrapper에서 기존 Vulkan 드라이버 지정이 없고 NVIDIA ICD manifest가 존재하면 `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json`을 적용한다. 전역 환경·설치 파일·학습 프로세스는 변경하지 않는다.
+- 실제 1000iter Partition Push checkpoint/1환경/30step 네이티브 평가 rc=0. 센서 생성이나 별도 창 없이 기본 1600×900 viewer에서 사람·상자·바닥이 정상 출력되는 원본 프레임을 확인했다: `runs/jointpush/partition_view_check_20261019/native_partition_nvidia_icd.png`. CPU 회귀 14개·셸 구문·diff 검사 통과.
+
+### 로컬 검은 네이티브 창을 센서 영상 viewer로 대체
+
+- 실행 중인 Isaac Gym 창의 X11 framebuffer가 검은색임을 직접 확인했다. 같은 simulation의 camera sensor에서는 사람·상자·바닥이 정상 렌더링되어, 이전 카메라 구도 변경만으로는 해결되지 않았음을 확인했다.
+- 로컬 `partition_push_view.sh`의 기본 backend를 sensor로 변경했다. Gym 센서 RGBA 영상을 1280×720 Tk 창에 실시간 표시하며 왼쪽 드래그 회전·휠 확대·Esc/닫기를 제공한다. 네이티브 graphics context는 유지하고 해당 PID의 검은 창만 최소화한다. 다른 실행의 창은 건드리지 않는다. native backend를 명시적으로 선택할 수도 있다.
+- 네이티브 viewer 해제 후 센서 렌더링은 rc=139로 실패하여 해제 방식을 제거했다. 실패 로그는 보존했다. 수정 후 실제 view 스크립트/1000iter checkpoint/1환경에서 사람 4명과 상자가 표시되는 Tk 창을 직접 캡처했다: `runs/jointpush/partition_view_check_20261019/sensor_window.png`. 1환경/240step 실행 rc=0, CPU 회귀 14개 및 창 최소화 대상 PID 검사 통과. 학습은 유지했다.
+
+### Partition Push 뷰어 카메라 구도 보완 (빈 화면 해결 아님)
+
+- 렌더링은 기존 물리 스텝에서 수행됨을 확인했다. Partition Push는 기존 근접 agent 카메라를 상속하고 있었으며 전용 장면 카메라를 추가했다.
+- Partition Push reset마다 첫 환경의 사람·배정 상자·목표 범위로 overview 카메라를 배치한다. 격리 bank actor와 먼 일반 상자는 범위에서 제외하며 기본 추적을 해제했다. 새 episode에서 그룹 구도가 바뀌어도 화면 안에 배치한다.
+- CPU 회귀 14개와 공동/독립 그룹 카메라 배치·parked actor 제외 검사 통과. GPU0/1000iter checkpoint/1환경/60step/2회 GUI 평가 rc=0 및 렌더 호출 확인. 후속 데스크톱 캡처는 Wayland/XCB 제약으로 실패하여 실제 화면 이미지는 검증하지 못했다. 기존 학습은 유지했다. 검증 로그: `runs/jointpush/partition_view_check_20261019/`.
+
+### Partition Push 로컬 viewer 준비
+
+- `scripts/partition_push_view.sh`를 추가했다. checkpoint 경로를 받아 기존 test 복원 경로에 연결하며 HEADLESS=0/기본 1환경/기본 100만 회 반복으로 실행한다. `NUM_ENVS`, `REPEATS`, `TOKENHSI_GPU`를 지정할 수 있고 출력은 `runs/jointpush/partition_push_view`로 분리한다. 상대 checkpoint 경로도 실행 전 절대경로로 해석한다.
+- 셸 구문·인자 누락 시 사용법 출력·diff 검사를 확인했다. GUI는 실행하지 않았다.
+
+### 로컬 Push180 모션 정리와 RTX 5090 실행 검증
+
+- 받은 `output/dataset_bones_push180`을 `motiondata/dataset_bones_push180`으로 이동하고 57개 파일의 SHA-256 일치를 확인했다. 실행 포트에 상대 심링크를 연결하고 loco는 기존 로컬 데이터로 연결했다. raw NPZ와 Stage1 checkpoint는 output에 보관한다.
+- 사용자 요청에 따라 변환된 Push180 19개만 사용한다. 기존 AMP 목록의 별도 dataset_bones_push 2개는 제외했으므로 이전 21개 목록과 분포가 다르다. 데이터 본체는 Git에서 제외하고 위치·사용 범위를 문서화했다.
+- Partition Push의 기본 Stage1을 받은 로컬 29000 파일로 변경했다. conda hook의 nounset 오류, conda compiler의 crypt.h 빌드 실패를 수정하고 RTX 5090용 legacy TorchScript fusion 비활성화 및 EPISODE_LENGTH를 연결했다. 첫 실패 로그는 보존했다.
+- CPU 테스트 14개, manifest 전체 경로·NPY 로드·rotation/root translation 유한값, 셸 문법·diff 검사 통과. RTX 5090/GPU0/1024환경/MAX_ITERATIONS=2 전이·학습·저장 rc=0, 저장 모델 16환경/30step/2회 복원 평가 rc=0. 단기 실행 검증이며 성공 성능 검증은 아니다. 산출물: `runs/jointpush/partition_local_check_20261019/`. 장기 학습은 시작하지 않았다.
 
 ### 직선 Push 목표 거리 2~6m
 

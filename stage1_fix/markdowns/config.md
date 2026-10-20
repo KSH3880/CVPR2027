@@ -933,3 +933,7 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/lift_support_pose_view.sh --hei
 ```
 
 기본 산출물은 root `runs/lift_support_pose_170/`이며 `--output`으로 분리 가능하다. 학습/train config 또는 checkpoint는 사용하지 않는다.
+
+## PUSH view의 질량만 변경 (2026-10-19)
+
+학습 당시 저장 env를 복사하고 `env.interaction.push.box.density`를 원하는 질량/부피로 변경한다. `CFG_ENV`에 복사본을 지정하고 test/view 실행 앞에 `PUSH_EVAL_ALLOW_MASS_OVERRIDE=1`을 추가한다. 평가 player만 density 차이를 허용하며 크기·마찰·보상 등 다른 checkpoint 계약은 유지한다. 현재 20kg/1.3m 설정은 root `runs/push_view_20kg/env.yaml`, GPU 검증 로그는 `runs/push_view_20kg/check.log`다. 원본 checkpoint/학습 config는 변경하지 않는다.

@@ -1,5 +1,6 @@
 """Stage-1 pushing/open-and-hold contracts, independent of Isaac Gym."""
 import math
+import copy
 import torch
 
 VARIANT = 'push_door_stage1_v1'
@@ -292,13 +293,22 @@ def interaction_metadata(env):
     return metadata
 
 
-def check_interaction_checkpoint(weights, expected):
+def check_interaction_checkpoint(weights, expected, allow_box_density_override=False):
     actual=weights.get('interaction_metadata')
     def active_metadata(value):
         if value is not None and value.get('relation_graph',{}).get('door_hand_open_relations',False):
             value=dict(value)
             value['relation_taxonomy']={k:v for k,v in value.get('relation_taxonomy',{}).items() if k not in ('DOOR_OPEN','DOOR_HOLD')}
         return value
+    if allow_box_density_override and actual is not None:
+        actual=copy.deepcopy(actual)
+        expected=copy.deepcopy(expected)
+        for value in (actual,expected):
+            box=value['interaction']['push']['box']
+            density=float(box['density'])
+            if not math.isfinite(density) or density<=0:
+                raise ValueError('Evaluation box density must be finite and positive')
+            box.pop('density')
     if active_metadata(actual) != active_metadata(expected):
         raise ValueError('Push/door checkpoint contract mismatch; use its dedicated checkpoint/config')
 

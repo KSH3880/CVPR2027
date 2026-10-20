@@ -10,7 +10,7 @@ from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.humanoid_ma_open_push import HumanoidMAOpenPush
 from env.tasks.multi_agent.humanoid_ma_joint_push import cpa_penalty
 from utils.door_reference import rotate, multiply, yaw_from_quat
-from utils.partition_push import nearest_boxes, group_tokens, group_layout, sample_groups, sample_asset_bank, partition_reward
+from utils.partition_push import nearest_boxes, group_tokens, group_layout, sample_groups, sample_asset_bank, partition_reward, sample_surround_spawn
 from utils.open_push_spec import compile_graph
 from utils.edge_ontop_spec import expand_graph
 from utils.edge_stage1_spec import semantic_graph_packet
@@ -220,8 +220,17 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         lo,hi = self._joint_push_spec['spawn_distance']
         local[...,1] = -size[...,1]/2-lo-(hi-lo)*torch.rand(n,4,device=self.device)
         selected = boxes[rows,expected]
-        self._spawn_roots[ids] = (selected[...,:3]+rotate(q[:,None].expand(n,4,4),local))[...,:2]
-        self._spawn_yaw[ids] = yaw[:,None]+torch.pi/2
+        spawn_mode = self._joint_push_spec.get('spawn_mode', 'rear_lanes')
+        if spawn_mode == 'surround_independent':
+            positions, headings = sample_surround_spawn(selected, size, (lo, hi),
+                self._joint_push_spec.get('spawn_min_agent_distance', 1.2))
+            self._spawn_roots[ids] = positions
+            self._spawn_yaw[ids] = headings
+        elif spawn_mode == 'rear_lanes':
+            self._spawn_roots[ids] = (selected[...,:3]+rotate(q[:,None].expand(n,4,4),local))[...,:2]
+            self._spawn_yaw[ids] = yaw[:,None]+torch.pi/2
+        else:
+            raise ValueError('Unknown Partition Push spawn_mode: '+spawn_mode)
         self._reset_actors(ids)
         active = torch.cat((expected,keep),-1)
         candidates = boxes[rows,active]
@@ -242,6 +251,31 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         self._compute_observations(ids)
         self._compute_amp_observations(ids)
         self._hist_amp_obs_buf[ids] = self._curr_amp_obs_buf[ids,:,None]
+        if getattr(self, 'viewer', None) is not None and (ids == 0).any():
+            self._place_partition_camera()
+
+    def _init_camera(self):
+        # The useful scene positions are assigned at reset, after construction.
+        self._cam_prev_char_pos = self._humanoid_root_states[0, 0, :3].detach().cpu().numpy().copy()
+        self.cfg['env']['cameraFollow'] = False
+        self._camera_follow_flag = False
+
+    def _place_partition_camera(self):
+        roots = self._humanoid_root_states[0, :, :3]
+        boxes = self._box_states[0, self._agent_box_assignment[0], :3]
+        # Ignore parked bank actors at x/y >= 1000 and distant distractors.
+        points = torch.cat((roots, boxes, self._tar_pos[0]), 0)
+        lower, upper = points.amin(0), points.amax(0)
+        target = (lower + upper) / 2
+        target[2] = 1.
+        distance = max(8., float((upper[:2] - lower[:2]).norm()) * 1.2)
+        camera = target + target.new_tensor([0., -distance, distance * .75])
+        self.gym.viewer_camera_look_at(self.viewer, None,
+            gymapi.Vec3(*camera.detach().cpu().tolist()),
+            gymapi.Vec3(*target.detach().cpu().tolist()))
+        self._camera_follow_flag = False
+        self._cam_prev_char_pos = roots[0].detach().cpu().numpy().copy()
+        print('[Partition Push viewer] camera framed active groups', flush=True)
 
     def _compute_reward(self, actions):
         self._select_regions(torch.arange(self.num_envs, device=self.device), live=True)
