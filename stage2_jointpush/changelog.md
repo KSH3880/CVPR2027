@@ -4,6 +4,12 @@
 
 ## 2026-10-20
 
+### Partition Push 구역 독점 배정 수정
+
+- 매 step 각 사람의 최근접 구역을 독립 선택하여 같은 구역을 중복 배정하던 오류를 수정했다. reset에서 같은 그룹 내 거리 합을 최소화하는 일대일 배정을 선택하고 에피소드 동안 고정한다. 관측 graph·손 목표·보상이 같은 배정을 사용하며 부분 reset은 다른 환경을 보존한다.
+- 새 checkpoint에 배정 방식 버전을 저장하고 알 수 없는 방식은 거부한다. 기존 checkpoint는 새 배정 방식 적용을 로그에 알리며 로딩한다. 실행 중인 학습·뷰어는 종료하거나 재시작하지 않았다.
+- CPU 테스트 **29개 통과**. 실제 GPU/Isaac Gym 2환경에서 기존 rear_lanes·랜덤 surround_independent, 5종 그룹 구성, 반복/부분 reset과 **64 physics step**을 검증했다. 구역 중복 없음·그룹 소유권·graph/손 목표 일치·step 중 배정 고정·finite 관측/보상을 확인했다. 로그: `runs/jointpush/partition_exclusive_regions_check_20261020/smoke.log`. 장기 정책 수렴 검증은 아니다.
+
 ### 로컬 반영 후 Stage1 경로 분리와 테스트 충돌 정리
 
 - Partition Push 신규 학습의 없는 로컬 기본 경로와 모델 테스트의 옛 재현 경로를 공통 resolver로 통합했다. 명시 CLI/STAGE1_CHECKPOINT → 기기 전용 YAML → 로컬output/서버stage1_sources/옛재현 후보를 순서대로 사용한다. 잘못된 명시 경로·모호한 최신 run은 실패한다. 기존 Stage2 resume/test 복원은 유지한다.

@@ -10,13 +10,14 @@ from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.humanoid_ma_open_push import HumanoidMAOpenPush
 from env.tasks.multi_agent.humanoid_ma_joint_push import cpa_penalty
 from utils.door_reference import rotate, multiply, yaw_from_quat
-from utils.partition_push import nearest_boxes, group_tokens, group_layout, sample_groups, sample_asset_bank, partition_reward, sample_surround_spawn
+from utils.partition_push import nearest_boxes, group_tokens, group_layout, sample_groups, sample_asset_bank, partition_reward, sample_surround_spawn, exclusive_regions
 from utils.open_push_spec import compile_graph
 from utils.edge_ontop_spec import expand_graph
 from utils.edge_stage1_spec import semantic_graph_packet
 
 
 class HumanoidMAPartitionPush(HumanoidMACarry):
+    REGION_ASSIGNMENT = 'exclusive_reset_min_distance_v1'
     REWARD_TERM_NAMES = ('state', 'progress', 'success', 'power', 'collision', 'total')
 
     def __init__(self, cfg, *args, **kwargs):
@@ -108,6 +109,7 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         self._group_counts = torch.full_like(self._group_leaders,4)
         self._ordinary_keep = torch.arange(4, device=self.device)[None].expand(self.num_envs, -1).clone()
         self._local_hands = torch.zeros(self.num_envs, 4, 2, 3, device=self.device)
+        self._agent_region_assignment = torch.arange(4, device=self.device)[None].expand(self.num_envs, -1).clone()
 
     def _select_graph(self, ids):
         from utils.edge_ontop_spec import select_graph
@@ -133,6 +135,11 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
                 saved['partition'][key] = actual['partition'][key]
         if saved != actual:
             raise ValueError('Partition Push checkpoint configuration differs')
+        assignment = checkpoint.get('partition_region_assignment')
+        if assignment is None:
+            print('[Partition Push] Legacy checkpoint: applying exclusive, episode-fixed region assignment', flush=True)
+        elif assignment != self.REGION_ASSIGNMENT:
+            raise ValueError('Partition Push checkpoint region assignment differs')
 
     def _reset_ref_state_init(self, slot_env, slot_agent):
         HumanoidMACarry._reset_ref_state_init(self, slot_env, slot_agent)
@@ -152,13 +159,15 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
             rotate(q, root[:, 10:13]), self._dof_vel[slot_env, slot_agent].clone())
         self._kinematic_humanoid_rigid_body_states[slot_env, slot_agent] = body
 
-    def _select_regions(self, ids, live=False):
-        roots = self._humanoid_root_states[ids] if live else self._kinematic_humanoid_rigid_body_states[ids, :, 0]
+    def _select_regions(self, ids, live=False, reassign=False):
         assignment = self._agent_box_assignment[ids]
         states, _, offsets = group_tokens(self._box_states[ids], self._box_size[ids], assignment, self._ordinary_keep[ids])
-        distances = torch.cdist(roots[..., :2], states[:, :4, :2])
-        same = assignment[..., None] == assignment[:, None, :]
-        strip = distances.masked_fill(~same, float('inf')).argmin(-1)
+        if reassign:
+            roots = self._humanoid_root_states[ids] if live else self._kinematic_humanoid_rigid_body_states[ids, :, 0]
+            distances = torch.cdist(roots[..., :2], states[:, :4, :2])
+            same = assignment[..., None] == assignment[:, None, :]
+            self._agent_region_assignment[ids] = exclusive_regions(distances, same)
+        strip = self._agent_region_assignment[ids]
         rows = torch.arange(len(ids),device=self.device)[:,None]
         size = self._box_size[ids[:,None],assignment]
         points = self._local_hands[ids].clone(); points.zero_()
@@ -246,7 +255,7 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         self._tar_pos[ids] = selected[...,:3]+rotate(q[:,None].expand(n,4,4),local_goal)
         self.relation_runtime.graph.edge_dst[ids,1::2] = 12+groups
         self.relation_runtime.done[ids] = False
-        self._select_regions(ids)
+        self._select_regions(ids, reassign=True)
         self._reset_env_tensors(ids)
         self._compute_observations(ids)
         self._compute_amp_observations(ids)
@@ -297,6 +306,7 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         self._reward_term_sums += terms.sum(0); self._reward_term_count += len(terms)
         self.extras['partition_push_group_counts'] = self._group_counts.clone()
         self.extras['partition_push_assignment'] = self._agent_box_assignment.clone()
+        self.extras['partition_push_regions'] = self._agent_region_assignment.clone()
         self.extras['partition_push_hand_targets'] = r['targets']
         self.extras['partition_push_group_phi'] = r['group_phi']
 

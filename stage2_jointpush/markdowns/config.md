@@ -1,3 +1,7 @@
+## Partition Push 구역 중복 배정 수정 (2026-10-20)
+
+reset마다 그룹 내 이동거리 합을 최소화하는 **1인 1구역** 배정을 선택하고 에피소드 동안 고정한다. 관측 graph·손 목표·보상이 같은 배정을 사용한다. 기존 checkpoint는 새 배정 방식으로 로딩 가능하며 로그에 표시한다. 새 checkpoint에는 `partition_region_assignment=exclusive_reset_min_distance_v1`을 저장한다. 실행 중인 학습·뷰어는 재시작해야 반영되며 이번 수정에서 종료하지 않았다.
+
 ## 서버·로컬 Stage1 경로 분리 (2026-10-20)
 
 Partition Push 학습과 실제 checkpoint 모델 테스트는 같은 `resolve_stage1_checkpoint`를 쓴다. 선택 우선순위는 CLI에 명시한 경로 → `STAGE1_CHECKPOINT` → 기기 전용 YAML → 기본 후보 순이다. 명시한 경로가 잘못되면 다른 모델로 fallback하지 않는다. 기존 resume/test는 지정된 Stage2 checkpoint 복원 경로를 유지한다.

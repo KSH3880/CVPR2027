@@ -391,8 +391,8 @@ BEFORE Stage 2는 `approach_stage2_before_task_embedding` env YAML·train/test/V
 
 ## 공유 상자 분할 Push
 
-- `ports/koo_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_partition_push.py`: 순차coupled80%/NONE20% 가변그룹, 인원비례상자/n분할+랜덤일반4개로8토큰, 최근접구역·손point·그룹별보상.
-- `ports/koo_push/tokenhsi/utils/partition_push.py`: CPU 그룹샘플러·24후보asset크기/질량·가변분할기하·최근접할당·그룹보상.
+- `ports/koo_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_partition_push.py`: 순차coupled80%/NONE20% 가변그룹, 인원비례상자/n분할+랜덤일반4개로8토큰, reset별 일대일 고정 구역·손point·그룹별보상.
+- `ports/koo_push/tokenhsi/utils/partition_push.py`: CPU 그룹샘플러·24후보asset크기/질량·가변분할기하·그룹 내 최소 거리 합 일대일할당·그룹보상.
 - `ports/koo_push/tokenhsi/data/cfg/{multi_agent,train/rlg}/partition_push_ca4.yaml`: 환경/학습 프로필.
 - `ports/koo_push/tokenhsi/data/partition_push_motions.yaml`: raw Push+loco AMP.
 - `ports/koo_push/tokenhsi/scripts/multi_agent/partition_push_setup.py`: source 경로 선택, checkpoint 환경 복원·추론 ablation.

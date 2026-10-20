@@ -2,7 +2,7 @@ from pathlib import Path
 import torch
 import yaml
 import pytest
-from utils.partition_push import strip_geometry, nearest_boxes, partition_reward, group_tokens, group_layout, sample_groups, sample_asset_bank, sample_surround_spawn
+from utils.partition_push import strip_geometry, nearest_boxes, partition_reward, group_tokens, group_layout, sample_groups, sample_asset_bank, sample_surround_spawn, exclusive_regions
 from utils.open_push_spec import compile_graph, validate_env
 from utils.edge_stage1_spec import semantic_graph_packet
 from utils.edge_ontop_spec import expand_graph
@@ -70,7 +70,7 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
                ('_reset_envs', '_select_regions', '_logical_box_values')]
     namespace = dict(torch=torch, rotate=rotate, nearest_boxes=nearest_boxes, group_tokens=group_tokens, group_layout=group_layout,
                      sample_groups=lambda n,*args: torch.tensor(leaders)[None].expand(n,-1),
-                     sample_surround_spawn=sample_surround_spawn)
+                     sample_surround_spawn=sample_surround_spawn, exclusive_regions=exclusive_regions)
     for method in methods:
         exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
     class Fake:
@@ -92,6 +92,7 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     task._humanoid_root_states = torch.zeros(3,4,13)
     task._kinematic_humanoid_rigid_body_states = torch.zeros(3,4,1,13)
     task._agent_box_assignment = torch.zeros(3,4,dtype=torch.long)
+    task._agent_region_assignment = torch.arange(4)[None].expand(3,-1).clone()
     task._tar_pos = torch.zeros(3,4,3)
     task._curr_amp_obs_buf = torch.zeros(3,4,5)
     task._hist_amp_obs_buf = torch.zeros(3,4,9,5)
@@ -110,6 +111,18 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     expected,counts,_ = group_layout(torch.tensor(leaders)[None].expand(2,-1))
     assert torch.equal(task._agent_box_assignment[[0,2]],expected)
     assert torch.equal(task._group_counts[[0,2]],counts)
+    regions = task._agent_region_assignment[[0,2]]
+    assert regions.sort(-1).values.eq(torch.arange(4)).all()
+    assert torch.equal(expected.gather(1, regions), expected)
+    assert torch.equal(task.relation_runtime.graph.edge_dst[[0,2],::2], regions+4)
+    assert torch.equal(task.relation_runtime.graph.edge_src[[0,2],1::2], regions+4)
+    # Crossing over another region cannot steal its ownership within the episode.
+    fixed_regions = task._agent_region_assignment.clone()
+    fixed_hands = task._local_hands.clone()
+    task._humanoid_root_states[0,:,0] += torch.tensor([20.,-20.,20.,-20.])
+    task._select_regions(torch.tensor([0]), live=True)
+    assert torch.equal(task._agent_region_assignment, fixed_regions)
+    torch.testing.assert_close(task._local_hands, fixed_hands)
     active = task._box_states[[0,2],:,0].abs()<100
     assert active.sum(-1).eq(len(set(leaders))+4).all()
     assert (task._box_states[[0,2],:8,0] > 900).sum(-1).eq(4).all()
@@ -121,8 +134,56 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     assert torch.equal(task.relation_runtime.graph.edge_dst[[0,2],1::2],12+torch.tensor(leaders)[None].expand(2,-1))
     # A second reset on just one scene cannot alter other scenes' assignments.
     untouched_assignment = task._agent_box_assignment[2].clone()
+    untouched_regions = task._agent_region_assignment[2].clone()
     task._reset_envs(torch.tensor([0]))
     assert torch.equal(task._agent_box_assignment[2],untouched_assignment)
+    assert torch.equal(task._agent_region_assignment[2],untouched_regions)
+
+
+def test_exclusive_regions_resolve_shared_nearest_and_global_conflict():
+    cost = torch.tensor([[[1.,2.,100.,100.], [1.1,100.,100.,100.],
+                          [100.,100.,0.,100.], [100.,100.,100.,0.]]])
+    assert cost.argmin(-1).tolist() == [[0,0,2,3]]
+    assert exclusive_regions(cost,torch.ones_like(cost,dtype=torch.bool)).tolist()==[[1,0,2,3]]
+    tied = torch.tensor([[[0.,1.,2.,3.]]]).expand(32,4,4)
+    result = exclusive_regions(tied,torch.ones_like(tied,dtype=torch.bool))
+    assert result.sort(-1).values.eq(torch.arange(4)).all()
+
+
+@pytest.mark.parametrize('groups', [(0,0,0,0),(0,0,2,2),(0,0,0,3),(0,1,2,3),(0,1,1,1),(0,1,0,1)])
+def test_exclusive_regions_cannot_take_another_groups_region(groups):
+    owners=torch.tensor(groups)[None].expand(128,-1)
+    same=owners[...,None]==owners[:,None,:]
+    distances=torch.rand(128,4,4)
+    result=exclusive_regions(distances,same)
+    assert result.sort(-1).values.eq(torch.arange(4)).all()
+    assert torch.equal(owners.gather(1,result),owners)
+
+
+def test_exclusive_regions_reject_impossible_group_matching():
+    with pytest.raises(ValueError,match='No valid exclusive'):
+        exclusive_regions(torch.ones(1,4,4),torch.zeros(1,4,4,dtype=torch.bool))
+
+
+def test_region_checkpoint_metadata_accepts_legacy_and_rejects_unknown_semantics():
+    import ast
+    import copy
+    from types import SimpleNamespace
+    path=Path(__file__).resolve().parents[1]/'env/tasks/multi_agent/humanoid_ma_partition_push.py'
+    cls=next(n for n in ast.parse(path.read_text()).body if isinstance(n,ast.ClassDef))
+    method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=='validate_inference_checkpoint')
+    ns={}
+    exec(compile(ast.Module(body=[method],type_ignores=[]),str(path),'exec'),ns)
+    contract=dict(policy='partition_push_ca4',partition=dict(version=2),friction=.6)
+    task=SimpleNamespace(cfg={'args':SimpleNamespace(test=True),'env':{}},
+        REGION_ASSIGNMENT='exclusive_reset_min_distance_v1',get_open_push_contract=lambda:copy.deepcopy(contract))
+    validate=ns['validate_inference_checkpoint']
+    validate(task,{'open_push_contract':contract})
+    validate(task,{'open_push_contract':contract,'partition_region_assignment':task.REGION_ASSIGNMENT})
+    with pytest.raises(ValueError,match='region assignment differs'):
+        validate(task,{'open_push_contract':contract,'partition_region_assignment':'unknown'})
+    with pytest.raises(ValueError,match='configuration differs'):
+        validate(task,{'open_push_contract':dict(contract,friction=.1)})
 
 
 def test_surround_spawn_clearance_separation_and_independent_heading():

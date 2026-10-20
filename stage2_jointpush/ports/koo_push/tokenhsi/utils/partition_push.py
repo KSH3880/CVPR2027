@@ -1,5 +1,20 @@
 """Variable Push groups and fixed eight-token scene geometry, without a simulator."""
 import torch
+from itertools import permutations
+
+
+def exclusive_regions(distances, same_group):
+    """Minimum-total-distance bijection; regions from other groups are forbidden."""
+    agents = distances.shape[-1]
+    if distances.shape[-2] != agents or not 1 <= agents <= 4:
+        raise ValueError('Exclusive assignment supports one to four agents')
+    choices = torch.tensor(list(permutations(range(agents))), device=distances.device)
+    rows = torch.arange(agents, device=distances.device)
+    costs = distances.masked_fill(~same_group, float('inf'))[:, rows, choices].sum(-1)
+    best = costs.argmin(-1)
+    if not torch.isfinite(costs.gather(1, best[:, None])).all():
+        raise ValueError('No valid exclusive region assignment within the groups')
+    return choices[best]
 
 
 def sample_surround_spawn(boxes, sizes, distance_range, min_separation=1.2):

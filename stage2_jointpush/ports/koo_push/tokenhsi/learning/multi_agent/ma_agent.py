@@ -293,12 +293,20 @@ class MAAgent(amp_agent.AMPAgent):
             weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)
         if task._state_relation:
             weights['relation_experiment_config'] = self._relation_experiment_config
+        if getattr(task, '_partition_push', False):
+            weights['partition_region_assignment'] = task.REGION_ASSIGNMENT
         if getattr(task, '_stage2', False) or getattr(task, '_joint_push', False):
             weights['stage2_checkpoint_info'] = self._stage2_checkpoint_info
         return weights
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
+        if getattr(task, '_partition_push', False):
+            assignment = weights.get('partition_region_assignment')
+            if assignment is None:
+                print('[Partition Push] Loading legacy weights; exclusive, episode-fixed region assignment is now applied', flush=True)
+            elif assignment != task.REGION_ASSIGNMENT:
+                raise ValueError('Partition Push checkpoint region assignment differs')
         if getattr(task,'_open_push',False) and weights.get('open_push_contract') != task.get_open_push_contract():
             raise ValueError('OPEN/PUSH checkpoint physics/reference contract differs')
         if getattr(task,'_door_open',False) and weights.get('door_experiment_contract') != task.get_door_experiment_contract():
