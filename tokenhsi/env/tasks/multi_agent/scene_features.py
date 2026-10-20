@@ -4,6 +4,21 @@ import math
 import torch
 
 
+def object_task_owners(graph, env_id):
+    row = lambda value: value if value.ndim == 1 else value[env_id]
+    valid = row(graph.edge_valid)
+    src = row(graph.edge_src)[valid].detach().cpu().tolist()
+    dst = row(graph.edge_dst)[valid].detach().cpu().tolist()
+    owners = row(graph.edge_owner)[valid].detach().cpu().tolist()
+    result = {}
+    for source, target, owner in zip(src, dst, owners):
+        for entity in (source, target):
+            obj = entity - graph.num_agents
+            if 0 <= obj < graph.num_objects:
+                result.setdefault(obj, set()).add(owner)
+    return result
+
+
 def scenario_neutral_targets(env_origins, env_ids, num_targets):
     """Place inactive scenario targets at each environment's local origin."""
     return env_origins[env_ids].unsqueeze(1).expand(-1, num_targets, -1)

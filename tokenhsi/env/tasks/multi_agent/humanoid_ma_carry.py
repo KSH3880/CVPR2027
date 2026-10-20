@@ -10,6 +10,7 @@ from env.tasks.multi_agent.humanoid_ma import HumanoidMA
 from env.tasks.multi_agent.scene_features import (
     build_gta_pose_records,
     scenario_neutral_targets,
+    object_task_owners,
 )
 from utils.relation_task_spec import validate_relation_config
 from env.tasks.humanoid import dof_to_obs
@@ -60,7 +61,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         self, cfg, sim_params, physics_engine, device_type, device_id, headless
     ):
         self._shared_support = cfg["env"].get("sharedSupport") is not None
-        self._stage2 = cfg["env"].get("stage2") is not None or self._shared_support
+        self._before = cfg["env"].get("before") is not None
+        self._stage2 = cfg["env"].get("stage2") is not None or self._shared_support or self._before
         self._relation_cfg = cfg["env"]["relationReward"]
         validate_relation_config(self._relation_cfg)
         from utils.unified_training import validate_unified_env
@@ -91,6 +93,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if self._shared_support:
             from utils.shared_support import PRESETS
             allowed_presets = PRESETS
+        if self._before:
+            from utils.before_spec import PRESETS
+            allowed_presets = PRESETS
         if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
         ) not in ("stack", "agent"):
@@ -99,6 +104,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             expected_shape = (4, 8) if self._stage2 else (2, 4)
             if self._shared_support:
                 expected_shape = (4, cfg["env"]["numObjects"])
+            if self._before:
+                expected_shape = (cfg["env"]["numAgents"], cfg["env"]["numObjects"])
             if self._task_graph_preset != "random_scenario" or (
                 cfg["env"]["numAgents"],
                 cfg["env"]["numObjects"],
@@ -112,6 +119,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         configured_objects = int(cfg["env"].get("numObjects", 0))
         self.num_objects = num_agents if configured_objects <= 0 else configured_objects
         self.num_physical_objects = 12 if self._stage2 else self.num_objects
+        if self._before:
+            self.num_physical_objects = max(4*num_agents, self.num_objects)
         if self._shared_support:
             from utils.shared_support import capacities
             self.num_physical_objects = capacities(cfg["env"])[1]
@@ -179,8 +188,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             box_cfg["obs"]["enableBboxObs"] is True
         ), "the multi-agent object token always carries the bbox points"
         self._reset_random_rot = box_cfg["reset"]["randomRot"]
-        self._reset_random_height = True
-        self._stage1_platforms = True
+        self._ground_only = self._before and box_cfg['reset']['platformMode'] == 'ground_only'
+        self._reset_random_height = not self._ground_only
+        self._stage1_platforms = not self._ground_only
         from utils.stage1_v2_fixed import uses_fixed_platforms
 
         self._fixed_platforms = uses_fixed_platforms(cfg["env"])
@@ -442,7 +452,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         asset_options.disable_gravity = not self._fixed_platforms
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
         self._platform_height = 0.02
-        self._platform_inactive_height = 20.0
+        self._platform_inactive_height = -20.0 if self._ground_only else 20.0
         self._platform_asset = self.gym.create_box(
             self.sim, 0.4, 0.4, self._platform_height, asset_options
         )
@@ -732,26 +742,17 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         shared_color = gymapi.Vec3(1.0, 0.85, 0.15)
         for env_id in rendered_envs:
             env_ptr = self.envs[env_id]
-            slot_env = torch.full(
-                (self.num_agents,), env_id, device=self.device, dtype=torch.long
-            )
-            slot_agent = torch.arange(self.num_agents, device=self.device)
-            logical = agent_object_indices(
-                self.relation_runtime.graph, slot_env, slot_agent
-            )
-            assignment = (
-                self._logical_box_order[env_id, logical].detach().cpu().tolist()
-            )
             owners_by_box = {}
-            for agent_id, physical_box in enumerate(assignment):
-                owners_by_box.setdefault(physical_box, []).append(agent_id)
+            for logical, owners in object_task_owners(self.relation_runtime.graph, env_id).items():
+                physical_box = int(self._logical_box_order[env_id, logical])
+                owners_by_box.setdefault(physical_box, set()).update(owners)
             for physical_box in range(self.num_physical_objects):
                 box_handle = self._box_handles[env_id * self.num_physical_objects + physical_box]
                 owners = owners_by_box.get(physical_box, [])
                 color = (
                     shared_color
                     if len(owners) > 1
-                    else self._agent_color(owners[0]) if owners else unassigned_color
+                    else self._agent_color(next(iter(owners))) if owners else unassigned_color
                 )
                 self.gym.set_rigid_body_color(
                     env_ptr, box_handle, 0, gymapi.MESH_VISUAL, color

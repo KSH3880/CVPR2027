@@ -24,8 +24,9 @@ class Stage2Builder(AMPMultiAgentBuilder):
             for encoder in (self.actor_encoder, self.critic_encoder):
                 encoder.relation_graph_spec = graph
                 encoder.context_fusion = TaskTypeEmbeddingFusion(merge_shared=True)
-            self.coordination = HumanCoordination(shuffle_human_order=True)
-            self.critic_coordination = HumanCoordination(shuffle_human_order=True)
+            before = graph['sampler'] == 'stage2_before_groups'
+            self.coordination = HumanCoordination(shuffle_human_order=True, before=before)
+            self.critic_coordination = HumanCoordination(shuffle_human_order=True, before=before)
             initialize = self.init_factory.create(name="default")
             for branch in (self.coordination, self.critic_coordination):
                 for layer in branch.modules():

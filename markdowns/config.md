@@ -6,7 +6,7 @@
 
 - Config·스크립트·실행 옵션 변경 시 아래 표와 학습·로컬 추론·VNC 명령을 함께 갱신한다. 새 컨피그는 표와 각 명령 목록의 맨 아래에 추가한다. 실험별 설명·별도 섹션을 늘리지 않는다.
 - 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 지정한다. 기존 프로세스는 임의 종료·재시작하지 않는다.
-- 학습 인자: `[agents] [envs] [objects]`. stage1 계열은 **2명·2048환경·4물체**, stage2는 **4명·1024환경·8물체**를 사용한다. 공유 받침 두 실험은 **4명·1024환경**이며 마지막 인자는 총 obj 토큰 수(기본·최소 `12`)다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
+- 학습 인자: `[agents] [envs] [objects]`. stage1 계열은 **2명·2048환경·4물체**, stage2는 **4명·1024환경·8물체**를 사용한다. `stage2_before`·`stage2_before_ground`도 기본값은 같으며 학습·평가에서 인원 N≥1, 물체 M≥N을 지정할 수 있다. 공유 받침 두 실험은 **4명·1024환경**이며 마지막 인자는 총 obj 토큰 수(기본·최소 `12`)다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 추론 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 해당 실험의 checkpoint를 사용한다. test/VNC는 학습 당시 저장된 `relation_config.yaml`을 기본으로 읽는다.
 - 본학습은 `output/`, 확인 학습·test·VNC 결과는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이고 해당 실험의 환경 수(stage1 계열 2048, stage2 계열 1024)를 유지한다.
 - 화면 없는 평가는 로컬 추론 명령의 `HEADLESS=0`을 `HEADLESS=1`로 바꾼다. 추가 옵션·resume·checkpoint 예외는 [USAGE](USAGE.md)를 따른다.
@@ -21,6 +21,8 @@
 | [stage2.yaml](../tokenhsi/data/cfg/multi_agent/stage2.yaml) | [stage2.yaml](../tokenhsi/data/cfg/train/rlg/stage2.yaml) |
 | [stage2_shared_full_success.yaml](../tokenhsi/data/cfg/multi_agent/stage2_shared_full_success.yaml) | [stage2_shared_full_success.yaml](../tokenhsi/data/cfg/train/rlg/stage2_shared_full_success.yaml) |
 | [stage2_shared_region_success.yaml](../tokenhsi/data/cfg/multi_agent/stage2_shared_region_success.yaml) | [stage2_shared_region_success.yaml](../tokenhsi/data/cfg/train/rlg/stage2_shared_region_success.yaml) |
+| [stage2_before.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before.yaml) | [stage2_before.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before.yaml) |
+| [stage2_before_ground.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground.yaml) | [stage2_before_ground.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground.yaml) |
 
 ## 학습
 
@@ -44,6 +46,12 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_full_success_trai
 
 # stage2_shared_region_success
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_region_success_train.sh 4 1024 12
+
+# stage2_before
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_train.sh 4 1024 8
+
+# stage2_before_ground
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -70,6 +78,12 @@ TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_shared_full_s
 
 # stage2_shared_region_success
 TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_shared_region_success_test.sh "$CKPT" 4 1 12 10
+
+# stage2_before
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -94,6 +108,12 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_full_success_vnc.
 
 # stage2_shared_region_success
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_region_success_vnc.sh "$CKPT" 4 1 12 10
+
+# stage2_before
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -144,3 +164,5 @@ Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, 
 공동 그룹의 `EVAL_SKILLS`는 `loco`, `pickUp`, `carryWith`, `putDown`을 지원한다. Stage2 ON_TOP에는 `putDown`을 지정하지 않는다. SIT/CLIMB 참조 동작은 해당 전원 단독 preset에서 사용한다.
 
 공유 받침 두 실험은 `random_scenario`, `all_solo`, `all_shared`, `sit`, `climb`, `carry_at`, `carry_ontop`, `shared_sit`, `shared_climb`, `shared_ontop`을 지원하며, `EVAL_SKILLS=loco`만 사용한다. `shared_*`는 전원이 하나의 받침을 공유한다.
+
+`stage2_before`·`stage2_before_ground`는 인원 N≥1·물체 M≥N을 지원하며 기본값은 4명·8물체다. `EVAL_SKILLS=loco`만 지원한다. `TASK_GRAPH`는 `random_scenario`, `before_sit`, `before_climb`, `before_stack`(가능한 최대 2인 쌍, 홀수의 마지막 1명은 단독), `one_pair_sit`, `one_pair_climb`, `one_pair_stack`(1쌍), `all_solo`, `sit`, `climb`, `carry_at`, `carry_ontop`이다. pair preset은 2명 이상, 전원 `carry_ontop`은 물체 2N개 이상이 필요하다. 후행 근접 무작위 평가는 `BEFORE_FOLLOWER_NEAR=1`을 test/VNC 앞에 붙인다. 추가 옵션은 [USAGE](USAGE.md)를 따른다.

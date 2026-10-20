@@ -57,7 +57,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
-                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) else 1,
+                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) and not getattr(task, "_before", False) else 1,
             ).to(self.device)
             self.running_mean_std.eval()
         return

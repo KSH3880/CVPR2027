@@ -44,6 +44,8 @@ def reset_stage1_platforms(task, env_ids):
 
     task._platform_pos[env_ids] = task._platform_default_pos[env_ids]
     task._tar_platform_pos[env_ids] = task._tar_platform_default_pos[env_ids]
+    if getattr(task, '_ground_only', False):
+        return
     for source, skills in ((True, ['loco']), (False, ['loco', 'pickUp', 'carryWith'])):
         slots = task._collect_random_slots(skills)
         if slots is None:

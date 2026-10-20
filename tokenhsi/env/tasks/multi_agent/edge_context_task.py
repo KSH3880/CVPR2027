@@ -290,7 +290,7 @@ class EdgeContextTaskMixin:
     def consume_relation_diagnostics(self):
         result = {}
         for key, sums in self._edge_metric_sums.items():
-            if key.startswith(("ontop/", "sharing/", "sit/", "climb/")):
+            if key.startswith(("ontop/", "sharing/", "sit/", "climb/", "before/")):
                 denominator = self._edge_metric_denominators.get(
                     key, max(self._edge_metric_steps, 1)
                 )

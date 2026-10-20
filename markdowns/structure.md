@@ -1,6 +1,6 @@
 # 레포 구조
 
-Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공유 받침 성공 기준 비교 두 개다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
+Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유 받침 성공 기준 비교 두 개와 `stage2_before`다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
 
 ## 실행과 설정
 
@@ -86,3 +86,17 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 | `tokenhsi/tests/{test,check}_shared_support.py` | CPU 계약·보상·전이와 GPU 추론/부분 reset 검사 |
 
 설정·관측·초기화 계약은 [공유 받침 참고](reference/shared_support.md)에 있다.
+
+## BEFORE 실험
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before.yaml`, `tokenhsi/scripts/multi_agent/stage2_before_{train,test,vnc}.sh` | GPU5 기본 4명·1024환경·8물체, 가변 N명·M≥N 물체 학습/평가 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before_ground.yaml`, `tokenhsi/scripts/multi_agent/stage2_before_ground_{train,test,vnc}.sh` | BEFORE 기반 바닥 시작·AT 바닥 목표, 인공 받침 비활성 실험 |
+| `tokenhsi/utils/before_spec.py` | 2인 BEFORE/단독 sampler·물체 예산 초과 시 graph 재샘플링·크기 조건 역할·과제/distractor 토큰·checkpoint 계약 |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_before.py`, `before_reward.py` | 현재 AT 성공 gate·loco 배치·일반 물리 bank·reset 시 과제 소유자 색상 갱신 |
+| `tokenhsi/env/tasks/multi_agent/before_follower_near.py`, `tokenhsi/utils/before_layout.py` | 평가 전용 무작위 후행 근접 배치와 수평 강체 변환 |
+| `tokenhsi/learning/multi_agent/before_network.py`, `human_coordination.py` | 공통 장면 encoder·SELF/NONE/단방향 BEFORE SA4 |
+| `tokenhsi/tests/test_before.py`, `test_before_follower_near.py`, `check_before.py` | CPU gate/분포/전이·GPU 과제 연결/부분 reset/추론 검사 |
+
+세부 계약은 [BEFORE 참고](reference/stage2_before.md)에 있다.

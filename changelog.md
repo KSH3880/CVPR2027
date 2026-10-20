@@ -4,6 +4,35 @@
 
 ## 2026-10-19
 
+### Stage2 BEFORE 바닥 전용 비교 실험
+
+- `stage2_before_ground` env/train YAML과 GPU5 기본 train/test/VNC를 추가했다. 기존 BEFORE에서 시작 받침과 AT 도착 받침을 비활성화하고 모든 초기 상자·AT 목적지를 바닥 높이로 설정했다. ON_TOP 대상 상자는 유지한다. 물리 인덱스 보존용 고정 받침은 지하 -20/-19.5m로 격리한다. 기존 실험 파일·실행 프로세스는 유지한다.
+- 그룹·가변 인원/물체·물체 예산 재추첨·색상·현재 AT gate·loco/AMP·PPO·Stage1 전이는 기존 BEFORE와 같다. reset 계약으로 기존 BEFORE와 checkpoint를 구분하고 ground wrapper에 기존 환경을 넣으면 거부한다. [설정/배치](markdowns/reference/stage2_before.md#바닥-전용-비교-stage2_before_ground), [명령](markdowns/config.md).
+- CPU90개 통과. GPU5에서4환경·8preset의 바닥 상자/AT 높이·받침 비활성·초기 gate·물체 연결·각16step 추론·AMP finite·부분 reset·전이 가중치 불변을 확인했다. [물리 검사](output_etc/check/stage2_before_ground/physics/validation.json).
+- 표준 train으로4명·1024환경·8물체 CHECK=1 학습·저장(epoch2/frame262144)을 완료했다. 260 scalar와 모델 finite, actor/RMS 동결, 물리 배치 실패0을 확인했다. 저장본을 표준 test로6명·6물체·4환경·근접 옵션·32step 재로드 평가했다. [학습 검사](output_etc/check/stage2_before_ground/training_validation.json).
+- 별도 GPU5 VNC의4명·2환경 BEFORE STACK에서 근접 배치와 선반 없는 장면을 확인했다. AT 상자를 바닥 목표에 놓고30 physics step 후4/4 AT 성공·4/4 후행 gate 개방, 최대 Z 오차 약8.54e-6m를 확인했다. 이는 제어된 도달 가능성 검사이며 학습 성공률이 아니다. [AT 검사](output_etc/check/stage2_before_ground/viewer/floor_at_validation.json). 본학습은 시작하지 않았다.
+
+### BEFORE viewer 물체 색상 복구
+
+- BEFORE graph 샘플링 후 누락됐던 색상 갱신을 복구했다. `stage2_coupled`의 기존 규칙처럼 유효 edge의 source/target 전체에서 사용자를 집계해 distractor는 회색, 개인 과제 물체와 ON_TOP 받침은 사람 색, 공유 물체는 노란색으로 표시한다. 논리 토큰이 같은 물리 물체를 가리키면 사용자 집합을 합친다.
+- CPU64개 통과. GPU5의 별도 VNC viewer에서4명·2환경·근접 옵션으로 BEFORE STACK→단독→전원 ON_TOP→무작위 과제를 reset하며 각16step 추론·부분 reset·finite를 확인했다. [BEFORE 화면](output_etc/check/stage2_before_colors/viewer/before_stack.png), [단독 화면](output_etc/check/stage2_before_colors/viewer/all_solo.png), [개인 ON_TOP 받침](output_etc/check/stage2_before_colors/viewer/holding_ontop.png)을 직접 확인했다. 색상 getter는 실제 렌더와 달리 흰색을 반환해 검증 근거로 쓰지 않았다.
+- 기존 학습·viewer는 종료하지 않았다. 현재 viewer를 같은 명령으로 다시 실행하면 적용되며 재학습은 필요 없다.
+
+### Stage2 BEFORE 가변 인원·물체 예산
+
+- 사용자 요청으로 학습·test·VNC의 4명·8물체 제한을 해제했다. N≥1, M≥N이며 BEFORE 그룹은 항상 2명이다. 고유 과제 물체가 M을 넘는 환경만 그룹·역할·과제를 다시 뽑고, 남는 토큰은 실제 distractor로 채운다. 물체 예산이 작으면 최종 과제/그룹 분포가 조건부로 바뀐다. 불가능한 전원 ON_TOP/pair preset은 오류를 낸다.
+- 물리 bank를 max(4N,M)으로 확장하고 압축 토큰·AT 목표 인덱스를 가변 수에 맞췄다. 홀수 인원 학습의 기존 PPO 미니배치 나눗셈 오류를 발견해 장면당4096을 유지하는 4096×N으로 계산한다. 기본4명 설정과 기존 BEFORE checkpoint 계약은 유지한다.
+- CPU64개 통과. GPU5에서3명·3물체/4preset, 6명·6물체·2명·11물체·1명·1물체/각2preset을4환경·각16step 검사했다. 근접 옵션, 연결·토큰 예산·부분 reset·AMP/추론 finite·가중치 불변을 확인했다. 기존4명 저장본도 표준 test로6명·6물체·4환경·근접 옵션·32step 재로드 평가를 통과했다. 산출물은 `output_etc/check/stage2_before_variable/`이다.
+- GPU5 표준 train으로3명·1024환경·3물체의 CHECK=1 학습·저장을 완료했다. epoch2/frame196608, 미니배치12288, actor/RMS 동결·모델/지표 finite·물리 배치 실패0을 확인했다. [학습 검사](output_etc/check/stage2_before_variable/training_validation.json). 셸 문법·문서 링크·diff 확인. 기존 본학습은 종료·재시작하지 않았다.
+
+### Stage2 BEFORE 2인 그룹 실험
+
+- `stage2_before` env/train YAML과 GPU5 기본 train/test/VNC를 추가했다. 현재 full-success 기반의 fixed Stage1 전이·전원 loco·Stage1 AMP·PPO를 유지하며 4명·1024환경·8개 실제 물체 토큰을 쓴다. BEFORE 80%/단독 20%를 순차 추첨하고 BEFORE는 정확히2명이다. 큰 공유 받침·구역 토큰·COUPLED·공동운반은 없으며 일반 받침과 distractor는 유지한다.
+- 선행 AT→크기 조건 후행 SIT/CLIMB/ON_TOP을 연결했다. SA4의 B query→A key만 BEFORE이며, 현재 AT 성공으로 후행 state/success/포화를 열고 HOLDING·progress는 유지한다. 조기 수행/대기 페널티는 추가하지 않았다. `BEFORE_FOLLOWER_NEAR=1`은 무작위1~2m 후행 근접 평가 옵션이다. [설계 계약](markdowns/reference/stage2_before.md), [명령](markdowns/config.md).
+- CPU55개 통과. GPU5에서8환경·8구성의 물체 연결·초기 gate 닫힘·각16step 추론·AMP finite·부분 reset·165 tensor strict 전이/가중치 불변을 확인했다. 근접 옵션의8환경·4구성도 통과했다. [기본 검사](output_etc/check/stage2_before/physics/validation.json), [근접 검사](output_etc/check/stage2_before/near/validation.json).
+- GPU5 표준 train으로1024환경·CHECK=1·epoch2/frame262144 학습·저장 완료. actor encoder73 tensor·관측 RMS 불변, head/critic/SA 갱신,260 scalar finite·물리 reset 실패0을 확인했다. 첫 확인 학습에서 드러난 BEFORE scalar 지표 수집 오류를 고치고 회귀 테스트와 재학습으로 확인했다. [학습 검사](output_etc/check/stage2_before/training_validation.json).
+- 저장본을 표준 test로4환경·before_sit·근접 옵션·episode32 재로드 평가해 정상 종료했다. 셸 문법·문서 링크·diff 확인. 본학습·장기 성공률·실제 VNC 화면은 검사하지 않았으며 기존 실행 프로세스와 다른 레포는 변경하지 않았다.
+
 ### 공유 받침 토큰 예산과 distractor 유지
 
 - 두 공유 실험의 X/Y를 1.2~1.6m로 변경했다(Z 0.35~0.5m 유지). 기본 분할은 2×2, 구역 한 변은 0.6~0.8m다. train/test/VNC의 마지막 물체 인자는 총 obj 토큰 수이며 기본·학습 최소는 12다. 인원·공유 크기 상한에 따른 최소값보다 적으면 오류를 낸다.

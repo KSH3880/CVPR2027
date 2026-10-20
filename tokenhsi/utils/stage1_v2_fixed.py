@@ -16,9 +16,11 @@ def uses_fixed_platforms(env):
     mode = reset.get('platformPhysics')
     if mode is None:
         return False
+    ground = (env.get('before') is not None and reset.get('platformMode') == 'ground_only'
+              and reset.get('randomHeight') is False and reset.get('randomHeightProb') == 0.)
     if (mode != MODE or env.get('relationReward', {}).get('stage1_variant') != 'stage1_v2'
-            or reset.get('platformMode') != 'carry_payload_tokenhsi'
-            or reset.get('randomHeight') is not True):
+            or (not ground and (reset.get('platformMode') != 'carry_payload_tokenhsi'
+                                or reset.get('randomHeight') is not True))):
         raise ValueError('fixed_warmup_v1 platforms require the stage1_v2 carry platform config')
     return True
 

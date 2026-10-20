@@ -11,13 +11,13 @@ PRESETS = ('random_scenario', 'two_pairs_at', 'two_pairs_ontop', 'one_pair_at',
            'one_pair_ontop', 'all_solo', 'sit', 'climb', 'carry_at', 'carry_ontop', 'holding_at', 'holding_ontop')
 
 
-def sample_groups(n, device, preset='random_scenario'):
-    order = torch.rand(n, 4, device=device).argsort(-1)
-    remaining = torch.ones(n, 4, dtype=torch.bool, device=device)
-    groups = torch.full((n, 4), -1, device=device, dtype=torch.long)
+def sample_groups(n, device, preset='random_scenario', num_agents=4):
+    order = torch.rand(n, num_agents, device=device).argsort(-1)
+    remaining = torch.ones(n, num_agents, dtype=torch.bool, device=device)
+    groups = torch.full((n, num_agents), -1, device=device, dtype=torch.long)
     rows = torch.arange(n, device=device)
     count = torch.zeros(n, device=device, dtype=torch.long)
-    for _ in range(4):
+    for _ in range(num_agents):
         active = remaining.any(-1)
         first = order.gather(1, remaining.gather(1, order).long().argmax(-1)[:, None]).flatten()
         remaining[rows, first] = False
@@ -28,7 +28,7 @@ def sample_groups(n, device, preset='random_scenario'):
             paired = active & remaining.any(-1) & (count == 0)
         elif preset != 'random_scenario':
             paired[:] = False
-        partner = torch.rand(n, 4, device=device).masked_fill(~remaining, -1).argmax(-1)
+        partner = torch.rand(n, num_agents, device=device).masked_fill(~remaining, -1).argmax(-1)
         leader = torch.where(paired, torch.minimum(first, partner), first)
         groups[rows[active], first[active]] = leader[active]
         groups[rows[paired], partner[paired]] = leader[paired]
@@ -101,6 +101,11 @@ def validate_env(env):
 
 
 def check_checkpoint(weights, env):
+    if "before" in env:
+        from utils.before_spec import checkpoint_contract
+        if weights.get("before_contract") != checkpoint_contract(env):
+            raise ValueError("BEFORE checkpoint contract differs")
+        return
     if "sharedSupport" in env:
         from utils.shared_support import checkpoint_contract
         if weights.get("shared_support_contract") != checkpoint_contract(env):

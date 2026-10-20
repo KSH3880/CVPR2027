@@ -142,6 +142,9 @@ def validate_stage1_context_config(config):
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get("sampler") == "stage2_before_groups":
+        from utils.before_spec import compile_graph
+        return compile_graph(spec, m, o, device)
     if spec.get("sampler") == "shared_support_groups":
         from utils.shared_support import compile_graph
         return compile_graph(spec, m, o, device)

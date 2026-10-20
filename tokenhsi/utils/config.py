@@ -87,7 +87,7 @@ def load_cfg(args):
     from utils.unified_training import validate_stage1_network
 
     validate_stage1_network(cfg["env"], cfg_train)
-    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport"):
+    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport", "HumanoidMABefore"):
         from utils.output_paths import resolve_output_path
 
         is_eval = args.test or args.eval or getattr(args, "play", False)
@@ -107,6 +107,11 @@ def load_cfg(args):
         cfg["env"]["numAgents"] = args.num_agents
     if getattr(args, "num_objects", 0) > 0:
         cfg["env"]["numObjects"] = args.num_objects
+    if cfg["env"].get("before") is not None:
+        training = cfg_train["params"]["config"]
+        if training['name'] == 'Stage2BeforeGround' and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
+            raise ValueError('stage2_before_ground requires a ground_only environment/checkpoint')
+        training["minibatch_size"] = training.get("scene_minibatch_size", 4096) * cfg["env"]["numAgents"]
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
     if bool(eval_skills_arg) != bool(eval_skill_probs_arg):
@@ -137,6 +142,12 @@ def load_cfg(args):
         cfg["env"]["video"]["enable"] = False
     if getattr(args, "transfer_checkpoint", ""):
         cfg["experiment"]["transfer"]["checkpoint"] = args.transfer_checkpoint
+    if getattr(args, "before_follower_near", False):
+        if not args.eval or 'before' not in cfg['env']:
+            raise ValueError('--before_follower_near requires BEFORE evaluation')
+        if cfg['env']['eval']['skill'] != ['loco']:
+            raise ValueError('--before_follower_near requires EVAL_SKILLS=loco')
+
     cfg["name"] = args.task
     cfg["headless"] = args.headless
     if "task" in cfg:
@@ -360,6 +371,8 @@ def get_args(benchmark=False):
             "default": 0,
             "help": "Object slots per environment (0 keeps config; shared support counts region and distractor tokens)",
         },
+        {"name": "--before_follower_near", "action": "store_true", "default": False,
+         "help": "BEFORE loco evaluation with randomized follower-near placement"},
         {
             "name": "--eval_repeats",
             "type": int,

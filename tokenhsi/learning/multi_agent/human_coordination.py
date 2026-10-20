@@ -52,10 +52,21 @@ class CoordinationBlock(nn.Module):
         return humans + self.ffn(self.ffn_norm(humans))
 
 
-def human_relations(packet, num_agents):
+def human_relations(packet, num_agents, before=False):
     packet = packet.reshape(packet.shape[0], -1, 5).long()
     ids = torch.arange(num_agents, device=packet.device)
     owners = packet[..., 0].bool()[..., None] & (packet[..., 2, None] == ids)
+    if before:
+        valid, task, actor, payload, target = packet.unbind(-1)
+        dependency = (valid.bool()[:, :, None] & valid.bool()[:, None, :]
+            & (task[:, :, None] == 2)
+            & ((task[:, None, :] == 0) | (task[:, None, :] == 1) | (task[:, None, :] == 3))
+            & (payload[:, :, None] == target[:, None, :])
+            & (actor[:, :, None] != actor[:, None, :]))
+        predecessor = torch.einsum('nqi,nji,njk->nqk', owners.transpose(1, 2).float(),
+                                   dependency.float(), owners.float()).bool()
+        return torch.where(torch.eye(num_agents, device=packet.device, dtype=torch.bool),
+                           1, torch.where(predecessor, 2, 0))
     coupled = (
         (task_relations(packet, num_agents) == 2)[..., None] & owners[:, None]
     ).any(2)
@@ -74,9 +85,11 @@ class HumanCoordination(nn.Module):
         num_layers=4,
         feedforward_dim=128,
         shuffle_human_order=False,
+        before=False,
     ):
         super().__init__()
         self.shuffle_human_order = shuffle_human_order
+        self.before = before
         self.blocks = nn.ModuleList(
             [
                 CoordinationBlock(width, heads, feedforward_dim, 3)
@@ -94,7 +107,7 @@ class HumanCoordination(nn.Module):
     def forward(
         self, humans, nodes, packet, edge_encoder, entity_types=None, entity_poses=None
     ):
-        relations = human_relations(packet, humans.shape[1])
+        relations = human_relations(packet, humans.shape[1], self.before)
         context = humans
         if self.shuffle_human_order:
             order = torch.randperm(humans.shape[1], device=humans.device)

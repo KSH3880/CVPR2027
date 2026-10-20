@@ -94,3 +94,29 @@ OUTPUT_PATH=output_etc/check/stage2_from_stage1_45000/viewer \
 bash tokenhsi/scripts/multi_agent/stage2_vnc.sh \
   output_etc/check/stage2_from_stage1_45000/transfer/nn/Stage2Transfer.pth 4 1 8 1000000
 ```
+
+## Stage2 BEFORE 평가 옵션
+
+`stage2_before`는 현재 레포의 fixed Stage1 전이 기반으로 새 학습을 시작한다. 기본 source는 `stage1/Stage1V2Fixed_00030500.pth`이며 `STAGE1_CHECKPOINT`로 지정한다. 기존 공동운반·공유 받침·다른 레포의 BEFORE checkpoint는 직접 재개/평가하지 않는다. train/test 환경 YAML 재정의는 `BEFORE_ENV_CONFIG`이고, test/VNC는 기본적으로 checkpoint 옆 `relation_config.yaml`을 사용한다.
+
+인원 N≥1, 물체 M≥N을 train/test/VNC 위치 인자로 지정한다. 예: 아래 명령의 `4 1 8 10`을 `6 1 6 10`으로 바꾸면 6명·1환경·6물체다. BEFORE는 항상 2인 그룹이며 물체 예산을 넘는 환경은 task graph 전체를 재샘플링한다. 예산이 작으면 최종 그룹·과제 비율이 달라질 수 있다. 전원 `carry_ontop`은 M≥2N을 요구한다. 기존 4명·8물체 BEFORE 저장본도 가변 인원·물체 평가에 사용할 수 있다.
+
+`BEFORE_FOLLOWER_NEAR=1`은 loco 평가 전용이다. 각 BEFORE 쌍의 선행 상자 중심까지 root XY 거리를 1~2m에서 추첨하고 후행에 작은 값을 준다. 각도도 매 reset 추첨하며 기존 높이와 자세 기울기를 보존한다. STACK도 선행 상자를 기준으로 비교한다. 기본 학습 배치와 보상은 바꾸지 않는다. 같은 seed는 같은 추첨을 재현한다.
+
+```bash
+# stage2_before
+BEFORE_FOLLOWER_NEAR=1 TOKENHSI_GPU=5 PORT=6083 SEED=5125 \
+TASK_GRAPH=random_scenario EVAL_SKILLS=loco \
+bash tokenhsi/scripts/multi_agent/stage2_before_vnc.sh "$CKPT" 4 1 8 10
+```
+
+## Stage2 BEFORE 바닥 전용
+
+`stage2_before_ground`는 인공 시작/도착 받침을 비활성화한 별도 비교 실험이다. 기본 GPU5·4명·1024환경·8물체이며, 가변 인원·물체와 `BEFORE_FOLLOWER_NEAR=1` 평가 옵션은 동일하다. `STAGE1_CHECKPOINT`로 fixed Stage1 가중치를 지정하고 `RESUME_CHECKPOINT`에는 ground 실험 저장본을 쓴다. 환경 YAML 재정의는 `BEFORE_GROUND_ENV_CONFIG`이며 test/VNC 기본값은 저장본 옆 `relation_config.yaml`이다. 기존 `stage2_before` 저장본은 ground 재개/평가에 사용하지 않는다. 기본 명령은 [config](config.md), 배치 계약은 [BEFORE 참고](reference/stage2_before.md#바닥-전용-비교-stage2_before_ground)를 따른다.
+
+```bash
+# stage2_before_ground
+BEFORE_FOLLOWER_NEAR=1 TOKENHSI_GPU=5 SEED=5125 TASK_GRAPH=random_scenario EVAL_SKILLS=loco \
+OUTPUT_PATH=output_etc/check/stage2_before_ground/follower_near_viewer \
+bash tokenhsi/scripts/multi_agent/stage2_before_ground_vnc.sh "$CKPT" 4 1 8 10
+```
