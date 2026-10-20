@@ -165,3 +165,6 @@ events.out.tfevents.*
 *.pid
 *.lock
 /align_tmp/
+
+# Per-machine paths; copy paths.local.example.yaml for local overrides.
+/paths.local.yaml

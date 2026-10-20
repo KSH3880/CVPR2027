@@ -294,7 +294,11 @@ class MotionLib():
         for f in range(num_motion_files):
             curr_file = motion_files[f]
             print("Loading {:d}/{:d} motion files: {:s}".format(f + 1, num_motion_files, curr_file))
-            curr_motion = SkeletonMotion.from_file(curr_file)
+            if curr_file.endswith('.npz'):
+                from utils.raw_push_motion import SourceAmpMotion
+                curr_motion = SourceAmpMotion.from_file(curr_file)
+            else:
+                curr_motion = SkeletonMotion.from_file(curr_file)
 
             motion_fps = curr_motion.fps
             curr_dt = 1.0 / motion_fps
@@ -310,7 +314,7 @@ class MotionLib():
             curr_motion.dof_vels = curr_dof_vels
 
             # Moving motion tensors to the GPU
-            if USE_CACHE:
+            if USE_CACHE or getattr(curr_motion, 'source_amp', False):
                 curr_motion = DeviceCache(curr_motion, self._device)                
             else:
                 curr_motion.tensor = curr_motion.tensor.to(self._device)

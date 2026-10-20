@@ -46,3 +46,15 @@ def sample_surround_spawn(count, device, size, clearance=(1.,2.), minimum_gap=.8
     depth=-forward-half_depth
     heading=torch.empty_like(depth).uniform_(-math.pi,math.pi)
     return depth,lateral,heading
+
+
+def preview_spawn_distances(value, *, test, evaluation, agents, device):
+    """Explicit two-agent inference-only distance diagnostic; defaults unchanged."""
+    if value is None:return None
+    if not test or not evaluation or agents!=2:
+        raise ValueError('Near/far spawn requires two-agent test/eval')
+    try:values=[float(x) for x in value.split(',')]
+    except ValueError:raise ValueError('Expected two positive spawn distances')
+    if len(values)!=2 or any(not math.isfinite(x) or x<=0 for x in values):
+        raise ValueError('Expected two positive finite spawn distances')
+    return torch.tensor(values,device=device)

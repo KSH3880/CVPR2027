@@ -1,3 +1,26 @@
+## 서버·로컬 Stage1 경로 분리 (2026-10-20)
+
+Partition Push 학습과 실제 checkpoint 모델 테스트는 같은 `resolve_stage1_checkpoint`를 쓴다. 선택 우선순위는 CLI에 명시한 경로 → `STAGE1_CHECKPOINT` → 기기 전용 YAML → 기본 후보 순이다. 명시한 경로가 잘못되면 다른 모델로 fallback하지 않는다. 기존 resume/test는 지정된 Stage2 checkpoint 복원 경로를 유지한다.
+
+```bash
+# 한 번만 경로를 지정 (서버·로컬 모두 절대경로 권장)
+STAGE1_CHECKPOINT=/path/to/stage1.pth bash stage2_jointpush/scripts/partition_push_train.sh
+# 기기별 경로를 저장: 복사한 파일의 stage1_checkpoint를 수정
+cp stage2_jointpush/paths.local.example.yaml stage2_jointpush/paths.local.yaml
+# 설정 확인만 수행: GPU/학습을 시작하지 않음
+python stage2_jointpush/ports/koo_push/tokenhsi/scripts/multi_agent/partition_push_setup.py checkpoint
+```
+
+`paths.local.yaml`은 Git 제외이며 `stage1_checkpoint`만 지원한다. YAML 내부 상대 경로는 YAML 파일 위치 기준이다. 다른 설정 파일은 `PARTITION_PUSH_PATHS=/absolute/path/paths.yaml`로 지정할 수 있다. 직접 파일 또는 checkpoint 디렉터리를 지정할 수 있으며 디렉터리에서는 최신 epoch를 고르되 최신 epoch의 run이 여러 개면 오류를 낸다.
+
+설정이 없으면 다음 정확한 파일명 `OpenPushPush180ContactAtWarmstart_00029000.pth`를 순서대로 찾는다:
+
+1. `stage2_jointpush/output/` (로컬 기존 위치)
+2. `runs/jointpush/stage1_sources/` (서버 기존 위치)
+3. `runs/jointpush/push_stage1_repro_20261012/checkpoints/` (이전 재현 위치)
+
+현재 기본 AMP manifest는 `partition_push_motions.yaml`의 변환된 `.npy`다. raw `.npz` 지원은 별도 옵션으로 남아 있으며 기본 프로필은 raw 데이터 사용을 강제하지 않는다. 기존 `PARTITION_PUSH_MOTION_FILE` 명령별 override도 유지한다.
+
 ## 현재 RSI/AMP 모션 영상 출력
 
 RSI는 loco 4개에서 허용 시점을 샘플링한다. AMP는 PUSH 조건에서 loco 0.33/Push 0.67이며, source는 같은 loco 4개와 변환된 Push180 19개다. 아래 명령은 정책 실행 없이 학습 저장 환경의 원본 모션을 재생한다.

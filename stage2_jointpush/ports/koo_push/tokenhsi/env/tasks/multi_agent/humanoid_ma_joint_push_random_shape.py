@@ -24,8 +24,9 @@ class HumanoidMAJointPushRandomShape(HumanoidMAJointPush):
         preview_size=os.environ.get('JOINT_PUSH_PREVIEW_BOX_SIZE')
         preview_mass=os.environ.get('JOINT_PUSH_PREVIEW_BOX_MASS')
         if preview_size is not None or preview_mass is not None:
-            if not cfg['args'].test or not cfg['env'].get('jointPushThreeAgentPreview'):
-                raise ValueError('Payload override requires explicit team-size inference preview')
+            two_preview=os.environ.get('JOINT_PUSH_TWO_AGENT_PAYLOAD_PREVIEW')=='1'
+            if not cfg['args'].test or not cfg['args'].eval or not (cfg['env'].get('jointPushThreeAgentPreview') or (two_preview and cfg['env']['numAgents']==2)):
+                raise ValueError('Payload override requires explicit team-size or two-agent inference preview')
             if preview_size is None or preview_mass is None:
                 raise ValueError('Provide both preview size and mass')
             size=tuple(float(x) for x in preview_size.split(','));mass=float(preview_mass)

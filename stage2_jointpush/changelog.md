@@ -4,6 +4,12 @@
 
 ## 2026-10-20
 
+### 로컬 반영 후 Stage1 경로 분리와 테스트 충돌 정리
+
+- Partition Push 신규 학습의 없는 로컬 기본 경로와 모델 테스트의 옛 재현 경로를 공통 resolver로 통합했다. 명시 CLI/STAGE1_CHECKPOINT → 기기 전용 YAML → 로컬output/서버stage1_sources/옛재현 후보를 순서대로 사용한다. 잘못된 명시 경로·모호한 최신 run은 실패한다. 기존 Stage2 resume/test 복원은 유지한다.
+- Git 제외 `paths.local.yaml`과 예시를 추가했다. 기본 프로필은 변환된.npy를 사용하므로 raw AMP 강제 테스트를 현재 기본 manifest 검증으로 수정했다. raw 모듈/원본 motion과 사용자 삭제 내용은 복구하거나 삭제하지 않았다.
+- CPU29개 통과(실제 Stage1 로딩·action 보존·CA gradient 포함). 실제 checkpoint CLI가 서버stage1_sources29000을 찾는 것 확인, 셸 문법·diff 검사 통과. GPU 실행이나 기존 작업 종료는 하지 않았다.
+
 ### 기존 뒷면 정렬 3,000iter 학습 재개
 
 - 사용자 승인으로 랜덤 출발 학습만 SIGTERM 종료했다. 해당 뷰어는 종료 직전 확인에서 이미 종료된 상태였다. 기존 랜덤 출발 결과·로그는 보존했다.

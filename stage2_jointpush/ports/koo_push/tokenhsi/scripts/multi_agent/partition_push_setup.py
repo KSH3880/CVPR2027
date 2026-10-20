@@ -1,37 +1,24 @@
 """Resolve Stage1 paths or restore a saved Partition Push configuration on CPU."""
 import argparse
 from pathlib import Path
-import re
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
+from utils.partition_push_paths import checkpoint_path, resolve_stage1_checkpoint
 import yaml
 
-
-def checkpoint_path(value):
-    path = Path(value).expanduser()
-    if path.is_file(): return path.resolve()
-    candidates = []
-    if path.is_dir():
-        for candidate in path.rglob('OpenPushPush180ContactAtWarmstart_*.pth'):
-            match = re.search(r'_(\d+)\.pth$', candidate.name)
-            if match: candidates.append((int(match[1]), candidate))
-    if not candidates:
-        raise ValueError('No Stage1 checkpoint found; set STAGE1_CHECKPOINT to a local .pth file')
-    epoch = max(step for step, _ in candidates)
-    latest = [p for step, p in candidates if step == epoch]
-    if len(latest) != 1: raise ValueError('Multiple Stage1 runs; specify an exact .pth file')
-    return latest[0].resolve()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
-    resolve = sub.add_parser('checkpoint'); resolve.add_argument('path')
+    resolve = sub.add_parser('checkpoint'); resolve.add_argument('path',nargs='?')
     config = sub.add_parser('config')
     config.add_argument('checkpoint'); config.add_argument('output')
     config.add_argument('--size', nargs=3, type=float)
     config.add_argument('--mass', type=float, help='Mass per participating human in kg; total is n times this value')
     args = parser.parse_args()
     if args.command == 'checkpoint':
-        print(checkpoint_path(args.path)); return
+        print(resolve_stage1_checkpoint(args.path)); return
     import torch
     saved = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
     env = saved['relation_experiment_config']['env']

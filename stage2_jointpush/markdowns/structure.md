@@ -1,3 +1,9 @@
+## 서버·로컬 경로 처리
+
+- `ports/koo_push/tokenhsi/utils/partition_push_paths.py`: CLI/환경변수/기기별 YAML/기본 후보의 Stage1 경로 해석. 학습 CLI와 checkpoint 모델 테스트가 공유한다.
+- `paths.local.example.yaml`: 버전 관리하는 설정 예시. 복사한 `paths.local.yaml`은 Git 제외.
+- `ports/koo_push/tokenhsi/tests/test_partition_push_paths.py`: 로컬·서버 후보 우선순위, YAML 상대경로, 명시 경로 실패, 디렉터리 최신/모호한 run 검증.
+
 ## 로컬 Partition Push 모션 데이터 (2026-10-19)
 
 - `scripts/export_partition_reference_videos.sh`: 학습 저장 환경에서 RSI/AMP 원본 모션의 1080p MP4를 생성하는 진입점.

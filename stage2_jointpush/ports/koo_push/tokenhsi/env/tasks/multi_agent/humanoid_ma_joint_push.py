@@ -24,6 +24,13 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
     RSI_MODE = "loco_only"
     def __init__(self,cfg,*args,**kwargs):
         self._joint_push=True
+        import os
+        from env.tasks.multi_agent.joint_push_spawn import preview_spawn_distances
+        self._view_spawn_distances=preview_spawn_distances(os.environ.get('JOINT_PUSH_VIEW_SPAWN_DISTANCES'),
+            test=cfg['args'].test,evaluation=cfg['args'].eval,agents=cfg['env']['numAgents'],device='cpu')
+        self._view_side_entry=os.environ.get('JOINT_PUSH_VIEW_SIDE_ENTRY')=='1'
+        if self._view_side_entry and self._view_spawn_distances is None:
+            raise ValueError('Side entry requires explicit two-agent test/eval spawn distances')
         spec=cfg['env']['jointPush']
         self._three_agent_preview=cfg['env'].get('jointPushThreeAgentPreview',False)
         preview_agents=cfg['env'].get('jointPushPreviewAgents',3)
@@ -229,8 +236,11 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         goals=boxes[:,:3]+self._push_goal_offsets[slot_env,0]
         center,normal,tangent,half_width,_=push_face_geometry(boxes,goals,self._box_size[slot_env,2],self._joint_push_spec['reward'])
         facing=torch.atan2(normal[:,1],normal[:,0])
-        if self._joint_push_spec.get('random_spawn'):
+        if self._joint_push_spec.get('random_spawn') and self._view_spawn_distances is None:
             facing=facing+self._push_spawn_heading[slot_env,slot_agent]
+        if self._view_side_entry:
+            side_heading=torch.atan2(-tangent[:,1],-tangent[:,0])
+            facing=torch.where(slot_agent==1,side_heading,facing)
         turn=facing-yaw_from_quat(root[:,3:7])
         q=torch.zeros_like(root[:,3:7]);q[:,2]=torch.sin(turn/2);q[:,3]=torch.cos(turn/2)
         lo,hi=self._joint_push_spec['spawn_distance']
@@ -239,6 +249,13 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         if self._joint_push_spec.get('random_spawn'):
             distance=self._push_spawn_depth[slot_env,slot_agent]
             side=self._push_spawn_lateral[slot_env,slot_agent]
+        if self._view_spawn_distances is not None:
+            distance=self._view_spawn_distances.to(root.device)[slot_agent]
+            side=(slot_agent.to(root.dtype)*2-1)*half_width*.5
+        if self._view_side_entry:
+            half_depth=self._box_size[slot_env,2,:2].sum(-1)/2-half_width
+            distance=torch.where(slot_agent==1,-half_depth-.6,distance)
+            side=torch.where(slot_agent==1,half_width+1.2,side)
         target=root[:,:3].clone();target[:,:2]=center[:,:2]-normal*distance[:,None]+tangent*side[:,None]
         expanded=q[:,None].expand_as(body[...,3:7])
         body[...,:3]=rotate(expanded,body[...,:3]-root[:,None,:3])+target[:,None]
@@ -253,6 +270,30 @@ class HumanoidMAJointPush(HumanoidMAOpenPush):
         self._reset_boxes(env_ids);self._agent_lanes[env_ids]=torch.arange(self.num_agents,device=self.device)%2;self._push_binding[env_ids]=0
         self.relation_runtime.reset(env_ids,self._sample_tasks(env_ids),self._owner_push_boxes(env_ids))
         self._sample_box_assignments(env_ids);self._reset_actors(env_ids);self._reset_task(env_ids)
+        if self._view_spawn_distances is not None and not getattr(self,'_view_spawn_audited',False):
+            import json
+            from env.tasks.multi_agent.joint_push_reward import push_face_geometry
+            box=self._box_states[env_ids,2]
+            center,normal,tangent,face_half_width,_=push_face_geometry(box,self._tar_pos[env_ids,0],self._box_size[env_ids,2],self._joint_push_spec['reward'])
+            relative=self._humanoid_root_states[env_ids,:,:2]-center[:,None,:2]
+            measured=-(relative*normal[:,None]).sum(-1)
+            expected=self._view_spawn_distances.to(measured.device).expand_as(measured).clone()
+            if self._view_side_entry:
+                half_depth=self._box_size[env_ids,2,:2].sum(-1)/2-face_half_width
+                expected[:,1]=-half_depth-.6
+
+            if not torch.allclose(measured,expected,atol=1e-4):raise RuntimeError('Near/far spawn audit failed')
+            report=dict(distances_from_rear_face_m=measured.cpu().tolist(),
+                box_sizes=self._box_size[env_ids,2].cpu().tolist(),
+                box_masses=getattr(self,'_payload_masses',torch.tensor([getattr(self,'_mass_preview_constructed',self.cfg['env']['pushBox']['mass'])],device=self.device)).cpu().tolist(),
+                goal_mode=self._joint_push_spec['goal_mode'],
+                headings_toward_box=True,side_entry=self._view_side_entry,
+                lateral_offsets_m=(relative*tangent[:,None]).sum(-1).cpu().tolist())
+            directory=Path(self.cfg['args'].output_path);directory.mkdir(parents=True,exist_ok=True)
+            (directory/'near_far_preview.json').write_text(json.dumps(report,indent=2)+'\n')
+            print('[Joint Push near/far audit]',report,flush=True)
+            self._view_spawn_audited=True
+
         if self._joint_push_spec['reward'].get('contact_mode')=='assigned_faces':
             from env.tasks.multi_agent.joint_push_assigned_contact import assign_contact_targets
             spec=self._joint_push_spec['assigned_contact']

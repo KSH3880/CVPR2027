@@ -12,8 +12,7 @@ if [ "$MODE" = train ]; then
     CFG_ENV=$(python tokenhsi/scripts/multi_agent/partition_push_setup.py config "$RESUME_CHECKPOINT" "$OUT/configs/partition_push.yaml")
     set -- "$@" --checkpoint "$RESUME_CHECKPOINT" --resume 1
   else
-    SOURCE=${STAGE1_CHECKPOINT:-$PROJECT_ROOT/stage2_jointpush/output/OpenPushPush180ContactAtWarmstart_00029000.pth}
-    SOURCE=$(python tokenhsi/scripts/multi_agent/partition_push_setup.py checkpoint "$SOURCE")
+    SOURCE=$(python tokenhsi/scripts/multi_agent/partition_push_setup.py checkpoint)
     set -- "$@" --transfer_checkpoint "$SOURCE"
   fi
   set -- "$@" --headless

@@ -1,0 +1,3 @@
+# Copy to paths.local.yaml (gitignored). Relative paths use this YAML directory.
+# STAGE1_CHECKPOINT overrides this setting for an individual command.
+stage1_checkpoint: /absolute/path/OpenPushPush180ContactAtWarmstart_00029000.pth

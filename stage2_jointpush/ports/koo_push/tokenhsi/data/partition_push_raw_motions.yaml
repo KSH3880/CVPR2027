@@ -1,0 +1,56 @@
+motions:
+  loco:
+  - &id001
+    file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  doorOpen:
+  - *id001
+  push:
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_001__A344_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_002__A342.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_002__A342_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_002__A344.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_002__A344_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_003__A342.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_003__A342_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_003__A344.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_003__A344_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_101__A341.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_101__A341_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_101__A343.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_101__A343_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_102__A341.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_102__A341_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_102__A343.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_102__A343_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_103__A341.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_103__A341_M.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_103__A343.npz
+    weight: 1.0
+  - file: ../../../../../runs/jointpush/raw_push_amp/push_obstacle_180_103__A343_M.npz
+    weight: 1.0

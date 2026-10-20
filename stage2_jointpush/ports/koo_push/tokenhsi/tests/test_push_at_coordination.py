@@ -39,8 +39,8 @@ def test_missing_at_empty_and_permutation_gradients():
     assert edge.relation_embed.weight.grad is None
 
 def test_real_checkpoint_initial_actions_and_gradients():
-    root=Path(__file__).resolve().parents[5]
-    weights=torch.load(root/'runs/jointpush/push_stage1_repro_20261012/checkpoints/OpenPushPush180ContactAtWarmstart_00029000.pth',map_location='cpu',weights_only=False)
+    from utils.partition_push_paths import resolve_stage1_checkpoint
+    weights=torch.load(resolve_stage1_checkpoint(),map_location='cpu',weights_only=False)
     snapshot=weights['relation_experiment_config'];builder=AMPMultiAgentBuilder();builder.load(snapshot['train']['params']['network'])
     amp_width=weights['model']['a2c_network._disc_mlp.0.weight'].shape[1]
     network=builder.build('push_test',actions_num=32,input_shape=(684,),amp_input_shape=(amp_width,),value_size=1,
