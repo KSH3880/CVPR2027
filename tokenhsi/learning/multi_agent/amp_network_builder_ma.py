@@ -867,6 +867,12 @@ class AMPMultiAgentBuilder(AMPBuilder):
             self.scene_kinematic_size = kwargs.get("scene_kinematic_size", 13)
             self.relation_reward_mode = kwargs.get('relation_reward_mode', LEGACY_MODE)
             self.stage2 = self.relation_reward_mode == STAGE2_CONTEXT_MODE
+            self.sensor_points = kwargs.get('sensor_points', 0)
+            self.mask_sensor = False
+            if bool(self.sensor_points) != bool(params.get('cliff_sensor', False)):
+                raise ValueError('Cliff task and sensor network must be paired')
+            if self.sensor_points and self.stage2:
+                raise ValueError('Cliff late fusion and cooperative Stage 2 are separate experiments')
             self.relation_graph_spec = kwargs.get('relation_graph_spec')
             self.scene_arena_scale = float(kwargs.get("scene_arena_scale", 1.0))
             assert self.scene_arena_scale > 0.0
@@ -965,15 +971,22 @@ class AMPMultiAgentBuilder(AMPBuilder):
                 self.coordination = GroundedEdgeCoordination(
                     d_model, coordination_cfg.get('grounding_hidden', 128),
                     coordination_cfg.get('num_heads', 2))
+            if self.sensor_points:
+                from learning.multi_agent.cliff_sensor import sensor_encoder
+                self.actor_sensor = sensor_encoder(self.sensor_points, d_model)
+                self.critic_sensor = sensor_encoder(self.sensor_points, d_model)
             self.action_head = head(kwargs['actions_num'], tp["extra_mlp_units"],
-                                    2 * d_model if self.stage2 else d_model)
-            self.value_head = head(self.value_size, tp["extra_mlp_units"])
+                                    2 * d_model if self.stage2 or self.sensor_points else d_model)
+            self.value_head = head(self.value_size, tp["extra_mlp_units"],
+                                   2 * d_model if self.sensor_points else d_model)
 
             mlp_init = self.init_factory.create(**{"name": "default"})
             modules = [self.actor_encoder, self.critic_encoder,
                        self.action_head, self.value_head]
             if self.stage2:
                 modules.append(self.coordination)
+            if self.sensor_points:
+                modules.extend((self.actor_sensor, self.critic_sensor))
             for net in modules:
                 for m in net.modules():
                     if isinstance(m, nn.Linear):
@@ -1003,7 +1016,15 @@ class AMPMultiAgentBuilder(AMPBuilder):
 
         def eval_actor(self, obs):
             if self.is_continuous and self.space_config['fixed_sigma']:
-                if self.stage2:
+                if self.sensor_points:
+                    base, sensor = self._split_sensor_obs(obs)
+                    with torch.no_grad():
+                        humans = self.actor_encoder(base)
+                    sensor_features = self.actor_sensor(sensor)
+                    if self.mask_sensor:
+                        sensor_features = torch.zeros_like(sensor_features)
+                    encoded = torch.cat((humans, sensor_features), -1)
+                elif self.stage2:
                     with torch.no_grad():
                         humans, nodes = self.actor_encoder(obs, return_all=True)
                     context = self.coordination(
@@ -1020,8 +1041,19 @@ class AMPMultiAgentBuilder(AMPBuilder):
             raise NotImplementedError
 
         def eval_critic(self, obs):
-            encoded = self.critic_encoder(obs)
+            if self.sensor_points:
+                base, sensor = self._split_sensor_obs(obs)
+                sensor_features = self.critic_sensor(sensor)
+                if self.mask_sensor:
+                    sensor_features = torch.zeros_like(sensor_features)
+                encoded = torch.cat((self.critic_encoder(base), sensor_features), -1)
+            else:
+                encoded = self.critic_encoder(obs)
             value = self.value_head(encoded)
             if self.observation_mode == "clean_scene":
                 value = value.reshape(obs.shape[0] * self.num_agents, -1)
             return value
+
+        def _split_sensor_obs(self, obs):
+            width = self.num_agents * self.sensor_points
+            return obs[:, :-width], obs[:, -width:].reshape(-1, self.num_agents, self.sensor_points)

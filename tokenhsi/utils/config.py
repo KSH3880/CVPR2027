@@ -84,6 +84,10 @@ def load_cfg(args):
     with open(os.path.join(os.getcwd(), args.cfg_env), 'r') as f:
         cfg = yaml.load(f, Loader=yaml.SafeLoader)
 
+    if getattr(args, 'mask_cliff_sensor', False) and (
+            args.task not in ('HumanoidMACliff', 'HumanoidMABridge', 'HumanoidMARoom', 'HumanoidMAMixedSensor') or not (args.test and args.eval)):
+        raise ValueError('--mask_cliff_sensor is only for cliff/bridge/room sensor evaluation')
+
     graph_path = getattr(args, 'relation_graph', '')
     if graph_path:
         if not (args.test or args.eval) or cfg['env'].get('relationReward', {}).get('mode') not in ('state_relation_v1', 'state_relation_edge_ontop_v1', 'state_relation_edge_interaction_v1', 'state_relation_edge_stage1_v1', 'state_relation_edge_stage2_v1'):
@@ -174,6 +178,13 @@ def load_cfg(args):
     if args.checkpoint != "Base":
         cfg_train["params"]["load_path"] = args.checkpoint
         cfg["env"]["checkpoint"] = args.checkpoint
+
+    if args.teacher_checkpoint:
+        if args.task != 'HumanoidMACarry' or args.test or args.eval:
+            raise ValueError('--teacher_checkpoint is for HumanoidMACarry training only')
+        cfg_train['params']['config']['teacher_distillation'] = dict(
+            checkpoint=args.teacher_checkpoint, kl_coef=args.teacher_kl_coef,
+            grad_checks=args.teacher_grad_checks)
         
     if args.llc_checkpoint != "":
         cfg_train["params"]["config"]["llc_checkpoint"] = args.llc_checkpoint
@@ -266,6 +277,8 @@ def get_args(benchmark=False):
     custom_parameters = [
         {"name": "--task_camera", "type": str, "default": "stack", "help": "OnTop viewer camera: stack or agent"},
         {"name": "--task_graph", "type": str, "default": "", "help": "Edge viewer preset (OnTop or SIT/CLIMB); random re-samples each episode"},
+        {"name": "--mask_cliff_sensor", "action": "store_true", "default": False,
+            "help": "Evaluation ablation: zero the 64-D sensor features before the policy head"},
         {"name": "--task_role_swap", "action": "store_true", "default": False, "help": "Swap A/B roles in fixed OnTop viewer presets"},
         {"name": "--relation_graph", "type": str, "default": "",
             "help": "Evaluation-only YAML explicit edges or independent_carry template"},
@@ -322,6 +335,12 @@ def get_args(benchmark=False):
         {"name": "--seed", "type": int, "help": "Random seed"},
         {"name": "--max_iterations", "type": int, "default": 0,
             "help": "Set a maximum number of training iterations"},
+        {"name": "--teacher_checkpoint", "type": str, "default": "",
+            "help": "Frozen TokenHSI Stage-1 checkpoint for graph-routed distillation"},
+        {"name": "--teacher_kl_coef", "type": float, "default": 1e-3,
+            "help": "Coefficient of joint-action KL(teacher || student)"},
+        {"name": "--teacher_grad_checks", "type": int, "default": 0,
+            "help": "Number of initial optimizer updates to check distillation gradients"},
         {"name": "--horizon_length", "type": int, "default": -1,
             "help": "Set number of simulation steps per 1 PPO iteration. Supported only by rl_games. If not -1 overrides the config settings."},
         {"name": "--minibatch_size", "type": int, "default": -1,

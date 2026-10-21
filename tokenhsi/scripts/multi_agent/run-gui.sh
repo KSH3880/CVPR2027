@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run a command on a temporary Xvfb display and expose it through noVNC.
+# Use the persistent noVNC display when available, otherwise start temporary Xvfb.
 #
 #   TOKENHSI_GPU=5 sh tokenhsi/scripts/multi_agent/run-gui.sh \
 #     sh tokenhsi/scripts/multi_agent/ma_carry_test.sh <checkpoint> 2 1 3
@@ -7,7 +7,8 @@
 # Every external dependency is auto-detected on PATH and in the usual system /
 # user-local install locations. Override any of them if yours live elsewhere:
 #
-#   PORT                web (noVNC) port                     default 6080
+#   PORT                web (noVNC) port                     default 5803
+#   VNC_PORT            VNC port                             default 5903
 #   RESOLUTION          virtual screen size                  default 1600x900x24
 #   VNC_DIR             prefix of a user-local x11vnc install
 #                       (e.g. an unpacked .deb: $VNC_DIR/usr/bin/x11vnc)
@@ -20,7 +21,7 @@
 set -e
 
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
-WEB_PORT=${PORT:-6080}
+WEB_PORT=${PORT:-5803}
 RESOLUTION=${RESOLUTION:-1600x900x24}
 VNC_DIR=${VNC_DIR:-}
 CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
@@ -37,6 +38,21 @@ fi
 
 # Resolve the same physical GPU for CUDA and Vulkan before starting services.
 . "$ROOT/tokenhsi/scripts/multi_agent/gui_gpu_env.sh"
+
+# This server already exposes display :2 through its persistent noVNC service.
+if [ "$TOKENHSI_GUI_GPU_INDEX" = 0 ] && \
+   command -v tokenhsi-gui-run >/dev/null 2>&1 && \
+   command -v systemctl >/dev/null 2>&1 && \
+   systemctl --user is-active --quiet tokenhsi-gui.service; then
+    curl -fsS http://127.0.0.1:5802/ >/dev/null || {
+        echo "noVNC endpoint is not ready: http://127.0.0.1:5802/" >&2
+        exit 1
+    }
+    echo "noVNC: http://127.0.0.1:5802/ (VS Code PORTS에서 5802 포워딩)"
+    cd "$ROOT"
+    export HEADLESS=0
+    exec tokenhsi-gui-run "$@"
+fi
 
 first_executable() {
     for _candidate in "$@"; do
@@ -97,7 +113,7 @@ done
 [ -n "$DISPLAY_NUM" ] || { echo "no free X display found" >&2; exit 1; }
 
 DISPLAY_NAME=:$DISPLAY_NUM
-VNC_PORT=$((5900 + DISPLAY_NUM))
+VNC_PORT=${VNC_PORT:-5903}
 if ss -ltn 2>/dev/null | grep -q ":$VNC_PORT "; then
     echo "VNC port $VNC_PORT is already in use" >&2
     exit 1

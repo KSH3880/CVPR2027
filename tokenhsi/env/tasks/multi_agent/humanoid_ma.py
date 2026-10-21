@@ -253,7 +253,7 @@ class HumanoidMA(Humanoid):
         return self._policy_obs_mode
 
     def _compute_clean_humanoid_nodes(self, body_pos, body_rot, body_vel, body_ang_vel,
-                                      env_origins):
+                                      env_origins, env_ids=None):
         """Return one 223-D heading-local TokenHSI self state per Human.
 
         ``env_origins`` is accepted to keep the task call site stable; absolute position
@@ -418,7 +418,8 @@ class HumanoidMA(Humanoid):
 
         # set_camera_location takes ENV-LOCAL coordinates when an env is passed, while the
         # root states are global -- subtract the env origin or the camera lands in the void.
-        center = (center - self._env_origins[0]).cpu().numpy()
+        origin = self.gym.get_env_origin(self.envs[0])
+        center = (center - center.new_tensor([origin.x, origin.y, origin.z])).cpu().numpy()
         cam_pos = gymapi.Vec3(float(center[0]) - dist,
                               float(center[1]) - dist,
                               float(center[2]) + height)

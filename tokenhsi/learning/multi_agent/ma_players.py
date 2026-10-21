@@ -38,11 +38,14 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     def restore(self, fn):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
+            from learning.multi_agent.cliff_sensor import check_sensor_checkpoint
+            check_sensor_checkpoint(checkpoint, self.env.task)
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
         return super().restore(fn)
 
     def _build_net(self, config):
         super()._build_net(config)
+        self.model.a2c_network.mask_sensor = getattr(self.env.task.cfg['args'], 'mask_cliff_sensor', False)
 
         if self.normalize_input:
             task = self.env.task
@@ -52,7 +55,8 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                     entity_counts=[task.num_agents, task.num_objects, task.num_agents],
                     normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
-                    extra_passthrough_size=task.get_relation_suffix_size(),
+                    extra_passthrough_size=task.get_relation_suffix_size() +
+                        task.num_agents * getattr(task, '_sensor_points', 0),
                 ).to(self.device)
             else:
                 self.running_mean_std = EntityRunningMeanStd(
@@ -78,6 +82,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             config["observation_mode"] = task.get_policy_obs_mode()
             config['relation_reward_mode'] = task._relation_cfg.get('mode', LEGACY_MODE)
             config['relation_graph_spec'] = task._relation_graph_spec
+            config['sensor_points'] = getattr(task, '_sensor_points', 0)
             if task.is_scene_policy():
                 config["scene_entity_sizes"] = task.get_scene_entity_sizes()
                 config["scene_kinematic_size"] = task.get_scene_kinematic_size()
@@ -148,7 +153,14 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         task = self.env.task
         if getattr(task, '_edge_context', False):
             from learning.multi_agent.edge_context_eval import run_edge_context_eval
-            return run_edge_context_eval(self)
+            result = run_edge_context_eval(self)
+            if getattr(task, '_sensor_points', 0):
+                directory = os.path.join(task.cfg['args'].output_path, 'metrics')
+                os.makedirs(directory, exist_ok=True)
+                with open(os.path.join(directory, 'cliff.json'), 'w') as f:
+                    json.dump(dict(sensor_masked=self.model.a2c_network.mask_sensor,
+                                   **task.cliff_diagnostics()), f, indent=2)
+            return result
         if not task._state_relation:
             return super().run_eval()
         N, M = task.num_envs, task.num_agents

@@ -831,7 +831,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         B, M, O = body_pos.shape[0], self.num_agents, self.num_objects
         human_nodes = self._compute_clean_humanoid_nodes(
-            body_pos, body_rot, body_vel, body_ang_vel, origins)
+            body_pos, body_rot, body_vel, body_ang_vel, origins, env_ids)
 
         box_rot = box_states[..., 3:7]
         box_rot_inv = box_rot.clone()
@@ -1659,10 +1659,11 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._enable_markers:
             self._marker_pos[env_ids] = self._tar_pos[env_ids]
             if self._edge_ontop:
-                from env.tasks.multi_agent.edge_context_reward import owner_sum
                 from utils.edge_ontop_spec import select_graph
                 graph = select_graph(self.relation_runtime.graph, env_ids)
-                active = owner_sum(((graph.edge_relation == 7) & graph.edge_valid).long(), graph).bool()
+                active = torch.stack([((graph.edge_relation == 7) & graph.edge_valid &
+                    (graph.edge_dst == self.num_agents + self.num_objects + slot)).any(-1)
+                    for slot in range(self.num_agents)], -1)
                 self._marker_pos[env_ids, :, 2] = torch.where(active, self._tar_pos[env_ids, :, 2], 20.)
             ids.append(self._marker_actor_ids[env_ids].contiguous().view(-1))
         if self._reset_random_height:
@@ -1676,11 +1677,15 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 self._platform_actor_ids[env_ids].contiguous().view(-1),
                 self._tar_platform_actor_ids[env_ids].contiguous().view(-1),
             ])
-        ids = torch.cat(ids)
+        ids = torch.cat(ids + self._extra_reset_actor_ids(env_ids))
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self._root_states),
                                                      gymtorch.unwrap_tensor(ids), len(ids))
         return
+
+    def _extra_reset_actor_ids(self, env_ids):
+        # Subclass actors must join this single indexed root-state call.
+        return []
 
     # ------------------------------------------------------------------ AMP
 
