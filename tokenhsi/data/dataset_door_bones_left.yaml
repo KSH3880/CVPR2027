@@ -1,0 +1,14 @@
+# Original locomotion for reset/approach; retargeted left-hand push for OPEN.
+motions:
+  loco:
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  doorOpen:
+  - file: dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0

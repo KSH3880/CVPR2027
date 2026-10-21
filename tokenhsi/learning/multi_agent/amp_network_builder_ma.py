@@ -544,7 +544,7 @@ class RelationEncoder(nn.Module):
             # legacy checkpoints and clean-scene ablations.
             self.rel_embed = nn.Parameter(torch.zeros(num_layers, num_heads, NUM_REL_TYPES))
         else:
-            relation_types = 11 if self.interaction_context else 9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES
+            relation_types = 13 if self.relation_graph_spec.get('sampler') == 'two_agent_open_push' else 12 if self.relation_graph_spec.get('sampler') in ('two_agent_two_door_open','single_agent_door_open') else 11 if self.interaction_context else 9 if (self.ontop_mixed or self.packed_context) else 8 if self.state_relation else NUM_REL_TYPES
             self.edge_encoder = EdgeEncoder(num_layers, num_heads, num_relation_types=relation_types)
 
         # non-persistent: derived from entity counts, so it must NOT end up in the
@@ -802,6 +802,9 @@ class RelationEncoder(nn.Module):
                                                 self.entity_types, relation_bias)
             if collect:
                 self.last_diagnostics = {}
+                if hasattr(self.context_fusion, 'bias_diagnostics'):
+                    self.last_diagnostics.update(self.context_fusion.bias_diagnostics(
+                        obs[:, -self.suffix_width:], relation_bias))
         elif self.ontop_mixed:
             relation_bias = self.build_mixed_relation_bias(obs[:, -self.suffix_width:])
             if collect:
@@ -1016,6 +1019,13 @@ class AMPMultiAgentBuilder(AMPBuilder):
                                self.critic_encoder.context_fusion.state_mlp):
                     torch.nn.init.zeros_(branch[-1].weight)
                     torch.nn.init.zeros_(branch[-1].bias)
+            if tp.get('share_edge_encoder', False):
+                if (self.relation_reward_mode != STAGE1_CONTEXT_MODE or
+                        relation_bias_mode != RELATION_BIAS_EDGE_MLP or
+                        not self.actor_encoder.semantic_only or
+                        self.actor_encoder.owner_holding_state):
+                    raise ValueError('Shared edge encoder requires semantic-only Stage 1 edge_mlp')
+                self.critic_encoder.edge_encoder = self.actor_encoder.edge_encoder
             return
 
         def set_entity_counts(self, num_agents, num_objects=None):

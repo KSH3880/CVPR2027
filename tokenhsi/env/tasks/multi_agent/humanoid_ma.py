@@ -163,7 +163,7 @@ class HumanoidMA(Humanoid):
 
         sensors_per_env = 2 * M
         self.vec_sensor_tensor = gymtorch.wrap_tensor(sensor_tensor).view(N, sensors_per_env * 6)
-        self.dof_force_tensor = gymtorch.wrap_tensor(dof_force_tensor).view(N, M, nd)
+        self.dof_force_tensor = gymtorch.wrap_tensor(dof_force_tensor).view(N, -1)[:, :M * nd].view(N, M, nd)
 
         self._root_states = gymtorch.wrap_tensor(actor_root_state)
         num_actors = self.get_num_actors_per_env()
@@ -179,9 +179,9 @@ class HumanoidMA(Humanoid):
 
         self._dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         dofs_per_env = self._dof_state.shape[0] // N
-        assert dofs_per_env == M * nd, \
-            "only the humanoids may own DOFs (got {} dofs/env, expected {})".format(dofs_per_env, M * nd)
-        dof_state_reshaped = self._dof_state.view(N, M, nd, 2)
+        expected_extra = getattr(self, '_extra_object_dofs', 0)
+        assert dofs_per_env == M * nd + expected_extra
+        dof_state_reshaped = self._dof_state.view(N, dofs_per_env, 2)[:, :M * nd].view(N, M, nd, 2)
         self._dof_pos = dof_state_reshaped[..., 0]
         self._dof_vel = dof_state_reshaped[..., 1]
 
@@ -560,11 +560,17 @@ class HumanoidMA(Humanoid):
             if self.cfg["env"]["enableTrackInitState"]:
                 pd_tar = self._every_env_init_dof_pos.clone()
 
-            pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar.contiguous().view(N, M * nd))
+            targets = pd_tar.contiguous().view(N, M * nd)
+            if getattr(self, '_extra_object_dofs', 0):
+                targets = torch.cat((targets, targets.new_zeros(N, self._extra_object_dofs)), -1)
+            pd_tar_tensor = gymtorch.unwrap_tensor(targets)
             self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
         else:
             forces = self.actions * self.motor_efforts.unsqueeze(0) * self.power_scale
-            force_tensor = gymtorch.unwrap_tensor(forces.contiguous().view(N, M * nd))
+            targets = forces.contiguous().view(N, M * nd)
+            if getattr(self, '_extra_object_dofs', 0):
+                targets = torch.cat((targets, targets.new_zeros(N, self._extra_object_dofs)), -1)
+            force_tensor = gymtorch.unwrap_tensor(targets)
             self.gym.set_dof_actuation_force_tensor(self.sim, force_tensor)
 
         return

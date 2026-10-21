@@ -1,0 +1,5 @@
+# Keep the small immutable upstream cache seed; ignore newly generated caches.
+/output/*
+!/output/rsi_cache/
+/output/rsi_cache/*
+!/output/rsi_cache/6361a69fcf429a02a66602bb.pkl.gz

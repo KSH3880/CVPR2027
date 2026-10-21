@@ -14,8 +14,11 @@ STAGE1_PACKET_FIELDS = ('valid', 'src', 'dst', 'relation', 'owner', 'start', 'ke
 STAGE1_SEMANTIC_FIELDS = STAGE1_PACKET_FIELDS[:5]
 STAGE1_OWNER_HOLDING_FIELDS = STAGE1_SEMANTIC_FIELDS + ('owner_holding_state',)
 OWNER_HOLDING_VARIANT = 'scenario_independent_stage1_paired_placement_owner_holding'
+UNIFIED_RANDOM_BINDING_VARIANT = 'scenario_independent_stage1_unified_shared_random_binding'
 UNIFIED_VARIANTS = ('scenario_independent_stage1_unified',
-                    'scenario_independent_stage1_unified_owner_holding')
+                    'scenario_independent_stage1_unified_owner_holding',
+                    'scenario_independent_stage1_unified_shared_edge_encoder',
+                    UNIFIED_RANDOM_BINDING_VARIANT)
 OWNER_HOLDING_VARIANTS = (OWNER_HOLDING_VARIANT, UNIFIED_VARIANTS[1])
 PATTERNS = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP',
             'HOLDING_SIT', 'HOLDING_CLIMB')
@@ -175,6 +178,13 @@ DEFAULT_GRAPH = dict(
 
 
 def validate_stage1_context_config(config):
+    if config.get('stage1_variant') == 'stage1_open_push':
+        from utils.open_push_spec import validate_reward
+        return validate_reward(config)
+    if config.get('stage1_variant') == 'stage1_door_open':
+        from utils.edge_door_spec import validate_reward
+        validate_reward(config)
+        return
     schema = config.get('schema_version')
     variant = config.get('stage1_variant')
     plane = variant in PLANE_VARIANTS
@@ -292,7 +302,12 @@ def validate_stage1_context_config(config):
         if schema in (7, 9) and not plane and (climb['success_phi_threshold'] != .6 or tolerance != .07):
             raise ValueError('CLIMB success must use phi=0.6 and feet=0.07m')
     expected_progress = {'kind': 'distance', 'delta': .5, 'sigma': 1.}
-    if schema in (7, 9):
+    if config['progress'].get('kind') == 'success_region':
+        if not sit_plane:
+            raise ValueError('Success-region progress requires rectangular SIT/CLIMB success')
+        expected_progress = {'kind': 'success_region', 'delta': .5, 'sigma': 1.,
+                             'holding_reach': .3}
+    elif schema in (7, 9):
         expected_progress['climb_pinning'] = 'bbox_valid_radius'
     if config['progress'] != expected_progress:
         raise ValueError('Unsupported Stage-1 distance progress')
@@ -310,7 +325,7 @@ def validate_stage1_context_config(config):
         }
         if variant == 'scenario_independent_stage1_slow_near_start':
             expected_training['near_start'].update(hold_steps=600000, anneal_steps=600000)
-        if variant in ('scenario_independent_stage1_paired_at_no_near',
+        if variant != UNIFIED_RANDOM_BINDING_VARIANT and variant in ('scenario_independent_stage1_paired_at_no_near',
                        'scenario_independent_stage1_paired_placement_no_near',
                        OWNER_HOLDING_VARIANT, *UNIFIED_VARIANTS):
             expected_training['near_start'].update(probability_start=0., probability_end=0.)
@@ -455,6 +470,12 @@ def sample_graph(n, spec, device='cpu', preset='random_stage1', role_swap=False,
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get('sampler') == 'two_agent_open_push':
+        from utils.open_push_spec import compile_graph
+        return compile_graph(spec,m,o,device)
+    if spec.get('sampler') in ('two_agent_two_door_open','single_agent_door_open'):
+        from utils.edge_door_spec import compile_graph
+        return compile_graph(spec, m, o, device)
     if spec.get('sampler') == 'two_agent_stage2_cooperative' or spec.get('mode') == 'stage2_explicit':
         from utils.edge_stage2_spec import compile_graph as compile_stage2_graph
         return compile_stage2_graph(spec, m, o, device)

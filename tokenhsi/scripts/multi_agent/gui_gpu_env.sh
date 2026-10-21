@@ -32,7 +32,6 @@ export TOKENHSI_GPU="$gui_gpu_uuid"
 export TOKENHSI_GUI_GPU_INDEX
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="$gui_gpu_uuid"
-export DRI_PRIME="$TOKENHSI_GUI_GPU_INDEX!"
 # Exclude software/other-vendor ICDs from the viewer's device enumeration.
 for gui_nvidia_icd in /etc/vulkan/icd.d/nvidia_icd.json /usr/share/vulkan/icd.d/nvidia_icd.json; do
     if [ -f "$gui_nvidia_icd" ]; then
@@ -41,6 +40,21 @@ for gui_nvidia_icd in /etc/vulkan/icd.d/nvidia_icd.json /usr/share/vulkan/icd.d/
         break
     fi
 done
+case "${TOKENHSI_GUI_GPU_MODE:-mesa}" in
+    native)
+        # Bypass Mesa's device layer when it crashes inside Gym's Vulkan loader.
+        # CUDA is remapped to device 0; unfiltered Vulkan retains its GPU index.
+        export TOKENHSI_GRAPHICS_DEVICE_ID="$TOKENHSI_GUI_GPU_INDEX"
+        unset DRI_PRIME MESA_VK_DEVICE_SELECT MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE
+        export NODEVICE_SELECT=1
+        VK_INSTANCE_LAYERS=$(printf '%s' "${VK_INSTANCE_LAYERS:-}" | \
+            awk -F: '{for(i=1;i<=NF;i++) if($i!="" && $i!="VK_LAYER_MESA_device_select") {printf "%s%s",sep,$i;sep=":"}}')
+        if [ -n "$VK_INSTANCE_LAYERS" ]; then export VK_INSTANCE_LAYERS; else unset VK_INSTANCE_LAYERS; fi
+        return 0 ;;
+    mesa) export TOKENHSI_GRAPHICS_DEVICE_ID=0 ;;
+    *) echo "Invalid TOKENHSI_GUI_GPU_MODE; use mesa or native" >&2; exit 1 ;;
+esac
+export DRI_PRIME="$TOKENHSI_GUI_GPU_INDEX!"
 case ":${VK_INSTANCE_LAYERS:-}:" in
     *:VK_LAYER_MESA_device_select:*) ;;
     *) VK_INSTANCE_LAYERS="VK_LAYER_MESA_device_select${VK_INSTANCE_LAYERS:+:$VK_INSTANCE_LAYERS}" ;;

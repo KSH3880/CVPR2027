@@ -16,6 +16,7 @@
 #   WEBSOCKIFY          full path to the websockify executable
 #   TOKENHSI_CONDA_ENV  conda env to search for websockify   default "tokenhsi"
 #   TOKENHSI_GPU        NVIDIA GPU index or UUID for both CUDA and rendering.
+#   TOKENHSI_GUI_GPU_MODE  mesa (default) or native (bypass Mesa Vulkan layer).
 
 set -e
 
@@ -152,7 +153,10 @@ if [ -n "$VNC_DIR" ]; then
     done
 fi
 
-LD_LIBRARY_PATH="${X11VNC_LIBS}${X11VNC_LIBS:+:}${LD_LIBRARY_PATH:-}" "$X11VNC" \
+# This server captures our Xvfb display, even when the desktop uses Wayland.
+# x11vnc otherwise exits before trying the explicit -display argument.
+LD_LIBRARY_PATH="${X11VNC_LIBS}${X11VNC_LIBS:+:}${LD_LIBRARY_PATH:-}" \
+    env -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE "$X11VNC" \
     -display "$DISPLAY_NAME" -rfbport "$VNC_PORT" -localhost -nopw -forever \
     -shared -noxdamage -noshm -quiet >"$VNC_LOG" 2>&1 &
 VNC_PID=$!
@@ -168,7 +172,7 @@ echo " noVNC    http://localhost:$WEB_PORT/vnc.html?autoconnect=1&resize=remote"
 echo " VS Code  PORTS에서 $WEB_PORT 포워딩"
 echo " display  $DISPLAY_NAME"
 echo " GPU      physical $TOKENHSI_GUI_GPU_INDEX / $TOKENHSI_GPU"
-echo " Vulkan   $DRI_PRIME (same GPU as CUDA; local device 0)"
+echo " Vulkan   ${TOKENHSI_GUI_GPU_MODE:-mesa}, graphics device $TOKENHSI_GRAPHICS_DEVICE_ID"
 echo " 종료     Ctrl+C"
 echo "=============================================================="
 

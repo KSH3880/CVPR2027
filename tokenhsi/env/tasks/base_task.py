@@ -37,6 +37,8 @@ class BaseTask():
         self.graphics_device_id = self.device_id
         if enable_camera_sensors == False and self.headless == True:
             self.graphics_device_id = -1
+        elif 'TOKENHSI_GRAPHICS_DEVICE_ID' in os.environ:
+            self.graphics_device_id = int(os.environ['TOKENHSI_GRAPHICS_DEVICE_ID'])
 
         self.num_envs = cfg["env"]["numEnvs"]
         self.num_obs = cfg["env"]["numObservations"]
@@ -81,6 +83,9 @@ class BaseTask():
 
         # todo: read from config
         self.enable_viewer_sync = True
+        self._viewer_render_every = max(1, int(os.environ.get('TOKENHSI_VIEWER_RENDER_EVERY', '1')))
+        self._viewer_draw_sync = os.environ.get('TOKENHSI_VIEWER_DRAW_SYNC', '1') != '0'
+        self._viewer_render_tick = 0
         self.viewer = None
 
         # save imgs
@@ -198,8 +203,12 @@ class BaseTask():
 
             # step graphics
             if self.enable_viewer_sync:
-                self.gym.step_graphics(self.sim)
-                self.gym.draw_viewer(self.viewer, self.sim, True)
+                self._viewer_render_tick += 1
+                if self._viewer_render_tick % self._viewer_render_every == 0:
+                    self.gym.step_graphics(self.sim)
+                    self.gym.draw_viewer(self.viewer, self.sim, self._viewer_draw_sync)
+                else:
+                    self.gym.poll_viewer_events(self.viewer)
             else:
                 self.gym.poll_viewer_events(self.viewer)
 

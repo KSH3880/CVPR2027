@@ -12,15 +12,25 @@ from learning.multi_agent.ma_agent import EntityRunningMeanStd
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 from utils.relation_task_spec import checkpoint_metadata, check_checkpoint_metadata, LEGACY_MODE
 from utils.torch_utils import load_checkpoint
+from utils.open_push_spec import checkpoint_contracts_match
 
 
 class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
+
+    def _amp_debug(self, info):
+        if os.environ.get('TOKENHSI_VIEWER_QUIET') != '1':
+            return super()._amp_debug(info)
+
+    def _calc_amp_rewards(self, amp_obs):
+        if not self.env.task.cfg['env'].get('ampEnabled', True):
+            return {'disc_rewards': amp_obs.new_zeros(*amp_obs.shape[:-1], 1)}
+        return super()._calc_amp_rewards(amp_obs)
 
     def _preproc_amp_obs(self, amp_obs):
         normalized = super()._preproc_amp_obs(amp_obs)
         if getattr(self.env.task, '_amp_task_conditioning', False):
             from utils.unified_training import preserve_amp_labels
-            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps)
+            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps, getattr(self.env.task, '_amp_family_count', 3))
         return normalized
 
     def __init__(self, config):
@@ -46,6 +56,10 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
+            if getattr(self.env.task,'_open_push',False) and not checkpoint_contracts_match(checkpoint.get('open_push_contract'),self.env.task.get_open_push_contract()):
+                raise ValueError('OPEN/PUSH checkpoint physics/reference contract differs')
+            if getattr(self.env.task,'_door_open',False) and checkpoint.get('door_experiment_contract') != self.env.task.get_door_experiment_contract():
+                raise ValueError('Door checkpoint network/reference contract differs')
         return super().restore(fn)
 
     def _build_net(self, config):
@@ -133,6 +147,8 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
 
         terms = info["reward_terms"][0].detach().cpu().tolist()
         amp_reward = self._calc_amp_rewards(info["amp_obs"][0:1])["disc_rewards"][0, 0].item()
+        if 'door_amp_weight' in info:
+            amp_reward *= info['door_amp_weight'][0,0].item()
         combined = self._task_reward_w * terms[-1] + self._disc_reward_w * amp_reward
         values = dict(zip(self.env.task.REWARD_TERM_NAMES, terms))
         if self.env.task._state_relation:

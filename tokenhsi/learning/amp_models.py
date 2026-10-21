@@ -49,7 +49,7 @@ class ModelAMPContinuous(ModelA2CContinuousLogStd):
             is_train = input_dict.get('is_train', True)
             result = super().forward(input_dict)
 
-            if (is_train):
+            if is_train and input_dict.get('amp_enabled', True):
                 amp_obs = input_dict['amp_obs']
                 disc_agent_logit = self.a2c_network.eval_disc(amp_obs)
                 result["disc_agent_logit"] = disc_agent_logit

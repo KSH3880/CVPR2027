@@ -21,7 +21,8 @@ esac
 ''')
     stub.chmod(0o755)
     env = dict(os.environ, PATH=str(tmp_path) + ':' + os.environ['PATH'])
-    for key in ('TOKENHSI_GPU', 'CUDA_VISIBLE_DEVICES', 'VK_INSTANCE_LAYERS'):
+    for key in ('TOKENHSI_GPU', 'CUDA_VISIBLE_DEVICES', 'VK_INSTANCE_LAYERS',
+                'TOKENHSI_GUI_GPU_MODE', 'TOKENHSI_GRAPHICS_DEVICE_ID'):
         env.pop(key, None)
     # The old hardcoded/default selectors must not silently win.
     env.update(DRI_PRIME='0!', NODEVICE_SELECT='1', MESA_VK_DEVICE_SELECT='10de:0000')
@@ -47,6 +48,20 @@ def test_gpu_selection_exports_one_consistent_device(gpu_env, selection, index, 
     assert values['VK_INSTANCE_LAYERS'] == 'VK_LAYER_MESA_device_select:VK_LAYER_example'
     assert 'NODEVICE_SELECT' not in values
     assert 'MESA_VK_DEVICE_SELECT' not in values
+
+
+def test_native_gpu_selection_bypasses_mesa_layer(gpu_env):
+    gpu_env.update(TOKENHSI_GPU='6', TOKENHSI_GUI_GPU_MODE='native',
+                   VK_INSTANCE_LAYERS='VK_LAYER_MESA_device_select:VK_LAYER_example')
+    result = subprocess.run(['sh', '-c', 'set -e; . "$1"; env', 'test', str(HELPER)],
+                            env=gpu_env, text=True, capture_output=True, check=True)
+    values = dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+    assert values['TOKENHSI_GPU'] == values['CUDA_VISIBLE_DEVICES'] == 'GPU-test-six'
+    assert values['TOKENHSI_GRAPHICS_DEVICE_ID'] == '6'
+    assert values['NODEVICE_SELECT'] == '1'
+    assert values['VK_INSTANCE_LAYERS'] == 'VK_LAYER_example'
+    for key in ('DRI_PRIME', 'MESA_VK_DEVICE_SELECT', 'MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE'):
+        assert key not in values
 
 
 @pytest.mark.parametrize('selection', ['6,0', '999'])

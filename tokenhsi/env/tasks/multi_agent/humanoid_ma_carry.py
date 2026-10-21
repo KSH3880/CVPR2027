@@ -38,9 +38,10 @@ from utils import torch_utils
 
 
 from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
-from utils.edge_context_spec import CONTEXT_MODE, compile_edge_context_graph, context_suffix_size
+from utils.edge_context_spec import (CONTEXT_MODE, compile_edge_context_graph,
+    context_suffix_size, at_goal_marker_slots)
 from env.tasks.multi_agent.edge_context_reward import scene_success
-from utils.edge_ontop_spec import ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
+from utils.edge_ontop_spec import ON_TOP, ONTOP_CONTEXT_MODE, compile_ontop_graph, packet_size, batched, PRESETS
 from utils.edge_interaction_spec import (INTERACTION_CONTEXT_MODE, compile_interaction_graph,
     PRESETS as INTERACTION_PRESETS, SIT, CLIMB)
 from utils.edge_stage1_spec import (STAGE1_CONTEXT_MODE, compile_stage1_graph,
@@ -69,107 +70,149 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._relation_cfg = cfg['env'].get('relationReward', {})
         validate_relation_config(self._relation_cfg)
-        self._stage2 = self._relation_cfg.get('mode') == STAGE2_CONTEXT_MODE
-        self._edge_stage1 = self._relation_cfg.get('mode') in (STAGE1_CONTEXT_MODE,
-                                                               STAGE2_CONTEXT_MODE)
-        self._edge_interaction = self._relation_cfg.get('mode') in (INTERACTION_CONTEXT_MODE,
-                                                                    STAGE1_CONTEXT_MODE,
-                                                                    STAGE2_CONTEXT_MODE)
-        self._edge_ontop = self._relation_cfg.get('mode') in (ONTOP_CONTEXT_MODE,
-            INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
-        self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE,
-            ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE,
-            STAGE2_CONTEXT_MODE)
-        from utils.unified_training import validate_unified_env
-        if self._edge_stage1 and not self._stage2:
-            validate_unified_env(cfg['env'])
-        self._amp_task_conditioning = cfg['env'].get('ampTaskConditioning', False)
-        sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
-        primitive_config = self._edge_stage1 and sampler_name == PRIMITIVE_SAMPLER
-        self._scenario_no_climb = self._stage2 or self._edge_stage1 and sampler_name in (
-            INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER, STAGE2_SAMPLER)
-        self._scenario_with_climb = self._stage2 or sampler_name in (
-            INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER, STAGE2_SAMPLER)
-        semantic_only_config = bool(cfg['env'].get('relationGraph', {}).get('semantic_only', False))
-        default_preset = ('place_climb' if self._stage2 else 'holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
-        train_preset = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
-        self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
-        self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
-        presets = STAGE2_PRESETS if self._stage2 else SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
-        if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
-            raise ValueError('Unknown sampled-edge graph preset or camera mode')
-        if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
-            expected_random = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
-            required_objects = 4 if sampler_name in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER) else 3
-            if self._task_graph_preset != expected_random or \
-                    (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2, required_objects):
-                raise ValueError('Sampled-edge training requires random graphs, 2 agents and {} objects'.format(required_objects))
-        self._relation_graph_spec = cfg['env'].get('relationGraph', {'template': 'independent_carry'})
-        self._primitive_stage1 = (self._edge_stage1 and
-            self._relation_graph_spec.get('sampler') == PRIMITIVE_SAMPLER)
-        self._semantic_only_stage1 = self._edge_stage1 and bool(
-            self._relation_graph_spec.get('semantic_only', False))
-        self._owner_holding_state = (
-            self._relation_cfg.get('stage1_variant') in OWNER_HOLDING_VARIANTS)
-        if self._owner_holding_state != bool(
-                self._relation_graph_spec.get('owner_holding_state', False)):
-            raise ValueError('Owner-HOLDING packet and reward variant must be paired')
-        if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9, 10)):
-            raise ValueError('Semantic-only graph and Stage-1/2 schema 7/8/9/10 must be paired')
-        self._relation_rsi = cfg['env'].get('relationRsi')
-        self._template_rsi = cfg['env'].get('templateRsi')
-        if self._relation_rsi is not None and not self._primitive_stage1:
-            raise ValueError('relationRsi requires the primitive Stage-1 sampler')
-        if self._scenario_no_climb != (self._template_rsi is not None):
-            raise ValueError('No-CLIMB scenario sampler requires templateRsi exclusively')
-        if self._primitive_stage1 and self._relation_rsi is None:
-            raise ValueError('Primitive Stage-1 requires relationRsi')
-        if self._primitive_stage1 != (self._relation_cfg.get('schema_version') in (6, 7)):
-            raise ValueError('Primitive sampler and Stage-1 schema 6/7 must be paired')
-        schema = self._relation_cfg.get('schema_version')
-        if self._scenario_no_climb != (schema in (8, 9, 10)) or \
-                self._scenario_with_climb != (schema in (9, 10)) or \
-                self._stage2 != (schema == 10):
-            raise ValueError('Scenario sampler and Stage-1/2 schema must be paired')
-        if not self._stage2 and (sampler_name in (INDEPENDENT_CLIMB_SAMPLER,
-                PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER)) != (
-                self._relation_cfg.get('stage1_variant') in (
-                    'scenario_independent_with_climb', 'scenario_independent_stage1_plane',
-                    *SIT_PLANE_VARIANTS)):
-            raise ValueError('Independent scenario sampler and reward variant must be paired')
-        self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
-        self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
-            ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
-            STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
-        if self._ontop_mixed:
-            if (cfg['env'].get('numAgents'), cfg['env'].get('numObjects')) != (2, 3):
-                raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
-            self._ontop_scenario_list = scenario_ids(
-                cfg['env']['scenarioMixture'], cfg['env']['numEnvs'],
-                evaluation=bool(cfg['args'].test or cfg['args'].eval),
-                selected=getattr(cfg['args'], 'ontop_scenario', 'mixed')).tolist()
-        if self._state_relation:
-            if cfg['env'].get('policyObsMode', 'legacy_multirow') != 'clean_scene':
-                raise ValueError('State relation modes require policyObsMode=clean_scene')
-            self.REWARD_TERM_NAMES = ('holding_state', 'at_state', 'holding_progress',
-                'at_progress', 'success_bonus', 'power', 'collision', 'box_speed', 'total')
+        self._door_open = cfg['env'].get('relationGraph', {}).get('sampler') in ('two_agent_two_door_open', 'single_agent_door_open')
+        self._open_push = cfg['env'].get('relationGraph', {}).get('sampler') == 'two_agent_open_push'
+        if self._open_push:
+            if not hasattr(self, '_joint_cfg'):
+                raise ValueError('Joint OPEN/PUSH config requires HumanoidMAOpenPush')
+            from utils.open_push_spec import validate_env
+            validate_env(cfg['env'])
+            self._stage2 = self._edge_ontop = self._ontop_mixed = False
+            self._edge_stage1 = self._edge_context = self._state_relation = True
+            self._edge_interaction = False
+            self._scenario_no_climb = self._scenario_with_climb = False
+            self._primitive_stage1 = self._owner_holding_state = False
+            self._semantic_only_stage1 = self._amp_task_conditioning = True
+            self._relation_rsi = self._template_rsi = None
+            self._task_role_swap = False
+            self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or 'random_open_push'
+            if self._task_graph_preset not in ('random_open_push','open','push','open_push','push_open'):
+                raise ValueError('Invalid OPEN/PUSH graph preset')
+            self.num_objects = 2 if cfg['env']['relationGraph'].get('push_only',False) else 4
+            self._relation_graph_spec = cfg['env']['relationGraph']
+            self._context_suffix_width = semantic_packet_size(4)
+        elif self._door_open:
+            if not hasattr(self, '_door_cfg'):
+                raise ValueError('Door config requires the HumanoidMADoor task')
+            from utils.edge_door_spec import validate_env
+            validate_env(cfg['env'])
+            self._stage2 = self._edge_ontop = self._ontop_mixed = False
+            self._edge_stage1 = self._edge_context = self._state_relation = True
+            self._edge_interaction = False
+            self._scenario_no_climb = self._scenario_with_climb = False
+            self._primitive_stage1 = self._owner_holding_state = False
+            self._semantic_only_stage1 = True
+            self._amp_task_conditioning = False
+            self._relation_rsi = self._template_rsi = None
+            self._task_role_swap = False
+            self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or 'open'
+            if self._task_graph_preset != 'open':
+                raise ValueError('Door environment accepts --task_graph open only')
+            self.num_objects = cfg['env']['numObjects']
+            self._relation_graph_spec = cfg['env']['relationGraph']
+            self._context_suffix_width = semantic_packet_size(cfg['env']['numAgents'])
+        else:
+            self._stage2 = self._relation_cfg.get('mode') == STAGE2_CONTEXT_MODE
+            self._edge_stage1 = self._relation_cfg.get('mode') in (STAGE1_CONTEXT_MODE,
+                                                                   STAGE2_CONTEXT_MODE)
+            self._edge_interaction = self._relation_cfg.get('mode') in (INTERACTION_CONTEXT_MODE,
+                                                                        STAGE1_CONTEXT_MODE,
+                                                                        STAGE2_CONTEXT_MODE)
+            self._edge_ontop = self._relation_cfg.get('mode') in (ONTOP_CONTEXT_MODE,
+                INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
+            self._edge_context = self._relation_cfg.get('mode') in (CONTEXT_MODE,
+                ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE, STAGE1_CONTEXT_MODE,
+                STAGE2_CONTEXT_MODE)
+            from utils.unified_training import validate_unified_env
+            if self._edge_stage1 and not self._stage2:
+                validate_unified_env(cfg['env'])
+            self._amp_task_conditioning = cfg['env'].get('ampTaskConditioning', False)
+            sampler_name = cfg['env'].get('relationGraph', {}).get('sampler')
+            primitive_config = self._edge_stage1 and sampler_name == PRIMITIVE_SAMPLER
+            self._scenario_no_climb = self._stage2 or self._edge_stage1 and sampler_name in (
+                INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER, STAGE2_SAMPLER)
+            self._scenario_with_climb = self._stage2 or sampler_name in (
+                INDEPENDENT_CLIMB_SAMPLER, PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER, STAGE2_SAMPLER)
+            semantic_only_config = bool(cfg['env'].get('relationGraph', {}).get('semantic_only', False))
+            default_preset = ('place_climb' if self._stage2 else 'holding_at' if self._scenario_no_climb else 'climb' if semantic_only_config else 'holding' if primitive_config else 'holding_sit') if self._edge_stage1 else ('hold_sit' if self._edge_interaction else 'at_ontop')
+            train_preset = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
+            self._task_graph_preset = getattr(cfg['args'], 'task_graph', '') or (default_preset if cfg['args'].test or cfg['args'].eval else train_preset)
+            self._task_role_swap = bool(getattr(cfg['args'], 'task_role_swap', False))
+            presets = STAGE2_PRESETS if self._stage2 else SCENARIO_PRESETS if self._scenario_no_climb else STAGE1_PRESETS if self._edge_stage1 else (INTERACTION_PRESETS if self._edge_interaction else PRESETS)
+            if self._edge_ontop and (self._task_graph_preset not in presets or getattr(cfg['args'], 'task_camera', 'stack') not in ('stack', 'agent')):
+                raise ValueError('Unknown sampled-edge graph preset or camera mode')
+            if self._edge_ontop and not (cfg['args'].test or cfg['args'].eval):
+                expected_random = 'random_scenario' if self._scenario_no_climb else 'random_stage1' if self._edge_stage1 else 'random'
+                required_objects = 4 if sampler_name in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER) else 3
+                if self._task_graph_preset != expected_random or \
+                        (cfg['env']['numAgents'], cfg['env']['numObjects']) != (2, required_objects):
+                    raise ValueError('Sampled-edge training requires random graphs, 2 agents and {} objects'.format(required_objects))
+            self._relation_graph_spec = cfg['env'].get('relationGraph', {'template': 'independent_carry'})
+            self._primitive_stage1 = (self._edge_stage1 and
+                self._relation_graph_spec.get('sampler') == PRIMITIVE_SAMPLER)
+            self._semantic_only_stage1 = self._edge_stage1 and bool(
+                self._relation_graph_spec.get('semantic_only', False))
+            self._owner_holding_state = (
+                self._relation_cfg.get('stage1_variant') in OWNER_HOLDING_VARIANTS)
+            if self._owner_holding_state != bool(
+                    self._relation_graph_spec.get('owner_holding_state', False)):
+                raise ValueError('Owner-HOLDING packet and reward variant must be paired')
+            if self._semantic_only_stage1 != (self._relation_cfg.get('schema_version') in (7, 8, 9, 10)):
+                raise ValueError('Semantic-only graph and Stage-1/2 schema 7/8/9/10 must be paired')
+            self._relation_rsi = cfg['env'].get('relationRsi')
+            self._template_rsi = cfg['env'].get('templateRsi')
+            if self._relation_rsi is not None and not self._primitive_stage1:
+                raise ValueError('relationRsi requires the primitive Stage-1 sampler')
+            if self._scenario_no_climb != (self._template_rsi is not None):
+                raise ValueError('No-CLIMB scenario sampler requires templateRsi exclusively')
+            if self._primitive_stage1 and self._relation_rsi is None:
+                raise ValueError('Primitive Stage-1 requires relationRsi')
+            if self._primitive_stage1 != (self._relation_cfg.get('schema_version') in (6, 7)):
+                raise ValueError('Primitive sampler and Stage-1 schema 6/7 must be paired')
+            schema = self._relation_cfg.get('schema_version')
+            if self._scenario_no_climb != (schema in (8, 9, 10)) or \
+                    self._scenario_with_climb != (schema in (9, 10)) or \
+                    self._stage2 != (schema == 10):
+                raise ValueError('Scenario sampler and Stage-1/2 schema must be paired')
+            if not self._stage2 and (sampler_name in (INDEPENDENT_CLIMB_SAMPLER,
+                    PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER)) != (
+                    self._relation_cfg.get('stage1_variant') in (
+                        'scenario_independent_with_climb', 'scenario_independent_stage1_plane',
+                        *SIT_PLANE_VARIANTS)):
+                raise ValueError('Independent scenario sampler and reward variant must be paired')
+            self._ontop_mixed = self._relation_cfg.get('mode') == ONTOP_MODE
+            self._state_relation = self._relation_cfg.get('mode', LEGACY_MODE) in (STATE_MODE,
+                ONTOP_MODE, CONTEXT_MODE, ONTOP_CONTEXT_MODE, INTERACTION_CONTEXT_MODE,
+                STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE)
             if self._ontop_mixed:
-                self.REWARD_TERM_NAMES = self.REWARD_TERM_NAMES[:-1] + ('ontop_state', 'ontop_progress', 'total')
-        num_agents = int(cfg["env"].get("numAgents", 1))
-        configured_objects = int(cfg["env"].get("numObjects", 0))
-        self.num_objects = num_agents if configured_objects <= 0 else configured_objects
-        assert self.num_objects >= num_agents, \
-            "numObjects ({}) must be >= numAgents ({})".format(self.num_objects, num_agents)
+                if (cfg['env'].get('numAgents'), cfg['env'].get('numObjects')) != (2, 3):
+                    raise ValueError('Mixed OnTop currently requires 2 agents and 3 objects')
+                self._ontop_scenario_list = scenario_ids(
+                    cfg['env']['scenarioMixture'], cfg['env']['numEnvs'],
+                    evaluation=bool(cfg['args'].test or cfg['args'].eval),
+                    selected=getattr(cfg['args'], 'ontop_scenario', 'mixed')).tolist()
+            if self._state_relation:
+                if cfg['env'].get('policyObsMode', 'legacy_multirow') != 'clean_scene':
+                    raise ValueError('State relation modes require policyObsMode=clean_scene')
+                self.REWARD_TERM_NAMES = ('holding_state', 'at_state', 'holding_progress',
+                    'at_progress', 'success_bonus', 'power', 'collision', 'box_speed', 'total')
+                if self._ontop_mixed:
+                    self.REWARD_TERM_NAMES = self.REWARD_TERM_NAMES[:-1] + ('ontop_state', 'ontop_progress', 'total')
+            num_agents = int(cfg["env"].get("numAgents", 1))
+            configured_objects = int(cfg["env"].get("numObjects", 0))
+            self.num_objects = num_agents if configured_objects <= 0 else configured_objects
+            assert self.num_objects >= num_agents, \
+                "numObjects ({}) must be >= numAgents ({})".format(self.num_objects, num_agents)
 
-        if self._edge_context:
-            compiler = compile_stage1_graph if self._edge_stage1 else (compile_interaction_graph if self._edge_interaction else (compile_ontop_graph if self._edge_ontop else compile_edge_context_graph))
-            graph = compiler(self._relation_graph_spec, num_agents, self.num_objects)
-            size_fn = (owner_holding_packet_size if self._owner_holding_state else
-                semantic_packet_size if self._semantic_only_stage1 else
-                packet_size if self._edge_ontop else context_suffix_size)
-            self._context_suffix_width = size_fn(len(graph.ids))
-            self.REWARD_TERM_NAMES = ('edge_state', 'edge_progress', 'edge_success',
-                                      'power', 'collision', 'box_speed', 'total')
+            if self._edge_context:
+                compiler = compile_stage1_graph if self._edge_stage1 else (compile_interaction_graph if self._edge_interaction else (compile_ontop_graph if self._edge_ontop else compile_edge_context_graph))
+                graph = compiler(self._relation_graph_spec, num_agents, self.num_objects)
+                size_fn = (owner_holding_packet_size if self._owner_holding_state else
+                    semantic_packet_size if self._semantic_only_stage1 else
+                    packet_size if self._edge_ontop else context_suffix_size)
+                self._context_suffix_width = size_fn(len(graph.ids))
+                self.REWARD_TERM_NAMES = ('edge_state', 'edge_progress', 'edge_success',
+                                          'power', 'collision', 'box_speed', 'total')
 
         self._enable_task_obs = cfg["env"]["enableTaskObs"]
         self._only_vel_reward = cfg["env"]["onlyVelReward"]
@@ -233,6 +276,15 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         self._reset_ref_motion_ids = {}
         self._reset_ref_motion_times = {}
 
+        from utils.reference_rsi import validate_reference_rsi
+        self._reference_rsi_spec = cfg['env'].get('referenceRsi')
+        validate_reference_rsi(self._reference_rsi_spec)
+        if self._reference_rsi_spec and not self._scenario_no_climb:
+            raise ValueError('referenceRsi requires the scenario reference-object reset path')
+        self._reference_rsi_bank = None
+        self._hybrid_rsi_runtime = None
+        self._reference_scene_screen = None
+
         self._power_reward = cfg["env"]["power_reward"]
         self._power_coefficient = cfg["env"]["power_coefficient"]
 
@@ -262,7 +314,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 'CLIMB': {'loco', 'climb'},
                 'HOLDING_AT': {'loco', 'pickUp', 'carryWith', 'putDown'},
                 'HOLDING_ON_TOP': ({'loco', 'pickUp', 'carryWith', 'putDown'}
-                    if self._relation_cfg.get('stage1_variant') ==
+                    if (self._reference_rsi_spec and self._reference_rsi_spec['mode'] == 'hybrid_late') or self._relation_cfg.get('stage1_variant') ==
                     'scenario_independent_stage1_ontop_putdown' else
                     {'loco', 'pickUp', 'carryWith'})}
             templates = scenario_templates(self._relation_graph_spec)
@@ -288,6 +340,25 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         motion_file = cfg['env']['motion_file']
         self._load_motion(motion_file)
+
+        if (self._reference_rsi_spec and not cfg['args'].eval and
+                self._reference_rsi_spec['mode'] != 'hybrid_late'):
+            from utils.reference_rsi import ReferenceRSIBank
+            if self._reference_rsi_spec['mode'] == 'student_candidates':
+                from utils.student_rsi import StudentRSIBank
+                bank_class = StudentRSIBank
+            else:
+                bank_class = ReferenceRSIBank
+            self._reference_rsi_bank = bank_class(
+                self._reference_rsi_spec, self._motion_lib, motion_file,
+                os.path.join(cfg['env']['asset']['assetRoot'], cfg['env']['asset']['assetFileName']),
+                self.device)
+            if self._reference_rsi_spec['mode'] != 'student_candidates':
+                from utils.reference_rsi import SceneGeometryScreen
+                body_names = self.gym.get_actor_rigid_body_names(self.envs[0],self.humanoid_handles_all[0][0])
+                self._reference_scene_screen = SceneGeometryScreen(
+                    os.path.join(cfg['env']['asset']['assetRoot'],cfg['env']['asset']['assetFileName']),
+                    body_names,self.device)
 
         N, M = self.num_envs, self.num_agents
 
@@ -336,6 +407,16 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         if self._state_relation:
             self._init_relation_runtime()
+        if (self._reference_rsi_spec and not self._is_eval and
+                self._reference_rsi_spec['mode'] == 'hybrid_late'):
+            from env.tasks.multi_agent.hybrid_rsi_screen import build_physical_records
+            from env.tasks.multi_agent.hybrid_rsi_runtime import HybridRSIRuntime
+            from utils.hybrid_late_rsi import HybridLateRSIBank
+            asset = os.path.join(cfg['env']['asset']['assetRoot'], cfg['env']['asset']['assetFileName'])
+            records, fingerprint = build_physical_records(self, self._reference_rsi_spec, motion_file, asset)
+            self._reference_rsi_bank = HybridLateRSIBank(self._reference_rsi_spec,
+                self._motion_lib, motion_file, asset, self.device, records, fingerprint)
+            self._hybrid_rsi_runtime = HybridRSIRuntime(self, self._reference_rsi_bank)
         return
 
     # ------------------------------------------------------------------ sizes
@@ -509,6 +590,15 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                                             num_samples=num_boxes, replacement=True)
                 self._box_scale = scale_pool[sampled]
 
+        evaluation_sizes = self.cfg['env'].get('evaluationBoxSizes')
+        if evaluation_sizes is not None:
+            if not self.cfg['args'].eval:
+                raise ValueError('evaluationBoxSizes is evaluation-only')
+            sizes = torch.as_tensor(evaluation_sizes, device=self.device, dtype=torch.float32)
+            if sizes.shape != (N, O, 3) or not torch.isfinite(sizes).all() or not (sizes > 0).all():
+                raise ValueError('evaluationBoxSizes must be positive finite [num_envs, num_objects, 3]')
+            self._box_scale = sizes.reshape(num_boxes, 3) / torch.as_tensor(self._build_base_size, device=self.device)
+
         self._box_density = torch.full((num_boxes,), 100.0, dtype=torch.float32, device=self.device)
         self._box_size = torch.tensor(self._build_base_size, device=self.device).reshape(1, 3) * self._box_scale
 
@@ -632,7 +722,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         marker_handle = self.gym.create_actor(env_ptr, self._marker_asset, default_pose,
                                               "marker_{}".format(agent_id), col_group, col_filter, segmentation_id)
-        self.gym.set_rigid_body_color(env_ptr, marker_handle, 0, gymapi.MESH_VISUAL, gymapi.Vec3(0.8, 0.0, 0.0))
+        self.gym.set_rigid_body_color(env_ptr, marker_handle, 0, gymapi.MESH_VISUAL, self._agent_color(agent_id))
         self.gym.set_actor_scale(env_ptr, marker_handle, 0.3)
         self._marker_handles.append(marker_handle)
         return
@@ -821,6 +911,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self.obs_buf[self._flat_slot_ids(env_ids)] = obs
         return
 
+    def _clean_object_features(self, object_local, env_ids):
+        return object_local
+
     def _compute_clean_scene_obs(self, env_ids=None):
         """Build one clean, compact scene observation per environment.
 
@@ -859,7 +952,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             quat_rotate(box_rot_inv.reshape(-1, 4), box_states[..., 10:13].reshape(-1, 3)).view(B, O, 3),
             box_bps.reshape(B, O, 24),
         ], dim=-1)
-        object_nodes = object_local
+        object_nodes = self._clean_object_features(object_local, env_ids)
         goal_nodes = torch.ones(B, M, 1, device=self.device, dtype=body_pos.dtype)
         assert human_nodes.shape == (B, M, self.get_clean_humanoid_obs_size())
         assert object_nodes.shape == (B, O, self.get_clean_object_obs_size())
@@ -1055,6 +1148,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._compute_observations()
             self._compute_reward(self.actions)
         self._compute_reset()
+        if self._hybrid_rsi_runtime is not None:
+            self._hybrid_rsi_runtime.step()
         if self._state_relation:
             self._finish_relation_diagnostics()
 
@@ -1208,6 +1303,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
     def _reset_ref_state_init(self, slot_env, slot_agent):
         num_slots = slot_env.shape[0]
+        if self._hybrid_rsi_runtime is not None:
+            self._hybrid_rsi_runtime.begin_slots(slot_env, slot_agent)
         if self._template_rsi is not None and not self._is_eval:
             graph = self.relation_runtime.graph
             template = classify_templates(
@@ -1255,6 +1352,50 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         else:
             sk_ids = torch.multinomial(self._skill_init_prob, num_samples=num_slots, replacement=True)
 
+        bank = self._reference_rsi_bank if not self._is_eval else None
+        if bank is not None:
+            reference_ids = torch.zeros(num_slots, dtype=torch.long, device=self.device)
+            reference_times = torch.zeros(num_slots, device=self.device)
+            for uid, name in enumerate(self._skill):
+                if name not in bank.data:
+                    continue
+                sel = (sk_ids == uid).nonzero().flatten()
+                if not len(sel):
+                    continue
+                physical = self._scenario_physical_object(slot_env[sel], slot_agent[sel])
+                sizes = self._box_size[slot_env[sel], physical]
+                if self._hybrid_rsi_runtime is not None and name == 'putDown':
+                    ontop = template[sel] == scenario_templates(self._relation_graph_spec).index('HOLDING_ON_TOP')
+                    ids = torch.zeros(len(sel), device=self.device, dtype=torch.long)
+                    times = torch.zeros(len(sel), device=self.device)
+                    empty = torch.ones(len(sel), device=self.device, dtype=torch.bool)
+                    for top in (False, True):
+                        chosen = (ontop == top).nonzero().flatten()
+                        if not len(chosen):
+                            continue
+                        supports = None
+                        if top:
+                            r, a = slot_env[sel[chosen]], slot_agent[sel[chosen]]
+                            graph = self.relation_runtime.graph
+                            edges = graph.edge_valid[r] & (graph.edge_relation[r] == ON_TOP) & (graph.edge_owner[r] == a[:, None])
+                            edge = edges.long().argmax(-1)
+                            logical = graph.edge_dst[r, edge] - self.num_agents
+                            supports = self._box_size[r, self._logical_box_order[r, logical]]
+                        i, t, e = bank.sample_context('putDownOnTop' if top else name, sizes[chosen], supports)
+                        ids[chosen], times[chosen], empty[chosen] = i, t, e
+                        self._hybrid_rsi_runtime.mark_slots(slot_env[sel[chosen]], slot_agent[sel[chosen]], bank.last_tokens)
+                else:
+                    ids, times, empty = bank.sample(name, sizes)
+                    if self._hybrid_rsi_runtime is not None:
+                        self._hybrid_rsi_runtime.mark_slots(slot_env[sel], slot_agent[sel], bank.last_tokens)
+                reference_ids[sel] = ids
+                reference_times[sel] = times
+                # Explicit, counted fallback: still original reference RSI, same size.
+                if empty.any():
+                    if (weights[sel[empty], self._skill.index('loco')] <= 0).any():
+                        raise ValueError('Empty size-conditioned RSI pool without legal loco fallback')
+                    sk_ids[sel[empty]] = self._skill.index('loco')
+
         for uid, sk_name in enumerate(self._skill):
             curr_motion_lib = self._motion_lib[sk_name]
             sel = (sk_ids == uid).nonzero().squeeze(-1)
@@ -1275,7 +1416,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             else:
                 assert (False), "Unsupported state initialization strategy: {:s}".format(str(self._state_init))
 
-            if (sk_name == 'climb' and not self._is_eval and
+            if bank is not None and sk_name in bank.data:
+                motion_ids = reference_ids[sel]
+                motion_times = reference_times[sel]
+            elif (sk_name == 'climb' and not self._is_eval and
                     self._relation_cfg.get('stage1_variant') in CURRICULUM_VARIANTS):
                 motion_times = mix_late_climb_rsi_times(
                     curr_motion_lib, motion_ids, motion_times,
@@ -1522,6 +1666,16 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             self._box_states[curr_env, curr_box, 3:7] = root_rot
             self._box_states[curr_env, curr_box, 7:13] = 0.0
 
+            if (self._reference_rsi_bank is not None and not self._is_eval
+                    and sk_name in ('pickUp', 'carryWith', 'putDown')):
+                from utils.reference_rsi import interpolate_object_velocity
+                linear, angular = interpolate_object_velocity(self._motion_lib[sk_name],
+                    self._reset_ref_motion_ids[sk_name], self._reset_ref_motion_times[sk_name])
+                # Floor clamp changes the prescribed vertical trajectory locally.
+                linear[on_ground, 2] = 0.
+                self._box_states[curr_env, curr_box, 7:10] = linear
+                self._box_states[curr_env, curr_box, 10:13] = angular
+
             if self._reset_random_height:
                 self._platform_pos[curr_env, curr_agent] = \
                     self._platform_default_pos[curr_env, curr_agent]
@@ -1596,8 +1750,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                 continue
 
             curr_env, curr_agent = self._reset_ref_slots[sk_name]
-            if (self._scenario_no_climb and self._relation_cfg.get('stage1_variant') ==
-                    'scenario_independent_stage1_ontop_putdown'):
+            if (self._scenario_no_climb and (self._hybrid_rsi_runtime is not None or
+                    self._relation_cfg.get('stage1_variant') == 'scenario_independent_stage1_ontop_putdown')):
                 templates = classify_templates(self.relation_runtime.graph,
                     curr_env, curr_agent, self._scenario_with_climb)
                 is_at = templates == scenario_templates(self._relation_graph_spec).index(
@@ -1704,11 +1858,18 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._enable_markers:
             self._marker_pos[env_ids] = self._tar_pos[env_ids]
             if self._edge_ontop:
-                from env.tasks.multi_agent.edge_context_reward import owner_sum
                 from utils.edge_ontop_spec import select_graph
                 graph = select_graph(self.relation_runtime.graph, env_ids)
-                active = owner_sum(((graph.edge_relation == 7) & graph.edge_valid).long(), graph).bool()
+                at_edges, goal_slots, active = at_goal_marker_slots(graph)
                 self._marker_pos[env_ids, :, 2] = torch.where(active, self._tar_pos[env_ids, :, 2], 20.)
+                shown = torch.ones_like(env_ids, dtype=torch.bool) if self.viewer is not None else env_ids == 0
+                rows, edges = (at_edges & shown[:, None]).nonzero(as_tuple=True)
+                assignments = torch.stack((env_ids[rows], goal_slots[rows, edges],
+                                           graph.edge_owner[rows, edges]), dim=-1).cpu().tolist()
+                for env_id, goal_id, owner in assignments:
+                    marker = self._marker_handles[env_id * self.num_agents + goal_id]
+                    self.gym.set_rigid_body_color(self.envs[env_id], marker, 0,
+                                                  gymapi.MESH_VISUAL, self._agent_color(owner))
             ids.append(self._marker_actor_ids[env_ids].contiguous().view(-1))
         if self._reset_random_height:
             self._platform_states[env_ids, :, 3:6] = 0.0
@@ -1743,7 +1904,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
             print("Unsupported character config file: {s}".format(asset_file))
             assert (False)
         if self.cfg['env'].get('ampTaskConditioning', False):
-            self._num_amp_obs_per_step += 3
+            self._num_amp_obs_per_step += getattr(self, '_amp_family_count', 3)
         return
 
     def get_num_amp_obs(self):
@@ -1813,7 +1974,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
 
         motion_ids = []
         motion_times0 = []
-        for uid, sk_name in enumerate(self._skill):
+        for uid, sk_name in enumerate(getattr(self, '_amp_expert_skills', self._skill)):
             curr_num = (sk_ids == uid).sum().item()
             if curr_num == 0:
                 continue
@@ -1890,7 +2051,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
         if self._amp_task_conditioning:
             from utils.unified_training import append_family
             labels = self._amp_family(slot_env, slot_agent).repeat_interleave(self._num_amp_obs_steps - 1)
-            amp_obs_demo = append_family(amp_obs_demo, labels)
+            amp_obs_demo = append_family(amp_obs_demo, labels, getattr(self, '_amp_family_count', 3))
         self._hist_amp_obs_buf[slot_env, slot_agent] = \
             amp_obs_demo.view(slot_env.shape[0], self._num_amp_obs_steps - 1, self._num_amp_obs_per_step)
         return
@@ -1919,7 +2080,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                                          self._dof_obs_size, self._dof_offsets)
             if self._amp_task_conditioning:
                 from utils.unified_training import append_family
-                obs = append_family(obs, self._amp_family())
+                obs = append_family(obs, self._amp_family(), getattr(self, '_amp_family_count', 3))
             self._curr_amp_obs_buf[:] = obs.view(N, M, self._num_amp_obs_per_step)
         else:
             K = env_ids.shape[0]
@@ -1934,7 +2095,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, OnTopTaskMixi
                                          self._dof_obs_size, self._dof_offsets)
             if self._amp_task_conditioning:
                 from utils.unified_training import append_family
-                obs = append_family(obs, self._amp_family(env_ids))
+                obs = append_family(obs, self._amp_family(env_ids), getattr(self, '_amp_family_count', 3))
             self._curr_amp_obs_buf[env_ids] = obs.view(K, M, self._num_amp_obs_per_step)
         return
 

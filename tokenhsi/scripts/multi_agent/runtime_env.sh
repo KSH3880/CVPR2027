@@ -72,7 +72,19 @@ export CUDA_VISIBLE_DEVICES=${TOKENHSI_GPU:-${CUDA_VISIBLE_DEVICES:-0}}
 
 # A verified MPS daemon on the selected GPU is discovered even in a fresh
 # terminal. Never rely on mps_run or an inherited pipe variable being present.
-. "$TOKENHSI_ROOT/tokenhsi/scripts/multi_agent/mps_auto_env.sh" || exit 1
+if [ "${TOKENHSI_GUI_GPU_MODE:-}" = native ] && [ "${HEADLESS:-1}" = 0 ] && \
+   [ -n "${TOKENHSI_GUI_GPU_INDEX:-}" ]; then
+    # Gym uses the Vulkan index in CUDA interop too. Keep both enumerations
+    # unfiltered and select the requested index explicitly in get_args().
+    tokenhsi_gui_uuids=$(nvidia-smi --query-gpu=uuid --format=csv,noheader) || exit 1
+    [ -n "$tokenhsi_gui_uuids" ] || exit 1
+    CUDA_VISIBLE_DEVICES=$(printf '%s' "$tokenhsi_gui_uuids" | paste -sd, -)
+    export CUDA_VISIBLE_DEVICES
+    unset CUDA_MPS_PIPE_DIRECTORY CUDA_MPS_LOG_DIRECTORY
+    echo "[viewer native] Direct CUDA/Vulkan GPU $TOKENHSI_GUI_GPU_INDEX (viewer only; existing MPS unchanged)"
+else
+    . "$TOKENHSI_ROOT/tokenhsi/scripts/multi_agent/mps_auto_env.sh" || exit 1
+fi
 
 # --- libcuda shim ----------------------------------------------------------
 # Some driver packages ship libcuda.so.1 but no unversioned libcuda.so, which

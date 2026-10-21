@@ -1,0 +1,16 @@
+{
+  "checked": 184,
+  "failures": [],
+  "fps_values": [
+    120.00480019200768
+  ],
+  "joint_counts": [
+    77
+  ],
+  "channel_counts": [
+    240
+  ],
+  "uniform_skeleton_all_match": true,
+  "frame_counts_all_match": true,
+  "finite_all": true
+}

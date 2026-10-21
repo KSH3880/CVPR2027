@@ -90,6 +90,12 @@ def evaluate_interaction_edges(hands, feet, roots, objects, sizes, goals, graph,
             human[..., :2], support, support_size,
             config['sit']['success_inner_margin_fraction'])
         diag['region_error'] = torch.where(sit, region, diag['region_error'])
+    if p.get('kind') == 'success_region':
+        # Exactly the same yaw-aware internal rectangles used by own_success.
+        error = diag['region_error']
+        progress = 1/(1+error/p['sigma'])
+        diag['progress'] = torch.where(mask,progress,diag['progress'])
+        diag['progress_xy_error'] = torch.where(mask,error,diag['progress_xy_error'])
     return phi, diag
 
 

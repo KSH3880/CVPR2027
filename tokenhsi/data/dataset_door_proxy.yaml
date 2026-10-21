@@ -1,0 +1,28 @@
+motions:
+  loco:
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  pickUp:
+  - file: dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii/phys_humanoid_v3/box_motion.npy
+    rsi_skipped_range:
+    - 30
+    - 75
+    weight: 1.0
+  - file: dataset_carry/motions/carry/ACCAD+__+Female1General_c3d+__+A5_-_pick_up_box_stageii/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_carry/motions/carry/ACCAD+__+Female1General_c3d+__+A5_-_pick_up_box_stageii/phys_humanoid_v3/box_motion.npy
+    rsi_skipped_range:
+    - 65
+    - 105
+    weight: 1.0
+  carryWith:
+  - file: dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii/phys_humanoid_v3/ref_motion.npy
+    obj_file: dataset_carry/motions/carry/ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii/phys_humanoid_v3/box_motion.npy
+    rsi_skipped_range: []
+    weight: 1.0

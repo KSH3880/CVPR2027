@@ -1,0 +1,9 @@
+{
+  "door_angle_measured": false,
+  "physics_contact_verified": false,
+  "contact_anchor_s": 1.2666666666666666,
+  "inferred_angle_max_rad": 1.337358771001155,
+  "hand_handle_distance_1_27_to_2_4_s_median_m": 0.07646338431205857,
+  "hand_handle_distance_1_27_to_2_4_s_max_m": 0.10356958161270359,
+  "note": "Positions from final SkeletonMotion; hand XY aligned once, no Z correction. Door is a diagnostic overlay."
+}

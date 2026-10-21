@@ -69,14 +69,15 @@ def validate_sampler(spec, m=2, o=None):
         raise ValueError('Unsupported scenario sampler')
     if spec.get('owner_holding_state', False) and sampler not in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER):
         raise ValueError('Owner-HOLDING state requires paired placement')
-    binding = ({'objects': 'canonical', 'goals': 'canonical'} if sampler == UNIFIED_SAMPLER
-               else {'objects': 'disjoint', 'goals': 'disjoint'})
+    allowed_bindings = ({'objects': 'disjoint', 'goals': 'disjoint'},)
+    if sampler == UNIFIED_SAMPLER:
+        allowed_bindings += ({'objects': 'canonical', 'goals': 'canonical'},)
     required_objects = 4 if sampler in (PAIRED_PLACEMENT_SAMPLER, UNIFIED_SAMPLER) else 3
     if o is None:
         o = required_objects
     if (m, o) != (2, required_objects) or spec['edge_capacity'] != 4 or \
             spec['max_edges_per_agent'] != 2 or spec['semantic_only'] is not True or \
-            spec['random_binding'] != binding or \
+            spec['random_binding'] not in allowed_bindings or \
             type(spec['shuffle_edge_order']) is not bool:
         raise ValueError('Scenario requires 2 humans, {} objects and semantic capacity 4'.format(required_objects))
     p = spec['template_probabilities']
@@ -182,8 +183,9 @@ def sample_graph(n, spec, device='cpu', preset='random_scenario', role_swap=Fals
             templates = (fixed[preset], fixed[preset] if paired or unified else 'HOLDING')
             if role_swap and not (paired or unified):
                 templates = templates[::-1]
-        objects = list(range(num_objects)) if unified else torch.randperm(num_objects, device=device, generator=generator).tolist()
-        goals = list(range(2)) if unified else torch.randperm(2, device=device, generator=generator).tolist()
+        canonical = unified and spec['random_binding']['objects'] == 'canonical'
+        objects = list(range(num_objects)) if canonical else torch.randperm(num_objects, device=device, generator=generator).tolist()
+        goals = list(range(2)) if canonical else torch.randperm(2, device=device, generator=generator).tolist()
         bindings = tuple((objects[agent], goals[agent]) if template == 'HOLDING_AT'
             else (objects[agent], objects[2 + agent] if paired or unified else objects[2]) if template == 'HOLDING_ON_TOP'
             else (objects[agent],) for agent, template in enumerate(templates))

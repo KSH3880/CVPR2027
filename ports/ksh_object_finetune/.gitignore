@@ -1,0 +1,3 @@
+weights/*.pth
+output/
+__pycache__/

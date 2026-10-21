@@ -64,6 +64,34 @@ class PackedEdgeContextFusion(nn.Module):
 
 class PackedEdgeSemanticFusion(nn.Module):
     """Five-field graph bindings only; no context input or context parameters."""
+    @torch.no_grad()
+    def bias_diagnostics(self, suffix, bias):
+        """Actual task-edge attention logits, before token permutation."""
+        from utils.edge_stage1_spec import parse_semantic_packet
+        from utils.edge_context_spec import HOLDING, AT
+        from utils.edge_ontop_spec import ON_TOP
+        from utils.edge_interaction_spec import SIT, CLIMB
+        from utils.edge_door_spec import OPEN
+        from utils.open_push_spec import PUSH
+        valid, src, dst, relation, _ = parse_semantic_packet(suffix)
+        # Semantic bindings have no state input: a bounded batch represents each
+        # task's bias exactly, while avoiding a full training-batch reduction.
+        valid, src, dst, relation = (x[:32] for x in (valid, src, dst, relation))
+        indices = src * bias.shape[-1] + dst
+        values = bias[:, :32].detach().float().flatten(-2).gather(
+            -1, indices[None, :, None].expand(bias.shape[0], -1, bias.shape[2], -1))
+        result = {}
+        for kind, name in ((HOLDING, 'holding'), (SIT, 'sit'), (CLIMB, 'climb'),
+                           (AT, 'at'), (ON_TOP, 'ontop'), (OPEN, 'open'), (PUSH, 'push')):
+            mask = valid & (relation == kind)
+            count = mask.sum().to(values.dtype)
+            denom = count.clamp_min(1) * values.shape[0] * values.shape[2]
+            selected = values * mask[None, :, None]
+            result['edge_bias/{}/mean'.format(name)] = selected.sum() / denom
+            result['edge_bias/{}/rms'.format(name)] = (selected.square().sum() / denom).sqrt()
+            result['edge_bias/{}/sample_count'.format(name)] = count
+        return result
+
     def forward(self, suffix, semantic_encoder, entity_types, background_bias):
         from utils.edge_stage1_spec import parse_semantic_packet
         valid, src, dst, relation, owner = parse_semantic_packet(suffix)

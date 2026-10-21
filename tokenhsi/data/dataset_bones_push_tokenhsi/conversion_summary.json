@@ -1,0 +1,1236 @@
+{
+  "method": "tokenhsi_rotation_transfer_soma_adapter_v1",
+  "original_generator_sha256": "2e22ab22276faa71d3f4fb8a75b74820dcdcf4e998d10e289b8404aa9a6c8d9a",
+  "original_data_utils_sha256": "cf848d8a5e311efd8bd96b9ab8ae96e619c154984930df58cae4301753620194",
+  "upstream_files_identical": true,
+  "source_manifest_sha256": "e5f31e1b4123da416b8f62068706e1811764773a2699bdc561115965f37b8f06",
+  "adaptation": "SOMA BVH reader, cm-to-m, source joints and rest-coordinate basis only",
+  "absent": [
+    "IK",
+    "semantic_crop",
+    "hand_height_target",
+    "RSI_PD_filter"
+  ],
+  "clips": [
+    {
+      "clip": "push_obstacle_180_001__A344_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_001__A344_M.bvh",
+      "source_sha256": "c026005c206fddf1e2837b40f154f850ed2e5eaa704fab7366ffbe4e7b6d7e9f",
+      "source_frames": 1858,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1856,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 465,
+      "source_duration_s": 15.474381000000001,
+      "output_duration_s": 15.466666666666667,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.22683706879615784,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.012846231460571289
+    },
+    {
+      "clip": "push_obstacle_180_002__A342",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A342.bvh",
+      "source_sha256": "e0818c5dd71bfef192ed9b843ad1a0e80508f29af456164a140393a331fd1218",
+      "source_frames": 1882,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1880,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 471,
+      "source_duration_s": 15.674373000000001,
+      "output_duration_s": 15.666666666666666,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.3300958275794983,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": 0.052936702966690063
+    },
+    {
+      "clip": "push_obstacle_180_002__A342_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A342_M.bvh",
+      "source_sha256": "8847cf75977fffdfc7a8c230f68434b99b4dbfd7ae1556d122010d774c4d1141",
+      "source_frames": 1882,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1880,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 471,
+      "source_duration_s": 15.674373000000001,
+      "output_duration_s": 15.666666666666666,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.31282418966293335,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": 0.08484980463981628
+    },
+    {
+      "clip": "push_obstacle_180_002__A344",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A344.bvh",
+      "source_sha256": "b9c3e92c61ca114a0fc2312d1fe11cf83c48cfa8966601b0be49ebcc63981175",
+      "source_frames": 1788,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1784,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 447,
+      "source_duration_s": 14.891071,
+      "output_duration_s": 14.866666666666667,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.21825844049453735,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.028027236461639404
+    },
+    {
+      "clip": "push_obstacle_180_002__A344_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A344_M.bvh",
+      "source_sha256": "b9edac0b9293b6e68aa9ecce8d25eb7a715f3bcac1348e8a82e9082dc3b7db4c",
+      "source_frames": 1788,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1784,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 447,
+      "source_duration_s": 14.891071,
+      "output_duration_s": 14.866666666666667,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.22539237141609192,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.007585346698760986
+    },
+    {
+      "clip": "push_obstacle_180_003__A342",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A342.bvh",
+      "source_sha256": "136c28516884e8c1b73f353238d782780289a1a2010d6d16996f5a9996c231cc",
+      "source_frames": 1668,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1664,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 417,
+      "source_duration_s": 13.891111,
+      "output_duration_s": 13.866666666666667,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.31895631551742554,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": 0.07266125082969666
+    },
+    {
+      "clip": "push_obstacle_180_003__A342_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A342_M.bvh",
+      "source_sha256": "c1d63b2a6ca25baae9f95b9b920b56d9fc60eadf2350ea81f0a338b526c48f12",
+      "source_frames": 1668,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1664,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 417,
+      "source_duration_s": 13.891111,
+      "output_duration_s": 13.866666666666667,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.33000943064689636,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": 0.05074146389961243
+    },
+    {
+      "clip": "push_obstacle_180_003__A344",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A344.bvh",
+      "source_sha256": "4944c5492fbdbb05c324e7f96e991b48d94830c3e69704c048e13f1baa752d14",
+      "source_frames": 1842,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1840,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 461,
+      "source_duration_s": 15.341053,
+      "output_duration_s": 15.333333333333334,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.23435530066490173,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.029993057250976562
+    },
+    {
+      "clip": "push_obstacle_180_003__A344_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A344_M.bvh",
+      "source_sha256": "df70621f558cd095f8317d7eb80a3d73552129502d230b0fe8f6b40845060e93",
+      "source_frames": 1842,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1840,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 461,
+      "source_duration_s": 15.341053,
+      "output_duration_s": 15.333333333333334,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.24840694665908813,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.04481014609336853
+    },
+    {
+      "clip": "push_obstacle_180_101__A341",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A341.bvh",
+      "source_sha256": "222523114e393c7ca764f2143f0e89ee0a7da803bebadc0893aaa2eb4d8de470",
+      "source_frames": 1771,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1768,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 443,
+      "source_duration_s": 14.749410000000001,
+      "output_duration_s": 14.733333333333333,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.30695483088493347,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": 0.0155792236328125
+    },
+    {
+      "clip": "push_obstacle_180_101__A341_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A341_M.bvh",
+      "source_sha256": "8cef64bc75ffb0c837fdd8f8dd8e68a610db2807f9a04260a09b358fcafed2cd",
+      "source_frames": 1771,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1768,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 443,
+      "source_duration_s": 14.749410000000001,
+      "output_duration_s": 14.733333333333333,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.31074655055999756,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": 0.02436918020248413
+    },
+    {
+      "clip": "push_obstacle_180_101__A343",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A343.bvh",
+      "source_sha256": "e851d172be8d03c8da4fb88195b368deca88800182239e3045b3c6fa62fa19bd",
+      "source_frames": 2111,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 2108,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 528,
+      "source_duration_s": 17.58263,
+      "output_duration_s": 17.566666666666666,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.23740392923355103,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.10197684168815613
+    },
+    {
+      "clip": "push_obstacle_180_101__A343_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A343_M.bvh",
+      "source_sha256": "8142199eaef00b3a13cdab318773daf701a8f6864a60e05b3008e9da36b0f3fe",
+      "source_frames": 2111,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 2108,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 528,
+      "source_duration_s": 17.58263,
+      "output_duration_s": 17.566666666666666,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.23098257184028625,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.11614906787872314
+    },
+    {
+      "clip": "push_obstacle_180_102__A341",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A341.bvh",
+      "source_sha256": "0381d1494df65ae710f5f98db68937644acdd4af726acf5f0a88cc13d596a64e",
+      "source_frames": 1770,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1768,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 443,
+      "source_duration_s": 14.741077,
+      "output_duration_s": 14.733333333333333,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.30697396397590637,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.054859280586242676
+    },
+    {
+      "clip": "push_obstacle_180_102__A341_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A341_M.bvh",
+      "source_sha256": "e88f83138ac253ac8a9f24e70099de8b317d758dee4db8889b6ada402a44937f",
+      "source_frames": 1770,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1768,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 443,
+      "source_duration_s": 14.741077,
+      "output_duration_s": 14.733333333333333,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.311779260635376,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.02312290668487549
+    },
+    {
+      "clip": "push_obstacle_180_102__A343",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A343.bvh",
+      "source_sha256": "2b1f9219d094e1af2012a0085bc8c69c3588b12d25d9e70292975da44a4e9528",
+      "source_frames": 2065,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 2064,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 517,
+      "source_duration_s": 17.199312,
+      "output_duration_s": 17.2,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.22616097331047058,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.09795653820037842
+    },
+    {
+      "clip": "push_obstacle_180_102__A343_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A343_M.bvh",
+      "source_sha256": "824877eb412865f1c37603a23e9204ac654a9191283afed5eec30471d0fabdcb",
+      "source_frames": 2065,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 2064,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 517,
+      "source_duration_s": 17.199312,
+      "output_duration_s": 17.2,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.2340853214263916,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.08223885297775269
+    },
+    {
+      "clip": "push_obstacle_180_103__A341",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A341.bvh",
+      "source_sha256": "4027ff913d5a212d3dd683c3803876021875c885c4bb96cfb38c44f664614c92",
+      "source_frames": 1826,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1824,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 457,
+      "source_duration_s": 15.207725,
+      "output_duration_s": 15.2,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.28847989439964294,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.09532588720321655
+    },
+    {
+      "clip": "push_obstacle_180_103__A341_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A341_M.bvh",
+      "source_sha256": "43d64340cf90434e41216aa40fa2e270ae38becbecd07c35c7c05c715e4f88dd",
+      "source_frames": 1826,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 1824,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 457,
+      "source_duration_s": 15.207725,
+      "output_duration_s": 15.2,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.30020299553871155,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.09159359335899353
+    },
+    {
+      "clip": "push_obstacle_180_103__A343",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A343.bvh",
+      "source_sha256": "785a266296f1639a677ff787aeccbecdfad72154a28e7053ee1efea693eaee58",
+      "source_frames": 2018,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 2016,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 505,
+      "source_duration_s": 16.807661,
+      "output_duration_s": 16.8,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.2428126037120819,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.13751307129859924
+    },
+    {
+      "clip": "push_obstacle_180_103__A343_M",
+      "source": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A343_M.bvh",
+      "source_sha256": "a574a58d31be39d1a0c7bfac6282261c9770883cbf6f99f56d4d73e98a2d8fbb",
+      "source_frames": 2018,
+      "source_fps": 120.00480019200768,
+      "stride": 4,
+      "selected_source_first": 0,
+      "selected_source_last": 2016,
+      "full_sequence": true,
+      "interaction_crop": false,
+      "ik": false,
+      "root_scale": 1.0,
+      "source_basis": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ]
+      ],
+      "mapping": {
+        "pelvis": "Hips",
+        "torso": "Spine2",
+        "head": "Head",
+        "right_upper_arm": "RightArm",
+        "right_lower_arm": "RightForeArm",
+        "right_hand": "RightHand",
+        "left_upper_arm": "LeftArm",
+        "left_lower_arm": "LeftForeArm",
+        "left_hand": "LeftHand",
+        "right_thigh": "RightLeg",
+        "right_shin": "RightShin",
+        "right_foot": "RightFoot",
+        "left_thigh": "LeftLeg",
+        "left_shin": "LeftShin",
+        "left_foot": "LeftFoot"
+      },
+      "fps": 30,
+      "frames": 505,
+      "source_duration_s": 16.807661,
+      "output_duration_s": 16.8,
+      "floor_rule": "mean(frame_min_joint_z), then +0.07m; original TokenHSI loco rule",
+      "root_z_shift_m": -0.2366187572479248,
+      "project_joints_simple_sha256": "f89f6404a3d6583bd62f6b1ceb858fc5b78289e92dc7aabc7e2ad54316cf4da2",
+      "projection_non_arm_rotations_unchanged": true,
+      "serialized_reload_equal": true,
+      "foot_joint_min_z_m": -0.08056992292404175
+    }
+  ],
+  "manifest": "/home/hwanhee/koo_cvpr/stage1_fix/tokenhsi/data/dataset_push_tokenhsi.yaml",
+  "manifest_sha256": "eab38812f14ce03c188a93d1de0809f923584f06a04870b8a174adfd42bb4424"
+}

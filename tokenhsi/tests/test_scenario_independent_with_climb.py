@@ -4,7 +4,7 @@ import pytest
 import torch
 import yaml
 
-from utils.edge_context_spec import HOLDING, AT
+from utils.edge_context_spec import HOLDING, AT, at_goal_marker_slots
 from utils.edge_interaction_spec import SIT, CLIMB
 from utils.edge_ontop_spec import ON_TOP
 from utils.edge_scenario_spec import (CLIMB_TEMPLATES, agent_goal_indices, agent_object_indices,
@@ -48,6 +48,17 @@ def check_independent_graph(graph):
         goal = graph.edge_dst.masked_fill(~at, -1)
         both = at.sum(-1) == 2
         assert torch.all(goal[both].max(-1).values != goal[both].min(-1).values)
+
+
+def test_at_goal_marker_uses_bound_goal_slot():
+    graph = sample_graph(64, ENV['relationGraph'], preset='holding_at',
+        generator=torch.Generator().manual_seed(27))
+    at_edges, slots, active = at_goal_marker_slots(graph)
+    rows, edges = at_edges.nonzero(as_tuple=True)
+    assert (slots[rows, edges] != graph.edge_owner[rows, edges]).any()
+    assert active.sum(-1).eq(1).all()
+    assert active[rows, slots[rows, edges]].all()
+    assert not active[rows, 1 - slots[rows, edges]].any()
 
 
 def test_random_sampler_preserves_template_marginals_and_disjoint_objects():
