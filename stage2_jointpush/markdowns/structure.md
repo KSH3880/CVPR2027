@@ -1,3 +1,23 @@
+## Native4 attention 진단
+
+- `scripts/stage1_native2_attention.sh`: 원래 Koo2인 OPEN/PUSH 환경에서 actor 층별/head별 attention PNG와 원본 수치를 저장한다.
+- `scripts/stage1_native4_attention.sh`: 4명·문4·상자4 OPEN/PUSH 혼합 환경의16×16 actor attention PNG 저장.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/mixed4.py`: attention 수집에 opt-in된 4인 혼합 과제의 배정/그래프 및 원래2인 보상 함수를 재사용하는 agent쌍별 실행.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/attention_capture.py`: 실제 QKV hook과 GTA/bias를 사용해 softmax를 수집하고 토큰 순열을 복원한다. PNG·NPZ·상태/배정 메타데이터를 저장한다.
+- `ports/koo_push/tokenhsi/tests/test_attention_capture.py`: softmax 일치 및 GTA head/token축 정렬 검사.
+
+- `scripts/stage1_partition_box_ablation.sh`: 문 없는4인 Partition 환경에서 Stage1 원본으로 작업토큰4개를 유지하고 일반상자4→0개를 순차 축소하는 zero-shot 낙상 진단.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/partition_stage1_setup.py`: Partition 환경과 원래 source network 설정·checkpoint 해시를 별도 출력에 기록한다.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/partition_stage1_launch.py`: 의도된 환경 개입을 검증하며 원래 Stage1을 head 확장 없이 strict 복원하고 공통 진단 루프에 연결한다.
+
+- `scripts/stage1_native2_no_doors_ablation.sh`: 원래 2인/문2/상자2 환경에서 actor attention8→6토큰 비교. 설정 복원은 공통 setup의 `--agents 2`를 사용한다.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/native2_launch.py`: native4 count/graph/reward 확장 없이 원래 HumanoidMAOpenPush에서 공통 낙상/가중치 불변 진단을 실행한다.
+
+- `scripts/stage1_native4_attention_ablation.sh`: 동일 초기 물리 상태의 full/pair(기본), none_zero, hide_humans, hide_doors, hide_boxes, hide_goals, hide_boxes_goals, hide_objects_goals, hide_box_first, hide_box_second, remove_doors 조건을 기준/full과 순차 실행하고 결과를 비교한다.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/attention_probe.py`: 물리 장면별 actor mask 또는 NONE bias만 0으로 만드는 개입, 동일 관측 action 비교, 상태/가중치 해시와 첫 낙상 기록.
+- `ports/koo_push/tokenhsi/scripts/multi_agent/native4_zeroshot/launch.py`: `NATIVE4_ATTENTION_SCOPE=full|pair`가 지정된 headless 진단에서만 위 실행 루프로 연결한다.
+- `ports/koo_push/tokenhsi/tests/test_native4_attention_probe.py`: 독립 물리 배정과 토큰 순열 아래 모든 actor 층의 mask 범위를 검사한다.
+
 ## 서버·로컬 경로 처리
 
 - `ports/koo_push/tokenhsi/utils/partition_push_paths.py`: CLI/환경변수/기기별 YAML/기본 후보의 Stage1 경로 해석. 학습 CLI와 checkpoint 모델 테스트가 공유한다.
@@ -398,3 +418,8 @@ BEFORE Stage 2는 `approach_stage2_before_task_embedding` env YAML·train/test/V
 - `ports/koo_push/tokenhsi/scripts/multi_agent/partition_push_setup.py`: source 경로 선택, checkpoint 환경 복원·추론 ablation.
 - `scripts/partition_push_{train,test,vnc}.sh`: 로컬 진입점.
 - [PARTITION_PUSH.md](PARTITION_PUSH.md): 설정·로컬 데이터 준비·실행법.
+
+### 랜덤 출발·CPA0.5 전용 실험
+
+- `ports/koo_push/tokenhsi/data/cfg/multi_agent/partition_push_surround_cpa05.yaml`: 기본 Partition Push를 보존하는 surround/CPA0.5 설정.
+- `scripts/partition_push_surround_cpa05_{train,test,vnc}.sh`: 전용 env·산출물로 분리한 학습/평가/기존 VNC 실행. test/VNC는 checkpoint env를 복원한다.

@@ -44,7 +44,8 @@ def test_all_push_edges_bind_to_four_distinct_boxes_and_goals():
 
 
 @pytest.mark.parametrize('state_init', ['Start','Random'])
-def test_setup_restores_saved_source_and_rejects_wrong_initialization(tmp_path, state_init):
+@pytest.mark.parametrize('agents', [2, 4])
+def test_setup_restores_saved_source_and_rejects_wrong_initialization(tmp_path, state_init, agents):
     path = PACKAGE/'setup.py'
     spec = importlib.util.spec_from_file_location('native4_setup', path)
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
@@ -57,10 +58,10 @@ def test_setup_restores_saved_source_and_rejects_wrong_initialization(tmp_path, 
     before = source.read_bytes()
     out = tmp_path/'output'
     if state_init != 'Start':
-        with pytest.raises(ValueError, match='Start'): module.prepare(out, str(source))
+        with pytest.raises(ValueError, match='Start'): module.prepare(out, str(source), agents)
         return
-    assert module.prepare(out, str(source)) == source
+    assert module.prepare(out, str(source), agents) == source
     target = yaml.safe_load((out/'env.yaml').read_text())
-    assert (target['env']['numAgents'],target['env']['numObjects']) == (4,8)
+    assert (target['env']['numAgents'],target['env']['numObjects']) == (agents, 2 * agents)
     assert target['env']['stateInit'] == 'Start'
     assert source.read_bytes() == before

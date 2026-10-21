@@ -65,6 +65,14 @@ def evaluate(self):
  out.write_text(json.dumps(result,indent=2)+'\n');print('PROBE_SUMMARY',json.dumps({k:v for k,v in result.items() if k!='trials'}),flush=True)
 if os.environ.get('PROBE_VIEW')!='1':
  MAPlayerContinuous.run=evaluate
+ if os.environ.get('NATIVE4_ATTENTION_SCOPE'):
+  sys.path.insert(0,str(Path(__file__).parent))
+  from attention_probe import evaluate_attention
+  MAPlayerContinuous.run=evaluate_attention
+ if os.environ.get('NATIVE4_MIXED_ATTENTION') == '1':
+  sys.path.insert(0,str(Path(__file__).parent))
+  from attention_capture import capture_run
+  MAPlayerContinuous.run=capture_run
 snapshot=runpy.run_path(str(Path(__file__).with_name('native4_task.py')))
 Task=snapshot['HumanoidMAOpenPush']
 # Reuse Carry's configured-object-count branch for this diagnostic only.
@@ -81,6 +89,7 @@ def validate_scaled(env):
  return _original_validation(proxy)
 spec_module.validate_env=validate_scaled
 import env.tasks.multi_agent.open_push_reward as reward_module
+_original_runtime_step=reward_module.OpenPushRuntime.step
 from utils.edge_ontop_spec import expand_graph
 def graph4(spec,m,o,device=None):
  g=_original_compile(spec,4,8,device)
@@ -103,4 +112,7 @@ def push_step(self,roots,hands,handles,angles,boxes,goals):
  self.done.copy_(p['success']);self.achieved|=self.own_success;self.error.copy_(p['error'])
  return dict(state=p['state'],progress=p['progress'],bonus=p['bonus'],reward=.9*local+.1*local.flip(-1),success=p['success'])
 reward_module.OpenPushRuntime.step=push_step
+if os.environ.get('NATIVE4_MIXED_ATTENTION') == '1':
+ from mixed4 import install
+ install(Task,reward_module,_original_runtime_step,graph4)
 runpy.run_path('tokenhsi/scripts/multi_agent/partition_push_launch.py',run_name='__main__')

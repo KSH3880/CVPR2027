@@ -1,3 +1,80 @@
+## 원본 Koo 2인 actor attention PNG 저장 (2026-10-21)
+
+```bash
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native2_attention.sh
+# PUSH-only 또는 수집 시점/장면 수 변경
+TOKENHSI_GPU=5 TASK_GRAPH=push NUM_ENVS=4 ATTENTION_STEPS=0,30,60,120,180,299 \
+  bash stage2_jointpush/scripts/stage1_native2_attention.sh
+# 4명·문4·상자4·목표4 OPEN/PUSH 혼합, 16×16 attention PNG
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention.sh
+```
+
+기본 원본2명·상자2·문2, source snapshot/Stage1 원본 strict 로드, 원본 OPEN/PUSH 혼합 과제(`random_open_push`), seed123/4장면/300step을 사용한다. attention 개입 없이 actor 각층 QKV 실제 출력과 실제 GTA/bias 입력으로 softmax를 재계산하고 토큰 순열을 canonical순서로 복원한다. 첫 action을 수집기 없는 원래 encoder와 비교해 차이0을 검사하고 모델/normalizer 불변을 검사한다.
+
+출력 `runs/jointpush/native2_attention_<timestamp>/attention_png/scene_NNN_step_NNNNNN.png`: 각 PNG에 actor4층×2head, 행=query·열=key, 값0~1을 표시한다. H0/H1=사람, D0/D1=문, B0/B1=상자, G0/G1=목표. D/B 인덱스는 owner순서의 논리슬롯이며 실제 물리 배정은 `states.json`에 저장한다. 기본 step0/30/60/120/180/299, 첫 종료 뒤 장면은 이미지 저장에서 제외한다. raw 수치는 `attention_raw.npz`의 attention/qk_scores/relation_bias, 축은 [step,scene,layer,head,query,key]다. `summary.json`에 shape/수집 시점/원본 action 불변을 기록한다. 원래 환경·motion override 조건은 native2 진단과 동일하며 학습이나 teacher/CA4는 사용하지 않는다. attention 가중치만으로 인과적 중요도를 뜻하지 않는다.
+
+4인 wrapper는 `runs/jointpush/native4_attention_images_<timestamp>/`에 같은 형식의16×16 PNG를 저장한다. 원래 native4 물리 확장(복제 box 장면±10m, 문 lane±5/±15m)을 사용하며 이 attention 진단에서만 OPEN/PUSH 혼합을 opt-in한다. 각 agent별 OPEN→자기 문 또는 PUSH→자기 상자/목표로 그래프를 구성한다. 보상 계산은 원래2인 함수를 두 agent쌍에 적용하며 학습은 하지 않는다. 기존 PUSH-only ablation 기본 동작은 유지한다. capture 기본 step0/15/30/60/120/180/299이며 종료 이후 장면은 렌더하지 않는다. 2인과4인 PNG는 같은 seed여도 같은 물리 상태/과제 배정은 아니므로 인과 대조로 해석하지 않는다.
+
+## 문 없는 Partition Push의 Stage1 zero-shot 박스 ablation (2026-10-21)
+
+```bash
+TOKENHSI_GPU=5 NUM_ENVS=64 PROBE_STEPS=300 \
+  bash stage2_jointpush/scripts/stage1_partition_box_ablation.sh
+```
+
+4명/variable-group Partition Push의 `partition_push_surround_cpa05.yaml` 환경에서 원래 OPEN/PUSH Stage1을 strict 복원한다. CA4·확장 head·Stage2 전이·추가 학습 없이 source actor/critic/discriminator/normalizer를 사용한다. source network 설정은 그대로 저장하고, 환경/관측 개입은 전용 launcher에서 명시적으로 검증한다. 물리 문은 처음부터 없으며 물체의 문 전용10차원은 기존 Partition 환경처럼0이다. 초기화/크기/질량/그룹/목표는 Partition 환경 분포이므로 원래 Stage1 장면 재현은 아니다.
+
+작업구역 box 토큰4개는 유지하고 일반 box 토큰4→3→2→1→0개를 actor 모든 attention 층의 Q/K/V·GTA·bias에서 실제 제외한다. 총box 토큰8→4개, 총attention 토큰16→12개다. 물리 box bank와 충돌체·critic은 유지하므로 물리 box 개수나 속도 실험은 아니다. source checkpoint는 공통 resolver/`STAGE1_CHECKPOINT`, seed기본123. 결과는 `runs/jointpush/partition_stage1_boxes_<timestamp>/summary.json`, 조건별 result/manifest/env/train/log로 저장한다. 모든 조건 초기 물리 상태 해시와 가중치/normalizer 불변을 검사한다. 이 지표는 장면 첫 낙상/종료이며 에피소드 내 팀원 후속 낙상은 검열된다.
+
+## Native4 attention 차단 비교 (2026-10-20)
+
+원래 2명·상자2개에서도 문 토큰 전체 제거를 비교하려면 다음을 사용한다. native4 확장 없이 원래 2인 환경/보상/배치를 사용하며 같은 장면에서 actor attention 8→6토큰만 개입한다. 물리 문2개와 critic은 유지한다. 기본 seed123/64장면/300step, 결과는 `runs/jointpush/native2_no_doors_<timestamp>/comparison.json`에 저장한다.
+
+```bash
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native2_no_doors_ablation.sh
+```
+
+```bash
+TOKENHSI_GPU=5 NUM_ENVS=64 PROBE_STEPS=300 \
+  bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh
+# 전체 토큰/QKV 유지, NONE 관계 bias만 0으로 만드는 비교
+TOKENHSI_GPU=5 NUM_ENVS=64 PROBE_STEPS=300 \
+  bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh none_zero
+# 다른 장면의 key 토큰 종류를 각각 차단 (선택해 한 명령씩 실행)
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_humans
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_doors
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_boxes_goals
+# 위의 상자/목표 차단에 문까지 추가 (다른 장면의 사람은 유지)
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_objects_goals
+# 다른 장면의 상자만 차단, 문·목표·사람은 유지
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_boxes
+# 다른 장면의 목표만 차단, 문·상자·사람은 유지
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_goals
+# 다른 장면 상자 2개 중 1개만 차단: 두 물리 rank를 각각 실행
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_box_first
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh hide_box_second
+# 모든 문 토큰을 actor attention에서 제거: 16토큰 → 12토큰
+TOKENHSI_GPU=5 bash stage2_jointpush/scripts/stage1_native4_attention_ablation.sh remove_doors
+```
+
+동일 seed123/4명·문4·상자4 장면에서 원본 actor 전체 attention(`full`)과 원래 두 복제 장면 사이 모든 actor attention을 차단한 조건(`pair`)을 순차 평가한다. 물리 actor·pose·정책·normalizer는 유지한다. 그룹은 실제 상자 배정/door lane으로 정하며 토큰 순열을 따라 mask를 적용한다. 각 그룹은 사람2·문2·상자2·목표2=8토큰이다. Critic은 변경하지 않는다. source checkpoint는 native4와 같은 resolver/`STAGE1_CHECKPOINT`를 사용한다.
+
+`none_zero`는 task edge로 연결되지 않은 off-diagonal 토큰 쌍의 actor 관계 bias만 0으로 만든다. 모든 토큰의 Q/K/V, task edge bias와 SELF bias는 그대로 사용하고 attention 연결을 차단하지 않는다. 기본 `pair` 실험과 별도 출력 디렉터리에서 full/none_zero를 순차 실행한다.
+
+`hide_humans`, `hide_doors`, `hide_boxes_goals`는 모든 actor 층에서 다른 복제 장면에 속한 선택 종류의 key만 차단한다. query와 같은 장면의 key 및 선택하지 않은 종류의 key는 유지한다. 물리 객체는 제거하지 않는다. 선택하지 않은 토큰이 다른 층에서 정보를 중계할 수 있으므로 해당 종류 정보 전체를 제거한 인과 실험으로 해석하지 않는다.
+
+`hide_objects_goals`는 위 상자·목표 차단에 문까지 포함한다. 다른 장면의 사람 key는 유지하며, 같은 장면의 문·상자·목표는 차단하지 않는다.
+
+`hide_boxes`는 다른 장면의 상자 key만 차단한다. 문·목표·사람 key와 같은 장면 상자는 유지한다.
+
+`hide_goals`는 다른 장면의 목표 key만 차단한다. 문·상자·사람 key와 같은 장면 목표는 유지한다.
+
+`hide_box_first`/`hide_box_second`는 다른 장면 상자 2개 중 물리 ID 짝내 rank0 또는 rank1인 key를 차단한다. 논리 토큰 순서·소유권 순열과 독립적으로 물리 rank를 사용하며 query마다 정확히 다른 장면 상자 1개가 차단됐는지 검사한다. 두 조건 모두 직접 참조 가능한 상자는 같은 장면2+다른 장면1=3개다. `full`은4개, `hide_boxes`는2개이며 물리 actor나 토큰 자체를 삭제하지 않는다. 문·목표·사람 및 같은 장면 상자는 유지한다.
+
+`remove_doors`는 자기/다른 장면 구분 없이 문4개를 모든 actor 층의 Q/K/V·GTA·bias 행렬에서 실제 제외하여 사람4+상자4+목표4=12토큰으로 attention한다. 기존 정규화·tokenizer·출력 인덱스와 파라미터를 보존하기 위해 주변 encoder의 원래 슬롯 구조는 유지하지만 문 슬롯은 어느 actor attention 층에도 참여하지 않는다. 물리 문과 critic 입력은 유지한다. 문 제거에 따른 충돌/물리 효과를 시험하는 조건은 아니다.
+
+결과는 새 `runs/jointpush/native4_attention_<timestamp>/`의 `comparison.json`, 각 조건 `result.json`/`manifest.json`과 로그에 저장한다. `OUTPUT_PATH`, `NUM_ENVS`, `PROBE_STEPS`, `SEED`로 재정의할 수 있다. 초기 상태 해시 일치와 정책/normalizer 불변을 검사한다. 동일 관측의 두 action 차이를 매 step 기록하며 초기 action 비교가 동일 상태 비교다. 후속 rollout은 서로 다른 action으로 상태가 달라진다. `fallen_before_assigned_box_proximity`는 신체점이 자기 상자에서 0.2m 안으로 접근하기 전 낙상이며 실제 접촉 센서 기준은 아니다. token 수/거리/관계 bias 개별 원인을 분리하는 실험은 아니다.
+
 ## Partition Push 구역 중복 배정 수정 (2026-10-20)
 
 reset마다 그룹 내 이동거리 합을 최소화하는 **1인 1구역** 배정을 선택하고 에피소드 동안 고정한다. 관측 graph·손 목표·보상이 같은 배정을 사용한다. 기존 checkpoint는 새 배정 방식으로 로딩 가능하며 로그에 표시한다. 새 checkpoint에는 `partition_region_assignment=exclusive_reset_min_distance_v1`을 저장한다. 실행 중인 학습·뷰어는 재시작해야 반영되며 이번 수정에서 종료하지 않았다.
@@ -1481,3 +1558,16 @@ TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_assigned_faces
 ```
 
 산출물 기본값은 `runs/jointpush/assigned_faces_training/`, `assigned_faces_evaluation/`. 이전 실험 설정·checkpoint는 변경하지 않았다. 장기 학습은 별도 실행한다.
+
+## 360° 랜덤 출발·CPA0.5m GPU5 실험 (2026-10-20)
+
+전용 env `partition_push_surround_cpa05.yaml`: 기존 Partition Push에서 `agentCollisionDist=0.5`, `partitionPush.spawn_mode=surround_independent`. 위치·heading 모두 독립360°, 할당 상자의 XY 외접원 밖1~2m, 초기 사람 간 최소1.2m 유지. CPA 계수0.5·물리 충돌·그룹/크기/질량/목표/AMP/RSI는 유지한다. CPA0.5는 root 기준 위험거리이며 물리 collider 크기나 초기 간격이 아니다.
+
+```bash
+TOKENHSI_GPU=5 NUM_ENVS=2048 bash stage2_jointpush/scripts/partition_push_surround_cpa05_train.sh
+HEADLESS=1 bash stage2_jointpush/scripts/partition_push_surround_cpa05_test.sh /absolute/path/checkpoint.pth
+HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_surround_cpa05_test.sh /absolute/path/checkpoint.pth
+NUM_ENVS=1 bash stage2_jointpush/scripts/partition_push_surround_cpa05_vnc.sh /absolute/path/checkpoint.pth
+```
+
+실제 요청 실행: tmux `partition_surround_cpa05_gpu5`, `runs/jointpush/partition_surround_cpa05_gpu5_20261020/`. fresh Stage2/Stage1전이/seed42/2048환경/GPU5. `launch.sh`·`launch.json`·`env.yaml`에 실행 명세/설정을 보존한다. 기존 GPU5 MPS를 read-only 검증 후 연결하며 daemon을 시작·종료·재설정하지 않는다. 기존0.7m 프로필·checkpoint는 변경하지 않았다. 평가/VNC는 checkpoint 저장 env를 복원한다.

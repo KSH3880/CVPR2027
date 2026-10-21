@@ -2,7 +2,70 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-21
+
+### 원본 Koo 4인 OPEN/PUSH 혼합 attention PNG
+
+- 사용자 요청으로 사람/문/상자/목표 각각4개인 native4 장면의16×16 actor attention 수집을 추가했다. 이전2인 PNG와 같은 OPEN/PUSH 혼합을 사용하며 mask나 CA4·추가학습은 없다. attention 수집 opt-in에서만4인 과제 샘플링·자기 문/상자/목표 그래프를 확장하고 원래2인 보상 함수를 두 agent쌍에 적용한다. 기존 PUSH-only ablation 기본값은 유지한다.
+- CPU10개(혼합16조합 그래프·원래2인 보상 일치·attention/GTA·기존native4설정)·셸 문법·diff 검사 통과. GPU5 기존 MPS/seed123/4장면300step에서 step0/15/30/60/120/180/299 수집, 유효 장면17PNG 저장. raw shape[7,4,4,2,16,16], row합1/finite·수집기 없는 actor와 첫action차0·모델/normalizer 불변 확인. scene0/1/2는56/34/111step 첫낙상, scene3은300step까지 조기종료없음. 첫PNG 육안검사로16토큰·4층2head·과제표시 확인. `runs/jointpush/koo_native4_attention_20261021_gpu5/attention_png/`. 실행 종료·메모리반환·MPS 유지.
+
+### 원본 Koo 2인 actor attention PNG 수집
+
+- 사용자 요청으로 원본2명·문2·상자2/OPEN-PUSH 혼합 환경에서 actor4층×2head attention을 PNG로 저장하는 전용 진단을 추가했다. 실제 layer QKV 출력·GTA·관계bias로 softmax를 계산하며 토큰 순열을 canonical H0/H1/D0/D1/B0/B1/G0/G1 순으로 복원한다. task/물리배정 상태와 QK/bias/attention 원본도 별도 저장한다. 학습·mask·외부 원본 수정은 없다.
+- CPU softmax/GTA2개 및 셸 문법 통과. GPU5 기존 MPS/seed123/4장면300step에서 step0/30/60/120/180/299 총24PNG 저장. shape[6,4,4,2,8,8], attention행합1·finite 검사, 수집기 없는 원래 actor와 첫 action차0, 정책/normalizer 불변을 확인했다. 첫 이미지 육안검사로 축·head/layer·토큰/과제 표기를 확인했다. 4장면 모두300step내 조기종료 없음. `runs/jointpush/koo_native2_attention_20261021_gpu5/attention_png/`. 실행 종료·메모리 반환·MPS 유지.
+
+### 문 없는 Partition Push Stage1 zero-shot 박스 토큰 축소
+
+- 사용자 요청을 4인 Partition Push로 해석해 전용 진단을 추가했다. 기존 surround_cpa05 환경에서 원래 Stage1 network/가중치/normalizer를 strict 복원하며 CA4·확장 head·전이학습은 사용하지 않는다. 물리 문은 없고 작업구역4토큰을 유지한 채 일반상자4→0개를 actor attention 모든 층의 QKV/GTA/bias에서 제외한다. 물리 박스·목표·critic은 유지한다. 문없는 Partiton 환경 특유의 크기·질량·그룹·랜덤시작/초기화 분포는 원래 Stage1과 다르다.
+- CPU16개·셸 문법 통과. GPU5 기존 MPS/seed123/64장면300step 각조건 초기 물리 상태 해시 일치·정책/normalizer 불변. 총box토큰8/7/6/5/4 모두64/64장면낙상. 첫 종료 평균29.20/30.44/32.13/35.41/45.00step, 자기상자0.2m근접전낙상 포함장면58/55/56/52/49. 일반box정보를 줄여 낙상시점은 늦어졌지만 이 환경의zero-shot낙상은 해결되지 않았다. 시드반복이나 과제성공률 실험은 아니다. `runs/jointpush/partition_stage1_boxes_20261021_gpu5/summary.json`. 실행 종료·메모리 반환·MPS 유지 확인.
+
+### 원래 2인 정책의 문 토큰 제거
+
+- 사용자 질문에 따라 native4 확장 없이 원래 2명·문2·상자2 환경에서 문 토큰 제거를 비교하는 wrapper/launcher를 추가했다. 공통 source 설정 복원에 `--agents 2`를 지원하고 actor 모든 층의 Q/K/V·GTA·bias가8→6토큰으로 정렬되도록 일반화했다. 기존4인 기본값과 학습 가중치·외부 원본은 유지한다. 물리 문과 critic은 남는다.
+- CPU12개·셸 문법·diff 검사 통과. GPU5 기존 MPS/seed123/64장면300step 원본0/64낙상, 문토큰제거0/64, 초기 물리 상태 해시 일치·정책/normalizer 불변. 첫 action차 RMS0.00003767/max0.001078. 낙상 안정성 검사이며 Push 성공률·학습속도·물리 문 제거 실험은 아니다. `runs/jointpush/native2_remove_doors_20261021_gpu5/comparison.json`. 실행 종료·메모리 반환·MPS 유지.
+
+### Native4 모든 문 토큰 제거
+
+- 사용자 요청으로 remove_doors 진단을 추가했다. 문4개를 actor 모든 층의 Q/K/V·GTA·bias에서 실제 제외해16→12토큰으로 attention한다. 정규화·원래 tokenizer·readout 슬롯·정책 가중치를 보존하며 물리 문과 critic은 유지한다. 이전 hide_doors(다른 장면 문 key만차단)와 구분한다.
+- CPU5개 및 셸 문법 통과. GPU5 기존 MPS/seed123/64장면300step 원본50/64낙상 대비 문토큰제거54/64(84.375%), 자기 상자0.2m 근접 전 낙상 포함 장면14→17. 초기 상태 해시 일치·정책/normalizer 불변. 문토큰 전체 제거만으로 안정성이 개선되지는 않았다. `runs/jointpush/native4_remove_doors_20261021_gpu5/comparison.json`. 실행 종료·메모리 반환·MPS 유지.
+
+### Native4 상자 개수 점진 차단
+
+- 사용자 요청으로 다른 장면 상자2개 중 하나만 가리는 hide_box_first/hide_box_second를 추가했다. 물리 box rank로 선택하여 소유권·토큰 순열에 독립적이며 모든 query에서 정확히1개 key만 차단되는지 검사한다. 같은 장면 상자2개, 문·목표·사람은 유지한다.
+- CPU mask4개·셸 문법 통과. GPU5 기존 MPS/seed123/64장면300step: 참조가능 상자4개 원본50/64낙상, 3개(첫 상자차단)46/64, 3개(둘째상자차단)48/64, 2개29/64. 자기 상자0.2m 근접 전 낙상 포함 장면은14/11/15/3. 4개/2개 조건은 이전 hide_boxes 비교에서 재사용했고 초기 물리 상태 및 checkpoint SHA 일치를 검사했다. 장면 수와 학습 시드 수는 구분하며, 물체 개수와 내용·거리 효과를 분리한 인과 결론은 아니다. `runs/jointpush/native4_box_count_20261020_gpu5/summary.json`. 실행 종료·기존 MPS 유지.
+
 ## 2026-10-20
+
+### Native4 목표만 차단, 문·상자 유지
+
+- 사용자 요청으로 다른 장면의 목표 key만 차단하는 hide_goals를 추가했다. 다른 종류 및 같은 장면 목표는 유지한다.
+- CPU mask3개·셸 문법 통과. GPU5 기존 MPS/seed123/64장면300step 비교 완료: 원본50/64낙상, 목표만차단51/64(79.6875%). 자기 상자0.2m 근접 전 낙상 포함 장면14→12. 초기 상태 해시 일치·정책/normalizer 불변. 목표 단독 차단은 안정성을 회복하지 않았다. `runs/jointpush/native4_goals_only_20261020_gpu5/comparison.json`. 실행 종료·MPS 유지 확인.
+
+### Native4 상자만 차단, 문·목표 유지
+
+- 사용자 요청으로 다른 장면의 상자 key만 차단하는 hide_boxes를 추가했다. 문·목표·사람 및 같은 장면 상자를 모든 actor 층에서 유지한다. 기존 개입은 변경하지 않았다.
+- CPU mask3개·셸 문법·diff 검사 통과. GPU5 기존 MPS/seed123/64장면300step 원본50/64낙상 대비 상자만차단29/64(45.3125%), 자기 상자0.2m 근접 전 낙상 포함 장면14→3. 초기 상태 해시 일치·정책/normalizer 불변. 이전 상자+목표14/64, 문+상자+목표1/64와 비교해 추가 상자 key 직접유입 차단만으로도 일부 개선되지만 전체 회복은 아니다. `runs/jointpush/native4_boxes_only_20261020_gpu5/comparison.json`.
+
+### Native4 문·상자·목표 동시 차단
+
+- 사용자 요청으로 상자·목표 차단에 문 차단을 더한 hide_objects_goals 조건을 추가했다. 다른 장면의 사람 및 같은 장면의 모든 토큰은 유지한다. 모든 actor 층에 적용하며 물리 환경·가중치·QKV 파라미터는 변경하지 않는다.
+- CPU mask3개·셸 문법 통과. GPU5 기존 MPS/seed123/64장면300step 순차 비교 완료: 원본50/64낙상, 문+상자+목표차단1/64, 자기 상자0.2m 근접 전 낙상 포함 장면14→0. 초기 상태 해시 일치, 정책/normalizer 불변. 이전 상자+목표차단14/64에서 문까지 차단했을 때 추가 개선됐다. task 성공률이나 단일 attention 기전을 확정한 결과는 아니다. `runs/jointpush/native4_objects_goals_20261020_gpu5/comparison.json`. 실행 종료·GPU메모리 반환·MPS 유지 확인.
+
+### Native4 추가 토큰 종류별 attention 차단
+
+- 사용자 요청으로 다른 복제 장면의 사람/문/상자+목표 key를 각각 차단하는 hide_humans/hide_doors/hide_boxes_goals를 추가했다. 모든 actor 층에 적용하며 query와 같은 장면의 key 및 다른 종류의 key는 유지한다. 미차단 토큰을 통한 층간 간접 정보 전달은 남는다.
+- CPU3개·셸 문법·diff 검사 통과. GPU5 기존 MPS에서 seed123/64장면300step으로 종류별 full/개입을 순차 실행했다. 6회 초기 상태 해시 일치 및 정책/normalizer 불변. 원본50/64낙상, 사람차단51/64, 문차단47/64, 상자+목표차단14/64. 자기 상자0.2m 근접 전 낙상 포함 장면은 원본14, 사람14, 문15, 상자+목표1. 상자+목표 정보의 직접 유입 차단이 가장 큰 안정성 개선을 보였으나 거리/관계bias/QKV 중 원인이나 단일 원인을 확정하지 않는다. `runs/jointpush/native4_types_20261020_gpu5/summary.json`. 실행 종료, 기존 학습/MPS는 건드리지 않았다.
+
+### Native4 NONE bias 제거 비교
+
+- 사용자 요청으로 모든 토큰/QKV/attention 연결은 유지하고 task edge로 연결되지 않은 off-diagonal NONE bias만 0으로 만드는 `none_zero` 진단을 추가했다. task/SELF bias와 critic은 보존한다. 기존 native4/pair 기본값은 유지한다.
+- CPU mask·NONE/task/SELF 보존 테스트2개 및 셸 문법 통과. GPU5 기존 MPS에서 seed123/64장면300step full/none_zero 비교 완료, 초기 상태 해시 일치·정책/normalizer 불변. full50/64(78.125%), none_zero64/64(100%) 장면 낙상. 자기 상자 0.2m 근접 전 낙상을 포함한 장면14→33, 첫 action RMS차0.20406. NONE bias 제거로 안정성이 회복되지 않았으며 오히려 악화됐다. bias 전체의 원인 여부나 다른 기전을 배제하지 않는다. 결과: `runs/jointpush/native4_none_bias_20261020_gpu5/comparison.json`.
+
+### Native4 Stage1 attention 차단 비교
+
+- 사용자 요청으로 native4 물리 장면은 유지하면서 actor 모든 층에서 서로 다른 복제 장면 사이 attention을 차단하는 진단을 추가했다. 사람/목표는 배정 상자의 원래 2개 단위 장면, 문은 실제 door lane에 따라 그룹화한다. 토큰 순열에도 mask를 함께 적용하며 그룹당 8토큰을 검사한다. 기존 native4 기본 동작과 외부 원본은 변경하지 않았다.
+- 같은 관측에서 full/pair action을 비교하고 RNG를 복원해 rollout 간 초기조건을 보존한다. 초기 상태 해시·정책/normalizer 불변·장면별 첫 종료를 기록한다. 상자 근접 지표는 자기 상자와 신체점 거리 0.2m 기준이며 실제 접촉 센서 판정이 아니다.
+- CPU5개 통과. GPU5 기존 MPS에서 2장면4step 검사 후 seed123/64장면300step 비교 완료: full50/64장면 낙상, pair0/64, 초기 상태 해시 일치. 첫 action 차이 RMS0.11316/max1.13985. 추가 장면 정보 유입에 대한 민감성을 확인한 결과이며 거리/QKV/관계bias별 원인을 분리하거나 과제 성공률을 검증한 결과는 아니다. 산출물: `runs/jointpush/native4_attention_20261020_gpu5/`. 기존 학습/MPS는 종료하지 않았다.
 
 ### Partition Push 구역 독점 배정 수정
 

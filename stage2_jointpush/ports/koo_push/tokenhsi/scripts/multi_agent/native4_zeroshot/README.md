@@ -1,5 +1,12 @@
 # Stage1 native4 zero-shot diagnostic
 
+Attention PNG capture additionally supports mixed OPEN/PUSH via the opt-in
+`stage2_jointpush/scripts/stage1_native4_attention.sh` wrapper. It uses agent-specific
+door/box/goal bindings and applies the original two-agent reward per pair. This does
+not change the PUSH-only fall-ablation defaults described below. PNGs contain four
+actor layers/two heads, with canonical 16-token labels; raw QK/bias/attention and
+physical bindings are saved alongside them.
+
 Original Stage1 weights, **4 humans / 4 real doors / 4 real boxes**, `Start` initialization, PUSH-only evaluation. No learning, Stage2 weight, or coordination-head expansion. This is the portable version of the locally verified native4 setting.
 
 From the repository root:
