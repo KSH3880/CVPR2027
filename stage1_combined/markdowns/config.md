@@ -267,6 +267,8 @@ Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, 
 
 의자 좌판·등받이 FT의 상세 조건과 현재 실행은 [상위 README](../../README.md)를 따른다.
 
+물체별 독립 SIT/CLIMB 평가(Box/Chair/Cabinet/Table): [실행·조건](../evaluation/object_comparison/README.md). 저장소 루트에서 `python3 evaluation/object_comparison/run_eval.py`를 실행한다.
+
 ## 독립 폴더 실행 위치
 
 모든 명령은 `/home/hwanhee/juan/CVPR2027/stage1_combined`에서 실행한다. 본학습은 `MAX_ITERATIONS`를 해제하면 YAML 기본20,000회 적용. 현재 실행 중인 기존 학습과 중복 실행하지 않는다.

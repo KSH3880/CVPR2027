@@ -1,3 +1,44 @@
+## koo_1021 기반 Partial Joint Push Stage2 (2026-10-22)
+
+실제 사용자 요청의 partial 학습은 [전용 안내](../../jointpush/PARTIAL_KOO_1021.md)를 따른다. 아래 Stage1 resume와 구분한다.
+
+```bash
+TOKENHSI_GPU=5 bash jointpush/scripts/koo_partial_train.sh jointpush/checkpoints/koo_1021/Stage1BasePush_00007500.pth
+TOKENHSI_GPU=5 HEADLESS=0 KOO_PARTIAL_WORK=/path/to/training/workspace bash jointpush/scripts/koo_partial_test.sh /path/to/Stage2.pth
+TOKENHSI_GPU=5 PORT=6086 KOO_PARTIAL_WORK=/path/to/training/workspace bash jointpush/scripts/koo_partial_vnc.sh /path/to/Stage2.pth
+```
+
+4인/2048환경·group partial/8object token·동결 Stage1 encoder+새 coordination/새 optimizer다. 최신 실행 경로는 `runs/jointpush/koo_partial_stage2_20261022/latest_training.json`이다.
+
+## koo_1021 Stage1BasePush (2026-10-22)
+
+원본 2명·상자4개 실행 준비는 [별도 안내](../../jointpush/KOO_1021.md)를 참조한다. 기본 업로드는 `jointpush/checkpoints/koo_1021/Stage1BasePush.pth`다.
+
+```bash
+bash jointpush/scripts/koo_1021_prepare.sh
+TOKENHSI_GPU=5 bash jointpush/scripts/koo_1021_train.sh
+TOKENHSI_GPU=5 HEADLESS=0 bash jointpush/scripts/koo_1021_test.sh
+TOKENHSI_GPU=5 PORT=6086 bash jointpush/scripts/koo_1021_vnc.sh
+```
+
+train은 해당 Stage1 checkpoint의 optimizer 포함 resume이며 Stage2 partial 학습은 아니다. 업로드 전 GPU 실행/strict restore 미검증, 원본 점유GPU 시작 거부를 유지한다.
+
+## KSH Depth180 9000 Partial Joint Push viewer (2026-10-22)
+
+```bash
+# 서버 viewer: GPU6, noVNC6092, 1환경. 학습하지 않는다.
+TOKENHSI_GPU=6 bash stage2_jointpush/scripts/ksh_partition_view.sh
+# 화면 없는 추론 확인(위 wrapper로 config 준비 후)
+TOKENHSI_GPU=6 CUDA_VISIBLE_DEVICES=6 HEADLESS=1 NUM_ENVS=2 VIEW_CHECK_STEPS=16 \
+  bash stage2_jointpush/scripts/ksh_partition_view_run.sh
+```
+
+기본 checkpoint는 `/home/hwanhee/koo_cvpr/stage1_fix/ports/ksh_stage1_stage2_base/push/output/stage1_depth180_20kg_push100_from1000/Stage1FiveTaskDepth18020kg_21-20-09-05/nn/Stage1FiveTaskDepth18020kg_00009000.pth`. `STAGE1_CHECKPOINT`로 prepare 입력을 변경할 수 있다. source는 읽기 전용 symlink로 연결하며 로컬 설정·산출물은 `runs/jointpush/ksh_partition_depth180_9000_20261022/workspace/`에 둔다.
+
+viewer는 사람별 색상의 연결선(사람→담당 구역)과 상자 윗면의 분할 구역 테두리를 표시한다. 초록/파랑/주황/보라가 agent1/2/3/4다. `PORT=6093` 등으로 별도 화면을 열 수 있다.
+
+기존 partial surround 설정에서 상자 Y는1.8m고정, 초기 spawn_distance는[1.0,5.0]m로 원본 Push와 맞춘다. 구역별 양손 point 목표는 유지한다. KSH FiveTask 관측/AMP/normalizer를 유지하고 새 Stage2 coordination은 identity 초기화한다. 현재 전용 adapter는 viewer/test/eval만 지원하며 학습 launcher는 추가하지 않았다. 기존 Koo 학습 설정은 별도다. `http://localhost:6092/vnc.html`로 접속한다(원격 접속은6092포트 포워딩 필요).
+
 ## 원본 Koo 2인 actor attention PNG 저장 (2026-10-21)
 
 ```bash

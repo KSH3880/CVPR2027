@@ -1,0 +1,487 @@
+{
+  "repository": "KSH3880/CVPR2027",
+  "ref": "stage1_stage2_base",
+  "commit": "28f02b3278f0a3e703cfa22a1e8cc376bb8ec512",
+  "files": [
+    {
+      "path": "tokenhsi/env/tasks/__init__.py",
+      "git_blob": "bc6ee169446e3ff481659f963b550b39fd9f43d3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_box2objs.py",
+      "git_blob": "4820a10f7e1e8234ed90d2dafac42ff2d74a1f7f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_ground2terrain.py",
+      "git_blob": "e3f41547136d55572da1b62761cbd592c7e72880"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_traj_ground2terrain.py",
+      "git_blob": "784befb4da98f77c15d320d9f9be0904ebbe6c14"
+    },
+    {
+      "path": "tokenhsi/env/tasks/base_task.py",
+      "git_blob": "2c697c8a8ddd2818b5a33029c0c9365db7aa1595"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py",
+      "git_blob": "51bd4b2ffb8cb5ca8825259e57002e6010cdfc41"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py",
+      "git_blob": "62e63d6c493cf1445006c96fd28b1f50872ad9d2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py",
+      "git_blob": "f25007b190cef1bf187a963761a307a8f004bb43"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_traj.py",
+      "git_blob": "b40362cdf1ae643bcb12611644c345616d3e3ee6"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_climb_carry.py",
+      "git_blob": "4c44126df725f400d03117f83aa3bfe46520ab56"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_sit_carry.py",
+      "git_blob": "2d04c967f8c95a7627e1e80cb7a243105383fc3c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_traj_carry.py",
+      "git_blob": "1754fb75abd1a5f1de6f6799e07bbe749e172d4f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/humanoid.py",
+      "git_blob": "ce7eed87f85553eeee1ee3eef7daf32e328549b7"
+    },
+    {
+      "path": "tokenhsi/env/tasks/humanoid_amp.py",
+      "git_blob": "7e7f19e69c38383253d1a52befbaf4db4210c0a2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/longterm_task_completion/humanoid_longterm_4basicskills.py",
+      "git_blob": "02a228a0f6b3e57a2c68646492e78a2d661e655a"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/__init__.py",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/collision_reward.py",
+      "git_blob": "882273002ca271eefc54568ea7da9e0996cc70fd"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_reward.py",
+      "git_blob": "1c12555ad4cf5e35ce475eb57ee9881328c9d217"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_task.py",
+      "git_blob": "3cca66a955b41803a0d9fb631ebb959359f52eab"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py",
+      "git_blob": "4813331b9a555861b7f08d08b087748134d26816"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py",
+      "git_blob": "46c76f6c4fde0fc0ba2aa148632ae1864ab4e597"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_task.py",
+      "git_blob": "c3dcc5a2d27c32231096aa699eeb7616addf75ef"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py",
+      "git_blob": "d164e28e0540eb61d690be5f340634dc1cb5211a"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma.py",
+      "git_blob": "ae4ed0927a4ff6551a63fd21c37c532f9308100f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py",
+      "git_blob": "0d9f297eb98adad1b6329d53fdd19a00d2c0b8bf"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_shared_support.py",
+      "git_blob": "f853bb91ddc46d700fff2bb00c7ae58aebd16bd3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2.py",
+      "git_blob": "57e5d2ce17c32fd57c90afe42215c1ac7985ba0c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_diagnostics.py",
+      "git_blob": "e9d405c180c756dbbdfc1fe3ae252cc39e801638"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_reward.py",
+      "git_blob": "c2063874e504ed18569154ba82ca17a052733925"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_features.py",
+      "git_blob": "3dec40f880a49dc5d2cf1dd03d381f2508db8cab"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/shared_support_reward.py",
+      "git_blob": "f7e8f87ff2555785f392dcc708e72c13b2a79e28"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/shared_support_scene.py",
+      "git_blob": "e3a0dad2fdb25ce1ff60323a5894d93d60a84729"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/size_rsi_cache.py",
+      "git_blob": "b33a1399872722920e4a8aaf72eadae9a9bc3e30"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/stage2_scene.py",
+      "git_blob": "aa832da259b6ffeb9f664101cff459b37d14a167"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/stage2_solo_rsi_cache.py",
+      "git_blob": "840bb032403edd0e50ff2bec45dc4fbc1ab931e4"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/vec_task_wrapper_ma.py",
+      "git_blob": "d3f6a28c7203d8631c7428072194038c46ac8e9b"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_task/humanoid_traj_sit_carry_climb.py",
+      "git_blob": "99513486afa827a94babc6d86ba4d18613db6217"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task.py",
+      "git_blob": "356e9e47e43ec8f334d4f07d8c804cf55779ed41"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task_wrappers.py",
+      "git_blob": "2b4dbade73f637cd78f0230fd8216c982b39e1e4"
+    },
+    {
+      "path": "tokenhsi/learning/amp_agent.py",
+      "git_blob": "4ea6d02618c7610524654468afc378692f6e5bdc"
+    },
+    {
+      "path": "tokenhsi/learning/amp_datasets.py",
+      "git_blob": "e960b2ebeb51266e91d4ce30620d680ef9b3ecc0"
+    },
+    {
+      "path": "tokenhsi/learning/amp_models.py",
+      "git_blob": "5ff1d0084b62dfffecd855827b404e300552437e"
+    },
+    {
+      "path": "tokenhsi/learning/amp_network_builder.py",
+      "git_blob": "f3d5155fa1b39ea682bdae04d2a8008c1f66c448"
+    },
+    {
+      "path": "tokenhsi/learning/amp_players.py",
+      "git_blob": "2aac5ef8042e8be1ca045dc6aed7fd5b06c7fb0f"
+    },
+    {
+      "path": "tokenhsi/learning/common_agent.py",
+      "git_blob": "16af601298e11e6966ccb0e22fe32852883927f9"
+    },
+    {
+      "path": "tokenhsi/learning/common_player.py",
+      "git_blob": "ac4e626a0df53ccb174b5e5be76cded74c83003b"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/__init__.py",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/amp_network_builder_ma.py",
+      "git_blob": "db7ec9f8581ae5193fd61b52d1bf0a75980ad646"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/edge_context_eval.py",
+      "git_blob": "daeb74319e832e8f03693d7a1800c7f9d091891a"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/grasp_view.py",
+      "git_blob": "65fb1582ef91ef08c824b9793ad9001886053f91"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/human_coordination.py",
+      "git_blob": "43c600907ee089b7b38bb1b7da8da4394d3769a9"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_agent.py",
+      "git_blob": "0a332108f932f158164f2a8dc9975daa3b8c4d45"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_players.py",
+      "git_blob": "65b5d73e31cd68e76928d0269d88e10db294dc58"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/scene_normalizer.py",
+      "git_blob": "a63cfd1607ec4b4cd407d822eee66e19fd0d32bd"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/shared_support_network.py",
+      "git_blob": "8a2f1258f440194739a1a177e32cc6a740abb602"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/stage2_network_builder.py",
+      "git_blob": "48875ab3782abd332ed5ad1b667887cb16170115"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/task_role_encoder.py",
+      "git_blob": "6b42f7057222e038616f40ccf2a45b03f74be6c0"
+    },
+    {
+      "path": "tokenhsi/learning/replay_buffer.py",
+      "git_blob": "5c5e7c77aa1e7fa3f2f34e371c3b960d3bb580d7"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer.py",
+      "git_blob": "ed73b1d09e651e896dbd2cf1cb7df126c46541f2"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_adapt.py",
+      "git_blob": "477defc3d17197d0f0f1d0cd08ea77890b96e421"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_comp.py",
+      "git_blob": "72beddb79e3ea1c065eae20b74c4a5e277d1c614"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_longterm.py",
+      "git_blob": "524c81c34241fe3b4044b861e734c3bf5d100b79"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/composer.py",
+      "git_blob": "652b92e9ae70a4c89e901b52dfd7c0fe6a372769"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/trans_agent.py",
+      "git_blob": "24d8b7efc969c0dee70e205ec921c6c8d8745791"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/trans_players.py",
+      "git_blob": "a5d6264da96a1b63aa8dbd0b1353c114d53f8cdb"
+    },
+    {
+      "path": "tokenhsi/run.py",
+      "git_blob": "66624ca10eea0e1359e67962aec278eafb7ee1d1"
+    },
+    {
+      "path": "tokenhsi/tests/check_shared_support.py",
+      "git_blob": "733b92b6168fdf40ed3c37be42268df77cdea7a9"
+    },
+    {
+      "path": "tokenhsi/tests/check_stage2.py",
+      "git_blob": "ed7deebc8d1e172ee78ebc52019126a2a81c5adf"
+    },
+    {
+      "path": "tokenhsi/tests/smoke_stage1_sim.py",
+      "git_blob": "cfd5aa8f5e1ca86b4b664632baa7052d5b6b3311"
+    },
+    {
+      "path": "tokenhsi/tests/smoke_stage1_v2_training.py",
+      "git_blob": "cf7c25d042f9d218d402d68e4a992d0dd7f3c7c3"
+    },
+    {
+      "path": "tokenhsi/tests/stage1_test_utils.py",
+      "git_blob": "27ab93c6953e19c73bcce7fb81c184198d99aa80"
+    },
+    {
+      "path": "tokenhsi/tests/test_agent_cpa_collision.py",
+      "git_blob": "6a97ef9af0eaa82170e9fc89b4fa6fea617a67da"
+    },
+    {
+      "path": "tokenhsi/tests/test_generic_task_scenario.py",
+      "git_blob": "e7b2f2623d5a95d87c895cb0963700505306577f"
+    },
+    {
+      "path": "tokenhsi/tests/test_graph_box_speed_penalty.py",
+      "git_blob": "59f301c888b14e4bb968a74df9fffc895c434cb8"
+    },
+    {
+      "path": "tokenhsi/tests/test_gui_gpu.py",
+      "git_blob": "2897c4a330b047491a7a5d1bb9b0325b99f43cfc"
+    },
+    {
+      "path": "tokenhsi/tests/test_ma_scene_features.py",
+      "git_blob": "19d7ca13585d2e9d5001449d1ac208fd3fdea545"
+    },
+    {
+      "path": "tokenhsi/tests/test_output_paths.py",
+      "git_blob": "95cef5f0badd54bfa9379b1b70091071715635aa"
+    },
+    {
+      "path": "tokenhsi/tests/test_shared_support.py",
+      "git_blob": "231ad732e26447b423ed407f147ad52644913014"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1.py",
+      "git_blob": "c2c6d1923e88c566f93efe9def5a77841ee64630"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_gta.py",
+      "git_blob": "cb696592806237bf0a8588c0bec82312b6d5324e"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_policy.py",
+      "git_blob": "9e8cc43d6f2920e2502a9f2486fee37bf8069c2b"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_sampling.py",
+      "git_blob": "3796ded00a92a733224371acb91322c3df9dde8f"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_v2.py",
+      "git_blob": "dbe1d775173c804a3b54995882471ce46c91ef2d"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_v2_fixed.py",
+      "git_blob": "24af31f777dd259723697c33a932a3d5379e9324"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_wrapper.py",
+      "git_blob": "f9021a3d42418d3f06f5eebcd3119c55d80ffb18"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage2.py",
+      "git_blob": "41e1483969e7e3eda72af27aafa543482fe3d29c"
+    },
+    {
+      "path": "tokenhsi/utils/__init__.py",
+      "git_blob": "bc6ee169446e3ff481659f963b550b39fd9f43d3"
+    },
+    {
+      "path": "tokenhsi/utils/config.py",
+      "git_blob": "52c866e8aa1bb96531e2cac65b87bed8739fe9e5"
+    },
+    {
+      "path": "tokenhsi/utils/edge_context_spec.py",
+      "git_blob": "d6b0f4b686a8f5f889f35f2e5ae3e3fadb729528"
+    },
+    {
+      "path": "tokenhsi/utils/edge_interaction_spec.py",
+      "git_blob": "9f7421fee092dc0b5531854ee6b64d8c74971709"
+    },
+    {
+      "path": "tokenhsi/utils/edge_ontop_spec.py",
+      "git_blob": "653e4120df7f2a5dbdda32471cb054348148cafe"
+    },
+    {
+      "path": "tokenhsi/utils/edge_scenario_spec.py",
+      "git_blob": "41e19f19805869c14060c75dcc5937d81057d4b5"
+    },
+    {
+      "path": "tokenhsi/utils/edge_stage1_spec.py",
+      "git_blob": "2185445936f9e233ce3cddd2545c9eb863782a34"
+    },
+    {
+      "path": "tokenhsi/utils/grasp_geometry.py",
+      "git_blob": "f7230a3911c2d5d37cad014080974ecb1d2e6fad"
+    },
+    {
+      "path": "tokenhsi/utils/gym_util.py",
+      "git_blob": "204344c192da6eb0b2d642901f6746765668c849"
+    },
+    {
+      "path": "tokenhsi/utils/logger.py",
+      "git_blob": "b5b104100befd3caeea4ac0506265f83a0697c61"
+    },
+    {
+      "path": "tokenhsi/utils/motion_lib.py",
+      "git_blob": "c9318b22be98b041c7a7c0a8817e39c91e59aa61"
+    },
+    {
+      "path": "tokenhsi/utils/output_paths.py",
+      "git_blob": "4a54f5614a4a5d8ef1baa51bc7316448bdfc3fe5"
+    },
+    {
+      "path": "tokenhsi/utils/parse_task.py",
+      "git_blob": "b0e153115ee55ae5f7758c7bf3b0b90c1105eb38"
+    },
+    {
+      "path": "tokenhsi/utils/relation_task_spec.py",
+      "git_blob": "3eba64687a250cfb38d2feecdb1fd87ab9c72d05"
+    },
+    {
+      "path": "tokenhsi/utils/shared_support.py",
+      "git_blob": "c37147803fb7a6db5a0356e54775d65ad4fd3187"
+    },
+    {
+      "path": "tokenhsi/utils/size_rsi.py",
+      "git_blob": "2fe9064a1a713bb81724e0f717de297a66ad5c63"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_platforms.py",
+      "git_blob": "b10ae68e8928da436dee290ba8e4a9d237ab095f"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_sampling.py",
+      "git_blob": "537d69eab25a7deffad22c4ae921900c18c8b2e4"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_v2.py",
+      "git_blob": "1232d64b754c72672a22e4fb85812664cf3b2537"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_v2_fixed.py",
+      "git_blob": "0577cfe6c75a6cb615c1f5a6dff75d5e3b598e62"
+    },
+    {
+      "path": "tokenhsi/utils/stage2_amp.py",
+      "git_blob": "6af9a858076be987b15f62ae901f59a89a1b0df0"
+    },
+    {
+      "path": "tokenhsi/utils/stage2_rsi.py",
+      "git_blob": "bd6e908f1181dfa0c598240777bb34761a201d81"
+    },
+    {
+      "path": "tokenhsi/utils/stage2_spec.py",
+      "git_blob": "6309964054c6af89cfbde02a98601fcaa25b936e"
+    },
+    {
+      "path": "tokenhsi/utils/task_role_spec.py",
+      "git_blob": "77f3fa0e556060ba6019fff056de5178e2d771fe"
+    },
+    {
+      "path": "tokenhsi/utils/torch_utils.py",
+      "git_blob": "9d22fedd63f3091ad92ca0ae94888070dd070792"
+    },
+    {
+      "path": "tokenhsi/utils/traj_generator.py",
+      "git_blob": "0d533267d689be0b12f0d960da4ea0c1ee1f5cbd"
+    },
+    {
+      "path": "tokenhsi/utils/traj_generator_custom.py",
+      "git_blob": "cfb115c502e6c008120a976ca7cf27d441e4a37a"
+    },
+    {
+      "path": "tokenhsi/utils/unified_training.py",
+      "git_blob": "30e65d921d94c5bdac83feee43d160361bc0adf2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml",
+      "git_blob": "62bf6e40f3b67930f3814cffa38901b1a2fe3630"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1_v2_fixed.yaml",
+      "git_blob": "91dc1e3a03a391557cce55bf4e49afaae843dd18"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1.yaml",
+      "git_blob": "c5e58d060f2094d3cb72725a1fa49dd94235445a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1.yaml",
+      "git_blob": "926c705393b99e016444f1fda919643df901d182"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1_v2.yaml",
+      "git_blob": "eb1505bf521bed691cbb4a62d5b7bd8d46d7e984"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1_v2.yaml",
+      "git_blob": "926c705393b99e016444f1fda919643df901d182"
+    }
+  ]
+}

@@ -1,3 +1,25 @@
+## koo_1021 Partial Stage2
+
+- `../jointpush/scripts/koo_partial_prepare.py`: Stage1BasePush 표현·AMP를 유지한 Partial Stage2 config/workspace 생성.
+- `../jointpush/scripts/koo_partial_run.py`: 기존 ksh_partition_scene를 재사용하며 source를 바꾸지 않는 5-task/PUSH graph·Stage2 strict transfer/동결·저장 계약·업데이트 검사.
+- `../jointpush/scripts/koo_partial_{train,test,vnc}.sh`, `koo_partial_launch.sh`: Stage1 resume와 별도인 Partial Stage2 실행.
+- `../jointpush/PARTIAL_KOO_1021.md`: 환경·명령·checkpoint와 검증 범위.
+
+## koo_1021 Stage1BasePush
+
+- `../jointpush/ports/koo_1021/`: ec09d71 고정 원본 및 Stage1BasePush port.
+- `../jointpush/koo_1021_manifest.json`: 파일 무결성/고정 커밋.
+- `../jointpush/scripts/koo_1021_{prepare,train,test,vnc}.sh`: 준비·Stage1 resume·평가·서버 viewer.
+- `../jointpush/scripts/koo_1021_prepare.py`, `koo_1021_common.sh`, `koo_1021_runtime.sh`: CPU checkpoint 계약 검사와 로컬 경로 adapter.
+- `../jointpush/KOO_1021.md`: 업로드 경로·학습/추론/VNC 명령·검증 범위.
+
+## KSH Depth180 9000 Partial viewer
+
+- `scripts/ksh_partition_prepare.py`: 원본 체크포인트의 saved config와 현재 partial 설정으로 runs 내부 설정 생성, Y1.8고정, source 읽기 전용 연결.
+- `scripts/ksh_partition_scene.py`, `ksh_partition_helpers.py`: KSH FiveTask 표현을 유지하는 partial 장면·배정·보상 adapter.
+- `scripts/ksh_partition_run.py`: source bootstrap, Stage1 transfer, test/eval 강제, 추론 및 가중치 불변 검증.
+- `scripts/ksh_partition_view.sh`, `ksh_partition_view_run.sh`: GPU6 noVNC 및 test/eval 진입점. 학습 launcher 아님.
+
 ## Native4 attention 진단
 
 - `scripts/stage1_native2_attention.sh`: 원래 Koo2인 OPEN/PUSH 환경에서 actor 층별/head별 attention PNG와 원본 수치를 저장한다.

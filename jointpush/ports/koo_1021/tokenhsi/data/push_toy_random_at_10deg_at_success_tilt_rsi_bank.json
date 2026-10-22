@@ -1,0 +1,882 @@
+{
+  "contract": {
+    "revision": 3,
+    "push_arm_retarget": "shoulder_rotation_v1",
+    "motion_hashes": {
+      "doorOpen": [
+        "cf0b934660e4463ee124d4373f5d398a67e1b72ece56a457560eabb5d050cbe4"
+      ],
+      "push": [
+        "d374df64b37beef3bf55a05722b4948f8641e1a4a7937e1fd8a9d5bc93515e4d",
+        "20aa94e4d981db81dec78c5db29b8bc5ebb1889dcedc408556ac0abfc59518e3"
+      ]
+    },
+    "door": {
+      "resetAngleRange": [
+        0.0,
+        0.0
+      ],
+      "autoClose": {
+        "stiffness": 2.0,
+        "damping": 0.5,
+        "max_torque": 4.0
+      },
+      "hinge": {
+        "damping": 0.5,
+        "friction": 0.0
+      }
+    },
+    "hold": {
+      "posture": {
+        "min_pelvis_height_ratio": 0.7,
+        "max_torso_tilt": 0.6981317007977318,
+        "max_foot_height": 0.18,
+        "min_foot_force": 1.0
+      },
+      "contact_grace": 0.1,
+      "duration": 5.0,
+      "hand_distance": 0.12,
+      "min_hand_force": 0.5,
+      "min_door_force": 0.5
+    },
+    "push_box": {
+      "size": [
+        1.3,
+        1.3,
+        1.3
+      ],
+      "mass": 20.0,
+      "friction": 0.6
+    },
+    "reward": {
+      "mode": "state_relation_edge_stage1_v1",
+      "schema_version": 12,
+      "stage1_variant": "stage1_open_push",
+      "state_reward_weight": 0.2,
+      "progress_reward_weight": 0.2,
+      "success_reward_weight": 0.2,
+      "door": {
+        "target_angle": 1.5707963267948966,
+        "angle_tolerance": 0.0,
+        "hand_distance_scale": 10.0,
+        "approach_delta": 0.5,
+        "approach_sigma": 1.0
+      },
+      "task_sharing": {
+        "self": 0.9,
+        "teammate": 0.1
+      },
+      "success": {
+        "saturation": "paired_placement_current_success",
+        "terminate_when_all_subgoals_done": false
+      },
+      "observation": {
+        "graph_packet_fields": [
+          "valid",
+          "src",
+          "dst",
+          "relation",
+          "owner"
+        ]
+      },
+      "diagnostics": {
+        "enabled": true,
+        "sample_envs": 2,
+        "log_interval": 30
+      },
+      "push": {
+        "target_distance": 2.0,
+        "goal_tolerance": 0.15,
+        "ground_tolerance": 0.08,
+        "max_tilt": 0.17453292519943295,
+        "max_speed": 0.2,
+        "max_angular_speed": 0.3,
+        "hand_distance": 0.18,
+        "hand_lateral_offset": 0.2,
+        "hand_target_height": 0.8,
+        "min_hand_force": 0.5,
+        "min_box_force": 0.5,
+        "min_contact_progress": 0.05,
+        "control_mode": "midpoint_xy_net_credit"
+      },
+      "edge_aggregation": "self_sum_teammate_mean",
+      "satisfaction_threshold": 0.9,
+      "at": {
+        "near_distance_scale": 10.0,
+        "z_tolerance": 0.001,
+        "progress_delta": 0.5,
+        "progress_sigma": 1.0,
+        "success_max_tilt": 0.17453292519943295
+      },
+      "push_at": {
+        "hand_reference": "goal_opposite_surface_xy",
+        "hand_distance_scale": 10.0,
+        "approach_delta": 0.5,
+        "approach_sigma": 1.0,
+        "require_tilt": false
+      }
+    },
+    "stand_off": 0.06,
+    "push_rsi_alignment": "goal_opposite_surface_xy_v1"
+  },
+  "screen": "PD_12_steps",
+  "candidates": {
+    "doorOpen": [
+      {
+        "motion_id": 0,
+        "time": 0.6333333663642406,
+        "phase": 0.18627450980392157,
+        "angle": 0.6235294117647059,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 0.7666667066514492,
+        "phase": 0.22549019607843138,
+        "angle": 0.6705882352941177,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 0.9000000469386578,
+        "phase": 0.2647058823529412,
+        "angle": 0.7176470588235294,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.0333333872258663,
+        "phase": 0.30392156862745096,
+        "angle": 0.7647058823529411,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.1666667275130749,
+        "phase": 0.3431372549019608,
+        "angle": 0.8117647058823529,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.3000000678002834,
+        "phase": 0.38235294117647056,
+        "angle": 0.8588235294117647,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.433333408087492,
+        "phase": 0.4215686274509804,
+        "angle": 0.9058823529411765,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.5666667483747005,
+        "phase": 0.46078431372549017,
+        "angle": 0.9529411764705882,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.700000088661909,
+        "phase": 0.5,
+        "angle": 1.0,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.8333334289491177,
+        "phase": 0.5392156862745098,
+        "angle": 1.0470588235294116,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 1.9666667692363262,
+        "phase": 0.5784313725490197,
+        "angle": 1.0941176470588236,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 2.1000001095235348,
+        "phase": 0.6176470588235294,
+        "angle": 1.1411764705882352,
+        "box_progress": 0.0
+      },
+      {
+        "motion_id": 0,
+        "time": 2.2333334498107433,
+        "phase": 0.6568627450980392,
+        "angle": 1.188235294117647,
+        "box_progress": 0.0
+      }
+    ],
+    "push": [
+      {
+        "motion_id": 0,
+        "time": 0.5666666962206364,
+        "phase": 0.04644808743169399,
+        "angle": 0.0,
+        "box_progress": 0.03948087431693989
+      },
+      {
+        "motion_id": 0,
+        "time": 0.7000000365078449,
+        "phase": 0.05737704918032787,
+        "angle": 0.0,
+        "box_progress": 0.048770491803278686
+      },
+      {
+        "motion_id": 0,
+        "time": 0.8333333767950535,
+        "phase": 0.06830601092896176,
+        "angle": 0.0,
+        "box_progress": 0.05806010928961749
+      },
+      {
+        "motion_id": 0,
+        "time": 0.966666717082262,
+        "phase": 0.07923497267759563,
+        "angle": 0.0,
+        "box_progress": 0.06734972677595628
+      },
+      {
+        "motion_id": 0,
+        "time": 1.1000000573694706,
+        "phase": 0.09016393442622951,
+        "angle": 0.0,
+        "box_progress": 0.07663934426229509
+      },
+      {
+        "motion_id": 0,
+        "time": 1.2333333976566792,
+        "phase": 0.10109289617486339,
+        "angle": 0.0,
+        "box_progress": 0.08592896174863388
+      },
+      {
+        "motion_id": 0,
+        "time": 1.3666667379438877,
+        "phase": 0.11202185792349727,
+        "angle": 0.0,
+        "box_progress": 0.09521857923497268
+      },
+      {
+        "motion_id": 0,
+        "time": 1.5000000782310963,
+        "phase": 0.12295081967213115,
+        "angle": 0.0,
+        "box_progress": 0.10450819672131147
+      },
+      {
+        "motion_id": 0,
+        "time": 1.6333334185183048,
+        "phase": 0.13387978142076504,
+        "angle": 0.0,
+        "box_progress": 0.11379781420765028
+      },
+      {
+        "motion_id": 0,
+        "time": 1.7666667588055134,
+        "phase": 0.1448087431693989,
+        "angle": 0.0,
+        "box_progress": 0.12308743169398906
+      },
+      {
+        "motion_id": 0,
+        "time": 1.900000099092722,
+        "phase": 0.1557377049180328,
+        "angle": 0.0,
+        "box_progress": 0.13237704918032786
+      },
+      {
+        "motion_id": 0,
+        "time": 2.0333334393799305,
+        "phase": 0.16666666666666666,
+        "angle": 0.0,
+        "box_progress": 0.14166666666666666
+      },
+      {
+        "motion_id": 0,
+        "time": 2.166666779667139,
+        "phase": 0.17759562841530055,
+        "angle": 0.0,
+        "box_progress": 0.15095628415300547
+      },
+      {
+        "motion_id": 0,
+        "time": 2.3000001199543476,
+        "phase": 0.1885245901639344,
+        "angle": 0.0,
+        "box_progress": 0.16024590163934424
+      },
+      {
+        "motion_id": 0,
+        "time": 4.166666883975267,
+        "phase": 0.34153005464480873,
+        "angle": 0.0,
+        "box_progress": 0.2903005464480874
+      },
+      {
+        "motion_id": 0,
+        "time": 4.300000224262476,
+        "phase": 0.3524590163934426,
+        "angle": 0.0,
+        "box_progress": 0.2995901639344262
+      },
+      {
+        "motion_id": 0,
+        "time": 4.83333358541131,
+        "phase": 0.39617486338797814,
+        "angle": 0.0,
+        "box_progress": 0.33674863387978143
+      },
+      {
+        "motion_id": 0,
+        "time": 4.966666925698519,
+        "phase": 0.40710382513661203,
+        "angle": 0.0,
+        "box_progress": 0.3460382513661202
+      },
+      {
+        "motion_id": 0,
+        "time": 5.100000265985727,
+        "phase": 0.4180327868852459,
+        "angle": 0.0,
+        "box_progress": 0.35532786885245904
+      },
+      {
+        "motion_id": 0,
+        "time": 5.366666946560144,
+        "phase": 0.43989071038251365,
+        "angle": 0.0,
+        "box_progress": 0.3739071038251366
+      },
+      {
+        "motion_id": 0,
+        "time": 5.500000286847353,
+        "phase": 0.45081967213114754,
+        "angle": 0.0,
+        "box_progress": 0.3831967213114754
+      },
+      {
+        "motion_id": 0,
+        "time": 5.76666696742177,
+        "phase": 0.4726775956284153,
+        "angle": 0.0,
+        "box_progress": 0.401775956284153
+      },
+      {
+        "motion_id": 0,
+        "time": 5.900000307708979,
+        "phase": 0.48360655737704916,
+        "angle": 0.0,
+        "box_progress": 0.4110655737704918
+      },
+      {
+        "motion_id": 0,
+        "time": 6.70000034943223,
+        "phase": 0.5491803278688525,
+        "angle": 0.0,
+        "box_progress": 0.4668032786885246
+      },
+      {
+        "motion_id": 0,
+        "time": 6.8333336897194386,
+        "phase": 0.5601092896174863,
+        "angle": 0.0,
+        "box_progress": 0.47609289617486333
+      },
+      {
+        "motion_id": 0,
+        "time": 7.63333373144269,
+        "phase": 0.6256830601092896,
+        "angle": 0.0,
+        "box_progress": 0.5318306010928961
+      },
+      {
+        "motion_id": 0,
+        "time": 7.7666670717298985,
+        "phase": 0.6366120218579235,
+        "angle": 0.0,
+        "box_progress": 0.541120218579235
+      },
+      {
+        "motion_id": 0,
+        "time": 8.56666711345315,
+        "phase": 0.7021857923497268,
+        "angle": 0.0,
+        "box_progress": 0.5968579234972677
+      },
+      {
+        "motion_id": 0,
+        "time": 8.700000453740358,
+        "phase": 0.7131147540983607,
+        "angle": 0.0,
+        "box_progress": 0.6061475409836066
+      },
+      {
+        "motion_id": 0,
+        "time": 11.100000578910112,
+        "phase": 0.9098360655737705,
+        "angle": 0.0,
+        "box_progress": 0.773360655737705
+      },
+      {
+        "motion_id": 0,
+        "time": 11.36666725948453,
+        "phase": 0.9316939890710383,
+        "angle": 0.0,
+        "box_progress": 0.7919398907103825
+      },
+      {
+        "motion_id": 1,
+        "time": 0.6666667014360428,
+        "phase": 0.05698005698005698,
+        "angle": 0.0,
+        "box_progress": 0.04843304843304843
+      },
+      {
+        "motion_id": 1,
+        "time": 0.8000000417232513,
+        "phase": 0.06837606837606838,
+        "angle": 0.0,
+        "box_progress": 0.05811965811965812
+      },
+      {
+        "motion_id": 1,
+        "time": 0.9333333820104599,
+        "phase": 0.07977207977207977,
+        "angle": 0.0,
+        "box_progress": 0.0678062678062678
+      },
+      {
+        "motion_id": 1,
+        "time": 1.0666667222976685,
+        "phase": 0.09116809116809117,
+        "angle": 0.0,
+        "box_progress": 0.07749287749287749
+      },
+      {
+        "motion_id": 1,
+        "time": 1.200000062584877,
+        "phase": 0.10256410256410256,
+        "angle": 0.0,
+        "box_progress": 0.08717948717948718
+      },
+      {
+        "motion_id": 1,
+        "time": 1.3333334028720856,
+        "phase": 0.11396011396011396,
+        "angle": 0.0,
+        "box_progress": 0.09686609686609686
+      },
+      {
+        "motion_id": 1,
+        "time": 1.4666667431592941,
+        "phase": 0.12535612535612536,
+        "angle": 0.0,
+        "box_progress": 0.10655270655270656
+      },
+      {
+        "motion_id": 1,
+        "time": 1.6000000834465027,
+        "phase": 0.13675213675213677,
+        "angle": 0.0,
+        "box_progress": 0.11623931623931624
+      },
+      {
+        "motion_id": 1,
+        "time": 1.7333334237337112,
+        "phase": 0.14814814814814814,
+        "angle": 0.0,
+        "box_progress": 0.1259259259259259
+      },
+      {
+        "motion_id": 1,
+        "time": 1.8666667640209198,
+        "phase": 0.15954415954415954,
+        "angle": 0.0,
+        "box_progress": 0.1356125356125356
+      },
+      {
+        "motion_id": 1,
+        "time": 2.0000001043081284,
+        "phase": 0.17094017094017094,
+        "angle": 0.0,
+        "box_progress": 0.1452991452991453
+      },
+      {
+        "motion_id": 1,
+        "time": 2.133333444595337,
+        "phase": 0.18233618233618235,
+        "angle": 0.0,
+        "box_progress": 0.15498575498575498
+      },
+      {
+        "motion_id": 1,
+        "time": 2.2666667848825455,
+        "phase": 0.19373219373219372,
+        "angle": 0.0,
+        "box_progress": 0.16467236467236465
+      },
+      {
+        "motion_id": 1,
+        "time": 2.400000125169754,
+        "phase": 0.20512820512820512,
+        "angle": 0.0,
+        "box_progress": 0.17435897435897435
+      },
+      {
+        "motion_id": 1,
+        "time": 2.5333334654569626,
+        "phase": 0.21652421652421652,
+        "angle": 0.0,
+        "box_progress": 0.18404558404558405
+      },
+      {
+        "motion_id": 1,
+        "time": 2.666666805744171,
+        "phase": 0.22792022792022792,
+        "angle": 0.0,
+        "box_progress": 0.19373219373219372
+      },
+      {
+        "motion_id": 1,
+        "time": 2.8000001460313797,
+        "phase": 0.23931623931623933,
+        "angle": 0.0,
+        "box_progress": 0.20341880341880342
+      },
+      {
+        "motion_id": 1,
+        "time": 2.9333334863185883,
+        "phase": 0.25071225071225073,
+        "angle": 0.0,
+        "box_progress": 0.21310541310541312
+      },
+      {
+        "motion_id": 1,
+        "time": 3.066666826605797,
+        "phase": 0.2621082621082621,
+        "angle": 0.0,
+        "box_progress": 0.2227920227920228
+      },
+      {
+        "motion_id": 1,
+        "time": 3.2000001668930054,
+        "phase": 0.27350427350427353,
+        "angle": 0.0,
+        "box_progress": 0.23247863247863249
+      },
+      {
+        "motion_id": 1,
+        "time": 3.333333507180214,
+        "phase": 0.2849002849002849,
+        "angle": 0.0,
+        "box_progress": 0.24216524216524216
+      },
+      {
+        "motion_id": 1,
+        "time": 3.4666668474674225,
+        "phase": 0.2962962962962963,
+        "angle": 0.0,
+        "box_progress": 0.2518518518518518
+      },
+      {
+        "motion_id": 1,
+        "time": 3.600000187754631,
+        "phase": 0.3076923076923077,
+        "angle": 0.0,
+        "box_progress": 0.26153846153846155
+      },
+      {
+        "motion_id": 1,
+        "time": 3.7333335280418396,
+        "phase": 0.3190883190883191,
+        "angle": 0.0,
+        "box_progress": 0.2712250712250712
+      },
+      {
+        "motion_id": 1,
+        "time": 3.866666868329048,
+        "phase": 0.33048433048433046,
+        "angle": 0.0,
+        "box_progress": 0.2809116809116809
+      },
+      {
+        "motion_id": 1,
+        "time": 4.000000208616257,
+        "phase": 0.3418803418803419,
+        "angle": 0.0,
+        "box_progress": 0.2905982905982906
+      },
+      {
+        "motion_id": 1,
+        "time": 4.133333548903465,
+        "phase": 0.35327635327635326,
+        "angle": 0.0,
+        "box_progress": 0.3002849002849003
+      },
+      {
+        "motion_id": 1,
+        "time": 4.266666889190674,
+        "phase": 0.3646723646723647,
+        "angle": 0.0,
+        "box_progress": 0.30997150997150996
+      },
+      {
+        "motion_id": 1,
+        "time": 4.400000229477882,
+        "phase": 0.37606837606837606,
+        "angle": 0.0,
+        "box_progress": 0.31965811965811963
+      },
+      {
+        "motion_id": 1,
+        "time": 4.533333569765091,
+        "phase": 0.38746438746438744,
+        "angle": 0.0,
+        "box_progress": 0.3293447293447293
+      },
+      {
+        "motion_id": 1,
+        "time": 4.6666669100522995,
+        "phase": 0.39886039886039887,
+        "angle": 0.0,
+        "box_progress": 0.33903133903133903
+      },
+      {
+        "motion_id": 1,
+        "time": 4.800000250339508,
+        "phase": 0.41025641025641024,
+        "angle": 0.0,
+        "box_progress": 0.3487179487179487
+      },
+      {
+        "motion_id": 1,
+        "time": 4.933333590626717,
+        "phase": 0.42165242165242167,
+        "angle": 0.0,
+        "box_progress": 0.3584045584045584
+      },
+      {
+        "motion_id": 1,
+        "time": 5.066666930913925,
+        "phase": 0.43304843304843305,
+        "angle": 0.0,
+        "box_progress": 0.3680911680911681
+      },
+      {
+        "motion_id": 1,
+        "time": 5.200000271201134,
+        "phase": 0.4444444444444444,
+        "angle": 0.0,
+        "box_progress": 0.37777777777777777
+      },
+      {
+        "motion_id": 1,
+        "time": 5.333333611488342,
+        "phase": 0.45584045584045585,
+        "angle": 0.0,
+        "box_progress": 0.38746438746438744
+      },
+      {
+        "motion_id": 1,
+        "time": 5.466666951775551,
+        "phase": 0.4672364672364672,
+        "angle": 0.0,
+        "box_progress": 0.3971509971509971
+      },
+      {
+        "motion_id": 1,
+        "time": 5.600000292062759,
+        "phase": 0.47863247863247865,
+        "angle": 0.0,
+        "box_progress": 0.40683760683760684
+      },
+      {
+        "motion_id": 1,
+        "time": 5.733333632349968,
+        "phase": 0.49002849002849,
+        "angle": 0.0,
+        "box_progress": 0.4165242165242165
+      },
+      {
+        "motion_id": 1,
+        "time": 5.8666669726371765,
+        "phase": 0.5014245014245015,
+        "angle": 0.0,
+        "box_progress": 0.42621082621082623
+      },
+      {
+        "motion_id": 1,
+        "time": 6.000000312924385,
+        "phase": 0.5128205128205128,
+        "angle": 0.0,
+        "box_progress": 0.43589743589743585
+      },
+      {
+        "motion_id": 1,
+        "time": 6.133333653211594,
+        "phase": 0.5242165242165242,
+        "angle": 0.0,
+        "box_progress": 0.4455840455840456
+      },
+      {
+        "motion_id": 1,
+        "time": 6.266666993498802,
+        "phase": 0.5356125356125356,
+        "angle": 0.0,
+        "box_progress": 0.4552706552706553
+      },
+      {
+        "motion_id": 1,
+        "time": 6.400000333786011,
+        "phase": 0.5470085470085471,
+        "angle": 0.0,
+        "box_progress": 0.46495726495726497
+      },
+      {
+        "motion_id": 1,
+        "time": 6.533333674073219,
+        "phase": 0.5584045584045584,
+        "angle": 0.0,
+        "box_progress": 0.4746438746438746
+      },
+      {
+        "motion_id": 1,
+        "time": 6.666667014360428,
+        "phase": 0.5698005698005698,
+        "angle": 0.0,
+        "box_progress": 0.4843304843304843
+      },
+      {
+        "motion_id": 1,
+        "time": 6.800000354647636,
+        "phase": 0.5811965811965812,
+        "angle": 0.0,
+        "box_progress": 0.49401709401709404
+      },
+      {
+        "motion_id": 1,
+        "time": 6.933333694934845,
+        "phase": 0.5925925925925926,
+        "angle": 0.0,
+        "box_progress": 0.5037037037037037
+      },
+      {
+        "motion_id": 1,
+        "time": 7.200000375509262,
+        "phase": 0.6153846153846154,
+        "angle": 0.0,
+        "box_progress": 0.5230769230769231
+      },
+      {
+        "motion_id": 1,
+        "time": 7.333333715796471,
+        "phase": 0.6267806267806267,
+        "angle": 0.0,
+        "box_progress": 0.5327635327635327
+      },
+      {
+        "motion_id": 1,
+        "time": 7.466667056083679,
+        "phase": 0.6381766381766382,
+        "angle": 0.0,
+        "box_progress": 0.5424501424501424
+      },
+      {
+        "motion_id": 1,
+        "time": 7.733333736658096,
+        "phase": 0.6609686609686609,
+        "angle": 0.0,
+        "box_progress": 0.5618233618233618
+      },
+      {
+        "motion_id": 1,
+        "time": 7.866667076945305,
+        "phase": 0.6723646723646723,
+        "angle": 0.0,
+        "box_progress": 0.5715099715099715
+      },
+      {
+        "motion_id": 1,
+        "time": 8.000000417232513,
+        "phase": 0.6837606837606838,
+        "angle": 0.0,
+        "box_progress": 0.5811965811965812
+      },
+      {
+        "motion_id": 1,
+        "time": 8.26666709780693,
+        "phase": 0.7065527065527065,
+        "angle": 0.0,
+        "box_progress": 0.6005698005698006
+      },
+      {
+        "motion_id": 1,
+        "time": 9.066667139530182,
+        "phase": 0.7749287749287749,
+        "angle": 0.0,
+        "box_progress": 0.6586894586894586
+      },
+      {
+        "motion_id": 1,
+        "time": 10.000000521540642,
+        "phase": 0.8547008547008547,
+        "angle": 0.0,
+        "box_progress": 0.7264957264957265
+      },
+      {
+        "motion_id": 1,
+        "time": 10.666667222976685,
+        "phase": 0.9116809116809117,
+        "angle": 0.0,
+        "box_progress": 0.7749287749287749
+      },
+      {
+        "motion_id": 1,
+        "time": 11.600000604987144,
+        "phase": 0.9914529914529915,
+        "angle": 0.0,
+        "box_progress": 0.8427350427350427
+      }
+    ]
+  },
+  "screened_skills": [
+    "doorOpen",
+    "push"
+  ],
+  "screen_device": "cpu",
+  "notes": "Object trajectories are geometric proxies, not measured BONES states. PD screen verifies short pose stability/foot support/hand proximity, not policy success or sustained manipulation.",
+  "reuse_provenance": {
+    "source_bank": "tokenhsi/data/push_toy_midpoint_2m_rsi_bank.json",
+    "source_sha256": "b90a05df25205f4feabd7754c640b4c30c1aad1c4e527737b0b4222af5d49322",
+    "reason": "Same motions, geometry, reset and physical PD screen; only independent edge reward changed. Candidates reused without rescreening."
+  },
+  "reuse": {
+    "source": "tokenhsi/data/push_toy_only_random_scene_at_rsi_bank.json",
+    "source_sha256": "29c3ee656992fbd6742efbd18c8808618240ffb092d831f9d63d31008d18ad4b",
+    "reason": "Same box physics, humanoid assets, motions and local hand alignment. Random goals and 10deg PUSH reward threshold checked separately; PD candidates not rescreened."
+  },
+  "goal_reference_update": {
+    "previous_bank_sha256": "82ecb9f075190634f156f489cec0faf0214367a41e8921381395c43de4f638c3",
+    "reason": "Only PUSH reward hand reference changed to current goal-opposite XY surface. Physics, reference alignment and PD candidates unchanged; no rescreen performed."
+  },
+  "goal_rear_rsi_update": {
+    "previous_sha256": "3dc223c9baaebe00a57dc4ee2a680177dbd5a5d0e6a22fc66bec52ad2a52c618",
+    "candidates_preserved": true,
+    "rescreened": false,
+    "alignment": "goal_opposite_surface_xy_v1"
+  },
+  "at_success_tilt_reuse": {
+    "source": "tokenhsi/data/push_toy_random_at_10deg_rsi_bank.json",
+    "source_sha256": "04a1d1e2001e922ddeabbb5322bdb4045a2be870bdc5865a389d3465997a2a5b",
+    "candidate_rescreened": false,
+    "change": "AT success <=10deg only; no AT state/progress shaping; PUSH tilt disabled"
+  }
+}

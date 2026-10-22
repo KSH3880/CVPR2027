@@ -1,3 +1,7 @@
+> **Partial Joint Push Stage2**는 [PARTIAL_KOO_1021.md](PARTIAL_KOO_1021.md)와 `scripts/koo_partial_train.sh`를 사용한다. `koo_1021_train.sh`는 Stage1 재개 전용이다.
+
+> 최신 `koo_1021`의 **Stage1BasePush(2명·4상자)** 준비는 [KOO_1021.md](KOO_1021.md)를 참조한다. 아래 NativePhaseY2m과 checkpoint 계약이 다르다.
+
 # PushNativePhaseY2m 재현
 
 `juan` 브랜치에서 사용하는 Koo Stage1 Native PUSH Y2m 재현 패키지다. 소스는 `koo_1021`의 커밋 `c3b71cf9149db5304dc2ae74bf30ace01eb61e93`에서 가져왔다. `ports/koo_native_y2m/`의 소스·YAML·RSI bank·asset은 원본 그대로 보존한다. `source_manifest.json`으로 원본 768개 파일의 무결성을 확인한다. 외부 KSH/Koo 디렉터리는 수정하지 않는다.

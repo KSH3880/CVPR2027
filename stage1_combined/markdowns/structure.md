@@ -152,3 +152,7 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 - `learning/multi_agent/chair_ft_{network,agent}.py`: PointNet 토크나이저/전이/동결 검증.
 - `chair_assets/catalog.json`: train49/test26 의자와 주변 테이블 descriptor.
 - 상위 [README.md](../../README.md): 실행/검증/파일럿 정보.
+
+`../evaluation/climb_mixed/`: 원본 category-balanced CLIMB 혼합 샘플링, metadata 목표, 두 frozen 정책 paired 평가 런처. 에셋과 실제 평가 backend/산출물은 프로젝트 runs/climb_mixed_eval_20261022/에 준비.
+
+현재 기본 물체 평가는 `../evaluation/object_comparison/`의 종류별 독립 SIT/CLIMB 비교다. `climb_mixed/`는 이전 혼합 방식 코드로 보존한다.

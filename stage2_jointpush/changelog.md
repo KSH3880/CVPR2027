@@ -2,6 +2,37 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-22
+
+### koo_1021 Stage1BasePush 기반 Partial Joint Push Stage2 실행
+
+- 요청을 Stage1 resume로 잘못 해석해 실행한 자체 프로세스만 사용자 정정에 따라 종료했다. 업로드7500회 Stage1의165tensor/RMS를 복사하고 새 coordination104tensor를 identity 초기화하는 전용 Partial Stage2를 추가했다. actor encoder/RMS 동결, 새 optimizer/epoch0,4명·2048환경·8object token·24physics bank, 기존 partial 분할·보상/CPA0.5·Y1.8·loco RSI·원본 conditional AMP(PUSH family/loco50+push50)를 유지한다. source는 process-local adapter로 연결하며 원본 파일은 수정하지 않는다.
+- 첫2048환경 시작에서 다른 상자에 더 가까운 spawn이 검증에 걸려 optimizer 전에 종료됐다. 그룹 배정을 유지하며 모호한 surround 후보만 재추출하도록 local adapter를 보완했다. CPU128환경24step finite 통과 후 GPU5 재실행, coordination gradient229.81·2epoch 후 encoder/RMS불변/coordination변화·startup checkpoint 저장을 확인했다. 기존 GPU5 학습/MPS PID 생존, 총사용약57GiB/여유40GiB. 현재 실제 실행은 runs/jointpush/koo_partial_stage2_20261022/latest_training.json 참조. viewer GUI는 미검증이다.
+
+### Stage1BasePush 7500회 GPU5 resume 실행
+
+- 업로드된 Stage1BasePush_00007500.pth의 CPU 학습 계약 통과 후 GPU5 공유 MPS 실행을 시작했다. 로컬 runtime의 명시적 공유 opt-in은 여유32GiB·기존 Python1개/MPS server1개·MPS pipe 확인을 모두 요구하며 기본 점유GPU 차단은 유지한다. 외부 source/기존 학습/MPS daemon은 변경하지 않는다.
+- prepare의 상대 checkpoint 경로를 source 검사에서 cwd가 바뀌기 전에 절대경로로 고정했다. 전용 tmux·로그·실행설정은 runs/jointpush/koo_1021/latest_training.json 참조. TensorBoard info/epochs=7506과 finite 학습 지표를 확인했으며 GPU5 약43GiB/여유54GiB, 기존 학습 PID 생존을 확인했다.
+
+### koo_1021 Stage1BasePush 독립 실행 준비
+
+- 사용자 확인에 따라 koo_1021/ec09d71의 Stage1BasePush를 `jointpush/ports/koo_1021`에 별도로 준비했다. 기존 Native Y2m과 KSH partial adapter 및 외부 원본은 유지한다. 업로드는 `jointpush/checkpoints/koo_1021/Stage1BasePush.pth`, 전용 prepare/train/test/VNC와 CPU contract 검사를 제공한다.
+- 원본 학습 점유GPU 차단·2048환경·MPS 탐색을 유지하고 로컬 wrapper만 output을 runs/jointpush/koo_1021로 분리한다. CPU 원본 회귀11개·991개 source 항목/634D·1330D·949후보 bank 계약·셸 문법·diff 검사 통과, 누락 checkpoint의 GPU 실행 전 거부를 확인했다. checkpoint 업로드 전이며 strict restore/학습/GPU/viewer는 실행하지 않았다. 세부 검증 보고서는 runs/jointpush/koo_1021/preparation.json과 jointpush/KOO_1021.md를 참조한다.
+
+### KSH Partial 초기 거리 원본 정렬
+
+- 사용자 요청으로 전용 prepare의 spawn_distance를1~5m로 변경했다. 구역별 양손 point 접촉 보상과 goal2~6m는 유지한다. 설정 생성 후 값 확인. 실행 중6093 viewer는 변경 전 초기화 설정을 메모리에 유지하며 다음 실행부터 적용된다.
+
+### Partial Joint Push 할당 관계 표시
+
+- 사람별 색상으로 담당 분할 구역의 상단 테두리와 사람→구역 연결선을 표시한다. 실제 물리 box pose와 reset 시 확정된 구역 배정을 사용하며 관측·정책·보상은 바꾸지 않는다. GPU6/6093 표시용 viewer에서 추론·실제 구역 테두리/연결선 렌더링을 확인했다. 사용자 지시에 따라 기존6092 viewer와 전용VNC를 종료하고6093만 유지한다. Python 구문·diff 검사 통과, optimizer0.
+
+### KSH Depth180 9000 체크포인트 Partial Joint Push viewer
+
+- 지정 FiveTaskDepth18020kg_00009000 체크포인트를 별도 읽기 전용 KSH source adapter로 연결했다. 기존 Koo OPEN/PUSH 모델과 task/object/AMP 관측 규격이 달라 단순 경로 교체 대신 KSH 원래 표현과 normalizer를 유지한다. Stage1 tensor165개를 복사하고 새 coordination tensor104개는 identity 초기화한다.
+- 기존 partial surround/CPA0.5 설정에서 Y만1.8m로 고정한다. 4인, coupled80%/NONE20%, 그룹 n에 따른 X=n×U(1,1.3), Z1.2~1.5m, aligned goal2~6m를 유지한다. 외부 source/checkpoint 수정은 없다. 이번 진입점은 test/eval 전용이며 학습 실행은 거부한다.
+- GPU6에서2환경16step 추론 통과, finite/관측1272/8토큰/24actor/Y1.8/가중치 불변/optimizer0 확인. GPU6의1환경 viewer도 렌더링·추론·화면 캡처 확인. 첫 shim 없는 실행은 CUDA context 오류로 실패했으며 runtime shim 적용 후 해결했다. 기록: `runs/jointpush/ksh_partition_depth180_9000_20261022/`.
+
 ## 2026-10-21
 
 ### 원본 Koo 4인 OPEN/PUSH 혼합 attention PNG

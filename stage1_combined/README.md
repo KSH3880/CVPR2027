@@ -7,4 +7,6 @@
 학습·추론 명령: [markdowns/config.md](markdowns/config.md).
 의자/주변 테이블 에셋과 초기 체크포인트는 이 폴더에 실제 복사. 공용 motion/SMPL 데이터와 IsaacGym/conda는 기존 공유 경로를 사용. ksh 및 baseline 수정 없음.
 
-현재 실행 중인 학습은 안전하게 기존 runs 경로에서 계속 동작한다. [실행 기록](../runs/chair_bbox_ft_20261022/active_run.json). 이 폴더에서 중복 학습은 시작하지 않았다. 이후 실행은 이 폴더 기준.
+기존 GPU5 의자 토크나이저 학습은 사용자 요청으로 종료했고 체크포인트·로그를 보존했다. [실행 기록](../runs/chair_bbox_ft_20261022/active_run.json). 이 폴더에서 중복 학습은 시작하지 않았다. 이후 실행은 이 폴더 기준.
+
+물체 종류별 기본 평가: [Box/Chair/Cabinet/Table 독립 SIT·CLIMB 비교](evaluation/object_comparison/README.md). Box는 원본 TokenHSI 테스트18 크기를 사용한다.

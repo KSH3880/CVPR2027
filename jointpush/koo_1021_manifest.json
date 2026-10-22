@@ -1,0 +1,2981 @@
+{
+  "branch": "koo_1021",
+  "commit": "ec09d71994ef48e9d7cd4bf17264e8183274da51",
+  "base_source_manifest": "source_manifest.json",
+  "profile": "stage1_base_push",
+  "files": {
+    "LICENSE": {
+      "sha256": "d0d188f5b08ec03da7fdd0371f39d274e4de5b2f82f68b77ed4aa1bc817c0f11"
+    },
+    "body_models/model_loader.py": {
+      "sha256": "abfee48462d8f793bfa9a01964949672bbf93abc8aefdb23bfddcdc3a56a080d"
+    },
+    "lpanlib/isaacgym_utils/joint_monkey.py": {
+      "sha256": "e239cc0cc549f0fec64ee1f3628c8486f92a83f9213ec3bf539234cda3de26b4"
+    },
+    "lpanlib/isaacgym_utils/vis/api.py": {
+      "sha256": "aa38e5703f8585762f8ddbd2d1f8f03eefa26778c91112b607823047af400f1d"
+    },
+    "lpanlib/isaacgym_utils/vis/data/plane_y_up.obj": {
+      "sha256": "8f888d207c0e1a2618419c04beca196107685d34ba2f7809e5faa2612ee8cf99"
+    },
+    "lpanlib/isaacgym_utils/vis/data/plane_z_up.obj": {
+      "sha256": "8571ec79f0e0abdcca806b58f4af9b5932b8be0653cc3805c0552532443beaa3"
+    },
+    "lpanlib/isaacgym_utils/vis/utils/body_builder.py": {
+      "sha256": "4a4ebe02f318e11a5187b122b31fd0083fb4c6bf4e4835a1123fa865d9befc90"
+    },
+    "lpanlib/isaacgym_utils/vis/utils/sp_animation.py": {
+      "sha256": "3fe94bf941ced1d6ee1f1c087f5a1360a016f8256436a256ce80b720c466dae1"
+    },
+    "lpanlib/isaacgym_utils/vis/utils/xml_parser.py": {
+      "sha256": "9ff0b8cf1b8166f5d45bd5d22a95bdd0f575be94abd38031bad51e762fca7377"
+    },
+    "lpanlib/others/colors.py": {
+      "sha256": "fb52fc6adf2223503f4fc4917d949e3982a2d4b879b471a67d8576e1e094a7f9"
+    },
+    "lpanlib/others/video.py": {
+      "sha256": "417f9b3a2ff90683230225f94861ec46e937369231c52ba4d4168737edd47d02"
+    },
+    "lpanlib/poselib/__init__.py": {
+      "sha256": "18ce45a88ddb9502ee84c2bd80295bce410618920fcfb4b89a93021a7db3fac0"
+    },
+    "lpanlib/poselib/core/__init__.py": {
+      "sha256": "8f9b40e15e49814c7d667fae8af58972da336bdbc699cd0f0d9f498e4c5e258c"
+    },
+    "lpanlib/poselib/core/backend/__init__.py": {
+      "sha256": "73e67af6fb090b3abd7f40a1140c9655e8507110021103269a2fcb3e9faa3e05"
+    },
+    "lpanlib/poselib/core/backend/abstract.py": {
+      "sha256": "ae98c096f1d452e57d33eeb53b963a2e804440b1a609f4921f362d060193ae49"
+    },
+    "lpanlib/poselib/core/backend/logger.py": {
+      "sha256": "6a8dd1dc63dfd5b06762760fe588b2a3b61fb12518edf54b872579bf410c080c"
+    },
+    "lpanlib/poselib/core/rotation3d.py": {
+      "sha256": "66049e0082db433c58f28ff24cea3a346630392f8bfb1bd68a8a965fa7a4df31"
+    },
+    "lpanlib/poselib/core/tensor_utils.py": {
+      "sha256": "af92d69d6b059997cdf9f724924dec78c5bc113915a9cbbf806dffe17ff752a5"
+    },
+    "lpanlib/poselib/core/tests/__init__.py": {
+      "sha256": "8dce5b7233c902f52621feba238c6305e82c3eda374ba8a294015fd242f041f6"
+    },
+    "lpanlib/poselib/core/tests/test_rotation.py": {
+      "sha256": "ff29924b8a16b051d5ce1e65eaf2089c4d2c2626719c4c0803caefaf1a4c2f42"
+    },
+    "lpanlib/poselib/skeleton/__init__.py": {
+      "sha256": "8dce5b7233c902f52621feba238c6305e82c3eda374ba8a294015fd242f041f6"
+    },
+    "lpanlib/poselib/skeleton/backend/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lpanlib/poselib/skeleton/backend/fbx/__init__.py": {
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    "lpanlib/poselib/skeleton/backend/fbx/fbx_backend.py": {
+      "sha256": "33d0944d40e19798fbc04da30dcaa8926f817b69349d71b3bead04c0ed86df4c"
+    },
+    "lpanlib/poselib/skeleton/backend/fbx/fbx_read_wrapper.py": {
+      "sha256": "0f709b8c8671c9a3408dc69eeb80087d7a3b810c781e5792946c8a9021ab6dbc"
+    },
+    "lpanlib/poselib/skeleton/skeleton3d.py": {
+      "sha256": "1db0944462b8f9dda86420c36e0f397a68e8d7073fda630e25219a974abedc5c"
+    },
+    "lpanlib/poselib/visualization/__init__.py": {
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    "lpanlib/poselib/visualization/common.py": {
+      "sha256": "5fbe1a33ced714a31a50fddc8e385c3521ac2c926299627fed226255b3596385"
+    },
+    "lpanlib/poselib/visualization/core.py": {
+      "sha256": "663c01a1bd123b86e3535741eec3621702cf0381dfa90418cc483416f65de271"
+    },
+    "lpanlib/poselib/visualization/plt_plotter.py": {
+      "sha256": "db13f6eeb09740e50a556f7f814dc33e9fc98e0112579bc9331dacd2c59acf99"
+    },
+    "lpanlib/poselib/visualization/simple_plotter_tasks.py": {
+      "sha256": "ba317a4d1090e73ce7966682513448e07b59673d9459eab3a10bf8dcb9a698af"
+    },
+    "lpanlib/poselib/visualization/skeleton_plotter_tasks.py": {
+      "sha256": "e59e59fbd07333be9e4ea54170f2a27d711586f4e7c3bdd9637f058449d2644c"
+    },
+    "lpanlib/poselib/visualization/tests/__init__.py": {
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    "lpanlib/poselib/visualization/tests/test_plotter.py": {
+      "sha256": "9c4dfe1b6a746b7ad6a5c26f21591afa4b698ddfe08afacd57d6eba797dc2186"
+    },
+    "mps/CODEX_SETUP.md": {
+      "sha256": "e355c6dea5dd39f886155ea70109ce91a911841da6ce84e5a1d369cc1da5b943"
+    },
+    "mps/README.md": {
+      "sha256": "1667121a0df92708cc4509f68f8803004fef43c856924a973185f7537ed0380e"
+    },
+    "mps/commands.md": {
+      "sha256": "a61fc56b1cdeea245004145621dd2d3ee9b4053a342c1d078d9d086fb323817f"
+    },
+    "mps/gpu4_gpu6_test.md": {
+      "sha256": "a285eedc9c85e8203bec2f1323725a93f303820607018ab8a5860373f09f9dfc"
+    },
+    "mps/heartbeat.py": {
+      "sha256": "40825de4636bbad24aecb34e2a2bab283e589d0e6a61b7140f4f40cb90eb59e4"
+    },
+    "mps/shell.sh": {
+      "sha256": "fca023a073454864e573239baedf0fd6ebd9011b1be9c984a0244ec4458f6fa9"
+    },
+    "mps/test_shell.py": {
+      "sha256": "5d82e0f65135238d9fc117a62dd8115acf18a5630381bcc1ced39ccb50d4ec8d"
+    },
+    "output": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/runs/jointpush/koo_1021/output"
+    },
+    "output_etc": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/runs/jointpush/koo_1021/output_etc"
+    },
+    "ports/stage1_base_push/LICENSE": {
+      "sha256": "d0d188f5b08ec03da7fdd0371f39d274e4de5b2f82f68b77ed4aa1bc817c0f11"
+    },
+    "ports/stage1_base_push/PORT_CHANGES.json": {
+      "sha256": "d197a1f148c7e7a0f81dce7015b1a20ceec2ccac7b530b1ca22d040cde4cf6a7"
+    },
+    "ports/stage1_base_push/README.md": {
+      "sha256": "b30a8d4d0009816e1ecb9db8c1036917d8cba45dec0709f9b3a09332ae3d4817"
+    },
+    "ports/stage1_base_push/UPSTREAM.json": {
+      "sha256": "3fc00b6f862a69b9c242e19bb27101eba63def3234c9c8bc710ca56169717639"
+    },
+    "ports/stage1_base_push/body_models": {
+      "symlink": "../../body_models"
+    },
+    "ports/stage1_base_push/check_player.py": {
+      "sha256": "75d5533e4ad43d31e559bbe5b4b0a94c41f6e3c8dce2e9b5eaf4ce487460bc6a"
+    },
+    "ports/stage1_base_push/check_scene.py": {
+      "sha256": "674343706cada74f30ce15f5311ac661bb3a6b9fef94b537321b556a8afdd62a"
+    },
+    "ports/stage1_base_push/lpanlib": {
+      "symlink": "../../lpanlib"
+    },
+    "ports/stage1_base_push/preflight.py": {
+      "sha256": "9c69c43f966af628bc1b0d8536e304a8f306981956d9731d71cdef282c651cb7"
+    },
+    "ports/stage1_base_push/tokenhsi/data/assets": {
+      "symlink": "../../../../tokenhsi/data/assets"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/push_native_phase_y2m.yaml": {
+      "sha256": "f580287dc266ff9ddeee8d53de7ce3ac702cf457fc02c93a14802f8dd01ccbe1"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1.yaml": {
+      "sha256": "f040c6a735cd5ca3fd7419c77bfeaf88934addc602e51704cb30d76569e1c73e"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_base_push.yaml": {
+      "sha256": "05bac33512f624f2ae98a7ce81d89fc87a44879512432e7eca13b514636046fc"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_v2.yaml": {
+      "sha256": "308dfa2bdc4438f4238e985094b5f011d7bbf4b91729d82911b02577c0ef6d85"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml": {
+      "sha256": "87afdd9d51b71e4935334366e8f5d24e4d0e4841343cc484f2adebeb80ac6b36"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/train/rlg/stage1.yaml": {
+      "sha256": "6766a164327eb53ce390f3970f11ea09588f3e170a5dff82a5898a7d93fc07f2"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/train/rlg/stage1_base_push.yaml": {
+      "sha256": "4372ab16fd936c2ce434dd02c81356fe16722d080c92fa40f71d74e6039cd0d4"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/train/rlg/stage1_v2.yaml": {
+      "sha256": "6766a164327eb53ce390f3970f11ea09588f3e170a5dff82a5898a7d93fc07f2"
+    },
+    "ports/stage1_base_push/tokenhsi/data/cfg/train/rlg/stage1_v2_fixed.yaml": {
+      "sha256": "b2c1106191200c9481efb857493f85d7da2430b32695f2fa49a97b4e8f6d6d88"
+    },
+    "ports/stage1_base_push/tokenhsi/data/data_utils.py": {
+      "symlink": "../../../../tokenhsi/data/data_utils.py"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_amass_climb": {
+      "symlink": "../../../../tokenhsi/data/dataset_amass_climb"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_amass_loco": {
+      "symlink": "../../../../tokenhsi/data/dataset_amass_loco"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_amass_loco_stairs": {
+      "symlink": "../../../../tokenhsi/data/dataset_amass_loco_stairs"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_bones_door": {
+      "symlink": "../../../../tokenhsi/data/dataset_bones_door"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_bones_push": {
+      "symlink": "../../../../tokenhsi/data/dataset_bones_push"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_bones_push_tokenhsi": {
+      "symlink": "../../../../tokenhsi/data/dataset_bones_push_tokenhsi"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_carry": {
+      "symlink": "../../../../tokenhsi/data/dataset_carry"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_cfg.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_cfg.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_door_bones_left.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_door_bones_left.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_door_loco.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_door_loco.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_door_proxy.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_door_proxy.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_dynamic_objects": {
+      "symlink": "../../../../tokenhsi/data/dataset_dynamic_objects"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_loco_sit_carry_climb.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_loco_sit_carry_climb.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_loco_sit_carry_no_climb.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_loco_sit_carry_no_climb.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_longterm_task_completion": {
+      "symlink": "../../../../tokenhsi/data/dataset_longterm_task_completion"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_open_push.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_open_push.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_push_native_phase_xy.yaml": {
+      "symlink": "../../../../tokenhsi/data/dataset_push_native_phase_xy.yaml"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_sit": {
+      "symlink": "../../../../tokenhsi/data/dataset_sit"
+    },
+    "ports/stage1_base_push/tokenhsi/data/dataset_stage1_base_push.yaml": {
+      "sha256": "76704fd8d5b87a9695080c7718be5a49e5826e67ebaecac9d32782197dedc1bc"
+    },
+    "ports/stage1_base_push/tokenhsi/data/open_push_late_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/open_push_late_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/open_push_late_rsi_cube_low_bank.json": {
+      "symlink": "../../../../tokenhsi/data/open_push_late_rsi_cube_low_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/open_push_late_rsi_h13_bank.json": {
+      "symlink": "../../../../tokenhsi/data/open_push_late_rsi_h13_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/open_push_late_rsi_two_hand_bank.json": {
+      "symlink": "../../../../tokenhsi/data/open_push_late_rsi_two_hand_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/open_toy_reference_close_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/open_toy_reference_close_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/open_toy_strong_close_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/open_toy_strong_close_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_contact_face_at_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_contact_face_at_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_contact_face_at_tilt_soft_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_contact_face_at_tilt_soft_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_native_phase_xy_2to5m_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_native_phase_xy_2to5m_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_native_phase_xy_forward_2to5m_no_clip7_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_native_phase_xy_forward_2to5m_no_clip7_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_native_phase_xy_forward_2to5m_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_native_phase_xy_forward_2to5m_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_native_phase_xy_grounded_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_native_phase_xy_grounded_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_native_phase_xy_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_native_phase_xy_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_native_phase_y2m_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_native_phase_y2m_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_soft_legacy40_at05_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_soft_legacy40_at05_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_contact_align_at_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_contact_align_at_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_midpoint_2m_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_midpoint_2m_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_only_random_scene_at_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_only_random_scene_at_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_random_at_10deg_at_grounded_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_random_at_10deg_at_grounded_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_random_at_10deg_at_state_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_random_at_10deg_at_state_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_random_at_10deg_at_success_tilt_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_random_at_10deg_at_success_tilt_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_random_at_10deg_at_tilt_soft_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_random_at_10deg_at_tilt_soft_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/push_toy_random_at_10deg_rsi_bank.json": {
+      "symlink": "../../../../tokenhsi/data/push_toy_random_at_10deg_rsi_bank.json"
+    },
+    "ports/stage1_base_push/tokenhsi/data/stage1_push_motion_data_20261020": {
+      "symlink": "../../../../tokenhsi/data/stage1_push_motion_data_20261020"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/__init__.py": {
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_box2objs.py": {
+      "sha256": "2e318d8602eafdf38a8f07e22cf82b130d145b28d8cd70b4a2d124823864a705"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_ground2terrain.py": {
+      "sha256": "0905fae47db9db5982a400ff433f543ab378e0d1f480cab163745daa34060d2c"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_traj_ground2terrain.py": {
+      "sha256": "9460995007c53c673d390924c508b6116abd18afe059db0d650d08daf277febc"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/base_task.py": {
+      "sha256": "d749f679cb94fe3001ed0242696cce586d8727fa684ad6336fdbd364712971d3"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py": {
+      "sha256": "6d942e993b76fe53af1595072c216daf775bc713613159971be0674539e3bf85"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py": {
+      "sha256": "3267ebc9896c3dabedbc4da5e7ecd1804e73b34ba5c73e72de2f37669cd9e1f3"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py": {
+      "sha256": "edc0f5be85c9ab43fbe1938f0792f5f264d9e455c3551aebfd36d018c6501df0"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_traj.py": {
+      "sha256": "61db1fb19e881df70b87c592c079c860c8f3d57a24314bc7eaaab6e376eab360"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_climb_carry.py": {
+      "sha256": "e3620cbf210b0c794a30e6179a093bcf3a6e73fa9cd94ad0be08091834f6cd0a"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_sit_carry.py": {
+      "sha256": "c5275bd8cf33f298c556cef627192b2567e2394297d74014de20ec1a735d7318"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_traj_carry.py": {
+      "sha256": "6904967f2333c522512209e91e2ac299ab59835fc43efba691e029a9610acbed"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/humanoid.py": {
+      "sha256": "07b3608ec87d8501b79a4c030cdf710d8457bc1025503c9cb4b211d38995c1b4"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/humanoid_amp.py": {
+      "sha256": "21a271b18827a1f11a577197f959c8ac71e6319a9b1a4a877834f49c3fa0fa74"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/longterm_task_completion/humanoid_longterm_4basicskills.py": {
+      "sha256": "19fca0c3ee200588621a0344ed3ca3120d4a3732797ff8aa6fce6a7e4a5d6680"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/collision_reward.py": {
+      "sha256": "c3db37e73ef2a42b9967e87849b965b66c7c45ee57f82d87f507107ab5cbcb11"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/edge_context_reward.py": {
+      "sha256": "d151c48ef8259a0539ef8f36b5be9bd7367749a86987582cd8efc170196a198d"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/edge_context_task.py": {
+      "sha256": "b96798212019ec942ae26b5f17134c37e7b21a82009774b85c611ae8be685b16"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py": {
+      "sha256": "9780af2f2838a3c8e899451340b5d73b1f5c747618c4764b3b75722abecc8e1f"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py": {
+      "sha256": "dfbc0270643b1cc8264e1d12d9431ecfe64391a5701009d058786d6191078ed8"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/edge_ontop_task.py": {
+      "sha256": "8e95ad7fbf0e1a1be2f0ecc4cd8f32def61168b08404f63a4518352c50d6342f"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py": {
+      "sha256": "60adaa5c8c9586e9cade03e4af1aa462ecc44c3ab9e20d3c43307b81b4652d2b"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/humanoid_ma.py": {
+      "sha256": "50198b4ed2a8e53fb035a4766d4f8b7021c2978b54f5d6f41b302c46d071c5df"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py": {
+      "sha256": "64f986d1c249bacacaebc91b2a312a5c1d18e3e50155bc42fa27abe272e1e817"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_shared_support.py": {
+      "sha256": "f12cb3576fa649bc433f632b87278e30ea24d5285f9807d5af7f2173c5bbea62"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_stage1_push.py": {
+      "sha256": "8bb8e8f0cf35716b91850b753cf629d47de851cc49ad5c8bc6a2b10699620de5"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2.py": {
+      "sha256": "1eeead2e93ed91968fab3cf5b51cf603145d6ad7218f60f9a59bfa687d737a3b"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/push_contact.py": {
+      "sha256": "7671246620b9c9efa33068d38764d590e6a0c07a97b517cafabb00c7780c8171"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/relation_diagnostics.py": {
+      "sha256": "c3e6dab6813f66ee321c02cf833c1e4b743baa7746447eea860f10857d9a6a98"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/relation_reward.py": {
+      "sha256": "21df5afe31fc05e2a2b25e2adce5d238461b0b8f8c0ff47183f525184c58d773"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/scene_features.py": {
+      "sha256": "cb86d1abfc4fb511440182d49dfdc62e251c5079be36a72c789842f4d67322fa"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/shared_support_reward.py": {
+      "sha256": "ced3fdfd3ca948ceefdafade3aacb6c318666c6394e838e86c3dacd1435dfefc"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/shared_support_scene.py": {
+      "sha256": "a386db92d77d4943016b54305d21f99040e78002e7c826f69b54ae4e720edbf2"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/size_rsi_cache.py": {
+      "sha256": "6e128eb10786399cc22972b6e957e78a206bfd1ae1cda3c6ff3743ef3c2077c8"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/stage1_push_reward.py": {
+      "sha256": "372607ee693c45a4d29f7dec058f453ed4529e5ea51f0cda84b568a11909fe2e"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/stage2_scene.py": {
+      "sha256": "840763da44d957f25776c2ae017495b86993a27228713656923cff61677d1aa5"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/stage2_solo_rsi_cache.py": {
+      "sha256": "47b1b3f5427f2ed86ca6e91278413a8a8546a9c145cebf93eb320342e86095e0"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_agent/vec_task_wrapper_ma.py": {
+      "sha256": "c1dd89b2eb5b70ce56ecd1426c58e10979d3a083307a9e77f602d67c8757878f"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/multi_task/humanoid_traj_sit_carry_climb.py": {
+      "sha256": "dde2f49d687a167e14fc0d47a33e171b70e65fe343c9ce4c2f12d36221b6c2c2"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/vec_task.py": {
+      "sha256": "33db038a7183fa74025fa6e11bbfbcaca54f10f72e52e97910196060f84000d2"
+    },
+    "ports/stage1_base_push/tokenhsi/env/tasks/vec_task_wrappers.py": {
+      "sha256": "be3001d8b341118c556d1ccdc9d91f5c4f8ba4edd31cabb8db63f1f015a3f4c2"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/amp_agent.py": {
+      "sha256": "b20fc99f97e14299ed8dc9f01cb4a04b9d650fd3ae86ea5c3e57084c74d557e8"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/amp_datasets.py": {
+      "sha256": "8e2802113413e9d88e31559c1b3b8b233ae1b6f4b6b9e82440eb0f0aa1eeebb7"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/amp_models.py": {
+      "sha256": "d92aa96243f8cd10b85b7dca4d11bdd8a67eb02a6242968b2253e260877097db"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/amp_network_builder.py": {
+      "sha256": "a51179a14690d50467e0161f1afdbe537c1670463d7a20782fe4687c19695d68"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/amp_players.py": {
+      "sha256": "ccc382cd71962d2fd3d1252ed9ac18d141289cd63b1579f1c40ca811d69c03f8"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/common_agent.py": {
+      "sha256": "8e90235fef14465040be1bad875fe9f3de69b94f391a2b788e1463ec99620187"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/common_player.py": {
+      "sha256": "bd37d2597217e9258dc6fad0a27500e1e7a26c8246643f1a7b5198a7d6199b45"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/amp_network_builder_ma.py": {
+      "sha256": "34e44484d021403406c4af32d4430a4c316c6da7d321bd79d271e7343191693d"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/edge_context_eval.py": {
+      "sha256": "3f5a25bb037727fd7e12b45a00ac3c7c715b025d66b1e84df9acd1c2c87ea8ea"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/grasp_view.py": {
+      "sha256": "91bc694e81e056ea83fc10fb3abd3c35753030e0bd4024864ec59176ba8c11dc"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/human_coordination.py": {
+      "sha256": "55a4a2cd9d81f62a3e9bd53e7f2773289a4adbf2f56d9370ff1a8a77253eda29"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/ma_agent.py": {
+      "sha256": "1aaff5c465732d8312aa502b2175f81f7cecd3e4497d75f0a6e5401fd16aacf8"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/ma_players.py": {
+      "sha256": "951ff0d9e90a6caababb81d7e46f553aeb6f85462b14dec7aadca4e9aefe963b"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/scene_normalizer.py": {
+      "sha256": "40085d119636e6b42e41f54e411f428761ecd73003b4c4b7e834de7866a6c976"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/shared_support_network.py": {
+      "sha256": "641b05f132c5da6f50c422e2c15bed9c4a0a522d83c14adbd13e628e2366ad24"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/stage2_network_builder.py": {
+      "sha256": "d84d3ad93b19c1e21094bf876d83dae1443f82196c649a4fbbbb03e5aad655b5"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/multi_agent/task_role_encoder.py": {
+      "sha256": "6aca26418b28f7857fc5c75ff2ca97c1dd17b5d27be29e34afa7af234c168fe4"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/replay_buffer.py": {
+      "sha256": "9f4097a1f3ea44d132d18dc0b72a9141051c093b193443e4e9bd578d28844a5c"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/amp_network_builder_transformer.py": {
+      "sha256": "efda485e1375fbb3d7a1f86bd182b2585861490e8a08f434b6dbfb4f515577f0"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/amp_network_builder_transformer_adapt.py": {
+      "sha256": "4dae24d8d42b31a8cda12791fc2f9abb8d69700be4c6f6d954f5662a3bb54890"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/amp_network_builder_transformer_comp.py": {
+      "sha256": "188f612865a4e39581d6be57eae19b6d7eeedb5b51bf19bcfc54176657f446b2"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/amp_network_builder_transformer_longterm.py": {
+      "sha256": "f0e6a6113e5303ea89778916ee1ce08d17a504ea038fbe55f491789ae503bc8f"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/composer.py": {
+      "sha256": "03716f77a57353bc5008ba217c66c775e911197be4b766e7485a7dda84265cbe"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/trans_agent.py": {
+      "sha256": "46d8322c8203966b5bb6b56accc09d53f0ea6385614102036f797557a2db772e"
+    },
+    "ports/stage1_base_push/tokenhsi/learning/transformer/trans_players.py": {
+      "sha256": "40b57c33012a0c0db13c697fa425804143fccdc76eb7fb1bc81e2021833c2bad"
+    },
+    "ports/stage1_base_push/tokenhsi/run.py": {
+      "sha256": "41b5e95c13db566c5b4cc9a0fed6c8b4953015830c1d46f133135f78332e11ad"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/check_shared_support.py": {
+      "sha256": "a373e618b675cd02c0bb522f3f396c10183b95ca2630401aa7a006ec5809535c"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/check_stage2.py": {
+      "sha256": "e9d432dcbb0fe0c2d5033c1b357037a2ba91d038bb6ecdb850bd54ce25cc4452"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/conftest.py": {
+      "sha256": "742e1b43ec93c6f8573511eccda37abd44043b2fa76a09b039c33de340d64b94"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/smoke_stage1_sim.py": {
+      "sha256": "04c31f20605275ca6a733a326842c720785ee2a5390d087f9a6a10a7104b5fa8"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/smoke_stage1_v2_training.py": {
+      "sha256": "a7b181822206c62f5d085b9cc982627d2e323f9c1bf144700b1373df6d845da9"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/stage1_test_utils.py": {
+      "sha256": "99f02d6d0e6d73fe9c07130b00b21648d108e79c042c628d41fe704a0b81bc89"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_agent_cpa_collision.py": {
+      "sha256": "dfac02a5f5b8ff35d703999310e6915bc2b3d0ce7d84d9a813a502915f2bcdcf"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_generic_task_scenario.py": {
+      "sha256": "3dad253804ceee18c85e0a7525ac0b4e5945ea7a615cd2b1fda6baed5550a9ae"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_graph_box_speed_penalty.py": {
+      "sha256": "021d80fe8fbfb5fa3738176d2c383cfccc883aec7efb94685fd905077adf315e"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_gui_gpu.py": {
+      "sha256": "5172abc28bbc20eeee3eff47ca3bf797e6e37855c3287d3f17a39bca0a24e7c9"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_ma_scene_features.py": {
+      "sha256": "70333a0da1602f834335b5afd9db8cd7059595ee5712ca202f4eeda85a470106"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_output_paths.py": {
+      "sha256": "a5e399b4096bfa08b0592498979148c8526eeacdeeb0d163fd4732377aa82343"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_shared_support.py": {
+      "sha256": "56286822bdee2cf39d6821877dd822db21e927adb8440eec28b63072cb71de50"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1.py": {
+      "sha256": "2a07dbcecd2e027909cea97f11baffa1cc67d20dcba8df363151826d66e5403d"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_gta.py": {
+      "sha256": "9ed0ec091910fb811ddf0a65c8c63274b0eb90febb13c94c42c5ff3ce97bff00"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_policy.py": {
+      "sha256": "10861f553afea785083dd408635a1a7e21517a0ce55fa3fa5616342598b8982c"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_push.py": {
+      "sha256": "d1cd935774626707504900f5fd676ec05021f7dff4346c926f170bdf582ee6a2"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_sampling.py": {
+      "sha256": "3f8cd4ca430394981a084f77bb175c51d415943861cda0baf3f0f5a6571b0488"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_v2.py": {
+      "sha256": "1d6268b3a34fd3ee8ae099754a741ca22a1f7eaa99689cfeee65f0e1eefc8d0f"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_v2_fixed.py": {
+      "sha256": "6ba5fe11cca7da9e3142667a79cb693ae9fd11fbabd507612b6acaa3fff87920"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage1_wrapper.py": {
+      "sha256": "c03650d129113f897f1c74db025699fa4fada5e0e36fa085c16005f571c70a8c"
+    },
+    "ports/stage1_base_push/tokenhsi/tests/test_stage2.py": {
+      "sha256": "4ad66625175b2ad73ccf472331fac05190e1650cd2b803d9abec89c5689c4403"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/__init__.py": {
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/config.py": {
+      "sha256": "b35b0daa60288bfd1e5a8812eb059ebc6f601bb396372d3029bb169f03ec4102"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/door_reference.py": {
+      "sha256": "d84404e6be4f44fedb6b9b12f5ef02eac691d2ab4a1145f4426ea82fe466849e"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/edge_context_spec.py": {
+      "sha256": "57311f3c01f7b33b149f789f7c4be68d8ba04a65b62f0abdcc3eaf954b213a5e"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/edge_interaction_spec.py": {
+      "sha256": "26411719f5bc774ba2b565ac8fb2561cab0e34391647cb9f3af02524c87ce120"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/edge_ontop_spec.py": {
+      "sha256": "6822fafaf2fc183f85e29a105994e036f02dea783704904308bb00e56ceb1473"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/edge_scenario_spec.py": {
+      "sha256": "b0ce362043bbce9c898c9e6f04a676accb5321ce1a9bfaa3c13fc5708c35904c"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/edge_stage1_spec.py": {
+      "sha256": "9479bb476fc3c0495c07bc58e0109d02406933f86e3b94f7893b24b00b6ccfa7"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/grasp_geometry.py": {
+      "sha256": "f7ab8b2e1b6af38154d49ba53fd6adc9bef33d019e4fe6ed5f0122d1d9617008"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/gym_util.py": {
+      "sha256": "8ee056cda5bb39615d5c7c39b6e6c6b665f38fbe3a5d82af12383fea444fffa9"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/logger.py": {
+      "sha256": "2f34444692c15106fe6a3ec014fc14e685cbc428490f2956b4188206148b555d"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/manipulation_contact.py": {
+      "sha256": "200063bd572e241f6db96a11597dfe0707013aea04f593180527f76bd42e4b4f"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/motion_lib.py": {
+      "sha256": "50f28b8f5cc705d520a7a8693dab3f8b57907a8a015d0bdf80f67f8326313d4d"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/native_push_rsi.py": {
+      "sha256": "0eb3b60f498c80bf14edd8bcf6ed98b3be3776c6908b5251b6bc0de9b11696f9"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/open_push_rsi.py": {
+      "sha256": "4a4f75bb40c8d4e5bac4fb349d92ed7d2ef02dc053a922232aea97d1a89835b4"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/output_paths.py": {
+      "sha256": "22a5af04a1c378e03c38260327c8e763bcdbe1dca3dc6f5bcc9f0e6cdae2e397"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/parse_task.py": {
+      "sha256": "a55a4a25878ab0e99c0fd7e0f0a1c88206dfa6c479e675187bbb6f7d1b1dafd8"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/push_scene.py": {
+      "sha256": "fc21a070f9824ba2955f523eb25c2d19c1b9a6ff4ab3334237b5c48d5d04f2d7"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/relation_task_spec.py": {
+      "sha256": "56574a857df8cd8012dcbb37e9a2ef674a022ac15cd0e01f246c8c2e5dcd6949"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/shared_support.py": {
+      "sha256": "39c79fe340bd71886277c3ad1c6b9c4b2e2c0ddd1ce93d6da2bb03bb3278cd36"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/size_rsi.py": {
+      "sha256": "49d664dc7661cf1ef49ef8a7c39702763f52eb7dc3e974edd94db92978b8ab26"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage1_platforms.py": {
+      "sha256": "82204e1aea616b76dffaa8f132dbc90677485b78d791b18cfca4f55a76f5fac9"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage1_push_scene.py": {
+      "sha256": "e2c0cb6e24b2575e53b091547ba1b9e764b097131d132b9604fad36a2c60b515"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage1_push_spec.py": {
+      "sha256": "358eebf627b4f77f65079d1a4cadf323306f93ccc12872489f0b578f540da6b1"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage1_sampling.py": {
+      "sha256": "0e4b3d1cffee3559cc3384c2e76cd4ade5922a6fa86540bc79beb055a576895a"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage1_v2.py": {
+      "sha256": "255e4d1ae63557acf7d15449263c99663ee4b89f9d05deb1a15294163afd16e2"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage1_v2_fixed.py": {
+      "sha256": "2feec70676aabb71c3d69ac12eac24b4675e2b49545e0344f4d386328976ae3d"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage2_amp.py": {
+      "sha256": "ac97cde386b48175df3196ed494a22e213a9b73f7711a76eae1424250bc55e66"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage2_rsi.py": {
+      "sha256": "3636a2deba3051f181d93d595cf995d7c1cd605bd67cec0376a0bad45bd40ac7"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/stage2_spec.py": {
+      "sha256": "b7bcc49f019805b842235e372d9f713df6d42e324165b4c2cf2837ef2cefb3e4"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/task_role_spec.py": {
+      "sha256": "1205cfa3f75b83f4a8e0d54c5fd839e7a99df4e4af71e2f2829c03d6a91374e3"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/torch_utils.py": {
+      "sha256": "834225cad151e0003b4306ad5f3bc6f56f789ab95158a1bb74649b5ebd6e14b4"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/traj_generator.py": {
+      "sha256": "5797dfa6a9f5dd514553f17d35e800f023d50334abb1e3446feb5e512a15cd57"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/traj_generator_custom.py": {
+      "sha256": "e31b274cf9d195c9b5a8b7fa91a4c51760903549a2cd9cd324919e9725abb760"
+    },
+    "ports/stage1_base_push/tokenhsi/utils/unified_training.py": {
+      "sha256": "2559717bb6f931c1fe5b81fd0bac3078162ef8832ce702b8bda76c6f57ad4994"
+    },
+    "ports/stage1_base_push/verify.sh": {
+      "sha256": "1c6269d1993b41438ec1e45c63747f145840ca88eb1412bc783cd4ee82b5dae4"
+    },
+    "requirements.txt": {
+      "sha256": "3de3e4959d54e09dd993c7affa159960c9ef510894ede7fbc8d930b489eaff21"
+    },
+    "tokenhsi/__init__.py": {
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    "tokenhsi/assets/door/door.urdf": {
+      "sha256": "e73e894fb66c62b593d4857488b820fb01ed1c5555e76d9b1ebb27f489a375a6"
+    },
+    "tokenhsi/assets/door/door_hold.urdf": {
+      "sha256": "57a38af11d65161e72071f15d45786556dd855e778af5c86db588afbd683bc4f"
+    },
+    "tokenhsi/assets/door/door_pull.urdf": {
+      "sha256": "8bafdcff3c04b630daa4c29b44e3803c28085efe0c82b1ab2897f24da0ef374e"
+    },
+    "tokenhsi/data/assets/mjcf/amp_humanoid.obj": {
+      "sha256": "c6fc8b0e78162d034d2dc496ccb673025033ab0b538e1b73b5ce73c7d64cf66f"
+    },
+    "tokenhsi/data/assets/mjcf/amp_humanoid.xml": {
+      "sha256": "352d669d8903cd70c3b07f0b15f78d0b2685d3ea7940316201b6655ed253a686"
+    },
+    "tokenhsi/data/assets/mjcf/location_marker.urdf": {
+      "sha256": "72bf4b443f328fd362772ff8e12df724fb8b2d0e439d2e2596aca140ed149277"
+    },
+    "tokenhsi/data/assets/mjcf/phys_humanoid_v3.obj": {
+      "sha256": "ea089cdc6edab2a70b7f5f3ba8d4b611eb10ebd7f06b81d242593dab438aca69"
+    },
+    "tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml": {
+      "sha256": "ee3c898fa22993f15525afcd10ca3ccd614fb5ee3a9f10df46576f970b7aba56"
+    },
+    "tokenhsi/data/assets/mjcf/phys_humanoid_v3_box_foot.obj": {
+      "sha256": "b6144e214d53ef3fedfbe4e29f2c5c99c2cce6beab734651d27a67883ad7f504"
+    },
+    "tokenhsi/data/assets/mjcf/phys_humanoid_v3_box_foot.xml": {
+      "sha256": "f5c44649f490f9b324f3adc2108a9d727609fb65ec9e77f181730418c1a7ee48"
+    },
+    "tokenhsi/data/assets/mjcf/smpl_humanoid.xml": {
+      "sha256": "a93a9e3b39521609f7db1dc4cec49987e1924bd26549684402cac0143537401c"
+    },
+    "tokenhsi/data/assets/smpl_foot_meshes/left_foot.obj": {
+      "sha256": "4911cae4ac3896acbb9e07a067260d9eff377a3d6eb1c977069444237d326d40"
+    },
+    "tokenhsi/data/assets/smpl_foot_meshes/right_foot.obj": {
+      "sha256": "0d5db2564ff8f0c1f9a55e194a91e07f6d8c322f37694e57e8854d5eb728308c"
+    },
+    "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_box2objs_chair.yaml": {
+      "sha256": "4318dfb3364266bfdcc0a456ef3f5aea49471a848a7d15bd469f9c926ee8336c"
+    },
+    "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_box2objs_table.yaml": {
+      "sha256": "39bb031b8eb0018b8ba567801e9c2de8c5f5fc1fc21faeb8c1a1ea317167faae"
+    },
+    "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_ground2terrain.yaml": {
+      "sha256": "c8d0ad3fa6b9b668abd69e27ad4b08a62a9d251071b1aa099a6002306602af9a"
+    },
+    "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_traj_ground2terrain.yaml": {
+      "sha256": "61d390c7e7d058d11b99dcc09f33ca8ffe20a4353936641982e01e10b6a59ecb"
+    },
+    "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_carry.yaml": {
+      "sha256": "5fcbf8cc6ca58854d1361fe64a97ac3dcdc57625c0746d543f5063146cad9073"
+    },
+    "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_climb.yaml": {
+      "sha256": "33c849918a616cc0b56858a1375bb284b923f09685aa479e68e1d5ccbddb40c9"
+    },
+    "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_sit.yaml": {
+      "sha256": "c809ee354f7913b45c4d61eefa324907312e6e70abb58894a997d12a28333e9c"
+    },
+    "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_traj.yaml": {
+      "sha256": "4c457d0cdc76d36e00aa432022334c3f4ded120e3cf1d8135a0e2c344a0819a3"
+    },
+    "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_climb_carry.yaml": {
+      "sha256": "b4e435887844a55ec8d54bc72233007a2a660230b29a21843ef5045d796fdb85"
+    },
+    "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_sit_carry.yaml": {
+      "sha256": "2cac5d261df7e4ef19a5b7d1f24c548495f82b4a9b27a81811d825148409d350"
+    },
+    "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_traj_carry.yaml": {
+      "sha256": "eefd26ae4ba62bb0d18ef7cb41a356343346f7e6caf590f3eec37c5cde69e99e"
+    },
+    "tokenhsi/data/cfg/longterm_task_completion/amp_humanoid_longterm_4basicskills_0.yaml": {
+      "sha256": "1cf7ae993b29d8975f2aac546a6ae3d2128208e8bf4eb776ac0115302ad697e3"
+    },
+    "tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml": {
+      "sha256": "91e66987d0d5f2520d3d9114f96451c65c5b3ca19e7a9926761bcd0ce2b7e553"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_reference_rsi_semantic_late.yaml": {
+      "sha256": "21b35e8a0232a2509a53ba17eb1c4612f35c98116978f8595451b4b84341d129"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_reference_rsi_time_late.yaml": {
+      "sha256": "1eb4c0f254738ecda1b780f161d9b1e51b5bd7a3c0c95d9a1f95e306d466ba74"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_independent_with_climb.yaml": {
+      "sha256": "033633998f68b769e99bc7e9bcdf4beb506c1b1d46d27053fe181b67a15272fa"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_at_goal_fix.yaml": {
+      "sha256": "95fc1e5d85e9b0bbf39838f0e5cee8edd9701e1edf2ba0c64ba06ab634906e06"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_hybrid_late_rsi.yaml": {
+      "sha256": "591f190791a6837544dbfc3223e2bf3289ab820a1ee1f1c6d1b1bb6246d86cd2"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_ontop_putdown.yaml": {
+      "sha256": "0e83461f35b9fa2362124ec21eb675636795d4c1c99caa3a6974b16628914bdd"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_paired_at_no_near.yaml": {
+      "sha256": "afb7142d7ead84afaf2e224785458f70a80cddcc5576c47e932c8db6014de60f"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_paired_placement_no_near.yaml": {
+      "sha256": "d7a76615c8977d3e1a42f61059364a7f7bee1e3853c3fed197e2da3f23d4f12c"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_paired_placement_owner_holding.yaml": {
+      "sha256": "7df367b24220cd2c72ab0cb5a95dcd75f7a7ab3dda49bb667b4026d597f41077"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_placement_focus.yaml": {
+      "sha256": "e8282700faab238bae14bc27e8b38b3bbd6cd325243a7216ba7e42cb60ab2303"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_plane.yaml": {
+      "sha256": "100b49daa9571b1dc3dbf90fba545f60fb9ab5d448d79bc0eac004123e7e4cf0"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_self_sum.yaml": {
+      "sha256": "f94f514bfca64b68b61b2942f7d8ae2b77259fc68c7789c01ddf988cd184112b"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_sit_plane_normalized.yaml": {
+      "sha256": "03080f44537f6ac76f6108a4c6218df69a0ebf34f4f3a67ed57c2e6ed8efd9d1"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_size_progress.yaml": {
+      "sha256": "899d936096fb00a325d79f807671d553d34537d51ff239708caa2bc86323799c"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum.yaml": {
+      "sha256": "27412b7c832a3598873422152fc4661ad5097c8a8235d5d798a7518a4c000394"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved.yaml": {
+      "sha256": "4bee7016a20dc6abbcbf10651ff3bc466baab1f4128f3e95ffda93f3abb8b94c"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_slow_near_start.yaml": {
+      "sha256": "bcd7434af2f78ca14fb88e45b82cbfb1d482dc245a6d9ff7db9df9e2c1ba0465"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_student_rsi.yaml": {
+      "sha256": "2b50b8cb83cf170da4ef360f82fe5cd217d32d2707b366381a430b304cb2837c"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified.yaml": {
+      "sha256": "1652638636d459d53c2f4fd1cd716c8692d104c03e424982c37ea680da04202a"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_owner_holding.yaml": {
+      "sha256": "fc2f8a3552d9c462e0e10cb4ddae0277fba8ed11fac1eda6b4260558a65027e2"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_shared_edge_encoder.yaml": {
+      "sha256": "a22ccab4e54a6dade67a7f969f9cb7c71e6b2803fda5015042470d8d11c6cfdf"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_shared_random_binding.yaml": {
+      "sha256": "0d69ff4a03cc2bca76a18f75a49d64e1303d1b481d38fd28a59536a507d1af1a"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_stage2_coordination.yaml": {
+      "sha256": "6ceaf51af44444d5a3686b77d11f790d9da0d7a708d68d93a51240e0843c595e"
+    },
+    "tokenhsi/data/cfg/multi_agent/approach_stage2_coordination_sit_plane.yaml": {
+      "sha256": "43eb32cf1a3cdaee51977786d5a6248a9f0d6d84f18653c56e4249a347ae7aac"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_amp_off.yaml": {
+      "sha256": "763d6ed87130028dc38a7554e6ad017e1f6037d0a61b155182f3e626997b5781"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_amp_on.yaml": {
+      "sha256": "b223651dec2f6e06d0a5dcd4980938098bc246385ad195b15c069008244f320e"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_bones_left_amp.yaml": {
+      "sha256": "f51030677f76e4545e1e2993465427b6bbaddede4065583b49b2b55f23a7e084"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_hold_amp.yaml": {
+      "sha256": "8bb1c566d061662caa5089722cc8e81a0f2064c0fb428ab5f504b51bfc8ab6e1"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_shared_edge_amp_on.yaml": {
+      "sha256": "288848038603b238c2af462f0bb94096e3f843acb1dead2dabae42ecc9fc50e3"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_shared_edge_approach_amp.yaml": {
+      "sha256": "c44cd5f4e1c6e7c085d226f7d9c108fba200963c355a81a92b1612eb36d19bf9"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_unified_amp_on.yaml": {
+      "sha256": "288848038603b238c2af462f0bb94096e3f843acb1dead2dabae42ecc9fc50e3"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_open_unified_approach_amp.yaml": {
+      "sha256": "c44cd5f4e1c6e7c085d226f7d9c108fba200963c355a81a92b1612eb36d19bf9"
+    },
+    "tokenhsi/data/cfg/multi_agent/door_pull_unified_approach_amp.yaml": {
+      "sha256": "778d251496bb14d12f8274dd609a9bc56c81ee4bb845bba8ed10dd4901f8c8f0"
+    },
+    "tokenhsi/data/cfg/multi_agent/graphs/stage2_four_agent_pairs.yaml": {
+      "sha256": "88fb83dbcf48279cc71b3271c831e38c95da38d69188c1ed72bfdc3935b0bbc1"
+    },
+    "tokenhsi/data/cfg/multi_agent/graphs/stage2_three_agent_shared.yaml": {
+      "sha256": "47a1b49ca3961c07d3f6670fa88ea997371dc757a8b686fc2cbc7cb49ea0acd7"
+    },
+    "tokenhsi/data/cfg/multi_agent/open_push_late_rsi.yaml": {
+      "sha256": "d2a8df5a3528a6ca53b6d8976cc198621e5c43ae5418595080602bab8a3cc85a"
+    },
+    "tokenhsi/data/cfg/multi_agent/open_push_unified_amp.yaml": {
+      "sha256": "fc51fbb7f61e61bfc91d75d16c5e41a291ecc6b1cb6395d319532dbbbf0dd281"
+    },
+    "tokenhsi/data/cfg/multi_agent/open_toy.yaml": {
+      "sha256": "4bb2c84d166e56ecf0223edaec8e705b1eac735e3050d74d0c1b84e3cbabca1e"
+    },
+    "tokenhsi/data/cfg/multi_agent/open_toy_reference_close.yaml": {
+      "sha256": "575d0f041a363d5dc3dca67cd90c439e2a6c6fa2c71f11a43b3dec4ac129a3c0"
+    },
+    "tokenhsi/data/cfg/multi_agent/open_toy_strong_close.yaml": {
+      "sha256": "4aee189638d1857073dfbbbb5e549289866c9875bf00ba8ca7f0b466a5313107"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_contact_face_at.yaml": {
+      "sha256": "6cfbe73659c9056fb7627e331b35425e5ae52f837b589c1e3bdd7c052859b598"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_contact_face_at_tilt_soft.yaml": {
+      "sha256": "c2af72944caa6b3c47ce52833b7741282128e65b16eeaa5cec7068fbfbadb7f6"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_contact_face_at_tilt_soft_3to5m.yaml": {
+      "sha256": "80dbd5e470194998a063f6d80b84efa7a84f993fd449b0dafde78245acaca1c9"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_native_phase_xy.yaml": {
+      "sha256": "d04630da7c289c5c77d1622b5315695e17c9020de7ecd38e999fd0f55760db7c"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_native_phase_y2m.yaml": {
+      "sha256": "f580287dc266ff9ddeee8d53de7ce3ac702cf457fc02c93a14802f8dd01ccbe1"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_soft_legacy40_at05.yaml": {
+      "sha256": "1b2111877827fa3076097093fe63ee744c516d60e68768654052cde05b05166d"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy.yaml": {
+      "sha256": "875dee0947e61dd80384ec5fda24d45c29f6bbaf823a2b58c68dc966b1e8b8aa"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_contact_align_at.yaml": {
+      "sha256": "1412081f425eedd8e0c957db32ef5ff9ed4d369f944d65ec3b9540320f0500df"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_midpoint_2m.yaml": {
+      "sha256": "25367d75a871372769d4982f938430b46a71c921f165a84d18992b9608ecf7bb"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_midpoint_2m_random_scene.yaml": {
+      "sha256": "7374c4ca2973a5cd3cffde3bcaddffcfbde109247b08595e51741fa2c1205e7f"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_midpoint_2m_zone_swap.yaml": {
+      "sha256": "66796274f9cafbad6677417d6b3d3434cd8482f72b47e12214d74d1932de2e99"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_only_random_scene.yaml": {
+      "sha256": "270463f362168d864fd2a0a212ffa51fd877800d6f527486a057e9e6c8f2f356"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_only_random_scene_at.yaml": {
+      "sha256": "1b6328d6df9f09c60fe4f92c96881f1b10b06ee0ef49c0f8a5e3bfe892f547ea"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_random_at_10deg.yaml": {
+      "sha256": "af05057ddf2b11040c294e8612df0b886a0ccdf8fe435e749edc84b48af2468d"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_random_at_10deg_at_grounded.yaml": {
+      "sha256": "14a5aa5be1a9a1fd54c6466e99ce02f67765915398ce2ac30f4a5b2cbe3537f1"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_random_at_10deg_at_state.yaml": {
+      "sha256": "4c3a6063b1283070668ea5147d113f2dd59b69834803192a2e970929f65d77f0"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_random_at_10deg_at_success_tilt.yaml": {
+      "sha256": "946969472fe51f2063fc1ac461fa380cae89794763f093599e7aa9c8e563bc9e"
+    },
+    "tokenhsi/data/cfg/multi_agent/push_toy_random_at_10deg_at_tilt_soft.yaml": {
+      "sha256": "5b18b0dcf8d16f3529c518a4616db369a7be8470f585e77dc74877dd5cc9ad37"
+    },
+    "tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml": {
+      "sha256": "9e03850df9e3adda0e97970052ba5dccc26d450ef65770f682a0c0375ceca9ad"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_imitation_task.yaml": {
+      "sha256": "de0d4d6a4503937863fbf38257c78ad7c0b171106ecf0bc29f63b5b2b4bf422d"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task.yaml": {
+      "sha256": "c502022109070199e9e18443fc4816207022e337b60eeb51d524fb419c97c02e"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml": {
+      "sha256": "1ffc72db6152e52a66bfb61746b0cbde96316ddf1441d1ff61bca68c01bca2f6"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt_disc3.yaml": {
+      "sha256": "b024513663196344e80f465d2f86a1fb05c5d5a65b61ae54cee53df71d340478"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_comp.yaml": {
+      "sha256": "2b20779e76df3b8f52e0020759f7fef2b6c9c11c56a0f6740d7469972950527c"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_longterm.yaml": {
+      "sha256": "26aff0476c52787d56b8e45bfff867bf716ad77cc6b2d1a6bd30afcb413a4878"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_ma_carry.yaml": {
+      "sha256": "715ab477ff0116e352ff0a18c5c3af15a6b95cb36594cc5c6f97a7961b1a3aa8"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation.yaml": {
+      "sha256": "ac636b0b1f78cfcf9ab7a932384a9e18f13ee1e50119bf49a0e564a9c4ffab3e"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_shared_edge_encoder.yaml": {
+      "sha256": "25828ff6b4c1717baff673d53dc7fa4cd51b50cdb5e0104ab655effe0e125e9e"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_ma_carry_watch.yaml": {
+      "sha256": "50933b17a3e8851ddd94e066730cd61fa549d4ffd0ab850df3f34dde2e2ec9aa"
+    },
+    "tokenhsi/data/cfg/train/rlg/amp_ma_stage2_coordination.yaml": {
+      "sha256": "0ccdebbd5c923874048bfa422ae16fce00b3e7cb25e24d6220aac41337dd6ebd"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_amp_off.yaml": {
+      "sha256": "3e2fca33ea13ff3b835cc6cae268a9be5bdbced6cde3fe22eb1e175edf523dec"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_amp_on.yaml": {
+      "sha256": "30ed8c8642dc8b3c49be49040bcb63cf271edfe2ee614ccf90e1c42ead753aaf"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_bones_left_amp.yaml": {
+      "sha256": "b71bbd33756ee0f97f31452aca803cd30cac444d1e9b233de13ca002b316202f"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_hold_amp.yaml": {
+      "sha256": "13d108ed360669a9354dc84cb445db8168bad3624dfbe9fd27163d98e0b19ae6"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_shared_edge_amp_on.yaml": {
+      "sha256": "e0b7224a896b8281703648516737efffc643e1ad35b0f3148ef1b02fd63816e3"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_shared_edge_approach_amp.yaml": {
+      "sha256": "7e484c586ef30eb85b9561eebb5d2ca2629260287a0c7bb3241502c6c281d968"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_unified_amp_on.yaml": {
+      "sha256": "02fa10cfc9b49a3dc28ed9aa7b196b672247193eb9014a971353cc221fd851c5"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_open_unified_approach_amp.yaml": {
+      "sha256": "fc9a216173915ff0f2a803577f1a09c5ca691a20de98a8fbe0789132674af50a"
+    },
+    "tokenhsi/data/cfg/train/rlg/door_pull_unified_approach_amp.yaml": {
+      "sha256": "fc9a216173915ff0f2a803577f1a09c5ca691a20de98a8fbe0789132674af50a"
+    },
+    "tokenhsi/data/cfg/train/rlg/open_push_unified_amp.yaml": {
+      "sha256": "bafca18196c7ad72afbc2dd4e74d78e4d98530716a9a7ee7ec393348037dd734"
+    },
+    "tokenhsi/data/cfg/train/rlg/open_toy.yaml": {
+      "sha256": "9abc9c4968ab55017a6818bd85f7ffe8d2e3870810f9237388d4fd13d15ae010"
+    },
+    "tokenhsi/data/cfg/train/rlg/open_toy_reference_close.yaml": {
+      "sha256": "802e2ed012a2d7022b708cf5b4abb5429174949bccf4804de7e696134e80115a"
+    },
+    "tokenhsi/data/cfg/train/rlg/open_toy_strong_close.yaml": {
+      "sha256": "8c5900702043747c0c140244f8878ccaff870942aff36196ee8fce7fce3de5d6"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_contact_face_at.yaml": {
+      "sha256": "0a4f2f4586dc582249cf3d3f247007349373afbe8de9d78943795d6fbeb082c1"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_contact_face_at_tilt_soft.yaml": {
+      "sha256": "14028ef74c1d696d4a218a2b902ee27d20d48103d9166e558537c72047b1f2aa"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_contact_face_at_tilt_soft_3to5m.yaml": {
+      "sha256": "e1287eb005ec5704120bf133f1bc42e1f8070e939ec4eeeb2ca5fd1ab0642163"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_native_phase_xy.yaml": {
+      "sha256": "ae981c9474473ff631567ab74ce8db0bd95fb9e0402fe37b1ff0639bde2ba900"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_native_phase_y2m.yaml": {
+      "sha256": "508a610b303eb494ff6e8d591960caba2876ec3342b775ac7f845cc21eaf3896"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy.yaml": {
+      "sha256": "87586f81455a5c837b838365065a1177ceed2d3e888236f657a251ab8b067cb2"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_contact_align_at.yaml": {
+      "sha256": "f1c01cc30e6549769af862ddc8c4e86d92e04df111f76b37c9d0c2d20146a9e1"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_midpoint_2m.yaml": {
+      "sha256": "57d5d13180e87412dade22e306aa43b00ce359176b7b7d61d41deffedbe468e6"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_midpoint_2m_random_scene.yaml": {
+      "sha256": "fb82c1a26a08ee3ac2cf06eb892d2adc23b8d1489322f6ad52a5373bbeb69ab8"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_midpoint_2m_zone_swap.yaml": {
+      "sha256": "55b4f49c3d45608ad0e0ee23808914a1a8bc74ba1d9d434166b8e05668904b06"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_only_random_scene.yaml": {
+      "sha256": "d9678af89c1e56a1944fa3b9bbab2995300956f9dcb59e28d7b1069178fee131"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_only_random_scene_at.yaml": {
+      "sha256": "afae3b70d19a5b87d1e39d54343249df48b458ab31c3d13290e5ccd011c96e55"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_random_at_10deg.yaml": {
+      "sha256": "edb6b34d39ca3fcce8e8988b710ec22e16c554cf976ae6862e26c7c685337700"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_random_at_10deg_at_grounded.yaml": {
+      "sha256": "a112afac4f0f8b2e192e49520f4f22c41c566ab51b5941ca92b08d693b4eb138"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_random_at_10deg_at_state.yaml": {
+      "sha256": "c86cac5f592fb656b6d53d2b93cff7c65661f5666a20a692ce8d0c8e526f2db7"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_random_at_10deg_at_success_tilt.yaml": {
+      "sha256": "db568e371b85d047f84a414da02555391a251922e39b0728da2abfe44e0e2b2d"
+    },
+    "tokenhsi/data/cfg/train/rlg/push_toy_random_at_10deg_at_tilt_soft.yaml": {
+      "sha256": "57728b294be939a3b3c40442be9894c0ea8383b328e2bd2b7d4df384a565523e"
+    },
+    "tokenhsi/data/data_utils.py": {
+      "sha256": "cf848d8a5e311efd8bd96b9ab8ae96e619c154984930df58cae4301753620194"
+    },
+    "tokenhsi/data/dataset_amass_climb/dataset_amass_climb.yaml": {
+      "sha256": "d96491dca873ded30db918122f63ea1f5f00451b1c4439a2ffad0ab2fa4b972b"
+    },
+    "tokenhsi/data/dataset_amass_climb/generate_motion.py": {
+      "sha256": "a9c69f75ceb47830012aca8bc10f6153484a76e8444c8b5fa1423d9e00135775"
+    },
+    "tokenhsi/data/dataset_amass_climb/generate_object.py": {
+      "sha256": "facc2f7fd80f4c6a86605d410b2904d56a5965065f46a78e178f1e1a2d0c4736"
+    },
+    "tokenhsi/data/dataset_amass_climb/preprocess.py": {
+      "sha256": "427bbf04a7ab781618300507c52494b5bedf1759407cc45cbd2ba0c681502b27"
+    },
+    "tokenhsi/data/dataset_amass_loco/dataset_amass_loco.yaml": {
+      "sha256": "4a08d4ad777af089d32449157368ac0b07d99ecb3250f39d1036d312dbd9fe15"
+    },
+    "tokenhsi/data/dataset_amass_loco/generate_motion.py": {
+      "sha256": "2e22ab22276faa71d3f4fb8a75b74820dcdcf4e998d10e289b8404aa9a6c8d9a"
+    },
+    "tokenhsi/data/dataset_amass_loco/preprocess.py": {
+      "sha256": "90b01f67fa442cb34aa8c843e43672c9b292907f454b9a78dc2597404fc51980"
+    },
+    "tokenhsi/data/dataset_amass_loco_stairs/dataset_amass_loco_stairs.yaml": {
+      "sha256": "1a955ceb237b1534691d282b34527c6dbcd2874b149dbcf51e5eaea4a2c9281a"
+    },
+    "tokenhsi/data/dataset_amass_loco_stairs/generate_motion.py": {
+      "sha256": "2e22ab22276faa71d3f4fb8a75b74820dcdcf4e998d10e289b8404aa9a6c8d9a"
+    },
+    "tokenhsi/data/dataset_amass_loco_stairs/preprocess.py": {
+      "sha256": "fe6c99a919e78190e1d811e3df3857af120f44700e1e120c4072827109a99cb2"
+    },
+    "tokenhsi/data/dataset_bones_door/README.md": {
+      "sha256": "319558c738ea2f2ea3993e9143af2f19c362fb983ae51a33e8db9257edbef289"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "e18e90798a447583c5011a5962ae71271431831f6ac75ebd26640841dbaa6894"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/door_contact_sheet.jpg": {
+      "sha256": "045b0dde96c7e09c499f614788533da274365a43787b5a45c9a60a1969374463"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/door_geometry_report.json": {
+      "sha256": "75310ad50f7bb16b9f5deb04daf5d5cb103cefdb119ff1ce675db67ea6c77a46"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/door_preview.gif": {
+      "sha256": "db7a04257539559fef5738a1a0b501ce6e98fa50687c38940ddf563eb2b5eca7"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/door_preview.html": {
+      "sha256": "145525d25c98947f9413b31a22cf3384bb5d4854af3dcf84e20887ffa3fa8d76"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/door_preview_data.json": {
+      "sha256": "9eb80fcca708f95ff24f92784ba3e8d991f7196e69b7b94ad3540d0f2d3bcb86"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "5f4a87337b2c9da5c492d6c35f86ca2d3b281825dccae4967548bad2b10bcc5b"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/dataset_bones_door/motions/inside_door_handle_right_side_open_walk_R_001__A515_M/phys_humanoid_v3/retarget_preview.html": {
+      "sha256": "94c35a19cdfe57d0cc9fd2ae464070c92b470d85ea42fd8bb08cc9002348a21d"
+    },
+    "tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "e9528f12f844a15882700a58597e0f8b3940c2aaf5ae45a73cb9670de2caa1fc"
+    },
+    "tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/preview_data.json": {
+      "sha256": "b0139ebd50bc9ee2854af5c0a6663fbe8da1630fcecf9dc2ca5b6a04dc3b90c0"
+    },
+    "tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "a45c388736168a00d7568cc8f75c95056cefe2be439edb4d2a1d46f4c1ca2da8"
+    },
+    "tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/preview_data.json": {
+      "sha256": "fe77e5e21bda4897fea34106200d9db67a851e5830862b3b4c3aff9678f0a137"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/conversion_summary.json": {
+      "sha256": "79af0e1d069fe5757f36653ce012c7e1391d530e5e0d48f75723c17995b3b95a"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "28d5bd1fd77d0ba0e024ff2abfe1d978351415be1950b6e65afe7a7ef97d676c"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "12207a091575b6c595c8a1e0d5f3aa719b2d1d0638bdb95695ace69a621b63c3"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A342/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "6681d9d467953c9705f9b970e67afb7f61b59488fe419b840a962514700beeac"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A342/phys_humanoid_v3/preview_data.json": {
+      "sha256": "1cf73c6e97fe876818929443571618acd3dd0e10fa18245f279e02d319eca427"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "377eb6678bf6e22fb4c0748312df8718a10372ce1bf0bfcb853362f1a53093a5"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "92f08fa57b28ac04e431ebf75e71fe23b9118fc699fe1cc580ec94bc09c76d94"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A344/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "ad13ca55a26c6d5e340b6fafeb5b99924aed9341a94abb238f09ccaf3ac1cc88"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A344/phys_humanoid_v3/preview_data.json": {
+      "sha256": "b97ab9765dcba8ec83046a4e52e3c325471a882d239cba4bab93c175aa6bc63e"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "69aad383627edbdc9b1f6f7265dae72f0deba5ba0b557e27d9e01e4227752328"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "4feba45fec8e3a667ef07ea75d5977404be390b633e303862fa3f3005dce253a"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A342/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "780b28e9103bbdde4245a40b07ae5078c192a545298d2b1b773178da5b4d6dbd"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A342/phys_humanoid_v3/preview_data.json": {
+      "sha256": "70013f129d334ec50660717bceb086051ad03aa49c5c494c143a9032428af829"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "6e1f31a3efa668c105698be3ca5266260dbb1e59e98bd98ef98a2900f8ddfa96"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "9f22f7adc91f7e2d24075e2066eced98cf4a8007d8a6ddcce027215e0ba92d92"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A344/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "8c9af5ec5293c91c59d2eafe6b633c7541a07d9cf177e58d6123592f3928adbb"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A344/phys_humanoid_v3/preview_data.json": {
+      "sha256": "b0ccb2374c004dbf800ccf85038c869bfb764d5fa886e54910e7b8d02e1e4997"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "1ba2d2b347d7402ea91a88e8fb50a18de90d757b77208910f6072c5d17316c46"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "3450c9cf430dbb7ff39ee4c7e01c9e3afe267adaa0d59778c2ce10d0cdc881be"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A341/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "3d4c5a73818d0e70e5d45e26320b5725373456132e135bb14a7423e78191dd18"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A341/phys_humanoid_v3/preview_data.json": {
+      "sha256": "bd069af7f787334e4027dd3f17fed7cad96e285479bd72a645a5bcbf66f09258"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "35df730e6c586b9973e5a3e6b7f8e3f4b599d61eaf7aa58644e3511a53aa1aa8"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "3a7d1bc79b1f51463f2c81d4e366029aa3642cdb3ec434597f6234fce3bde57c"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A343/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "5c952925ec5c5746dd79fe6cd6cf6dabff7afa138258107a6583e819ba5aa558"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A343/phys_humanoid_v3/preview_data.json": {
+      "sha256": "041bfcaa85aec08fd24850d7a211402d62a56e2f99c95278f4badcfcec4e55a5"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "cc3d4f141481097e8c8b0405d7ea22ac40145ec6c9f33e8117737de2eb26b3e9"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "8ea87a266c3cf37c11776f39493e74778ff806110c848d36c9b497abbcfdcdbe"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A341/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "e694aba0fdb949039cbd26880e60e9e0bfd610da22bf9dc3415bb93779c82aa2"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A341/phys_humanoid_v3/preview_data.json": {
+      "sha256": "5d8161fb8a034fa21d391e6486cf8a22d46c563c936261be3cf5d5dcaca387b7"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "551ab2a5add257cf696e24acbe24281483c3cf386ca521a4f8248fa6e3f9149b"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "6ab66011c9ae9b8a081855f009237c925497a34a1857d3849c74cdaef7ee577a"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A343/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "490a77766f3d213079e65d2928cc0e1074019b8555c3a07415ef13d52ab3e3d0"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A343/phys_humanoid_v3/preview_data.json": {
+      "sha256": "6214087444371714480fe5e86370854bc5d772a40c23fc3e18881d02e01443ca"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "3316a727cf8aed37f54eb8a347ce9131f7cd161a018c5f669467211727c4df5a"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "62f08ad52b48d7c6b4ac3282dc45113dae13968c3c5ac027891f4f2375418d84"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A341/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "7252698f77974ac7b8a84ce2dc955de33617423a19367f96030497d39e7c7ac8"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A341/phys_humanoid_v3/preview_data.json": {
+      "sha256": "7275d30f8a95b07166c8d0bdfd52b0c48b69a85c85760455e7f9adc42d023286"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "1b0914f61ef12145494bae9360f67c4b9b0ca5339c25e6e5e0a8e8a43e2d5c6d"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "7399702100827932b82771b17c848ba10a7693f9bef7937cfca09cc51a03f123"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A343/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "43a1a6b54146e07c9d386c2ecb5708f30f280ea37b2cb8b321c6c44d926f312a"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A343/phys_humanoid_v3/preview_data.json": {
+      "sha256": "1ef57f7562721fab07ff767ff5c90b350e7ca8b7c24f2b90587e06c52ee28a01"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/conversion_report.json": {
+      "sha256": "fc6f868f21008ce13d4a1e1bc4080e3b55b56960f6b3e5e1e5f954955e3524e5"
+    },
+    "tokenhsi/data/dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/preview_data.json": {
+      "sha256": "3700961d2c34c670b42e876d0b366e15b6e0c3b74e9ce4d517e53b41eb6b4789"
+    },
+    "tokenhsi/data/dataset_carry/dataset_carry.yaml": {
+      "sha256": "e8839d47c1b81a633c16bd9a30cb24a110cf1f77c3681b89cc28c0627098f1d0"
+    },
+    "tokenhsi/data/dataset_carry/generate_motion.py": {
+      "sha256": "e03c843d2b3b334e050cbc5d67555c1274a9c7bc17c42f9f2d7138631fd98241"
+    },
+    "tokenhsi/data/dataset_carry/generate_object.py": {
+      "sha256": "b4f49b5b57bcf81ea32ae8dacd4f83a28788322c54e4483fd0d1b3a052ec1a31"
+    },
+    "tokenhsi/data/dataset_carry/preprocess_amass.py": {
+      "sha256": "6dfff96b15559ed8917014edb2f9c7430b99a24cc142c6158cd59f4e82679a26"
+    },
+    "tokenhsi/data/dataset_carry/preprocess_omomo.py": {
+      "sha256": "4b55a386bade6e1f39274097350dbde79af86a09385672cbff825082ffda9675"
+    },
+    "tokenhsi/data/dataset_cfg.yaml": {
+      "sha256": "bface53728bc1ad14a5ba9c263f87530b16989363b0a87b80f9c5b1f13beb8ba"
+    },
+    "tokenhsi/data/dataset_door_bones_left.yaml": {
+      "sha256": "d0aaeab77883a64bfea2d8a65a5562f9f65c4058eba0db5438e12f3de5638c6e"
+    },
+    "tokenhsi/data/dataset_door_loco.yaml": {
+      "sha256": "4d28513544f3203c1f70b41ce776bade1d976ba059a1d8af88e9f8e89e8835cb"
+    },
+    "tokenhsi/data/dataset_door_proxy.yaml": {
+      "sha256": "8fc435f61d74d7a03d28a0e7e3ef3b7b708248499b5da63edcbdfcae5a52e454"
+    },
+    "tokenhsi/data/dataset_dynamic_objects/objects.json": {
+      "sha256": "4197ddd1c11f5d6e383eb10a84faaebc95b51050863cd837e2f543939022b40d"
+    },
+    "tokenhsi/data/dataset_loco_sit_carry_climb.yaml": {
+      "sha256": "762c3a4bbd92ab3ea22593987ed34905c702efffdbefafd6f95e475172c90104"
+    },
+    "tokenhsi/data/dataset_loco_sit_carry_no_climb.yaml": {
+      "sha256": "ed81bbb2bb684a139ddc15fa5bf60bc3a6d9e32ce88bf46c797597131954205b"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/generate_object.py": {
+      "sha256": "dd1020ac0c684642fe8b34e8e36da1fb9d76801f576fcf2818ca5ad63e27f9a3"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/generate_plan.py": {
+      "sha256": "e584372101ccc8c70f0dee5330e688ffe304606acef6b5afb058f8afac02a123"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/cfg.yaml": {
+      "sha256": "00db0e76f5826d46b45cd8c07c4022501bb95649bc9e49bdf943a3a61edac9a4"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/asset.urdf": {
+      "sha256": "46e3f1fc147c2b0e3b0707df12284ce0db48e79da7230eaba62ac8048d31e96f"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/config.json": {
+      "sha256": "8a207a676a14ea8d0f2b97bd6f8e279d349321659df948fa9c6e9fa69ac97a0f"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/geom/material.mtl": {
+      "sha256": "4575e95bcf87917ffe2b4a3527f869e5d7bed95fd4d931c2dd6c81161c578530"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/geom/material_0.png": {
+      "sha256": "e8889eb0662d230da8ef2f2b2a0a2adca9e752c15115b8eaf7f5a47bbdc066e2"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/geom/mesh.obj": {
+      "sha256": "930aa6c2947c90b75cd59ec3ac11c5cc6cba82254c98ebdcf7dde0c692e24d99"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/height_map/map2d.npy": {
+      "sha256": "45dc0ab966093e2889a4a249e88e200f78de8fa1b5b68c8918444ee5f969626e"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/height_map/map2d.png": {
+      "sha256": "db6865a84c57616f8de1eb807cf394071e77b1c8d511e67ff348059f9a9cacf7"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/vis/material.mtl": {
+      "sha256": "0d90fe7d688a6da0b82b0f8053231a1c8986de34aa839f8113ed53a610c09227"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/vis/material_0.png": {
+      "sha256": "7812af5dbfe558e0270c60fd1cf7c7ac60b91b8a35fa29d3d607a9153a278e1a"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/vis/mesh.obj": {
+      "sha256": "078d6a3868e5c3f4acdc08663bfe9d1510ddec7316f6f248eae275cdd8de8761"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/asset.urdf": {
+      "sha256": "f0b111e94aa718bec7de3f853852f6d5dfbe9d7a039a47133e8804e03dd22b52"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/config.json": {
+      "sha256": "751d899ed2cd74b85cf2c3b72ed89f48b8dffc5a80d5196f06738af961bdd964"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/geom/mesh.obj": {
+      "sha256": "7ecd1ff2c5ea380a750ec7a1190952c11a2f9a2e88557d6aac1488c64a8e5332"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/height_map/map2d.npy": {
+      "sha256": "395647ad2007c62941c1315c0c503b39c5818982b3044edba61b162d75590437"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/height_map/map2d.png": {
+      "sha256": "10b9001770dc7aaba9d7c526d0f35c36c00531ea91291114dedea44affbe9985"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/vis/mesh.obj": {
+      "sha256": "044162b3f4efd0d80d5f4ebaf92605448e87c17b5aa72766cf48d542c421dbdc"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/asset.urdf": {
+      "sha256": "9c7e156b43497f4b5d32aca9d3059409ba027cfab69a368d0eab1a92e197d00c"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/config.json": {
+      "sha256": "a95596b3cab94a7ec633643f017037d7720ffc621bdb17da490b029851dd6b1d"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/geom/mesh.obj": {
+      "sha256": "b75e1a1e4233ffd1af30fbf50fbec9ac466919bd354753318420ea8693d9d6e8"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/height_map/map2d.npy": {
+      "sha256": "5cc41d3c1d5353b08b7de487e6371c757e8a4dca3f24058a50a6bd27c9661f6a"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/height_map/map2d.png": {
+      "sha256": "be4c3615c3319a554b904dc75c9c3afc5424ca3fa5cb8e26d6caa454b356c7e7"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/vis/mesh.obj": {
+      "sha256": "cd6ca9e2e51eb8c49cf0826ef7636ae8570e257fadd53de24c0a909c663458f9"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/asset.urdf": {
+      "sha256": "324e180e9539ae59a299eed66734aee4cd44e4765682a9ea014abd7c1ce262b9"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/config.json": {
+      "sha256": "d8ae900d7a2ccbe832b86ab8b393d48fa36665da1b3ef290518ceaeeab5da633"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/geom/mesh.obj": {
+      "sha256": "17041fcce4b177a9c28ff04f3e2240a7e32915cda75ccd39d448fb2b2331f8b9"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/height_map/map2d.npy": {
+      "sha256": "1fdb3536b2bbcb5a057d23f8784ee5990facf4b3da2890c21c6fab74605c3ad2"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/height_map/map2d.png": {
+      "sha256": "fa5eddfac222d794224653a3daa20eb50c97c7aaa09667ea3c36f39a589cb234"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/vis/mesh.obj": {
+      "sha256": "6e5b6e8ac1f125db521647db0b0f29a0218a4f909d91445d784ad2094e957a09"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/ground.obj": {
+      "sha256": "25a7a838f1c5c0f7d46e573a09545c1b00999adc2b4182f562eeb56a423a11cf"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/humanoid_init_pos2d.obj": {
+      "sha256": "747df21bb4bc29582fdca49349fde8d6070561db889f6195209a79b793c11fe5"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_0/mesh.obj": {
+      "sha256": "cac5aef3aa7af35631d25d8793fe29b99354bd763041d9f9a1a747ce1ce3615d"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_1/material.mtl": {
+      "sha256": "4575e95bcf87917ffe2b4a3527f869e5d7bed95fd4d931c2dd6c81161c578530"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_1/material_0.png": {
+      "sha256": "e8889eb0662d230da8ef2f2b2a0a2adca9e752c15115b8eaf7f5a47bbdc066e2"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_1/mesh.obj": {
+      "sha256": "5fa887703982262cc0aa5cf3dac51b599af59e109847f89e481ca40a158454a2"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_2/mesh.obj": {
+      "sha256": "27852d6097ee804150d7201e3c2f7037ae652462d06eb9ec828279fd91547975"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_3/mesh.obj": {
+      "sha256": "ec5589240872721d1e7fd569f38deb53894738b00c4469381667e51693ca1fde"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_4/mesh.obj": {
+      "sha256": "69b294f6a1a4c6cbb37022b44cfa936f189de8a6211f4afb9231d0501bf4f408"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/tar_pos_0.obj": {
+      "sha256": "b3dae385776ebec6e9bb5324da8ba292dfca8841226ad56b8f8a76f57666ab7a"
+    },
+    "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/traj_0.obj": {
+      "sha256": "54f88d969d849b6a5b98562d03a1bc6e4c52faff190e59e3a052341c6f56e74e"
+    },
+    "tokenhsi/data/dataset_open_push.yaml": {
+      "sha256": "92eb016585d7bc8a7cd44d94a43c678c624b51792e206b12730e9610f9127bde"
+    },
+    "tokenhsi/data/dataset_push_native_phase_xy.yaml": {
+      "sha256": "4744ef263a610e7278c374044a76a1c69f5a1cf661899610ef2be066e380aa28"
+    },
+    "tokenhsi/data/dataset_sit/dataset_sit.yaml": {
+      "sha256": "3eec2532abda8b589d957db4a347a558552bd1c6e48f451c95c6d5260e21b246"
+    },
+    "tokenhsi/data/dataset_sit/generate_motion.py": {
+      "sha256": "ccbcc2ee43792dd4d6d86a99a1dbb19f74eca27834fae78ab06fd5d26e5ff5fb"
+    },
+    "tokenhsi/data/dataset_sit/generate_object.py": {
+      "sha256": "6167375aff13bde66c9bf21b1825ee249cf954baa0385c4dc99c226680bba1b8"
+    },
+    "tokenhsi/data/dataset_sit/preprocess_samp.py": {
+      "sha256": "5dde1872b03872a7e2cf6dbeacb4db396207f5564348c1a3b2eaed010126fa30"
+    },
+    "tokenhsi/data/open_push_late_rsi_bank.json": {
+      "sha256": "fbcfbc35d455cf9fafdd30720479953a0fe5ec3d28dd3553554858156904f155"
+    },
+    "tokenhsi/data/open_push_late_rsi_cube_low_bank.json": {
+      "sha256": "d92acdd17a542bf79f7d4cdb391f528f4ce00905bf43713444035b4e1816a927"
+    },
+    "tokenhsi/data/open_push_late_rsi_h13_bank.json": {
+      "sha256": "4cbf0eb4fde2a71b426c4b80cb244bb2da5fdd11612c97ef684b16a23b8206fe"
+    },
+    "tokenhsi/data/open_push_late_rsi_two_hand_bank.json": {
+      "sha256": "05d8b7abc7a593dd9d728548ca5ee28e9f9a67f30e30489e8581ef0242874034"
+    },
+    "tokenhsi/data/open_toy_reference_close_rsi_bank.json": {
+      "sha256": "097e6175e11da2874bab697b866c9498c2c5c43b3ffb285de8c5b05eed482add"
+    },
+    "tokenhsi/data/open_toy_strong_close_rsi_bank.json": {
+      "sha256": "e4f01404f6b3b5f5545cd0f2244c6e9bc35c059d1ba2a01c33c971b3687d17c5"
+    },
+    "tokenhsi/data/push_contact_face_at_rsi_bank.json": {
+      "sha256": "4e97bd5f765dad23d84f21f5da6b9a159e44683294fda15f5a6cad5dca34cef3"
+    },
+    "tokenhsi/data/push_contact_face_at_tilt_soft_rsi_bank.json": {
+      "sha256": "0d1a2b042c843bf62d81ce3335f4b8b60438839e6a192a12934f425d0dc1dad2"
+    },
+    "tokenhsi/data/push_native_phase_xy_2to5m_rsi_bank.json": {
+      "sha256": "2dd013a47a92b1e65a85a29d28e703bf4b411d2b23e1ea20f1eac0855435a1c9"
+    },
+    "tokenhsi/data/push_native_phase_xy_forward_2to5m_no_clip7_rsi_bank.json": {
+      "sha256": "5572e9a7c999a937f752416c4ff6e09d766f98bb44b9ebf33c18badbd4a4b585"
+    },
+    "tokenhsi/data/push_native_phase_xy_forward_2to5m_rsi_bank.json": {
+      "sha256": "0ff6f0bec0283e4fce1b1b0941c9534c7ee0790d4e01e5428589a314f60ed5c5"
+    },
+    "tokenhsi/data/push_native_phase_xy_grounded_rsi_bank.json": {
+      "sha256": "e81c770bdf80faea0f6024072b590f4d984411c782bea3afaae0fb9ccbc69bae"
+    },
+    "tokenhsi/data/push_native_phase_xy_rsi_bank.json": {
+      "sha256": "c314f20d7cbc25bc71f6de827e6f56f8639bd265463f1aa269ba3e75ae9be4a6"
+    },
+    "tokenhsi/data/push_native_phase_y2m_rsi_bank.json": {
+      "sha256": "84d67d20bc656d31492a19f26f6e05774424ef69b3aed2144895320361396c3e"
+    },
+    "tokenhsi/data/push_soft_legacy40_at05_rsi_bank.json": {
+      "sha256": "1ca43c1bfdb61a61e1d89c0ab01831e4049b6c60c8af9d707142ed0c8e6b1332"
+    },
+    "tokenhsi/data/push_toy_contact_align_at_rsi_bank.json": {
+      "sha256": "77a6972afd2bc2d1333149dce457275d07249079e4df3f76ee8368acda786194"
+    },
+    "tokenhsi/data/push_toy_midpoint_2m_rsi_bank.json": {
+      "sha256": "b90a05df25205f4feabd7754c640b4c30c1aad1c4e527737b0b4222af5d49322"
+    },
+    "tokenhsi/data/push_toy_only_random_scene_at_rsi_bank.json": {
+      "sha256": "29c3ee656992fbd6742efbd18c8808618240ffb092d831f9d63d31008d18ad4b"
+    },
+    "tokenhsi/data/push_toy_random_at_10deg_at_grounded_rsi_bank.json": {
+      "sha256": "0a8fc76f88769fdc07ee2889c58c450451a1d6bb5c3fc28dc9e2e73a98ccb62a"
+    },
+    "tokenhsi/data/push_toy_random_at_10deg_at_state_rsi_bank.json": {
+      "sha256": "b21073a99876c3f5e6be30e1c457d6c5f80e84b55f0fa46e38aa62be70e9f1d7"
+    },
+    "tokenhsi/data/push_toy_random_at_10deg_at_success_tilt_rsi_bank.json": {
+      "sha256": "4de89732852b5c5d5d751f67ea7c2c48f3f158b1c5a0be2dbc26fb732b3c1eba"
+    },
+    "tokenhsi/data/push_toy_random_at_10deg_at_tilt_soft_rsi_bank.json": {
+      "sha256": "5fb45a808d9e6af9362355fd4cb88c4027dcf7c5e0ebacf64fd713f51f386ba5"
+    },
+    "tokenhsi/data/push_toy_random_at_10deg_rsi_bank.json": {
+      "sha256": "04a1d1e2001e922ddeabbb5322bdb4045a2be870bdc5865a389d3465997a2a5b"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/FILE_SHA256.json": {
+      "sha256": "2d037858afefc56a341ac45bd7ae17df58a0959fa3415ceabac31ca0601594c1"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/README.txt": {
+      "sha256": "e4b2775f24aa9ec241fddbbb98134062add01b49ba26c95342b9c022e5128e7c"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/cfg/multi_agent/stage1_push_depth180_h080_rsi1m.yaml": {
+      "sha256": "72dfa615e1049a0a6c31c92a8abcce687538f50c8edffa6c8585216240a78b7f"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/cfg/multi_agent/stage1_push_depth180_h100_rsi1m_at5deg.yaml": {
+      "sha256": "18e787f26de45b5ba4963086e8b978adafa146d776dbe9de9856c89dcf4db688"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/cfg/train/rlg/stage1_push_depth180_h080_rsi1m.yaml": {
+      "sha256": "9e67906cecca2134f981fdfee4113bb5e59dec07951d42719f0e429f80a2b253"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/cfg/train/rlg/stage1_push_depth180_h100_rsi1m_at5deg.yaml": {
+      "sha256": "aebbeb6a94df7c1c1fb1e021140f3040b94e432fdd438d8a43290e5b25740dd6"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A342/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A342/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A344/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A344/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_003__A344/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_003__A344/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_101__A343/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_101__A343/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A341/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A341/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A343/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A343/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A341/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A341/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A343/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A343/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/ref_motion.npy": {
+      "symlink": "/home/hwanhee/juan/CVPR2027/stage2_jointpush/ports/koo_push/tokenhsi/data/dataset_bones_push180/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/ref_motion.npy"
+    },
+    "tokenhsi/data/stage1_push_motion_data_20261020/tokenhsi/data/dataset_stage1_push.yaml": {
+      "sha256": "e5f31e1b4123da416b8f62068706e1811764773a2699bdc561115965f37b8f06"
+    },
+    "tokenhsi/docs/relation_diagnostics.md": {
+      "sha256": "5f6e68afb57637fcfee16bef26502bb645630c01dd8844103e9d2a41ad639273"
+    },
+    "tokenhsi/env/tasks/__init__.py": {
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_box2objs.py": {
+      "sha256": "2e318d8602eafdf38a8f07e22cf82b130d145b28d8cd70b4a2d124823864a705"
+    },
+    "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_ground2terrain.py": {
+      "sha256": "0905fae47db9db5982a400ff433f543ab378e0d1f480cab163745daa34060d2c"
+    },
+    "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_traj_ground2terrain.py": {
+      "sha256": "9460995007c53c673d390924c508b6116abd18afe059db0d650d08daf277febc"
+    },
+    "tokenhsi/env/tasks/base_task.py": {
+      "sha256": "cfe3b4a158391b21873875c1ce1809a590f402f59ce0bf69b1bb5aad2dc59d96"
+    },
+    "tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py": {
+      "sha256": "6d942e993b76fe53af1595072c216daf775bc713613159971be0674539e3bf85"
+    },
+    "tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py": {
+      "sha256": "3267ebc9896c3dabedbc4da5e7ecd1804e73b34ba5c73e72de2f37669cd9e1f3"
+    },
+    "tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py": {
+      "sha256": "edc0f5be85c9ab43fbe1938f0792f5f264d9e455c3551aebfd36d018c6501df0"
+    },
+    "tokenhsi/env/tasks/basic_interaction_skills/humanoid_traj.py": {
+      "sha256": "61db1fb19e881df70b87c592c079c860c8f3d57a24314bc7eaaab6e376eab360"
+    },
+    "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_climb_carry.py": {
+      "sha256": "e3620cbf210b0c794a30e6179a093bcf3a6e73fa9cd94ad0be08091834f6cd0a"
+    },
+    "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_sit_carry.py": {
+      "sha256": "c5275bd8cf33f298c556cef627192b2567e2394297d74014de20ec1a735d7318"
+    },
+    "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_traj_carry.py": {
+      "sha256": "6904967f2333c522512209e91e2ac299ab59835fc43efba691e029a9610acbed"
+    },
+    "tokenhsi/env/tasks/humanoid.py": {
+      "sha256": "07b3608ec87d8501b79a4c030cdf710d8457bc1025503c9cb4b211d38995c1b4"
+    },
+    "tokenhsi/env/tasks/humanoid_amp.py": {
+      "sha256": "21a271b18827a1f11a577197f959c8ac71e6319a9b1a4a877834f49c3fa0fa74"
+    },
+    "tokenhsi/env/tasks/longterm_task_completion/humanoid_longterm_4basicskills.py": {
+      "sha256": "19fca0c3ee200588621a0344ed3ca3120d4a3732797ff8aa6fce6a7e4a5d6680"
+    },
+    "tokenhsi/env/tasks/multi_agent/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_context_reward.py": {
+      "sha256": "e77031f2def7a664696ea3ed8ac0336a48cff8f5c73de17beac4e1304fb4e925"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_context_task.py": {
+      "sha256": "b804440a4c9ec8c009aee8df0949ebd253b900571b2d3bffa817fb7f06bff37f"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_door_reward.py": {
+      "sha256": "365e6851990104506e37d8e61fa61cd26bff7432354bef55176db17aa704df3e"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py": {
+      "sha256": "ad1bf1ccbecc60fa51e0bf30ba295a0a25b3bb4cecfb6105f1bc59a7a7ad4e8e"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py": {
+      "sha256": "b50d9bd5f12fe7f34ec5ec2180ed674a440049ab25204f89528a4204b2fbbe8b"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_ontop_task.py": {
+      "sha256": "771a588f6e724238632ffaca277126725a5ea0420e68cc7d5e77523675eb8987"
+    },
+    "tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py": {
+      "sha256": "f018ca75c8e574d0979cebca1d4b3993bf2d65ccd15e862621e5c820b2d43eb3"
+    },
+    "tokenhsi/env/tasks/multi_agent/humanoid_ma.py": {
+      "sha256": "6fa2c8d2e54a4e6e6747614209ef15711000b646a150322b83aaa1012f20b53e"
+    },
+    "tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py": {
+      "sha256": "a9eb90e8b3d2461886ba58312afdce6b8d95fbf614c67e765b1f2b7923ecac74"
+    },
+    "tokenhsi/env/tasks/multi_agent/humanoid_ma_door.py": {
+      "sha256": "cd52c735de9586b23727ac15e6d4d3d9b8081cd4527440bf42372b2315dbdcbc"
+    },
+    "tokenhsi/env/tasks/multi_agent/humanoid_ma_door_hold.py": {
+      "sha256": "7a212e35c1b068a22020593aeb4b8351bef98060d52e40f5770fa32ea205911e"
+    },
+    "tokenhsi/env/tasks/multi_agent/humanoid_ma_open_push.py": {
+      "sha256": "c035adf20d789e13b736e8b6aa2401ec8c1669be757a57a5e75a7e550a77b610"
+    },
+    "tokenhsi/env/tasks/multi_agent/hybrid_rsi_runtime.py": {
+      "sha256": "01b374ded2fccd7287f07617aacd5df64134c877d5829853d415bb211cade425"
+    },
+    "tokenhsi/env/tasks/multi_agent/hybrid_rsi_screen.py": {
+      "sha256": "fedfb83711521fe1fce06c624050584eb1ece2669f66c48e612d6604f0160cd9"
+    },
+    "tokenhsi/env/tasks/multi_agent/ontop_task.py": {
+      "sha256": "99a799a2896c2d80dff3aaf9445836b6316b23894c2e902ebd504bf5c44aa776"
+    },
+    "tokenhsi/env/tasks/multi_agent/open_push_reward.py": {
+      "sha256": "7c9add86f5018f81d9a3306b0c9b3af74aa7393e94c4c79e6c0887719f6d941e"
+    },
+    "tokenhsi/env/tasks/multi_agent/relation_diagnostics.py": {
+      "sha256": "11ef475aa950b10e202cd1b4bdeb89837b2eb105096f8fc663fef9eafc9676ed"
+    },
+    "tokenhsi/env/tasks/multi_agent/relation_reward.py": {
+      "sha256": "97132dbff7428cda7dda601db128f5d41eb9748538b0b78f552fc7f018e17e70"
+    },
+    "tokenhsi/env/tasks/multi_agent/relation_task.py": {
+      "sha256": "a0b43ceb78e4a8378fffc7b841b9f97ab5d663f6e84be356013776dc8e7f92a3"
+    },
+    "tokenhsi/env/tasks/multi_agent/scene_features.py": {
+      "sha256": "a72314083d7390c9277cc8421115b517acae010079ade7a6d4356220b8f63b9f"
+    },
+    "tokenhsi/env/tasks/multi_agent/vec_task_wrapper_ma.py": {
+      "sha256": "af6ec9a8e7c9b9f5d91b610aafdc440efd07791532c467e9de85d211ce10f2d1"
+    },
+    "tokenhsi/env/tasks/multi_task/humanoid_traj_sit_carry_climb.py": {
+      "sha256": "355d6dd2cf159850783f99d95b401276103f3cb0c6cbc096933ec651de2f1575"
+    },
+    "tokenhsi/env/tasks/vec_task.py": {
+      "sha256": "33db038a7183fa74025fa6e11bbfbcaca54f10f72e52e97910196060f84000d2"
+    },
+    "tokenhsi/env/tasks/vec_task_wrappers.py": {
+      "sha256": "be3001d8b341118c556d1ccdc9d91f5c4f8ba4edd31cabb8db63f1f015a3f4c2"
+    },
+    "tokenhsi/learning/amp_agent.py": {
+      "sha256": "b20fc99f97e14299ed8dc9f01cb4a04b9d650fd3ae86ea5c3e57084c74d557e8"
+    },
+    "tokenhsi/learning/amp_datasets.py": {
+      "sha256": "8e2802113413e9d88e31559c1b3b8b233ae1b6f4b6b9e82440eb0f0aa1eeebb7"
+    },
+    "tokenhsi/learning/amp_models.py": {
+      "sha256": "e1cafd7ac4f133039ef9d160bd49666829012a8c12b17cfc9bee858fa6bbd589"
+    },
+    "tokenhsi/learning/amp_network_builder.py": {
+      "sha256": "a51179a14690d50467e0161f1afdbe537c1670463d7a20782fe4687c19695d68"
+    },
+    "tokenhsi/learning/amp_players.py": {
+      "sha256": "ccc382cd71962d2fd3d1252ed9ac18d141289cd63b1579f1c40ca811d69c03f8"
+    },
+    "tokenhsi/learning/common_agent.py": {
+      "sha256": "8e90235fef14465040be1bad875fe9f3de69b94f391a2b788e1463ec99620187"
+    },
+    "tokenhsi/learning/common_player.py": {
+      "sha256": "bd37d2597217e9258dc6fad0a27500e1e7a26c8246643f1a7b5198a7d6199b45"
+    },
+    "tokenhsi/learning/multi_agent/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tokenhsi/learning/multi_agent/amp_network_builder_ma.py": {
+      "sha256": "f5b7a6df63c6444bfd9fcc39e90e44479676a604044993dc02db09b1c1ca8b59"
+    },
+    "tokenhsi/learning/multi_agent/coordination_head.py": {
+      "sha256": "53094781b05401bd169933de746215226f1cf19884e3292f02d093d534a9e659"
+    },
+    "tokenhsi/learning/multi_agent/edge_context_encoder.py": {
+      "sha256": "3f49e294e73321902789de995b9dd9a8431f241ae2b66e4507b7ee58fd75ef2e"
+    },
+    "tokenhsi/learning/multi_agent/edge_context_eval.py": {
+      "sha256": "d3a8bfe61ade874d1799681fee7c83856ce5d5b3e10979d0822c57dd7a4b3cdb"
+    },
+    "tokenhsi/learning/multi_agent/ma_agent.py": {
+      "sha256": "037cfb01c1a808fd4300628076a1891e1921f8658fb3c6151dbf7b18a088081d"
+    },
+    "tokenhsi/learning/multi_agent/ma_players.py": {
+      "sha256": "078283713d6897cfb60afb1c16547631499e405dbe6686dea901add262058d1c"
+    },
+    "tokenhsi/learning/multi_agent/scene_normalizer.py": {
+      "sha256": "fa36a08cfb9018e9a51130ce5c7626f55e66af17327e1b159e703eed7ea214f4"
+    },
+    "tokenhsi/learning/multi_agent/stage2_transfer.py": {
+      "sha256": "cc5a9f4752d8ca23c26381bb7ca59297709207f150afb0cb225703a5631de588"
+    },
+    "tokenhsi/learning/multi_agent/transfer.py": {
+      "sha256": "a47072693284688f8e9bd95dec55863e53f4c6d1be758d29c2bab280ad2a99b1"
+    },
+    "tokenhsi/learning/replay_buffer.py": {
+      "sha256": "9f4097a1f3ea44d132d18dc0b72a9141051c093b193443e4e9bd578d28844a5c"
+    },
+    "tokenhsi/learning/transformer/amp_network_builder_transformer.py": {
+      "sha256": "efda485e1375fbb3d7a1f86bd182b2585861490e8a08f434b6dbfb4f515577f0"
+    },
+    "tokenhsi/learning/transformer/amp_network_builder_transformer_adapt.py": {
+      "sha256": "4dae24d8d42b31a8cda12791fc2f9abb8d69700be4c6f6d954f5662a3bb54890"
+    },
+    "tokenhsi/learning/transformer/amp_network_builder_transformer_comp.py": {
+      "sha256": "188f612865a4e39581d6be57eae19b6d7eeedb5b51bf19bcfc54176657f446b2"
+    },
+    "tokenhsi/learning/transformer/amp_network_builder_transformer_longterm.py": {
+      "sha256": "f0e6a6113e5303ea89778916ee1ce08d17a504ea038fbe55f491789ae503bc8f"
+    },
+    "tokenhsi/learning/transformer/composer.py": {
+      "sha256": "03716f77a57353bc5008ba217c66c775e911197be4b766e7485a7dda84265cbe"
+    },
+    "tokenhsi/learning/transformer/trans_agent.py": {
+      "sha256": "46d8322c8203966b5bb6b56accc09d53f0ea6385614102036f797557a2db772e"
+    },
+    "tokenhsi/learning/transformer/trans_players.py": {
+      "sha256": "40b57c33012a0c0db13c697fa425804143fccdc76eb7fb1bc81e2021833c2bad"
+    },
+    "tokenhsi/run.py": {
+      "sha256": "dfabf435d70f477d7f3e2eb2914397a7dad50dadd84d1df8668c96fbca6c8014"
+    },
+    "tokenhsi/scripts/gen_data.sh": {
+      "sha256": "49356f26a57806e3cecd1e42fb2a8ec2eab47ebe8401afde2681c6cacaa4eb9d"
+    },
+    "tokenhsi/scripts/multi_agent/approach_reference_rsi_semantic_late_test.sh": {
+      "sha256": "3fb2e154dd8ac707b5d2173a495b7ca5288d06b9f1c1d97e059f58dec431f3d5"
+    },
+    "tokenhsi/scripts/multi_agent/approach_reference_rsi_semantic_late_train.sh": {
+      "sha256": "956abfb64c8026815a322bad0b6cbf926ac0330a82cdb43f23fa5c962f4e55ec"
+    },
+    "tokenhsi/scripts/multi_agent/approach_reference_rsi_semantic_late_vnc.sh": {
+      "sha256": "eabac75e9f03af915b15096455780b01ceec745c161dea079d20398a730b1c28"
+    },
+    "tokenhsi/scripts/multi_agent/approach_reference_rsi_time_late_test.sh": {
+      "sha256": "a8f19fa7b20edf00a8cd8da05a70f3f6c137860d1b288e0c734c53f32021d1ce"
+    },
+    "tokenhsi/scripts/multi_agent/approach_reference_rsi_time_late_train.sh": {
+      "sha256": "31389f2f52f411bf12d929ebe2f5a2be27d90003e6336e80169f78b466da0859"
+    },
+    "tokenhsi/scripts/multi_agent/approach_reference_rsi_time_late_vnc.sh": {
+      "sha256": "83e64ede5d58c6a6ccc1f36a88e73f8c8c0cc25080e01305f80d9d13b66e95de"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_independent_with_climb_test.sh": {
+      "sha256": "52244426734381f771612d3ed62f47cbfd7af36da8029786216725db548383c7"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_independent_with_climb_train.sh": {
+      "sha256": "b7652f28fef6b2eb0fecf7fa47ce5ee925932238a8da28a9d0e13766aa71dd3d"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_independent_with_climb_vnc.sh": {
+      "sha256": "b2c4c80423628fd8ef2e9f1556b9b2208d307d35da754e423b36dc958a88fc23"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_at_goal_fix_test.sh": {
+      "sha256": "609f312b01bc4a6e9c859d1cb6d24624f19026049806e7b87167000114edc66e"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_at_goal_fix_train.sh": {
+      "sha256": "23fd42b84d4519f22c3a2140106066dbd2c4d314eb49cad699f732136a4ce1a8"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_at_goal_fix_vnc.sh": {
+      "sha256": "cb2e9549af3acead8d41b00df1e20aa55b01d884c4a802e56143f96cc1e90a92"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_hybrid_late_rsi_test.sh": {
+      "sha256": "2f4a339a1e2bc95bbc5d726ac6576488c7bc25d8fd9a9dfa54f03cdf5827e8f5"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_hybrid_late_rsi_train.sh": {
+      "sha256": "6c0d58fb021de820e323efb58fd79e25523c79314581d6a72f9421a060903b72"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_hybrid_late_rsi_vnc.sh": {
+      "sha256": "7c540cd03ec4bf233ef16a41cfc06b4ef3be4f1f2a6118c2c6a1e806cb6125dd"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_ontop_putdown_test.sh": {
+      "sha256": "f61c8d265253249bcfc290fc8b179e30f488f2f57fbbd478a2a6083ea0a88b42"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_ontop_putdown_train.sh": {
+      "sha256": "b7241b746b63c4cfe046269ab7e18a9c071f8e4f1c350a1474215e398b16002a"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_ontop_putdown_vnc.sh": {
+      "sha256": "6a792e0ef147d51368b1272242826cccfaac89dabe66c7b87068bf909d77964a"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_at_no_near_test.sh": {
+      "sha256": "16e06398bf2ed1cf98fd7188b8a417c20c540f6796c08a36f46e822a94304c8f"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_at_no_near_train.sh": {
+      "sha256": "b2d9f06f0e4c7eda5808d7cc84a540f57436e965150c8832116519a39a8306ee"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_at_no_near_vnc.sh": {
+      "sha256": "d619ec7d5d60d810dbe8d923de506ce4125b6c1e0dc6e6795587cf5f47720d0d"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_placement_no_near_test.sh": {
+      "sha256": "61775588f2f49727463f102c5c16c416c480cbf1d209576240eba8c303ccff97"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_placement_no_near_train.sh": {
+      "sha256": "a07749532866e0b327c506cb89da2ad67b2cf56618e8cd967eb4c86e18c05d15"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_placement_no_near_vnc.sh": {
+      "sha256": "6e89ed4d5e638d6f876a6a17d041f3a30587a80930aae374697f367b65a8d8b9"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_placement_owner_holding_test.sh": {
+      "sha256": "97553cc4e705f2b784c69eba6e2c46e265536cf31e8430b179c7ef7fbfffa360"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_placement_owner_holding_train.sh": {
+      "sha256": "47ac307a29bd440bbb5c8c13af7832433add7581cb9b99cf4c1352d6f2788f62"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_paired_placement_owner_holding_vnc.sh": {
+      "sha256": "70b1e213f1ef8637d0a2055423fef666c8c88466ed86de2d52f0ca8342ac3111"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_placement_focus_test.sh": {
+      "sha256": "aa0364854a004213d76dc0a336a36b1d9358eea7afd595f287d0c4755993f370"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_placement_focus_train.sh": {
+      "sha256": "39b90e5bb68def232d3a089b6b7dc99371c8f2d41f8df5a9cb33b40a8296f013"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_placement_focus_vnc.sh": {
+      "sha256": "3fb1a1b421e90f9b93fc2567ec43ac4d36c6071a59ced98f1c1e470ef014b675"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_plane_test.sh": {
+      "sha256": "0a6249f0f726c3ae97866a37bea29ebff40cb48e740aca1b5cd29dde94c86f34"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_plane_train.sh": {
+      "sha256": "3d07cdc9f6b33e08b969ab80a63f48faf7d1a7ff78b22e01c1cdc93b32cd43cc"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_plane_vnc.sh": {
+      "sha256": "31ee91140947263940acdaef22439e564aaaa4fcc3b23abdc8c2d9bb9c5485c1"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_test.sh": {
+      "sha256": "353168db4ab87b0669e8230b5c7de3a8cd57f54c79089ccfabe922bf05381542"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_train.sh": {
+      "sha256": "3909eea8730ecd1592f6f451f6efd8e4c91520c66cb672762fbaff944e964ed0"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_self_sum_vnc.sh": {
+      "sha256": "52377d3699799a0c215bbb0b55134c982723210e944c862ff9d835fa0c918a40"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_sit_plane_normalized_test.sh": {
+      "sha256": "ae6377f56bf710a18c455254decd66f956f886144013dd2f4be0242480662ef2"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_sit_plane_normalized_train.sh": {
+      "sha256": "dab346b98c63fb8155a0cb1b90cb1553e0a0402d01f7b66bd7dc951ea3bb4709"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_sit_plane_normalized_vnc.sh": {
+      "sha256": "5b831417c972a1cd0df5f687d5a7d6346dd4800cd4494f26061ec6a0fd23ce69"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_size_progress_test.sh": {
+      "sha256": "9918d2301d11ff370214a0d65a5d9d80664e8a89eedf1f22a772f67c736cf3ba"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_size_progress_train.sh": {
+      "sha256": "6b6b8cba4b787e1b22645c2476fcd551a6ae84ede86392f0644c69fc567a9265"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_test.sh": {
+      "sha256": "469199e2a9708413addd01971731c174937ecc9ad525e4721b2d68550e3e1d0d"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_train.sh": {
+      "sha256": "f41c763230b41a713e9d8303854656edb747744259a4669df6bfe2aec033ab71"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved_vnc.sh": {
+      "sha256": "4c1febde21661622cabd10c69a34d455d5fbe29b88204c7c3e770240aaaa61b1"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_test.sh": {
+      "sha256": "585cb96a5c1b5e4cbe35016ee534ae6b38b770e0fa5d2aaa997df23c1a823147"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_train.sh": {
+      "sha256": "dc47025fd3595da4777e34b005f5a0c4095f0a509ffa2a630f1c4e3945baa66e"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_skill_curriculum_vnc.sh": {
+      "sha256": "d720b4430c99b0e39ed49737d0b079b418a79c125c647febd6d52f617577e173"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_slow_near_start_test.sh": {
+      "sha256": "2507071420b459b534ceadd85be365deef21f58c3ef25486e56ace4a0ffcdeaa"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_slow_near_start_train.sh": {
+      "sha256": "c1dda380a0dae3c87cf930519c16087714301bd45e7c7998102a8b4bcada7cdc"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_slow_near_start_vnc.sh": {
+      "sha256": "1570c11d230da30bddf86d058d72d8fa811c4b290e2ba1180f1129e3a5eefdf7"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_student_rsi_test.sh": {
+      "sha256": "eb37604f16f932653c914c3f9f9638914cbe36536761725fca106c31a7c72be8"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_student_rsi_train.sh": {
+      "sha256": "90fafbbee896fe37e1c2044e0250c506a4f8d7a7ba3764f1ab407666ae7946f2"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_owner_holding_test.sh": {
+      "sha256": "28769ecef1031e450ef9083af0011dbbebb6883e91219cbac04470e56544694f"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_owner_holding_train.sh": {
+      "sha256": "97feaebf6bbd5e911a7953c48b949693c0217a436a59c22e9c91c1f1a0be155c"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_owner_holding_vnc.sh": {
+      "sha256": "56296119cb7bcfccfecef1cab5e7420a28d56160801701e85e9c2846448be472"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_shared_edge_encoder_test.sh": {
+      "sha256": "efb9b4a18d03e325c7f5341ee52db3b50b8ebed985c7b23b95790e0a139058f3"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_shared_edge_encoder_train.sh": {
+      "sha256": "a6b57e0739dc8df82b4ed0a5b0dfa4daeb0097351dc6ba9729b5822f5374a74e"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_shared_edge_encoder_vnc.sh": {
+      "sha256": "ae0994306d94d63ca3a5429219f3a68f987945ba7d485ca05638966c2607b0e5"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_shared_random_binding_test.sh": {
+      "sha256": "8e2e9a52ba50a0712cd3e8995609473b2906658d68e45119f5a1cc3b34aee38b"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_shared_random_binding_train.sh": {
+      "sha256": "c20ac244dbfaa39b00368c38dc3f29b3003a1fa038fb41109fb90ae1ef2ca6ee"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_shared_random_binding_vnc.sh": {
+      "sha256": "90d9447544ef3652c3efea297c0e145879646b7461501a78fe397e12b79f1e64"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_test.sh": {
+      "sha256": "bfdd2a48a156d44aa3a1a9f25740bb284800af86fab83199602bf5345876c095"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_train.sh": {
+      "sha256": "4e42f152f187686a31e559a83854d5e8a4a18fba682b0f2f5f9e98821d7733f7"
+    },
+    "tokenhsi/scripts/multi_agent/approach_scenario_stage1_unified_vnc.sh": {
+      "sha256": "71432a59cac82ba9ea5c8078de9da6743c5ab8b9681e9077c25c9269e8397de5"
+    },
+    "tokenhsi/scripts/multi_agent/approach_stage2_coordination_sit_plane_test.sh": {
+      "sha256": "7a78b0f4f42be18714149086c68fd293cf861e3e6a446364770148c940986ff1"
+    },
+    "tokenhsi/scripts/multi_agent/approach_stage2_coordination_sit_plane_train.sh": {
+      "sha256": "430057c91ae620bde743e43e646fc4059e735149190d25b5e946a37cf51b1416"
+    },
+    "tokenhsi/scripts/multi_agent/approach_stage2_coordination_sit_plane_vnc.sh": {
+      "sha256": "b154bd830d000da9dc0cc526c74557a804c15f0022aee8b7390b9e3546d56196"
+    },
+    "tokenhsi/scripts/multi_agent/approach_stage2_coordination_test.sh": {
+      "sha256": "3f9acd19f0369249725a3cb72e70a6b504ce9874b5185a33dbf6f2f860c36324"
+    },
+    "tokenhsi/scripts/multi_agent/approach_stage2_coordination_train.sh": {
+      "sha256": "8bd07f290688fa346086d6fb58cbd31242dbcb9153cff5220dc664bdb33d4249"
+    },
+    "tokenhsi/scripts/multi_agent/approach_stage2_coordination_vnc.sh": {
+      "sha256": "8d75260f4e4f808b1263ea72625044355bdcb66f6d90a0369276197cfe97baed"
+    },
+    "tokenhsi/scripts/multi_agent/audit_native_push_geometry.py": {
+      "sha256": "ffceef99a1167bc42c7194a368222274946067fe6e78db2d5f8e35d07d7a9122"
+    },
+    "tokenhsi/scripts/multi_agent/audit_native_push_sampler.py": {
+      "sha256": "6e8b93879aea28c123e67c5b53381231f2fe32ac9117916b6ce452b56fb4ec4c"
+    },
+    "tokenhsi/scripts/multi_agent/build_bones_door_preview.py": {
+      "sha256": "94a490af41a7072c4c4fb5eaae906e9751422618275ee4b2f4e3979414766ccb"
+    },
+    "tokenhsi/scripts/multi_agent/build_native_push_phase.py": {
+      "sha256": "c56a2168d0c69291d428b22b01ae42a432df235407c36e1d6dde26878877d7b3"
+    },
+    "tokenhsi/scripts/multi_agent/build_open_push_rsi.py": {
+      "sha256": "f746885fcba44f75b4f234ac3b1e3dabc6e812f9b273bfa1d47f16d19b6fe1c4"
+    },
+    "tokenhsi/scripts/multi_agent/build_open_push_rsi.sh": {
+      "sha256": "e146e985913715cb7fb11369a8fa1af5a9b4bfa287c33c9258ee6edf6dc32427"
+    },
+    "tokenhsi/scripts/multi_agent/build_push_midpoint_2m_rsi.sh": {
+      "sha256": "7a137b2bd1e8a78966af7920fb8a29518e4966123420275649a2aa06197d0f66"
+    },
+    "tokenhsi/scripts/multi_agent/build_reference_rsi_bank.py": {
+      "sha256": "f25731bf1b2212752ede9fed3f0370f47fbe5928d51ec838441a36db4aa322a3"
+    },
+    "tokenhsi/scripts/multi_agent/check_door_autoclose.py": {
+      "sha256": "c98cbc23debdf922e4af51e0999e401560ce58b1703227e16d1ecbdb2f988166"
+    },
+    "tokenhsi/scripts/multi_agent/check_door_open_cpu.py": {
+      "sha256": "0e87ae700fd45a07058f20f0fbd92498ca550d59d3f79c733252834aeb12102e"
+    },
+    "tokenhsi/scripts/multi_agent/check_native_push_phase.py": {
+      "sha256": "c8fcbcce6216125afea860db5b65128b07c78222e2b588dce7e09a752a7efd50"
+    },
+    "tokenhsi/scripts/multi_agent/check_native_push_phase.sh": {
+      "sha256": "3a74c234523a26b88adafa85b0a6edf237ebaba9e445c5a71d3f4e4e2629aa0c"
+    },
+    "tokenhsi/scripts/multi_agent/check_native_push_y2m.sh": {
+      "sha256": "903a4fd87fbdc36bdd195d6cd80d08c90a8c2787fec5cecd087d9aa21f91cb13"
+    },
+    "tokenhsi/scripts/multi_agent/check_open_push_physics.py": {
+      "sha256": "f6e816aa7841b2a4b3e1f62b27625e67d06af24bcd5afd67e3fc171960fc74ea"
+    },
+    "tokenhsi/scripts/multi_agent/check_open_push_physics.sh": {
+      "sha256": "ee8d8df096f6c26ebb0334b4c9987259e1ab76a98d9f292605e8d28fabf19680"
+    },
+    "tokenhsi/scripts/multi_agent/check_open_push_zones.py": {
+      "sha256": "5f5b2b0e25c16c9ab7c7b3a3ea051ba11db208d1bba9ab2e41290e11b7d3a4b7"
+    },
+    "tokenhsi/scripts/multi_agent/check_open_push_zones.sh": {
+      "sha256": "7bd33cc0453edc830969b8a4381d999fca269a10d801d2aa9390d3f6da22ffbf"
+    },
+    "tokenhsi/scripts/multi_agent/check_open_reference_push.py": {
+      "sha256": "746cee65ce142036dc11e4d1a1b4b841a91809345f52f75667efc6116ffc1946"
+    },
+    "tokenhsi/scripts/multi_agent/check_open_reference_push.sh": {
+      "sha256": "613efe905106caa471885cc691cc5a384bf68d990bb0b100c788500c471d83c7"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_at_scene.sh": {
+      "sha256": "a7f630220b15d4561da8449aa4957b3d21bf303791d7345496b5989785f90b45"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_at_success_tilt_scene.sh": {
+      "sha256": "aa12a9ac849a1c481e2bb80503fd28594078519cea2889e57e4d390fd41a057e"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_at_tilt_soft_scene.sh": {
+      "sha256": "71b36d12becad2289f3f5ed4e58e6aec132ae75053e8e44d81f631d5ac7de70c"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_contact_align_scene.sh": {
+      "sha256": "0ceb49d5146e78c63532a7990802caa2d6e7c60223434dfbd12eead227a886cd"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_contact_face_at_3to5m_scene.sh": {
+      "sha256": "4d43924f4e5b3c2c7c5e97c84a3806e6bc2c4b3081af930b046d15ffa56e11f5"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_contact_face_at_scene.sh": {
+      "sha256": "b5b2e2ff1c73e05757b1df8af9970f333e09335e4eaf04d6da72538ccfa22b87"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_native_y2m_scene.sh": {
+      "sha256": "3ae8083125f4e63d74c8d3e64678e67b1b1f11a8cf9ec61a6fe0daaeef40a18a"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_only_scene.sh": {
+      "sha256": "454ffe6140f4b6bfc49fa2984c8ed77ecea12a40946a112d5c1b90624e42fe6d"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_random_at_scene.sh": {
+      "sha256": "06d59b0856c8ca4468ebc555ec96e70d5a642ff0abd116b2e256b7b4eee3b5fb"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_random_scene.py": {
+      "sha256": "e43ff605a9bb546b4cce8ebaaa8ddceddcaab3dcb9cf793c016f485863f7533f"
+    },
+    "tokenhsi/scripts/multi_agent/check_push_random_scene.sh": {
+      "sha256": "a555dcf13099b932fa29ecbbacd8fa1e9a2bc07ce55a33d96414e7e99d6fc851"
+    },
+    "tokenhsi/scripts/multi_agent/check_stage1_base_push.sh": {
+      "sha256": "05dc5097da4d45ad8a2c67a68d3bc9d67ab355808dc43be7ecbbf54db07fb71e"
+    },
+    "tokenhsi/scripts/multi_agent/convert_bones_door.py": {
+      "sha256": "2619d933fedfb06e77598e396b09b272e092ecc70d97c289a694b983ddd42bc1"
+    },
+    "tokenhsi/scripts/multi_agent/convert_bones_push.py": {
+      "sha256": "6ace4b14ccacf710392c6266268f855726457fc7b16e51328e997a21b0abc874"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_amp_off_test.sh": {
+      "sha256": "03c1274ee6669455586f11bf4341969cbbe39ad7392e7d4f6055f9f721252a84"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_amp_off_train.sh": {
+      "sha256": "9b4a1a8adf7fa2fc8256f8f8b5fa418d74026872a165ce57dcb151d9289900a9"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_amp_off_vnc.sh": {
+      "sha256": "8a87531f189b737fc5c095e803fa39bef25b561e09a9689939b4ed46c3212a87"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_amp_on_test.sh": {
+      "sha256": "85d93c1b630555a15f8bfd17d5ee4cdf2067dd5f81c3a47302b9a8493a5b2670"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_amp_on_train.sh": {
+      "sha256": "cc8656d68a22dd3e27a845e21c1c0b731e6382d27a5fa52e5899bf9faebd74ee"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_amp_on_vnc.sh": {
+      "sha256": "e829807b618258409b59bf286e46cf28b60f913cb162114370cdbe13b6aa049c"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_bones_left_amp_test.sh": {
+      "sha256": "c76e00d3d27888f41dcda7fbce6a678da7558e8a02ce440cfe43b6d2aac4e649"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_bones_left_amp_train.sh": {
+      "sha256": "d8b7226578ff5906421c8b9de439768dfbba8f10be5cbaee628be24b875ef575"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_bones_left_amp_vnc.sh": {
+      "sha256": "762a0b8a6400513834408318b9db822d3d33daeb013b0eaafe9e00c2213528d7"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_hold_amp_test.sh": {
+      "sha256": "9a592b86c9bccd17402a8cb3c8ee82ecefc5f265cc468c672bccff170d32d349"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_hold_amp_train.sh": {
+      "sha256": "6a26af6525613219677cbf931863b8b017e99d873206406408256fe3743b6ef5"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_hold_amp_vnc.sh": {
+      "sha256": "b4cdc7b8d6703cb31eb23db704075777eb41b73ada2fc5be0e56250583a7e3c5"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_shared_edge_amp_on_test.sh": {
+      "sha256": "60957c713900a3e3912295669031883f0581e0a1ff56947cfba4dda9514c1668"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_shared_edge_amp_on_train.sh": {
+      "sha256": "e3064628d2c186e408f7e158f3d36329e113a276e7ec0f58dea2b1278ee7de81"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_shared_edge_amp_on_vnc.sh": {
+      "sha256": "102a202fd6b79b19f157da1fcbe67db00ca881cff5c0fdf1d5ecf7c1bad835f7"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_shared_edge_approach_amp_test.sh": {
+      "sha256": "9bfeca3c38ae4dd87a61f5c4b1acde4bec491e34e808500776b0e5bb51000af0"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_shared_edge_approach_amp_train.sh": {
+      "sha256": "92db12c1ca602443bbd09969e378571297405c5a4f8151d74d5420a4237a6fdf"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_shared_edge_approach_amp_vnc.sh": {
+      "sha256": "17d662fcecea49c63bc475355041be9d2881fae98c3bdf3a083e6cfd3e639adf"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_unified_amp_on_test.sh": {
+      "sha256": "caad860936f1da05050225ff209d6d674aaafc5486abfd5edbe51e8f08b767db"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_unified_amp_on_train.sh": {
+      "sha256": "af24ca6dbe9447b892dd4312fe356a90cbee0dbdb23dfb6995260dc44f3f04cd"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_unified_amp_on_vnc.sh": {
+      "sha256": "4a1203deeb17992e1fcfc2baec5db97cb651408bee9533c63dd52b48e764d88c"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_unified_approach_amp_test.sh": {
+      "sha256": "f142f9ebb41f921f8e700b5066debec47a7ad92b13dd9b09414219005a5a77a2"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_unified_approach_amp_train.sh": {
+      "sha256": "e83e6a94e92af275d346f9885deb3579edb5a815044c50b7bee36705312b5ef2"
+    },
+    "tokenhsi/scripts/multi_agent/door_open_unified_approach_amp_vnc.sh": {
+      "sha256": "2840b42c1c16256421a403a74759d10d724c7611bfe4f9f8ce6063341e46471c"
+    },
+    "tokenhsi/scripts/multi_agent/door_pull_unified_approach_amp_test.sh": {
+      "sha256": "d48db2bdd486cd1296e0d68c018563941bfcd2e0377b05bf04d51b8932885af3"
+    },
+    "tokenhsi/scripts/multi_agent/door_pull_unified_approach_amp_train.sh": {
+      "sha256": "0dcfc612fe5e3c062048a54e52ff143a34c67b46f518a511c386f7375595de98"
+    },
+    "tokenhsi/scripts/multi_agent/door_pull_unified_approach_amp_vnc.sh": {
+      "sha256": "d8811ab2579fc20fe55c4fe07004feeef060ef3a74d53984de6ee4631071d286"
+    },
+    "tokenhsi/scripts/multi_agent/door_reset_view.sh": {
+      "sha256": "b73c7462ed0cb203ef896ea8bdc673eccf12a53cffe3ef401ad2661820da8537"
+    },
+    "tokenhsi/scripts/multi_agent/door_reset_vnc.sh": {
+      "sha256": "0a9a5bd36b91acd1ac067ff0dd6a09dcaaa6a7f50ada7a51f7789585433427a1"
+    },
+    "tokenhsi/scripts/multi_agent/evaluate_z_sweep.py": {
+      "sha256": "59dad7a992868e8b35232ec53376c2fcd5ff2acee12f50c319f24a637c64ecce"
+    },
+    "tokenhsi/scripts/multi_agent/evaluate_z_sweep.sh": {
+      "sha256": "76a1971730c56d3079029506aabb0aa17bfe82219413df26df42c8567bf99c0c"
+    },
+    "tokenhsi/scripts/multi_agent/gui_gpu_env.sh": {
+      "sha256": "4d8fd7bf1a49b9e4a6805d3d0dae36b144e1784d1b39d6f7ce2a79d719680650"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_port_common.sh": {
+      "sha256": "5bb01fa87d8d99a017aed7ff38ce9166bd4640b2b2fa4c65aefa8da884973f19"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_test.sh": {
+      "sha256": "bdc30b4be30bc7034b52d3156814f82be1ee569538c95a97ddb6ee8514e4289a"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_train.sh": {
+      "sha256": "14dc0fbb7027ce951124b98ca820305f611249c70f8cba962e78c90fd0be3cfe"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_typed_bias_message_test.sh": {
+      "sha256": "a8727a8d16f3cb9dd980d8b2d96c94844524d9ad65bf67657b6966a612f0757d"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_typed_bias_message_train.sh": {
+      "sha256": "ac82b6cf513e5c834a15fa57421750cca1074882f2d691f7eda929f384673b2a"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_typed_bias_message_vnc.sh": {
+      "sha256": "0617970e172cf130dc4f1f44f5d0a0a604d92d8439b35f094f75eecc87345cb4"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_typed_bias_test.sh": {
+      "sha256": "2c90151c849fdb60382e0179e1d5a44d2a08061b37015cbd6a26e1450106ba46"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_typed_bias_train.sh": {
+      "sha256": "399c2dcef888a7ccdc4ee7f1dd9f052a4340bf77b214ad7a0fdf6d852a9e2932"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_typed_bias_vnc.sh": {
+      "sha256": "4f32bebc2fbcc496b4d5705a83278022ae13d6dbff77cf2cae319d3d352c70e3"
+    },
+    "tokenhsi/scripts/multi_agent/ksh_size_rsi_vnc.sh": {
+      "sha256": "89b75d52b0f3bcef191526f7e04366de3ff6a904626b01968edd2912c8e10c40"
+    },
+    "tokenhsi/scripts/multi_agent/ma_carry_test.sh": {
+      "sha256": "e0595468c063da1fcf947aa5417b27245bd2898ce72d3d9c41f9b25727f7023b"
+    },
+    "tokenhsi/scripts/multi_agent/ma_carry_train.sh": {
+      "sha256": "dde2a110cd1607332817b070c8309ea681bbfe5e2bce9733b5d1d72ae1cbb73a"
+    },
+    "tokenhsi/scripts/multi_agent/ma_carry_watch.sh": {
+      "sha256": "ec6ff7f4ad133f3e8bfd411280b59493571bb95e615796459caf96a25dad6693"
+    },
+    "tokenhsi/scripts/multi_agent/mps_auto_env.sh": {
+      "sha256": "97901b4b15844d52951930dc4fbfc803b7029a6eca1477a371413a297d92ee30"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_late_rsi_test.sh": {
+      "sha256": "fe2dffacdcfbd9ef77c99e9148e6ac2edac9690f50136ae2d44ceeaf8502065e"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_late_rsi_train.sh": {
+      "sha256": "cc1b42b03caac2bba9765e083d51d6988b3a30a30cfb96a0d8ae59495b1b249d"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_late_rsi_vnc.sh": {
+      "sha256": "f21b8f3f7a14f94efe809ae707aa2189d9f1182ea7a51c2fa6781256c8b8e690"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_rsi_view.sh": {
+      "sha256": "d5af16e17863a910182c91b8879d01ed453fd8801c1f2e5413734c114933dd85"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_rsi_view_vnc.sh": {
+      "sha256": "f2a438794190a099f28ee2eee76c672457cd65d815c2ab3dd0a9b97d42d228e0"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_unified_amp_test.sh": {
+      "sha256": "e17f8b7e1f5925e0cd2c96edce95352a9ed20658594bc71540aa33efd08d8f60"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_unified_amp_train.sh": {
+      "sha256": "649deb003f103d7629d4c9b5d3873edba5e8e00d140db37236bffdf85b1b07bf"
+    },
+    "tokenhsi/scripts/multi_agent/open_push_unified_amp_vnc.sh": {
+      "sha256": "7d3cbbcf88a460790e9899494d6bd9fa074d27d104c343a4f467898eb8a9e942"
+    },
+    "tokenhsi/scripts/multi_agent/open_reference_motion_view.sh": {
+      "sha256": "2b709731dd16c2364aed46f63bc6d888fcc77fb3c691f4ac269db36fbc73042f"
+    },
+    "tokenhsi/scripts/multi_agent/open_reference_motion_view_vnc.sh": {
+      "sha256": "f8ed4460a9fa00df701d82b8c9b63d738da069b1b9c9a0e394f6c5e088ba5785"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_reference_close_test.sh": {
+      "sha256": "6f124c5d4ea0bdbda9a1efe33e55123b81ee7cc1b47ec02d368f0b3fc87fa93a"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_reference_close_train.sh": {
+      "sha256": "8ea00d2001b9c879ddf1c9cd8047838aab5e55ae1bc909f8dd9bd0444e8bebff"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_reference_close_vnc.sh": {
+      "sha256": "30bbf8eb17efc5870c90e16a459aa01b797ba49f3ef9a1a87abc825871dc2756"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_strong_close_test.sh": {
+      "sha256": "ab0ef066745dfadee61e6698fc31cc14f7b4cd38bd9b49dd24cf3a40c2e6cfdb"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_strong_close_train.sh": {
+      "sha256": "e3da63ba2e3149fb01b526390c2a51a879559317ab557869b0c1a2873ae1994c"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_strong_close_vnc.sh": {
+      "sha256": "e25713b9dc3ada4a4c18ed5e1d7edfd8df01d2d00b29fc2b5513cac2c66c2990"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_test.sh": {
+      "sha256": "73afa26f3d204c1621fe383099aded11098a707c993ce799c4593c5676ad81f2"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_train.sh": {
+      "sha256": "e5068102c6587695579e7716ba34f2e1af5d2491ee7e99f99102a96759623752"
+    },
+    "tokenhsi/scripts/multi_agent/open_toy_vnc.sh": {
+      "sha256": "93cbff39cbc0d023b56c06c827a864beb108963a2d5aa2d5a4057662332df3cd"
+    },
+    "tokenhsi/scripts/multi_agent/probe_reference_rsi.py": {
+      "sha256": "e2d39a83f66598a8def0781eff40984a42ce261bf728113d0c30b447901eddf1"
+    },
+    "tokenhsi/scripts/multi_agent/probe_reference_rsi.sh": {
+      "sha256": "1fe6950d2c462b6443631fe5e459db6aed0f0b8a7b37c5de6e8c0c1e682c9f79"
+    },
+    "tokenhsi/scripts/multi_agent/probe_student_candidates.sh": {
+      "sha256": "9285700b10992b2f14786144ac3b14686f0375c976fcd11b21de9498bc96e8dc"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_test.sh": {
+      "sha256": "0ee16039a85fdf60cc7f40d2b102cf0ebf31005ef285f9700cef7d76101e75a4"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_tilt_soft_3to5m_test.sh": {
+      "sha256": "955b9f204ff5a8c2deff92f17daf2ef8c29c049b20cfc90e1a340ac6e468d7a4"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_tilt_soft_3to5m_train.sh": {
+      "sha256": "d5a6ca0726283600922fd0dfb6b23b95a1380a1dcf8d7205c9ff95724bdd10a4"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_tilt_soft_3to5m_vnc.sh": {
+      "sha256": "f42ecb57b5b6802d9eacac2f74623a2e08e60d70e32a4c3965bc6f1634ddfcb7"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_tilt_soft_test.sh": {
+      "sha256": "29736c2d2fc10c498e14228e3c2f89436d4326b1445130797c39f757b9bdb4b0"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_tilt_soft_train.sh": {
+      "sha256": "d834c2b7e1bc9addacebcc6f4f1692c495375bd15a3bff592e8cb87bd2700abe"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_tilt_soft_vnc.sh": {
+      "sha256": "a2416e75451c5635bfb3928310e9801abebe4c3be425fe06b4452858fdbfc8c6"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_train.sh": {
+      "sha256": "8c9a47a4b0d64589e6205427936bf2c6fd2e835120e33024f3fb797ff585e6da"
+    },
+    "tokenhsi/scripts/multi_agent/push_contact_face_at_vnc.sh": {
+      "sha256": "7da99cdc90c6435484cad49f537229a82b00b4b2598cd6d0a9910b81ff6f03a4"
+    },
+    "tokenhsi/scripts/multi_agent/push_native_phase_xy_test.sh": {
+      "sha256": "31abd1113716bf773bb510122d91c54533d5eb82f16a72c04eb29befa23c9457"
+    },
+    "tokenhsi/scripts/multi_agent/push_native_phase_xy_train.sh": {
+      "sha256": "40a467444452ede911f8e8aa4f51f2d7286dc4df8e8b27648074c58346015c33"
+    },
+    "tokenhsi/scripts/multi_agent/push_native_phase_xy_vnc.sh": {
+      "sha256": "5471dee4788d49212b9b7de08607e9390f4b058d3f18e248b2132d20172a55be"
+    },
+    "tokenhsi/scripts/multi_agent/push_native_phase_y2m_test.sh": {
+      "sha256": "c5e0d31eacb709b1dfb6a0de9a392d78d2780ac2da19d178335b19aaaab7a7b4"
+    },
+    "tokenhsi/scripts/multi_agent/push_native_phase_y2m_train.sh": {
+      "sha256": "eddfd1206f61c06a255eac95706251187f5afe0a27d270c98e57e26106952f74"
+    },
+    "tokenhsi/scripts/multi_agent/push_native_phase_y2m_vnc.sh": {
+      "sha256": "6d04f42f3463508d340c78afd630c5db6abaec209d90600526d30cad3c9cdfc3"
+    },
+    "tokenhsi/scripts/multi_agent/push_soft_legacy40_at05_test.sh": {
+      "sha256": "5c25a2a7cca0fd1e0be19ae429a21edc8c7312ccf5ec2cd8443016581babb4bd"
+    },
+    "tokenhsi/scripts/multi_agent/push_soft_legacy40_at05_train.sh": {
+      "sha256": "5d77fe7174c7f2a5a5b8c8b61a96538e1ff3491036c5011c281cb49c6f148181"
+    },
+    "tokenhsi/scripts/multi_agent/push_soft_legacy40_at05_vnc.sh": {
+      "sha256": "8f0084b457185bcb5aa7bea0888dcc5925e4fa53473ad1c8bf6161c84565c59a"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_contact_align_at_test.sh": {
+      "sha256": "9d652e1fcae2fe1e7675bb6482ae1804a0585f8657d7dfbee2733d81f3f99f80"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_contact_align_at_train.sh": {
+      "sha256": "29781b75eee40d0878c9b9937e1915e28e944f48630c5c0d3f794ac2fdfdfdf6"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_contact_align_at_vnc.sh": {
+      "sha256": "83168dfc9a1e901e85602cc4a09f1aabc142abd0f85a2c3cdb0f41ac00e46ac0"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_random_scene_test.sh": {
+      "sha256": "17d0b8f342d0fb44ab033e2fc71ac71db252fc0e02cbfed6604f32c424da2a3c"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_random_scene_train.sh": {
+      "sha256": "269251abc11d231a40c91f57ff606d18002ac7c71e244614c11e4b861d368324"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_random_scene_vnc.sh": {
+      "sha256": "88bf0af6bf69516e288c3c022876cf5774f961255b025a8de459cafb81e0c856"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_test.sh": {
+      "sha256": "e81975c45d03fbd095eb9df967586d27467520864fa42f15997eb3a512fae190"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_train.sh": {
+      "sha256": "45b04a82dd4b0b17d943524b50ac19d0498aca7d27743dc56c55b789ba272131"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_vnc.sh": {
+      "sha256": "0cd6e95f6c9621dddca0a27b345f2fa8e7032063fd7fce4522e0a7f7fa2f3488"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_zone_swap_test.sh": {
+      "sha256": "febb5dc2fcea3937e43020579bd99cf6c180ac67d863fabe0bac705c3e89a44e"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_zone_swap_train.sh": {
+      "sha256": "8c14ce185e180afb129d629c8f11a6f6358bf6f41bfe6a3976638426e2ccc0be"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_midpoint_2m_zone_swap_vnc.sh": {
+      "sha256": "4a2d2bee9f39bea89052028d4b1f0523b43f132e5dc43af32008963b484c2788"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_only_random_scene_at_test.sh": {
+      "sha256": "e06db4613a8c2de02a7e7ea023b204e5dac284dbfefa9f4f6628eac4a85cca4c"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_only_random_scene_at_train.sh": {
+      "sha256": "0d873cb9c6a4fd73404216471fc832cf85fc68ad9f373c01df16066b7a726499"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_only_random_scene_at_vnc.sh": {
+      "sha256": "8d25a439f2fb572d991d91b69243b12f881bf834b0e84b73f6f28dafff458ab8"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_only_random_scene_test.sh": {
+      "sha256": "f408a70c743a9b853adc065b4283681cee4bf4be2c70ca0baeb87cc693ab7dd6"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_only_random_scene_train.sh": {
+      "sha256": "4a4ab927a7e32a336cf7736811579250382711a925b7cdfbca445b8ee4fb6aed"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_only_random_scene_vnc.sh": {
+      "sha256": "10308b8a404589cacbc6253c7605d68da0916be72924c9a9ba452d64b0015f77"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_grounded_test.sh": {
+      "sha256": "044e0ec36834e0e353f22c665d214a3f2ae4b1439e3c885375c11f51263f970f"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_grounded_train.sh": {
+      "sha256": "d28b5ef786a96fa76ad93bb02d2373442f040a779ef0b7644c89f9292816303b"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_grounded_vnc.sh": {
+      "sha256": "216f354a0d78690f9a49bb6b4d0baf2ce449ce6951e8510cb7759559ea8ea454"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_state_test.sh": {
+      "sha256": "57142619a9b3fb7b321ff264e220e7053180220be8c9642e836f37b29fbb48b2"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_state_train.sh": {
+      "sha256": "0be05e167e8cf9f23fa539df331686d487cdb6be0a58dde0f3d9737806c8717c"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_state_vnc.sh": {
+      "sha256": "896f6484c4e395071e1cec14e2cd24a62ced2a51d620b0aff17c508f15d1d84e"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_success_tilt_test.sh": {
+      "sha256": "f34b78ab2585a5fbfd761ff4e0d73f39ec4ad7dd3a4efedaf630908be1eba93d"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_success_tilt_train.sh": {
+      "sha256": "2d6e4d1c5899d6b1828d906f6e552b0869a430b14b0a524f25fc3c5f90f62c0c"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_success_tilt_vnc.sh": {
+      "sha256": "3ca32479a1c73503d20bb52cdf7f8c5a5740dc802975c326721476c3aaac6438"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_tilt_soft_test.sh": {
+      "sha256": "ae5a5203da6f15e4a641a908a02fc1f74b1bfca53821a4489d5c7530d4b330cd"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_tilt_soft_train.sh": {
+      "sha256": "7c12e0e13b97a38aef3b90c2244bf8a46f696675fb5745327b5740ffced54e74"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_at_tilt_soft_vnc.sh": {
+      "sha256": "c1b179f530b7515bb6dd8c05759f2c8440e85293608d9149c08c3ec0efc6015a"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_test.sh": {
+      "sha256": "d6f74a2e0c50e1f8ff1620cf9809ddd50f1707ec18abbe8fd50047850d3e2855"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_train.sh": {
+      "sha256": "cf398dce0729d077f9caba6d34f90275eeef02237f72a36bcc0df30ed4cfee33"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_random_at_10deg_vnc.sh": {
+      "sha256": "6da270eae8cb6cdb7bd857687aaeb52875242c1ea8e6decefde6946e104b8f65"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_test.sh": {
+      "sha256": "f31f3ef2c96456d38e0365c999b61661d73db82080d792b5af2527e2ee6c0674"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_train.sh": {
+      "sha256": "f040ca382784c10ac5eb8b06396e2677564e48cda59c8ee1431b9a381ac75d87"
+    },
+    "tokenhsi/scripts/multi_agent/push_toy_vnc.sh": {
+      "sha256": "799d38fc1cc1299af1b9cf014067cf5c2f12e3441ea76a63078d79c05dcd9665"
+    },
+    "tokenhsi/scripts/multi_agent/render_native_push_rsi.py": {
+      "sha256": "5b767e0c0a4c4ad9ae09aadd7db7161ff94326dff64005e73311f8a03d273269"
+    },
+    "tokenhsi/scripts/multi_agent/run-gui.sh": {
+      "sha256": "76cd31173ee01b9fd679bef159b28a56973bf94d36b7925587e6f9128b738761"
+    },
+    "tokenhsi/scripts/multi_agent/runtime_env.sh": {
+      "sha256": "05ede2e4d14e8e0a40489a815354814aac2ee3064bbe845101215a25dee141ac"
+    },
+    "tokenhsi/scripts/multi_agent/screen_push_contact_face_at_3to5m_rsi.sh": {
+      "sha256": "caa200fd228ea48ae472ecfa001a47953850b9090f0c68b939d2398ae65571b9"
+    },
+    "tokenhsi/scripts/multi_agent/screen_push_contact_face_rsi.py": {
+      "sha256": "9ed77d1cbb7b10b370037225de19602c0adc10bd5f6e47a110ed738039e1f6c3"
+    },
+    "tokenhsi/scripts/multi_agent/screen_push_contact_face_rsi.sh": {
+      "sha256": "e934932b0cec8ee4f69393e940d763ac1859bab5bf96c7f949ab5a6c2d2c2810"
+    },
+    "tokenhsi/scripts/multi_agent/stage1_base_push_common.sh": {
+      "sha256": "b0ff1cdeafeef311a6dede854f5ff976ab41bfa0fd459491eab1d74d073d33da"
+    },
+    "tokenhsi/scripts/multi_agent/stage1_base_push_test.sh": {
+      "sha256": "a87a198a0087bce5ce1e1801c5abc6f74804249d55be73fcb12ef71e68f86018"
+    },
+    "tokenhsi/scripts/multi_agent/stage1_base_push_train.sh": {
+      "sha256": "fd2ae62c686cb44cdfdb29881ae93f0e64259a5df103dfb2594bf72a07715bab"
+    },
+    "tokenhsi/scripts/multi_agent/stage1_base_push_vnc.sh": {
+      "sha256": "fb7fb26dfde4fb4924f333ab9d0f391f750219a8f94cf49b9a74cb7f09fef74b"
+    },
+    "tokenhsi/scripts/multi_agent/summarize_push_faces.py": {
+      "sha256": "eea9f312d9502ba709464f53ba90729f153c5d8d5f8acb4a320a6c58ab79c304"
+    },
+    "tokenhsi/scripts/multi_agent/transfer_push_at_grounded_checkpoint.py": {
+      "sha256": "2d4f36c58393d9714f0a029a855a8ce24aac8c776a0154511cb8e401cca2a89c"
+    },
+    "tokenhsi/scripts/multi_agent/transfer_push_contact_face_tilt_checkpoint.py": {
+      "sha256": "964dff22c169a5fb7aad25f4888cf0d090dcf104f939b264b90c11281f11ac27"
+    },
+    "tokenhsi/scripts/multi_agent/transfer_push_goal_distance_checkpoint.py": {
+      "sha256": "1147a792bfa269783159b1ef9bf9b76b9e7b2fef2478956891f49e7a7a2f4dc8"
+    },
+    "tokenhsi/scripts/multi_agent/transfer_push_native_y2m_checkpoint.py": {
+      "sha256": "f9836bc79649e6de173cce608e43f80f5a5f31ac53bd382145c81fc78ec3347f"
+    },
+    "tokenhsi/scripts/multi_agent/validate_bones_door_amp.py": {
+      "sha256": "0bf3836847379aa63ebb841efadf6f8a6bc1d7e8263d0135d6abace776798bbd"
+    },
+    "tokenhsi/scripts/multi_agent/validate_bones_door_amp.sh": {
+      "sha256": "5f2c9b0b851c1bc0470f7b8685a1a16cd7b2ce0b82e217c4ef4f3d3981e30a06"
+    },
+    "tokenhsi/scripts/multi_agent/validate_door_hold.py": {
+      "sha256": "a5edede7bcae5d534febff46aea2a6a54ffb11f6a87ba974f068ae49d633ba8f"
+    },
+    "tokenhsi/scripts/multi_agent/validate_door_hold.sh": {
+      "sha256": "95538a495cafccb13dcaceb48d6a9f2bb5488c0253033ce2c1433185b5bbc31b"
+    },
+    "tokenhsi/scripts/multi_agent/validate_door_physics.py": {
+      "sha256": "82e66780fcf91be210b93fe10b8b06ecffe2f974693612cddd8cd77f01e734e1"
+    },
+    "tokenhsi/scripts/multi_agent/validate_door_physics.sh": {
+      "sha256": "6670e8781ef551cd4cbf8d9f6d612ce6b959079a9b640e7eaa8087cb9a6a0b92"
+    },
+    "tokenhsi/scripts/multi_agent/validate_open_push.py": {
+      "sha256": "2409f653b121d9ca682907cc9769d7ef3ed29a6c3b49e16b764941db5c7afffb"
+    },
+    "tokenhsi/scripts/multi_agent/validate_open_push.sh": {
+      "sha256": "9a47c21b8ed3db121b479da78904991ea8fcd37cd90cbfb633f20a34bca8798b"
+    },
+    "tokenhsi/scripts/multi_agent/view_door_reset.py": {
+      "sha256": "a91eef7b1e5087060ef0df6a17135c1e36688ea58a5f7773bf359da418de68c3"
+    },
+    "tokenhsi/scripts/multi_agent/view_open_push_rsi.py": {
+      "sha256": "20435e96338755c59d42aea5fd818949fa8ad4e276fa6b250c28a5681cd33805"
+    },
+    "tokenhsi/scripts/multi_agent/view_open_reference_motion.py": {
+      "sha256": "18fe3004f5727eee264eb52d86c6dafdfa54e5ca0478c16a1ec367b5ef386bab"
+    },
+    "tokenhsi/scripts/single_task/carry_test.sh": {
+      "sha256": "93969cf480e5b60165d537f57980a45c3661d12f056b2c15bcf07390a9482cb5"
+    },
+    "tokenhsi/scripts/single_task/carry_train.sh": {
+      "sha256": "ca9d1007a16f1dcfbf6f6833a15e98d7452f773057071c8d1f94770094d425a7"
+    },
+    "tokenhsi/scripts/single_task/climb_test.sh": {
+      "sha256": "75933119c99360fc133cdc65f2b57d4f40a3c71f2bc1244d389ed55039e1a372"
+    },
+    "tokenhsi/scripts/single_task/climb_train.sh": {
+      "sha256": "9be63266f193f6a7664903e800137c4908ecb5a1101689f19b57965a46fc9d09"
+    },
+    "tokenhsi/scripts/single_task/sit_test.sh": {
+      "sha256": "cce907a314b4bc42ba035c468b47650697699e58ed4c783782fc7bdfd9d067fa"
+    },
+    "tokenhsi/scripts/single_task/sit_train.sh": {
+      "sha256": "a4b180a107bfbb6943635fd3fabbedce63fe7dad577211cb335e8aa7380ec901"
+    },
+    "tokenhsi/scripts/single_task/traj_test.sh": {
+      "sha256": "5ae970ae6dd5b2703adb9f91b755f745788706fddc70609b37c8ed502157b286"
+    },
+    "tokenhsi/scripts/single_task/traj_train.sh": {
+      "sha256": "57dc7295618f4438f5f0bab76470765c1858bc66756d5bbdfe2ab22e40dd89f5"
+    },
+    "tokenhsi/scripts/tokenhsi/stage1_eval.sh": {
+      "sha256": "ca8021564b2689f8fbd24dc42734bda968c709d187fdb7c6346564ba175ae02b"
+    },
+    "tokenhsi/scripts/tokenhsi/stage1_test.sh": {
+      "sha256": "bc4d59ba9d59863737ca7943794269d4e26fc2bd3536e77540f536e558f7a94e"
+    },
+    "tokenhsi/scripts/tokenhsi/stage1_train.sh": {
+      "sha256": "08100a97462945c5625e56ffb06f09372cfd059eb781ac016e4685830ed56ba5"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_climb_carry_eval.sh": {
+      "sha256": "fb74e076038904ccf2993aa87ca28ca08e1a3931c87007f0d5b6ac1967d77327"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_climb_carry_test.sh": {
+      "sha256": "de74e97b7142438629d4c1bbe3d43ded10c91abf211c436bd7d4be5fad6556a9"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_climb_carry_train.sh": {
+      "sha256": "a5fd9ed10c120da6c82b73a1928e409c6406961aae1493a98fa490d7a7b0ccd3"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_sit_carry_eval.sh": {
+      "sha256": "06cf47aa33e19275a03378a306c10fc5b9c184a7bdffcfc99884f0a3bc7d0f2c"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_sit_carry_test.sh": {
+      "sha256": "bba0aaf2adc31b4d228bfac759a84cc64ffbf17dfe2787575e54015a180c14c3"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_sit_carry_train.sh": {
+      "sha256": "6f173e481d234a8e75f1aeb3d8ef59b6f3f461b2d885becc92e69440c6ad4d73"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_traj_carry_eval.sh": {
+      "sha256": "b077b58613225dc08b280e2a9ae1b9ea2a5560f272144a215bbe046809d5734c"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_traj_carry_test.sh": {
+      "sha256": "d4b52b2619dc561ba99d6cb54a0e428b81e7171c5a97d8b432b2e5b7ca31c018"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_comp_traj_carry_train.sh": {
+      "sha256": "e13b02433518b9cd20ace36bead641d2b0444716327fb4551ab646eb66d8aede"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_longterm_eval.sh": {
+      "sha256": "01b908de9315e6e973db9902d655b62c806b362153a04ce47c51a8c49cf794fc"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_longterm_test.sh": {
+      "sha256": "0d74ed1a2347203d74d8fadf51b615e1f8d7a3864985a1e6682709d9a1cf9688"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_longterm_train.sh": {
+      "sha256": "4e43d6ca8d324f94ed057d381d1d9357314e6a4f495b9cffa9e6d325c82717a0"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_object_chair_eval.sh": {
+      "sha256": "0d5d14c247459139c733322e175c1c4bccb435e99d606288f666237a1fb7a125"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_object_chair_test.sh": {
+      "sha256": "91c99428b2e4f19d65b39857e19c980083cff0a74ebaef60ae6b1c04d255e825"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_object_chair_train.sh": {
+      "sha256": "882a3d7ef258222c44f3d80ebaab16f2371237cb8f43e218f1bd640fd8998682"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_object_table_eval.sh": {
+      "sha256": "f3d8fc47aa8dbe9c91485a7daf8965994ccb1c0cadf406da1b5a5fb9857382b6"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_object_table_test.sh": {
+      "sha256": "c984fed5b2a5aff65af42f7c9d0c3ea54757adede15c21fdb526a8baa03e3dde"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_object_table_train.sh": {
+      "sha256": "2c56b0f6510f17be222f63a3d9463c3812e29e7807beeb4daa58b248cde78409"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_terrain_carry_eval.sh": {
+      "sha256": "251233cb9fb48ddfd0888fcc106a53a16a6f7d4c3cc08373a4b576dd955e96de"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_terrain_carry_test.sh": {
+      "sha256": "8fe6c837af6dd68b5d48156a6f92cf9f5e213d00cd693efa32eb221f72aa653c"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_terrain_carry_train.sh": {
+      "sha256": "733146b421df1513bb305d8b6821041620a072bfdb0fde54071a2debda1d97b0"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_terrain_traj_eval.sh": {
+      "sha256": "5108dce30277c4e6a6e2c9b6c4df97a93f812e269471bac97bf02720902a730c"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_terrain_traj_test.sh": {
+      "sha256": "b5d97f922f7383b0cfef23bab2586d2e9e78086a55c48e8de08a4400e068220e"
+    },
+    "tokenhsi/scripts/tokenhsi/stage2_terrain_traj_train.sh": {
+      "sha256": "40e52ee422daba0797cff8719cb1a328ee2a4887819fa82207f1f43ffbc0bc0e"
+    },
+    "tokenhsi/tests/benchmark_ma_scene_policy.py": {
+      "sha256": "f357898c5b1a3bf135b63059a7210cbe2d79b885b77ea843c476187184fe9bb8"
+    },
+    "tokenhsi/tests/smoke_edge_context_sim.py": {
+      "sha256": "ecc3c5458e3e12fb4f7d88410fbb5a6cab376c9817c8192cbde6384ebb05ff41"
+    },
+    "tokenhsi/tests/smoke_edge_ontop_sim.py": {
+      "sha256": "f78afe29dddc0879b6e4653e93ce867e05449fa7fe61e212fb735af31f444696"
+    },
+    "tokenhsi/tests/smoke_edge_ontop_train.py": {
+      "sha256": "9e41b08425102b0114252a963d01a8135592705070ad966b6cf7274a16c7e636"
+    },
+    "tokenhsi/tests/smoke_relation_sim.py": {
+      "sha256": "98e2af9cee15e75d00c07acccdbf01208b7aa287880aa7437f3bc14508a45f5b"
+    },
+    "tokenhsi/tests/test_bones_door_amp.py": {
+      "sha256": "d41fd657825a6ced0a91652d56952dab6f3b4c73d7c8c50f11a0af48271e2a5d"
+    },
+    "tokenhsi/tests/test_door_approach_amp.py": {
+      "sha256": "9c3785968750143739b75405dbabbcf6e17d0e5701d6e48f4d9aca009f72fbe4"
+    },
+    "tokenhsi/tests/test_door_hold.py": {
+      "sha256": "02a0424fcebb19568cc5ffe32daf70c0d807989a908dea13eb36499c76a46b33"
+    },
+    "tokenhsi/tests/test_door_open.py": {
+      "sha256": "0c4d3d7be4c617f34f7b26cdc66f7ee1218a7907d0ffcefd287f7d3a72b9e475"
+    },
+    "tokenhsi/tests/test_door_reference.py": {
+      "sha256": "3d0e00a666c756e47430f5461c452b3e226eeb9173354589c1967850495ee70f"
+    },
+    "tokenhsi/tests/test_graph_box_speed_penalty.py": {
+      "sha256": "c8f26605e26fd675049b02fa39f760d7d54540905929f3a527ffab50715835bd"
+    },
+    "tokenhsi/tests/test_gui_gpu.py": {
+      "sha256": "aadd83ca80b298ecfd1e55cabfbdca92844295ba5acdb34c623cf961c16b6499"
+    },
+    "tokenhsi/tests/test_hybrid_late_rsi.py": {
+      "sha256": "ac59f46c38935fa9fe7767d8cb5a14a9188fa6b7a701f4fbad935f100d48cd4d"
+    },
+    "tokenhsi/tests/test_impact_candidates.py": {
+      "sha256": "1fc6cbaa81cb045c8d01f7af5632400c3a159615cff7bfd6f39219f1480c1df3"
+    },
+    "tokenhsi/tests/test_ma_relation_policy.py": {
+      "sha256": "db37cd285bf63b4c95efb4fda2ba0200b38afe402e53c34fd9bc4d91e3b591a4"
+    },
+    "tokenhsi/tests/test_ma_scene_features.py": {
+      "sha256": "70333a0da1602f834335b5afd9db8cd7059595ee5712ca202f4eeda85a470106"
+    },
+    "tokenhsi/tests/test_ma_scene_policy.py": {
+      "sha256": "8f1d40f1db32806316e136565b97144d82fa8b4fd1877d09a49c30fd2badaa6f"
+    },
+    "tokenhsi/tests/test_manipulation_contact.py": {
+      "sha256": "2195631ef68c9379b5d6999b821b699e274e120b883fffe79ea05e1cd06c522a"
+    },
+    "tokenhsi/tests/test_native_push_phase.py": {
+      "sha256": "aec6ca978fc04e04ff9e4857499626deb48cbe39d174a6805fa639cd7c8f35d1"
+    },
+    "tokenhsi/tests/test_open_push.py": {
+      "sha256": "ea56ad92b39988c22dfe15877fd400141d517c7bb11c555985359f38a30c0220"
+    },
+    "tokenhsi/tests/test_open_push_rsi.py": {
+      "sha256": "dcf2c4fdcbbf5aa951ebcf3ad2701328c1c7d43856029f7a55fdff92b366fa75"
+    },
+    "tokenhsi/tests/test_open_push_toy.py": {
+      "sha256": "df1bcbdadf65567e02e5e02f6a580d6860b0174d764d60ac362b92a9503d56eb"
+    },
+    "tokenhsi/tests/test_push_at.py": {
+      "sha256": "df07ed6bdc2ece928d5cc925558720fb4ab62abdd065fcfed7265d618d199780"
+    },
+    "tokenhsi/tests/test_push_at_grounded.py": {
+      "sha256": "2b2146af65eb26994722d00d6307fcfab76252cab01dac541ed62a9ca3bb0b17"
+    },
+    "tokenhsi/tests/test_push_at_state_tilt.py": {
+      "sha256": "8900d8873c76c04e1949bb4b9b6e4af75968ed1deed97654f42577d596003dc0"
+    },
+    "tokenhsi/tests/test_push_at_success_tilt.py": {
+      "sha256": "e3d359364a28cacf36b4880a60c945a8c282f7dee3b3889bfe2519006cbe7ce9"
+    },
+    "tokenhsi/tests/test_push_at_tilt_soft.py": {
+      "sha256": "04e87923f6b7d6e1283553e6389c077e92d02a26ce4994e1eec92c69068550e0"
+    },
+    "tokenhsi/tests/test_push_contact_align.py": {
+      "sha256": "b5ec4ed5dd85465e4a50b6fddf59e737e3b161690c5655101dfdc3d7a0f3ee8b"
+    },
+    "tokenhsi/tests/test_push_contact_face_at.py": {
+      "sha256": "766a9b64625357d7d2ac17871a5d69d202d1ec3745b1a5fc6cb4dc6edc61233d"
+    },
+    "tokenhsi/tests/test_push_contact_face_tilt_soft.py": {
+      "sha256": "b54f6a80eaa588a181dae77432ba1fe6d2008044b442be56f749999253fe6a5d"
+    },
+    "tokenhsi/tests/test_push_distance_eval.py": {
+      "sha256": "42ce353cb5bf1128b557e6f2bb0330aa788f858b6121f4eea97c8eeacd8e6dbf"
+    },
+    "tokenhsi/tests/test_push_face_audit.py": {
+      "sha256": "b78bfee5585c4cbe74a6e1d5d6c29ff9e39d73e83aca1d8d264215d6e5eb9e90"
+    },
+    "tokenhsi/tests/test_push_goal_distance.py": {
+      "sha256": "ff9d7a53ad962316654d829ac05e7feff8012b4a6e078bc02b28e57a6e7a35de"
+    },
+    "tokenhsi/tests/test_push_midpoint_2m.py": {
+      "sha256": "6d821fe9851dcf809820f6f332123a89f414c3eaa1eeb0e81081b0ec1ede245d"
+    },
+    "tokenhsi/tests/test_push_native_y2m.py": {
+      "sha256": "ac907897561f665eac58499af0ce65d2fd360a29e509d4febcba5948aa39b4f1"
+    },
+    "tokenhsi/tests/test_push_only.py": {
+      "sha256": "f911ff0e3dda7ffb73cee7b9c550c9b8cf2a1e6e79b56e981db45769b789627a"
+    },
+    "tokenhsi/tests/test_push_random_at.py": {
+      "sha256": "1dd8d16d42081c489fafc76ddb9ec19a751ea4774177fc5e4c9062cf7035f5c4"
+    },
+    "tokenhsi/tests/test_push_random_scene.py": {
+      "sha256": "057a25da9dd4eac2661cbebe342d40e7ca8648608a0a09032d542eafd95f25b9"
+    },
+    "tokenhsi/tests/test_push_view_geometry.py": {
+      "sha256": "fe41acbf7a908d6b75baf4eb7f9cb9ee3161a9276b1a935c7657c138cb59d86e"
+    },
+    "tokenhsi/tests/test_reference_rsi.py": {
+      "sha256": "9e3bf4de89a53abf69567d36641414b9a7cdebbee808507ba50bca800d88214e"
+    },
+    "tokenhsi/tests/test_relation_diagnostics.py": {
+      "sha256": "0d9e2b8bd6384136a19b4c202e7ee27c0329226abefd6e0beecf51db998977fd"
+    },
+    "tokenhsi/tests/test_relation_direction.py": {
+      "sha256": "1201b838956b5417ffa7ebe36b7f8d9545c2d08874e0c54c1d0aae5de13529dc"
+    },
+    "tokenhsi/tests/test_relation_reward.py": {
+      "sha256": "0b570148af133a3d651ad928bc5c635109257a3b5f876178b190abc6f1923b4e"
+    },
+    "tokenhsi/tests/test_relation_runtime.py": {
+      "sha256": "24d32f1b61a31c8beef8598f02d89dff651c169c39e4526363541706616c4400"
+    },
+    "tokenhsi/tests/test_rsi_preview_render.py": {
+      "sha256": "6e25a5e03a7d57908d5630ad1b8c229b2f1521b7319c5474763a50b180c1fd65"
+    },
+    "tokenhsi/tests/test_scenario_independent_with_climb.py": {
+      "sha256": "24adaf61ac862b5e12cae96fdacef6c6fba087fccc21cbb9519acb84ce93af37"
+    },
+    "tokenhsi/tests/test_scenario_stage1_plane.py": {
+      "sha256": "b953305d54d020f469e1c40d826738f78eb9962255a4b67a385ca87795920c89"
+    },
+    "tokenhsi/tests/test_scenario_stage1_sit_plane_curriculum.py": {
+      "sha256": "0634bd742d2a8cf646933d51392af8e1380d6396ba7dc92c4be47c93d7348a34"
+    },
+    "tokenhsi/tests/test_size_progress.py": {
+      "sha256": "b91f578bae2d0623a8e302eba31c8f6fd999986d5dd3f5966f7a6d2ad5abaf5b"
+    },
+    "tokenhsi/tests/test_stage1_owner_holding.py": {
+      "sha256": "0a85094d7ecfc5ba802500b76515fd21790c9a3863b7da6f9c6ca2fae5864781"
+    },
+    "tokenhsi/tests/test_stage1_unified.py": {
+      "sha256": "1ac0ea72cb68b9563fc21dc72bb4fb605070bfa96945fc7bf99999db4211f09f"
+    },
+    "tokenhsi/tests/test_stage2_coordination.py": {
+      "sha256": "4f3c1cf3035b9c31d5261e69138510093ab440ca40af19a757463edf1ccdd68a"
+    },
+    "tokenhsi/tests/test_student_rsi.py": {
+      "sha256": "a8d41098e951ff699475ff98634805ef88d52f3c275bdb5ec5e8e53fccb05a56"
+    },
+    "tokenhsi/tests/test_unified_shared_random_binding.py": {
+      "sha256": "a308b9b61eb27d3ee2263d4cad283efbffd6834fe8a52a435300a9b494ad2d75"
+    },
+    "tokenhsi/tests/test_z_sweep.py": {
+      "sha256": "579591351100f5925dff1845345bdca4876fbe72f811f05266b9fe23101699e4"
+    },
+    "tokenhsi/utils/__init__.py": {
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    "tokenhsi/utils/bones_bvh.py": {
+      "sha256": "d3c27718b8df64fea41b19ff9cf015eb6c8271df62b937b6810f7b24de9c5b63"
+    },
+    "tokenhsi/utils/config.py": {
+      "sha256": "1b8ae54de88e21499c9996704fb542ddfe1e9fd94ece06a49388f60be9fbff25"
+    },
+    "tokenhsi/utils/door_approach_amp.py": {
+      "sha256": "d42ae70a0ebc93e675d837f6c08ac665d6158fd64bd11646b77f33990e9c8c7d"
+    },
+    "tokenhsi/utils/door_hold.py": {
+      "sha256": "022e2ecbc7b912045adb8695e6a39806d4d98a167506c4b64d70fb26c2f1fa1a"
+    },
+    "tokenhsi/utils/door_reference.py": {
+      "sha256": "d84404e6be4f44fedb6b9b12f5ef02eac691d2ab4a1145f4426ea82fe466849e"
+    },
+    "tokenhsi/utils/edge_context_spec.py": {
+      "sha256": "038b2e601470c2e37427efd2585e338cf1c861730e5b60a602c5e6d33ce974c2"
+    },
+    "tokenhsi/utils/edge_door_spec.py": {
+      "sha256": "70c0aed4bccaa571d1284910bc77f96b473602a9c0f5641bef679e9f0887020a"
+    },
+    "tokenhsi/utils/edge_interaction_spec.py": {
+      "sha256": "ff47ee58d22c72aa805b7caf4dd6a58499087a480e42d54b8a5f1ae71b4b21dc"
+    },
+    "tokenhsi/utils/edge_ontop_spec.py": {
+      "sha256": "0beb8dd976088ae7b10ac486afbffa63aced0bb89564e18f7b5901a3fe1c79a7"
+    },
+    "tokenhsi/utils/edge_scenario_spec.py": {
+      "sha256": "0bd932d92631cae56e0b4d3c15a375fc558feff88c7319bbd323113fa1a0d467"
+    },
+    "tokenhsi/utils/edge_stage1_spec.py": {
+      "sha256": "461c0289f2a017f20610ae0c01e719543642b92f092d2314b4a053332341d4bf"
+    },
+    "tokenhsi/utils/edge_stage2_spec.py": {
+      "sha256": "88ab36d2274a7ae1ea4f0e79b355a7dc3b7de6c1b0bb28c6bac204a2198b0925"
+    },
+    "tokenhsi/utils/gym_util.py": {
+      "sha256": "8ee056cda5bb39615d5c7c39b6e6c6b665f38fbe3a5d82af12383fea444fffa9"
+    },
+    "tokenhsi/utils/hybrid_late_rsi.py": {
+      "sha256": "c3cf6d9e2866cb933e51ba47a451dfcf853d781698d6b552efec07ff0db34d36"
+    },
+    "tokenhsi/utils/impact_candidates.py": {
+      "sha256": "cd1fbdf49b688edeb3480dc9e33bfd5f7b495958f884ba857528a276c600a65a"
+    },
+    "tokenhsi/utils/logger.py": {
+      "sha256": "2f34444692c15106fe6a3ec014fc14e685cbc428490f2956b4188206148b555d"
+    },
+    "tokenhsi/utils/manipulation_contact.py": {
+      "sha256": "200063bd572e241f6db96a11597dfe0707013aea04f593180527f76bd42e4b4f"
+    },
+    "tokenhsi/utils/motion_lib.py": {
+      "sha256": "50f28b8f5cc705d520a7a8693dab3f8b57907a8a015d0bdf80f67f8326313d4d"
+    },
+    "tokenhsi/utils/native_push_rsi.py": {
+      "sha256": "0eb3b60f498c80bf14edd8bcf6ed98b3be3776c6908b5251b6bc0de9b11696f9"
+    },
+    "tokenhsi/utils/ontop_task_spec.py": {
+      "sha256": "25248ec0a9b605964ef8929f7615f594e34330b1d16421a019c42f9de2868674"
+    },
+    "tokenhsi/utils/open_push_rsi.py": {
+      "sha256": "4a4f75bb40c8d4e5bac4fb349d92ed7d2ef02dc053a922232aea97d1a89835b4"
+    },
+    "tokenhsi/utils/open_push_spec.py": {
+      "sha256": "5530228992f2ee407f2262780be8081f5a06b05ce43c5284ba6200aead164c97"
+    },
+    "tokenhsi/utils/parse_task.py": {
+      "sha256": "e1881b32cc45c9a570d3acb1bb65eca82f75fa17259273cd7593ad3db42a8109"
+    },
+    "tokenhsi/utils/push_distance_eval.py": {
+      "sha256": "c9d58344297ad52f3deee6a86ae76d567d2fd7fa4e81bd005fa1953263da0dc1"
+    },
+    "tokenhsi/utils/push_face_audit.py": {
+      "sha256": "3e70258ae135824629826e6bae9be07e63f41ea6ea012ca32e6f4f86b03eff90"
+    },
+    "tokenhsi/utils/push_scene.py": {
+      "sha256": "fc21a070f9824ba2955f523eb25c2d19c1b9a6ff4ab3334237b5c48d5d04f2d7"
+    },
+    "tokenhsi/utils/push_view_geometry.py": {
+      "sha256": "006c8866e107e14d988790a104b779e6cc43c2753dd168c6ee96f11565cd0e9d"
+    },
+    "tokenhsi/utils/reference_rsi.py": {
+      "sha256": "f0b700c1beee1c1621fcf3bc2d4a21f898b89050079797565e464ad0ed89b4c6"
+    },
+    "tokenhsi/utils/relation_task_spec.py": {
+      "sha256": "16c40e2fa203d96188f333e59561dd16c9ad5d6658b0b09bc4b5a15d33eaf2c8"
+    },
+    "tokenhsi/utils/rsi_curriculum.py": {
+      "sha256": "bc7d65e88a43851afbbad7ccb4f87ee2b571914512bf5ad5972cfc445944b626"
+    },
+    "tokenhsi/utils/rsi_preview_render.py": {
+      "sha256": "ec7812b3a1b6baa99fc3d47a5864d789de91cfaf43530edf5c5081f79b9280c7"
+    },
+    "tokenhsi/utils/student_rsi.py": {
+      "sha256": "b7a3755c3a022cf183e2a21a3d313a923d6ef28aab3f60f4a160267e7fad84d1"
+    },
+    "tokenhsi/utils/torch_utils.py": {
+      "sha256": "834225cad151e0003b4306ad5f3bc6f56f789ab95158a1bb74649b5ebd6e14b4"
+    },
+    "tokenhsi/utils/traj_generator.py": {
+      "sha256": "5797dfa6a9f5dd514553f17d35e800f023d50334abb1e3446feb5e512a15cd57"
+    },
+    "tokenhsi/utils/traj_generator_custom.py": {
+      "sha256": "e31b274cf9d195c9b5a8b7fa91a4c51760903549a2cd9cd324919e9725abb760"
+    },
+    "tokenhsi/utils/unified_training.py": {
+      "sha256": "328f42e01ab518918503890385c0fbb2484477c0ad99bb541cc0decb563467fe"
+    },
+    "tokenhsi/utils/z_sweep.py": {
+      "sha256": "1b1646c0a84e8d799ee677653ba542f2d8823ad08bd80c485b3a3e7be1697e1b"
+    }
+  }
+}

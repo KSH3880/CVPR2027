@@ -1,5 +1,15 @@
 ## 2026-10-22
 
+### 물체 종류별 독립 SIT/CLIMB 평가
+혼합 대신 evaluation/object_comparison/을 기본 평가로 지정. Box18/Chair26/Cabinet9/Table8 각각 독립 SIT·CLIMB, 종류내균등복원추출, public40k vs우리73k paired 비교. Box는 원본TokenHSI test18 XY3종×높이6종 그대로. SIT기존목표 및 CLIMB의자좌판/기타metadata+94cm 유지. 기존혼합코드·결과 보존. CPU61자산/Box크기/회전/높이경계 통과. GPU5에서 전체8조건×두정책 각4env·seed0·900step의16실행 rc0, 8paired초기장면/DOF exact, 전16trace재채점/종료frame/hash/float32float64 검증 통과. 검증배치 runs/object_comparison_20261022/eval_20261022_205431_smoke. 정식512×3seed 재평가는 미실행.
+
+## 2026-10-22
+
+### CLIMB 원본 category 혼합 평가
+`evaluation/climb_mixed/`에 Box/Cabinet/Table_Square 각1/3·종류내균등복원추출 평가를 추가. 테스트35종(18/9/8), native mesh와 metadata+94cm 목표, paired frozen TokenHSI40k/우리73k. SIT 및 기존결과 보존. 실제 category/model배정, 전체/종류별 seed통계 기록. 원본가중치/추출 seed0/1/2 CPU동일성, 자산35개 경로/구문, GPU5 두정책각16env×seed0×900step, 전체초기배열exact, trace재채점/hash/float32float64/종료frame 검증 통과. 정식512×3seed 결과는 아직 없음. 실행법 markdowns/config.md 및 evaluation/climb_mixed/README.md.
+
+## 2026-10-22
+
 ### Git 대상에서 생성 데이터 제외
 독립 폴더 복사에 따라 노출된 joint_carry 모션/RSI bank, 로컬 데이터 링크, 배열 산출물을 .gitignore에 추가. 소스·설정·문서는 유지하고 실제 파일과 학습 프로세스는 변경하지 않음. git status/check-ignore로 확인.
 
