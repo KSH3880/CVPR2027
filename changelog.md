@@ -2,6 +2,39 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-22
+
+### BEFORE 30/30/40 거리 혼합·1200스텝
+
+- `stage2_before_ground_mix334_1200` env/train YAML과 GPU0 기본 train/test/VNC를 추가했다. BEFORE 쌍별 기존30%·가까움30%·더 가까움40%이며, 마지막 모드에서 선행 접근1~5m·후행 및 ON_TOP 자기 상자1~2.5m를 사용한다. 최소1m·독립 방향/거리·물리 재시도 중 모드 유지, 단독 배치·AT 목표 샘플러·보상·Stage1 전이를 보존하고 장면 에피소드 상한을1200스텝으로 늘렸다. 기존 ground/mix50와 checkpoint/output을 분리했다. [배치 계약](markdowns/reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix334_1200), [명령](markdowns/config.md).
+- CPU42개 통과(기존30500 파일 의존 전이 테스트1개 제외). 초기 GPU 검사에서 발견한 선행 rigid-body 이동 인덱싱 오류를 수정한 뒤,32환경·4구성·각16step에서 모든 후행 과제×3모드의 거리·초기 gate·부분 reset·추론/AMP finite·가중치 불변을 확인했다. [물리 검사](output_etc/check/stage2_before_ground_mix334_1200/physics/validation.json).
+- 표준 train의4명·1024환경·8물체 CHECK=1 학습/저장(epoch2/frame262144)을 완료했다. 저장 상한1200·모드30.78/29.79/39.43%·actor encoder73 tensor/RMS 동결·action head 갱신·265종 scalar finite·물리 실패0을 확인했다. 전용 test로 저장본4환경·32step headless 재로드 정상 종료. [학습 검사](output_etc/check/stage2_before_ground_mix334_1200/training_validation.json), [재로드](output_etc/check/stage2_before_ground_mix334_1200/reload.log). 셸 문법·새 문서 링크·diff 확인. 실제 VNC 화면·1200step 완주·장기 수렴은 미검증이며 본학습은 시작하지 않았다. 원본 checkout과 기존 학습 프로세스는 변경하지 않았다.
+
+## 2026-10-21
+
+### mix50 viewer 가까운 배치 선택
+
+- mix50 test/VNC에 `BEFORE_FOLLOWER_NEAR=1`을 연결했다. 평가에서만 BEFORE 쌍의 가까운 모드를100% 선택하며 선행1~10m·후행1~5m·ON_TOP 자기 상자1~5m, 독립 방향·거리 순서 미강제를 유지한다. 기준은 선행 상자의 초기 위치다. 기본50/50·단독·저장 checkpoint 계약·기존 non-mix 근접 viewer·학습은 유지한다. [명령](markdowns/USAGE.md#stage2-before-5050-혼합-배치).
+- CPU36개 통과(기존30500 파일 의존 테스트1개 제외). GPU0에서4환경·4구성·각16step의 전 BEFORE 쌍 가까운 모드·거리·부분 reset·finite·가중치 불변을 확인했다. mix50의10000 저장본을 전용 test로4환경·seed100·32step headless 재로드해 정상 종료했다. [물리 검사](output_etc/check/mix50_near_viewer_20261021/physics/validation.json), [재로드 로그](output_etc/check/mix50_near_viewer_20261021/reload.log). 셸 문법·문서 링크·diff 확인. 실제 viewer 화면은 검사하지 않았으며 실행 중 학습은 유지했다.
+
+## 2026-10-20
+
+### BEFORE 바닥 50/50 거리 혼합 실험
+
+- `stage2_before_ground_mix50` env/train YAML과 GPU0 기본 train/test/VNC를 추가했다. BEFORE 쌍마다 기존/가까운 배치를 50%씩 추첨하고 물리 재시도 동안 모드를 유지한다. 선행 AT는1~10m, 가까운 후행은1~5m, ON_TOP 자기 상자는 후행 기준1~5m이며 거리 순서를 강제하지 않는다. 단독·loco·보상·모델/PPO는 기존 ground와 같다. [배치 계약](markdowns/reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix50), [명령](markdowns/config.md).
+- 기본 source는 형제 원본 checkout의 fixed73000이며 읽기만 한다. 새 output·checkpoint 계약을 분리하고 test/VNC도 혼합 배치를 사용한다. 혼합 비율·쌍 수 지표를 추가하고 별도 `BEFORE_FOLLOWER_NEAR` 평가 옵션과의 동시 사용은 거부한다.
+- CPU35개 통과(기존30500 파일이 없는 전이 테스트1개 제외). GPU0의8환경·4구성·각16step에서 거리·초기 gate·부분 reset·AMP/추론 finite·가중치 불변을 확인했다. 표준 train으로4명·1024환경·8물체 CHECK=1 학습/저장(epoch2/frame262144), encoder73 tensor·관측 RMS 동결·head 갱신·262종 지표 finite·물리 실패0·가까운 비율50.13%(3367쌍)를 확인했다. 저장본의 표준 test4환경·32step 재로드도 통과했다. [학습 검사](output_etc/check/stage2_before_ground_mix50/training_validation.json), [물리 검사](output_etc/check/stage2_before_ground_mix50/physics/validation.json). 셸 문법·문서 링크·diff 확인. VNC 실화면·장기 수렴은 미검증이며 본학습은 시작하지 않았다. 기존 학습 프로세스는 유지했다.
+
+### BEFORE 근접 평가 거리 확대
+
+- 사용자 요청으로 `BEFORE_FOLLOWER_NEAR=1`의 선행 상자 중심→두 사람 root XY 거리를 1~5m로 확대하고 후행에 작은 값을 배정한다. ON_TOP 후행의 자기 payload는 후행의 최종 root XY 기준 1~3m·무작위 각도로 다시 배치한다. 높이·겹침 검사와 단독 인원·기본 학습/평가 경로는 유지한다. [평가 옵션](markdowns/USAGE.md#stage2-before-평가-옵션)을 갱신했다.
+- CPU29개 통과(거리·겹침·부분 reset·seed 재현 포함). 기존 전이 테스트1개는 이 checkout의30500 체크포인트 부재로 실패해 별도 실행에서 제외했다. GPU0의73000 체크포인트 전이로4명·4환경·8물체, `before_stack`·`one_pair_stack`·`all_solo`·`random_scenario` 각16step을 검사해 새 거리·초기 gate·AMP/추론 finite·부분 reset·가중치 불변을 확인했다. 처음 시도한 고정 `before_sit`은 검사기가 생성한 무작위 상자 크기와 호환되지 않아 중단했고 최종 무작위 구성에서 SIT/CLIMB 후행도 확인했다. [검증 결과](output_etc/check/before_near_1to5_20261020/physics/validation.json), [CPU](output_etc/check/before_near_1to5_20261020/cpu_available.log). 실제 viewer 화면은 검사하지 않았으며 기존 학습·원본 레포·프로세스는 변경하지 않았다.
+
+### 재부팅 없는 nvitop 조회 복구
+
+- 실행 중 커널 드라이버 `580.173.02`와 설치 NVML `580.178.04` 불일치를 확인했다. Ubuntu 공식 snapshot의 구버전 NVML만 `output_etc/check/nvml_compat/`에 추출해 명령 단위 `LD_LIBRARY_PATH`로 조회하는 방법을 [USAGE](markdowns/USAGE.md#재부팅-전-nvml-불일치-우회)에 기록했다. 시스템 패키지·원본 레포·기존 학습 프로세스는 변경하지 않았다.
+- `nvitop --once` 종료 코드0, GPU 메모리·사용률·원본 fixed 학습 PID2735256 표시를 확인했다. [조회 결과](output_etc/check/nvml_compat/nvitop_once.txt). 학습·평가는 실행하지 않았다.
+
 ## 2026-10-19
 
 ### Stage2 BEFORE 바닥 전용 비교 실험

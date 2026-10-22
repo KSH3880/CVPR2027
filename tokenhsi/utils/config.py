@@ -109,8 +109,18 @@ def load_cfg(args):
         cfg["env"]["numObjects"] = args.num_objects
     if cfg["env"].get("before") is not None:
         training = cfg_train["params"]["config"]
-        if training['name'] == 'Stage2BeforeGround' and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
+        if training['name'] in ('Stage2BeforeGround', 'Stage2BeforeGroundMix50', 'Stage2BeforeGroundMix334_1200') and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
             raise ValueError('stage2_before_ground requires a ground_only environment/checkpoint')
+        if training['name'] == 'Stage2BeforeGroundMix50':
+            from utils.before_sampling import DISTANCE_MIXTURE
+            if cfg['env']['before'].get('distance_mixture') != DISTANCE_MIXTURE:
+                raise ValueError('stage2_before_ground_mix50 requires the 50/50 distance mixture')
+        if training['name'] == 'Stage2BeforeGroundMix334_1200':
+            from utils.before_sampling import THREE_WAY_DISTANCE_MIXTURE
+            if cfg['env']['before'].get('distance_mixture') != THREE_WAY_DISTANCE_MIXTURE:
+                raise ValueError('stage2_before_ground_mix334_1200 requires the 30/30/40 distance mixture')
+            if not is_eval and cfg['env']['episodeLength'] != 1200:
+                raise ValueError('stage2_before_ground_mix334_1200 training requires 1200 steps')
         training["minibatch_size"] = training.get("scene_minibatch_size", 4096) * cfg["env"]["numAgents"]
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")

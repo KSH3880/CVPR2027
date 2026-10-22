@@ -32,7 +32,7 @@ def apply_layout(t, ids):
     stack = t._templates[envs, follower] == 4
     pending = torch.arange(len(envs), device=t.device)
     for _ in range(128):
-        distance = (1.+torch.rand(len(pending), 2, device=t.device)).sort(-1, descending=True).values
+        distance = (1.+4.*torch.rand(len(pending), 2, device=t.device)).sort(-1, descending=True).values
         angle = torch.rand(len(pending), 2, device=t.device)*2*torch.pi
         target = roots[pending].clone()
         target[..., :2] = boxes[pending, 0, None, :2]+distance[..., None]*torch.stack((angle.cos(), angle.sin()), -1)
@@ -47,6 +47,15 @@ def apply_layout(t, ids):
         moved_bodies = transform(bodies[pending], q, shift)
         moved_boxes = boxes[pending].clone()
         moved_boxes[:, 1] = transform(moved_boxes[:, 1], q[:, 1], shift[:, 1])
+        # ON_TOP payload distance is measured from the follower's final root,
+        # independently of the shared support (the predecessor's payload).
+        stack_rows = stack[pending].nonzero(as_tuple=True)[0]
+        payload_distance = 1.+2.*torch.rand(len(stack_rows), device=t.device)
+        payload_angle = torch.rand(len(stack_rows), device=t.device)*2*torch.pi
+        moved_boxes[stack_rows, 1, :2] = (
+            moved_roots[stack_rows, 1, :2]
+            + payload_distance[:, None]*torch.stack((payload_angle.cos(), payload_angle.sin()), -1)
+        )
         bad = pair_invalid(moved_roots, moved_bodies, moved_boxes, sizes[pending], stack[pending])
         actual = (moved_roots[..., :2]-moved_boxes[:, 0, None, :2]).norm(dim=-1)
         bad |= actual[:, 1] >= actual[:, 0]

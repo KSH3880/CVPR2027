@@ -51,15 +51,40 @@ def check_layout(task):
                 pairs += 1
                 assert mapping[env,target-m] == pre
                 assert relations[env,human,pre] == 2 and relations[env,pre,human] == 0
-                if task.cfg['args'].before_follower_near:
+                if (task.cfg['args'].before_follower_near
+                        and task.cfg['env']['before'].get('distance_mixture') is None):
                     distance = (task._humanoid_root_states[env,[pre,human],:2]-task._box_states[env,pre,:2]).norm(dim=-1)
-                    assert 1.-1e-5 <= distance[1] < distance[0] <= 2.+1e-5
+                    assert 1.-1e-5 <= distance[1] < distance[0] <= 5.+1e-5
+                    if template == 4:
+                        payload_distance = (task._box_states[env,human,:2]
+                                            - task._humanoid_root_states[env,human,:2]).norm()
+                        assert 1.-1e-5 <= payload_distance <= 3.+1e-5
+                elif task.cfg['env']['before'].get('distance_mixture') is not None:
+                    near = bool(task._before_near_pairs[env,human])
+                    mode = int(task._before_distance_modes[env,human])
+                    if task.cfg['args'].before_follower_near:
+                        assert near
+                    maximum = 5. if near or template == 1 else 10.
+                    if mode == 2:
+                        maximum = 2.5
+                    distance = (task._humanoid_root_states[env,[pre,human],:2]
+                                - task._box_states[env,pre,:2]).norm(dim=-1)
+                    leader_max = 5. if mode == 2 else 10.
+                    assert 1.-1e-5 <= distance[0] <= leader_max+1e-5
+                    assert 1.-1e-5 <= distance[1] <= maximum+1e-5
+                    if template == 4:
+                        own_distance = (task._box_states[env,human,:2]
+                                        - task._humanoid_root_states[env,human,:2]).norm()
+                        assert 1.-1e-5 <= own_distance <= maximum+1e-5
             elif template < 3:
                 assert mapping[env,target-m] == human+template*m
             elif template == 4:
                 assert mapping[env,target-m] == 3*m+human
     assert int((relations == 2).sum()) == pairs
-    return dict(pairs=pairs, task_tokens=task._task_token_count.tolist(),
+    assert not task._before_near_pairs[task._before_predecessor < 0].any()
+    return dict(pairs=pairs, near_pairs=int(task._before_near_pairs.sum()),
+                distance_modes=task._before_distance_modes.tolist(),
+                task_tokens=task._task_token_count.tolist(),
                 distractors=(o-task._task_token_count).tolist())
 
 
@@ -111,7 +136,9 @@ def main():
                 if not all(torch.isfinite(x).all() for x in (mu,value,obs,reward)):
                     raise RuntimeError('Non-finite BEFORE rollout')
             untouched = task._root_states.view(task.num_envs,-1,13)[1:].clone()
+            untouched_modes = task._before_distance_modes[1:].clone()
             task._reset_envs(torch.tensor([0],device=task.device))
+            assert torch.equal(untouched_modes, task._before_distance_modes[1:])
             if not torch.equal(untouched,task._root_states.view(task.num_envs,-1,13)[1:]):
                 raise RuntimeError('Partial reset changed another environment')
             results.append(dict(preset=preset,groups=groups,templates=templates,reward=float(reward.mean()),finite=True,**layout))

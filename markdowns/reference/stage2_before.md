@@ -24,7 +24,7 @@ Actor/critic의 human SA4는 SELF/NONE/BEFORE 세 관계를 사용한다. B quer
 
 기본 전이는 `stage1/Stage1V2Fixed_00030500.pth`다. actor encoder·관측 RMS는 동결하고 새 coordination은 항등 초기화한다. 학습률·AMP/PPO 설정은 공유 full-success의 값을 유지한다. PPO는 `scene_minibatch_size=4096`을 기준으로 `minibatch_size=4096×N`을 계산하므로 홀수 인원도 학습할 수 있다. 기본 4명에서는 기존 16384와 같다. BEFORE 전용 checkpoint 계약을 저장해 다른 실험과 재개/평가를 구분한다.
 
-`BEFORE_FOLLOWER_NEAR=1`은 평가에만 적용한다. 선행 상자 중심까지의 두 root XY 거리를 1~2m에서 추첨해 후행을 더 가깝게 두고 각도도 추첨한다. 다른 초기화 규칙과 보상 gate는 유지한다.
+`BEFORE_FOLLOWER_NEAR=1`은 loco 평가에만 적용한다. 선행 상자 중심까지의 두 사람 root XY 거리를 1~5m에서 추첨해 후행에 작은 값을 주고 각도도 추첨한다. ON_TOP 후행의 자기 payload는 후행 사람의 최종 root XY 기준 1~3m·무작위 각도로 별도 배치한다. 선행 상자는 유지하고 기존 높이·자세 기울기와 겹침 검사를 보존한다. 초기 배치에만 적용하며 단독 인원·옵션을 끈 평가·학습 배치·보상 gate는 유지한다.
 
 검증 결과는 [changelog](../../changelog.md), 산출물은 `output_etc/check/stage2_before/`에 둔다.
 
@@ -33,3 +33,38 @@ Actor/critic의 human SA4는 SELF/NONE/BEFORE 세 관계를 사용한다. B quer
 `stage2_before_ground`는 기존 BEFORE와 별도 env/train YAML·train/test/VNC·output을 쓴다. `randomHeight=false`, `randomHeightProb=0`, `platformMode=ground_only`로 모든 초기 상자를 바닥에 두고, BEFORE 선행과 단독 AT의 목표 중심 높이를 운반 상자 높이의 절반으로 둔다. 시작 받침과 AT 도착 받침은 모두 비활성화한다. 물리 actor 인덱스 구조를 유지하기 위해 고정 받침 슬롯은 지하 Z=-20m/-19.5m에 격리한다. ON_TOP의 쌓기 대상 상자는 실제 과제 물체로 유지한다.
 
 그룹 추첨·물체 예산 재샘플링·loco 초기화·현재 AT gate·보상·색상·학습 설정은 기존 BEFORE와 동일하다. 상자 yaw·XY·크기는 계속 무작위다. Stage1 fixed 가중치 전이로 새 학습을 시작하며 기존 BEFORE의 학습 프로세스와 설정은 유지한다. 저장된 reset 계약이 달라 기존 BEFORE checkpoint의 직접 resume/환경 변경 평가는 거부한다. ground test/VNC는 ground 저장본 옆 환경 설정을 사용한다.
+
+## 바닥 BEFORE 거리 혼합: stage2_before_ground_mix50
+
+`stage2_before_ground`에서 후행 접근 거리를 줄인 샘플을 더 자주 제공하는 별도 실험이다. 모든 사람은 loco로 시작하며 동작 중간 자세 RSI를 추가하지 않는다. BEFORE 쌍마다 episode graph를 만든 뒤 가까운/기존 배치를 각각 50%로 독립 추첨한다. 물리 겹침 재시도에서는 선택한 모드를 유지한다. 유한한 샘플 수에서 정확히 절반을 강제하지 않는다.
+
+| 초기 root XY/상자 중심 XY 거리 | 가까운 배치 50% | 기존 배치 50% |
+| --- | --- | --- |
+| 선행 사람 → 선행 AT 상자 | 1~10m | 1~10m |
+| 선행 상자 → 후행 SIT 사람 | 1~5m | 1~5m |
+| 선행 상자 → 후행 CLIMB/ON_TOP 사람 | 1~5m | 1~10m |
+| ON_TOP 후행 사람 → 자기 운반 상자 | 1~5m | 1~10m |
+
+각 반경과 각도는 독립 추첨하고 거리 대소 관계를 강제하지 않는다. ON_TOP은 선행 상자→후행 사람→후행 자기 상자 순서다. 사람/물체 간 겹침 검사는 그대로이며 최종 거리 분포는 이 조건에 영향을 받는다. 단독 과제·선행 AT 목표 추첨·과제/그룹 비율·모델·보상·AMP/PPO·바닥 높이는 기존 ground와 같다.
+
+학습과 기본 test/VNC 모두 저장된 혼합 배치를 사용한다. `BEFORE_FOLLOWER_NEAR=1`은 평가에서만 모든 BEFORE 쌍에 가까운 모드를 선택한다. 선행 사람→상자 1~10m, 선행 상자→후행 사람 1~5m, ON_TOP 후행→자기 상자 1~5m이며 거리 순서를 강제하지 않는다. 기준은 선행 상자의 초기 위치이며 AT 도착 위치 주변 배치는 아니다. 저장 config/계약·단독 과제·학습 비율은 바꾸지 않는다. `relation/sampling/before_near_fraction`은 기록 구간에서 새로 추첨한 BEFORE 쌍 중 가까운 모드 비율이며, `before_pairs`는 분모인 쌍 수다. 배치 재시도는 중복 집계하지 않는다.
+
+`before.distance_mixture`가 checkpoint 계약에 포함되어 기존 ground와 직접 resume/혼용하지 않는다. 기본 Stage1 source는 형제 checkout의 fixed73000 파일이며 `STAGE1_CHECKPOINT`로 바꿀 수 있다. 기존 checkpoint는 읽기만 하고 새 결과는 `output/stage2_before_ground_mix50/`에 저장한다. 실행법은 [config](../config.md), 추가 옵션은 [USAGE](../USAGE.md#stage2-before-5050-혼합-배치)를 따른다.
+
+## 바닥 BEFORE 거리 혼합: stage2_before_ground_mix334_1200
+
+별도 config·checkpoint 계약·output을 쓰며 에피소드 최대 길이는 장면 전체에 1200 제어 스텝(약40초)이다. BEFORE 쌍마다 아래 모드를 독립 추첨하고, 물리 배치 재시도 동안 모드를 유지한다. 단독 과제의 배치·AT 도착 목표 샘플러·과제/그룹 비율·loco 초기화·Stage1 동결·보상·AMP/PPO는 ground와 같다.
+
+| 초기 수평 거리 | 기존 30% | 가까움 30% | 더 가까움 40% |
+| --- | --- | --- | --- |
+| 선행 AT 사람 → 자기 상자 | 1~10m | 1~10m | 1~5m |
+| 후행 SIT 사람 → 선행 상자 | 1~5m | 1~5m | 1~2.5m |
+| 후행 CLIMB 사람 → 선행 상자 | 1~10m | 1~5m | 1~2.5m |
+| 후행 ON_TOP 사람 → 선행 상자 | 1~10m | 1~5m | 1~2.5m |
+| ON_TOP 자기 상자 → 후행 사람 | 1~10m | 1~5m | 1~2.5m |
+
+최소 거리는1m를 유지한다. 더 가까운 모드에서 선행 상자는 고정하고 선행 사람의 기존 방사 방향·반경을1~10m에서1~5m로 선형 변환한다. 이후 후행과 ON_TOP 자기 상자를 각자 독립 각도·반경으로 배치한다. AT 목표는 기존 샘플러로 최종 사람/상자 배치 후 생성한다. 후행이 반드시 선행보다 가깝게 나오도록 정렬하지 않으며, 겹침 검사에 따른 거부 추첨은 그대로다. 거리 기준은 선행 상자의 초기 위치이고, AT 도착 위치까지의 운반 거리는 별도로 축소하지 않는다.
+
+`relation/sampling/before_original_fraction`, `before_medium_fraction`, `before_short_fraction`은 새 BEFORE 쌍의 세 모드 비율이다. `before_near_fraction`은 두 가까운 모드를 합친 비율(기대70%), `before_pairs`는 분모이며 배치 재시도는 중복 집계하지 않는다. 기본 test/VNC도30/30/40을 사용한다. `BEFORE_FOLLOWER_NEAR=1`은 기존 mix50와 같은 의미로 가운데 모드(선행1~10m·후행/자기 상자1~5m)만 선택한다.
+
+기본 source는 형제 checkout의 fixed73000이다. 기존 ground/mix50 checkpoint와 직접 resume하지 않으며 새 실험의 저장본으로만 재개한다. 결과는 `output/stage2_before_ground_mix334_1200/`에 저장한다. 학습은1200스텝을 검사하며, 평가는 `EPISODE_LENGTH`로 재정의할 수 있다. 실행은 [config](../config.md), 추가 옵션은 [USAGE](../USAGE.md#stage2-before-mix334-1200)를 따른다.

@@ -33,6 +33,16 @@ python -c "import isaacgym, torch; print(torch.cuda.get_device_name(0))"'
 
 머신 이관은 [PORTING_GUIDE.md](reference/PORTING_GUIDE.md)를 따른다. 학습 결과는 `output/<실험>/<run>/`, 평가 지표는 `output_etc/check/<실험>/eval/metrics/`에 저장한다.
 
+### 재부팅 전 NVML 불일치 우회
+
+현재 커널 드라이버가 `580.173.02`, 설치된 NVML이 `580.178.04`인 서버에서는 아래 명령으로 `nvitop`만 구버전 NVML을 사용한다. 저장소 루트에서 실행하며, 시스템 라이브러리와 학습 프로세스는 변경하지 않는다. 재부팅으로 드라이버가 갱신되면 이 우회 대신 일반 `nvitop`을 사용한다. `LD_LIBRARY_PATH`를 전역 export하지 않는다.
+
+```bash
+LD_LIBRARY_PATH="$PWD/output_etc/check/nvml_compat/lib/580.173.02${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" nvitop
+```
+
+구버전 라이브러리는 [Ubuntu 공식 snapshot 패키지](https://snapshot.ubuntu.com/ubuntu/20261001T000000Z/pool/restricted/n/nvidia-graphics-drivers-580/libnvidia-compute-580_580.173.02-0ubuntu0.24.04.1_amd64.deb)에서 `libnvidia-ml.so.580.173.02`만 추출하고 같은 폴더에 `libnvidia-ml.so.1` 심링크를 만들었다. 파일은 이 checkout의 Git 제외 산출물이므로 다른 checkout에는 자동 제공되지 않는다.
+
 ## 추가 실행 옵션
 
 `EXP`는 `stage1_v2_fixed`, `stage1_v2`, `stage1` 중 하나다. 기본 학습·로컬 추론·VNC 명령은 config에만 나열한다.
@@ -101,7 +111,7 @@ bash tokenhsi/scripts/multi_agent/stage2_vnc.sh \
 
 인원 N≥1, 물체 M≥N을 train/test/VNC 위치 인자로 지정한다. 예: 아래 명령의 `4 1 8 10`을 `6 1 6 10`으로 바꾸면 6명·1환경·6물체다. BEFORE는 항상 2인 그룹이며 물체 예산을 넘는 환경은 task graph 전체를 재샘플링한다. 예산이 작으면 최종 그룹·과제 비율이 달라질 수 있다. 전원 `carry_ontop`은 M≥2N을 요구한다. 기존 4명·8물체 BEFORE 저장본도 가변 인원·물체 평가에 사용할 수 있다.
 
-`BEFORE_FOLLOWER_NEAR=1`은 loco 평가 전용이다. 각 BEFORE 쌍의 선행 상자 중심까지 root XY 거리를 1~2m에서 추첨하고 후행에 작은 값을 준다. 각도도 매 reset 추첨하며 기존 높이와 자세 기울기를 보존한다. STACK도 선행 상자를 기준으로 비교한다. 기본 학습 배치와 보상은 바꾸지 않는다. 같은 seed는 같은 추첨을 재현한다.
+`BEFORE_FOLLOWER_NEAR=1`은 loco 평가 전용이다. 각 BEFORE 쌍의 선행 상자 중심까지 두 사람의 root XY 거리를 1~5m에서 추첨하고 후행에 작은 값을 준다. ON_TOP(STACK) 후행이 들고 올 자기 상자는 후행 사람의 최종 root XY 기준 1~3m로 별도 재배치한다. 각도도 매 reset 추첨하며 기존 높이와 자세 기울기를 보존하고 사람·상자 겹침을 검사한다. 거리는 초기 배치에만 적용하며 단독 인원, 옵션을 끈 평가, 기본 학습 배치와 보상은 바꾸지 않는다. 같은 seed는 같은 추첨을 재현한다.
 
 ```bash
 # stage2_before
@@ -120,3 +130,26 @@ BEFORE_FOLLOWER_NEAR=1 TOKENHSI_GPU=5 SEED=5125 TASK_GRAPH=random_scenario EVAL_
 OUTPUT_PATH=output_etc/check/stage2_before_ground/follower_near_viewer \
 bash tokenhsi/scripts/multi_agent/stage2_before_ground_vnc.sh "$CKPT" 4 1 8 10
 ```
+
+## Stage2 BEFORE 50/50 혼합 배치
+
+`stage2_before_ground_mix50`는 기본 GPU0·4명·1024환경·8물체다. train/test/VNC는 전용 wrapper를 사용한다. 기본 평가는 저장 config의 50/50 혼합 배치를 사용하며, test/VNC에 `BEFORE_FOLLOWER_NEAR=1`을 붙이면 BEFORE 쌍에 가까운 모드만 적용한다. 선행은 초기 상자에서 1~10m, 후행은 선행 초기 상자에서 1~5m, ON_TOP 자기 상자는 후행에서 1~5m이며 후행이 더 가깝도록 강제하지 않는다. 단독 인원·checkpoint 계약·학습 비율은 유지한다. 배치·비율·TensorBoard 지표는 [혼합 배치 계약](reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix50)을 따른다.
+
+기본 Stage1 source는 저장소 루트 기준 `../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00073000.pth`다. 다른 source는 `STAGE1_CHECKPOINT`로 지정한다. 재개는 이 실험의 checkpoint를 `RESUME_CHECKPOINT`로 지정하고, test/VNC도 이 실험의 checkpoint를 사용한다. 기존 ground checkpoint는 혼합 배치 계약이 달라 직접 resume하지 않는다.
+
+환경 YAML 재정의는 `BEFORE_GROUND_MIX50_ENV_CONFIG`이며 test/VNC 기본값은 저장본 옆 `relation_config.yaml`이다. 기본 명령은 [config](config.md)에 있다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT`, `BEFORE_FOLLOWER_NEAR`의 잔여값을 해제한다. 짧은 확인 학습은 `CHECK=1`로 실행하고 환경 수는 1024를 유지한다.
+
+```bash
+# stage2_before_ground_mix50 — 가까운 BEFORE 배치 viewer
+HEADLESS=0 BEFORE_FOLLOWER_NEAR=1 TOKENHSI_GPU=0 \
+SEED=100 TASK_GRAPH=random_scenario EVAL_SKILLS=loco \
+OUTPUT_PATH=output_etc/check/stage2_before_ground_mix50/follower_near_viewer \
+bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_test.sh \
+"output/stage2_before_ground_mix50/Stage2BeforeGroundMix50_20-14-08-16/nn/Stage2BeforeGroundMix50.pth" 4 1 8 10
+```
+
+## Stage2 BEFORE mix334 1200
+
+`stage2_before_ground_mix334_1200`은 GPU0·4명·1024환경·8물체, 최대1200스텝의 별도 실험이다. [배치 표](reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix334_1200)와 [학습·로컬·VNC 명령](config.md)을 따른다. 세 전용 wrapper를 사용하고 환경 재정의는 `BEFORE_GROUND_MIX334_1200_ENV_CONFIG`로 지정한다. test/VNC는 저장본 옆 `relation_config.yaml`을 기본으로 읽는다.
+
+Stage1 source는 mix50와 같은 형제 checkout의 fixed73000이며 `STAGE1_CHECKPOINT`로 지정할 수 있다. `RESUME_CHECKPOINT`에는 이 새 실험의 저장본만 사용한다. 기존 ground/mix50를 직접 재개하는 설정이 아니다. 기본 평가는30/30/40이고, `BEFORE_FOLLOWER_NEAR=1`은 가운데 가까운 모드만 선택한다(더 가까운 모드 강제가 아님). `EPISODE_LENGTH`는 평가에만 적용하며 기본은1200이다. 단독 배치·학습 비율·저장 계약은 평가 옵션으로 변경하지 않는다.

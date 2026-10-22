@@ -7,7 +7,8 @@ from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.humanoid_ma_shared_support import LocoRsi, HumanoidMASharedSupport
 from utils.before_spec import sample_graph, pack_objects, task_objects
 from utils.edge_ontop_spec import copy_graph_rows, permute_graph
-from utils.stage1_sampling import sample_source_xy, sample_goal_xy
+from utils.stage1_sampling import sample_goal_xy
+from utils.before_sampling import sample_distance_modes, sample_follower_modes, shorten_leader_xy
 
 
 class HumanoidMABefore(HumanoidMACarry):
@@ -48,6 +49,10 @@ class HumanoidMABefore(HumanoidMACarry):
         shape = (self.num_envs, self.num_agents)
         self._templates = torch.full(shape, 3, device=self.device, dtype=torch.long)
         self._before_predecessor = torch.full_like(self._templates, -1)
+        self._before_near_pairs = torch.zeros(shape, device=self.device, dtype=torch.bool)
+        self._before_distance_modes = torch.zeros_like(self._templates)
+        self._before_mode_counts = torch.zeros(3, device=self.device)
+        self._before_mixture_counts = torch.zeros(2, device=self.device)
         self._task_token_count = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
 
     def _init_ontop_context_runtime(self):
@@ -61,6 +66,16 @@ class HumanoidMABefore(HumanoidMACarry):
         graph, predecessor, templates = sample_graph(self._box_size[ids, :m],
             self.cfg['env']['box']['build']['taskSizeRanges'], self._task_graph_preset, self.num_objects)
         self._before_predecessor[ids], self._templates[ids] = predecessor, templates
+        # Draw once per episode graph; physical placement retries retain the mode.
+        mixture = self.cfg['env']['before'].get('distance_mixture')
+        force_near = self._is_eval and getattr(self.cfg['args'], 'before_follower_near', False)
+        modes = sample_distance_modes(predecessor, mixture, force_near)
+        self._before_distance_modes[ids] = modes
+        self._before_near_pairs[ids] = modes > 0
+        if mixture is not None:
+            self._before_mode_counts += torch.bincount(modes[predecessor >= 0], minlength=3)
+            self._before_mixture_counts[0] += self._before_near_pairs[ids].sum()
+            self._before_mixture_counts[1] += (predecessor >= 0).sum()
         people = torch.arange(m, device=self.device)[None].expand(len(ids), -1)
         source = people+torch.where(templates == 1, m, torch.where(templates == 2, 2*m, 0))
         follower = predecessor >= 0
@@ -102,13 +117,22 @@ class HumanoidMABefore(HumanoidMACarry):
         row, human = (self._before_predecessor[ids] >= 0).nonzero(as_tuple=True)
         es = ids[row]
         first = self._before_predecessor[es, human]
-        desired = sample_source_xy(self._box_states[es, first, :2], self._templates[es, human])
+        modes = self._before_distance_modes[es, human]
+        short = modes == 2
+        se, leader = es[short], first[short]
+        leader_xy = self._humanoid_root_states[se, leader, :2]
+        delta = shorten_leader_xy(leader_xy, self._box_states[se, leader, :2]) - leader_xy
+        self._humanoid_root_states[se, leader, :2] += delta
+        self._kinematic_humanoid_rigid_body_states[se, leader, :, :2] += delta[:, None]
+        desired = sample_follower_modes(self._box_states[es, first, :2], self._templates[es, human], modes)
         delta = desired-self._humanoid_root_states[es, human, :2]
         self._humanoid_root_states[es, human, :2] += delta
         self._kinematic_humanoid_rigid_body_states[es, human, :, :2] += delta[:, None]
         top = self._templates[es, human] == 4
-        self._box_states[es[top], human[top], :2] = sample_source_xy(desired[top], self._templates[es[top], human[top]])
-        if getattr(self.cfg['args'], 'before_follower_near', False):
+        self._box_states[es[top], human[top], :2] = sample_follower_modes(
+            desired[top], self._templates[es[top], human[top]], modes[top])
+        if (getattr(self.cfg['args'], 'before_follower_near', False)
+                and self.cfg['env']['before'].get('distance_mixture') is None):
             from env.tasks.multi_agent.before_follower_near import apply_layout
             apply_layout(self, ids)
 
@@ -128,3 +152,16 @@ class HumanoidMABefore(HumanoidMACarry):
             key = 'before/'+name
             self._edge_metric_sums[key] = self._edge_metric_sums.get(key, 0)+(values & dependent).sum()
             self._edge_metric_denominators[key] = self._edge_metric_denominators.get(key, 0)+dependent.sum()
+
+    def _consume_sampling_diagnostics(self):
+        result = super()._consume_sampling_diagnostics()
+        if self.cfg['env']['before'].get('distance_mixture') is not None:
+            near, total = self._before_mixture_counts
+            result['sampling/before_near_fraction'] = near / total.clamp_min(1)
+            result['sampling/before_pairs'] = total.clone()
+            if 'probabilities' in self.cfg['env']['before']['distance_mixture']:
+                for index, name in enumerate(('original', 'medium', 'short')):
+                    result['sampling/before_'+name+'_fraction'] = self._before_mode_counts[index] / total.clamp_min(1)
+            self._before_mode_counts.zero_()
+            self._before_mixture_counts.zero_()
+        return result

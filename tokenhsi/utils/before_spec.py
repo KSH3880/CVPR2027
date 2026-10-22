@@ -17,9 +17,14 @@ SPEC = dict(pairing_probability=.8, follower_weights=[1., 1., 1.],
 
 def validate_env(env):
     from utils.unified_training import validate_unified_env
+    from utils.before_sampling import DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE
     if env['numAgents'] < 1 or env['numObjects'] < env['numAgents']:
         raise ValueError('BEFORE requires numAgents >= 1 and numObjects >= numAgents')
-    if env['before'] != SPEC or env['relationGraph']['sampler'] != SAMPLER:
+    before = dict(env['before'])
+    mixture = before.pop('distance_mixture', None)
+    if mixture is not None and mixture not in (DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE):
+        raise ValueError('BEFORE distance mixture requires the agreed 50/50 or 30/30/40 ranges')
+    if before != SPEC or env['relationGraph']['sampler'] != SAMPLER:
         raise ValueError('BEFORE configuration differs from the agreed contract')
     if any(row != [1.] + [0.]*7 for row in env['templateRsi'].values()):
         raise ValueError('BEFORE requires loco-only initialization')

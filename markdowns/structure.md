@@ -99,4 +99,8 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유
 | `tokenhsi/learning/multi_agent/before_network.py`, `human_coordination.py` | 공통 장면 encoder·SELF/NONE/단방향 BEFORE SA4 |
 | `tokenhsi/tests/test_before.py`, `test_before_follower_near.py`, `check_before.py` | CPU gate/분포/전이·GPU 과제 연결/부분 reset/추론 검사 |
 
+추가 혼합 실험 `stage2_before_ground_mix50`의 env/train YAML은 `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before_ground_mix50.yaml`, 실행은 `tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_{train,test,vnc}.sh`다. `tokenhsi/utils/before_sampling.py`가 쌍별 모드와 후행 거리를 추첨하며 `tokenhsi/tests/test_before_sampling.py`가 혼합 비율·거리·기존 경로·checkpoint 분리를 검사한다.
+
 세부 계약은 [BEFORE 참고](reference/stage2_before.md)에 있다.
+
+`stage2_before_ground_mix334_1200`은 같은 `before_sampling.py`의 3단계 거리 모드와 선행 접근 거리 축소를 사용한다. env/train YAML과 전용 train/test/VNC는 각각 `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before_ground_mix334_1200.yaml`, `tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_{train,test,vnc}.sh`에 있다.
