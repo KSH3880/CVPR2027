@@ -1,0 +1,7 @@
+checkpoints/*
+!checkpoints/.gitkeep
+__pycache__/
+*.pyc
+ports/koo_native_y2m/tokenhsi/data/**/motions/
+ports/koo_native_y2m/output/
+ports/koo_native_y2m/output_etc/
