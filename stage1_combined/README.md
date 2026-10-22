@@ -1,0 +1,10 @@
+# stage1_combined
+
+73000 체크포인트에서 의자 SIT/CLIMB용 object tokenizer만 미세조정하는 독립 코드 폴더.
+
+입력35D: 로컬 선속도3 + 각속도3 + bbox 꼭짓점24 + 등받이XY2 + 좌판XYZ3. MLP35→256→128→64. actor/critic 의자 토크나이저 외 기존 가중치165개와 정규화3종은 동결. 2명×2048환경, 사용 의자2개+주변box/table/chair2개. 기본20,000iteration, GPU5.
+
+학습·추론 명령: [markdowns/config.md](markdowns/config.md).
+의자/주변 테이블 에셋과 초기 체크포인트는 이 폴더에 실제 복사. 공용 motion/SMPL 데이터와 IsaacGym/conda는 기존 공유 경로를 사용. ksh 및 baseline 수정 없음.
+
+현재 실행 중인 학습은 안전하게 기존 runs 경로에서 계속 동작한다. [실행 기록](../runs/chair_bbox_ft_20261022/active_run.json). 이 폴더에서 중복 학습은 시작하지 않았다. 이후 실행은 이 폴더 기준.

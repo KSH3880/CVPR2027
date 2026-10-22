@@ -1,0 +1,22 @@
+output/
+output_etc/
+checkpoints/*
+!checkpoints/.gitkeep
+chair_assets/
+__pycache__/
+*.pyc
+*.log
+
+# Copied motion datasets and generated RSI banks (retain builder source)
+/joint_carry/source_corrected/
+/joint_carry/source_rsi/
+/joint_carry/stage2_size_rsi/
+/joint_carry/teamhoi_reference/
+/joint_carry/teamhoi_retarget_posture_all/
+
+# Local runtime data links and generated metrics
+/tokenhsi/data/dataset_*
+/body_models/smpl
+/metrics/
+*.npz
+*.npy
