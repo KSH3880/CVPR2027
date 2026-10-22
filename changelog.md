@@ -2,7 +2,30 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-22
+
+### Stage1 PUSH 5500회 정책 VNC
+
+- 사용자 요청으로 `output/stage1_base_push_view_20261022/launch.sh`를 추가하고 5500회 저장본·GPU1 native/MPS 우회·1환경·2명/4상자·loco 시작·1280×720 VNC6107을 실행했다. 모델 계약/복원·실제 정책 step·화면 캡처를 확인했다. tmux는 `koo_stage1_push_view_20261022`, 로그/화면은 같은 폴더 `viewer.log`/`preview.png`다.
+- 실행 후 두 학습 PID 생존·GPU1 이벤트 로그 갱신·MPS 로그 크기 불변·viewer MPS 변수 제거를 확인했다. GPU1 여유는 관측 시523MiB이고 학습 처리량은 약9600→7600~8000FPS로 감소했다. 장기 병행 안전성 검증은 아니다.
+
 ## 2026-10-21
+
+### Stage1 PUSH_AT RSI 검수 영상
+
+- `output_etc/check/stage1_base_push_rsi_review/stage1_push_rsi_review.mp4` 생성: 앞24초 실제CPU reset 2명/4상자 8장면, 이후 동일bank의 PUSH949후보 전체 영상 재사용. 55.633초·720p·30FPS·1,669프레임이며 사용자 검수 대기다.
+- bank/소스 해시 대조·전체 디코딩·대표 프레임 시각 검수·스크립트 문법/diff 확인. GPU 실행·학습설정 변경·새학습 시작 없음. 작업 후 GPU1 종료는 사용자 직접 종료로 확인했으며 재시작하지 않았다. 상세는 같은 폴더 `REPORT.md`.
+
+### PUSH_AT 과제·독립 AMP family 추가 유지
+
+- 사용자 확정대로 정책PUSH_AT ID4와 별도PUSH AMP family3을 유지한다. 직전 AMP3family 복원을 철회하고4family/1330D로 되돌렸다. 기존과제ID0~3·AMP family0~2는 유지한다. 원본과 모든 state_dict 키/shape를 비교해 actor/critic 과제embedding4→5행 및 discriminator 입력1320→1330만 다름을 확인했다. Transformer/TaskActionFusion/GTA의 층/폭은 유지한다.
+- CPU66회귀·1000agent reset·부분reset·실제물리24step·모델strict복원 및 MAPlayer/RMS복원·loco24step 재검증 통과. 정책634D/8토큰·AMP1330D다. 기존 GPU학습/물성은 이번 수정에서 변경하지 않았으며 새 GPU/PPO는 실행하지 않았다.
+
+### 원본 Stage 1 네트워크·4상자에 PUSH_AT 추가
+
+- 사용자 정정대로 GitHub `stage1_stage2_base`/`28f02b3`를 `ports/stage1_base_push`에 격리하고 기존SIT/CLIMB/carry_at/carry_ontop을 보존했다. 기존과제0~3 유지·새PUSH_AT=4/샘플링100%, 원본task-shared embedding/Action MLP/GTA·634D/8토큰·2H/4Box·학습2048환경이다. embedding1행·AMP PUSH family1칸을 추가하고 Stage2/coupled는 제외했다.
+- 원본AT(각0.2·20cm/1mm·본인100%)와 현재CONTACT(0.4/0.2/0.2·공통면/양손반력)를 결합한다. 현재Y2m/X1~1.5m/Z1.3m·20kg·마찰0.6을 네 상자에 적용하고 추가2개는 실제actor/관측에 포함해 경로 밖에 배치한다. 승인949후보/nativeDOF·loco/PUSH50/50·후반70%를 유지한다. 전용train/test/VNC·출력·checkpoint CPU preflight와 점유GPU 시작 거부를 추가했다.
+- CPU66회귀(기존16과제쌍 graph/보상동일성·현재CONTACT함수 AST동일성·2048scene 경로검사), 실제1000agent reset·부분reset·질량/마찰·물리24step·Actor/Critic/AMP·모델strict복원, 실제player 모델/RMS복원·loco24step 통과. 기존6000회/검사fixture 학습resume 거부·mock점유GPU 차단 확인. 기존두학습PID 생존·GPU1로그진행 확인. GPU/PPO/GUI·장기성공 검증 및 새학습 실행은 하지 않았다. 결과는 `output/stage1_base_push_check/REPORT.md`.
 
 ### 오래된 체크포인트 용량 정리
 

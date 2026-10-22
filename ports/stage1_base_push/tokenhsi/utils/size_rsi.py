@@ -24,7 +24,7 @@ def size_key(size):
     return tuple(round(float(x) * 20) for x in size)
 
 
-def task_probabilities(sizes, ranges=SIZE_RANGES):
+def task_probabilities(sizes, ranges=SIZE_RANGES, allow_unsupported=False):
     grid = (sizes * 20).round().long()
     weights = []
     for task, prior in zip(TASKS, TASK_PROBS):
@@ -33,9 +33,9 @@ def task_probabilities(sizes, ranges=SIZE_RANGES):
         count = (bounds[:, 1] - bounds[:, 0] + 1).prod()
         weights.append(eligible * (prior / count))
     weights = torch.stack(weights, -1)
-    if (weights.sum(-1) == 0).any():
+    if not allow_unsupported and (weights.sum(-1) == 0).any():
         raise ValueError('Source asset has no eligible task')
-    return weights / weights.sum(-1, keepdim=True)
+    return weights / weights.sum(-1, keepdim=True).clamp_min(1e-12)
 
 
 def sample_sizes(n, device, preset='random_scenario', ranges=SIZE_RANGES,

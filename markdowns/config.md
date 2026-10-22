@@ -38,6 +38,31 @@
 
 ## 현재 실험
 
+<a id="stage1-base-push"></a>
+
+### 원본 Stage 1 네트워크·4상자 + PUSH_AT
+
+`ports/stage1_base_push/`는 GitHub `stage1_stage2_base`의 `stage1_v2_fixed.yaml`과 task-shared embedding·Action MLP·GTA를 보존한 별도 실행본이다. 기존 SIT/CLIMB/carry_at/carry_ontop을 남기고 새 `PUSH_AT` 과제만100% 샘플링한다. 기존 네 과제 ID는0~3 유지, PUSH_AT은4로 추가하여 embedding이4→5행으로 늘어난다. AMP는 기존3family를 유지하고 별도 PUSH family3을 추가한다. 사람2·상자4·8토큰·정책634D·AMP1330D·2048환경이며 Stage2/coupled는 제외한다.
+
+AT은 원본 state/progress/success각0.2·성공거리20cm/Z오차1mm·self_sum/본인100%를 사용한다. CONTACT는 현재 PUSH의 유한 면 양손 XY/반력 조건·접근 progress·0.4/0.2/0.2를 적용한다. 네 상자는 현재Y2m/X1~1.5m/Z1.3m·각20kg·마찰0.6이며 추가2개도 실제 actor/관측에 포함하고 경로 밖에 배치한다. loco/PUSH50/50·승인949후보·70%후반 RSI를 유지한다. [구현·차이·제한](../ports/stage1_base_push/README.md), [CPU 검사](../output/stage1_base_push_check/REPORT.md).
+
+```bash
+# CPU 회귀 및 실제 CPU reset/물리/player/checkpoint 연결 검사
+WITH_SIM=1 bash ports/stage1_base_push/verify.sh
+# 본학습: 현재 GPU1 학습을 자동으로 종료하지 않으며, 점유 중이면 시작을 거부한다.
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS TOKENHSI_GPU=1 TOKENHSI_CONDA_ENV=tokenhsi_koo OUTPUT_PATH=output/stage1_base_push bash tokenhsi/scripts/multi_agent/stage1_base_push_train.sh 2 2048 4
+# 로컬 추론 / 화면 없는 평가 / 서버 VNC: 새 실험에서 학습한 저장본 사용
+TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_CONDA_ENV=tokenhsi_koo TOKENHSI_VIEWER_LOW_VRAM=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_base_push_test.sh <Stage1BasePush.pth> 2 1 4 10
+TOKENHSI_GPU=1 TOKENHSI_CONDA_ENV=tokenhsi_koo HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage1_base_push_test.sh <Stage1BasePush.pth> 2 1 4 10
+TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_CONDA_ENV=tokenhsi_koo TOKENHSI_VIEWER_LOW_VRAM=1 RESOLUTION=1280x720x24 PORT=6107 bash tokenhsi/scripts/multi_agent/stage1_base_push_vnc.sh <Stage1BasePush.pth> 2 1 4 10
+```
+
+RSI [검수 영상](../output_etc/check/stage1_base_push_rsi_review/stage1_push_rsi_review.mp4)·[보고서](../output_etc/check/stage1_base_push_rsi_review/REPORT.md): 실제4상자 reset8장면+PUSH949후보, CPU 초기자세55.6초다. 사용자 검수 대기이며 정책 rollout 영상은 아니다. 재생성: `bash output_etc/check/stage1_base_push_rsi_review/launch.sh`.
+
+VNC 접속 `http://localhost:6107/vnc.html?autoconnect=1&resize=remote`. 2026-10-22 실제5500회 정책 viewer 실행은 `bash output/stage1_base_push_view_20261022/launch.sh`이며 tmux `koo_stage1_push_view_20261022`가 살아 있으면 중복 실행하지 않는다. GPU1 native/MPS 우회·저메모리1환경·loco 시작·1280×720이며 실제 정책 step/화면 및 실행 후 기존학습 진행을 확인했다. 로그/캡처는 같은 폴더 `viewer.log`/`preview.png`다. 관측 시 GPU1 여유523MiB·학습FPS 감소가 있었고 장기 병행 안전성을 보장하지 않는다.
+
+짧은 학습은 별도 `OUTPUT_PATH=output/stage1_base_push_check_train MAX_ITERATIONS=2`와2048환경을 사용한다. 기존570D/6000회 PUSH 및 원본4과제 checkpoint 직접사용은 거부한다. 장기성능은 별도 평가하며 GPU 실행 전에 [로컬 보호 규칙](#local-vnc-viewer)을 따른다.
+
 <a id="push-native-y2m"></a>
 
 ### PUSH Y길이2m·5000회 저장본 resume
@@ -164,6 +189,7 @@ output/push_contact_face_at_tilt_soft_3to5m/PushContactFaceATTiltSoft3to5m_18-18
 | OPEN reference close | [open_toy_reference_close.yaml](../tokenhsi/data/cfg/multi_agent/open_toy_reference_close.yaml) | 참조 PD 후보 비교로 저항 조정·강성1/감쇠0.5/preload1/최대6·별도 RSI/출력 |
 | Local PUSH toy | [push_toy.yaml](../tokenhsi/data/cfg/multi_agent/push_toy.yaml) | PUSH 100%·후반 RSI·로컬 단독 정책/출력 |
 | ksh size RSI | [size_rsi.yaml](../ports/ksh_stage1/tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi.yaml) | 크기별 PD RSI·별도 actor/critic semantic MLP |
+| Stage1 base PUSH | [stage1_base_push.yaml](../ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_base_push.yaml) | 원본 task-shared embedding/Action MLP/GTA·4상자·기존과제 유지/PUSH_AT100%·원본AT+현재CONTACT |
 | ksh typed bias | [typed_bias.yaml](../ports/ksh_stage1/tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_typed_bias.yaml) | size RSI + typed attention bias |
 | ksh typed message | [typed_bias_message.yaml](../ports/ksh_stage1/tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_typed_bias_message.yaml) | typed bias + typed value message |
 | 1 | [amp_humanoid_ma_carry.yaml](../tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml) | 원본 multi-agent carry 기준 |

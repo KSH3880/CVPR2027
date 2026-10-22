@@ -38,6 +38,9 @@ class BaseTask():
         if enable_camera_sensors == False and self.headless == True:
             self.graphics_device_id = -1
 
+        if not self.headless and "TOKENHSI_GRAPHICS_DEVICE_ID" in os.environ:
+            self.graphics_device_id = int(os.environ["TOKENHSI_GRAPHICS_DEVICE_ID"])
+
         self.num_envs = cfg["env"]["numEnvs"]
         self.num_obs = cfg["env"]["numObservations"]
         self.num_states = cfg["env"].get("numStates", 0)

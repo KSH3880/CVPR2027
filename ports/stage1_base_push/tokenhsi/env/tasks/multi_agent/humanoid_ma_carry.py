@@ -1084,10 +1084,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 self._skill_init_prob, num_samples=num_slots, replacement=True
             )
         for uid, sk_name in enumerate(self._skill):
-            curr_motion_lib = self._motion_lib[sk_name]
             sel = (sk_ids == uid).nonzero().squeeze(-1)
             if len(sel) == 0:
                 continue
+            curr_motion_lib = self._motion_lib[sk_name]
             curr_env = slot_env[sel]
             curr_agent = slot_agent[sel]
             offset = self._agent_spawn_offsets[curr_agent] + self._env_origins[curr_env]
@@ -1444,7 +1444,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             print("Unsupported character config file: {s}".format(asset_file))
             assert False
         if self.cfg["env"].get("ampTaskConditioning", False):
-            self._num_amp_obs_per_step += 3
+            self._num_amp_obs_per_step += getattr(self, "_amp_family_count", 3)
         return
 
     def get_num_amp_obs(self):
@@ -1604,7 +1604,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         labels = self._amp_family(slot_env, slot_agent).repeat_interleave(
             self._num_amp_obs_steps - 1
         )
-        amp_obs_demo = append_family(amp_obs_demo, labels)
+        amp_obs_demo = append_family(amp_obs_demo, labels, getattr(self, "_amp_family_count", 3))
         self._hist_amp_obs_buf[slot_env, slot_agent] = amp_obs_demo.view(
             slot_env.shape[0], self._num_amp_obs_steps - 1, self._num_amp_obs_per_step
         )
@@ -1640,7 +1640,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             )
             from utils.unified_training import append_family
 
-            obs = append_family(obs, self._amp_family())
+            obs = append_family(obs, self._amp_family(), getattr(self, "_amp_family_count", 3))
             self._curr_amp_obs_buf[:] = obs.view(N, M, self._num_amp_obs_per_step)
         else:
             K = env_ids.shape[0]
@@ -1663,7 +1663,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             )
             from utils.unified_training import append_family
 
-            obs = append_family(obs, self._amp_family(env_ids))
+            obs = append_family(obs, self._amp_family(env_ids), getattr(self, "_amp_family_count", 3))
             self._curr_amp_obs_buf[env_ids] = obs.view(K, M, self._num_amp_obs_per_step)
         return
 

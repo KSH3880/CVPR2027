@@ -27,26 +27,26 @@ def family_from_templates(templates):
     return torch.where(templates == 1, 1, torch.where(templates == 2, 2, 0))
 
 
-def append_family(obs, family):
+def append_family(obs, family, num_families=3):
     """Append one-hot family to each motion frame, preserving arbitrary prefix dims."""
-    return torch.cat((obs, F.one_hot(family.long(), len(FAMILIES)).to(obs.dtype)), -1)
+    return torch.cat((obs, F.one_hot(family.long(), num_families).to(obs.dtype)), -1)
 
 
-def amp_family_ids(obs, steps):
-    return obs.reshape(-1, steps, obs.shape[-1] // steps)[:, 0, -3:].argmax(-1)
+def amp_family_ids(obs, steps, num_families=3):
+    return obs.reshape(-1, steps, obs.shape[-1] // steps)[:, 0, -num_families:].argmax(-1)
 
 
-def sample_family_matched(pool, reference, steps, fallback=None):
+def sample_family_matched(pool, reference, steps, fallback=None, num_families=3):
     """Sample actual trajectories of the requested family; never relabel motion.
 
     Matching row-by-row also matches every shuffled PPO minibatch and AMP prefix.
     Fresh rollouts supply a missing replay family during replay warm-up only.
     """
-    ids = amp_family_ids(reference, steps)
-    pool_ids = amp_family_ids(pool, steps)
+    ids = amp_family_ids(reference, steps, num_families)
+    pool_ids = amp_family_ids(pool, steps, num_families)
     result = torch.empty_like(reference)
-    fallback_ids = None if fallback is None else amp_family_ids(fallback, steps)
-    for family in range(len(FAMILIES)):
+    fallback_ids = None if fallback is None else amp_family_ids(fallback, steps, num_families)
+    for family in range(num_families):
         dest = (ids == family).nonzero(as_tuple=False).flatten()
         if not len(dest):
             continue
@@ -56,7 +56,7 @@ def sample_family_matched(pool, reference, steps, fallback=None):
             source = fallback
             candidates = (fallback_ids == family).nonzero(as_tuple=False).flatten()
         if not len(candidates):
-            raise ValueError("AMP buffer is missing expert family: " + FAMILIES[family])
+            raise ValueError("AMP buffer is missing expert family: " + (FAMILIES + ("push",))[family])
         selected = candidates[
             torch.randint(len(candidates), (len(dest),), device=pool.device)
         ]
@@ -64,12 +64,12 @@ def sample_family_matched(pool, reference, steps, fallback=None):
     return result
 
 
-def preserve_amp_labels(raw, normalized, steps):
+def preserve_amp_labels(raw, normalized, steps, num_families=3):
     """Normalise motion features, but keep task labels literal one-hot values."""
     shape = raw.shape
     raw = raw.reshape(-1, steps, shape[-1] // steps)
     normalized = normalized.reshape_as(raw)
-    return torch.cat((normalized[..., :-3], raw[..., -3:]), -1).reshape(shape)
+    return torch.cat((normalized[..., :-num_families], raw[..., -num_families:]), -1).reshape(shape)
 
 
 def validate_unified_env(env):

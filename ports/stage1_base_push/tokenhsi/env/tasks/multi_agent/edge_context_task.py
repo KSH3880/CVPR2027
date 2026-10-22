@@ -179,6 +179,8 @@ class EdgeContextTaskMixin:
         relations = [(HOLDING, "holding"), (AT, "at")]
         relations.append((ON_TOP, "ontop"))
         relations.extend([(SIT, "sit"), (CLIMB, "climb")])
+        if self.cfg['env'].get('pushExtension') is not None:
+            relations.append((12, 'push_contact'))
         for rel, name in relations:
             mask = batched(
                 graph.edge_valid & (graph.edge_relation == rel), self.num_envs

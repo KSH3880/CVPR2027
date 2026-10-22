@@ -1,5 +1,9 @@
 # 레포 구조
 
+`ports/stage1_base_push/`는 GitHub `stage1_stage2_base`의 독립 스냅샷·원본Stage1 config와 추가 `stage1_base_push.yaml`(env/train)을 포함한다. `utils/stage1_push_spec.py`는 기존과제ID 보존·추가PUSH graph/크기/전용checkpoint 계약, `env/tasks/multi_agent/humanoid_ma_stage1_push.py`는4상자·원본reset/RSI 확장·PUSH 연결, `stage1_push_reward.py`는 원본AT+현재CONTACT 보상을 담당한다. 새과제 embedding1행과 별도PUSH AMP family1칸(4family/1330D)을 추가하고 원본TaskActionFusion/GTA 구조를 유지한다. `verify.sh`는CPU회귀, `check_scene.py`/`check_player.py`는CPU물리·평가/player·무학습fixture 복원 검사다. root의 `tokenhsi/scripts/multi_agent/stage1_base_push_{train,test,vnc}.sh`가 private cwd/Python경로를 고정한다. [명령](config.md#stage1-base-push), [상세](../ports/stage1_base_push/README.md).
+
+`output_etc/check/stage1_base_push_rsi_review/`의 `render_review.py`·`launch.sh`는 실제4상자 CPU reset 및 동일bank949후보를 합친 검수영상 생성 진입점이며 `review.json`에 출처와 검수대기를 기록한다.
+
 `push_native_phase_y2m.yaml`(env/train), 동명`_{train,test,vnc}.sh`는 기존native5000회에서 Y길이2m·X6종으로 이어가는 별도resume 실험이다. `push_native_phase_y2m_rsi_bank.json`은 기존949후보를 새6종/양담당자 초기PD로 재검사한다. `check_native_push_y2m.sh`·`check_push_native_y2m_scene.sh`가CPU물리/네트워크 연결 진입점이고 `transfer_push_native_y2m_checkpoint.py`가 모델/RMS/optimizer/epoch/frame을 보존하며 새계약으로 전이한다. `tests/test_push_native_y2m.py`가 장면·후보 보존/거부조건을 검사한다(모두tokenhsi 아래). 렌더/기하/샘플러 도구는 `--cfg-env`로 전용config를 받는다. [명령](config.md#push-native-y2m), [검수](../output_etc/check/push_native_phase_y2m/REPORT.md).
 
 `utils/push_view_geometry.py`(tokenhsi 아래)는 `TOKENHSI_VIEWER_PUSH_LENGTH_Y`로 native GUI 평가에서만 상자 로컬Y를 늘린다. `humanoid_ma_open_push.py`가 평가 asset/크기 tensor·장면 sampler에 적용하고 source checkpoint/RSI 계약은 보존한다. `tests/test_push_view_geometry.py`는 학습/RSI/잘못된 모드 거부·원본불변·2m상자2048scene CPU clearance를 확인한다. 명령은 [가변 PUSH](config.md#push-native-phase-xy) 참조.

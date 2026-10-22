@@ -14,7 +14,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         from utils.unified_training import preserve_amp_labels
 
         normalized = preserve_amp_labels(
-            amp_obs, normalized, self.env.task._num_amp_obs_steps
+            amp_obs, normalized, self.env.task._num_amp_obs_steps, getattr(self.env.task, "_amp_family_count", 3)
         )
         return normalized
 
@@ -38,6 +38,9 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     def restore(self, fn):
         if fn != "Base":
             checkpoint = load_checkpoint(fn, self.device)
+            if self.env.task.cfg['env'].get('pushExtension') is not None:
+                from utils.stage1_push_spec import check_checkpoint
+                check_checkpoint(checkpoint, self.env.task.cfg['env'])
             check_checkpoint_metadata(
                 checkpoint, checkpoint_metadata(self.env.task._relation_cfg)
             )

@@ -26,7 +26,7 @@ class MAAgent(amp_agent.AMPAgent):
         task = self.vec_env.env.task
         from utils.unified_training import preserve_amp_labels
 
-        normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps)
+        normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps, getattr(task, "_amp_family_count", 3))
         return normalized
 
     def __init__(self, base_name, config):
@@ -142,10 +142,16 @@ class MAAgent(amp_agent.AMPAgent):
             weights["stage2_contract"] = copy.deepcopy(task.cfg["env"]["stage2"])
             from joint_carry.artifacts import contract_digest
             weights["stage2_rsi_contract"] = contract_digest()
+        if task.cfg['env'].get('pushExtension') is not None:
+            from utils.stage1_push_spec import checkpoint_contract
+            weights['stage1_push_contract'] = checkpoint_contract(task.cfg['env'])
         return weights
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
+        if task.cfg['env'].get('pushExtension') is not None:
+            from utils.stage1_push_spec import check_checkpoint
+            check_checkpoint(weights, task.cfg['env'], for_training=True)
         if getattr(task, "_stage2", False):
             from utils.stage2_spec import check_checkpoint
             check_checkpoint(weights, task.cfg["env"])
@@ -366,7 +372,7 @@ class MAAgent(amp_agent.AMPAgent):
             pool = buffer._data_buf["amp_obs"][:count] if count else reference[:0]
             fallback = reference if key == "amp_obs_replay" else None
             matched = sample_family_matched(
-                pool, reference, task._num_amp_obs_steps, fallback
+                pool, reference, task._num_amp_obs_steps, fallback, getattr(task, "_amp_family_count", 3)
             )
             batch_dict[key] = matched.view(scene_count, M, amp_dim)
         self.set_train()

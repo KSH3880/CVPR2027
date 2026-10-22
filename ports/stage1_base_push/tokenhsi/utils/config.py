@@ -229,6 +229,11 @@ def parse_sim_params(args, cfg, cfg_train):
         gymutil.parse_sim_config(cfg["sim"], sim_params)
     if args.physics_engine == gymapi.SIM_PHYSX and args.num_threads > 0:
         sim_params.physx.num_threads = args.num_threads
+    if os.environ.get("TOKENHSI_VIEWER_LOW_VRAM") == "1":
+        if not args.test or cfg["env"]["numEnvs"] > 16:
+            raise ValueError("Low VRAM viewer requires --test and at most 16 environments")
+        sim_params.physx.max_gpu_contact_pairs = 2097152
+        sim_params.physx.default_buffer_size_multiplier = 4.
     return sim_params
 
 
@@ -513,6 +518,15 @@ def get_args(benchmark=False):
     args = gymutil.parse_arguments(
         description="RL Policy", custom_parameters=custom_parameters
     )
+    if (os.environ.get("TOKENHSI_GUI_GPU_MODE") == "native"
+            and not args.headless and "TOKENHSI_GUI_GPU_INDEX" in os.environ):
+        if not args.test:
+            raise ValueError("Native viewer requires --test")
+        args.compute_device_id = int(os.environ["TOKENHSI_GUI_GPU_INDEX"])
+        args.sim_device = "cuda:" + str(args.compute_device_id)
+        args.sim_device_type = "cuda"
+        args.rl_device = args.sim_device
+        torch.cuda.set_device(args.compute_device_id)
     args.device_id = args.compute_device_id
     args.device = args.sim_device_type if args.use_gpu_pipeline else "cpu"
     if args.test:

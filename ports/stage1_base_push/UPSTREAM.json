@@ -466,6 +466,22 @@
     {
       "path": "tokenhsi/data/cfg/train/rlg/stage1_v2_fixed.yaml",
       "git_blob": "91dc1e3a03a391557cce55bf4e49afaae843dd18"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1.yaml",
+      "git_blob": "c5e58d060f2094d3cb72725a1fa49dd94235445a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1.yaml",
+      "git_blob": "926c705393b99e016444f1fda919643df901d182"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1_v2.yaml",
+      "git_blob": "eb1505bf521bed691cbb4a62d5b7bd8d46d7e984"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1_v2.yaml",
+      "git_blob": "926c705393b99e016444f1fda919643df901d182"
     }
   ]
 }

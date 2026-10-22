@@ -46,7 +46,8 @@ class SizeRsiCache:
                 self.entries = pickle.load(stream)
         self.sizes = env._box_size.cpu().tolist()
         self.eligible = task_probabilities(env._box_size[:, :2],
-            env.cfg['env']['box']['build']['taskSizeRanges']).cpu()
+            env.cfg['env']['box']['build']['taskSizeRanges'],
+            allow_unsupported=env.cfg['env'].get('pushExtension') is not None).cpu()
         self._build_missing()
         self._prepare_sampling()
         if self.strict_geometry:
