@@ -1,0 +1,32 @@
+{
+  "sit": {
+    "profiles": 487,
+    "empty_profiles": 0,
+    "no_phase_profiles": 0
+  },
+  "climb": {
+    "profiles": 715,
+    "empty_profiles": 0,
+    "no_phase_profiles": 129
+  },
+  "pickUp": {
+    "profiles": 712,
+    "empty_profiles": 0,
+    "no_phase_profiles": 0
+  },
+  "carryWith": {
+    "profiles": 712,
+    "empty_profiles": 35,
+    "no_phase_profiles": 35
+  },
+  "putDown": {
+    "profiles": 712,
+    "empty_profiles": 0,
+    "no_phase_profiles": 0
+  },
+  "putDownOnTop": {
+    "profiles": 0,
+    "empty_profiles": 0,
+    "no_phase_profiles": 0
+  }
+}

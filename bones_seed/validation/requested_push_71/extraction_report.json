@@ -1,0 +1,364 @@
+{
+  "requested_count": 71,
+  "found_count": 71,
+  "missing": [],
+  "scanned_members": 88523,
+  "elapsed_seconds": 260.79,
+  "files": {
+    "push_obstacle_180_001__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_001__A344_M.bvh",
+      "bytes": 4417754,
+      "sha256": "c026005c206fddf1e2837b40f154f850ed2e5eaa704fab7366ffbe4e7b6d7e9f"
+    },
+    "push_obstacle_180_002__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A342.bvh",
+      "bytes": 4476374,
+      "sha256": "e0818c5dd71bfef192ed9b843ad1a0e80508f29af456164a140393a331fd1218"
+    },
+    "push_obstacle_180_002__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A342_M.bvh",
+      "bytes": 4468429,
+      "sha256": "8847cf75977fffdfc7a8c230f68434b99b4dbfd7ae1556d122010d774c4d1141"
+    },
+    "push_obstacle_180_002__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A344.bvh",
+      "bytes": 4246801,
+      "sha256": "b9c3e92c61ca114a0fc2312d1fe11cf83c48cfa8966601b0be49ebcc63981175"
+    },
+    "push_obstacle_180_002__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_002__A344_M.bvh",
+      "bytes": 4251557,
+      "sha256": "b9edac0b9293b6e68aa9ecce8d25eb7a715f3bcac1348e8a82e9082dc3b7db4c"
+    },
+    "push_obstacle_180_003__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A342.bvh",
+      "bytes": 3961961,
+      "sha256": "136c28516884e8c1b73f353238d782780289a1a2010d6d16996f5a9996c231cc"
+    },
+    "push_obstacle_180_003__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A342_M.bvh",
+      "bytes": 3955981,
+      "sha256": "c1d63b2a6ca25baae9f95b9b920b56d9fc60eadf2350ea81f0a338b526c48f12"
+    },
+    "push_obstacle_180_003__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A344.bvh",
+      "bytes": 4381397,
+      "sha256": "4944c5492fbdbb05c324e7f96e991b48d94830c3e69704c048e13f1baa752d14"
+    },
+    "push_obstacle_180_003__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_003__A344_M.bvh",
+      "bytes": 4376910,
+      "sha256": "df70621f558cd095f8317d7eb80a3d73552129502d230b0fe8f6b40845060e93"
+    },
+    "push_obstacle_180_101__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A341.bvh",
+      "bytes": 4206755,
+      "sha256": "222523114e393c7ca764f2143f0e89ee0a7da803bebadc0893aaa2eb4d8de470"
+    },
+    "push_obstacle_180_101__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A341_M.bvh",
+      "bytes": 4204678,
+      "sha256": "8cef64bc75ffb0c837fdd8f8dd8e68a610db2807f9a04260a09b358fcafed2cd"
+    },
+    "push_obstacle_180_101__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A343.bvh",
+      "bytes": 5024170,
+      "sha256": "e851d172be8d03c8da4fb88195b368deca88800182239e3045b3c6fa62fa19bd"
+    },
+    "push_obstacle_180_101__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_101__A343_M.bvh",
+      "bytes": 5020487,
+      "sha256": "8142199eaef00b3a13cdab318773daf701a8f6864a60e05b3008e9da36b0f3fe"
+    },
+    "push_obstacle_180_102__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A341.bvh",
+      "bytes": 4200360,
+      "sha256": "0381d1494df65ae710f5f98db68937644acdd4af726acf5f0a88cc13d596a64e"
+    },
+    "push_obstacle_180_102__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A341_M.bvh",
+      "bytes": 4201806,
+      "sha256": "e88f83138ac253ac8a9f24e70099de8b317d758dee4db8889b6ada402a44937f"
+    },
+    "push_obstacle_180_102__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A343.bvh",
+      "bytes": 4905970,
+      "sha256": "2b1f9219d094e1af2012a0085bc8c69c3588b12d25d9e70292975da44a4e9528"
+    },
+    "push_obstacle_180_102__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A343_M.bvh",
+      "bytes": 4908062,
+      "sha256": "824877eb412865f1c37603a23e9204ac654a9191283afed5eec30471d0fabdcb"
+    },
+    "push_obstacle_180_103__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A341.bvh",
+      "bytes": 4335606,
+      "sha256": "4027ff913d5a212d3dd683c3803876021875c885c4bb96cfb38c44f664614c92"
+    },
+    "push_obstacle_180_103__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A341_M.bvh",
+      "bytes": 4344117,
+      "sha256": "43d64340cf90434e41216aa40fa2e270ae38becbecd07c35c7c05c715e4f88dd"
+    },
+    "push_obstacle_180_103__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A343.bvh",
+      "bytes": 4803287,
+      "sha256": "785a266296f1639a677ff787aeccbecdfad72154a28e7053ee1efea693eaee58"
+    },
+    "push_obstacle_180_103__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_103__A343_M.bvh",
+      "bytes": 4802216,
+      "sha256": "a574a58d31be39d1a0c7bfac6282261c9770883cbf6f99f56d4d73e98a2d8fbb"
+    },
+    "push_obstacle_270_001__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_001__A342.bvh",
+      "bytes": 6108226,
+      "sha256": "4e71500ac7f2a3d323d3a332cd2093b86c592be65d068b2659623e8960965a3c"
+    },
+    "push_obstacle_270_001__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_001__A342_M.bvh",
+      "bytes": 6093337,
+      "sha256": "5ff6c9fef54be58ef333fe0a62080e5ee7cb377a20cad3f5ee83ad1f193b8baa"
+    },
+    "push_obstacle_270_001__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_001__A344.bvh",
+      "bytes": 5735911,
+      "sha256": "e3380e09d3ff8f81ea5ff99574ade6146e521c2c4c79e2b63c5ed0b480eeae31"
+    },
+    "push_obstacle_270_001__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_001__A344_M.bvh",
+      "bytes": 5718241,
+      "sha256": "136d4bb9c581d2b746e9ad4f00f8b055db207dff811aa2b9d59342e46e8d3d62"
+    },
+    "push_obstacle_270_002__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_002__A342.bvh",
+      "bytes": 6935976,
+      "sha256": "fbbe44dfb224853c58fd91c36314b3dcccd049dd4d393fcbb2c1d6c33cd7d5eb"
+    },
+    "push_obstacle_270_002__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_002__A342_M.bvh",
+      "bytes": 6918779,
+      "sha256": "f1321d89c9b4fca1a41a1ebc0e8cbed5c28fafa5388af990695e19998328f681"
+    },
+    "push_obstacle_270_002__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_002__A344.bvh",
+      "bytes": 6508737,
+      "sha256": "851e747feba2569955775d791ce490525495a34fa4f6d249fb8548e61e312b14"
+    },
+    "push_obstacle_270_002__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_002__A344_M.bvh",
+      "bytes": 6476803,
+      "sha256": "922a2b7ee673988d93216bc84fa47913e36ca411ac51710cfd34774f33a752a4"
+    },
+    "push_obstacle_270_003__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_003__A342.bvh",
+      "bytes": 6419244,
+      "sha256": "6e578be2d9e1a89ab412ddaa6222d37e0099680af090146b154ded1bbe1dbbd1"
+    },
+    "push_obstacle_270_003__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_003__A342_M.bvh",
+      "bytes": 6411326,
+      "sha256": "1ab99e0b317418b11d1dc32747b3518f460ac8b9802715dea6bbd1db996bc817"
+    },
+    "push_obstacle_270_003__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_003__A344.bvh",
+      "bytes": 6369406,
+      "sha256": "fa9491035327e6c603cfbaaf69c0c27d9766528ebd6b17ef4ece972518dcd081"
+    },
+    "push_obstacle_270_003__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_003__A344_M.bvh",
+      "bytes": 6352028,
+      "sha256": "5dc1d3a8187157f8111e6691069c0d0cef3fd552c04ff1290412e8ffaf46fd2a"
+    },
+    "push_obstacle_270_101__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_101__A341.bvh",
+      "bytes": 5576765,
+      "sha256": "ff23a2a6897c70d4349ddb83d1a029b08e62eec4a8a469fc72e2b34483eb10a6"
+    },
+    "push_obstacle_270_101__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_101__A341_M.bvh",
+      "bytes": 5567897,
+      "sha256": "e2dc8dac52f0d2ef21e03bfb5eb6bebf2c5d1b3943692e3455b6d3cf74bf8bd2"
+    },
+    "push_obstacle_270_101__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_101__A343.bvh",
+      "bytes": 6039952,
+      "sha256": "b24e40dccbba825d02b5fc6f361c0c3ea529cbe26ad77175b0a00597b2dd3984"
+    },
+    "push_obstacle_270_101__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_101__A343_M.bvh",
+      "bytes": 6031840,
+      "sha256": "ea6aa176c11c6896ff87e1403ee1558e9c52a9e00557dd7a79fdcc1080fd80ca"
+    },
+    "push_obstacle_270_102__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_102__A341.bvh",
+      "bytes": 5488468,
+      "sha256": "e25dcbc2a7d8b879265ab56812f938e6329e574054487ec4a9fc5125038eeb41"
+    },
+    "push_obstacle_270_102__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_102__A341_M.bvh",
+      "bytes": 5477856,
+      "sha256": "b34e6e462099f3d3b8109d6b04fdcdf77d0d8a674b80adc2326815b7bc337b99"
+    },
+    "push_obstacle_270_102__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_102__A343.bvh",
+      "bytes": 5303408,
+      "sha256": "d0f7b313165d1d67d6d8d147cd0db5200159c50c01c65e4bbe6c712781ed8780"
+    },
+    "push_obstacle_270_102__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_102__A343_M.bvh",
+      "bytes": 5297960,
+      "sha256": "3b7b6ad072ed49d84d4748600c0356906a33fa0f8023f6759013375094f2c265"
+    },
+    "push_obstacle_270_103__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_103__A341.bvh",
+      "bytes": 5699444,
+      "sha256": "21103a8b75ed911119eb799135490a4cd6f2a61137ba65061590f0f2c8f18a3c"
+    },
+    "push_obstacle_270_103__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_103__A341_M.bvh",
+      "bytes": 5687351,
+      "sha256": "aa25a2199a16fb081ddb32220c8001e6484d0a5d6657bdae23ad90f1ae1f1acc"
+    },
+    "push_obstacle_270_103__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_103__A343.bvh",
+      "bytes": 6899412,
+      "sha256": "a24c3dba0aec7672f862c4a18ee4a8633ad80f4b9966dfdea9d2cf424b9facab"
+    },
+    "push_obstacle_270_103__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_270_103__A343_M.bvh",
+      "bytes": 6892565,
+      "sha256": "2b5632a088eee60e06393e1a46f015303931bd09b8d11745c9f580cf762b283b"
+    },
+    "push_obstacle_360_001__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_001__A344.bvh",
+      "bytes": 7969403,
+      "sha256": "694fe542c8fd47b1aa3f9dc77d8d84d26a5a9b64f9ae254cd1dd393fd767664d"
+    },
+    "push_obstacle_360_001__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_001__A344_M.bvh",
+      "bytes": 7983514,
+      "sha256": "0156c51f742a78dd92f345f6707560e42c7f070badbc21f0ee8abf05edd28179"
+    },
+    "push_obstacle_360_002__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_002__A342.bvh",
+      "bytes": 7288284,
+      "sha256": "e82135f0280c52139959c450bb9ab05344ad90eac24be354fe9b19c321ca2c95"
+    },
+    "push_obstacle_360_002__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_002__A342_M.bvh",
+      "bytes": 7281726,
+      "sha256": "61418e7dff5ef040146b5034caa3a3991edfe2385b8d728ac0e0755f7f86165f"
+    },
+    "push_obstacle_360_002__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_002__A344.bvh",
+      "bytes": 7081472,
+      "sha256": "ee0931f7281003c74777c760dbdf528d71d269d73b7c64026f1ccb09bcfc071f"
+    },
+    "push_obstacle_360_002__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_002__A344_M.bvh",
+      "bytes": 7081620,
+      "sha256": "5cf8b777d3c8ec6720a70429038314312919f2492b58134bea4643ae137ed964"
+    },
+    "push_obstacle_360_003__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_003__A342.bvh",
+      "bytes": 8019916,
+      "sha256": "a1560afc6cf408ff9ab98357064c310b11840297264e63b453f91e4cb4516d82"
+    },
+    "push_obstacle_360_003__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_003__A342_M.bvh",
+      "bytes": 8014607,
+      "sha256": "e350c5544652217577880c4c220b6a22b6006061e4c77f520d99faab2b6fec1a"
+    },
+    "push_obstacle_360_003__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_003__A344.bvh",
+      "bytes": 7992191,
+      "sha256": "71f2e0ecd455ed209b6433e2eb872d223bf1cc43eba99302c1aaf50d0f0bcc59"
+    },
+    "push_obstacle_360_003__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_003__A344_M.bvh",
+      "bytes": 7989400,
+      "sha256": "0c88dd75a5d711a52d0e5f857d8a5b72abeec97059e98e5121b1d4b9862b42bd"
+    },
+    "push_obstacle_360_005__A342": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_005__A342.bvh",
+      "bytes": 7219859,
+      "sha256": "4676925082ca243856c9281cecdf7d81749b6371039fc376afa6713a03b199d3"
+    },
+    "push_obstacle_360_005__A342_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_005__A342_M.bvh",
+      "bytes": 7214064,
+      "sha256": "93f59da0e7114b878603e8ecb92d2821a948e452c9499a7c94690ac4f8d9bb7a"
+    },
+    "push_obstacle_360_005__A344": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_005__A344.bvh",
+      "bytes": 6915047,
+      "sha256": "b1084711d646ad57b1e2f81b9462c9a2903169acd7470348530d021d68c7ac26"
+    },
+    "push_obstacle_360_005__A344_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_005__A344_M.bvh",
+      "bytes": 6907209,
+      "sha256": "2407c1d1f6ca29b23a41e8fa7534921688b1bf784e8a4792900fa656b6fded21"
+    },
+    "push_obstacle_360_101__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_101__A341.bvh",
+      "bytes": 6754294,
+      "sha256": "fbbee675c1df7dea69d2fe2caaad450a3df8674eaad5d920f44cd2023cad8859"
+    },
+    "push_obstacle_360_101__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_101__A341_M.bvh",
+      "bytes": 6745201,
+      "sha256": "27c980f32f89a9d5b27df3afcc26812254b592569e7509eadb6b4eee6b4d9992"
+    },
+    "push_obstacle_360_101__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_101__A343.bvh",
+      "bytes": 9650584,
+      "sha256": "30d025e573ab65e42df2b056610b4ba82d93d4ff47191383ed6f9310c69fe2e6"
+    },
+    "push_obstacle_360_101__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_101__A343_M.bvh",
+      "bytes": 9644350,
+      "sha256": "4487056f7fb987c1ab04806097b3aa8ce4f703bba577c18cab1f50e481c536e4"
+    },
+    "push_obstacle_360_102__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_102__A341.bvh",
+      "bytes": 6564456,
+      "sha256": "b72db972cf5cecaae8c45dcc6cab8f9042cfd902ee4783660321aa3106c7c821"
+    },
+    "push_obstacle_360_102__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_102__A341_M.bvh",
+      "bytes": 6570667,
+      "sha256": "7101cfaf012c1db164cdec7378fa92fad9b5d6ef366fc147bd2ffac3255e6bc1"
+    },
+    "push_obstacle_360_102__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_102__A343.bvh",
+      "bytes": 8009496,
+      "sha256": "8f7632b503d5a61c17ef90cc3a8edb2d6ac0d8f51a0c01a58d578d01f0592d2d"
+    },
+    "push_obstacle_360_102__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_102__A343_M.bvh",
+      "bytes": 8008198,
+      "sha256": "49c22d22c3183f848a7d9542ba7f045d0052f09eac1740d7ebcd53299cbea606"
+    },
+    "push_obstacle_360_103__A341": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_103__A341.bvh",
+      "bytes": 8701146,
+      "sha256": "827f591b4e76818843e5c85c03e6a9447c0804d6fe8309991fdd7ba64144fb49"
+    },
+    "push_obstacle_360_103__A341_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_103__A341_M.bvh",
+      "bytes": 8691415,
+      "sha256": "cc695de3f864f73d52a9c8eb962088284419fa81b58af84d83d7fb186d6350e6"
+    },
+    "push_obstacle_360_103__A343": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_103__A343.bvh",
+      "bytes": 8439103,
+      "sha256": "bbe6634d537e173935b069d18888b3b3445bd709a12869e70bd98887a0e8e8c9"
+    },
+    "push_obstacle_360_103__A343_M": {
+      "path": "bones_seed/soma_uniform/bvh/230420/push_obstacle_360_103__A343_M.bvh",
+      "bytes": 8445193,
+      "sha256": "e9ba16a757214c20d5b5ceb212f5273debcebc04100d49860cbfcb1b76ed9a0c"
+    }
+  }
+}

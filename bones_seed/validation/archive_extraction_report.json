@@ -1,0 +1,933 @@
+{
+  "archive_members_scanned": 67056,
+  "bvh_members_scanned": 67003,
+  "archive_scan_complete": false,
+  "expected_selected": 184,
+  "extracted": 184,
+  "missing": [],
+  "extracted_bytes": 373134682,
+  "viewer_files_matched": 11,
+  "viewer_files_mismatched": 0,
+  "files": {
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_001__A515.bvh": {
+      "bytes": 3102927,
+      "sha256": "e07dd7e16a6610b85df5d0404895ba382dd9fa593459f2ee6f75d54303c57016",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_turn_switch_hand_close_R_001__A515.bvh": {
+      "bytes": 1814364,
+      "sha256": "873b1513c22c910e1c990f177c18f97168bad2ec634b633739a402c64669045f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A515_M.bvh": {
+      "bytes": 1612437,
+      "sha256": "4bcf0da952033952b52d0f756b4d2151fe1758bc007820466aaaf6d1ebfa0785",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_001__A514.bvh": {
+      "bytes": 2210375,
+      "sha256": "d1f2e26c56aee4ae899bbedb47b3769e040f80e14b004f7fe5f8d55249b6c304",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_002__A514_M.bvh": {
+      "bytes": 1476234,
+      "sha256": "edb60d893f8529553ecc64f31af41bb9d345a8596d65dc7131e6a326605498b9",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_close_behind_R_001__A514_M.bvh": {
+      "bytes": 2283850,
+      "sha256": "161ffa8863a44992e66768a3e5bc25d5e3228aa86576bbe71be5f08fa7929dd5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_close_behind_R_001__A515.bvh": {
+      "bytes": 2414846,
+      "sha256": "f51f550443786aa15e4e3b71fd4d2055093ba4a715c1e9cf616f5b30c9da6e3a",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_close_R_001__A513.bvh": {
+      "bytes": 2500548,
+      "sha256": "2151bc1fdbd00bafb73766977a59d1d1ee055e5d36b50a1dd897301b061f9672",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A513_M.bvh": {
+      "bytes": 1392243,
+      "sha256": "13b8fe68a36136cb5a6713cf602ad16f1a7fb002defc655bcfd13d5f5e1ec3da",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A513_M.bvh": {
+      "bytes": 1578550,
+      "sha256": "76ba3a3f8142331f78b95920aba5f470fc67cf1eaed9996de905aac9ab1d1433",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_switch_hand_close_R_002__A512_M.bvh": {
+      "bytes": 2301744,
+      "sha256": "3c052e017f913e356bb276fa839b2c2403b31d8f9a2e2d42ee2192b3fc9a6ebb",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A515_M.bvh": {
+      "bytes": 2654188,
+      "sha256": "1fd776a2cfb9550ba5fdd5532658781f6bf26d4264fbeb5d7c6dc5063bda1543",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_R_002__A513_M.bvh": {
+      "bytes": 1954237,
+      "sha256": "3f7988a1caf95bb47e8d5850ba78adc6cbdc0bec46f599029af18f48da32b6d2",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_walk_close_behind_R_002__A514_M.bvh": {
+      "bytes": 2171698,
+      "sha256": "e15282c1a114b8fe3c406f9f934dcdc71e753be967b98bbef34a3210947dd8e8",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A514.bvh": {
+      "bytes": 2456253,
+      "sha256": "eca1d60d67a9e18f61a747f24e3c4b72a939e0629cd566f770dd6b4cd7c28499",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_003__A514.bvh": {
+      "bytes": 1486714,
+      "sha256": "265296693bff419dc811f31606be849d86265dc0a59aacfe95a560b577430706",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_switch_hand_close_behind_R_001__A512_M.bvh": {
+      "bytes": 2693563,
+      "sha256": "4524e1ae7c0b095c78e3a0bbb26636fee55206b7dfef98709b032472d48dce84",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_turn_close_R_001__A513_M.bvh": {
+      "bytes": 2218289,
+      "sha256": "06221c3a2f24ca813e5c4bef9684de984adc191f4aa18046cb33b6efb5ae5441",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A513.bvh": {
+      "bytes": 1903537,
+      "sha256": "ccb2124e6c6e535125b504aae288020701e1a9f26beeb4beebf0fdb5a26141a1",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_R_001__A515_M.bvh": {
+      "bytes": 2033504,
+      "sha256": "abe26e24b3af0ebad7ddbf0f5910ef34009f7eb581847caed0032ec186e8911a",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_R_001__A512.bvh": {
+      "bytes": 1049132,
+      "sha256": "09f12221e4096f3a7db7098e727f4da853281bf0d0aa5291fc54f2a12465ea8e",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_002__A515.bvh": {
+      "bytes": 3114689,
+      "sha256": "51ead3f1162d1086c851f5d283c150ea5b22408b01dcf35f0f6b68283372c0ca",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_002__A514.bvh": {
+      "bytes": 1479378,
+      "sha256": "1b438b3067edb0024aeb2138f20f0b82854f4a09928556d98ca45ade6aa98d15",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_R_001__A515.bvh": {
+      "bytes": 1029962,
+      "sha256": "bddb9d11e651947f6df6b1a9b142a8a111ca1a06353f3fb7a764c87ee87c8488",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A514.bvh": {
+      "bytes": 2143555,
+      "sha256": "35ca819ceb9362c30f5248208368a3ff02a4ef6ff4e9d260a5a6b5ce713dab50",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A513.bvh": {
+      "bytes": 1581277,
+      "sha256": "41675f0c6d1a700ce543782ad7c90279578e2a2814e5db1b254af1d1a456677e",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_unlock_open_R_001__A515_M.bvh": {
+      "bytes": 1435228,
+      "sha256": "fd1f359f0dfcb59967279154e8d9801e5d40ed32f04ad17d74622c612d026b49",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_turn_close_R_001__A513_M.bvh": {
+      "bytes": 2534393,
+      "sha256": "c01652eb8da97033e0b49ed61cdbc29e68045bba3d3be3574f6b99d20abae0d7",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_002__A515_M.bvh": {
+      "bytes": 1996853,
+      "sha256": "91c6317bf05b1d8986a9331075818b3d73ecac3b783b5c64499959e39a44b3aa",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A514.bvh": {
+      "bytes": 1315507,
+      "sha256": "809ed75723d3dab5577d3eea8c9ccd7432a20c16a1c1bec412320aadb27438d7",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_R_001__A512_M.bvh": {
+      "bytes": 1052578,
+      "sha256": "cda820a5be7090b2a077675a1bfb9b6d1cebcfd79c975b11068aa65d75981ff8",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_unlock_open_R_001__A512.bvh": {
+      "bytes": 1798871,
+      "sha256": "05aed06be85cdd7138a3f772b646f953ac60de08a55e16de6ad7c6a29e955ae5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_walk_close_behind_R_001__A513.bvh": {
+      "bytes": 1895534,
+      "sha256": "9c3c76af100155b9eda13312ff403f80a2d5f30a4b49cb04cc6f123b6a3bfa8d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_switch_hand_close_R_001__A513.bvh": {
+      "bytes": 2506989,
+      "sha256": "bf14b917e2bfaf98431ce26136c0ea08c305ba96953e1facfeb8daa22c568b40",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A514_M.bvh": {
+      "bytes": 1792219,
+      "sha256": "014360011b55999a31cfa03540ca23a903241d6201584f3cc293bd6260821271",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_close_R_001__A512.bvh": {
+      "bytes": 2336460,
+      "sha256": "c5a8d0fbefda080552b69e07f9bb8c883e24160f268026a1a7b84a0876e6bb59",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_close_behind_R_001__A515_M.bvh": {
+      "bytes": 2416942,
+      "sha256": "a0c2eb0bb5d0101a06f9877bd9eb75d6d0cda7bd4a7ba915631b264c917fa8bf",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_switch_hand_close_R_002__A513_M.bvh": {
+      "bytes": 3040242,
+      "sha256": "0f7bcbefe925497953817befc69517114fc59d598d839e125636775b244686bb",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_full_R_001__A515_M.bvh": {
+      "bytes": 1587610,
+      "sha256": "64981fa43caf1a314fb51857a2098b5245c6500fa30b69a0db4fca20608b9924",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_close_R_001__A515.bvh": {
+      "bytes": 2280909,
+      "sha256": "ab96cdc06de332f781208ffa617e912b8915fa35c6e243fe5e2d4758f6ddf2af",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A512_M.bvh": {
+      "bytes": 1117786,
+      "sha256": "bf35223ca9307ad011eb50f4a3c00c3955d698c5ecb3a36006ed83244a4cfc43",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A512_M.bvh": {
+      "bytes": 1645406,
+      "sha256": "cea38b3679eb5cfdf050c59b6f985bcc963187733b6504fee5f87a064b67ecae",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A512_M.bvh": {
+      "bytes": 2471250,
+      "sha256": "9e670ee72246f2bcc69ec85582db533f12f9155b321c730687c1a6343db41f1c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_turn_close_R_001__A512.bvh": {
+      "bytes": 2620181,
+      "sha256": "e82fa54b2b6fe0cd24f08817d21387270af2c1de5c6bee25f89423466a624d8f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A515.bvh": {
+      "bytes": 2652204,
+      "sha256": "5b9144e2f7e98adc4feb61781083190fc4f132ddd7e59cf214ad4cc4f13a75b0",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A512.bvh": {
+      "bytes": 1115376,
+      "sha256": "e6c158a3138b3753595ffc4253e1c26597b4ca6bb0d60a66057fc2dd5eb12abf",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_walk_close_behind_R_002__A515_M.bvh": {
+      "bytes": 2279096,
+      "sha256": "eab0384aa317efc7ba1929479f551179a6e0fde50e8204cbe900773bfcf22aa6",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_R_002__A512_M.bvh": {
+      "bytes": 1801759,
+      "sha256": "711c0da22a70fb4c4e7757975beba90534032afeb7ca43e554896bb11d041ab5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_unlock_open_R_001__A514_M.bvh": {
+      "bytes": 1738831,
+      "sha256": "0a5179fbcd925a4a8bbf5ebf88d4d4aa2f3940520905af0f1abc8c81a65e0078",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A512.bvh": {
+      "bytes": 1922758,
+      "sha256": "8be9a20b52bebdaa87c64f4c0a0272e2c144d8139797434976e24d0d1bb731ca",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A515.bvh": {
+      "bytes": 1642758,
+      "sha256": "476dd6ceb74b214e34e0eedb99625fd19b08711a541bd6f19b12ae8ba2abb87a",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A512_M.bvh": {
+      "bytes": 2674155,
+      "sha256": "244a413a3ad6fb551cbcdefa06e3d1b4293213f667b623024f46cc46559c86f0",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A515.bvh": {
+      "bytes": 1486707,
+      "sha256": "884ec3f1f10fcf3d52da254f47b8b51343d7b460a477850201a03e42a80f9200",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_R_001__A514_M.bvh": {
+      "bytes": 2344728,
+      "sha256": "e180e0bb9d9819b5e1dbf6b59a926159bc978d6c12fa8fe27487816b00a8decd",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A512.bvh": {
+      "bytes": 1314904,
+      "sha256": "f53edef118670d46f5216f5fa18c5f41e3f4bc6b2d062ef70a47a1a85922f417",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_002__A515.bvh": {
+      "bytes": 1994002,
+      "sha256": "c9b8a082fc32d50bb038f3ee2c254bee53b151db504abd03d2a5f6a6bee7db20",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_close_R_001__A512_M.bvh": {
+      "bytes": 2334699,
+      "sha256": "3e363c368655b9a7fefd277185b6dd51805312cfe04356b5b026a5ce8802b8a7",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_full_R_001__A515_M.bvh": {
+      "bytes": 1781308,
+      "sha256": "bf271334e8065f3483b223cd1dd4349dccc3330a3f2af7614a174e73aae45873",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A515.bvh": {
+      "bytes": 2251216,
+      "sha256": "3e605611cc1ee47d484168a95b13782d5a73af1cb002ea1405b38b2d98d716c9",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_turn_switch_hand_close_R_001__A515.bvh": {
+      "bytes": 1952251,
+      "sha256": "9517d94cfffe6921c09665b58c51ba03b8a5612e7629ca3b9df94cd9e5fca5ff",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A512_M.bvh": {
+      "bytes": 1906003,
+      "sha256": "a34c76c791c89a343f0c9c11c04ad18886436acd323fc3b0c26fe8299044dde1",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A512.bvh": {
+      "bytes": 1902142,
+      "sha256": "e679db9a5b7d65b061882777c49fe5db41ac407caf0f65acbcaf3e9da122f763",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_002__A514.bvh": {
+      "bytes": 2172581,
+      "sha256": "bf9b80543d29497a35b13131d07695c199728ff7e5432b41a9fbe2b0e4ab5914",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A512.bvh": {
+      "bytes": 2671338,
+      "sha256": "8aa64719cba0fde2c2b052874255b8e1d19459d5e07ed8a0c496818c96a03737",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A515_M.bvh": {
+      "bytes": 1574062,
+      "sha256": "fa30435c5e5279066815b3d91d7d445df31755da1114a90a3a657ff8e7e54247",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_003__A515.bvh": {
+      "bytes": 1610395,
+      "sha256": "fa1039fa66f40f1246653adbf93494eb1d4d5ad0edacf9dc9927986967e1ccc0",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A515.bvh": {
+      "bytes": 2633329,
+      "sha256": "20d082061c29a8b244742642b88e97d3bf5b0538265c935250bb814ef68c400d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A515_M.bvh": {
+      "bytes": 1489380,
+      "sha256": "875308f6fd6440b423bb70550fcf87090a50589b64422d53d0d535ce0af31e36",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_close_behind_R_001__A514.bvh": {
+      "bytes": 2282680,
+      "sha256": "20326fe918e350364778ff2e636c287f244537e73b0310ede01bf45acb4ef446",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_full_R_001__A515.bvh": {
+      "bytes": 1782360,
+      "sha256": "e0c82bb4c08089fd607137ba64e926b9076257d623572b81f53041642bfe026f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_001__A515.bvh": {
+      "bytes": 2903721,
+      "sha256": "693ed051ed63f8ccc8cfcb5648382fbedb76ef3e47080323e9316914c8ae42f7",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_001__A515_M.bvh": {
+      "bytes": 3107536,
+      "sha256": "8e467545f44a9e9e2eb25245099e6a61b74db0447e5e7dd261bfb6b92b0e43b1",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_001__A515.bvh": {
+      "bytes": 1881319,
+      "sha256": "de864aba9723b0c0e98972df56385619fb126e22b9b71c0dd9ef6e0bc8b41b48",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_001__A515_M.bvh": {
+      "bytes": 2910721,
+      "sha256": "ec11dbc5006c2edd4bff4ea54cfad934324fe573cff27dbb71af531229db7f83",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_001__A514.bvh": {
+      "bytes": 2810751,
+      "sha256": "c711221695443d2e2852e58ed271609f656f3c399e937e4536fee3b241481944",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_001__A512.bvh": {
+      "bytes": 1963580,
+      "sha256": "2b249f59612215a249ed09eed1d17361f9a478fc3c254eda34fa565ea336d54a",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_close_R_001__A513_M.bvh": {
+      "bytes": 2420618,
+      "sha256": "ae712d78d298f876f290267250a15caf28606bc4248d0a8908ce61829f8d819d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_close_R_001__A515_M.bvh": {
+      "bytes": 2489254,
+      "sha256": "ffc40f45e14d3f8d87769079fee295bf118b88d271380e2851e68e576027dc08",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A513.bvh": {
+      "bytes": 1251659,
+      "sha256": "3fbac8058a68970174388f919f9218689aec44cf41b170e5143ab8be8654ba63",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_close_behind_R_002__A515_M.bvh": {
+      "bytes": 1911859,
+      "sha256": "9f408daf99b3505c69cf73ee0cfead3617fee8fe5f9e926a5e210bf44baaf0b6",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A514.bvh": {
+      "bytes": 1273744,
+      "sha256": "c0a14097279aebbc26c1e49a60d32c5fe5ec2bad304802cafac7f3bac1ac57ca",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A513_M.bvh": {
+      "bytes": 1903879,
+      "sha256": "fb2f0281a8ca21a192b4068859242fff738ed4983504479125878a400eaa386e",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A513.bvh": {
+      "bytes": 2553286,
+      "sha256": "4d56ac1835444b74a6943023cfc788dfaf85d5364c8adc344532d9c96104de58",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A514.bvh": {
+      "bytes": 951869,
+      "sha256": "57abf71d92f6482675b348a260abbf0e4a051b4ba19809c75bfac04d6c22d912",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A514_M.bvh": {
+      "bytes": 1327087,
+      "sha256": "e6666875d46238aada1262fc9f3a31738b5fa5d18b28ab4d0f43adb22680a181",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_turn_close_R_001__A513.bvh": {
+      "bytes": 3029488,
+      "sha256": "659a292e87e7eb38a11983531892a9cd411573f58d20b75647a57e1331e5d28d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A513.bvh": {
+      "bytes": 1392357,
+      "sha256": "f784525dd94096004b92b87ec4e1706055534fb45611f2ed9046b1a08c293084",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A514_M.bvh": {
+      "bytes": 1276465,
+      "sha256": "2466d3407ccacd3df74ffec1e06cbec45af177bb32483e043d857c3b921986cd",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_walk_close_behind_R_001__A512.bvh": {
+      "bytes": 1999831,
+      "sha256": "baab260f53a5d7cc34c417b61d0e03df71db28df844021b95ca488b417712aab",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_switch_hand_close_R_001__A512.bvh": {
+      "bytes": 2199758,
+      "sha256": "4ffecb85f8e41adbcd6b44cdc87663ffeb32994deada2bc822132750adff9677",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_turn_close_R_001__A513.bvh": {
+      "bytes": 2218425,
+      "sha256": "9ca5f6a3cd87793b657027d5fbd62074b5e79fdbf57ff305882282e765600e45",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_close_R_001__A513.bvh": {
+      "bytes": 2421008,
+      "sha256": "06598572b0713fd04b2367e3359ec068112aa54442e3b23af54ef8ea4778762f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A515.bvh": {
+      "bytes": 1967187,
+      "sha256": "d97bf7729d90609b075ab62f92354534f55dd0ae46a7d6910e50e900da10e416",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_001__A514_M.bvh": {
+      "bytes": 2810625,
+      "sha256": "7ed72c11c3da975cc0038717196d8e4bbe166eb79ca61c47d8e4511527628d38",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A512.bvh": {
+      "bytes": 1640568,
+      "sha256": "b0b3432e942308fe593d5e05ecd6ba0392135ca820455119cb1b88212689a4fe",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_unlock_open_R_001__A514.bvh": {
+      "bytes": 1736119,
+      "sha256": "fa5e7912e2e2011b2ebf96bb1d1b0267130c40d6ce4844c4a92d75e4f6ceba9d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_001__A514_M.bvh": {
+      "bytes": 2212440,
+      "sha256": "0cd925996a46a7a1c4801f9dd4d58841d2137a5fc8ba1dc5cddc9d22f631db9c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_R_002__A512.bvh": {
+      "bytes": 1798979,
+      "sha256": "3f712e4d4d6c48d064e6b9c02e9beb2ca886f3d2ce1e8a8549d7da70f29047bb",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A513.bvh": {
+      "bytes": 1122550,
+      "sha256": "3bcee69bd22ec640c94f22d30f3f999f4eb7c26d5875ac31207340bde588aaea",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_switch_hand_close_R_001__A512_M.bvh": {
+      "bytes": 2196920,
+      "sha256": "6b38d8d41887124a81c24f38d1aa6630797a1c17c5fc00b0658da76c7ed3c6be",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A512.bvh": {
+      "bytes": 2465426,
+      "sha256": "4b021c3097261731d6c8836e165e89cbdd1f0e53f0586b0ddaf2c71d20b7794f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A513_M.bvh": {
+      "bytes": 1307488,
+      "sha256": "d499c305a57a072312fee940038b1cf14132885dde929b349b5e3e73eb0e227d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_turn_switch_hand_close_R_001__A515_M.bvh": {
+      "bytes": 1818968,
+      "sha256": "90d5250b5aa499c35b8be41a774d5f9f3d0aa0b8cca91a22c3d60c75d0d31d93",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A514_M.bvh": {
+      "bytes": 2145785,
+      "sha256": "82301d99af95be66a02aaf8b66e8d8b987e8f66f963db5112db13a3c9f0ed8ba",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_002__A514_M.bvh": {
+      "bytes": 2170920,
+      "sha256": "0b74de4323796b7d0e09c6dbf2ff994fd3dc6d1a5d128ff2b75583ce52f0487b",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_full_R_001__A515_M.bvh": {
+      "bytes": 1561544,
+      "sha256": "0d2f0831a5df37e1acccf5e8fb658d21367d20a102264085403730a181b63b26",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_close_behind_R_001__A515_M.bvh": {
+      "bytes": 2323877,
+      "sha256": "3f1a2609db955b3a84ae71478c90d8ea4f71900e92238c3e547b7bfcaf5b324a",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_switch_hand_close_behind_R_001__A513.bvh": {
+      "bytes": 2693176,
+      "sha256": "1da7f1500b4706adf5ee1c3918a42341db054d47e6a9adac230bd6cbcb8d37d9",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_switch_hand_close_R_002__A512.bvh": {
+      "bytes": 2163414,
+      "sha256": "fa451615a4c9461c43b0d0d69d46d4f611a6f94313d6df430c2f467e455c403a",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A513_M.bvh": {
+      "bytes": 1249985,
+      "sha256": "61563867c6752e90c534c36a5f04615358e3fa08fa24be689e0ea77c92f75bc6",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A513_M.bvh": {
+      "bytes": 2508996,
+      "sha256": "dc37f8232168a589bf0c3dcf334bdbf9b51ecfadd61a66f0c0ec089dfb16ca83",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_R_001__A515.bvh": {
+      "bytes": 2034919,
+      "sha256": "cc6b06ec16b1d1c6744037f565e196e3f9f9ce848e5b4130489c3b179b7380c0",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_unlock_open_R_001__A515.bvh": {
+      "bytes": 1435298,
+      "sha256": "52e843d4670debaf01fb452b01b64e03698f3710ed41743edc9a20cdb2619fea",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A513.bvh": {
+      "bytes": 1851349,
+      "sha256": "8d112c53a7fc8fa93b308b2dc7aa46487e014c85430de3ffe47832bf2c3cf76c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_switch_hand_close_R_001__A513_M.bvh": {
+      "bytes": 2505415,
+      "sha256": "13ef1aa8c9b20c6df6be5a77e38c35850711feb8e4951d67cccfdab5f998f22c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A512_M.bvh": {
+      "bytes": 1732634,
+      "sha256": "f5e8b106026ea8154ddcd70007a38d7ff6a8a1624f499af428422f057a80d8d2",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A514.bvh": {
+      "bytes": 1790335,
+      "sha256": "5329eb8068f7128a4617616676613a3051c3badad34f0f14b2b89405db8c4433",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A512.bvh": {
+      "bytes": 1859885,
+      "sha256": "84f8337dd6c32e8aba73a46cb8eba7a53c494d53a6e46bb7758d7400fd168bb8",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_close_behind_R_001__A515.bvh": {
+      "bytes": 2515743,
+      "sha256": "966577ada71cd24c11efdc1b556b37894d116c627ba8069a9804140f15ffebf6",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_002__A515_M.bvh": {
+      "bytes": 2255021,
+      "sha256": "99b449fc9ad20300957207511cbabb89cba94624cafa97f8c8daf562a7949ad2",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_close_R_001__A515_M.bvh": {
+      "bytes": 2283389,
+      "sha256": "59ef3d7e099904d0ed78000ff4e6cf9f2c8a1883e200951ad58e4e6539cfc4c5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_switch_hand_close_R_002__A515_M.bvh": {
+      "bytes": 3122186,
+      "sha256": "8d9676609532ec11fb16b15ea5f6f92754cf786930804b7dc253a42720e5747a",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_close_behind_R_001__A515_M.bvh": {
+      "bytes": 2515251,
+      "sha256": "037a4d4817e8f6f77320d1c725ede8f118a3635e0a80fccdea1228902ea5700e",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_turn_close_R_001__A515.bvh": {
+      "bytes": 2483623,
+      "sha256": "0933243f306d9013e9265e2a4679bdd101efb5e1cb62c76e061211a3ce6028f1",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_switch_hand_close_behind_R_001__A512_M.bvh": {
+      "bytes": 1969115,
+      "sha256": "87072faf1a9735b7e2fa5312e31c88b81b7470920dfb6d4d6cbce3a91c72cddc",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A514.bvh": {
+      "bytes": 1323751,
+      "sha256": "db1435c883170ccfb36c37aa3401d13847dabe50e53453c0c1391523f210537e",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A512_M.bvh": {
+      "bytes": 1863453,
+      "sha256": "31feb8562e43032fa55c1125d869736bb94ac4c81fa52bdfeb47c6c890a34184",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_walk_close_behind_R_002__A515.bvh": {
+      "bytes": 2275393,
+      "sha256": "f887b885da987dbea2e0c56721c2436e42acab4f5217b7856f7fc68b6373a6e1",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A513.bvh": {
+      "bytes": 1312358,
+      "sha256": "16d5f8af75849e96b77a9cf1106ae8c7b00c70d1c37cfd5873cfa3d7b88c8302",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_switch_hand_close_R_002__A512.bvh": {
+      "bytes": 2307061,
+      "sha256": "125b68229eed97f98af30c79fcb1b6bbd08bcc9dc37769b6b012133149ee6329",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A512_M.bvh": {
+      "bytes": 1314896,
+      "sha256": "824e61bf73a3ab8ef6a36d891e0a9923ce385d8ac07decd446fb94af7967da07",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_turn_close_R_001__A513.bvh": {
+      "bytes": 2534872,
+      "sha256": "8d8991ff1e5e2a87830ad2d38a3fc721e7db48a2bebb01f3662569186de83e38",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_switch_hand_close_R_002__A513.bvh": {
+      "bytes": 2044849,
+      "sha256": "eb4714c1823af05ee307ad3c9ec6e942c503678599bba17ab7c22af97dfc278b",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_switch_hand_close_R_002__A514_M.bvh": {
+      "bytes": 2887212,
+      "sha256": "7427c88ac66fa956a65cd7ab2646a68113dc7b980000724b36e155df966a5987",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A513_M.bvh": {
+      "bytes": 2548439,
+      "sha256": "1a957b2b7ef478d5bf1d78e43c65f40647b2bdaa95b7feefc61e6a936321e399",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A515_M.bvh": {
+      "bytes": 1642783,
+      "sha256": "ad81f419ccf675d3c14e364b4ba994f46db7947b3dd328e543409ea5ebedb3d3",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_R_001__A514.bvh": {
+      "bytes": 2343926,
+      "sha256": "2460f7f1056a03222459dceeb5748191cc7701973f42279973d2da72579a2e4d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A515_M.bvh": {
+      "bytes": 1970913,
+      "sha256": "7524173c533e38f9b8816b74d7ecc4a94c245ef323bd804d4bfb4c5b10ee32a5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_walk_close_behind_R_001__A513_M.bvh": {
+      "bytes": 1895852,
+      "sha256": "57ce9ef35760deb901d7efc0bf3b63bcfe8ddccabfe867c4c84bafd42f941fcd",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_switch_hand_close_behind_R_001__A512.bvh": {
+      "bytes": 2116835,
+      "sha256": "b3966f13fa1b7d87f25b82159f46706f11fa6d6537caa56c46ee14bbe7d4c82d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_switch_hand_close_R_002__A512_M.bvh": {
+      "bytes": 2160138,
+      "sha256": "0e00f68e81139ac00092d80afb4bb230b1c300da250126ca3fc7ead610c3f6a1",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A513_M.bvh": {
+      "bytes": 1848906,
+      "sha256": "b35f7cd2e52ea33ff4716b4db2ef11a707d0d88f04aad4d0af293a4db547791f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_R_001__A513.bvh": {
+      "bytes": 1740581,
+      "sha256": "49cf21bc97cbfc5efea6cf2c355ca67ae06414ea8d297272cc8467871fa4de19",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_close_behind_R_001__A515.bvh": {
+      "bytes": 2322476,
+      "sha256": "7a6a0bc67bb0d3e9dca53792588edcc4504a9b990e1cdb65655a9b9a146c9090",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_close_R_001__A513_M.bvh": {
+      "bytes": 2494012,
+      "sha256": "766cd9f1c835d344df0551404feb630009d403400297b92f69ec0e59d467383e",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_turn_switch_hand_close_R_001__A515_M.bvh": {
+      "bytes": 1955533,
+      "sha256": "81a5f69860ff8438e35e38d08520f3ca8c281916e45727eeea55b155fb14bfb7",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_R_001__A515_M.bvh": {
+      "bytes": 1032567,
+      "sha256": "4d4374cca5ed88191ce9816536544b71f211358db2d1ad5480ad9e2487efdac7",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_turn_close_R_001__A513_M.bvh": {
+      "bytes": 3023252,
+      "sha256": "5a358eab9fee78bfd48f6d459451da97b26a06ef6da4f5eebb1d937bffe2f3a5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A513_M.bvh": {
+      "bytes": 1123525,
+      "sha256": "090f00658ba4c065e8c17fa2967da6facc865de009454188e196a3c8b6c5908f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_001__A515_M.bvh": {
+      "bytes": 1882187,
+      "sha256": "cce8610cf1b17f5e6d2a6cd3e8fd9c712e4710b2c91e5ebf6e48235b532a62c0",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_full_R_001__A515.bvh": {
+      "bytes": 1558704,
+      "sha256": "e978a5c0ef884a33846d6fdde08e872f62efa9d08509586d8ff147f34a045d50",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_switch_hand_close_behind_R_001__A513.bvh": {
+      "bytes": 2537695,
+      "sha256": "609bfe777e3a5d593e899b97c4836cdaad6eb605e306bc287be59579899e5f57",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A512.bvh": {
+      "bytes": 977305,
+      "sha256": "bb1fa3b223975b9ee90abca0a925241da17a58a70f3d78b79e9d70327a804867",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_003__A514_M.bvh": {
+      "bytes": 1487762,
+      "sha256": "190a1642ba9b53a6aeaf0e87219a2e8977e7d0ce06d39f9136c1550214e6e13f",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A515_M.bvh": {
+      "bytes": 2633847,
+      "sha256": "21bd0f51375941e8b34910469dcd77bb92a6b626aca1653bbba27d623ace8232",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_R_002__A513.bvh": {
+      "bytes": 1958542,
+      "sha256": "152d01e1d20f6c4fa2f812f4832d4f3e93cd16646328d451b9b128ffc60c6839",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_switch_hand_close_behind_R_001__A512_M.bvh": {
+      "bytes": 2120678,
+      "sha256": "883da85125d6742ac2b7d4ee44338c8408f60be9fe72a629349a46c9c7abf0c5",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_close_behind_R_002__A515.bvh": {
+      "bytes": 1910601,
+      "sha256": "071740adf1b9b4765f9b46947694a85df9d847b5669c91f1f771fe4c4a64685c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A515.bvh": {
+      "bytes": 1609643,
+      "sha256": "69b1fe33fde44d017672bead533d4b26de72f570d11e33cd128b62db60ec15e3",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A514_M.bvh": {
+      "bytes": 954264,
+      "sha256": "680917e1b299212ba2927ac63ced0352a46540fff409c774c71009ea50199f05",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_walk_close_behind_R_002__A514.bvh": {
+      "bytes": 2171607,
+      "sha256": "ea699cf37b5fd6f4616edd1590a7e6fdd4ea8ea153ebed7707f0c2bbc2488858",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A512.bvh": {
+      "bytes": 1731417,
+      "sha256": "fcff2c0e286b2a5f5766b382a89e8a231485a6ad1eb634bf3ac34f4e5f760c9d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_walk_close_behind_R_001__A512_M.bvh": {
+      "bytes": 2002194,
+      "sha256": "fe2ce03898a4a0a324a5c05cdeca8e774b766c18d735715d55e559ad87b7a312",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A514_M.bvh": {
+      "bytes": 1317550,
+      "sha256": "a78dda55d846da5b27228c147a1ad75ce84a6bb396cb0306064111edec8428d8",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_switch_hand_close_R_002__A513.bvh": {
+      "bytes": 3038062,
+      "sha256": "db26c479029b2bd5b50d9fd418ae380e530d18cdef4d884ddadaf54a524c9ba0",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_switch_hand_close_behind_R_002__A512_M.bvh": {
+      "bytes": 2743804,
+      "sha256": "d0b9a3861a40145266d221434bd903c655fdedd9de0c8574d01c3240561645f3",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_switch_hand_close_behind_R_001__A513_M.bvh": {
+      "bytes": 2542164,
+      "sha256": "025e522ab97bdabeeb7c92eef98db087fe36c97303a9dcb5f36510d86365ea4b",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A512_M.bvh": {
+      "bytes": 1921576,
+      "sha256": "6857fc567846b410557aab082740975ec289317634c9b525ff654e6558b01997",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A512_M.bvh": {
+      "bytes": 1872706,
+      "sha256": "6292315fceee6f5b2b59e901dfa796d117969bb540e0399e6168ffaf61b48cf9",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_switch_hand_close_R_002__A514.bvh": {
+      "bytes": 2889587,
+      "sha256": "307976e32d5f4368cd052535363dfc640da159bc3fc3dfbbafa6fa4be9c14224",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_switch_hand_close_behind_R_002__A512.bvh": {
+      "bytes": 2741145,
+      "sha256": "792c7c91501edb255770fc00be6315ee635ba2518717dc67a8184963c24caf9c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_turn_switch_hand_close_R_002__A513_M.bvh": {
+      "bytes": 2042552,
+      "sha256": "f19966ed4c983518a7253d5b36618266c898e9f3cc34a1ec80abf6766a267419",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_handle_right_side_open_walk_R_001__A513_M.bvh": {
+      "bytes": 1740457,
+      "sha256": "473d35e3d03bbab8dbeb2f2e17db85e56d68b8cac44d1f8074ae17e0a806bcf3",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_walk_R_002__A515.bvh": {
+      "bytes": 1570335,
+      "sha256": "17a04037460726ba3e4dcdf1c3192caadef79fd9a765c29db946bed41eb597b8",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_turn_close_R_001__A512_M.bvh": {
+      "bytes": 2623884,
+      "sha256": "9d27314501d198eadfd61bbe5f24a000478898d37a350b4e6a7772fd0b4ab455",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A512_M.bvh": {
+      "bytes": 982818,
+      "sha256": "f11c6ca2279990e503676fb69fb237e81c903023c80035b156a614a73b148e77",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_open_full_R_001__A515.bvh": {
+      "bytes": 1584308,
+      "sha256": "ec6581a92a6766a728ce6ae755ca07a952f86bed2aa5e42ac80867813da03932",
+      "viewer_sha256_matches": true
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A514_M.bvh": {
+      "bytes": 2460158,
+      "sha256": "bc44bba3536619063062652842940c5e5341b85aba7ab7ec17ca6e1e4fe4a550",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_left_side_open_walk_R_003__A515_M.bvh": {
+      "bytes": 1610100,
+      "sha256": "3eda8cc3ce5afcedd47014f201a1f51a9c2a7f80c1d585e9684c385493c31299",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_turn_switch_hand_close_R_001__A513.bvh": {
+      "bytes": 2511692,
+      "sha256": "c490410ff0324cf4202087d176e3be0a293863923d0cb0b6033d2e3bf47de1de",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_turn_switch_hand_close_R_001__A512.bvh": {
+      "bytes": 1873019,
+      "sha256": "aee5ca29a4fb35bdb050a83c31d5ce37d614b4a595626567291972a9817d5c71",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_right_side_unlock_open_R_001__A512_M.bvh": {
+      "bytes": 1799399,
+      "sha256": "1428e8447e1bd950fa3af0c257cf3634973a15e8c1f6c874028ae4d6e769886c",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_switch_hand_close_behind_R_001__A513_M.bvh": {
+      "bytes": 2694287,
+      "sha256": "326f5df1256fe625ed8a173be3f1b2aef623d8c116aeeab71c962ddd5b41a35d",
+      "viewer_sha256_matches": null
+    },
+    "soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_switch_hand_close_behind_R_001__A512.bvh": {
+      "bytes": 2693631,
+      "sha256": "77ad27c74eecced6163f8d5f5058b599055b229963f343304b1f9cf225429b54",
+      "viewer_sha256_matches": null
+    }
+  }
+}

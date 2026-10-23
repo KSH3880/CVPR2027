@@ -1,0 +1,53 @@
+motions:
+  loco:
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  push:
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A342/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A344/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A342/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A344/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A341/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A343/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A341/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A343/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A341/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A343/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0
+  - file: dataset_bones_push_tokenhsi/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/ref_motion.npy
+    weight: 1.0

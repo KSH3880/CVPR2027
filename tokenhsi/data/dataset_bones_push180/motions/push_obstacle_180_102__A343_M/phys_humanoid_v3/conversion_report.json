@@ -1,0 +1,104 @@
+{
+  "source": "bones_seed/soma_uniform/bvh/230420/push_obstacle_180_102__A343_M.bvh",
+  "source_sha256": "824877eb412865f1c37603a23e9204ac654a9191283afed5eec30471d0fabdcb",
+  "source_frames": 2065,
+  "source_fps": 120.00480019200768,
+  "source_skeleton_joints": 77,
+  "source_crop_start_s": 0.0,
+  "source_crop_end_s": 14.2,
+  "source_crop_frame_range_inclusive": [
+    0,
+    1704
+  ],
+  "source_interpolation_support_frames_inclusive": [
+    0,
+    1705
+  ],
+  "fps": 30,
+  "frames": 427,
+  "duration_s": 14.2,
+  "rotation_shape": [
+    427,
+    15,
+    4
+  ],
+  "root_translation_shape": [
+    427,
+    3
+  ],
+  "target_skeleton": [
+    "pelvis",
+    "torso",
+    "head",
+    "right_upper_arm",
+    "right_lower_arm",
+    "right_hand",
+    "left_upper_arm",
+    "left_lower_arm",
+    "left_hand",
+    "right_thigh",
+    "right_shin",
+    "right_foot",
+    "left_thigh",
+    "left_shin",
+    "left_foot"
+  ],
+  "joint_mapping": {
+    "pelvis": "Hips",
+    "torso": "Spine2",
+    "head": "Head",
+    "right_upper_arm": "RightArm",
+    "right_lower_arm": "RightForeArm",
+    "right_hand": "RightHand",
+    "left_upper_arm": "LeftArm",
+    "left_lower_arm": "LeftForeArm",
+    "left_hand": "LeftHand",
+    "right_thigh": "RightLeg",
+    "right_shin": "RightShin",
+    "right_foot": "RightFoot",
+    "left_thigh": "LeftLeg",
+    "left_shin": "LeftShin",
+    "left_foot": "LeftFoot"
+  },
+  "scale": 0.9089608040484671,
+  "ground_shift_m": 0.08289375729651488,
+  "foot_mesh_floor_min_m": 0.0050000000000000044,
+  "foot_mesh_floor_quantiles_m": [
+    0.0050000000000000044,
+    0.012560952205605774,
+    0.02703836918852945,
+    0.03872070085119489,
+    0.05735622975181745
+  ],
+  "key_body_fit_error_mean_m": [
+    0.0012360082782210894,
+    0.0014479279403250994,
+    0.003909136485627974,
+    0.0029141838242980854
+  ],
+  "key_body_fit_error_max_m": [
+    0.015323290045229861,
+    0.014484838306336924,
+    0.010838525870416315,
+    0.008511619744470598
+  ],
+  "key_body_error_order": [
+    "right_hand",
+    "left_hand",
+    "right_foot",
+    "left_foot"
+  ],
+  "joint_limit_violation_max_rad": 0.0,
+  "max_dof_speed_rad_s": 5.4279503371588955,
+  "root_net_horizontal_m": 4.191911636702163,
+  "notes": [
+    "No measured box pose/contact in source.",
+    "Human reference only; box state comes from simulation.",
+    "IK follows scaled endpoints with humanoid DOF limits."
+  ],
+  "profile": "push",
+  "hand_height_median_m": [
+    1.0063551664352417,
+    1.021190881729126
+  ]
+}

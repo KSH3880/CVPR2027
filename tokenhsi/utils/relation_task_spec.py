@@ -198,6 +198,17 @@ def validate_relation_config(config):
 
 def checkpoint_metadata(config):
     mode = config.get('mode', LEGACY_MODE)
+    if config.get('stage1_variant') == 'stage1_open_push':
+        return {'reward_mode': mode, 'schema_version': 12,
+            'relation_taxonomy': {'open': 11, 'push': 12, 'at': 7},
+            'suffix_fields': list(STAGE1_SEMANTIC_FIELDS), 'packet_version': 3,
+            'graph_record_width': 5, 'context_dim_per_edge': 0,
+            'context_fusion': 'semantic_only', 'relation_reward_config': config}
+    if config.get('stage1_variant') == 'stage1_door_open':
+        return {'reward_mode': mode, 'schema_version': 11,
+            'relation_taxonomy': {'open': 11}, 'suffix_fields': list(STAGE1_SEMANTIC_FIELDS),
+            'packet_version': 3, 'graph_record_width': 5, 'context_dim_per_edge': 0,
+            'context_fusion': 'semantic_only', 'relation_reward_config': config}
     if mode in (STAGE1_CONTEXT_MODE, STAGE2_CONTEXT_MODE):
         if config['schema_version'] in (7, 8, 9, 10):
             taxonomy = {'holding': 6, 'at': 7, 'ontop': 8, 'sit': SIT}

@@ -1,0 +1,2334 @@
+{
+  "repository": "https://github.com/KSH3880/CVPR2027",
+  "branch": "stage1_stage2_base",
+  "commit": "28f02b3278f0a3e703cfa22a1e8cc376bb8ec512",
+  "tree": "3e7223f9a79f7646edc19d7e6c7b4b168b28f377",
+  "imported_date": "2026-10-19",
+  "files_count": 387,
+  "archive_sha256": "027aa7237b4541f7d3f736ccaf165087e44fb7471ce9951027137cc6f9863e38",
+  "data_links": "Preserved exactly; external targets not modified or required for this import",
+  "files": [
+    {
+      "path": ".gitignore",
+      "git_mode": "100644",
+      "git_blob": "82693744bd3ef9c5d4af9f93e81a3581e41257df",
+      "sha256": "bf7d0d23350a42047f516d62564c6734347d3f2938e2be442f09c78770ceea1f"
+    },
+    {
+      "path": "AGENTS.md",
+      "git_mode": "100644",
+      "git_blob": "85254cbb72842108b86199ead706ca239e1c91e6",
+      "sha256": "4d8878a91084ffb548073dff272f21f9083791fc474dbd01577bef98ecbeb851"
+    },
+    {
+      "path": "LICENSE",
+      "git_mode": "100644",
+      "git_blob": "8f1c5846004eb0f9d5af5bb4d67ce7cb9955f4d5",
+      "sha256": "d0d188f5b08ec03da7fdd0371f39d274e4de5b2f82f68b77ed4aa1bc817c0f11"
+    },
+    {
+      "path": "README.md",
+      "git_mode": "100644",
+      "git_blob": "c9e69d1c0d67b051e2508080bdc583e0d30a30d4",
+      "sha256": "db893ed218cb993e82bd9f1aeba8467564d40ca70adb4218dca4ac7fd69fb27e"
+    },
+    {
+      "path": "body_models/model_loader.py",
+      "git_mode": "100644",
+      "git_blob": "5c52ee3081b4485a8dc2e2dd89c52f6aeb32cdcb",
+      "sha256": "abfee48462d8f793bfa9a01964949672bbf93abc8aefdb23bfddcdc3a56a080d"
+    },
+    {
+      "path": "changelog.md",
+      "git_mode": "100644",
+      "git_blob": "de84c0d00e8747325b82a4b957a19027c2a1fd9e",
+      "sha256": "46d641be801af93a12c70ba4e76d067da36214440ccb00551c8e172e821f067b"
+    },
+    {
+      "path": "joint_carry/README.md",
+      "git_mode": "100644",
+      "git_blob": "924277e37fb34c1265f76f51405b65a32959c181",
+      "sha256": "1c70c01c56973e54338eb781bf94ecb8c69c15c79ede35d6a8907ba21a0cc8dd"
+    },
+    {
+      "path": "joint_carry/artifacts.py",
+      "git_mode": "100644",
+      "git_blob": "51bed8ee013a0109db046ab628b474a8e8a1adf6",
+      "sha256": "efbc8453b5cdadf95bfb0a45023883f81ff7acb0b940447c28cf0540c5d50c77"
+    },
+    {
+      "path": "joint_carry/audit_size_rsi.py",
+      "git_mode": "100644",
+      "git_blob": "a53d8983e02cd973c1641951755581f36017d151",
+      "sha256": "4ce207dde96f95c6015d4eb46af8008523d604f96c80eac95746e44d394e2f29"
+    },
+    {
+      "path": "joint_carry/build_size_rsi.py",
+      "git_mode": "100644",
+      "git_blob": "291e5cb0b1cd4bda33261e9196c7b605766dbc80",
+      "sha256": "b675daa038fc0ea3703159442b2a8eda0e8d68985a8117cf6513d0b246b18389"
+    },
+    {
+      "path": "joint_carry/correction.py",
+      "git_mode": "100644",
+      "git_blob": "05a0dbe0f6d830883937a2bb3b819159079d9284",
+      "sha256": "6dc6a8944100db1443540074f81d3f221cdc3c0041b91c78c456d24257befc66"
+    },
+    {
+      "path": "joint_carry/geometry.py",
+      "git_mode": "100644",
+      "git_blob": "5cf5cea19ba3358717c31dbc0357adb40983af1f",
+      "sha256": "713c84e1ef98965899fb9c8a4c355a75d810d72ae6a1ea7fce8d88513e1e52aa"
+    },
+    {
+      "path": "joint_carry/kinematics.py",
+      "git_mode": "100644",
+      "git_blob": "3439b6c6be7d25ebbcaa8eb3d0766f01a4398cfa",
+      "sha256": "b54e11f931817917f1c4b327bca27ea2d73bdb1d8918f388f42f6889aba3d0f0"
+    },
+    {
+      "path": "joint_carry/leg_correction.py",
+      "git_mode": "100644",
+      "git_blob": "4b666add1efaff724d4afce68a5493905954de3e",
+      "sha256": "a2380c78989d96ad779e70324a09ce1d81627e656fc8334a7df6dced2d0f51a6"
+    },
+    {
+      "path": "joint_carry/render_size_rsi.py",
+      "git_mode": "100644",
+      "git_blob": "0bf728153f91595fd8f12d34405ad88347541e24",
+      "sha256": "e546b1a2e7dfd074c3bc5fe9a567769a3312c40498485a5d0b2100175e12253b"
+    },
+    {
+      "path": "joint_carry/single_source.py",
+      "git_mode": "100644",
+      "git_blob": "d062220ce61034faf63e64ee359b25c8a184d4ac",
+      "sha256": "b44314f4fc9d659d6b608c1f02a8ae7efd50d1044bb82005d676b0a84741176c"
+    },
+    {
+      "path": "joint_carry/single_source_manifest.json",
+      "git_mode": "100644",
+      "git_blob": "64017017297f638e7d22aaf9d40af6b55a00f0a4",
+      "sha256": "19dc4b7af7becee77568062c0feb565b8a500be08b33799a4fc4a3bca574c647"
+    },
+    {
+      "path": "joint_carry/size_candidates.py",
+      "git_mode": "100644",
+      "git_blob": "20ba8f7deaefebc1a56dad22b39d38597d21dff6",
+      "sha256": "fc9cf264008d096309aaa5fdf349400abfb87f19abf32080e3d96ada8b730cd4"
+    },
+    {
+      "path": "joint_carry/size_screen.py",
+      "git_mode": "100644",
+      "git_blob": "3a7440300e9158f336b42fc048852ea6d14c8446",
+      "sha256": "914130fc53c6d6765d4d7be4de26275d57fa8f9a1ea974f2871ea0ce4667d60f"
+    },
+    {
+      "path": "joint_carry/source_manifest.json",
+      "git_mode": "100644",
+      "git_blob": "7354acfeaf4e1aaeaa6d8dc671d836141719a34f",
+      "sha256": "4483bc13efecfd8168a8ff8417cdd777526825625272f076edcc2ba4ebf96a7e"
+    },
+    {
+      "path": "joint_carry/source_rsi/carryWith/cooperative_rsi_candidate.npz",
+      "git_mode": "100644",
+      "git_blob": "7c5dfa701418db20e35caf4e14e9980592e6cc96",
+      "sha256": "a4807c9eb1d60626f23c4c1ccf637e9c711f756baf2fc8eaa387662e3f5ab2cc"
+    },
+    {
+      "path": "joint_carry/source_rsi/carryWith/screened_rsi_snapshots.npz",
+      "git_mode": "100644",
+      "git_blob": "e279905a6e3fbfd2e0d5e2c1814eff0ce175ef6d",
+      "sha256": "97fc207bfe4101a553d6244e0fb52943072d0a3f182882d4d29110c0dde3f284"
+    },
+    {
+      "path": "joint_carry/source_rsi/pickUp/cooperative_rsi_candidate.npz",
+      "git_mode": "100644",
+      "git_blob": "d214cb783a89eb8348ec06b183f5944befc0b6cc",
+      "sha256": "204888954f5333c9c820eef034e08bd8bd5ff1f7534c59184d342d9ab59d2fb7"
+    },
+    {
+      "path": "joint_carry/source_rsi/pickUp/screened_rsi_snapshots.npz",
+      "git_mode": "100644",
+      "git_blob": "3b01fa818d13eed2cfa09d72ca8cea249b944b28",
+      "sha256": "9b4a8871edcc7d55bb9b78030a586ba43daf49386b461fa783c86396d090e33a"
+    },
+    {
+      "path": "joint_carry/source_rsi/putDown/cooperative_rsi_candidate.npz",
+      "git_mode": "100644",
+      "git_blob": "9f4375e99022e24d20360fdaae9290a38cdc8c61",
+      "sha256": "410f8e5fe8ba06dcb54fa552d9d7a5d9cc62c74e4ca440463e056a8fdc2ba913"
+    },
+    {
+      "path": "joint_carry/source_rsi/putDown/screened_rsi_snapshots.npz",
+      "git_mode": "100644",
+      "git_blob": "09e4bacc6c50a280ff6167c824890be1c59bfb06",
+      "sha256": "2e4fcf15cc28767100047a31a271ce4fddb5396521d588ff606cfef02a079675"
+    },
+    {
+      "path": "joint_carry/teamhoi_reference/LICENSE.TeamHOI",
+      "git_mode": "100644",
+      "git_blob": "c3358c88d0ed9d3127cae417e20d84842d17abc9",
+      "sha256": "f57374d0eff5106e953b8bfa38be0e4cdaaa637f8c49316df00c9e7cfd91e482"
+    },
+    {
+      "path": "joint_carry/teamhoi_reference/manifest.json",
+      "git_mode": "100644",
+      "git_blob": "c5314868184b3b04f88624b2776a361008e3ac99",
+      "sha256": "8e2f15412ac3ee2f83398080156f7353566167ac522190125c8ca9ee9f63034c"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B10_-_Walk_turn_left_45_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "aaa2355f010e2db9ae94ff3fd8b2c06a6251004a",
+      "sha256": "a0932290734060007086e76069f01cd72c8a3a841131d67d28666c1adac8542b"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B13_-_Walk_turn_right_45_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "dde893dcabf9fa1fde2e51eba2a13556bcbbc1e3",
+      "sha256": "4bd5faf4ead699d786d9b456baf2e23e0baaf64ff2082f354e69b524fbe9599f"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B15_-_Walk_turn_around_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "b849e6b59b0b27a6eb23748d5e9fc3a580cd41e6",
+      "sha256": "57bfab0dd634c7a919d7f344f273465992843575e76bda4d85c8e37701e69ed6"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B16_-_Walk_turn_change_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "04cbfb08d23635a2d43c718c13b4535e30dfc507",
+      "sha256": "21e380f244645eb13c11da5a842486ddbc0ccedeb2dd360b38c1c24ca3f8cb9a"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B10_-__Walk_turn_left_45_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "5f4e3138edc6469298f1fc71cd3b9980b8c12132",
+      "sha256": "05a9f9761a4f74effa596932a9e3f8c9a80fe6b6cc08d847900c7596c9fb3807"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B11_-__Walk_turn_left_135_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "f02fdfa682b8f3aa17672e565f6d80fa77d8617d",
+      "sha256": "e12f65a867ebf2ae5f3a946ab728e7b0ae40847c4949b22c2140feeed1542d51"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B13_-__Walk_turn_right_90_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "a83fdfef1f925f1caea02659cd3163f92b2b0010",
+      "sha256": "050afd7d9c861dd63bee907afe29fe9d3e863258f030956c087d67c820df8a1b"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B15_-__Walk_turn_around_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "7fd65fa905315205e9c4d4a2047d73c574354dc1",
+      "sha256": "db6edcf2183cb068aeb103f74f10fcc32e4262c5ed0c897743e8d7e51415b24f"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B9_-__Walk_turn_left_90_stageii.npy",
+      "git_mode": "100644",
+      "git_blob": "29d376070c826cbc543d8b5520caf88a720042b3",
+      "sha256": "3aef948c38bce4658a0bc1533e2106509e9d101ea8e5c9798052a57494c966c3"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/amp_motions.yaml",
+      "git_mode": "100644",
+      "git_blob": "5e12d30e6b1e018176950140fc391ffd4b66241d",
+      "sha256": "ee96e2dbcc7b6bc6d48a251c37aa611559a43e69ec7f597001d28f3c866cc716"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_113_18_poses.npy",
+      "git_mode": "100644",
+      "git_blob": "17bd402e3659d2aef7f369f39c09b19945d69b81",
+      "sha256": "da3cbd49ce4098d28bc89b8e6e06515e401db8e60b8e3de81addbe4e15845ebc"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_141_33_poses.npy",
+      "git_mode": "100644",
+      "git_blob": "e3a70f8318da8e5f6126d28a6357dff9cb981fbb",
+      "sha256": "8b8e8e00c7c1300c5080682ecf3a2175178276d0cfdef37167012d42c577739b"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_143_40_poses.npy",
+      "git_mode": "100644",
+      "git_blob": "50542633e95a14370973d6f066a5b41920353a5a",
+      "sha256": "edb00868dd9a73813fb0b7c25bcea5e2d9e211d691d6a19af4267d84a3e5d924"
+    },
+    {
+      "path": "joint_carry/teamhoi_retarget_posture_all/manifest.json",
+      "git_mode": "100644",
+      "git_blob": "6ad520c4711866ed09d0402e11eacf881b4683db",
+      "sha256": "6b87a11d2ba3a2942857072d06b2d157cf5c39bd86b5f464a6821acd6f228e00"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/joint_monkey.py",
+      "git_mode": "100644",
+      "git_blob": "4763d64e96a84459307cdafc4d99fd5197b79058",
+      "sha256": "e239cc0cc549f0fec64ee1f3628c8486f92a83f9213ec3bf539234cda3de26b4"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/vis/api.py",
+      "git_mode": "100644",
+      "git_blob": "68b153aaae19dc4d012665e8b69c7fe7f4cce4a6",
+      "sha256": "aa38e5703f8585762f8ddbd2d1f8f03eefa26778c91112b607823047af400f1d"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/vis/data/plane_y_up.obj",
+      "git_mode": "100644",
+      "git_blob": "b2446daa1335efc96a77f62390481803293a215d",
+      "sha256": "8f888d207c0e1a2618419c04beca196107685d34ba2f7809e5faa2612ee8cf99"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/vis/data/plane_z_up.obj",
+      "git_mode": "100644",
+      "git_blob": "a7e5b170673fa3e8e39126aa48820050c4d41d30",
+      "sha256": "8571ec79f0e0abdcca806b58f4af9b5932b8be0653cc3805c0552532443beaa3"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/vis/utils/body_builder.py",
+      "git_mode": "100644",
+      "git_blob": "fe34da39b8247f34f64dc00e1ed1ba5ae0dbf536",
+      "sha256": "4a4ebe02f318e11a5187b122b31fd0083fb4c6bf4e4835a1123fa865d9befc90"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/vis/utils/sp_animation.py",
+      "git_mode": "100644",
+      "git_blob": "60c8b375daca25cfa2f7a52b3389a979345c90d9",
+      "sha256": "3fe94bf941ced1d6ee1f1c087f5a1360a016f8256436a256ce80b720c466dae1"
+    },
+    {
+      "path": "lpanlib/isaacgym_utils/vis/utils/xml_parser.py",
+      "git_mode": "100644",
+      "git_blob": "b275f2e165df362c06d642c505a87848c4a1c013",
+      "sha256": "9ff0b8cf1b8166f5d45bd5d22a95bdd0f575be94abd38031bad51e762fca7377"
+    },
+    {
+      "path": "lpanlib/others/colors.py",
+      "git_mode": "100644",
+      "git_blob": "189008d2a756fa722ce4dd3fdef697d32b0ed648",
+      "sha256": "fb52fc6adf2223503f4fc4917d949e3982a2d4b879b471a67d8576e1e094a7f9"
+    },
+    {
+      "path": "lpanlib/others/video.py",
+      "git_mode": "100644",
+      "git_blob": "0fb681c2bcc9e167947333846ef4bb9877a35f13",
+      "sha256": "417f9b3a2ff90683230225f94861ec46e937369231c52ba4d4168737edd47d02"
+    },
+    {
+      "path": "lpanlib/poselib/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "989e5fbd67cd2d0043276c0f43459b4290aa989e",
+      "sha256": "18ce45a88ddb9502ee84c2bd80295bce410618920fcfb4b89a93021a7db3fac0"
+    },
+    {
+      "path": "lpanlib/poselib/core/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "f76d60e3261c44b26bc16a66488fd603ec0e368e",
+      "sha256": "8f9b40e15e49814c7d667fae8af58972da336bdbc699cd0f0d9f498e4c5e258c"
+    },
+    {
+      "path": "lpanlib/poselib/core/backend/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "616d0a2dd62cbd2e8ce552115b97a176cddbf31a",
+      "sha256": "73e67af6fb090b3abd7f40a1140c9655e8507110021103269a2fcb3e9faa3e05"
+    },
+    {
+      "path": "lpanlib/poselib/core/backend/abstract.py",
+      "git_mode": "100644",
+      "git_blob": "5af2b9664c211d667350500a3fb7ec6fe5661831",
+      "sha256": "ae98c096f1d452e57d33eeb53b963a2e804440b1a609f4921f362d060193ae49"
+    },
+    {
+      "path": "lpanlib/poselib/core/backend/logger.py",
+      "git_mode": "100644",
+      "git_blob": "cdf08cc51b8bdc0796f24f8b974377c5bb0475fd",
+      "sha256": "6a8dd1dc63dfd5b06762760fe588b2a3b61fb12518edf54b872579bf410c080c"
+    },
+    {
+      "path": "lpanlib/poselib/core/rotation3d.py",
+      "git_mode": "100644",
+      "git_blob": "4cb43aa6185c41c41a832ca81959d575333c715d",
+      "sha256": "66049e0082db433c58f28ff24cea3a346630392f8bfb1bd68a8a965fa7a4df31"
+    },
+    {
+      "path": "lpanlib/poselib/core/tensor_utils.py",
+      "git_mode": "100644",
+      "git_blob": "38960be525e77082cf97cc5c55fdaafe76077420",
+      "sha256": "af92d69d6b059997cdf9f724924dec78c5bc113915a9cbbf806dffe17ff752a5"
+    },
+    {
+      "path": "lpanlib/poselib/core/tests/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "095a1c6d1570627c79f8ed8c531bf74d7e9c86ee",
+      "sha256": "8dce5b7233c902f52621feba238c6305e82c3eda374ba8a294015fd242f041f6"
+    },
+    {
+      "path": "lpanlib/poselib/core/tests/test_rotation.py",
+      "git_mode": "100644",
+      "git_blob": "996b0f0b92b60863b5013f14a60c6de9fc609da6",
+      "sha256": "ff29924b8a16b051d5ce1e65eaf2089c4d2c2626719c4c0803caefaf1a4c2f42"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "095a1c6d1570627c79f8ed8c531bf74d7e9c86ee",
+      "sha256": "8dce5b7233c902f52621feba238c6305e82c3eda374ba8a294015fd242f041f6"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/fbx/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "3a13450372c5a07ad6adc0c4467a128b36a90a64",
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/fbx/fbx_backend.py",
+      "git_mode": "100644",
+      "git_blob": "f2f56df819f78327bc349345ec562ef5d6ff8a98",
+      "sha256": "33d0944d40e19798fbc04da30dcaa8926f817b69349d71b3bead04c0ed86df4c"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/fbx/fbx_read_wrapper.py",
+      "git_mode": "100644",
+      "git_blob": "2bf859394309e3ddb80348e6c21bb40a0f3f018d",
+      "sha256": "0f709b8c8671c9a3408dc69eeb80087d7a3b810c781e5792946c8a9021ab6dbc"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/skeleton3d.py",
+      "git_mode": "100644",
+      "git_blob": "645225d924c58e29fb7f4a0a3a4df05815acbd79",
+      "sha256": "1db0944462b8f9dda86420c36e0f397a68e8d7073fda630e25219a974abedc5c"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "3a13450372c5a07ad6adc0c4467a128b36a90a64",
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/common.py",
+      "git_mode": "100644",
+      "git_blob": "5a75fa58ad8581d0b1b1c3b5e6b2d0186133eee3",
+      "sha256": "5fbe1a33ced714a31a50fddc8e385c3521ac2c926299627fed226255b3596385"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/core.py",
+      "git_mode": "100644",
+      "git_blob": "24c2aece96b564eb4b4320a3d296b07085d75d65",
+      "sha256": "663c01a1bd123b86e3535741eec3621702cf0381dfa90418cc483416f65de271"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/plt_plotter.py",
+      "git_mode": "100644",
+      "git_blob": "a2da26dbe7e7e836ffff2229ed48aea90c7a01e8",
+      "sha256": "db13f6eeb09740e50a556f7f814dc33e9fc98e0112579bc9331dacd2c59acf99"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/simple_plotter_tasks.py",
+      "git_mode": "100644",
+      "git_blob": "de0ee37a4a9d87388eaa06dd71e70da5db367f0a",
+      "sha256": "ba317a4d1090e73ce7966682513448e07b59673d9459eab3a10bf8dcb9a698af"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/skeleton_plotter_tasks.py",
+      "git_mode": "100644",
+      "git_blob": "018cf4b49d34beb34846906aa9544b36a7d77d3a",
+      "sha256": "e59e59fbd07333be9e4ea54170f2a27d711586f4e7c3bdd9637f058449d2644c"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/tests/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "3a13450372c5a07ad6adc0c4467a128b36a90a64",
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    {
+      "path": "lpanlib/poselib/visualization/tests/test_plotter.py",
+      "git_mode": "100644",
+      "git_blob": "974ee3f3199262d66fa9f1a7f8e63fd3a8d9a608",
+      "sha256": "9c4dfe1b6a746b7ad6a5c26f21591afa4b698ddfe08afacd57d6eba797dc2186"
+    },
+    {
+      "path": "markdowns/USAGE.md",
+      "git_mode": "100644",
+      "git_blob": "4068d5f16f3c2624ad0bac253276ad4badcc6df1",
+      "sha256": "359b95cff04ea7e315d499231b4b5b047014be3aa323452a43f14f5484318c21"
+    },
+    {
+      "path": "markdowns/config.md",
+      "git_mode": "100644",
+      "git_blob": "1778c8b7091af57a4639f1eb0f43c6b8e00487ef",
+      "sha256": "1509d1140a12e190ebd12824a3c5873cfc58b6e12d85df9e1e0b622e8c442279"
+    },
+    {
+      "path": "markdowns/legacy/README.md",
+      "git_mode": "100644",
+      "git_blob": "4eddffac3eee908876cb91ac4fd3a4a1fdf9745c",
+      "sha256": "cf4b5d03bbfbfa82b59ad95ef9bd8ddc085d87c304e8514f32a91acf66b90566"
+    },
+    {
+      "path": "markdowns/legacy/changelog_before_cleanup.md",
+      "git_mode": "100644",
+      "git_blob": "cd426244a0a2e5eb30997c89e7d88953014f2735",
+      "sha256": "6f4005a889038d1fe7650754769041f5fa02f3d08b67c013b3f11a3b1157216a"
+    },
+    {
+      "path": "markdowns/legacy/mps/CODEX_SETUP.md",
+      "git_mode": "100644",
+      "git_blob": "0c603880f3b8b965ed7762c978453e36dfe99e68",
+      "sha256": "e355c6dea5dd39f886155ea70109ce91a911841da6ce84e5a1d369cc1da5b943"
+    },
+    {
+      "path": "markdowns/legacy/mps/gpu4_gpu6_test.md",
+      "git_mode": "100644",
+      "git_blob": "b67b26b35776027f91aac2c98d8ef47805c6e1aa",
+      "sha256": "a285eedc9c85e8203bec2f1323725a93f303820607018ab8a5860373f09f9dfc"
+    },
+    {
+      "path": "markdowns/legacy/tokenhsi_original_carry_sit_climb.md",
+      "git_mode": "100644",
+      "git_blob": "d561d0794e92cfca04fc7f9687c97ff3c4fb3879",
+      "sha256": "6e17ceae7ce38f24ad1c3d672f0a1c76452b37f1a1c17bd9f310de3704a0eaca"
+    },
+    {
+      "path": "markdowns/legacy/tokenhsi_vs_stage1_v2_train_eval.md",
+      "git_mode": "100644",
+      "git_blob": "77de6e04137505783cab7f11887257ac287ed2af",
+      "sha256": "3d00551ed9bf9d498d6c20d597d71ae713b10b3888d0d9727ae9a72845ea26ff"
+    },
+    {
+      "path": "markdowns/reference/PORTING_GUIDE.md",
+      "git_mode": "100644",
+      "git_blob": "51c25e2ec00a90c99529da26046782560e4e31ed",
+      "sha256": "4f898be261aad954f57f126df9b049de455b0cd18f92f9e519ebcd5833cfc3c6"
+    },
+    {
+      "path": "markdowns/reference/ma_clean_scene_gta.md",
+      "git_mode": "100644",
+      "git_blob": "4346c2ecded073dc55a9fc55485a7e98c715ce96",
+      "sha256": "38d2c175c01be95428f717bf5dcfc9f5c07e1a8f1233a05f9ecad669a8db6f9d"
+    },
+    {
+      "path": "markdowns/reference/relation_diagnostics.md",
+      "git_mode": "100644",
+      "git_blob": "88e70eeb783481da3cf6841522347975269b9719",
+      "sha256": "20a1b21afd923141ff3964d3f3d7d5586ed3adf69ab0186f0d287c1023326c54"
+    },
+    {
+      "path": "markdowns/reference/shared_support.md",
+      "git_mode": "100644",
+      "git_blob": "b5e484af8308c1f3e86a0cd4c8cddfa5a879d3e3",
+      "sha256": "28ea8ba79df662ece6f391982d39fb2968b03f6bbd1d8f3c4d136880b3f9d153"
+    },
+    {
+      "path": "markdowns/reference/stage2.md",
+      "git_mode": "100644",
+      "git_blob": "d3f9579241e7e8a240e4c64a3fb50eeabac91092",
+      "sha256": "56af164e9f7caccf73bc097341b783d8c000f1821b45adc14f920ee952d97654"
+    },
+    {
+      "path": "markdowns/structure.md",
+      "git_mode": "100644",
+      "git_blob": "b6683fd57f040ac3331039adebb4caf368b901cc",
+      "sha256": "467b9986c1ccc74f13c703da5719a513e78d08997ae8048efce6ed78a6bf641c"
+    },
+    {
+      "path": "mps/README.md",
+      "git_mode": "100644",
+      "git_blob": "b35048a740b9c66eeeea29f2b90098eb90ecdb51",
+      "sha256": "096108511a78a8f5738dc6e665a1f11b9604d46e5c9bc249edd0d21707c957d5"
+    },
+    {
+      "path": "mps/commands.md",
+      "git_mode": "100644",
+      "git_blob": "b8ceadba07b809505dcea07d57e71420df4a2459",
+      "sha256": "36141fa1ea3790920041a3d3bd9e698dc7dce9b849637ba5dbd63dbe00ca43d6"
+    },
+    {
+      "path": "mps/heartbeat.py",
+      "git_mode": "100644",
+      "git_blob": "1d16ab87460d899f479ac6337c215d40efee75fa",
+      "sha256": "40825de4636bbad24aecb34e2a2bab283e589d0e6a61b7140f4f40cb90eb59e4"
+    },
+    {
+      "path": "mps/shell.sh",
+      "git_mode": "100644",
+      "git_blob": "c9efb7a65bd321576925613bbbe7c6f047d31b26",
+      "sha256": "fca023a073454864e573239baedf0fd6ebd9011b1be9c984a0244ec4458f6fa9"
+    },
+    {
+      "path": "mps/test_shell.py",
+      "git_mode": "100644",
+      "git_blob": "2b0fa053310987304863f9c057cb416634574962",
+      "sha256": "5d82e0f65135238d9fc117a62dd8115acf18a5630381bcc1ced39ccb50d4ec8d"
+    },
+    {
+      "path": "requirements.txt",
+      "git_mode": "100644",
+      "git_blob": "936b16d62380fedce9097cccc80c648e78e6d4bf",
+      "sha256": "3de3e4959d54e09dd993c7affa159960c9ef510894ede7fbc8d930b489eaff21"
+    },
+    {
+      "path": "tokenhsi/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "bc6ee169446e3ff481659f963b550b39fd9f43d3",
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/amp_humanoid.obj",
+      "git_mode": "100644",
+      "git_blob": "7f96d756d08ccfe6e85f4094904442ad62c32ed4",
+      "sha256": "c6fc8b0e78162d034d2dc496ccb673025033ab0b538e1b73b5ce73c7d64cf66f"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/amp_humanoid.xml",
+      "git_mode": "100644",
+      "git_blob": "16410409710cf471938a3105d695416248d49812",
+      "sha256": "352d669d8903cd70c3b07f0b15f78d0b2685d3ea7940316201b6655ed253a686"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/location_marker.urdf",
+      "git_mode": "100644",
+      "git_blob": "a61d4e3e4df39108e95704333237dc93d784583d",
+      "sha256": "72bf4b443f328fd362772ff8e12df724fb8b2d0e439d2e2596aca140ed149277"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/phys_humanoid_v3.obj",
+      "git_mode": "100644",
+      "git_blob": "c0646975f0ab6ba4aae08a44ea76db6423f91139",
+      "sha256": "ea089cdc6edab2a70b7f5f3ba8d4b611eb10ebd7f06b81d242593dab438aca69"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml",
+      "git_mode": "100644",
+      "git_blob": "46dd18296da64fb5bb9761c3237134d0b726805b",
+      "sha256": "ee3c898fa22993f15525afcd10ca3ccd614fb5ee3a9f10df46576f970b7aba56"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/phys_humanoid_v3_box_foot.obj",
+      "git_mode": "100644",
+      "git_blob": "e62d328c0bf87b6f140d823362e8febcabc3c85d",
+      "sha256": "b6144e214d53ef3fedfbe4e29f2c5c99c2cce6beab734651d27a67883ad7f504"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/phys_humanoid_v3_box_foot.xml",
+      "git_mode": "100644",
+      "git_blob": "2b54a500d63011c1e0ce0eceb5822cf12c85a91c",
+      "sha256": "f5c44649f490f9b324f3adc2108a9d727609fb65ec9e77f181730418c1a7ee48"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/smpl_humanoid.xml",
+      "git_mode": "100644",
+      "git_blob": "ec14072ec507e9d5af0ad45c76d34ba7ed6d6dfd",
+      "sha256": "a93a9e3b39521609f7db1dc4cec49987e1924bd26549684402cac0143537401c"
+    },
+    {
+      "path": "tokenhsi/data/assets/smpl_foot_meshes/left_foot.obj",
+      "git_mode": "100644",
+      "git_blob": "d8294e071b4b0f10f596c25da6cf08a772617e63",
+      "sha256": "4911cae4ac3896acbb9e07a067260d9eff377a3d6eb1c977069444237d326d40"
+    },
+    {
+      "path": "tokenhsi/data/assets/smpl_foot_meshes/right_foot.obj",
+      "git_mode": "100644",
+      "git_blob": "66bb4249aa5df28a6abf108192184ed727b618e1",
+      "sha256": "0d5db2564ff8f0c1f9a55e194a91e07f6d8c322f37694e57e8854d5eb728308c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_box2objs_chair.yaml",
+      "git_mode": "100644",
+      "git_blob": "2478b7e76b9eafcf29ddcf5890aa5fa7b39f225d",
+      "sha256": "4318dfb3364266bfdcc0a456ef3f5aea49471a848a7d15bd469f9c926ee8336c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_box2objs_table.yaml",
+      "git_mode": "100644",
+      "git_blob": "187202623c0c11c10edc79041cbb32ad22aa0243",
+      "sha256": "39bb031b8eb0018b8ba567801e9c2de8c5f5fc1fc21faeb8c1a1ea317167faae"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_ground2terrain.yaml",
+      "git_mode": "100644",
+      "git_blob": "15275aa91b931b34202035f0f2ec042d9637bf6c",
+      "sha256": "c8d0ad3fa6b9b668abd69e27ad4b08a62a9d251071b1aa099a6002306602af9a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_traj_ground2terrain.yaml",
+      "git_mode": "100644",
+      "git_blob": "8e9db031e20da7eac328102fdcfa4b3112ee7ad0",
+      "sha256": "61d390c7e7d058d11b99dcc09f33ca8ffe20a4353936641982e01e10b6a59ecb"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_carry.yaml",
+      "git_mode": "100644",
+      "git_blob": "0097bd539cf7bbf319b9796a1976747d5384c903",
+      "sha256": "5fcbf8cc6ca58854d1361fe64a97ac3dcdc57625c0746d543f5063146cad9073"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_climb.yaml",
+      "git_mode": "100644",
+      "git_blob": "4b3a89ffec33fd6530b2c7e3601b94d8a8d51c9d",
+      "sha256": "33c849918a616cc0b56858a1375bb284b923f09685aa479e68e1d5ccbddb40c9"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_sit.yaml",
+      "git_mode": "100644",
+      "git_blob": "3fd5af264a756c8c6e1c11d128d46b8be785e87b",
+      "sha256": "c809ee354f7913b45c4d61eefa324907312e6e70abb58894a997d12a28333e9c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_traj.yaml",
+      "git_mode": "100644",
+      "git_blob": "78a27a5ed2ba4335c9e72eb74c70bcd6afca52fb",
+      "sha256": "4c457d0cdc76d36e00aa432022334c3f4ded120e3cf1d8135a0e2c344a0819a3"
+    },
+    {
+      "path": "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_climb_carry.yaml",
+      "git_mode": "100644",
+      "git_blob": "dc017972dc95d6ab6f3eed57164b45844531887b",
+      "sha256": "b4e435887844a55ec8d54bc72233007a2a660230b29a21843ef5045d796fdb85"
+    },
+    {
+      "path": "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_sit_carry.yaml",
+      "git_mode": "100644",
+      "git_blob": "3327625600f9756e826c58e17f5089296f2e8547",
+      "sha256": "2cac5d261df7e4ef19a5b7d1f24c548495f82b4a9b27a81811d825148409d350"
+    },
+    {
+      "path": "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_traj_carry.yaml",
+      "git_mode": "100644",
+      "git_blob": "7f49095c6d8be321b2b011136bfbc9f7d3ee5fd0",
+      "sha256": "eefd26ae4ba62bb0d18ef7cb41a356343346f7e6caf590f3eec37c5cde69e99e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/longterm_task_completion/amp_humanoid_longterm_4basicskills_0.yaml",
+      "git_mode": "100644",
+      "git_blob": "4d307a29367c0082d2b472dbe54edaa5fb890a83",
+      "sha256": "1cf7ae993b29d8975f2aac546a6ae3d2128208e8bf4eb776ac0115302ad697e3"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1.yaml",
+      "git_mode": "100644",
+      "git_blob": "c5e58d060f2094d3cb72725a1fa49dd94235445a",
+      "sha256": "f040c6a735cd5ca3fd7419c77bfeaf88934addc602e51704cb30d76569e1c73e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1_v2.yaml",
+      "git_mode": "100644",
+      "git_blob": "eb1505bf521bed691cbb4a62d5b7bd8d46d7e984",
+      "sha256": "308dfa2bdc4438f4238e985094b5f011d7bbf4b91729d82911b02577c0ef6d85"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml",
+      "git_mode": "100644",
+      "git_blob": "62bf6e40f3b67930f3814cffa38901b1a2fe3630",
+      "sha256": "87afdd9d51b71e4935334366e8f5d24e4d0e4841343cc484f2adebeb80ac6b36"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2.yaml",
+      "git_mode": "100644",
+      "git_blob": "ae4ef0fbb1db2b3d6c4a57b44af11d22bfd7a5f8",
+      "sha256": "e282bace988c038b9ede65584560c5d82af4ec2f3c29c4a5654790b213eed7e4"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_shared_full_success.yaml",
+      "git_mode": "100644",
+      "git_blob": "295da07f5d862efbfd16173e879959fcc1c081cb",
+      "sha256": "524454a365e61d90b51f656fe2e22389132b0a9d03f5d390b5c86b14db2b9274"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_shared_region_success.yaml",
+      "git_mode": "100644",
+      "git_blob": "5d83f8e6b84261bb9a97ed8e9042b31ac65e3748",
+      "sha256": "8203c8fd1b727697c58b4512794f178185657d8e3b061f68ac0e34aaacd29eba"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml",
+      "git_mode": "100644",
+      "git_blob": "9bd8b12a02353126d71a049ba8549d6992a01f39",
+      "sha256": "9e03850df9e3adda0e97970052ba5dccc26d450ef65770f682a0c0375ceca9ad"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task.yaml",
+      "git_mode": "100644",
+      "git_blob": "c55aa15696dcbcb8c2a672a8b58d0a33a8835f0c",
+      "sha256": "de0d4d6a4503937863fbf38257c78ad7c0b171106ecf0bc29f63b5b2b4bf422d"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task.yaml",
+      "git_mode": "100644",
+      "git_blob": "1df3cedf3b45d40f64b0a7dc6815c1a779fc78a4",
+      "sha256": "c502022109070199e9e18443fc4816207022e337b60eeb51d524fb419c97c02e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml",
+      "git_mode": "100644",
+      "git_blob": "eb062a49032cea8694dd2d0f47341eea2f66bc19",
+      "sha256": "1ffc72db6152e52a66bfb61746b0cbde96316ddf1441d1ff61bca68c01bca2f6"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt_disc3.yaml",
+      "git_mode": "100644",
+      "git_blob": "e81a273b30a217791be6dbe2b9a54d0bc92737f5",
+      "sha256": "b024513663196344e80f465d2f86a1fb05c5d5a65b61ae54cee53df71d340478"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_comp.yaml",
+      "git_mode": "100644",
+      "git_blob": "c818d1dc30fc4507eaf5e8dcec5f7fa821f74e33",
+      "sha256": "2b20779e76df3b8f52e0020759f7fef2b6c9c11c56a0f6740d7469972950527c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_longterm.yaml",
+      "git_mode": "100644",
+      "git_blob": "4a6b6bf7ec450255991895d2b98fc02ba80294ea",
+      "sha256": "26aff0476c52787d56b8e45bfff867bf716ad77cc6b2d1a6bd30afcb413a4878"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1.yaml",
+      "git_mode": "100644",
+      "git_blob": "926c705393b99e016444f1fda919643df901d182",
+      "sha256": "6766a164327eb53ce390f3970f11ea09588f3e170a5dff82a5898a7d93fc07f2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1_v2.yaml",
+      "git_mode": "100644",
+      "git_blob": "926c705393b99e016444f1fda919643df901d182",
+      "sha256": "6766a164327eb53ce390f3970f11ea09588f3e170a5dff82a5898a7d93fc07f2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1_v2_fixed.yaml",
+      "git_mode": "100644",
+      "git_blob": "91dc1e3a03a391557cce55bf4e49afaae843dd18",
+      "sha256": "b2c1106191200c9481efb857493f85d7da2430b32695f2fa49a97b4e8f6d6d88"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2.yaml",
+      "git_mode": "100644",
+      "git_blob": "48fbfb011581a2e58e0fba50f29759b9437fb076",
+      "sha256": "d476a119999fa42a2a6c2493c023b2ea4a50e8faf3ec15ac3ab4426c91cee9ad"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_shared_full_success.yaml",
+      "git_mode": "100644",
+      "git_blob": "5029b173ba4ced40721a95481060d353c6dd3ef2",
+      "sha256": "8f87ff57983525e1245658f0e03359a5657d83a2905d0741e176e580dd36443d"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_shared_region_success.yaml",
+      "git_mode": "100644",
+      "git_blob": "bfc833410697cb5c1e29a6ad5f9a3ba916eeedea",
+      "sha256": "42128dce6548c1b278df30a153f41c6dcb774cd48a7650005c333d7941192e1a"
+    },
+    {
+      "path": "tokenhsi/data/data_utils.py",
+      "git_mode": "100644",
+      "git_blob": "cfcbf357cba056e6698c7c8cb3b468a0e921c257",
+      "sha256": "cf848d8a5e311efd8bd96b9ab8ae96e619c154984930df58cae4301753620194"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/dataset_amass_climb.yaml",
+      "git_mode": "100644",
+      "git_blob": "ad60c22dac6b79c9c3077a4941f028a3b6662d01",
+      "sha256": "d96491dca873ded30db918122f63ea1f5f00451b1c4439a2ffad0ab2fa4b972b"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/generate_motion.py",
+      "git_mode": "100644",
+      "git_blob": "3bf310f86698f3295c629af18486b37b086b5d99",
+      "sha256": "a9c69f75ceb47830012aca8bc10f6153484a76e8444c8b5fa1423d9e00135775"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/generate_object.py",
+      "git_mode": "100644",
+      "git_blob": "190f7ceea141fd28a3fe692df8c309865879e32a",
+      "sha256": "facc2f7fd80f4c6a86605d410b2904d56a5965065f46a78e178f1e1a2d0c4736"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/motions",
+      "git_mode": "120000",
+      "git_blob": "ff6cae0cce0cda4d90d1466c40b56de04de9617b",
+      "sha256": "d691ff105c500b91617707f62f6d76cd8c7b59cce03cb82417288460e09b9dd1"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/objects",
+      "git_mode": "120000",
+      "git_blob": "3192cb1a670844828c4d1a39e6e55d5e481e6516",
+      "sha256": "c1e9a0b99560226d0f9f6682223767ab477bf28e8389ce84fec75ba55224f9ed"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/preprocess.py",
+      "git_mode": "100644",
+      "git_blob": "d190545b58a83d541945fbd5fd9a6b54647cdb80",
+      "sha256": "427bbf04a7ab781618300507c52494b5bedf1759407cc45cbd2ba0c681502b27"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/smpl_params",
+      "git_mode": "120000",
+      "git_blob": "44df1b6396436480564c7d75ebdc479f78f5aec1",
+      "sha256": "e76db2325d7c2629fd667792e9b61fd22e538b0511460047e2375ab0c119b80c"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/dataset_amass_loco.yaml",
+      "git_mode": "100644",
+      "git_blob": "98b8ee0516adfc96481d9b549bbaf089ca5a6e41",
+      "sha256": "4a08d4ad777af089d32449157368ac0b07d99ecb3250f39d1036d312dbd9fe15"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/generate_motion.py",
+      "git_mode": "100644",
+      "git_blob": "bb2d285960befd32226a204572f11ac95de54947",
+      "sha256": "2e22ab22276faa71d3f4fb8a75b74820dcdcf4e998d10e289b8404aa9a6c8d9a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/motions",
+      "git_mode": "120000",
+      "git_blob": "1cbbd104d308b5fd06cd978397fd13dd70122d17",
+      "sha256": "678778378af23e85fc0a6408c114628bb799381d85a6768da571ec46b1d40269"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/preprocess.py",
+      "git_mode": "100644",
+      "git_blob": "79d5b2aeb08619b889054202dbc5845ffa3474fa",
+      "sha256": "90b01f67fa442cb34aa8c843e43672c9b292907f454b9a78dc2597404fc51980"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/smpl_params",
+      "git_mode": "120000",
+      "git_blob": "c0f8c6162b5386e97d473cd8ed18b2cbd97e1e47",
+      "sha256": "e008a37d04c048b91b77586d0dd1019643133221610444f588af8c1448f029f2"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/dataset_amass_loco_stairs.yaml",
+      "git_mode": "100644",
+      "git_blob": "44c2487d1553aa03c7e9f5dc8c3390c8ffb23e23",
+      "sha256": "1a955ceb237b1534691d282b34527c6dbcd2874b149dbcf51e5eaea4a2c9281a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/generate_motion.py",
+      "git_mode": "100644",
+      "git_blob": "bb2d285960befd32226a204572f11ac95de54947",
+      "sha256": "2e22ab22276faa71d3f4fb8a75b74820dcdcf4e998d10e289b8404aa9a6c8d9a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/motions",
+      "git_mode": "120000",
+      "git_blob": "547156190096aecbfebdff747cb4daa88c98a191",
+      "sha256": "7dd7696ac4dfb1f65072cfb645a1afb224bc3513173b549b25f7b83d5ce2245a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/preprocess.py",
+      "git_mode": "100644",
+      "git_blob": "b996f78b3788fa02071a92f34ed935a81d72e83b",
+      "sha256": "fe6c99a919e78190e1d811e3df3857af120f44700e1e120c4072827109a99cb2"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco_stairs/smpl_params",
+      "git_mode": "120000",
+      "git_blob": "dbf672e6f9be0823784fde15d39d8e91a986f66e",
+      "sha256": "58f45b5d564686d37bdd25d9a791725abf8f6ffbc05070a5626409a93c1127cf"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/dataset_carry.yaml",
+      "git_mode": "100644",
+      "git_blob": "267ff8fc885f2821336880fbb23e46bae00de403",
+      "sha256": "e8839d47c1b81a633c16bd9a30cb24a110cf1f77c3681b89cc28c0627098f1d0"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/generate_motion.py",
+      "git_mode": "100644",
+      "git_blob": "1acdd49bd862e046f82bb4d74dafc653533b64a7",
+      "sha256": "e03c843d2b3b334e050cbc5d67555c1274a9c7bc17c42f9f2d7138631fd98241"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/generate_object.py",
+      "git_mode": "100644",
+      "git_blob": "80ae5212922d8f6a0416d8d96399b9d673cbf178",
+      "sha256": "b4f49b5b57bcf81ea32ae8dacd4f83a28788322c54e4483fd0d1b3a052ec1a31"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/motions",
+      "git_mode": "120000",
+      "git_blob": "0812a1cb53dd5facd09dc9fc665f04de2364723e",
+      "sha256": "310ad8ce914694e5c2e0cc9b2b17a305f62346abc8bcd3eac3417a24524ecf3d"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/preprocess_amass.py",
+      "git_mode": "100644",
+      "git_blob": "69492b86a2f11485d0301f6e743e7b59ed2220c9",
+      "sha256": "6dfff96b15559ed8917014edb2f9c7430b99a24cc142c6158cd59f4e82679a26"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/preprocess_omomo.py",
+      "git_mode": "100644",
+      "git_blob": "67a7b00d159e40390bee16f38ff9c6694bc98366",
+      "sha256": "4b55a386bade6e1f39274097350dbde79af86a09385672cbff825082ffda9675"
+    },
+    {
+      "path": "tokenhsi/data/dataset_cfg.yaml",
+      "git_mode": "100644",
+      "git_blob": "016b0754df218d81520a2e100be128e0f0a8b68d",
+      "sha256": "bface53728bc1ad14a5ba9c263f87530b16989363b0a87b80f9c5b1f13beb8ba"
+    },
+    {
+      "path": "tokenhsi/data/dataset_dynamic_objects/objects.json",
+      "git_mode": "100644",
+      "git_blob": "6f187268096f45399c1e0577553f47daceb405da",
+      "sha256": "4197ddd1c11f5d6e383eb10a84faaebc95b51050863cd837e2f543939022b40d"
+    },
+    {
+      "path": "tokenhsi/data/dataset_dynamic_objects/test",
+      "git_mode": "120000",
+      "git_blob": "7687b3bdfa32ed249c792767049cc50df9d7f1e2",
+      "sha256": "d3d0b484823de9753067f168b6483268d0bd93db89d09a4c705b9e5a1548a5b4"
+    },
+    {
+      "path": "tokenhsi/data/dataset_dynamic_objects/train",
+      "git_mode": "120000",
+      "git_blob": "de837ae31b50c82caedf43dca8b9b3d509ef9a3b",
+      "sha256": "5a65addba558f4bb2a4ee505f5567f1f2c4accca9d31e19a65649a762bc43bf0"
+    },
+    {
+      "path": "tokenhsi/data/dataset_loco_sit_carry_climb.yaml",
+      "git_mode": "100644",
+      "git_blob": "bd7585fe85cf66db9d82fd20b4e324585bbc1ae6",
+      "sha256": "762c3a4bbd92ab3ea22593987ed34905c702efffdbefafd6f95e475172c90104"
+    },
+    {
+      "path": "tokenhsi/data/dataset_loco_sit_carry_no_climb.yaml",
+      "git_mode": "100644",
+      "git_blob": "149f80a6b2c6df49e5f703f752f8c62415f15473",
+      "sha256": "ed81bbb2bb684a139ddc15fa5bf60bc3a6d9e32ce88bf46c797597131954205b"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/generate_object.py",
+      "git_mode": "100644",
+      "git_blob": "8874adc30f22c70e05f665d4c423e6fca85daf8c",
+      "sha256": "dd1020ac0c684642fe8b34e8e36da1fb9d76801f576fcf2818ca5ad63e27f9a3"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/generate_plan.py",
+      "git_mode": "100644",
+      "git_blob": "e7bb873b1da6a117880b3a981e07d5830bae6fb0",
+      "sha256": "e584372101ccc8c70f0dee5330e688ffe304606acef6b5afb058f8afac02a123"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/cfg.yaml",
+      "git_mode": "100644",
+      "git_blob": "376bbf5089e021072cf4895d1a95cb80e9e233c7",
+      "sha256": "00db0e76f5826d46b45cd8c07c4022501bb95649bc9e49bdf943a3a61edac9a4"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/asset.urdf",
+      "git_mode": "100644",
+      "git_blob": "8e2b22c32b30bbb2fab3463bca1a08737922f9b3",
+      "sha256": "46e3f1fc147c2b0e3b0707df12284ce0db48e79da7230eaba62ac8048d31e96f"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/config.json",
+      "git_mode": "100644",
+      "git_blob": "8922a89c72360b978ba351a3895711d93821c866",
+      "sha256": "8a207a676a14ea8d0f2b97bd6f8e279d349321659df948fa9c6e9fa69ac97a0f"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/geom/material.mtl",
+      "git_mode": "100644",
+      "git_blob": "537dbf900e93a5e0fc4b00ff79fab03f7b28ce46",
+      "sha256": "4575e95bcf87917ffe2b4a3527f869e5d7bed95fd4d931c2dd6c81161c578530"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/geom/material_0.png",
+      "git_mode": "100644",
+      "git_blob": "00af0aa21e1805105c882c60c77cc81a4895a5a6",
+      "sha256": "e8889eb0662d230da8ef2f2b2a0a2adca9e752c15115b8eaf7f5a47bbdc066e2"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/geom/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "6ff205b7bf9d10af3c847e3aad3f19748f3a2ab9",
+      "sha256": "930aa6c2947c90b75cd59ec3ac11c5cc6cba82254c98ebdcf7dde0c692e24d99"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/height_map/map2d.npy",
+      "git_mode": "100644",
+      "git_blob": "8456e233a210dd56364654e71170103603bd39a3",
+      "sha256": "45dc0ab966093e2889a4a249e88e200f78de8fa1b5b68c8918444ee5f969626e"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/height_map/map2d.png",
+      "git_mode": "100644",
+      "git_blob": "dc48e938055feb154d40dbd06d85782cbbdfea23",
+      "sha256": "db6865a84c57616f8de1eb807cf394071e77b1c8d511e67ff348059f9a9cacf7"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/vis/material.mtl",
+      "git_mode": "100644",
+      "git_blob": "7d4f044bca1d7733b1c98d579c7cc04933a0f7a5",
+      "sha256": "0d90fe7d688a6da0b82b0f8053231a1c8986de34aa839f8113ed53a610c09227"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/vis/material_0.png",
+      "git_mode": "100644",
+      "git_blob": "f0341556eb1f8f6c253bb0fa7e57063929868305",
+      "sha256": "7812af5dbfe558e0270c60fd1cf7c7ac60b91b8a35fa29d3d607a9153a278e1a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/ArmChair_Normal/549eba4e-2479-34ae-9f50-1f8a09e64d7c/vis/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "7cfcbdcb477c394892407dd8c29e31206b5bb447",
+      "sha256": "078d6a3868e5c3f4acdc08663bfe9d1510ddec7316f6f248eae275cdd8de8761"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/asset.urdf",
+      "git_mode": "100644",
+      "git_blob": "57a26d99fd25ff25a4610f914c0b89f929d68c12",
+      "sha256": "f0b111e94aa718bec7de3f853852f6d5dfbe9d7a039a47133e8804e03dd22b52"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/config.json",
+      "git_mode": "100644",
+      "git_blob": "3169dc418a247192852fc875d2b131f9e2701a15",
+      "sha256": "751d899ed2cd74b85cf2c3b72ed89f48b8dffc5a80d5196f06738af961bdd964"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/geom/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "34c6ef7a67334ac968bfb5a63b3f3100e4bd6cc4",
+      "sha256": "7ecd1ff2c5ea380a750ec7a1190952c11a2f9a2e88557d6aac1488c64a8e5332"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/height_map/map2d.npy",
+      "git_mode": "100644",
+      "git_blob": "05c24b7c330306fe614f9b15287a7b2385751be9",
+      "sha256": "395647ad2007c62941c1315c0c503b39c5818982b3044edba61b162d75590437"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/height_map/map2d.png",
+      "git_mode": "100644",
+      "git_blob": "753dab424d582f3404969eed9bd4adb5a8adc329",
+      "sha256": "10b9001770dc7aaba9d7c526d0f35c36c00531ea91291114dedea44affbe9985"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Box/box_length_0-50_0-50_0-70/vis/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "fb18b78ac68d5f94b89750b74b0fc974ad9f6641",
+      "sha256": "044162b3f4efd0d80d5f4ebaf92605448e87c17b5aa72766cf48d542c421dbdc"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/asset.urdf",
+      "git_mode": "100644",
+      "git_blob": "e1cea76863b9326b3ce13de7d96b43a41d6200d8",
+      "sha256": "9c7e156b43497f4b5d32aca9d3059409ba027cfab69a368d0eab1a92e197d00c"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/config.json",
+      "git_mode": "100644",
+      "git_blob": "09164bea0f93cb4332c99cc42b35fc160296518e",
+      "sha256": "a95596b3cab94a7ec633643f017037d7720ffc621bdb17da490b029851dd6b1d"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/geom/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "6883c44140aea5ad30bf1ee433f695c03f410dca",
+      "sha256": "b75e1a1e4233ffd1af30fbf50fbec9ac466919bd354753318420ea8693d9d6e8"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/height_map/map2d.npy",
+      "git_mode": "100644",
+      "git_blob": "4815859a6074c56e626ae8f54353b92f358153df",
+      "sha256": "5cc41d3c1d5353b08b7de487e6371c757e8a4dca3f24058a50a6bd27c9661f6a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/height_map/map2d.png",
+      "git_mode": "100644",
+      "git_blob": "b8d4bdc5feb13b28f0f1e03f1941c0b66fdb7d9b",
+      "sha256": "be4c3615c3319a554b904dc75c9c3afc5424ca3fa5cb8e26d6caa454b356c7e7"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_0-30_5-00_3-00/vis/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "40d76b5d883f0938b6928e66f15bff7120aec461",
+      "sha256": "cd6ca9e2e51eb8c49cf0826ef7636ae8570e257fadd53de24c0a909c663458f9"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/asset.urdf",
+      "git_mode": "100644",
+      "git_blob": "f597f3aafd41edcbf9e9e36bac360c6d5da5223b",
+      "sha256": "324e180e9539ae59a299eed66734aee4cd44e4765682a9ea014abd7c1ce262b9"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/config.json",
+      "git_mode": "100644",
+      "git_blob": "81568140b3e0c8ba51ee0b676a92358fbb6061c6",
+      "sha256": "d8ae900d7a2ccbe832b86ab8b393d48fa36665da1b3ef290518ceaeeab5da633"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/geom/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "2ebd3c7bfc036e576c749dfb2ce7067d65b43c32",
+      "sha256": "17041fcce4b177a9c28ff04f3e2240a7e32915cda75ccd39d448fb2b2331f8b9"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/height_map/map2d.npy",
+      "git_mode": "100644",
+      "git_blob": "ddae96c86ce603cfa72685f577cba59dd42563d8",
+      "sha256": "1fdb3536b2bbcb5a057d23f8784ee5990facf4b3da2890c21c6fab74605c3ad2"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/height_map/map2d.png",
+      "git_mode": "100644",
+      "git_blob": "175f60b1867e8b79359d05d7075bd4235850dd6d",
+      "sha256": "fa5eddfac222d794224653a3daa20eb50c97c7aaa09667ea3c36f39a589cb234"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/objects/Obstacle/box_length_5-00_3-00_1-00/vis/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "a47dfa766811eb82712685d5e4d3b30bdc63f499",
+      "sha256": "6e5b6e8ac1f125db521647db0b0f29a0218a4f909d91445d784ad2094e957a09"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/ground.obj",
+      "git_mode": "100644",
+      "git_blob": "063984651875c7c1d27f3daa2dc3c718aaabc28b",
+      "sha256": "25a7a838f1c5c0f7d46e573a09545c1b00999adc2b4182f562eeb56a423a11cf"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/humanoid_init_pos2d.obj",
+      "git_mode": "100644",
+      "git_blob": "4b1313e8969d815c26588b1906e323f24baf118a",
+      "sha256": "747df21bb4bc29582fdca49349fde8d6070561db889f6195209a79b793c11fe5"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_0/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "96ced44779d830a8d17629ca49499ea6296a1b3f",
+      "sha256": "cac5aef3aa7af35631d25d8793fe29b99354bd763041d9f9a1a747ce1ce3615d"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_1/material.mtl",
+      "git_mode": "100644",
+      "git_blob": "537dbf900e93a5e0fc4b00ff79fab03f7b28ce46",
+      "sha256": "4575e95bcf87917ffe2b4a3527f869e5d7bed95fd4d931c2dd6c81161c578530"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_1/material_0.png",
+      "git_mode": "100644",
+      "git_blob": "00af0aa21e1805105c882c60c77cc81a4895a5a6",
+      "sha256": "e8889eb0662d230da8ef2f2b2a0a2adca9e752c15115b8eaf7f5a47bbdc066e2"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_1/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "d41b805f7aafc3e7d5b303032e6996cb1b1ead24",
+      "sha256": "5fa887703982262cc0aa5cf3dac51b599af59e109847f89e481ca40a158454a2"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_2/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "07730e728dd7b64f77d8853e861fa2a652fc0570",
+      "sha256": "27852d6097ee804150d7201e3c2f7037ae652462d06eb9ec828279fd91547975"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_3/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "8e12e85b51bd12b093370ee1be2fa34c730b010e",
+      "sha256": "ec5589240872721d1e7fd569f38deb53894738b00c4469381667e51693ca1fde"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/obj_4/mesh.obj",
+      "git_mode": "100644",
+      "git_blob": "0baf9f1ac198abcae76b299cae0c1b3c351127ba",
+      "sha256": "69b294f6a1a4c6cbb37022b44cfa936f189de8a6211f4afb9231d0501bf4f408"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/tar_pos_0.obj",
+      "git_mode": "100644",
+      "git_blob": "084dd532093a6d42524e4e9ae9621c4a4f9ff29d",
+      "sha256": "b3dae385776ebec6e9bb5324da8ba292dfca8841226ad56b8f8a76f57666ab7a"
+    },
+    {
+      "path": "tokenhsi/data/dataset_longterm_task_completion/task_plans/4_basic_skills_0/vis/traj_0.obj",
+      "git_mode": "100644",
+      "git_blob": "76b68791a46626393c70296c741add525e5b8451",
+      "sha256": "54f88d969d849b6a5b98562d03a1bc6e4c52faff190e59e3a052341c6f56e74e"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/dataset_sit.yaml",
+      "git_mode": "100644",
+      "git_blob": "d14ff05eb6fec9014409a2fb02b2cee2ea4aabea",
+      "sha256": "3eec2532abda8b589d957db4a347a558552bd1c6e48f451c95c6d5260e21b246"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/generate_motion.py",
+      "git_mode": "100644",
+      "git_blob": "fb57d06ad5e08094cf2de84e9aa40f1650c0dcc9",
+      "sha256": "ccbcc2ee43792dd4d6d86a99a1dbb19f74eca27834fae78ab06fd5d26e5ff5fb"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/generate_object.py",
+      "git_mode": "100644",
+      "git_blob": "8603a11520ad2ad88b66f716b7f1040bdf319574",
+      "sha256": "6167375aff13bde66c9bf21b1825ee249cf954baa0385c4dc99c226680bba1b8"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/motions",
+      "git_mode": "120000",
+      "git_blob": "f1a664cef259b434b3331116e0a404721ed686ff",
+      "sha256": "8370f11d080e181fbb0e303cb3de9e3d5695111740c377595700249e85837146"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/objects",
+      "git_mode": "120000",
+      "git_blob": "86909a95b98d36a5c30a8520b5e525ced5bbfb1c",
+      "sha256": "7498b964c7d3078a488c4e264f465057dd00ab67ebd90a4b5354d320c579e553"
+    },
+    {
+      "path": "tokenhsi/data/dataset_sit/preprocess_samp.py",
+      "git_mode": "100644",
+      "git_blob": "cab2ef4b4b51b43ed57f16b04c5c2f05dcdfe13b",
+      "sha256": "5dde1872b03872a7e2cf6dbeacb4db396207f5564348c1a3b2eaed010126fa30"
+    },
+    {
+      "path": "tokenhsi/env/tasks/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "bc6ee169446e3ff481659f963b550b39fd9f43d3",
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_box2objs.py",
+      "git_mode": "100644",
+      "git_blob": "4820a10f7e1e8234ed90d2dafac42ff2d74a1f7f",
+      "sha256": "2e318d8602eafdf38a8f07e22cf82b130d145b28d8cd70b4a2d124823864a705"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_ground2terrain.py",
+      "git_mode": "100644",
+      "git_blob": "e3f41547136d55572da1b62761cbd592c7e72880",
+      "sha256": "0905fae47db9db5982a400ff433f543ab378e0d1f480cab163745daa34060d2c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_traj_ground2terrain.py",
+      "git_mode": "100644",
+      "git_blob": "784befb4da98f77c15d320d9f9be0904ebbe6c14",
+      "sha256": "9460995007c53c673d390924c508b6116abd18afe059db0d650d08daf277febc"
+    },
+    {
+      "path": "tokenhsi/env/tasks/base_task.py",
+      "git_mode": "100644",
+      "git_blob": "2c697c8a8ddd2818b5a33029c0c9365db7aa1595",
+      "sha256": "b43ad85990486c66ac5b56af11416c339e9a2c530deddd6dd2e85f123eb1f609"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py",
+      "git_mode": "100644",
+      "git_blob": "51bd4b2ffb8cb5ca8825259e57002e6010cdfc41",
+      "sha256": "6d942e993b76fe53af1595072c216daf775bc713613159971be0674539e3bf85"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py",
+      "git_mode": "100644",
+      "git_blob": "62e63d6c493cf1445006c96fd28b1f50872ad9d2",
+      "sha256": "3267ebc9896c3dabedbc4da5e7ecd1804e73b34ba5c73e72de2f37669cd9e1f3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py",
+      "git_mode": "100644",
+      "git_blob": "f25007b190cef1bf187a963761a307a8f004bb43",
+      "sha256": "edc0f5be85c9ab43fbe1938f0792f5f264d9e455c3551aebfd36d018c6501df0"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_traj.py",
+      "git_mode": "100644",
+      "git_blob": "b40362cdf1ae643bcb12611644c345616d3e3ee6",
+      "sha256": "61db1fb19e881df70b87c592c079c860c8f3d57a24314bc7eaaab6e376eab360"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_climb_carry.py",
+      "git_mode": "100644",
+      "git_blob": "4c44126df725f400d03117f83aa3bfe46520ab56",
+      "sha256": "e3620cbf210b0c794a30e6179a093bcf3a6e73fa9cd94ad0be08091834f6cd0a"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_sit_carry.py",
+      "git_mode": "100644",
+      "git_blob": "2d04c967f8c95a7627e1e80cb7a243105383fc3c",
+      "sha256": "c5275bd8cf33f298c556cef627192b2567e2394297d74014de20ec1a735d7318"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_traj_carry.py",
+      "git_mode": "100644",
+      "git_blob": "1754fb75abd1a5f1de6f6799e07bbe749e172d4f",
+      "sha256": "6904967f2333c522512209e91e2ac299ab59835fc43efba691e029a9610acbed"
+    },
+    {
+      "path": "tokenhsi/env/tasks/humanoid.py",
+      "git_mode": "100644",
+      "git_blob": "ce7eed87f85553eeee1ee3eef7daf32e328549b7",
+      "sha256": "07b3608ec87d8501b79a4c030cdf710d8457bc1025503c9cb4b211d38995c1b4"
+    },
+    {
+      "path": "tokenhsi/env/tasks/humanoid_amp.py",
+      "git_mode": "100644",
+      "git_blob": "7e7f19e69c38383253d1a52befbaf4db4210c0a2",
+      "sha256": "21a271b18827a1f11a577197f959c8ac71e6319a9b1a4a877834f49c3fa0fa74"
+    },
+    {
+      "path": "tokenhsi/env/tasks/longterm_task_completion/humanoid_longterm_4basicskills.py",
+      "git_mode": "100644",
+      "git_blob": "02a228a0f6b3e57a2c68646492e78a2d661e655a",
+      "sha256": "19fca0c3ee200588621a0344ed3ca3120d4a3732797ff8aa6fce6a7e4a5d6680"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/collision_reward.py",
+      "git_mode": "100644",
+      "git_blob": "882273002ca271eefc54568ea7da9e0996cc70fd",
+      "sha256": "c3db37e73ef2a42b9967e87849b965b66c7c45ee57f82d87f507107ab5cbcb11"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_reward.py",
+      "git_mode": "100644",
+      "git_blob": "1c12555ad4cf5e35ce475eb57ee9881328c9d217",
+      "sha256": "d151c48ef8259a0539ef8f36b5be9bd7367749a86987582cd8efc170196a198d"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_task.py",
+      "git_mode": "100644",
+      "git_blob": "3cca66a955b41803a0d9fb631ebb959359f52eab",
+      "sha256": "a90aa996277416fdb5d043bb367acb5980c95b00cfcd855fbc5a73b6bf6b7f6b"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py",
+      "git_mode": "100644",
+      "git_blob": "4813331b9a555861b7f08d08b087748134d26816",
+      "sha256": "9780af2f2838a3c8e899451340b5d73b1f5c747618c4764b3b75722abecc8e1f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py",
+      "git_mode": "100644",
+      "git_blob": "46c76f6c4fde0fc0ba2aa148632ae1864ab4e597",
+      "sha256": "dfbc0270643b1cc8264e1d12d9431ecfe64391a5701009d058786d6191078ed8"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_task.py",
+      "git_mode": "100644",
+      "git_blob": "c3dcc5a2d27c32231096aa699eeb7616addf75ef",
+      "sha256": "2c871ddb819520583a019caa17d0928a975e09492b8e737352687c52cedc077d"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py",
+      "git_mode": "100644",
+      "git_blob": "d164e28e0540eb61d690be5f340634dc1cb5211a",
+      "sha256": "60adaa5c8c9586e9cade03e4af1aa462ecc44c3ab9e20d3c43307b81b4652d2b"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma.py",
+      "git_mode": "100644",
+      "git_blob": "ae4ed0927a4ff6551a63fd21c37c532f9308100f",
+      "sha256": "50198b4ed2a8e53fb035a4766d4f8b7021c2978b54f5d6f41b302c46d071c5df"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py",
+      "git_mode": "100644",
+      "git_blob": "0d9f297eb98adad1b6329d53fdd19a00d2c0b8bf",
+      "sha256": "3e1bb680c346724f640cf2c4f0460735d8aaa7a1df2bff07f790dd8898abc8d1"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_shared_support.py",
+      "git_mode": "100644",
+      "git_blob": "f853bb91ddc46d700fff2bb00c7ae58aebd16bd3",
+      "sha256": "f12cb3576fa649bc433f632b87278e30ea24d5285f9807d5af7f2173c5bbea62"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2.py",
+      "git_mode": "100644",
+      "git_blob": "57e5d2ce17c32fd57c90afe42215c1ac7985ba0c",
+      "sha256": "1eeead2e93ed91968fab3cf5b51cf603145d6ad7218f60f9a59bfa687d737a3b"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_diagnostics.py",
+      "git_mode": "100644",
+      "git_blob": "e9d405c180c756dbbdfc1fe3ae252cc39e801638",
+      "sha256": "c3e6dab6813f66ee321c02cf833c1e4b743baa7746447eea860f10857d9a6a98"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_reward.py",
+      "git_mode": "100644",
+      "git_blob": "c2063874e504ed18569154ba82ca17a052733925",
+      "sha256": "21df5afe31fc05e2a2b25e2adce5d238461b0b8f8c0ff47183f525184c58d773"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_features.py",
+      "git_mode": "100644",
+      "git_blob": "3dec40f880a49dc5d2cf1dd03d381f2508db8cab",
+      "sha256": "cb86d1abfc4fb511440182d49dfdc62e251c5079be36a72c789842f4d67322fa"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/shared_support_reward.py",
+      "git_mode": "100644",
+      "git_blob": "f7e8f87ff2555785f392dcc708e72c13b2a79e28",
+      "sha256": "ced3fdfd3ca948ceefdafade3aacb6c318666c6394e838e86c3dacd1435dfefc"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/shared_support_scene.py",
+      "git_mode": "100644",
+      "git_blob": "e3a0dad2fdb25ce1ff60323a5894d93d60a84729",
+      "sha256": "a386db92d77d4943016b54305d21f99040e78002e7c826f69b54ae4e720edbf2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/size_rsi_cache.py",
+      "git_mode": "100644",
+      "git_blob": "b33a1399872722920e4a8aaf72eadae9a9bc3e30",
+      "sha256": "dc27aa8dd9f460266be8a0fedbd9479a6c32eff6cfce4f3e5fbdbe0422dfbd41"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/stage2_scene.py",
+      "git_mode": "100644",
+      "git_blob": "aa832da259b6ffeb9f664101cff459b37d14a167",
+      "sha256": "840763da44d957f25776c2ae017495b86993a27228713656923cff61677d1aa5"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/stage2_solo_rsi_cache.py",
+      "git_mode": "100644",
+      "git_blob": "840bb032403edd0e50ff2bec45dc4fbc1ab931e4",
+      "sha256": "47b1b3f5427f2ed86ca6e91278413a8a8546a9c145cebf93eb320342e86095e0"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/vec_task_wrapper_ma.py",
+      "git_mode": "100644",
+      "git_blob": "d3f6a28c7203d8631c7428072194038c46ac8e9b",
+      "sha256": "c1dd89b2eb5b70ce56ecd1426c58e10979d3a083307a9e77f602d67c8757878f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_task/humanoid_traj_sit_carry_climb.py",
+      "git_mode": "100644",
+      "git_blob": "99513486afa827a94babc6d86ba4d18613db6217",
+      "sha256": "dde2f49d687a167e14fc0d47a33e171b70e65fe343c9ce4c2f12d36221b6c2c2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task.py",
+      "git_mode": "100644",
+      "git_blob": "356e9e47e43ec8f334d4f07d8c804cf55779ed41",
+      "sha256": "33db038a7183fa74025fa6e11bbfbcaca54f10f72e52e97910196060f84000d2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task_wrappers.py",
+      "git_mode": "100644",
+      "git_blob": "2b4dbade73f637cd78f0230fd8216c982b39e1e4",
+      "sha256": "be3001d8b341118c556d1ccdc9d91f5c4f8ba4edd31cabb8db63f1f015a3f4c2"
+    },
+    {
+      "path": "tokenhsi/learning/amp_agent.py",
+      "git_mode": "100644",
+      "git_blob": "4ea6d02618c7610524654468afc378692f6e5bdc",
+      "sha256": "b20fc99f97e14299ed8dc9f01cb4a04b9d650fd3ae86ea5c3e57084c74d557e8"
+    },
+    {
+      "path": "tokenhsi/learning/amp_datasets.py",
+      "git_mode": "100644",
+      "git_blob": "e960b2ebeb51266e91d4ce30620d680ef9b3ecc0",
+      "sha256": "8e2802113413e9d88e31559c1b3b8b233ae1b6f4b6b9e82440eb0f0aa1eeebb7"
+    },
+    {
+      "path": "tokenhsi/learning/amp_models.py",
+      "git_mode": "100644",
+      "git_blob": "5ff1d0084b62dfffecd855827b404e300552437e",
+      "sha256": "d92aa96243f8cd10b85b7dca4d11bdd8a67eb02a6242968b2253e260877097db"
+    },
+    {
+      "path": "tokenhsi/learning/amp_network_builder.py",
+      "git_mode": "100644",
+      "git_blob": "f3d5155fa1b39ea682bdae04d2a8008c1f66c448",
+      "sha256": "a51179a14690d50467e0161f1afdbe537c1670463d7a20782fe4687c19695d68"
+    },
+    {
+      "path": "tokenhsi/learning/amp_players.py",
+      "git_mode": "100644",
+      "git_blob": "2aac5ef8042e8be1ca045dc6aed7fd5b06c7fb0f",
+      "sha256": "ccc382cd71962d2fd3d1252ed9ac18d141289cd63b1579f1c40ca811d69c03f8"
+    },
+    {
+      "path": "tokenhsi/learning/common_agent.py",
+      "git_mode": "100644",
+      "git_blob": "16af601298e11e6966ccb0e22fe32852883927f9",
+      "sha256": "8e90235fef14465040be1bad875fe9f3de69b94f391a2b788e1463ec99620187"
+    },
+    {
+      "path": "tokenhsi/learning/common_player.py",
+      "git_mode": "100644",
+      "git_blob": "ac4e626a0df53ccb174b5e5be76cded74c83003b",
+      "sha256": "bd37d2597217e9258dc6fad0a27500e1e7a26c8246643f1a7b5198a7d6199b45"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/amp_network_builder_ma.py",
+      "git_mode": "100644",
+      "git_blob": "db7ec9f8581ae5193fd61b52d1bf0a75980ad646",
+      "sha256": "1033a2bdadfdba7c3abd135fa45eace529baeab89295e44407f72dd79ecb3d71"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/edge_context_eval.py",
+      "git_mode": "100644",
+      "git_blob": "daeb74319e832e8f03693d7a1800c7f9d091891a",
+      "sha256": "3f5a25bb037727fd7e12b45a00ac3c7c715b025d66b1e84df9acd1c2c87ea8ea"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/grasp_view.py",
+      "git_mode": "100644",
+      "git_blob": "65fb1582ef91ef08c824b9793ad9001886053f91",
+      "sha256": "91bc694e81e056ea83fc10fb3abd3c35753030e0bd4024864ec59176ba8c11dc"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/human_coordination.py",
+      "git_mode": "100644",
+      "git_blob": "43c600907ee089b7b38bb1b7da8da4394d3769a9",
+      "sha256": "55a4a2cd9d81f62a3e9bd53e7f2773289a4adbf2f56d9370ff1a8a77253eda29"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_agent.py",
+      "git_mode": "100644",
+      "git_blob": "0a332108f932f158164f2a8dc9975daa3b8c4d45",
+      "sha256": "02d768b4b139d53815831421d56770de27509f72e7b7201b4fa9c55eeb439460"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_players.py",
+      "git_mode": "100644",
+      "git_blob": "65b5d73e31cd68e76928d0269d88e10db294dc58",
+      "sha256": "2b14bb676506c25eb47dc52f3eeb3b1bb3b287b2412329584bd8d5d5d9c864c1"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/scene_normalizer.py",
+      "git_mode": "100644",
+      "git_blob": "a63cfd1607ec4b4cd407d822eee66e19fd0d32bd",
+      "sha256": "40085d119636e6b42e41f54e411f428761ecd73003b4c4b7e834de7866a6c976"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/shared_support_network.py",
+      "git_mode": "100644",
+      "git_blob": "8a2f1258f440194739a1a177e32cc6a740abb602",
+      "sha256": "641b05f132c5da6f50c422e2c15bed9c4a0a522d83c14adbd13e628e2366ad24"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/stage2_network_builder.py",
+      "git_mode": "100644",
+      "git_blob": "48875ab3782abd332ed5ad1b667887cb16170115",
+      "sha256": "d84d3ad93b19c1e21094bf876d83dae1443f82196c649a4fbbbb03e5aad655b5"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/task_role_encoder.py",
+      "git_mode": "100644",
+      "git_blob": "6b42f7057222e038616f40ccf2a45b03f74be6c0",
+      "sha256": "cefbe99f7694ecd414cf82b9eb3501d0e7d2f83f89d84f20677c11123bc929b8"
+    },
+    {
+      "path": "tokenhsi/learning/replay_buffer.py",
+      "git_mode": "100644",
+      "git_blob": "5c5e7c77aa1e7fa3f2f34e371c3b960d3bb580d7",
+      "sha256": "9f4097a1f3ea44d132d18dc0b72a9141051c093b193443e4e9bd578d28844a5c"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer.py",
+      "git_mode": "100644",
+      "git_blob": "ed73b1d09e651e896dbd2cf1cb7df126c46541f2",
+      "sha256": "efda485e1375fbb3d7a1f86bd182b2585861490e8a08f434b6dbfb4f515577f0"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_adapt.py",
+      "git_mode": "100644",
+      "git_blob": "477defc3d17197d0f0f1d0cd08ea77890b96e421",
+      "sha256": "4dae24d8d42b31a8cda12791fc2f9abb8d69700be4c6f6d954f5662a3bb54890"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_comp.py",
+      "git_mode": "100644",
+      "git_blob": "72beddb79e3ea1c065eae20b74c4a5e277d1c614",
+      "sha256": "188f612865a4e39581d6be57eae19b6d7eeedb5b51bf19bcfc54176657f446b2"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_longterm.py",
+      "git_mode": "100644",
+      "git_blob": "524c81c34241fe3b4044b861e734c3bf5d100b79",
+      "sha256": "f0e6a6113e5303ea89778916ee1ce08d17a504ea038fbe55f491789ae503bc8f"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/composer.py",
+      "git_mode": "100644",
+      "git_blob": "652b92e9ae70a4c89e901b52dfd7c0fe6a372769",
+      "sha256": "03716f77a57353bc5008ba217c66c775e911197be4b766e7485a7dda84265cbe"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/trans_agent.py",
+      "git_mode": "100644",
+      "git_blob": "24d8b7efc969c0dee70e205ec921c6c8d8745791",
+      "sha256": "46d8322c8203966b5bb6b56accc09d53f0ea6385614102036f797557a2db772e"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/trans_players.py",
+      "git_mode": "100644",
+      "git_blob": "a5d6264da96a1b63aa8dbd0b1353c114d53f8cdb",
+      "sha256": "40b57c33012a0c0db13c697fa425804143fccdc76eb7fb1bc81e2021833c2bad"
+    },
+    {
+      "path": "tokenhsi/run.py",
+      "git_mode": "100644",
+      "git_blob": "66624ca10eea0e1359e67962aec278eafb7ee1d1",
+      "sha256": "41b5e95c13db566c5b4cc9a0fed6c8b4953015830c1d46f133135f78332e11ad"
+    },
+    {
+      "path": "tokenhsi/scripts/gen_data.sh",
+      "git_mode": "100644",
+      "git_blob": "24263ec81e68753ca6852e374144ba6fdbe8dc70",
+      "sha256": "49356f26a57806e3cecd1e42fb2a8ec2eab47ebe8401afde2681c6cacaa4eb9d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/gui_gpu_env.sh",
+      "git_mode": "100644",
+      "git_blob": "d1a777585dcf85fb248fbb7f310584ab120f76d6",
+      "sha256": "211087f9d9b56a37e6bc94431629430a399234051dcc4a94be6ea2e2b921d1cb"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/mps_auto_env.sh",
+      "git_mode": "100644",
+      "git_blob": "3ba3fd2005985485ee8f026a3167f1516a02b49e",
+      "sha256": "97901b4b15844d52951930dc4fbfc803b7029a6eca1477a371413a297d92ee30"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/output_paths.sh",
+      "git_mode": "100644",
+      "git_blob": "a4dfeed8b5904d15d950b6cb428537c3b5e6f715",
+      "sha256": "54915a27a4999f2db6e25d05df85a05c9a5742ef0734015f946b711a54f6f71b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/run-gui.sh",
+      "git_mode": "100644",
+      "git_blob": "f71ece8257a16397d4e1a2e645e944b697776c5a",
+      "sha256": "c2546582dcb62a8a816210af6db5132b1a7d8967acbdc536e29b292a71fdc27e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/runtime_env.sh",
+      "git_mode": "100644",
+      "git_blob": "b453eedac20ff226c381aa4a841932ce19aabdff",
+      "sha256": "8c543aa8d9298dd7a52656e93cbf32b494547dff0c1eda9d79dd39b790bfc0b7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_test.sh",
+      "git_mode": "100755",
+      "git_blob": "806a0d123eb7dc880b41b42ae40eda95a036734c",
+      "sha256": "eaae9b552494a40c119f56d3f327913f26297b2de08da5dfcf41c0e943bafa7b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_train.sh",
+      "git_mode": "100755",
+      "git_blob": "5b36921100dea87eaaf99480761c1736eac2f56c",
+      "sha256": "4f249ba9055e44370f8200a0eb25091410817b121ab612eb11dee291315ff817"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_v2_fixed_test.sh",
+      "git_mode": "100755",
+      "git_blob": "5ce4f60638290b4aed027c3c9fb98be23c4d9dfc",
+      "sha256": "1c5189c5dca0501ea86a5665db41ec29e76936f405a02a17148bfe6d35d225cb"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh",
+      "git_mode": "100755",
+      "git_blob": "514939e2a9a5d6e34dc3c6364c26dbc9adbeca1b",
+      "sha256": "cbc8bbb96559f793dee8c57e3119b61eef2d4df4e6ae9159a529442a1d3a471e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_v2_fixed_vnc.sh",
+      "git_mode": "100755",
+      "git_blob": "6e7d86613f81638db02956b82ee88cf346bef83d",
+      "sha256": "e8acaac664d6b1b4057e9cf9f2685bc93aa522a8dbe64c6cffd46b0747c1aa48"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_v2_test.sh",
+      "git_mode": "100755",
+      "git_blob": "b0996360f59815773f2d9e289f1cff4dadc208d2",
+      "sha256": "fd5eec05ba9ced3373465fd8ddfc51fbd9fc1d7b244763901ccbe8f03f44663b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_v2_train.sh",
+      "git_mode": "100755",
+      "git_blob": "2d259411be2052f39ded0551a406acd9dec3bfd9",
+      "sha256": "ab4947d91606d800eb3726bc6254fe4a48e50398424febfb2950de2c110931e4"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_v2_vnc.sh",
+      "git_mode": "100755",
+      "git_blob": "a57b772ae601461a58de8872b66740a001821d1b",
+      "sha256": "6f2406501635dbe742a5a7c0c34ad6c2179289bd543d5951b57d83ac2c74d2d7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_vnc.sh",
+      "git_mode": "100755",
+      "git_blob": "41f0426742d08e67536f12271e2a5d38ed28f7be",
+      "sha256": "c1724f83093cb749f2d7d4c285fc795133cbe53d55b99813a696a9bc141dc015"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_shared_full_success_test.sh",
+      "git_mode": "100755",
+      "git_blob": "d49313d767b67d4aac5083febd34c45f65c34834",
+      "sha256": "d1705b469ccba014f079b95b6b1545656b40964988dba7a1717b1fabecb52192"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_shared_full_success_train.sh",
+      "git_mode": "100755",
+      "git_blob": "5c8005c30b72df0aabcea80e336707630e16d7f1",
+      "sha256": "364be9d0b1aad74cf9e6419b9928eda66b01c7ed991c3012226ca2ef1efd6f32"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_shared_full_success_vnc.sh",
+      "git_mode": "100755",
+      "git_blob": "6ab8cbdfddca8d69c722c9f973cb47fe2b038d7b",
+      "sha256": "f7411c86131b7002838ed57728320443fddca7e24dbea4a6696185471592e2b8"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_shared_region_success_test.sh",
+      "git_mode": "100755",
+      "git_blob": "eddfefa3f78bb71cdd045cfad58fe4384fe058b3",
+      "sha256": "ecd1d1cc348eb32d3f721f61e0bbc407f0014f6727031b09491b51aef7d749da"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_shared_region_success_train.sh",
+      "git_mode": "100755",
+      "git_blob": "588e000877fefc301b9bc6a14dad0a322b9015c1",
+      "sha256": "83147775835aa6871521780131230dbe1ac3b699286df8ee7ef09d5277ed7c3f"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_shared_region_success_vnc.sh",
+      "git_mode": "100755",
+      "git_blob": "8e24afbe8b59304b85628f70843c9f4e944f0427",
+      "sha256": "79ed950a49af5bc7c5d10fec80eb3ce872b1510ee5836f7bd79c763c877ff812"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_test.sh",
+      "git_mode": "100755",
+      "git_blob": "81fbcc1555300121b6b305847ebceb202186dd16",
+      "sha256": "1a1495c35029bcc0af29fe18e2bab01eec857d96aa9cac8a80fbd8319531ecf0"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_train.sh",
+      "git_mode": "100755",
+      "git_blob": "705efd19ae193b64e552104621aa6acb9a48d213",
+      "sha256": "b968434f58f8712494956dadf59ac1690f6ffb985c64e2c88a5268bd9484a9d1"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_vnc.sh",
+      "git_mode": "100755",
+      "git_blob": "4764edceea32eae5747a673f9817568ad2fd24d5",
+      "sha256": "e8713bdc78235f952fd4434af8f05ac635014d91a988273478eccf208d29555e"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/carry_test.sh",
+      "git_mode": "100644",
+      "git_blob": "417f599703a060807f9688fa9eb282f3f7af0a81",
+      "sha256": "93969cf480e5b60165d537f57980a45c3661d12f056b2c15bcf07390a9482cb5"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/carry_train.sh",
+      "git_mode": "100644",
+      "git_blob": "f8fc219f1e3fa0d5fd01fa61cd7236a7ce206bb1",
+      "sha256": "ca9d1007a16f1dcfbf6f6833a15e98d7452f773057071c8d1f94770094d425a7"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/climb_test.sh",
+      "git_mode": "100644",
+      "git_blob": "df9302ff98c981676369eb4e60d77b3d128c9cec",
+      "sha256": "75933119c99360fc133cdc65f2b57d4f40a3c71f2bc1244d389ed55039e1a372"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/climb_train.sh",
+      "git_mode": "100644",
+      "git_blob": "f2f1cacd58f432dd25fb85d84dde29766c206e1e",
+      "sha256": "9be63266f193f6a7664903e800137c4908ecb5a1101689f19b57965a46fc9d09"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/sit_test.sh",
+      "git_mode": "100644",
+      "git_blob": "df1a4f50648d84cbdd3ae729f1654c325ba71c67",
+      "sha256": "cce907a314b4bc42ba035c468b47650697699e58ed4c783782fc7bdfd9d067fa"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/sit_train.sh",
+      "git_mode": "100644",
+      "git_blob": "fdd39e7eabe74ee403a8fccc4bcf1ac2810a064b",
+      "sha256": "a4b180a107bfbb6943635fd3fabbedce63fe7dad577211cb335e8aa7380ec901"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/traj_test.sh",
+      "git_mode": "100644",
+      "git_blob": "a04855cb9927e16e9400401c44f06e0268a34e80",
+      "sha256": "5ae970ae6dd5b2703adb9f91b755f745788706fddc70609b37c8ed502157b286"
+    },
+    {
+      "path": "tokenhsi/scripts/single_task/traj_train.sh",
+      "git_mode": "100644",
+      "git_blob": "795aaab9de865b4e322e321acec7ab916327cec8",
+      "sha256": "57dc7295618f4438f5f0bab76470765c1858bc66756d5bbdfe2ab22e40dd89f5"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage1_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "b63a71ec44e143b77a2316ad3f98910c8a991fe3",
+      "sha256": "ca8021564b2689f8fbd24dc42734bda968c709d187fdb7c6346564ba175ae02b"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage1_test.sh",
+      "git_mode": "100644",
+      "git_blob": "28d84efc933a5785433a6166942880b4339a650d",
+      "sha256": "bc4d59ba9d59863737ca7943794269d4e26fc2bd3536e77540f536e558f7a94e"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage1_train.sh",
+      "git_mode": "100644",
+      "git_blob": "fd38c1739ad14a144b5ffa3ac8e33687fbed3007",
+      "sha256": "08100a97462945c5625e56ffb06f09372cfd059eb781ac016e4685830ed56ba5"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_climb_carry_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "423892e8c27a396ef2747dcc6267638f28c013c0",
+      "sha256": "fb74e076038904ccf2993aa87ca28ca08e1a3931c87007f0d5b6ac1967d77327"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_climb_carry_test.sh",
+      "git_mode": "100644",
+      "git_blob": "e1a2fa0b1954a45c9983c3b711369386df60f3be",
+      "sha256": "de74e97b7142438629d4c1bbe3d43ded10c91abf211c436bd7d4be5fad6556a9"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_climb_carry_train.sh",
+      "git_mode": "100644",
+      "git_blob": "42658dcfdf3f8b5ae0ea0d1e5dce2de8ef0645a9",
+      "sha256": "a5fd9ed10c120da6c82b73a1928e409c6406961aae1493a98fa490d7a7b0ccd3"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_sit_carry_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "5d1a7026fb4afc4e73f13ec05835e3047234adcb",
+      "sha256": "06cf47aa33e19275a03378a306c10fc5b9c184a7bdffcfc99884f0a3bc7d0f2c"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_sit_carry_test.sh",
+      "git_mode": "100644",
+      "git_blob": "bb97afc687e1d2c2a4e3ab71e14b53aefd688cb4",
+      "sha256": "bba0aaf2adc31b4d228bfac759a84cc64ffbf17dfe2787575e54015a180c14c3"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_sit_carry_train.sh",
+      "git_mode": "100644",
+      "git_blob": "20fbf2d7128dc1ffeff8a9c82fcaeb5e7f28f662",
+      "sha256": "6f173e481d234a8e75f1aeb3d8ef59b6f3f461b2d885becc92e69440c6ad4d73"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_traj_carry_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "1ec8ba98fbe2e7e83a8b01f52b3e272e4de4672c",
+      "sha256": "b077b58613225dc08b280e2a9ae1b9ea2a5560f272144a215bbe046809d5734c"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_traj_carry_test.sh",
+      "git_mode": "100644",
+      "git_blob": "d123db47bd23d2b2ad306c6224377e33bf054b05",
+      "sha256": "d4b52b2619dc561ba99d6cb54a0e428b81e7171c5a97d8b432b2e5b7ca31c018"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_comp_traj_carry_train.sh",
+      "git_mode": "100644",
+      "git_blob": "c893ceee0f697f13fec51a2e02bcdb655b3e658f",
+      "sha256": "e13b02433518b9cd20ace36bead641d2b0444716327fb4551ab646eb66d8aede"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_longterm_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "0ba60d0a0149e01021c683361d8bae0a932b0a9e",
+      "sha256": "01b908de9315e6e973db9902d655b62c806b362153a04ce47c51a8c49cf794fc"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_longterm_test.sh",
+      "git_mode": "100644",
+      "git_blob": "2a7004f95e518b2b3513d0b2f2c07ca5717b8e4a",
+      "sha256": "0d74ed1a2347203d74d8fadf51b615e1f8d7a3864985a1e6682709d9a1cf9688"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_longterm_train.sh",
+      "git_mode": "100644",
+      "git_blob": "d0553b0788cd035ddcf165abc284c68a5717b565",
+      "sha256": "4e43d6ca8d324f94ed057d381d1d9357314e6a4f495b9cffa9e6d325c82717a0"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_object_chair_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "afc4fdcf4bbe971f32fe3ed3a06760dbc23f8a12",
+      "sha256": "0d5d14c247459139c733322e175c1c4bccb435e99d606288f666237a1fb7a125"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_object_chair_test.sh",
+      "git_mode": "100644",
+      "git_blob": "d6b95258697117b5cd170dc004986ab148eb32f9",
+      "sha256": "91c99428b2e4f19d65b39857e19c980083cff0a74ebaef60ae6b1c04d255e825"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_object_chair_train.sh",
+      "git_mode": "100644",
+      "git_blob": "7611f36ffcb25b5cd88afbfd3d8b52030a3ad85c",
+      "sha256": "882a3d7ef258222c44f3d80ebaab16f2371237cb8f43e218f1bd640fd8998682"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_object_table_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "c34ffa12569dddde568f3d07d2f3d3ba06fe0dde",
+      "sha256": "f3d8fc47aa8dbe9c91485a7daf8965994ccb1c0cadf406da1b5a5fb9857382b6"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_object_table_test.sh",
+      "git_mode": "100644",
+      "git_blob": "c25d89bf37c4abeb8fef0fcbb0cdc2b6aa64e267",
+      "sha256": "c984fed5b2a5aff65af42f7c9d0c3ea54757adede15c21fdb526a8baa03e3dde"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_object_table_train.sh",
+      "git_mode": "100644",
+      "git_blob": "e83fbe9fbd9ba7d7e81a7e9086f70351a60bde46",
+      "sha256": "2c56b0f6510f17be222f63a3d9463c3812e29e7807beeb4daa58b248cde78409"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_terrain_carry_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "6500d85c8a68e5de99897044f605ef9a1f418c62",
+      "sha256": "251233cb9fb48ddfd0888fcc106a53a16a6f7d4c3cc08373a4b576dd955e96de"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_terrain_carry_test.sh",
+      "git_mode": "100644",
+      "git_blob": "9081ca4e22b91ec89b82d7e1953125cc77d3985e",
+      "sha256": "8fe6c837af6dd68b5d48156a6f92cf9f5e213d00cd693efa32eb221f72aa653c"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_terrain_carry_train.sh",
+      "git_mode": "100644",
+      "git_blob": "492db5f3d0edef7b450788e615396d0196a882d7",
+      "sha256": "733146b421df1513bb305d8b6821041620a072bfdb0fde54071a2debda1d97b0"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_terrain_traj_eval.sh",
+      "git_mode": "100644",
+      "git_blob": "d1a59bacbda9160d1ea09d93e95e5690e7711d73",
+      "sha256": "5108dce30277c4e6a6e2c9b6c4df97a93f812e269471bac97bf02720902a730c"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_terrain_traj_test.sh",
+      "git_mode": "100644",
+      "git_blob": "8fa7658db33464c6a1bb991e7138a85456ed3c4b",
+      "sha256": "b5d97f922f7383b0cfef23bab2586d2e9e78086a55c48e8de08a4400e068220e"
+    },
+    {
+      "path": "tokenhsi/scripts/tokenhsi/stage2_terrain_traj_train.sh",
+      "git_mode": "100644",
+      "git_blob": "958ad073154a6ebbeeac433c83d135257c7a6405",
+      "sha256": "40e52ee422daba0797cff8719cb1a328ee2a4887819fa82207f1f43ffbc0bc0e"
+    },
+    {
+      "path": "tokenhsi/tests/check_shared_support.py",
+      "git_mode": "100644",
+      "git_blob": "733b92b6168fdf40ed3c37be42268df77cdea7a9",
+      "sha256": "a373e618b675cd02c0bb522f3f396c10183b95ca2630401aa7a006ec5809535c"
+    },
+    {
+      "path": "tokenhsi/tests/check_stage2.py",
+      "git_mode": "100644",
+      "git_blob": "ed7deebc8d1e172ee78ebc52019126a2a81c5adf",
+      "sha256": "e9d432dcbb0fe0c2d5033c1b357037a2ba91d038bb6ecdb850bd54ce25cc4452"
+    },
+    {
+      "path": "tokenhsi/tests/smoke_stage1_sim.py",
+      "git_mode": "100644",
+      "git_blob": "cfd5aa8f5e1ca86b4b664632baa7052d5b6b3311",
+      "sha256": "04c31f20605275ca6a733a326842c720785ee2a5390d087f9a6a10a7104b5fa8"
+    },
+    {
+      "path": "tokenhsi/tests/smoke_stage1_v2_training.py",
+      "git_mode": "100644",
+      "git_blob": "cf7c25d042f9d218d402d68e4a992d0dd7f3c7c3",
+      "sha256": "a7b181822206c62f5d085b9cc982627d2e323f9c1bf144700b1373df6d845da9"
+    },
+    {
+      "path": "tokenhsi/tests/stage1_test_utils.py",
+      "git_mode": "100644",
+      "git_blob": "27ab93c6953e19c73bcce7fb81c184198d99aa80",
+      "sha256": "99f02d6d0e6d73fe9c07130b00b21648d108e79c042c628d41fe704a0b81bc89"
+    },
+    {
+      "path": "tokenhsi/tests/test_agent_cpa_collision.py",
+      "git_mode": "100644",
+      "git_blob": "6a97ef9af0eaa82170e9fc89b4fa6fea617a67da",
+      "sha256": "dfac02a5f5b8ff35d703999310e6915bc2b3d0ce7d84d9a813a502915f2bcdcf"
+    },
+    {
+      "path": "tokenhsi/tests/test_generic_task_scenario.py",
+      "git_mode": "100644",
+      "git_blob": "e7b2f2623d5a95d87c895cb0963700505306577f",
+      "sha256": "3dad253804ceee18c85e0a7525ac0b4e5945ea7a615cd2b1fda6baed5550a9ae"
+    },
+    {
+      "path": "tokenhsi/tests/test_graph_box_speed_penalty.py",
+      "git_mode": "100644",
+      "git_blob": "59f301c888b14e4bb968a74df9fffc895c434cb8",
+      "sha256": "021d80fe8fbfb5fa3738176d2c383cfccc883aec7efb94685fd905077adf315e"
+    },
+    {
+      "path": "tokenhsi/tests/test_gui_gpu.py",
+      "git_mode": "100644",
+      "git_blob": "2897c4a330b047491a7a5d1bb9b0325b99f43cfc",
+      "sha256": "5172abc28bbc20eeee3eff47ca3bf797e6e37855c3287d3f17a39bca0a24e7c9"
+    },
+    {
+      "path": "tokenhsi/tests/test_ma_scene_features.py",
+      "git_mode": "100644",
+      "git_blob": "19d7ca13585d2e9d5001449d1ac208fd3fdea545",
+      "sha256": "70333a0da1602f834335b5afd9db8cd7059595ee5712ca202f4eeda85a470106"
+    },
+    {
+      "path": "tokenhsi/tests/test_output_paths.py",
+      "git_mode": "100644",
+      "git_blob": "95cef5f0badd54bfa9379b1b70091071715635aa",
+      "sha256": "a5e399b4096bfa08b0592498979148c8526eeacdeeb0d163fd4732377aa82343"
+    },
+    {
+      "path": "tokenhsi/tests/test_shared_support.py",
+      "git_mode": "100644",
+      "git_blob": "231ad732e26447b423ed407f147ad52644913014",
+      "sha256": "56286822bdee2cf39d6821877dd822db21e927adb8440eec28b63072cb71de50"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1.py",
+      "git_mode": "100644",
+      "git_blob": "c2c6d1923e88c566f93efe9def5a77841ee64630",
+      "sha256": "2a07dbcecd2e027909cea97f11baffa1cc67d20dcba8df363151826d66e5403d"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_gta.py",
+      "git_mode": "100644",
+      "git_blob": "cb696592806237bf0a8588c0bec82312b6d5324e",
+      "sha256": "9ed0ec091910fb811ddf0a65c8c63274b0eb90febb13c94c42c5ff3ce97bff00"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_policy.py",
+      "git_mode": "100644",
+      "git_blob": "9e8cc43d6f2920e2502a9f2486fee37bf8069c2b",
+      "sha256": "10861f553afea785083dd408635a1a7e21517a0ce55fa3fa5616342598b8982c"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_sampling.py",
+      "git_mode": "100644",
+      "git_blob": "3796ded00a92a733224371acb91322c3df9dde8f",
+      "sha256": "3f8cd4ca430394981a084f77bb175c51d415943861cda0baf3f0f5a6571b0488"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_v2.py",
+      "git_mode": "100644",
+      "git_blob": "dbe1d775173c804a3b54995882471ce46c91ef2d",
+      "sha256": "1d6268b3a34fd3ee8ae099754a741ca22a1f7eaa99689cfeee65f0e1eefc8d0f"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_v2_fixed.py",
+      "git_mode": "100644",
+      "git_blob": "24af31f777dd259723697c33a932a3d5379e9324",
+      "sha256": "6ba5fe11cca7da9e3142667a79cb693ae9fd11fbabd507612b6acaa3fff87920"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_wrapper.py",
+      "git_mode": "100644",
+      "git_blob": "f9021a3d42418d3f06f5eebcd3119c55d80ffb18",
+      "sha256": "c03650d129113f897f1c74db025699fa4fada5e0e36fa085c16005f571c70a8c"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage2.py",
+      "git_mode": "100644",
+      "git_blob": "41e1483969e7e3eda72af27aafa543482fe3d29c",
+      "sha256": "4ad66625175b2ad73ccf472331fac05190e1650cd2b803d9abec89c5689c4403"
+    },
+    {
+      "path": "tokenhsi/utils/__init__.py",
+      "git_mode": "100644",
+      "git_blob": "bc6ee169446e3ff481659f963b550b39fd9f43d3",
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/utils/config.py",
+      "git_mode": "100644",
+      "git_blob": "52c866e8aa1bb96531e2cac65b87bed8739fe9e5",
+      "sha256": "c8dff5a722adb9ba2b6cabb3a892e869659fe5b3196adbdeb6579bbc15e5224b"
+    },
+    {
+      "path": "tokenhsi/utils/edge_context_spec.py",
+      "git_mode": "100644",
+      "git_blob": "d6b0f4b686a8f5f889f35f2e5ae3e3fadb729528",
+      "sha256": "57311f3c01f7b33b149f789f7c4be68d8ba04a65b62f0abdcc3eaf954b213a5e"
+    },
+    {
+      "path": "tokenhsi/utils/edge_interaction_spec.py",
+      "git_mode": "100644",
+      "git_blob": "9f7421fee092dc0b5531854ee6b64d8c74971709",
+      "sha256": "26411719f5bc774ba2b565ac8fb2561cab0e34391647cb9f3af02524c87ce120"
+    },
+    {
+      "path": "tokenhsi/utils/edge_ontop_spec.py",
+      "git_mode": "100644",
+      "git_blob": "653e4120df7f2a5dbdda32471cb054348148cafe",
+      "sha256": "6822fafaf2fc183f85e29a105994e036f02dea783704904308bb00e56ceb1473"
+    },
+    {
+      "path": "tokenhsi/utils/edge_scenario_spec.py",
+      "git_mode": "100644",
+      "git_blob": "41e19f19805869c14060c75dcc5937d81057d4b5",
+      "sha256": "134e252779551795b603ba2ee6af2518f842b7e3efa0b522b5f030ed3d730375"
+    },
+    {
+      "path": "tokenhsi/utils/edge_stage1_spec.py",
+      "git_mode": "100644",
+      "git_blob": "2185445936f9e233ce3cddd2545c9eb863782a34",
+      "sha256": "20e7d7542d3b3709b9d0711d165c0f4ef25f8a6c0563342f5d2297a76c8ef25a"
+    },
+    {
+      "path": "tokenhsi/utils/grasp_geometry.py",
+      "git_mode": "100644",
+      "git_blob": "f7230a3911c2d5d37cad014080974ecb1d2e6fad",
+      "sha256": "f7ab8b2e1b6af38154d49ba53fd6adc9bef33d019e4fe6ed5f0122d1d9617008"
+    },
+    {
+      "path": "tokenhsi/utils/gym_util.py",
+      "git_mode": "100644",
+      "git_blob": "204344c192da6eb0b2d642901f6746765668c849",
+      "sha256": "8ee056cda5bb39615d5c7c39b6e6c6b665f38fbe3a5d82af12383fea444fffa9"
+    },
+    {
+      "path": "tokenhsi/utils/logger.py",
+      "git_mode": "100644",
+      "git_blob": "b5b104100befd3caeea4ac0506265f83a0697c61",
+      "sha256": "2f34444692c15106fe6a3ec014fc14e685cbc428490f2956b4188206148b555d"
+    },
+    {
+      "path": "tokenhsi/utils/motion_lib.py",
+      "git_mode": "100644",
+      "git_blob": "c9318b22be98b041c7a7c0a8817e39c91e59aa61",
+      "sha256": "50f28b8f5cc705d520a7a8693dab3f8b57907a8a015d0bdf80f67f8326313d4d"
+    },
+    {
+      "path": "tokenhsi/utils/output_paths.py",
+      "git_mode": "100644",
+      "git_blob": "4a54f5614a4a5d8ef1baa51bc7316448bdfc3fe5",
+      "sha256": "22a5af04a1c378e03c38260327c8e763bcdbe1dca3dc6f5bcc9f0e6cdae2e397"
+    },
+    {
+      "path": "tokenhsi/utils/parse_task.py",
+      "git_mode": "100644",
+      "git_blob": "b0e153115ee55ae5f7758c7bf3b0b90c1105eb38",
+      "sha256": "8ff2ac428c0f5d9f9af2dba8f25286349e4dd1dbc9fadeca55a06f707cf53503"
+    },
+    {
+      "path": "tokenhsi/utils/relation_task_spec.py",
+      "git_mode": "100644",
+      "git_blob": "3eba64687a250cfb38d2feecdb1fd87ab9c72d05",
+      "sha256": "56574a857df8cd8012dcbb37e9a2ef674a022ac15cd0e01f246c8c2e5dcd6949"
+    },
+    {
+      "path": "tokenhsi/utils/shared_support.py",
+      "git_mode": "100644",
+      "git_blob": "c37147803fb7a6db5a0356e54775d65ad4fd3187",
+      "sha256": "39c79fe340bd71886277c3ad1c6b9c4b2e2c0ddd1ce93d6da2bb03bb3278cd36"
+    },
+    {
+      "path": "tokenhsi/utils/size_rsi.py",
+      "git_mode": "100644",
+      "git_blob": "2fe9064a1a713bb81724e0f717de297a66ad5c63",
+      "sha256": "f8fdea4367c6fdf379e92516f0d754bd2ec9dc2cd58965888fe7180a381f1055"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_platforms.py",
+      "git_mode": "100644",
+      "git_blob": "b10ae68e8928da436dee290ba8e4a9d237ab095f",
+      "sha256": "82204e1aea616b76dffaa8f132dbc90677485b78d791b18cfca4f55a76f5fac9"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_sampling.py",
+      "git_mode": "100644",
+      "git_blob": "537d69eab25a7deffad22c4ae921900c18c8b2e4",
+      "sha256": "0e4b3d1cffee3559cc3384c2e76cd4ade5922a6fa86540bc79beb055a576895a"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_v2.py",
+      "git_mode": "100644",
+      "git_blob": "1232d64b754c72672a22e4fb85812664cf3b2537",
+      "sha256": "255e4d1ae63557acf7d15449263c99663ee4b89f9d05deb1a15294163afd16e2"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_v2_fixed.py",
+      "git_mode": "100644",
+      "git_blob": "0577cfe6c75a6cb615c1f5a6dff75d5e3b598e62",
+      "sha256": "2feec70676aabb71c3d69ac12eac24b4675e2b49545e0344f4d386328976ae3d"
+    },
+    {
+      "path": "tokenhsi/utils/stage2_amp.py",
+      "git_mode": "100644",
+      "git_blob": "6af9a858076be987b15f62ae901f59a89a1b0df0",
+      "sha256": "ac97cde386b48175df3196ed494a22e213a9b73f7711a76eae1424250bc55e66"
+    },
+    {
+      "path": "tokenhsi/utils/stage2_rsi.py",
+      "git_mode": "100644",
+      "git_blob": "bd6e908f1181dfa0c598240777bb34761a201d81",
+      "sha256": "3636a2deba3051f181d93d595cf995d7c1cd605bd67cec0376a0bad45bd40ac7"
+    },
+    {
+      "path": "tokenhsi/utils/stage2_spec.py",
+      "git_mode": "100644",
+      "git_blob": "6309964054c6af89cfbde02a98601fcaa25b936e",
+      "sha256": "b7bcc49f019805b842235e372d9f713df6d42e324165b4c2cf2837ef2cefb3e4"
+    },
+    {
+      "path": "tokenhsi/utils/task_role_spec.py",
+      "git_mode": "100644",
+      "git_blob": "77f3fa0e556060ba6019fff056de5178e2d771fe",
+      "sha256": "925ff1773ad941b8072ab704d5c4abcc5883e08ff8a217422341618fdd690b54"
+    },
+    {
+      "path": "tokenhsi/utils/torch_utils.py",
+      "git_mode": "100644",
+      "git_blob": "9d22fedd63f3091ad92ca0ae94888070dd070792",
+      "sha256": "834225cad151e0003b4306ad5f3bc6f56f789ab95158a1bb74649b5ebd6e14b4"
+    },
+    {
+      "path": "tokenhsi/utils/traj_generator.py",
+      "git_mode": "100644",
+      "git_blob": "0d533267d689be0b12f0d960da4ea0c1ee1f5cbd",
+      "sha256": "5797dfa6a9f5dd514553f17d35e800f023d50334abb1e3446feb5e512a15cd57"
+    },
+    {
+      "path": "tokenhsi/utils/traj_generator_custom.py",
+      "git_mode": "100644",
+      "git_blob": "cfb115c502e6c008120a976ca7cf27d441e4a37a",
+      "sha256": "e31b274cf9d195c9b5a8b7fa91a4c51760903549a2cd9cd324919e9725abb760"
+    },
+    {
+      "path": "tokenhsi/utils/unified_training.py",
+      "git_mode": "100644",
+      "git_blob": "30e65d921d94c5bdac83feee43d160361bc0adf2",
+      "sha256": "9919b83e4b63b26cbac74058b450f7e9f0cf29310d2d78bb75acdb14cc1ce3fb"
+    }
+  ]
+}

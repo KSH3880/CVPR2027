@@ -32,6 +32,14 @@ class EdgeContextGraph:
             if isinstance(getattr(self, f.name), torch.Tensor) else getattr(self, f.name)) for f in fields(self)})
 
 
+def at_goal_marker_slots(graph):
+    at_edges = graph.edge_valid & (graph.edge_relation == AT)
+    slots = (graph.edge_dst - graph.num_agents - graph.num_objects).clamp(0, graph.num_agents - 1)
+    active = torch.zeros((at_edges.shape[0], graph.num_agents), device=slots.device, dtype=torch.long)
+    active.scatter_add_(1, slots, at_edges.long())
+    return at_edges, slots, active.bool()
+
+
 def compile_edge_context_graph(spec, num_agents, num_objects, device=None):
     if num_agents < 1 or num_objects < num_agents:
         raise ValueError('Carry scene requires M>=1 and O>=M')

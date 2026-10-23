@@ -1,0 +1,17 @@
+{
+  "source": "https://huggingface.co/datasets/bones-studio/seed/resolve/main/soma_uniform.tar.gz",
+  "expected_size": 45188088297,
+  "expected_sha256": "0c1fd91628d2644d0d7c0b735ae64faa5fa79834280bc1ce7860a871e55f912c",
+  "repository_entry": {
+    "type": "file",
+    "oid": "6335b7ac64750a538c1f9353a2211c8b85ac5cf4",
+    "size": 45188088297,
+    "lfs": {
+      "oid": "0c1fd91628d2644d0d7c0b735ae64faa5fa79834280bc1ce7860a871e55f912c",
+      "size": 45188088297,
+      "pointerSize": 136
+    },
+    "xetHash": "1ea76c31d487f99cabf1d7560114ecdf025805547267f01168d146d06c8d827c",
+    "path": "soma_uniform.tar.gz"
+  }
+}

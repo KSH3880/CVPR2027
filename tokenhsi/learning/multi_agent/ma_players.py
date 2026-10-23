@@ -16,11 +16,16 @@ from utils.torch_utils import load_checkpoint
 
 class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
 
+    def _calc_amp_rewards(self, amp_obs):
+        if not self.env.task.cfg['env'].get('ampEnabled', True):
+            return {'disc_rewards': amp_obs.new_zeros(*amp_obs.shape[:-1], 1)}
+        return super()._calc_amp_rewards(amp_obs)
+
     def _preproc_amp_obs(self, amp_obs):
         normalized = super()._preproc_amp_obs(amp_obs)
         if getattr(self.env.task, '_amp_task_conditioning', False):
             from utils.unified_training import preserve_amp_labels
-            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps)
+            normalized = preserve_amp_labels(amp_obs, normalized, self.env.task._num_amp_obs_steps, getattr(self.env.task, '_amp_family_count', 3))
         return normalized
 
     def __init__(self, config):
@@ -46,6 +51,10 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         if fn != 'Base':
             checkpoint = load_checkpoint(fn, self.device)
             check_checkpoint_metadata(checkpoint, checkpoint_metadata(self.env.task._relation_cfg))
+            if getattr(self.env.task,'_open_push',False) and checkpoint.get('open_push_contract') != self.env.task.get_open_push_contract():
+                raise ValueError('OPEN/PUSH checkpoint physics/reference contract differs')
+            if getattr(self.env.task,'_door_open',False) and checkpoint.get('door_experiment_contract') != self.env.task.get_door_experiment_contract():
+                raise ValueError('Door checkpoint network/reference contract differs')
         return super().restore(fn)
 
     def _build_net(self, config):
@@ -56,7 +65,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             if task.is_scene_policy():
                 self.running_mean_std = SceneRunningMeanStd(
                     entity_sizes=task.get_scene_entity_sizes(),
-                    entity_counts=[task.num_agents, task.num_objects, task.num_agents],
+                    entity_counts=[task.num_agents, task.get_policy_num_objects(), task.num_agents],
                     normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
                     extra_passthrough_size=task.get_relation_suffix_size(),
@@ -78,7 +87,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         if hasattr(self, 'env'):
             task = self.env.task
             config["num_agents"] = task.num_agents
-            config["num_objects"] = task.num_objects
+            config["num_objects"] = task.get_policy_num_objects()
             config["humanoid_obs_size"] = task.get_humanoid_obs_size()
             config["object_obs_size"] = task.get_object_obs_size()
             config["goal_obs_size"] = task.get_goal_obs_size()
@@ -133,6 +142,8 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
 
         terms = info["reward_terms"][0].detach().cpu().tolist()
         amp_reward = self._calc_amp_rewards(info["amp_obs"][0:1])["disc_rewards"][0, 0].item()
+        if 'door_amp_weight' in info:
+            amp_reward *= info['door_amp_weight'][0,0].item()
         combined = self._task_reward_w * terms[-1] + self._disc_reward_w * amp_reward
         values = dict(zip(self.env.task.REWARD_TERM_NAMES, terms))
         if self.env.task._state_relation:

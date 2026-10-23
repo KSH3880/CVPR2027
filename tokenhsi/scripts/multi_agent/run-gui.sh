@@ -90,6 +90,9 @@ fi
 DISPLAY_NUM=""
 for n in $(seq 99 130); do
     if [ ! -e "/tmp/.X11-unix/X$n" ] && [ ! -e "/tmp/.X$n-lock" ]; then
+        if ss -ltn 2>/dev/null | grep -q ":$((5900 + n)) "; then
+            continue
+        fi
         DISPLAY_NUM=$n
         break
     fi

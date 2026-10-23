@@ -1,0 +1,609 @@
+[
+  {
+    "filename": "inside_door_handle_left_side_open_walk_R_001__A515",
+    "frames": 675,
+    "metadata_frames": 675,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.94250671,
+    "root_height_max_m": 0.99428017,
+    "root_horizontal_path_m": 2.2644369438532794,
+    "root_net_horizontal_m": 2.032430077074631,
+    "root_net_initial_forward_m": 2.0324202839668652,
+    "root_net_initial_lateral_m": 0.006309319902780011,
+    "root_speed_max_mps": 1.0784963536231984,
+    "root_speed_p95_mps": 0.9793364424370071,
+    "tail_root_speed_mean_mps": 0.015955582145257035,
+    "opening_boundary_s_annotation": 3.4,
+    "post_boundary_forward_m": 0.16662594430916455,
+    "post_boundary_lateral_m": 0.1179531294265638,
+    "pre_boundary_forward_m": 1.8657943396577006,
+    "foot_height_min_m": 0.05979997072389843,
+    "foot_height_max_m": 0.2786357320679247,
+    "right_hand_path_m": 3.4526258711330233,
+    "left_hand_path_m": 2.6867639898862814,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.3,
+        "description": "A person grabs a doorknob with the right hand raised forward and starts to walk with their left leg while opening the door."
+      },
+      {
+        "start_time": 1.3,
+        "end_time": 3.4,
+        "description": "A person walks forward at a steady pace while pushing the door open towards the left with the right hand."
+      },
+      {
+        "start_time": 3.4,
+        "end_time": 4.6,
+        "description": "A person walking forward comes to a stop with their head turned, facing the left diagonal."
+      },
+      {
+        "start_time": 4.6,
+        "end_time": 5.633333,
+        "description": "A person stands upright with their arms swaying slightly and their head facing the left diagonal."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_walk_R_001__A515",
+    "frames": 621,
+    "metadata_frames": 621,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.9406337000000001,
+    "root_height_max_m": 0.99583,
+    "root_horizontal_path_m": 2.527295300480014,
+    "root_net_horizontal_m": 2.2728444283401394,
+    "root_net_initial_forward_m": 2.2683870002990902,
+    "root_net_initial_lateral_m": 0.14227512892600747,
+    "root_speed_max_mps": 1.2139407210469197,
+    "root_speed_p95_mps": 1.0164002409187611,
+    "tail_root_speed_mean_mps": 0.06859237452361935,
+    "opening_boundary_s_annotation": 1.25932,
+    "post_boundary_forward_m": 2.1099294434455493,
+    "post_boundary_lateral_m": -0.0030738768685609277,
+    "pre_boundary_forward_m": 0.15845755685354085,
+    "foot_height_min_m": 0.06057360279416621,
+    "foot_height_max_m": 0.2451081221001163,
+    "right_hand_path_m": 3.5849683314369702,
+    "left_hand_path_m": 3.205731942849164,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.25932,
+        "description": "A person tilts their head down toward the left and extends their right arm, and the right hand grabs the handle."
+      },
+      {
+        "start_time": 1.25932,
+        "end_time": 5.2,
+        "description": "A person begins walking forward, opens a door by pushing it to the right with their hand, and stops after a few steps."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_left_side_open_walk_close_behind_R_001__A514",
+    "frames": 1033,
+    "metadata_frames": 1033,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.94561172,
+    "root_height_max_m": 1.00762894,
+    "root_horizontal_path_m": 2.758270270638762,
+    "root_net_horizontal_m": 1.5697942219509253,
+    "root_net_initial_forward_m": 1.5697495388554836,
+    "root_net_initial_lateral_m": 0.01184417719842939,
+    "root_speed_max_mps": 1.082154144962873,
+    "root_speed_p95_mps": 0.9247928349982706,
+    "tail_root_speed_mean_mps": 0.02909351107450927,
+    "opening_boundary_s_annotation": 2.01,
+    "post_boundary_forward_m": 1.3838946595952824,
+    "post_boundary_lateral_m": 0.028912246353438708,
+    "pre_boundary_forward_m": 0.18585487926020108,
+    "foot_height_min_m": 0.06198246983951691,
+    "foot_height_max_m": 0.32297711113603794,
+    "right_hand_path_m": 5.274403903409324,
+    "left_hand_path_m": 3.971286700493814,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.01,
+        "description": "A person extends their right arm in front to grab the door handle."
+      },
+      {
+        "start_time": 1.01,
+        "end_time": 2.01,
+        "description": "A person pushes the door open using the door handle with their right hand."
+      },
+      {
+        "start_time": 2.01,
+        "end_time": 3.5,
+        "description": "A person uses their right hand to move the door to the left in front of them, then passes through it."
+      },
+      {
+        "start_time": 3.5,
+        "end_time": 4.5,
+        "description": "A person turns to the right and grabs the door handle behind them with their right hand."
+      },
+      {
+        "start_time": 4.5,
+        "end_time": 6.5,
+        "description": "A person closes a door to their right by further pushing it using their right hand."
+      },
+      {
+        "start_time": 6.5,
+        "end_time": 7.633333,
+        "description": "A person lets go of the door handle, lowers their right hand to the side and turns left to stand upright."
+      },
+      {
+        "start_time": 7.633333,
+        "end_time": 8.633333,
+        "description": "A person stands in an upright posture."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_left_side_open_walk_R_001__A512",
+    "frames": 408,
+    "metadata_frames": 408,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.90862473,
+    "root_height_max_m": 1.00389404,
+    "root_horizontal_path_m": 1.1229191235274714,
+    "root_net_horizontal_m": 0.9828939777188314,
+    "root_net_initial_forward_m": 0.9779465065752099,
+    "root_net_initial_lateral_m": 0.09849467860391976,
+    "root_speed_max_mps": 1.2210209973528912,
+    "root_speed_p95_mps": 1.109928051028485,
+    "tail_root_speed_mean_mps": 0.04097015367021343,
+    "opening_boundary_s_annotation": 2.25,
+    "post_boundary_forward_m": 0.12113655299565938,
+    "post_boundary_lateral_m": 0.09729351270402092,
+    "pre_boundary_forward_m": 0.8568099535795505,
+    "foot_height_min_m": 0.07011288799641463,
+    "foot_height_max_m": 0.2881801973154232,
+    "right_hand_path_m": 2.8096661207476608,
+    "left_hand_path_m": 1.2172666655482889,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 0.7,
+        "description": "A person gently reaches out for the doorknob of a left-side opening door from inside with their right hand."
+      },
+      {
+        "start_time": 0.7,
+        "end_time": 2.25,
+        "description": "A person gently opens a left-side opening door from inside with their right hand and walks through it."
+      },
+      {
+        "start_time": 2.25,
+        "end_time": 3.3,
+        "description": "A person gently walks out through a door from inside while releasing the door with their right hand and relaxing it."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_knob_left_side_open_walk_R_001__A514",
+    "frames": 552,
+    "metadata_frames": 552,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.94669724,
+    "root_height_max_m": 0.9992482,
+    "root_horizontal_path_m": 1.990114112817497,
+    "root_net_horizontal_m": 1.7918336026823265,
+    "root_net_initial_forward_m": 1.7898169953333127,
+    "root_net_initial_lateral_m": -0.0849869573379208,
+    "root_speed_max_mps": 1.1150049691495612,
+    "root_speed_p95_mps": 0.9839319589634608,
+    "tail_root_speed_mean_mps": 0.28111497462656326,
+    "opening_boundary_s_annotation": 2.46,
+    "post_boundary_forward_m": 1.2842699945737537,
+    "post_boundary_lateral_m": -0.014070529192459415,
+    "pre_boundary_forward_m": 0.505547000759559,
+    "foot_height_min_m": 0.06170736957357534,
+    "foot_height_max_m": 0.2844507489767438,
+    "right_hand_path_m": 2.4101917085625946,
+    "left_hand_path_m": 2.4249069805754977,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.0,
+        "description": "A person is grasping the left-side doorknob from inside."
+      },
+      {
+        "start_time": 1.0,
+        "end_time": 2.46,
+        "description": "A person opens the left-side door from the inside with their right hand and starts to walk out."
+      },
+      {
+        "start_time": 2.46,
+        "end_time": 4.6,
+        "description": "A person is walking forward."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_full_R_001__A515",
+    "frames": 688,
+    "metadata_frames": 688,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.97149017,
+    "root_height_max_m": 1.00217369,
+    "root_horizontal_path_m": 1.3152431634761124,
+    "root_net_horizontal_m": 0.0537730900682265,
+    "root_net_initial_forward_m": 0.048622904245686785,
+    "root_net_initial_lateral_m": -0.022964285275191426,
+    "root_speed_max_mps": 0.6033445492495714,
+    "root_speed_p95_mps": 0.5270130847767067,
+    "tail_root_speed_mean_mps": 0.013173273607651173,
+    "opening_boundary_s_annotation": 2.766667,
+    "post_boundary_forward_m": -0.438620682488624,
+    "post_boundary_lateral_m": -0.07553472876343606,
+    "pre_boundary_forward_m": 0.48724358673431084,
+    "foot_height_min_m": 0.061749323500871894,
+    "foot_height_max_m": 0.18213468713276854,
+    "right_hand_path_m": 3.916063466117261,
+    "left_hand_path_m": 2.238325896615536,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 2.766667,
+        "description": "A person standing upright and facing forward steps forward and opens a door with their right arm using a handle."
+      },
+      {
+        "start_time": 2.766667,
+        "end_time": 4.6,
+        "description": "A person steps backward while lowering their right arm and then stands still."
+      },
+      {
+        "start_time": 4.6,
+        "end_time": 5.733333,
+        "description": "A person is standing upright and facing forward."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_left_side_open_full_R_001__A515",
+    "frames": 654,
+    "metadata_frames": 654,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.98711823,
+    "root_height_max_m": 0.99815865,
+    "root_horizontal_path_m": 0.5630050141794414,
+    "root_net_horizontal_m": 0.01402015842879459,
+    "root_net_initial_forward_m": -0.010289237445687263,
+    "root_net_initial_lateral_m": 0.009523467601392208,
+    "root_speed_max_mps": 0.32776569169283665,
+    "root_speed_p95_mps": 0.28618257610931447,
+    "tail_root_speed_mean_mps": 0.012897284279186762,
+    "opening_boundary_s_annotation": 2.8,
+    "post_boundary_forward_m": -0.09663362940220518,
+    "post_boundary_lateral_m": -0.07453803219068683,
+    "pre_boundary_forward_m": 0.08634439195651793,
+    "foot_height_min_m": 0.06483484774574151,
+    "foot_height_max_m": 0.08192911454055335,
+    "right_hand_path_m": 2.8303611340815173,
+    "left_hand_path_m": 0.9399517324551715,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.27,
+        "description": "A person holds the left side handle of a door."
+      },
+      {
+        "start_time": 1.27,
+        "end_time": 2.8,
+        "description": "A person takes a small step forward and opens the left side door from the inside using the handle."
+      },
+      {
+        "start_time": 2.8,
+        "end_time": 4.066667,
+        "description": "A person takes a step back and leaves the handle of the door, relaxing their right hand."
+      },
+      {
+        "start_time": 4.066667,
+        "end_time": 5.466667,
+        "description": "A person is swaying while standing."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_knob_right_side_open_full_R_001__A515",
+    "frames": 664,
+    "metadata_frames": 664,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.96468628,
+    "root_height_max_m": 0.9987844800000001,
+    "root_horizontal_path_m": 1.0818725168079213,
+    "root_net_horizontal_m": 0.01155714423653612,
+    "root_net_initial_forward_m": -0.011137069961691322,
+    "root_net_initial_lateral_m": 0.003087597054748712,
+    "root_speed_max_mps": 0.7027792395662003,
+    "root_speed_p95_mps": 0.5508031780278823,
+    "tail_root_speed_mean_mps": 0.0469018782266655,
+    "opening_boundary_s_annotation": 3.166667,
+    "post_boundary_forward_m": -0.3849709288214026,
+    "post_boundary_lateral_m": -0.024011936648088456,
+    "pre_boundary_forward_m": 0.3738338588597113,
+    "foot_height_min_m": 0.06269301418602488,
+    "foot_height_max_m": 0.15229667623623527,
+    "right_hand_path_m": 3.375770193387226,
+    "left_hand_path_m": 1.7096575169104544,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.266667,
+        "description": "A person standing upright lifts their right arm to their left to hold the doorknob."
+      },
+      {
+        "start_time": 1.266667,
+        "end_time": 3.166667,
+        "description": "A person opens the door from inside with their right arm while holding the knob with their right hand."
+      },
+      {
+        "start_time": 3.166667,
+        "end_time": 4.433333,
+        "description": "A person lowers their right arm and steps back to stand upright while facing forward."
+      },
+      {
+        "start_time": 4.433333,
+        "end_time": 5.533333,
+        "description": "A person stands upright while facing forward as their arms sway by their sides."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_R_001__A512",
+    "frames": 439,
+    "metadata_frames": 439,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.98734131,
+    "root_height_max_m": 1.00088867,
+    "root_horizontal_path_m": 0.6214449800097918,
+    "root_net_horizontal_m": 0.011428314532738409,
+    "root_net_initial_forward_m": -0.011091945104387345,
+    "root_net_initial_lateral_m": 0.002752294835306995,
+    "root_speed_max_mps": 0.45351796052874765,
+    "root_speed_p95_mps": 0.382556433399178,
+    "tail_root_speed_mean_mps": 0.11784627281079428,
+    "opening_boundary_s_annotation": 1.95,
+    "post_boundary_forward_m": -0.19479549060834486,
+    "post_boundary_lateral_m": 0.029670435959862913,
+    "pre_boundary_forward_m": 0.1837035455039575,
+    "foot_height_min_m": 0.06298626479364813,
+    "foot_height_max_m": 0.10517481907754551,
+    "right_hand_path_m": 2.6212221454259947,
+    "left_hand_path_m": 0.7773648664580297,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.95,
+        "description": "A person steadily raises their right arm, holds a door handle with the right hand, and opens it from inside."
+      },
+      {
+        "start_time": 1.95,
+        "end_time": 3.6,
+        "description": "A person straightens up, steadily lowers the right arm beside the torso, and takes a step backwards."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_full_R_001__A512",
+    "frames": 467,
+    "metadata_frames": 467,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.9680617499999999,
+    "root_height_max_m": 1.0049919900000002,
+    "root_horizontal_path_m": 0.7876455228524004,
+    "root_net_horizontal_m": 0.0522529843968256,
+    "root_net_initial_forward_m": 0.03913915970129287,
+    "root_net_initial_lateral_m": -0.034619366780049454,
+    "root_speed_max_mps": 0.5082337976022443,
+    "root_speed_p95_mps": 0.4640765764515194,
+    "tail_root_speed_mean_mps": 0.12127208733479566,
+    "opening_boundary_s_annotation": 2.25,
+    "post_boundary_forward_m": -0.23895639265520835,
+    "post_boundary_lateral_m": -0.06372347766608381,
+    "pre_boundary_forward_m": 0.27809555235650124,
+    "foot_height_min_m": 0.05575474375655816,
+    "foot_height_max_m": 0.12580902568680735,
+    "right_hand_path_m": 3.0998997684480285,
+    "left_hand_path_m": 0.8568497119764371,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 0.65,
+        "description": "The person extends the right hand forward to open the door from inside, using the handle."
+      },
+      {
+        "start_time": 0.65,
+        "end_time": 2.25,
+        "description": "The person opens the right-side door from inside, using the handle with the right hand, and takes a step forward."
+      },
+      {
+        "start_time": 2.25,
+        "end_time": 3.8,
+        "description": "The person lowers their right hand holding the door handle and steps their right foot back."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  },
+  {
+    "filename": "outside_door_knob_right_side_open_walk_R_001__A515",
+    "frames": 854,
+    "metadata_frames": 854,
+    "frame_count_matches": true,
+    "frame_time_s": 0.008333,
+    "fps_header": 120.00480019200768,
+    "joints_with_wrapper": 78,
+    "soma_joints_without_wrapper": 77,
+    "channels": 240,
+    "finite": true,
+    "up_axis": "Y",
+    "units_original": "cm",
+    "root_source": "Hips position channels; wrapper Root is static zero",
+    "root_height_min_m": 0.94459633,
+    "root_height_max_m": 0.9997658500000001,
+    "root_horizontal_path_m": 2.1714947840524976,
+    "root_net_horizontal_m": 1.5249249707425174,
+    "root_net_initial_forward_m": 1.4843985809372346,
+    "root_net_initial_lateral_m": 0.3492234518264662,
+    "root_speed_max_mps": 1.1587118394781317,
+    "root_speed_p95_mps": 0.9491414114895749,
+    "tail_root_speed_mean_mps": 0.004591001199244998,
+    "opening_boundary_s_annotation": 2.6,
+    "post_boundary_forward_m": 1.4587189963356417,
+    "post_boundary_lateral_m": 0.4416492249523051,
+    "pre_boundary_forward_m": 0.025679584601592722,
+    "foot_height_min_m": 0.061022239655014306,
+    "foot_height_max_m": 0.2426536368800969,
+    "right_hand_path_m": 3.4429016766993237,
+    "left_hand_path_m": 3.025632132697739,
+    "temporal_events": [
+      {
+        "start_time": 0.0,
+        "end_time": 1.27,
+        "description": "A person takes a step forward and holds the knob of a door using their right hand."
+      },
+      {
+        "start_time": 1.27,
+        "end_time": 2.6,
+        "description": "A person opens a right side door by pulling the knob in their right hand."
+      },
+      {
+        "start_time": 2.6,
+        "end_time": 3.7,
+        "description": "A person lowers their right hand from a door knob and walks in through a door."
+      },
+      {
+        "start_time": 3.7,
+        "end_time": 5.133333,
+        "description": "A person stops walking forward."
+      },
+      {
+        "start_time": 5.133333,
+        "end_time": 7.133333,
+        "description": "A person is swaying their arms while standing."
+      }
+    ],
+    "complete_doorway_crossing": "UNKNOWN; no door plane/geometry",
+    "doorway_clearance": "UNKNOWN; no door plane/geometry",
+    "hold_open_contact": "UNKNOWN; no object/contact data"
+  }
+]

@@ -1,0 +1,2012 @@
+{
+  "metadata_source": "bones_seed/metadata/seed_metadata_v002_temporal_labels.jsonl",
+  "requested_count": 71,
+  "groups": {
+    "360": 26,
+    "270": 24,
+    "180": 21
+  },
+  "task_compatibility": {
+    "180": "front two-hand push; candidate for current task",
+    "270": "side/body or one-hand push; conflicts with current two-hand credit",
+    "360": "back/hips push, backward walking; conflicts with current two-hand credit"
+  },
+  "motions": [
+    {
+      "filename": "push_obstacle_180_001__A344_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 10.65,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 10.65,
+          "end_time": 12.45,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 12.45,
+          "end_time": 15.4,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A342",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 2.85,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 11.65,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.65,
+          "end_time": 15.6,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A342_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 2.85,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 11.65,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.65,
+          "end_time": 15.6,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A344",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.8,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A344_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.8,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A342",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.666667,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.666667,
+          "end_time": 2.9,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.9,
+          "end_time": 11.733333,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.733333,
+          "end_time": 13.9,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A342_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.666667,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.666667,
+          "end_time": 2.9,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.9,
+          "end_time": 11.733333,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.733333,
+          "end_time": 13.9,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A344",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.3,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 11.3,
+          "end_time": 15.25,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A344_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.3,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 11.3,
+          "end_time": 15.25,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A341",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 12.2,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.2,
+          "end_time": 13.766667,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.766667,
+          "end_time": 14.766667,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A341_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 12.2,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.2,
+          "end_time": 13.766667,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.766667,
+          "end_time": 14.766667,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A343",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.6,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.6,
+          "end_time": 15.6,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 15.6,
+          "end_time": 17.6,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A343_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.6,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.6,
+          "end_time": 15.6,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 15.6,
+          "end_time": 17.6,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A341",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.75,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.75,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.65,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A341_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.75,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.75,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.65,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A343",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.95,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.95,
+          "end_time": 14.2,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.2,
+          "end_time": 17.15,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A343_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.95,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.95,
+          "end_time": 14.2,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.2,
+          "end_time": 17.15,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A341",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 12.85,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.85,
+          "end_time": 14.1,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 14.1,
+          "end_time": 15.15,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A341_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 12.85,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.85,
+          "end_time": 14.1,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 14.1,
+          "end_time": 15.15,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A343",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 14.9,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.9,
+          "end_time": 16.75,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A343_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 14.9,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.9,
+          "end_time": 16.75,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A342",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.7,
+          "description": "A person steps forward and turns left."
+        },
+        {
+          "start_time": 1.7,
+          "end_time": 4.75,
+          "description": "A person takes a step forward and simultaneously turns left to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 4.75,
+          "end_time": 16.15,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the right direction, while leaning on it."
+        },
+        {
+          "start_time": 16.15,
+          "end_time": 19.65,
+          "description": "A person stops pushing an obstacle and turns right to stand upright."
+        },
+        {
+          "start_time": 19.65,
+          "end_time": 21.25,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A342_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.7,
+          "description": "A person steps forward and turns right."
+        },
+        {
+          "start_time": 1.7,
+          "end_time": 4.75,
+          "description": "A person takes a step forward and simultaneously turns right to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 4.75,
+          "end_time": 16.15,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the left direction, while leaning on it."
+        },
+        {
+          "start_time": 16.15,
+          "end_time": 19.65,
+          "description": "A person stops pushing an obstacle and turns left to stand upright."
+        },
+        {
+          "start_time": 19.65,
+          "end_time": 21.25,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A344",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.3,
+          "description": "A person steps forward and turns left."
+        },
+        {
+          "start_time": 1.3,
+          "end_time": 2.6,
+          "description": "A person takes a step forward and simultaneously turns left to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.6,
+          "end_time": 14.733333,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the right direction, while leaning on it."
+        },
+        {
+          "start_time": 14.733333,
+          "end_time": 18.5,
+          "description": "A person stops pushing an obstacle and turns right to stand upright."
+        },
+        {
+          "start_time": 18.5,
+          "end_time": 20.1,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A344_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.3,
+          "description": "A person steps forward and turns right."
+        },
+        {
+          "start_time": 1.3,
+          "end_time": 2.6,
+          "description": "A person takes a step forward and simultaneously turns right to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.6,
+          "end_time": 14.733333,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the left direction, while leaning on it."
+        },
+        {
+          "start_time": 14.733333,
+          "end_time": 18.5,
+          "description": "A person stops pushing an obstacle and turns left to stand upright."
+        },
+        {
+          "start_time": 18.5,
+          "end_time": 20.1,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A342",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.0,
+          "description": "A person steps forward and turns left."
+        },
+        {
+          "start_time": 1.0,
+          "end_time": 2.6,
+          "description": "A person takes a step forward and simultaneously turns left to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.6,
+          "end_time": 16.0,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the right direction, while leaning on it."
+        },
+        {
+          "start_time": 16.0,
+          "end_time": 20.4,
+          "description": "A person stops pushing an obstacle and turns right to stand upright."
+        },
+        {
+          "start_time": 20.4,
+          "end_time": 24.2,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A342_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.0,
+          "description": "A person steps forward and turns right."
+        },
+        {
+          "start_time": 1.0,
+          "end_time": 2.6,
+          "description": "A person takes a step forward and simultaneously turns right to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.6,
+          "end_time": 16.0,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the left direction, while leaning on it."
+        },
+        {
+          "start_time": 16.0,
+          "end_time": 20.4,
+          "description": "A person stops pushing an obstacle and turns left to stand upright."
+        },
+        {
+          "start_time": 20.4,
+          "end_time": 24.2,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A344",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 0.9,
+          "description": "A person steps forward and turns left."
+        },
+        {
+          "start_time": 0.9,
+          "end_time": 2.1,
+          "description": "A person takes a step forward and simultaneously turns left to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.1,
+          "end_time": 18.45,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the right direction, while leaning on it."
+        },
+        {
+          "start_time": 18.45,
+          "end_time": 22.25,
+          "description": "A person stops pushing an obstacle and turns right to stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A344_M",
+      "num_events": 4,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 0.9,
+          "description": "A person steps forward and turns right."
+        },
+        {
+          "start_time": 0.9,
+          "end_time": 2.1,
+          "description": "A person takes a step forward and simultaneously turns right to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.1,
+          "end_time": 18.45,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the left direction, while leaning on it."
+        },
+        {
+          "start_time": 18.45,
+          "end_time": 22.25,
+          "description": "A person stops pushing an obstacle and turns left to stand upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A342",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.0,
+          "description": "A person steps forward and turns left."
+        },
+        {
+          "start_time": 2.0,
+          "end_time": 3.5,
+          "description": "A person takes a step forward and simultaneously turns left to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 3.5,
+          "end_time": 16.3,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the right direction, while leaning on it."
+        },
+        {
+          "start_time": 16.3,
+          "end_time": 19.55,
+          "description": "A person stops pushing an obstacle and turns right to stand upright."
+        },
+        {
+          "start_time": 19.55,
+          "end_time": 22.4,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A342_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.0,
+          "description": "A person steps forward and turns right."
+        },
+        {
+          "start_time": 2.0,
+          "end_time": 3.5,
+          "description": "A person takes a step forward and simultaneously turns right to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 3.5,
+          "end_time": 16.3,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the left direction, while leaning on it."
+        },
+        {
+          "start_time": 16.3,
+          "end_time": 19.55,
+          "description": "A person stops pushing an obstacle and turns left to stand upright."
+        },
+        {
+          "start_time": 19.55,
+          "end_time": 22.4,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A344",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.55,
+          "description": "A person steps forward and turns left."
+        },
+        {
+          "start_time": 1.55,
+          "end_time": 2.85,
+          "description": "A person takes a step forward and simultaneously turns left to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 15.85,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the right direction, while leaning on it."
+        },
+        {
+          "start_time": 15.85,
+          "end_time": 19.0,
+          "description": "A person stops pushing an obstacle and turns right to stand upright."
+        },
+        {
+          "start_time": 19.0,
+          "end_time": 22.25,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A344_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.55,
+          "description": "A person steps forward and turns right."
+        },
+        {
+          "start_time": 1.55,
+          "end_time": 2.85,
+          "description": "A person takes a step forward and simultaneously turns right to push an obstacle with their side by leaning on it."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 15.85,
+          "description": "A person is pushing an obstacle forward with effort, walking sideways in the left direction, while leaning on it."
+        },
+        {
+          "start_time": 15.85,
+          "end_time": 19.0,
+          "description": "A person stops pushing an obstacle and turns left to stand upright."
+        },
+        {
+          "start_time": 19.0,
+          "end_time": 22.25,
+          "description": "A person is standing idle, gently swaying their hands."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A341",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.0,
+          "description": "A person standing upright, turns to the left and starting to push an obstacle."
+        },
+        {
+          "start_time": 2.0,
+          "end_time": 16.933333,
+          "description": "A person is pushing an obstacle using their right side and the left hand while walking to their right in a crisscross manner and coming to a stop."
+        },
+        {
+          "start_time": 16.933333,
+          "end_time": 19.533333,
+          "description": "A person turns to their right and stands upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A341_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.0,
+          "description": "A person standing upright, turns to the right and starting to push an obstacle."
+        },
+        {
+          "start_time": 2.0,
+          "end_time": 16.933333,
+          "description": "A person is pushing an obstacle using their left side and the right hand while walking to their left in a crisscross manner and coming to a stop."
+        },
+        {
+          "start_time": 16.933333,
+          "end_time": 19.533333,
+          "description": "A person turns to their left and stands upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A343",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.0,
+          "description": "A person standing is leaning the right shoulder on an obstacle placed forward."
+        },
+        {
+          "start_time": 2.0,
+          "end_time": 3.1,
+          "description": "A person leaning the right shoulder on an obstacle is starting to push it."
+        },
+        {
+          "start_time": 3.1,
+          "end_time": 15.83,
+          "description": "A person leaning on an obstacle with the right shoulder is pushing it towards their right."
+        },
+        {
+          "start_time": 15.83,
+          "end_time": 19.67,
+          "description": "A person leaning on an obstacle towards their right and pushing it is stopping, turning towards their right and standing."
+        },
+        {
+          "start_time": 19.67,
+          "end_time": 21.13,
+          "description": "A person standing is lifting the left leg a bit and standing in a neutral stance."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A343_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.0,
+          "description": "A person standing is leaning the left shoulder on an obstacle placed forward."
+        },
+        {
+          "start_time": 2.0,
+          "end_time": 3.1,
+          "description": "A person leaning the left shoulder on an obstacle is starting to push it."
+        },
+        {
+          "start_time": 3.1,
+          "end_time": 15.83,
+          "description": "A person leaning on an obstacle with the left shoulder is pushing it towards their left."
+        },
+        {
+          "start_time": 15.83,
+          "end_time": 19.67,
+          "description": "A person leaning on an obstacle towards their left and pushing it is stopping, turning towards their left and standing."
+        },
+        {
+          "start_time": 19.67,
+          "end_time": 21.13,
+          "description": "A person standing is lifting the right leg a bit and standing in a neutral stance."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A341",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.8,
+          "description": "A person standing upright, turns to the left and starting to push an obstacle."
+        },
+        {
+          "start_time": 1.8,
+          "end_time": 17.05,
+          "description": "A person is pushing an obstacle using their right side and the left hand while walking to their right in a crisscross manner and coming to a stop."
+        },
+        {
+          "start_time": 17.05,
+          "end_time": 19.15,
+          "description": "A person turns to their right and stands upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A341_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.8,
+          "description": "A person standing upright, turns to the right and starting to push an obstacle."
+        },
+        {
+          "start_time": 1.8,
+          "end_time": 17.05,
+          "description": "A person is pushing an obstacle using their left side and the right hand while walking to their left in a crisscross manner and coming to a stop."
+        },
+        {
+          "start_time": 17.05,
+          "end_time": 19.15,
+          "description": "A person turns to their left and stands upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A343",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person standing is leaning the right shoulder on an obstacle placed forward."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 3.6,
+          "description": "A person leaning the right shoulder on an obstacle is starting to push it."
+        },
+        {
+          "start_time": 3.6,
+          "end_time": 13.75,
+          "description": "A person leaning on an obstacle with the right shoulder is pushing it towards their right."
+        },
+        {
+          "start_time": 13.75,
+          "end_time": 17.95,
+          "description": "A person leaning on an obstacle towards their right and pushing it is stopping, turning towards their right and standing."
+        },
+        {
+          "start_time": 17.95,
+          "end_time": 18.5,
+          "description": "A person standing is lifting the left leg a bit and standing in a neutral stance."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A343_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person standing is leaning the left shoulder on an obstacle placed forward."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 3.6,
+          "description": "A person leaning the left shoulder on an obstacle is starting to push it."
+        },
+        {
+          "start_time": 3.6,
+          "end_time": 13.75,
+          "description": "A person leaning on an obstacle with the left shoulder is pushing it towards their left."
+        },
+        {
+          "start_time": 13.75,
+          "end_time": 17.95,
+          "description": "A person leaning on an obstacle towards their left and pushing it is stopping, turning towards their left and standing."
+        },
+        {
+          "start_time": 17.95,
+          "end_time": 18.5,
+          "description": "A person standing is lifting the right leg a bit and standing in a neutral stance."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A341",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.05,
+          "description": "A person standing upright, turns to the left and starting to push an obstacle."
+        },
+        {
+          "start_time": 2.05,
+          "end_time": 17.0,
+          "description": "A person is pushing an obstacle using their right side and the left hand while walking to their right in a crisscross manner and coming to a stop."
+        },
+        {
+          "start_time": 17.0,
+          "end_time": 19.9,
+          "description": "A person turns to their right and stands upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A341_M",
+      "num_events": 3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.05,
+          "description": "A person standing upright, turns to the right and starting to push an obstacle."
+        },
+        {
+          "start_time": 2.05,
+          "end_time": 17.0,
+          "description": "A person is pushing an obstacle using their left side and the right hand while walking to their left in a crisscross manner and coming to a stop."
+        },
+        {
+          "start_time": 17.0,
+          "end_time": 19.9,
+          "description": "A person turns to their left and stands upright."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A343",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.85,
+          "description": "A person standing is leaning the right shoulder on an obstacle placed forward."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 4.2,
+          "description": "A person leaning the right shoulder on an obstacle is starting to push it."
+        },
+        {
+          "start_time": 4.2,
+          "end_time": 20.35,
+          "description": "A person leaning on an obstacle with the right shoulder is pushing it towards their right."
+        },
+        {
+          "start_time": 20.35,
+          "end_time": 23.4,
+          "description": "A person leaning on an obstacle towards their right and pushing it is stopping, turning towards their right and standing."
+        },
+        {
+          "start_time": 23.4,
+          "end_time": 24.1,
+          "description": "A person standing is lifting the left leg a bit and standing in a neutral stance."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A343_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.85,
+          "description": "A person standing is leaning the left shoulder on an obstacle placed forward."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 4.2,
+          "description": "A person leaning the left shoulder on an obstacle is starting to push it."
+        },
+        {
+          "start_time": 4.2,
+          "end_time": 20.35,
+          "description": "A person leaning on an obstacle with the left shoulder is pushing it towards their left."
+        },
+        {
+          "start_time": 20.35,
+          "end_time": 23.4,
+          "description": "A person leaning on an obstacle towards their left and pushing it is stopping, turning towards their left and standing."
+        },
+        {
+          "start_time": 23.4,
+          "end_time": 24.1,
+          "description": "A person standing is lifting the right leg a bit and standing in a neutral stance."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_001__A344",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.8,
+          "description": "A person turns back over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.8,
+          "end_time": 4.0,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.0,
+          "end_time": 15.8,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 15.8,
+          "end_time": 24.8,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 24.8,
+          "end_time": 27.9,
+          "description": "A person turns backward over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_001__A344_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.8,
+          "description": "A person turns back over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.8,
+          "end_time": 4.0,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.0,
+          "end_time": 15.8,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 15.8,
+          "end_time": 24.8,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 24.8,
+          "end_time": 27.9,
+          "description": "A person turns backward over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A342",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 3.0,
+          "description": "A person standing upright slowly turns over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 3.0,
+          "end_time": 17.5,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 17.5,
+          "end_time": 21.4,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 21.4,
+          "end_time": 24.5,
+          "description": "A person slowly turns over their left shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 24.5,
+          "end_time": 25.633333,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A342_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 3.0,
+          "description": "A person standing upright slowly turns over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 3.0,
+          "end_time": 17.5,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 17.5,
+          "end_time": 21.4,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 21.4,
+          "end_time": 24.5,
+          "description": "A person slowly turns over their right shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 24.5,
+          "end_time": 25.633333,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A344",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.75,
+          "description": "A person turns back over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.75,
+          "end_time": 5.6,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 5.6,
+          "end_time": 17.8,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 17.8,
+          "end_time": 22.55,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 22.55,
+          "end_time": 24.75,
+          "description": "A person turns backward over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A344_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.75,
+          "description": "A person turns back over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.75,
+          "end_time": 5.6,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 5.6,
+          "end_time": 17.8,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 17.8,
+          "end_time": 22.55,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 22.55,
+          "end_time": 24.75,
+          "description": "A person turns backward over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A342",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 3.75,
+          "description": "A person standing upright slowly turns over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 3.75,
+          "end_time": 18.35,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 18.35,
+          "end_time": 22.4,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 22.4,
+          "end_time": 26.35,
+          "description": "A person slowly turns over their left shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 26.35,
+          "end_time": 28.1,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A342_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 3.75,
+          "description": "A person standing upright slowly turns over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 3.75,
+          "end_time": 18.35,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 18.35,
+          "end_time": 22.4,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 22.4,
+          "end_time": 26.35,
+          "description": "A person slowly turns over their right shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 26.35,
+          "end_time": 28.1,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A344",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.5,
+          "description": "A person standing upright slowly turns over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.5,
+          "end_time": 19.4,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 19.4,
+          "end_time": 24.2,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 24.2,
+          "end_time": 26.45,
+          "description": "A person slowly turns over their left shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 26.45,
+          "end_time": 27.95,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A344_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.5,
+          "description": "A person standing upright slowly turns over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.5,
+          "end_time": 19.4,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 19.4,
+          "end_time": 24.2,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 24.2,
+          "end_time": 26.45,
+          "description": "A person slowly turns over their right shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 26.45,
+          "end_time": 27.95,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A342",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 4.15,
+          "description": "A person standing upright slowly turns over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 4.15,
+          "end_time": 16.95,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 16.95,
+          "end_time": 20.55,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 20.55,
+          "end_time": 22.95,
+          "description": "A person slowly turns over their left shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 22.95,
+          "end_time": 25.3,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A342_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 4.15,
+          "description": "A person standing upright slowly turns over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 4.15,
+          "end_time": 16.95,
+          "description": "A person with their legs bent slowly pushes an obstacle using their back."
+        },
+        {
+          "start_time": 16.95,
+          "end_time": 20.55,
+          "description": "A person stops pushing an obstacle with their back."
+        },
+        {
+          "start_time": 20.55,
+          "end_time": 22.95,
+          "description": "A person slowly turns over their right shoulder to face the opposite direction."
+        },
+        {
+          "start_time": 22.95,
+          "end_time": 25.3,
+          "description": "A person stands upright while facing forward."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A344",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person turns back over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 4.85,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.85,
+          "end_time": 16.85,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 16.85,
+          "end_time": 21.35,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 21.35,
+          "end_time": 24.2,
+          "description": "A person turns backward over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A344_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person turns back over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 4.85,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.85,
+          "end_time": 16.85,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 16.85,
+          "end_time": 21.35,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 21.35,
+          "end_time": 24.2,
+          "description": "A person turns backward over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A341",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person turns back over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 4.3,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.3,
+          "end_time": 16.14,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 16.14,
+          "end_time": 20.86,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 20.86,
+          "end_time": 23.7,
+          "description": "A person turns backward over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A341_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person turns back over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 4.3,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.3,
+          "end_time": 16.14,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 16.14,
+          "end_time": 20.86,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 20.86,
+          "end_time": 23.7,
+          "description": "A person turns backward over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A343",
+      "num_events": 6,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.0,
+          "description": "A person is standing still."
+        },
+        {
+          "start_time": 1.0,
+          "end_time": 4.0,
+          "description": "A person turns back over their right shoulder and faces backward."
+        },
+        {
+          "start_time": 4.0,
+          "end_time": 6.0,
+          "description": "A person takes a few small steps forward while leaning the hips onto the obstacle behind them."
+        },
+        {
+          "start_time": 6.0,
+          "end_time": 28.5,
+          "description": "A person leaning back on the obstacle starts pushing it with their back by taking several small steps backward."
+        },
+        {
+          "start_time": 28.5,
+          "end_time": 31.3,
+          "description": "A person stops pushing the obstacle and stands upright by taking a step forward."
+        },
+        {
+          "start_time": 31.3,
+          "end_time": 33.9,
+          "description": "A person turns back over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A343_M",
+      "num_events": 6,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.0,
+          "description": "A person is standing still."
+        },
+        {
+          "start_time": 1.0,
+          "end_time": 4.0,
+          "description": "A person turns back over their left shoulder and faces backward."
+        },
+        {
+          "start_time": 4.0,
+          "end_time": 6.0,
+          "description": "A person takes a few small steps forward while leaning the hips onto the obstacle behind them."
+        },
+        {
+          "start_time": 6.0,
+          "end_time": 28.5,
+          "description": "A person leaning back on the obstacle starts pushing it with their back by taking several small steps backward."
+        },
+        {
+          "start_time": 28.5,
+          "end_time": 31.3,
+          "description": "A person stops pushing the obstacle and stands upright by taking a step forward."
+        },
+        {
+          "start_time": 31.3,
+          "end_time": 33.9,
+          "description": "A person turns back over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A341",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.35,
+          "description": "A person turns back over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.35,
+          "end_time": 4.05,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.05,
+          "end_time": 17.05,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 17.05,
+          "end_time": 20.35,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 20.35,
+          "end_time": 22.95,
+          "description": "A person turns backward over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A341_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.35,
+          "description": "A person turns back over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.35,
+          "end_time": 4.05,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 4.05,
+          "end_time": 17.05,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 17.05,
+          "end_time": 20.35,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 20.35,
+          "end_time": 22.95,
+          "description": "A person turns backward over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A343",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.05,
+          "end_time": 2.75,
+          "description": "A person turns back over their right shoulder and faces backward."
+        },
+        {
+          "start_time": 2.75,
+          "end_time": 4.45,
+          "description": "A person takes a few small steps forward while leaning the hips onto the obstacle behind them."
+        },
+        {
+          "start_time": 4.45,
+          "end_time": 21.25,
+          "description": "A person leaning back on the obstacle starts pushing it with their back by taking several small steps backward."
+        },
+        {
+          "start_time": 21.25,
+          "end_time": 24.45,
+          "description": "A person stops pushing the obstacle and stands upright by taking a step forward."
+        },
+        {
+          "start_time": 24.45,
+          "end_time": 28.05,
+          "description": "A person turns back over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A343_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.05,
+          "end_time": 2.75,
+          "description": "A person turns back over their left shoulder and faces backward."
+        },
+        {
+          "start_time": 2.75,
+          "end_time": 4.45,
+          "description": "A person takes a few small steps forward while leaning the hips onto the obstacle behind them."
+        },
+        {
+          "start_time": 4.45,
+          "end_time": 21.25,
+          "description": "A person leaning back on the obstacle starts pushing it with their back by taking several small steps backward."
+        },
+        {
+          "start_time": 21.25,
+          "end_time": 24.45,
+          "description": "A person stops pushing the obstacle and stands upright by taking a step forward."
+        },
+        {
+          "start_time": 24.45,
+          "end_time": 28.05,
+          "description": "A person turns back over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A341",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.4,
+          "description": "A person turns back over their right shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.4,
+          "end_time": 3.25,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 3.25,
+          "end_time": 18.45,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 18.45,
+          "end_time": 21.85,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 21.85,
+          "end_time": 30.45,
+          "description": "A person turns backward over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A341_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.4,
+          "description": "A person turns back over their left shoulder and bends their legs."
+        },
+        {
+          "start_time": 2.4,
+          "end_time": 3.25,
+          "description": "A person bends their legs deeply to push an obstacle using their back."
+        },
+        {
+          "start_time": 3.25,
+          "end_time": 18.45,
+          "description": "A person is walking backward while taking several small steps at a slow pace in a seated-like position and pushing an obstacle using their back."
+        },
+        {
+          "start_time": 18.45,
+          "end_time": 21.85,
+          "description": "A person walking backward comes to a stop and stands in an upright posture."
+        },
+        {
+          "start_time": 21.85,
+          "end_time": 30.45,
+          "description": "A person turns backward over their right shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A343",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.15,
+          "end_time": 3.0,
+          "description": "A person turns back over their right shoulder and faces backward."
+        },
+        {
+          "start_time": 3.0,
+          "end_time": 5.35,
+          "description": "A person takes a few small steps forward while leaning the hips onto the obstacle behind them."
+        },
+        {
+          "start_time": 5.35,
+          "end_time": 24.05,
+          "description": "A person leaning back on the obstacle starts pushing it with their back by taking several small steps backward."
+        },
+        {
+          "start_time": 24.05,
+          "end_time": 26.85,
+          "description": "A person stops pushing the obstacle and stands upright by taking a step forward."
+        },
+        {
+          "start_time": 26.85,
+          "end_time": 29.6,
+          "description": "A person turns back over their left shoulder."
+        }
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A343_M",
+      "num_events": 5,
+      "events": [
+        {
+          "start_time": 0.15,
+          "end_time": 3.0,
+          "description": "A person turns back over their left shoulder and faces backward."
+        },
+        {
+          "start_time": 3.0,
+          "end_time": 5.35,
+          "description": "A person takes a few small steps forward while leaning the hips onto the obstacle behind them."
+        },
+        {
+          "start_time": 5.35,
+          "end_time": 24.05,
+          "description": "A person leaning back on the obstacle starts pushing it with their back by taking several small steps backward."
+        },
+        {
+          "start_time": 24.05,
+          "end_time": 26.85,
+          "description": "A person stops pushing the obstacle and stands upright by taking a step forward."
+        },
+        {
+          "start_time": 26.85,
+          "end_time": 29.6,
+          "description": "A person turns back over their right shoulder."
+        }
+      ]
+    }
+  ]
+}

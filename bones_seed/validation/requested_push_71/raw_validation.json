@@ -1,0 +1,1001 @@
+{
+  "count": 71,
+  "all_passed": true,
+  "scope": "Original BVH parser/FK, 78 nodes, 240 channels, static Root, finite values. Does not certify retarget quality, contacts, AMP compatibility or RSI stability.",
+  "motions": [
+    {
+      "filename": "push_obstacle_180_001__A344_M",
+      "frames": 1858,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.474381000000001,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.322446364546303,
+      "hips_height_range_m": [
+        0.7363887,
+        1.00689217
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A342",
+      "frames": 1882,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.674373000000001,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 3.559458186288499,
+      "hips_height_range_m": [
+        0.83236519,
+        1.03265488
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A342_M",
+      "frames": 1882,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.674373000000001,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 3.5594382470654793,
+      "hips_height_range_m": [
+        0.83250717,
+        1.03236305
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A344",
+      "frames": 1788,
+      "frame_time": 0.008333,
+      "duration_seconds": 14.891071,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.403444166750017,
+      "hips_height_range_m": [
+        0.74509712,
+        1.00470802
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_002__A344_M",
+      "frames": 1788,
+      "frame_time": 0.008333,
+      "duration_seconds": 14.891071,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.4034386867383715,
+      "hips_height_range_m": [
+        0.7450535600000001,
+        1.00465637
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A342",
+      "frames": 1668,
+      "frame_time": 0.008333,
+      "duration_seconds": 13.891111,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.483604102425658,
+      "hips_height_range_m": [
+        0.82472069,
+        1.0113987
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A342_M",
+      "frames": 1668,
+      "frame_time": 0.008333,
+      "duration_seconds": 13.891111,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.483574682863498,
+      "hips_height_range_m": [
+        0.82444504,
+        1.01154633
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A344",
+      "frames": 1842,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.341053,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.50817404250488,
+      "hips_height_range_m": [
+        0.73900604,
+        1.0062480200000001
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_003__A344_M",
+      "frames": 1842,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.341053,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.508189280726726,
+      "hips_height_range_m": [
+        0.73887344,
+        1.00613976
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A341",
+      "frames": 1771,
+      "frame_time": 0.008333,
+      "duration_seconds": 14.749410000000001,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.198531956273954,
+      "hips_height_range_m": [
+        0.81197456,
+        1.01532463
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A341_M",
+      "frames": 1771,
+      "frame_time": 0.008333,
+      "duration_seconds": 14.749410000000001,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.198568148298793,
+      "hips_height_range_m": [
+        0.81167397,
+        1.0149128
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A343",
+      "frames": 2111,
+      "frame_time": 0.008333,
+      "duration_seconds": 17.58263,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.863925181611399,
+      "hips_height_range_m": [
+        0.6844117,
+        0.99973572
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_101__A343_M",
+      "frames": 2111,
+      "frame_time": 0.008333,
+      "duration_seconds": 17.58263,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.863921391187262,
+      "hips_height_range_m": [
+        0.68437866,
+        0.9998583999999999
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A341",
+      "frames": 1770,
+      "frame_time": 0.008333,
+      "duration_seconds": 14.741077,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.602494513209634,
+      "hips_height_range_m": [
+        0.76946136,
+        1.01246704
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A341_M",
+      "frames": 1770,
+      "frame_time": 0.008333,
+      "duration_seconds": 14.741077,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.602522814803166,
+      "hips_height_range_m": [
+        0.76938469,
+        1.01242485
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A343",
+      "frames": 2065,
+      "frame_time": 0.008333,
+      "duration_seconds": 17.199312,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.700306740228084,
+      "hips_height_range_m": [
+        0.6954719500000001,
+        1.01875092
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_102__A343_M",
+      "frames": 2065,
+      "frame_time": 0.008333,
+      "duration_seconds": 17.199312,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.70031431674146,
+      "hips_height_range_m": [
+        0.69542839,
+        1.01880699
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A341",
+      "frames": 1826,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.207725,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.369130609853942,
+      "hips_height_range_m": [
+        0.72975548,
+        1.0228154
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A341_M",
+      "frames": 1826,
+      "frame_time": 0.008333,
+      "duration_seconds": 15.207725,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.369128586785129,
+      "hips_height_range_m": [
+        0.72952209,
+        1.0225981899999999
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A343",
+      "frames": 2018,
+      "frame_time": 0.008333,
+      "duration_seconds": 16.807661,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.256144155722191,
+      "hips_height_range_m": [
+        0.6911743199999999,
+        1.00830505
+      ]
+    },
+    {
+      "filename": "push_obstacle_180_103__A343_M",
+      "frames": 2018,
+      "frame_time": 0.008333,
+      "duration_seconds": 16.807661,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.256171015288029,
+      "hips_height_range_m": [
+        0.6910556800000001,
+        1.00819817
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A342",
+      "frames": 2562,
+      "frame_time": 0.008333,
+      "duration_seconds": 21.340813,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 3.9184472212306978,
+      "hips_height_range_m": [
+        0.83496941,
+        1.0119096399999998
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A342_M",
+      "frames": 2562,
+      "frame_time": 0.008333,
+      "duration_seconds": 21.340813,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 3.9184894890698,
+      "hips_height_range_m": [
+        0.83519913,
+        1.01193382
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A344",
+      "frames": 2409,
+      "frame_time": 0.008333,
+      "duration_seconds": 20.065864,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.171386313415932,
+      "hips_height_range_m": [
+        0.81757721,
+        1.0054921
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_001__A344_M",
+      "frames": 2409,
+      "frame_time": 0.008333,
+      "duration_seconds": 20.065864,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.171372016277337,
+      "hips_height_range_m": [
+        0.81778839,
+        1.00543381
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A342",
+      "frames": 2912,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.257363,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.474750713749668,
+      "hips_height_range_m": [
+        0.87666931,
+        1.00688416
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A342_M",
+      "frames": 2912,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.257363,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.474754229378755,
+      "hips_height_range_m": [
+        0.87693336,
+        1.00680374
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A344",
+      "frames": 2727,
+      "frame_time": 0.008333,
+      "duration_seconds": 22.715758,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.237723980260139,
+      "hips_height_range_m": [
+        0.7639546199999999,
+        1.00438133
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_002__A344_M",
+      "frames": 2727,
+      "frame_time": 0.008333,
+      "duration_seconds": 22.715758,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.237741639417246,
+      "hips_height_range_m": [
+        0.76424995,
+        1.00429802
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A342",
+      "frames": 2699,
+      "frame_time": 0.008333,
+      "duration_seconds": 22.482434,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.156900629662241,
+      "hips_height_range_m": [
+        0.8568161000000001,
+        1.00753159
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A342_M",
+      "frames": 2699,
+      "frame_time": 0.008333,
+      "duration_seconds": 22.482434,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.156890286643515,
+      "hips_height_range_m": [
+        0.85704742,
+        1.0076445
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A344",
+      "frames": 2678,
+      "frame_time": 0.008333,
+      "duration_seconds": 22.307441,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.252462082748085,
+      "hips_height_range_m": [
+        0.8043244900000001,
+        1.0049020400000002
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_003__A344_M",
+      "frames": 2678,
+      "frame_time": 0.008333,
+      "duration_seconds": 22.307441,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.252441605774778,
+      "hips_height_range_m": [
+        0.80462418,
+        1.00483658
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A341",
+      "frames": 2344,
+      "frame_time": 0.008333,
+      "duration_seconds": 19.524219,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.41958232809674,
+      "hips_height_range_m": [
+        0.81546249,
+        1.0135581999999999
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A341_M",
+      "frames": 2344,
+      "frame_time": 0.008333,
+      "duration_seconds": 19.524219,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.419547109029227,
+      "hips_height_range_m": [
+        0.81606789,
+        1.01385742
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A343",
+      "frames": 2536,
+      "frame_time": 0.008333,
+      "duration_seconds": 21.124155000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.597721273364194,
+      "hips_height_range_m": [
+        0.7894200100000001,
+        1.00223907
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_101__A343_M",
+      "frames": 2536,
+      "frame_time": 0.008333,
+      "duration_seconds": 21.124155000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.597748645779212,
+      "hips_height_range_m": [
+        0.78969009,
+        1.00214973
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A341",
+      "frames": 2310,
+      "frame_time": 0.008333,
+      "duration_seconds": 19.240897,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.373251144441596,
+      "hips_height_range_m": [
+        0.8218572199999999,
+        1.00641129
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A341_M",
+      "frames": 2310,
+      "frame_time": 0.008333,
+      "duration_seconds": 19.240897,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.373225259543097,
+      "hips_height_range_m": [
+        0.8221179200000001,
+        1.00643456
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A343",
+      "frames": 2228,
+      "frame_time": 0.008333,
+      "duration_seconds": 18.557591,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.149527444694511,
+      "hips_height_range_m": [
+        0.75069618,
+        1.00325592
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_102__A343_M",
+      "frames": 2228,
+      "frame_time": 0.008333,
+      "duration_seconds": 18.557591,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.149556715504829,
+      "hips_height_range_m": [
+        0.7508776899999999,
+        1.00325325
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A341",
+      "frames": 2395,
+      "frame_time": 0.008333,
+      "duration_seconds": 19.949202,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.882151177166365,
+      "hips_height_range_m": [
+        0.83691574,
+        1.013293
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A341_M",
+      "frames": 2395,
+      "frame_time": 0.008333,
+      "duration_seconds": 19.949202,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.882129759337751,
+      "hips_height_range_m": [
+        0.83724075,
+        1.01347519
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A343",
+      "frames": 2899,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.149034,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.838193653361313,
+      "hips_height_range_m": [
+        0.7685025,
+        1.00020271
+      ]
+    },
+    {
+      "filename": "push_obstacle_270_103__A343_M",
+      "frames": 2899,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.149034,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.838247485334934,
+      "hips_height_range_m": [
+        0.76863602,
+        1.0002182
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_001__A344",
+      "frames": 3355,
+      "frame_time": 0.008333,
+      "duration_seconds": 27.948882,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.035457627682602,
+      "hips_height_range_m": [
+        0.8663198099999999,
+        1.01083862
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_001__A344_M",
+      "frames": 3355,
+      "frame_time": 0.008333,
+      "duration_seconds": 27.948882,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.035465603239514,
+      "hips_height_range_m": [
+        0.86631775,
+        1.01078171
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A342",
+      "frames": 3075,
+      "frame_time": 0.008333,
+      "duration_seconds": 25.615642,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.267755061966811,
+      "hips_height_range_m": [
+        0.88198318,
+        1.02113762
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A342_M",
+      "frames": 3075,
+      "frame_time": 0.008333,
+      "duration_seconds": 25.615642,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.2677688575600365,
+      "hips_height_range_m": [
+        0.8820063,
+        1.02115311
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A344",
+      "frames": 2980,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.824007,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.405029557805522,
+      "hips_height_range_m": [
+        0.81691917,
+        1.00217484
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_002__A344_M",
+      "frames": 2980,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.824007,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.404958904873885,
+      "hips_height_range_m": [
+        0.8169103200000001,
+        1.00224632
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A342",
+      "frames": 3382,
+      "frame_time": 0.008333,
+      "duration_seconds": 28.173873,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.4913157028815,
+      "hips_height_range_m": [
+        0.8934021,
+        1.01371353
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A342_M",
+      "frames": 3382,
+      "frame_time": 0.008333,
+      "duration_seconds": 28.173873,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.491337809879348,
+      "hips_height_range_m": [
+        0.8935532399999999,
+        1.01386337
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A344",
+      "frames": 3365,
+      "frame_time": 0.008333,
+      "duration_seconds": 28.032212,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.669270770476158,
+      "hips_height_range_m": [
+        0.82607613,
+        1.00973648
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_003__A344_M",
+      "frames": 3365,
+      "frame_time": 0.008333,
+      "duration_seconds": 28.032212,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 6.669246144233059,
+      "hips_height_range_m": [
+        0.82606918,
+        1.0098378
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A342",
+      "frames": 3044,
+      "frame_time": 0.008333,
+      "duration_seconds": 25.357319,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.85403814872425,
+      "hips_height_range_m": [
+        0.87708557,
+        1.02118622
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A342_M",
+      "frames": 3044,
+      "frame_time": 0.008333,
+      "duration_seconds": 25.357319,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.854063406652824,
+      "hips_height_range_m": [
+        0.87707375,
+        1.02122437
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A344",
+      "frames": 2911,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.24903,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.280600491880091,
+      "hips_height_range_m": [
+        0.82790634,
+        1.0125037399999999
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_005__A344_M",
+      "frames": 2911,
+      "frame_time": 0.008333,
+      "duration_seconds": 24.24903,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.280601710691051,
+      "hips_height_range_m": [
+        0.8278789500000001,
+        1.01239868
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A341",
+      "frames": 2844,
+      "frame_time": 0.008333,
+      "duration_seconds": 23.690719,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.5033927394644335,
+      "hips_height_range_m": [
+        0.85468102,
+        1.0157609600000002
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A341_M",
+      "frames": 2844,
+      "frame_time": 0.008333,
+      "duration_seconds": 23.690719,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.503324706412833,
+      "hips_height_range_m": [
+        0.8548383300000001,
+        1.01578697
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A343",
+      "frames": 4068,
+      "frame_time": 0.008333,
+      "duration_seconds": 33.890311000000004,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 3.440363007807474,
+      "hips_height_range_m": [
+        0.8060510999999999,
+        1.0133815800000001
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_101__A343_M",
+      "frames": 4068,
+      "frame_time": 0.008333,
+      "duration_seconds": 33.890311000000004,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 3.440351748540824,
+      "hips_height_range_m": [
+        0.80609261,
+        1.01328857
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A341",
+      "frames": 2765,
+      "frame_time": 0.008333,
+      "duration_seconds": 23.032412,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 7.273822053970535,
+      "hips_height_range_m": [
+        0.8761689,
+        1.02234215
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A341_M",
+      "frames": 2765,
+      "frame_time": 0.008333,
+      "duration_seconds": 23.032412,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 7.273808658315589,
+      "hips_height_range_m": [
+        0.8760717,
+        1.02226212
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A343",
+      "frames": 3377,
+      "frame_time": 0.008333,
+      "duration_seconds": 28.132208000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.383045096482712,
+      "hips_height_range_m": [
+        0.82906479,
+        1.0090464799999999
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_102__A343_M",
+      "frames": 3377,
+      "frame_time": 0.008333,
+      "duration_seconds": 28.132208000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 5.383018502114302,
+      "hips_height_range_m": [
+        0.8290522,
+        1.00923996
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A341",
+      "frames": 3666,
+      "frame_time": 0.008333,
+      "duration_seconds": 30.540445000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 7.190298638239927,
+      "hips_height_range_m": [
+        0.8623403199999999,
+        1.01099495
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A341_M",
+      "frames": 3666,
+      "frame_time": 0.008333,
+      "duration_seconds": 30.540445000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 7.190265471613372,
+      "hips_height_range_m": [
+        0.86245247,
+        1.0112075
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A343",
+      "frames": 3560,
+      "frame_time": 0.008333,
+      "duration_seconds": 29.657147000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.856846622356487,
+      "hips_height_range_m": [
+        0.76329269,
+        1.00865723
+      ]
+    },
+    {
+      "filename": "push_obstacle_360_103__A343_M",
+      "frames": 3560,
+      "frame_time": 0.008333,
+      "duration_seconds": 29.657147000000002,
+      "joint_count": 78,
+      "channel_count": 240,
+      "finite": true,
+      "root_displacement_m": 4.856812943740785,
+      "hips_height_range_m": [
+        0.76332764,
+        1.00879227
+      ]
+    }
+  ]
+}

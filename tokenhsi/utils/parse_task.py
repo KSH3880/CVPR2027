@@ -61,6 +61,11 @@ from env.tasks.adapt_interaction_skills.humanoid_adapt_carry_ground2terrain impo
 
 ######### multi agent
 from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
+from env.tasks.multi_agent.humanoid_ma_door import HumanoidMADoor
+from env.tasks.multi_agent.humanoid_ma_door_hold import HumanoidMADoorHold
+from env.tasks.multi_agent.humanoid_ma_open_push import HumanoidMAOpenPush
+from env.tasks.multi_agent.humanoid_ma_open_push_anchor import HumanoidMAOpenPushAnchor
+from env.tasks.multi_agent.humanoid_ma_open_push_point import HumanoidMAOpenPushPoint
 #########
 
 from env.tasks.vec_task_wrappers import VecTaskPythonWrapper

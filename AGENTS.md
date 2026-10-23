@@ -13,8 +13,13 @@
 
 ## 실행과 검증
 
+- PUSH RSI를 생성·선별·변경할 때는 먼저 [PUSH RSI 기준](markdowns/push_rsi_guidelines.md)을 읽는다. 기본은 원본 관절/속도 보존, 손 중점≤1m와 실제 밀기 구간의 동시 선별, loco 접근 유지, 실제 상자·발 메시를 포함한 검수다. 다른 실험 조건은 별도로 기록하고 필요한 검증을 다시 수행한다.
+
+- koo_cvpr 레포 내에서만 수정을 진행한다.
+
 - 학습 환경 수는 RTX PRO 6000 기준 **2048**이다. 메모리 절약을 이유로 자동 축소하지 않는다. 짧은 검증도 학습 반복 횟수만 줄인다. 평가·VNC 환경 수는 별도로 지정한다.
 
+- 검증 실행은 별도 지시가 없으면 **GPU6**을 사용한다.
 - GPU는 명령 앞의 `TOKENHSI_GPU=5`처럼 환경변수로 한 번 지정한다. VNC wrapper와 내부 학습·평가에 같은 설정을 전달한다. 실행 전 `nvidia-smi`로 점유를 확인하며 기존 학습 프로세스를 임의 종료·재시작하지 않는다.
 - 이 서버의 conda 환경은 `tokenhsi`; 실행 준비는 `tokenhsi/scripts/multi_agent/runtime_env.sh`를 사용한다. Isaac Gym을 직접 import할 때는 torch보다 먼저 한다.
 - 공유 데이터 원본 `/home/hwanhee/CVPR2027/TokenHSI`는 읽기 전용으로 취급한다. 이 repo의 데이터는 심링크로 연결한다.

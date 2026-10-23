@@ -163,16 +163,29 @@ class SampledOnTopTaskMixin:
         accepted_ref_motion_ids={}
         accepted_ref_motion_times={}
         pending=env_ids
+        fixed_size_rsi = getattr(self, '_reference_rsi_bank', None) is not None
+        if fixed_size_rsi:
+            # Commit the logical-to-physical mapping before choosing a size's RSI.
+            # Scene rejection must not silently select a different physical size.
+            self._sample_box_assignments(env_ids)
         max_attempts = 64 if getattr(self, '_scenario_no_climb', False) else 16
         for attempt in range(max_attempts):
             self._reset_default_slots=None;self._reset_ref_slots={}
             self._reset_ref_motion_ids={};self._reset_ref_motion_times={}
             self._reset_actors(pending)
-            self._sample_box_assignments(pending)
+            if not fixed_size_rsi:
+                self._sample_box_assignments(pending)
             self._reset_boxes(pending)
             self._reset_task(pending)
             self._configure_ontop_targets(pending)
             rejected=self._ontop_scene_infeasible(pending)
+            screen = getattr(self, '_reference_scene_screen', None)
+            if screen is not None:
+                body_rejected = screen.invalid(self._kinematic_humanoid_rigid_body_states[pending],
+                                               self._box_states[pending],self._box_size[pending])
+                bank = self._reference_rsi_bank
+                bank.stats['scene_body_rejections'] = bank.stats.get('scene_body_rejections',0)+int(body_rejected.sum())
+                rejected |= body_rejected
             if getattr(self, '_stage2', False):
                 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
                 from env.tasks.multi_agent.edge_context_reward import scene_success
@@ -237,6 +250,8 @@ class SampledOnTopTaskMixin:
         self._reset_relation_history(env_ids)
         self._compute_observations(env_ids)
         self._init_amp_obs(env_ids)
+        if getattr(self, '_hybrid_rsi_runtime', None) is not None:
+            self._hybrid_rsi_runtime.commit_reset(env_ids)
         if self._mode=='test' and (env_ids==0).any():
             bindings=json.dumps(self._ontop_trace_bindings(1,include_state=False)[0])
             signature=hashlib.sha256(bindings.encode()).hexdigest()[:12]
@@ -275,9 +290,9 @@ class SampledOnTopTaskMixin:
             self._tar_platform_pos[ids]=platforms
 
     def _putdown_ontop_supports(self):
-        if (self._relation_cfg.get('stage1_variant') !=
+        if ((getattr(self, '_hybrid_rsi_runtime', None) is None and self._relation_cfg.get('stage1_variant') !=
                 'scenario_independent_stage1_ontop_putdown'
-                or 'putDown' not in self._reset_ref_slots):
+                ) or 'putDown' not in self._reset_ref_slots):
             return None
         slot_env, slot_agent = self._reset_ref_slots['putDown']
         graph = self.relation_runtime.graph
@@ -337,8 +352,8 @@ class SampledOnTopTaskMixin:
                     continue
                 if ('putDown' in self._reset_ref_slots and
                         (kind == AT or (kind == ON_TOP and
-                        self._relation_cfg.get('stage1_variant') ==
-                        'scenario_independent_stage1_ontop_putdown'))):
+                        (getattr(self, '_hybrid_rsi_runtime', None) is not None or self._relation_cfg.get('stage1_variant') ==
+                        'scenario_independent_stage1_ontop_putdown')))):
                     put_env, put_agent = self._reset_ref_slots['putDown']
                     owner = graph.edge_owner[rows, edge]
                     from_put_down = ((ids[rows, None] == put_env[None, :]) &
@@ -543,6 +558,10 @@ class SampledOnTopTaskMixin:
         c=self._sampling_counts;den=c[0].clamp_min(1)
         out={'sampling/resets':c[0].clone(),'sampling/physical_retries':self._sampling_retries.clone(),
              'sampling/physical_failures':self._sampling_failures.clone()}
+        bank = getattr(self, '_reference_rsi_bank', None)
+        if bank is not None:
+            for key,value in bank.stats.items():
+                out['sampling/reference_cumulative/'+key] = torch.tensor(float(value),device=self.device)
         if getattr(self, '_stage2', False):
             for index, name in enumerate(('independent', 'place_climb', 'place_sit',
                                           'place_stack'), 1):

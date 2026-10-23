@@ -1,0 +1,301 @@
+{
+  "contract": {
+    "kind": "sustained_bilateral_arms_forward",
+    "min_each_hand_forward_of_shoulder_m": 0.25,
+    "min_each_hand_z_relative_to_shoulder_m": -0.25,
+    "minimum_kept_run_seconds": 0.5,
+    "trim_each_end_seconds": 0.2,
+    "all_size_profiles_required": true,
+    "retarget": false
+  },
+  "source_cache": "ports/ksh_stage1_stage2_base/push/tokenhsi/data/stage1_push_depth180_rsi_le1m_cache.npz",
+  "source_cache_sha256": "be0f9f0e69d3a2dd4523e297ba033cb66ce2bf6b0c699d5369095e5c4a9e9ee6",
+  "selected_cache": "tokenhsi/data/stage1_push_depth180_rsi_le1m_push_phase_cache.npz",
+  "selected_cache_sha256": "26fdac9429a5c71ceccd3b08abdc48ec8b4320c6991e3f8f5f34755f3a0a7aab",
+  "source_size_frames": 12831,
+  "selected_size_frames": 8372,
+  "unique_selected_frames": 1196,
+  "per_profile": [
+    1196,
+    1196,
+    1196,
+    1196,
+    1196,
+    1196,
+    1196
+  ],
+  "selected_clips": [
+    0,
+    3,
+    4,
+    7,
+    8
+  ],
+  "motions": [
+    {
+      "clip": 0,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "5459336b1e94036e3c0a5155c89419cb08d37f042598eb5375177ccfd5563932",
+      "fps": 30,
+      "original_frames": 302,
+      "selected_frames": 209,
+      "windows_frames_exclusive": [
+        [
+          97,
+          306
+        ]
+      ],
+      "windows_seconds_inclusive": [
+        [
+          3.2333333333333334,
+          10.166666666666666
+        ]
+      ]
+    },
+    {
+      "clip": 1,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_002__A342/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "ec5fb47016214883c55fe98abbe623f98a145cee33e1f75fdb387a08156cea86",
+      "fps": 30,
+      "original_frames": 9,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 2,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "38f2302df648e861e61187b06b438417460d68c97778a9bdb9bc60375a55f39b",
+      "fps": 30,
+      "original_frames": 9,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 3,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_002__A344/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "6a9d98335b708435f358aec29ba4428acc9fe56edb01562c71972047de0cd32e",
+      "fps": 30,
+      "original_frames": 341,
+      "selected_frames": 246,
+      "windows_frames_exclusive": [
+        [
+          90,
+          336
+        ]
+      ],
+      "windows_seconds_inclusive": [
+        [
+          3.0,
+          11.166666666666666
+        ]
+      ]
+    },
+    {
+      "clip": 4,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "14b6bc6b90872af625cf1f5cda1e76134dd276c7c1672e23a6de4a0641263084",
+      "fps": 30,
+      "original_frames": 341,
+      "selected_frames": 248,
+      "windows_frames_exclusive": [
+        [
+          88,
+          336
+        ]
+      ],
+      "windows_seconds_inclusive": [
+        [
+          2.933333333333333,
+          11.166666666666666
+        ]
+      ]
+    },
+    {
+      "clip": 5,
+      "file": "dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "20aa94e4d981db81dec78c5db29b8bc5ebb1889dcedc408556ac0abfc59518e3",
+      "fps": 30,
+      "original_frames": 13,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 6,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "cdb0ec18014291659b3adf09234d2794a867eaa22b226c1ca38987cae1303a43",
+      "fps": 30,
+      "original_frames": 13,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 7,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_003__A344/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "3624699f84114462f14e167172f63b08c1f709a273c376f02242aa0523a254e3",
+      "fps": 30,
+      "original_frames": 323,
+      "selected_frames": 247,
+      "windows_frames_exclusive": [
+        [
+          82,
+          329
+        ]
+      ],
+      "windows_seconds_inclusive": [
+        [
+          2.7333333333333334,
+          10.933333333333334
+        ]
+      ]
+    },
+    {
+      "clip": 8,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "f177f5dedd9ebc7c9dcf8d5fcc0e3902d35fcda44ba5638c4a3ba564db51f5b7",
+      "fps": 30,
+      "original_frames": 323,
+      "selected_frames": 246,
+      "windows_frames_exclusive": [
+        [
+          83,
+          329
+        ]
+      ],
+      "windows_seconds_inclusive": [
+        [
+          2.7666666666666666,
+          10.933333333333334
+        ]
+      ]
+    },
+    {
+      "clip": 9,
+      "file": "dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "d374df64b37beef3bf55a05722b4948f8641e1a4a7937e1fd8a9d5bc93515e4d",
+      "fps": 30,
+      "original_frames": 10,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 10,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "962a56788b0e4e957e8cc572dc8c4422316346c2b92a97f902d63355187774d5",
+      "fps": 30,
+      "original_frames": 10,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 11,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_101__A343/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "1b2b2146754315e8f95f6f108086714ec321935fb587cb7654f126c8b55abd58",
+      "fps": 30,
+      "original_frames": 13,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 12,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "1e202de929130931b378e2be27cedf994d851614fb1b1e118685ed433d8e8746",
+      "fps": 30,
+      "original_frames": 12,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 13,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_102__A341/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "ec7285d2ceb6ddc5d9177809fb26ebc795edd331476c137f7c013e7442c1a146",
+      "fps": 30,
+      "original_frames": 10,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 14,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "5f3d3b6a07282c3585d84a068a69861e0bc206ee220a24993e408fe7756a93a7",
+      "fps": 30,
+      "original_frames": 10,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 15,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_102__A343/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "7acc1b0633f4397d26aa10abe472c66c2e28ebb4618685e523857c3056f8565b",
+      "fps": 30,
+      "original_frames": 19,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 16,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "d7e49b5b8a4c07d0e442afe2b5f1b54d358321bbbdb517014b8d2c0ada30975d",
+      "fps": 30,
+      "original_frames": 19,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 17,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_103__A341/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "5a2ba42e17efc101a75702965163b9b6923a94f9cba977e109a94cafd1386ea9",
+      "fps": 30,
+      "original_frames": 12,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 18,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "5fe24a5444c3878bab80a29e6de342eac3eb2c11f629084ec61209ba5d58a937",
+      "fps": 30,
+      "original_frames": 12,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 19,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_103__A343/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "8cbc0c4e48ac2a8cc7af122bff2d7b2df11cb65bceebdd359ec0c148253419d7",
+      "fps": 30,
+      "original_frames": 16,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    },
+    {
+      "clip": 20,
+      "file": "dataset_bones_push180/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/ref_motion.npy",
+      "source_sha256": "bdedc3b473246c68335df105b5ead7b8f978c44a068b3002d1ed5a1a4e4fb6dc",
+      "fps": 30,
+      "original_frames": 16,
+      "selected_frames": 0,
+      "windows_frames_exclusive": [],
+      "windows_seconds_inclusive": []
+    }
+  ],
+  "loco_changed": false,
+  "source_motion_changed": false,
+  "physics_screen": "Inherited from unchanged source cache; not rerun by this CPU selector",
+  "limitation": "Posture selection, not measured contact or policy stability; source motions have no box trajectories",
+  "audit_path": "output_etc/check/push_rsi_phase_selection_20261020"
+}

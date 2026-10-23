@@ -63,7 +63,16 @@ def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
     xy=progress_delta[...,:2].norm(dim=-1)
     phi=torch.exp(-10*delta.square().sum(-1))*valid
     p=config['progress'];progress=1/(1+(xy-p['delta']).clamp_min(0)/p['sigma'])
-    if config.get('stage1_variant') == CURRICULUM_VARIANT:
+    if p.get('kind') == 'success_region':
+        holding_error = (inner_xy_region_error(
+            roots[batch,src.clamp(0,m-1),:2],dst_box,dst_size,0.)-p['holding_reach']).clamp_min(0)
+        ontop_error = inner_xy_region_error(src_box[...,:2],dst_box,dst_size,
+                                           config['ontop']['success_inner_margin_fraction'])
+        error = torch.where(hold,holding_error,torch.where(top,ontop_error,
+                            (xy-p['delta']).clamp_min(0)))
+        progress = 1/(1+error/p['sigma'])
+        diag['progress_xy_error'] = error*valid
+    elif config.get('stage1_variant') == CURRICULUM_VARIANT:
         max_distance = config['hard_skill_training']['progress']['max_distance']
         linear = (1 - (xy - p['delta']).clamp_min(0) / max_distance).clamp_min(0)
         progress = torch.where((at | top) & valid, linear, progress)

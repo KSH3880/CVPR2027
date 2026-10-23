@@ -1,0 +1,360 @@
+env:
+  numEnvs: 2048
+  envSpacing: 24
+  episodeLength: 600
+  isFlagrun: false
+  enableDebugVis: false
+  cameraFollow: true
+  video:
+    enable: false
+    focus: stack
+  relationGraph:
+    mode: edge_composition
+    sampler: two_agent_four_object_independent_unified
+    semantic_only: true
+    policy_task_roles: true
+    max_edges_per_agent: 2
+    edge_capacity: 4
+    template_probabilities:
+      HOLDING: 0.0
+      SIT: 0.0
+      CLIMB: 0.0
+      HOLDING_AT: 1.0
+      HOLDING_ON_TOP: 0.0
+    random_binding:
+      objects: canonical
+      goals: canonical
+    shuffle_edge_order: true
+    shuffle_token_order: true
+  relationReward:
+    mode: state_relation_edge_stage1_v1
+    schema_version: 9
+    stage1_variant: stage1_v2
+    state_reward_weight: 0.2
+    progress_reward_weight: 0.2
+    success_reward_weight: 0.2
+    satisfaction_threshold: 0.9
+    holding:
+      hand_distance_scale: 10.0
+    at:
+      state_definition: box_near
+      near_distance_scale: 10.0
+      success_distance: 0.2
+    ontop:
+      state_definition: centered_stack_world_z
+      near_distance_scale: 10.0
+      z_tolerance: 0.001
+      vertical_extent: rotated_bbox
+      success_inner_margin_fraction: 0.1
+    sit:
+      state_definition: box_top_plus_pelvis_clearance
+      near_distance_scale: 10.0
+      pelvis_clearance: 0.12
+      success_inner_margin_fraction: 0.1
+      z_tolerance: 0.07
+    climb:
+      state_definition: root_target
+      near_distance_scale: 10.0
+      target_height: rotated_bbox_top_plus_char_h
+      success_inner_margin_fraction: 0.1
+      root_height_tolerance: 0.2
+      feet_height_tolerance: 0.07
+    progress:
+      kind: distance
+      sigma: 1.0
+      bbox_buffers:
+        HOLDING: 0.2
+        SIT: 0.3
+        CLIMB: 0.3
+        AT: 0.1
+        ON_TOP: 0.1
+    success:
+      at_z_tolerance: 0.001
+      saturation: paired_placement_current_success
+      terminate_when_all_subgoals_done: false
+    task_sharing:
+      self: 1.0
+      teammate: 0.0
+    edge_aggregation: self_sum
+    hard_skill_training:
+      near_start:
+        probability_start: 0.0
+        probability_end: 0.0
+        anneal_steps: 300000
+        at_xy_range:
+        - 0.75
+        - 1.5
+        ontop_xy_range:
+        - 1.1
+        - 1.8
+      climb_rsi:
+        late_fraction: 0.0
+        phase_range:
+        - 0.65
+        - 0.98
+    observation:
+      graph_packet_fields:
+      - valid
+      - task
+      - actor
+      - payload
+      - target
+    diagnostics:
+      enabled: true
+      sample_envs: 2
+      log_interval: 30
+  numAgents: 2
+  numObjects: 4
+  agentSpawnRadius: 2.5
+  policyObsMode: clean_scene
+  obsFrame: owner
+  agentCollisionPenalty: true
+  agentCollisionMode: cpa
+  agentCollisionTTCDiscount: 0.99
+  agentCollisionCoeff: 0.5
+  agentCollisionDist: 0.7
+  pdControl: true
+  powerScale: 1.0
+  controlFrequencyInv: 2
+  stateInit: Start
+  hybridInitProb: 0.5
+  numAMPObsSteps: 10
+  localRootObs: true
+  localRootObsPolicy: false
+  rootHeightObs: false
+  rootHeightObsPolicy: false
+  cleanSceneLocalRootObsPolicy: true
+  cleanSceneRootHeightObsPolicy: true
+  keyBodies:
+  - right_hand
+  - left_hand
+  - right_foot
+  - left_foot
+  contactBodies:
+  - right_foot
+  - left_foot
+  terminationHeight: 0.15
+  enableEarlyTermination: true
+  enableSelfCollisionDetection: true
+  enableTrackInitState: false
+  power_reward: true
+  power_coefficient: 0.0005
+  skill:
+  - loco
+  - push
+  skillInitProb:
+  - 1.0
+  - 0.0
+  templateRsi: null
+  skillDiscProb:
+  - 0.33
+  - 0.67
+  enableTaskObs: true
+  onlyVelReward: true
+  onlyHeightHandHeldReward: false
+  box_vel_penalty: false
+  box_vel_pen_coeff: 1.0
+  box_vel_pen_threshold: 2.5
+  mode: train
+  box:
+    build:
+      baseSize:
+      - 1.3
+      - 1.3
+      - 1.3
+      randomSize: false
+      randomModeEqualProportion: false
+      scaleRangeX:
+      - 1.0
+      - 1.0
+      scaleRangeY:
+      - 1.0
+      - 1.0
+      scaleRangeZ:
+      - 0.75
+      - 1.25
+      scaleSampleInterval: 0.125
+      randomDensity: false
+      testSizes:
+      - - 1.3
+        - 1.3
+        - 1.3
+      taskSizeRanges:
+        HOLDING:
+        - - 0.2
+          - 0.6
+        - - 0.2
+          - 0.6
+        - - 0.2
+          - 0.6
+        SIT:
+        - - 0.25
+          - 0.8
+        - - 0.25
+          - 0.8
+        - - 0.35
+          - 0.5
+        CLIMB:
+        - - 0.4
+          - 0.8
+        - - 0.4
+          - 0.8
+        - - 0.2
+          - 0.7
+        HOLDING_AT:
+        - - 0.2
+          - 0.6
+        - - 0.2
+          - 0.6
+        - - 0.2
+          - 0.6
+        HOLDING_ON_TOP:
+        - - 0.2
+          - 0.6
+        - - 0.2
+          - 0.6
+        - - 0.2
+          - 0.6
+        SUPPORT:
+        - - 0.4
+          - 0.8
+        - - 0.4
+          - 0.8
+        - - 0.25
+          - 0.5
+      sizeInterval: 0.05
+    reset:
+      randomRot: true
+      randomAssignment: false
+      testRandomArenaSpawn: false
+      arenaSpawnRadius: 0.0
+      minAgentDistance: 1.0
+      minBoxDistance: 0.7
+      randomHeight: false
+      randomHeightProb: 0.0
+      groundStandaloneSitClimb: true
+      minPlatformHeight: 0.0
+      platformMode: carry_payload_tokenhsi
+      maxTopSurfaceHeight: 1.2
+      ownerLocoDistanceRange:
+      - 1.0
+      - 2.0
+      samplingMode: tokenhsi
+    obs:
+      enableBboxObs: true
+  debug:
+    vel: false
+    reward: true
+    rewardInterval: 30
+  eval:
+    successThreshold: 0.2
+    skill:
+    - loco
+    skillInitProb:
+    - 1.0
+  asset:
+    assetRoot: tokenhsi/data/assets
+    assetFileName: mjcf/phys_humanoid_v3.xml
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+  ampTaskConditioning: true
+  goalRotation: identity
+  sizeAwareRsi:
+    cacheDirectory: output/rsi_cache_stage1_v2
+    lateProbability: 0.7
+    lateFraction: 0.3
+    screen:
+      seconds: 0.1
+      root_velocity_change: 3.0
+      box_speed: 5.0
+      root_displacement: 0.3
+      box_displacement: 0.3
+    geometryFilter: body_points_v1
+    phaseMode: sampled_box
+  pushBox:
+    size_range_m:
+    - 1.2
+    - 1.5
+    size_interval_m: 0.05
+    size_z_m: 1.3
+    size_y_m: 1.8
+    mass: 20.0
+    friction: 0.6
+    restitution: 0.0
+  pushGoalRandomization:
+    sampling: box_forward_uniform
+    distance_range:
+    - 1.0
+    - 4.0
+  pushPointReward:
+    xy_reward_scale: 4.682689584792
+    z_reward_sigma_m: 0.154039131238
+  pushTask:
+    revision: 4
+    contact_objective: midpoint_only_v1
+    reset_geometry_filter: collider_bounds_v1
+    reset_geometry_margin_m: 0.02
+    reset_floor_clearance_m: 0.002
+    reset_geometry_sha256: de4f32e83e2784c752376db59ce6fea949d81e74a7b22cd6c8ed57e28f3d297f
+    objective: push_contact_plus_native_at
+    probability: 1.0
+    height_m: 1.0
+    interaction_probability: 0.5
+    late_probability: 0.7
+    late_fraction: 0.3
+    stand_off_m: 0.06
+    minimum_rsi_remaining_m: 0.21
+    amp_expert_probabilities:
+    - 0.33
+    - 0.67
+    loco_distance_range_m:
+    - 1.0
+    - 5.0
+    station_separation_m: 12.0
+    require_contact_force: true
+    min_hand_force_n: 0.5
+    min_box_force_n: 0.5
+    rsi_retarget: none
+    rsi_sampling: native_size_cache
+    rsi_box_progress_scale: 0.85
+    rsi_cache_file: tokenhsi/data/stage1_push_depth180_safe_cache.npz
+    rsi_cache_sha256: d0b201fa4e670b2dbbfb51e8322f66f48e4f78a1efc9554332fa500f8671ec52
+    motion_hashes:
+    - 5459336b1e94036e3c0a5155c89419cb08d37f042598eb5375177ccfd5563932
+    - ec5fb47016214883c55fe98abbe623f98a145cee33e1f75fdb387a08156cea86
+    - 38f2302df648e861e61187b06b438417460d68c97778a9bdb9bc60375a55f39b
+    - 6a9d98335b708435f358aec29ba4428acc9fe56edb01562c71972047de0cd32e
+    - 14b6bc6b90872af625cf1f5cda1e76134dd276c7c1672e23a6de4a0641263084
+    - 20aa94e4d981db81dec78c5db29b8bc5ebb1889dcedc408556ac0abfc59518e3
+    - cdb0ec18014291659b3adf09234d2794a867eaa22b226c1ca38987cae1303a43
+    - 3624699f84114462f14e167172f63b08c1f709a273c376f02242aa0523a254e3
+    - f177f5dedd9ebc7c9dcf8d5fcc0e3902d35fcda44ba5638c4a3ba564db51f5b7
+    - d374df64b37beef3bf55a05722b4948f8641e1a4a7937e1fd8a9d5bc93515e4d
+    - 962a56788b0e4e957e8cc572dc8c4422316346c2b92a97f902d63355187774d5
+    - 1b2b2146754315e8f95f6f108086714ec321935fb587cb7654f126c8b55abd58
+    - 1e202de929130931b378e2be27cedf994d851614fb1b1e118685ed433d8e8746
+    - ec7285d2ceb6ddc5d9177809fb26ebc795edd331476c137f7c013e7442c1a146
+    - 5f3d3b6a07282c3585d84a068a69861e0bc206ee220a24993e408fe7756a93a7
+    - 7acc1b0633f4397d26aa10abe472c66c2e28ebb4618685e523857c3056f8565b
+    - d7e49b5b8a4c07d0e442afe2b5f1b54d358321bbbdb517014b8d2c0ada30975d
+    - 5a2ba42e17efc101a75702965163b9b6923a94f9cba977e109a94cafd1386ea9
+    - 5fe24a5444c3878bab80a29e6de342eac3eb2c11f629084ec61209ba5d58a937
+    - 8cbc0c4e48ac2a8cc7af122bff2d7b2df11cb65bceebdd359ec0c148253419d7
+    - bdedc3b473246c68335df105b5ead7b8f978c44a068b3002d1ed5a1a4e4fb6dc
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25

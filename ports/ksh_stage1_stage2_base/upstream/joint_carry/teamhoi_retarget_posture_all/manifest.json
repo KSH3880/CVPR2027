@@ -1,0 +1,65 @@
+{
+  "validation_status": "interface_and_short_physics_pass",
+  "clips": [
+    {
+      "source": "sidewalk/cmu_sidewalk_113_18_poses.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_113_18_poses.npy",
+      "output_sha256": "da3cbd49ce4098d28bc89b8e6e06515e401db8e60b8e3de81addbe4e15845ebc"
+    },
+    {
+      "source": "sidewalk/cmu_sidewalk_141_33_poses.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_141_33_poses.npy",
+      "output_sha256": "8b8e8e00c7c1300c5080682ecf3a2175178276d0cfdef37167012d42c577739b"
+    },
+    {
+      "source": "sidewalk/cmu_sidewalk_143_40_poses.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/cmu_sidewalk_143_40_poses.npy",
+      "output_sha256": "edb00868dd9a73813fb0b7c25bcea5e2d9e211d691d6a19af4267d84a3e5d924"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male1Walking_c3d_Walk_B10_-_Walk_turn_left_45_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B10_-_Walk_turn_left_45_stageii.npy",
+      "output_sha256": "a0932290734060007086e76069f01cd72c8a3a841131d67d28666c1adac8542b"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male1Walking_c3d_Walk_B13_-_Walk_turn_right_45_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B13_-_Walk_turn_right_45_stageii.npy",
+      "output_sha256": "4bd5faf4ead699d786d9b456baf2e23e0baaf64ff2082f354e69b524fbe9599f"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male1Walking_c3d_Walk_B15_-_Walk_turn_around_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B15_-_Walk_turn_around_stageii.npy",
+      "output_sha256": "57bfab0dd634c7a919d7f344f273465992843575e76bda4d85c8e37701e69ed6"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male1Walking_c3d_Walk_B16_-_Walk_turn_change_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male1Walking_c3d_Walk_B16_-_Walk_turn_change_stageii.npy",
+      "output_sha256": "21e380f244645eb13c11da5a842486ddbc0ccedeb2dd360b38c1c24ca3f8cb9a"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male2Walking_c3d_B9_-__Walk_turn_left_90_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B9_-__Walk_turn_left_90_stageii.npy",
+      "output_sha256": "3aef948c38bce4658a0bc1533e2106509e9d101ea8e5c9798052a57494c966c3"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male2Walking_c3d_B10_-__Walk_turn_left_45_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B10_-__Walk_turn_left_45_stageii.npy",
+      "output_sha256": "05a9f9761a4f74effa596932a9e3f8c9a80fe6b6cc08d847900c7596c9fb3807"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male2Walking_c3d_B11_-__Walk_turn_left_135_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B11_-__Walk_turn_left_135_stageii.npy",
+      "output_sha256": "e12f65a867ebf2ae5f3a946ab728e7b0ae40847c4949b22c2140feeed1542d51"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male2Walking_c3d_B13_-__Walk_turn_right_90_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B13_-__Walk_turn_right_90_stageii.npy",
+      "output_sha256": "050afd7d9c861dd63bee907afe29fe9d3e863258f030956c087d67c820df8a1b"
+    },
+    {
+      "source": "loco_reverse/ACCAD_Male2Walking_c3d_B15_-__Walk_turn_around_stageii.npy",
+      "output": "joint_carry/teamhoi_retarget_posture_all/ACCAD_Male2Walking_c3d_B15_-__Walk_turn_around_stageii.npy",
+      "output_sha256": "db6edcf2183cb068aeb103f74f10fcc32e4262c5ed0c897743e8d7e51415b24f"
+    }
+  ]
+}

@@ -65,18 +65,45 @@ class EntityRunningMeanStd(nn.Module):
 
 class MAAgent(amp_agent.AMPAgent):
 
+    def _combine_rewards(self, task_rewards, amp_rewards):
+        if not self._amp_enabled:
+            return self._task_reward_w * task_rewards
+        return super()._combine_rewards(task_rewards, amp_rewards)
+
+    def _calc_amp_rewards(self, amp_obs):
+        if not self._amp_enabled:
+            return {'disc_rewards': amp_obs.new_zeros(*amp_obs.shape[:-1], 1)}
+        return super()._calc_amp_rewards(amp_obs)
+
+    def _init_amp_demo_buf(self):
+        if self._amp_enabled:
+            return super()._init_amp_demo_buf()
+
+    def _update_amp_demos(self):
+        if self._amp_enabled:
+            return super()._update_amp_demos()
+
+    def _store_replay_amp_obs(self, amp_obs):
+        if self._amp_enabled:
+            return super()._store_replay_amp_obs(amp_obs)
+
     def _preproc_amp_obs(self, amp_obs):
+        if not self._amp_enabled:
+            return amp_obs
         normalized = super()._preproc_amp_obs(amp_obs)
         task = self.vec_env.env.task
         if getattr(task, '_amp_task_conditioning', False):
             from utils.unified_training import preserve_amp_labels
-            normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps)
+            normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps, getattr(task, '_amp_family_count', 3))
         return normalized
 
     def __init__(self, base_name, config):
+        self._amp_enabled = config.get('amp_enabled', True)
         super().__init__(base_name, config)
 
         task = self.vec_env.env.task
+        if getattr(task, '_door_open', False) and self._amp_enabled != task.cfg['env']['ampEnabled']:
+            raise ValueError('Door env/train AMP settings must agree')
         curriculum_cfg = task.cfg['env'].get('skillInitCurriculum')
         args = task.cfg['args']
         self._skill_init_curriculum = None
@@ -112,7 +139,7 @@ class MAAgent(amp_agent.AMPAgent):
             if self._scene_policy:
                 self.running_mean_std = SceneRunningMeanStd(
                     entity_sizes=task.get_scene_entity_sizes(),
-                    entity_counts=[task.num_agents, task.num_objects, task.num_agents],
+                    entity_counts=[task.num_agents, task.get_policy_num_objects(), task.num_agents],
                     normalized_sizes=task.get_scene_normalized_entity_sizes(),
                     kinematic_size=task.get_scene_kinematic_size(),
                     extra_passthrough_size=task.get_relation_suffix_size(),
@@ -135,6 +162,18 @@ class MAAgent(amp_agent.AMPAgent):
             self.dataset = amp_datasets.AMPDataset(
                 scene_batch_size, scene_minibatch_size, self.is_discrete,
                 self.is_rnn, self.ppo_device, self.seq_len)
+        transfer=task.cfg.get('experiment',{}).get('transfer',{})
+        if transfer.get('kind')=='open_push_contact_at_warm_start' and args.resume<=0 and not (args.test or args.eval):
+            if not getattr(task,'_open_push',False):
+                raise ValueError('Contact/AT warm start requires OPEN/PUSH task')
+            from learning.multi_agent.open_push_transfer import transfer_open_push
+            path=transfer['checkpoint']
+            checkpoint=torch.load(path,map_location=self.ppo_device,weights_only=False)
+            report=transfer_open_push(self,checkpoint,path)
+            with open(os.path.join(self.experiment_dir,'transfer_report.json'),'w') as f:
+                json.dump(report,f,indent=2)
+            print('[OPEN/PUSH warm start] source epoch {}, {} actor/AMP tensors copied; critic/optimizer/counters fresh'.format(
+                report['source_epoch'],len(report['copied_tensors'])),flush=True)
         if getattr(task, '_ontop_mixed', False) and args.resume <= 0:
             from learning.multi_agent.transfer import transfer_carry_weights
             path = task.cfg['experiment']['transfer']['checkpoint']
@@ -222,6 +261,16 @@ class MAAgent(amp_agent.AMPAgent):
         weights = super().get_stats_weights()
         task = self.vec_env.env.task
         weights['relation_metadata'] = checkpoint_metadata(task._relation_cfg)
+        weights['amp_enabled'] = self._amp_enabled
+        if getattr(task,'_open_push',False):
+            weights['open_push_contract'] = task.get_open_push_contract()
+        if getattr(task,'_door_open',False):
+            weights['door_experiment_contract'] = task.get_door_experiment_contract()
+        if getattr(task, '_reference_rsi_bank', None) is not None:
+            weights['reference_rsi'] = {'config': task._reference_rsi_spec,
+                                       'bank_sha256': task._reference_rsi_bank.sha256}
+            if getattr(task, '_hybrid_rsi_runtime', None) is not None:
+                weights['hybrid_rsi_state'] = task._reference_rsi_bank.state_dict()
         if getattr(task, '_edge_context', False):
             from utils.edge_context_spec import task_instance
             weights['relation_task_instance'] = task_instance(task._relation_graph_spec, task.num_agents, task.num_objects)
@@ -233,6 +282,22 @@ class MAAgent(amp_agent.AMPAgent):
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
+        if getattr(task,'_open_push',False) and weights.get('open_push_contract') != task.get_open_push_contract():
+            raise ValueError('OPEN/PUSH checkpoint physics/reference contract differs')
+        if getattr(task,'_door_open',False) and weights.get('door_experiment_contract') != task.get_door_experiment_contract():
+            raise ValueError('Door checkpoint network/reference contract differs')
+        if not (task.cfg['args'].test or task.cfg['args'].eval) and weights.get('amp_enabled', True) != self._amp_enabled:
+            raise ValueError('Training resume requires the same AMP enabled setting')
+        if not (task.cfg['args'].test or task.cfg['args'].eval):
+            bank = getattr(task, '_reference_rsi_bank', None)
+            expected_rsi = None if bank is None else {'config': task._reference_rsi_spec,
+                                                    'bank_sha256': bank.sha256}
+            if weights.get('reference_rsi') != expected_rsi:
+                raise ValueError('Checkpoint reference RSI initialization differs')
+            if getattr(task, '_hybrid_rsi_runtime', None) is not None:
+                if 'hybrid_rsi_state' not in weights:
+                    raise ValueError('Hybrid RSI resume requires candidate policy state')
+                bank.load_state_dict(weights['hybrid_rsi_state'])
         stage2_evaluation = getattr(task, '_stage2', False) and (
             task.cfg['args'].test or task.cfg['args'].eval)
         if getattr(task, '_edge_context', False) and not stage2_evaluation:
@@ -248,7 +313,7 @@ class MAAgent(amp_agent.AMPAgent):
 
         task = self.vec_env.env.task
         config["num_agents"] = task.num_agents
-        config["num_objects"] = task.num_objects
+        config["num_objects"] = task.get_policy_num_objects()
         config["humanoid_obs_size"] = task.get_humanoid_obs_size()
         config["object_obs_size"] = task.get_object_obs_size()
         config["goal_obs_size"] = task.get_goal_obs_size()
@@ -300,6 +365,10 @@ class MAAgent(amp_agent.AMPAgent):
         done_indices = []
         update_list = self.update_list
         relation_near_masks = []
+        door_amp_weights = []
+        open_push_tasks = []
+        open_push_contact = []
+        open_push_near = []
 
         for step_idx in range(self.horizon_length):
             self.obs = self.env_reset(done_indices)
@@ -317,6 +386,12 @@ class MAAgent(amp_agent.AMPAgent):
             self.obs, rewards, self.dones, infos = self.env_step(res_dict['actions'])
             if 'relation_near_unplaced_slow' in infos:
                 relation_near_masks.append(infos['relation_near_unplaced_slow'].clone())
+            if 'door_amp_weight' in infos:
+                door_amp_weights.append(infos['door_amp_weight'].clone())
+            if 'open_push_tasks' in infos:
+                open_push_tasks.append(infos['open_push_tasks'].clone())
+                open_push_contact.append(infos['open_push_paired_contact'].clone())
+                open_push_near.append(infos['open_push_both_hands_near'].clone())
             shaped_rewards = self.rewards_shaper(rewards)
             self.experience_buffer.update_data('rewards', step_idx, shaped_rewards)
             self.experience_buffer.update_data('next_obses', step_idx, self.obs['obs'])
@@ -350,7 +425,7 @@ class MAAgent(amp_agent.AMPAgent):
             self.current_rewards *= not_dones.unsqueeze(1)
             self.current_lengths *= not_dones
 
-            if self.vec_env.env.task.viewer:
+            if self._amp_enabled and self.vec_env.env.task.viewer:
                 self._amp_debug(infos)
             done_indices = done_indices[:, 0]
 
@@ -361,18 +436,45 @@ class MAAgent(amp_agent.AMPAgent):
         mb_amp_obs = self.experience_buffer.tensor_dict['amp_obs']
 
         amp_rewards = self._calc_amp_rewards(mb_amp_obs)
+        if door_amp_weights:
+            if len(door_amp_weights)!=self.horizon_length:
+                raise ValueError('Missing Door AMP rollout weights')
+            from utils.door_approach_amp import apply_reward_gate
+            amp_rewards=apply_reward_gate(amp_rewards,torch.stack(door_amp_weights))
+        task_rewards = mb_rewards
         mb_rewards = self._combine_rewards(mb_rewards, amp_rewards)
         mb_advs = self.discount_values(mb_fdones, mb_values, mb_rewards, mb_next_values)
         mb_returns = mb_advs + mb_values
 
         batch_dict = {}
+        if open_push_tasks:
+            if len(open_push_tasks)!=self.horizon_length:
+                raise ValueError('Missing OPEN/PUSH task labels in rollout')
+            labels=torch.stack(open_push_tasks)
+            debug={}
+            for family,name in enumerate(('open','push')):
+                mask=(labels==family).reshape(*task_rewards.shape[:-1],1);count=mask.sum().clamp_min(1)
+                task_mean=(task_rewards*mask).sum()/count
+                amp_mean=(amp_rewards['disc_rewards']*mask).sum()/count
+                for key,value in dict(task_reward=task_mean,amp_reward=amp_mean,
+                    weighted_task_reward=self._task_reward_w*task_mean,
+                    weighted_amp_reward=self._disc_reward_w*amp_mean,
+                    combined_reward=(mb_rewards*mask).sum()/count,sample_count=mask.sum().float()).items():
+                    debug[name+'/reward_balance/'+key]=value
+            for group,selected in (('paired_contact',torch.stack(open_push_contact)),
+                                   ('both_hands_near',torch.stack(open_push_near))):
+                mask=((labels==1) & selected).reshape(*task_rewards.shape[:-1],1);count=mask.sum().clamp_min(1)
+                debug['push/reward_balance/'+group+'_sample_count']=mask.sum().float()
+                debug['push/reward_balance/'+group+'_amp_reward']=(amp_rewards['disc_rewards']*mask).sum()/count
+                debug['push/reward_balance/'+group+'_task_reward']=(task_rewards*mask).sum()/count
+            batch_dict['relation_conditional_diagnostics']=debug
         if relation_near_masks:
             mask = torch.stack(relation_near_masks).unsqueeze(-1)
             count = mask.sum().clamp_min(1)
-            batch_dict['relation_conditional_diagnostics'] = {
+            batch_dict.setdefault('relation_conditional_diagnostics',{}).update({
                 'near_unplaced_slow/amp': (amp_rewards['disc_rewards'] * mask).sum() / count,
                 'near_unplaced_slow/combined': (mb_rewards * mask).sum() / count,
-                'near_unplaced_slow/sample_count': mask.sum().float()}
+                'near_unplaced_slow/sample_count': mask.sum().float()})
         for key in self.tensor_list:
             value = self.experience_buffer.tensor_dict.get(key)
             if value is None:
@@ -443,14 +545,19 @@ class MAAgent(amp_agent.AMPAgent):
         self._update_amp_demos()
         scene_count, M, amp_dim = batch_dict['amp_obs'].shape
         num_agent_samples = scene_count * M
-        amp_obs_demo = self._amp_obs_demo_buffer.sample(num_agent_samples)['amp_obs']
-        batch_dict['amp_obs_demo'] = amp_obs_demo.view(scene_count, M, amp_dim)
+        if self._amp_enabled:
+            amp_obs_demo = self._amp_obs_demo_buffer.sample(num_agent_samples)['amp_obs']
+            batch_dict['amp_obs_demo'] = amp_obs_demo.view(scene_count, M, amp_dim)
 
-        if self._amp_replay_buffer.get_total_count() == 0:
-            batch_dict['amp_obs_replay'] = batch_dict['amp_obs']
+            if self._amp_replay_buffer.get_total_count() == 0:
+                batch_dict['amp_obs_replay'] = batch_dict['amp_obs']
+            else:
+                replay = self._amp_replay_buffer.sample(num_agent_samples)['amp_obs']
+                batch_dict['amp_obs_replay'] = replay.view(scene_count, M, amp_dim)
+
         else:
-            replay = self._amp_replay_buffer.sample(num_agent_samples)['amp_obs']
-            batch_dict['amp_obs_replay'] = replay.view(scene_count, M, amp_dim)
+            batch_dict['amp_obs_demo'] = torch.zeros_like(batch_dict['amp_obs'])
+            batch_dict['amp_obs_replay'] = batch_dict['amp_obs']
 
         task = self.vec_env.env.task
         if getattr(task, '_amp_task_conditioning', False):
@@ -461,7 +568,7 @@ class MAAgent(amp_agent.AMPAgent):
                 count = min(buffer.get_total_count(), buffer.get_buffer_size())
                 pool = buffer._data_buf['amp_obs'][:count] if count else reference[:0]
                 fallback = reference if key == 'amp_obs_replay' else None
-                matched = sample_family_matched(pool, reference, task._num_amp_obs_steps, fallback)
+                matched = sample_family_matched(pool, reference, task._num_amp_obs_steps, fallback, getattr(task, '_amp_family_count', 3))
                 batch_dict[key] = matched.view(scene_count, M, amp_dim)
 
         self.set_train()
@@ -543,12 +650,13 @@ class MAAgent(amp_agent.AMPAgent):
         amp_obs = self._preproc_amp_obs(amp_obs)
         amp_obs_replay = self._preproc_amp_obs(amp_obs_replay)
         amp_obs_demo = self._preproc_amp_obs(amp_obs_demo)
-        amp_obs_demo.requires_grad_(True)
+        amp_obs_demo.requires_grad_(self._amp_enabled)
 
         rand_action_sum = torch.sum(rand_action_mask)
         curr_e_clip = self.e_clip
         model_input = {
             'is_train': True,
+            'amp_enabled': self._amp_enabled,
             'prev_actions': actions_batch,
             'obs': obs_batch,
             'amp_obs': amp_obs,
@@ -577,10 +685,15 @@ class MAAgent(amp_agent.AMPAgent):
             a_clip_frac = torch.sum(
                 rand_action_mask * a_info['actor_clipped'].float()) / rand_action_sum
 
-            disc_agent_cat_logit = torch.cat([
-                res_dict['disc_agent_logit'], res_dict['disc_agent_replay_logit']], dim=0)
-            disc_info = self._disc_loss(
-                disc_agent_cat_logit, res_dict['disc_demo_logit'], amp_obs_demo)
+            if self._amp_enabled:
+                disc_agent_cat_logit = torch.cat([
+                    res_dict['disc_agent_logit'], res_dict['disc_agent_replay_logit']], dim=0)
+                disc_info = self._disc_loss(
+                    disc_agent_cat_logit, res_dict['disc_demo_logit'], amp_obs_demo)
+            else:
+                disc_info = {key: values.new_zeros(()) for key in (
+                    'disc_loss', 'disc_grad_penalty', 'disc_logit_loss',
+                    'disc_agent_acc', 'disc_demo_acc', 'disc_agent_logit', 'disc_demo_logit')}
             disc_loss = disc_info['disc_loss']
             loss = (a_loss + self.critic_coef * c_loss
                     - self.entropy_coef * entropy
@@ -642,6 +755,10 @@ class MAAgent(amp_agent.AMPAgent):
         return
 
     def _log_train_info(self, train_info, frame):
+        task = self.vec_env.env.task
+        if getattr(task, '_hybrid_rsi_runtime', None) is not None:
+            task._hybrid_rsi_runtime.dump(self.epoch_num)
+            task._reference_rsi_bank.on_epoch(self.epoch_num)
         super()._log_train_info(train_info, frame)
         disc_reward_mean = train_info["disc_rewards"].mean()
         self.writer.add_scalar("reward_terms/amp", disc_reward_mean.item(), frame)
@@ -657,6 +774,6 @@ class MAAgent(amp_agent.AMPAgent):
         if means is not None:
             for name, value in zip(self.vec_env.env.task.REWARD_TERM_NAMES, means):
                 self.writer.add_scalar("reward_terms/{}".format(name), value.item(), frame)
-            combined = self._task_reward_w * means[-1] + self._disc_reward_w * disc_reward_mean
+            combined = self._task_reward_w * means[-1] + (self._disc_reward_w * disc_reward_mean if self._amp_enabled else 0)
             self.writer.add_scalar("reward_terms/combined", combined.item(), frame)
         return

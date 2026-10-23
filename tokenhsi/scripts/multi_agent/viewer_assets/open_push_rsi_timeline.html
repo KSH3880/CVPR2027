@@ -1,0 +1,38 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OPEN / PUSH — RSI 프레임 검사</title>
+<style>body{font:15px system-ui;margin:24px;background:#101820;color:#edf2f7}h1{font-size:23px}button,select{font:inherit;padding:8px;margin:3px;background:#23313e;border:1px solid #637381;color:inherit;border-radius:5px}button:focus{outline:2px solid #62d9db}canvas{display:block;width:100%;height:55vh;background:#17232d;border-radius:8px;touch-action:none}#marks{height:28px;margin-top:8px}#frame{width:100%;margin:12px 0}p{line-height:1.6}.muted{color:#bdcbd8}#stamp{font-variant-numeric:tabular-nums}label{margin-right:15px}.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px}#candidate{min-height:28px;color:#ffc864}</style>
+<h1>전체 모션과 RSI 시작 프레임</h1><p id="setting"></p>
+<p class="muted">모션은 모든 프레임을 순서대로 재생합니다. 노란 표시는 RSI로 선택 가능한 프레임, 주황 표시는 후반 우선 후보입니다. 후보가 없는 구간도 재생에서 생략하지 않습니다.</p>
+<div class="toolbar"><select id="clip"></select><button id="start">처음부터</button><button id="prev">← 한 프레임</button><button id="play">재생</button><button id="next">한 프레임 →</button><select id="speed"><option value="0.25">0.25배속</option><option value="0.5" selected>0.5배속</option><option value="1">1배속</option></select><button id="prevRsi">이전 RSI 후보</button><button id="nextRsi">다음 RSI 후보</button></div>
+<p><label><input id="lower" type="checkbox" checked>PUSH 낮춘 팔 자세</label><label><input id="ghost" type="checkbox" checked>원본 AMP 겹쳐 보기</label><label>시점 <input id="yaw" type="range" min="-3.14" max="3.14" step="0.01" value="-0.7"></label><label>확대 <input id="zoom" type="range" min="0.5" max="2.5" step="0.05" value="1"></label></p>
+<canvas id="view"></canvas><canvas id="marks"></canvas><input id="frame" type="range" min="0" step="1"><div id="stamp"></div><div id="candidate"></div>
+<p class="muted">파랑: 왼쪽 팔다리 · 분홍: 오른쪽 팔다리 · 회색: 원본 AMP. ←/→로 한 프레임, Space로 재생/일시정지. 타임라인의 후보 표시를 클릭하면 해당 RSI 프레임으로 이동합니다. 끝에서는 멈춥니다.</p>
+<p class="muted">이 화면은 로드된 AMP clip 전체와 RSI 팔 보정을 보여줍니다. 실제 문/박스 접촉이나 reset 이후 학습 정책의 움직임은 시뮬레이터 뷰어에서 확인해야 합니다. 문 각도·박스 전진량은 RSI 배치 proxy이며 원본 물체 궤적이 아닙니다.</p>
+<script>
+const data=__MOTION_DATA__;const e=id=>document.getElementById(id);let selected=0,frame=0,playing=false,last=performance.now(),carry=0;
+e('setting').textContent='RSI 후보 기준: PUSH 목표 '+data.push_distance+'m';
+const clip=()=>data.clips[selected];const canvas=e('view'),ctx=canvas.getContext('2d'),marks=e('marks'),mc=marks.getContext('2d');
+data.clips.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(c.skill==='push'?'PUSH':'OPEN')+' · '+c.name;e('clip').appendChild(o)});
+function pause(){playing=false;carry=0;e('play').textContent='재생'}
+function seek(f){pause();frame=Math.max(0,Math.min(clip().frames-1,Math.round(f)));e('frame').value=frame}
+function toggle(){playing=!playing;if(playing&&frame===clip().frames-1)frame=0;carry=0;e('play').textContent=playing?'일시정지':'재생'}
+e('clip').onchange=()=>{selected=+e('clip').value;seek(0);e('frame').max=clip().frames-1};e('frame').max=clip().frames-1;
+e('start').onclick=()=>seek(0);e('prev').onclick=()=>seek(frame-1);e('next').onclick=()=>seek(frame+1);e('play').onclick=toggle;e('frame').oninput=()=>seek(+e('frame').value);
+function jump(direction){const rows=clip().candidates;const r=direction>0?rows.find(r=>r.frame>frame):rows.slice().reverse().find(r=>r.frame<frame);if(r)seek(r.frame)}
+e('prevRsi').onclick=()=>jump(-1);e('nextRsi').onclick=()=>jump(1);
+window.addEventListener('keydown',ev=>{if(['INPUT','SELECT'].includes(ev.target.tagName))return;if(ev.code==='Space'){ev.preventDefault();toggle()}if(ev.code==='ArrowLeft'){ev.preventDefault();seek(frame-1)}if(ev.code==='ArrowRight'){ev.preventDefault();seek(frame+1)}});
+marks.onclick=ev=>{const x=(ev.clientX-marks.getBoundingClientRect().left)/marks.clientWidth*(clip().frames-1);if(clip().candidates.length)seek(clip().candidates.reduce((a,b)=>Math.abs(a.frame-x)<Math.abs(b.frame-x)?a:b).frame)};
+function fit(c){c.width=Math.round(c.clientWidth*devicePixelRatio);c.height=Math.round(c.clientHeight*devicePixelRatio)}
+let drag=null;canvas.onpointerdown=ev=>{drag={x:ev.clientX,yaw:+e('yaw').value};canvas.setPointerCapture(ev.pointerId)};canvas.onpointermove=ev=>{if(drag)e('yaw').value=Math.max(-3.14,Math.min(3.14,drag.yaw+(ev.clientX-drag.x)*.01))};canvas.onpointerup=()=>drag=null;
+function draw(now){const dt=Math.min(.1,(now-last)/1000);last=now;const c=clip();if(playing){carry+=dt*c.fps*+e('speed').value;while(carry>=1){carry-=1;frame++;if(frame>=c.frames-1){frame=c.frames-1;pause();break}}}
+fit(canvas);fit(marks);ctx.clearRect(0,0,canvas.width,canvas.height);const p=(e('lower').checked?c.reset_positions:c.positions)[frame],origin=c.positions[frame][0];
+const yaw=+e('yaw').value,scale=Math.min(canvas.width/5,canvas.height/2.8)*+e('zoom').value;
+function proj(v){const x=v[0]-origin[0],y=v[1]-origin[1],a=Math.cos(yaw)*x-Math.sin(yaw)*y,b=Math.sin(yaw)*x+Math.cos(yaw)*y;return[canvas.width/2+a*scale,canvas.height*.85-(v[2]+b*.25)*scale]}
+function line(a,b,color,width=1,dashed=false){ctx.beginPath();ctx.setLineDash(dashed?[5,5]:[]);ctx.moveTo(...proj(a));ctx.lineTo(...proj(b));ctx.strokeStyle=color;ctx.lineWidth=width*devicePixelRatio;ctx.stroke();ctx.setLineDash([])}
+for(let i=-4;i<=4;i++){line([origin[0]+i*.5,origin[1]-2,0],[origin[0]+i*.5,origin[1]+2,0],'#30414e');line([origin[0]-2,origin[1]+i*.5,0],[origin[0]+2,origin[1]+i*.5,0],'#30414e')}
+function skeleton(points,ghost){c.nodes.forEach((n,j)=>{if(n.parent>=0)line(points[n.parent],points[j],ghost?'#8496a8':n.name.startsWith('right')?'#f589a5':'#62d9db',ghost?2:5,ghost)});if(!ghost)c.nodes.forEach((n,j)=>{const v=proj(points[j]);ctx.beginPath();ctx.arc(v[0],v[1],(n.name.includes('hand')?6:3)*devicePixelRatio,0,2*Math.PI);ctx.fillStyle=n.name.includes('hand')?'#ffc864':'#edf2f7';ctx.fill()})}
+if(e('ghost').checked&&e('lower').checked&&c.skill==='push')skeleton(c.positions[frame],true);skeleton(p,false);
+mc.clearRect(0,0,marks.width,marks.height);mc.fillStyle='#324655';mc.fillRect(0,marks.height*.3,marks.width,marks.height*.4);c.candidates.forEach(r=>{mc.fillStyle=r.late?'#ff9747':'#ffe17a';mc.fillRect(r.frame/(c.frames-1)*marks.width-1,0,2*devicePixelRatio,marks.height)});mc.fillStyle='#fff';mc.fillRect(frame/(c.frames-1)*marks.width-1,0,2*devicePixelRatio,marks.height);
+e('frame').value=frame;e('stamp').textContent=`프레임 ${frame} / ${c.frames-1} · ${(frame/c.fps).toFixed(3)}초 / ${((c.frames-1)/c.fps).toFixed(3)}초 · 모션 진행 ${(100*frame/(c.frames-1)).toFixed(1)}% · ${c.fps} FPS`;
+const r=c.candidates.find(r=>r.frame===frame);e('candidate').textContent=r?`RSI 시작 후보${r.late?' · 후반 우선':''} — `+(c.skill==='push'?`박스 초기 전진 ${r.initial_forward_m.toFixed(2)}m / 목표 ${data.push_distance}m`:`문 초기 각도 ${(r.angle*180/Math.PI).toFixed(1)}°`):'이 프레임은 RSI 후보가 아닙니다. 원본 모션에는 포함되어 있습니다.';
+requestAnimationFrame(draw)}requestAnimationFrame(draw);
+</script></html>

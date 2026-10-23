@@ -1,0 +1,79 @@
+[
+  {
+    "filename": "inside_door_handle_left_side_open_walk_R_001__A515",
+    "bytes": 1609643,
+    "sha256": "69b1fe33fde44d017672bead533d4b26de72f570d11e33cd128b62db60ec15e3",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_left_side_open_walk_R_001__A515",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A515.bvh"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_walk_R_001__A515",
+    "bytes": 1486707,
+    "sha256": "884ec3f1f10fcf3d52da254f47b8b51343d7b460a477850201a03e42a80f9200",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_right_side_open_walk_R_001__A515",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_right_side_open_walk_R_001__A515.bvh"
+  },
+  {
+    "filename": "inside_door_handle_left_side_open_walk_close_behind_R_001__A514",
+    "bytes": 2456253,
+    "sha256": "eca1d60d67a9e18f61a747f24e3c4b72a939e0629cd566f770dd6b4cd7c28499",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_left_side_open_walk_close_behind_R_001__A514",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_close_behind_R_001__A514.bvh"
+  },
+  {
+    "filename": "inside_door_handle_left_side_open_walk_R_001__A512",
+    "bytes": 977305,
+    "sha256": "bb1fa3b223975b9ee90abca0a925241da17a58a70f3d78b79e9d70327a804867",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_left_side_open_walk_R_001__A512",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_left_side_open_walk_R_001__A512.bvh"
+  },
+  {
+    "filename": "inside_door_knob_left_side_open_walk_R_001__A514",
+    "bytes": 1315507,
+    "sha256": "809ed75723d3dab5577d3eea8c9ccd7432a20c16a1c1bec412320aadb27438d7",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_knob_left_side_open_walk_R_001__A514",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_knob_left_side_open_walk_R_001__A514.bvh"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_full_R_001__A515",
+    "bytes": 1642758,
+    "sha256": "476dd6ceb74b214e34e0eedb99625fd19b08711a541bd6f19b12ae8ba2abb87a",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_right_side_open_full_R_001__A515",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A515.bvh"
+  },
+  {
+    "filename": "inside_door_handle_left_side_open_full_R_001__A515",
+    "bytes": 1558704,
+    "sha256": "e978a5c0ef884a33846d6fdde08e872f62efa9d08509586d8ff147f34a045d50",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_left_side_open_full_R_001__A515",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_left_side_open_full_R_001__A515.bvh"
+  },
+  {
+    "filename": "inside_door_knob_right_side_open_full_R_001__A515",
+    "bytes": 1584308,
+    "sha256": "ec6581a92a6766a728ce6ae755ca07a952f86bed2aa5e42ac80867813da03932",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_knob_right_side_open_full_R_001__A515",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_knob_right_side_open_full_R_001__A515.bvh"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_R_001__A512",
+    "bytes": 1049132,
+    "sha256": "09f12221e4096f3a7db7098e727f4da853281bf0d0aa5291fc54f2a12465ea8e",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_right_side_open_R_001__A512",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_right_side_open_R_001__A512.bvh"
+  },
+  {
+    "filename": "inside_door_handle_right_side_open_full_R_001__A512",
+    "bytes": 1115376,
+    "sha256": "e6c158a3138b3753595ffc4253e1c26597b4ca6bb0d60a66057fc2dd5eb12abf",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=inside_door_handle_right_side_open_full_R_001__A512",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/inside_door_handle_right_side_open_full_R_001__A512.bvh"
+  },
+  {
+    "filename": "outside_door_knob_right_side_open_walk_R_001__A515",
+    "bytes": 2034919,
+    "sha256": "cc6b06ec16b1d1c6744037f565e196e3f9f9ce848e5b4130489c3b179b7380c0",
+    "source": "https://seed-viewer.bones.studio/api/storage_local/somabvh/?bvhpath=outside_door_knob_right_side_open_walk_R_001__A515",
+    "path": "/home/hwanhee/koo_cvpr/stage1_fix/bones_seed/viewer_candidates/soma_uniform/bvh/231115/outside_door_knob_right_side_open_walk_R_001__A515.bvh"
+  }
+]

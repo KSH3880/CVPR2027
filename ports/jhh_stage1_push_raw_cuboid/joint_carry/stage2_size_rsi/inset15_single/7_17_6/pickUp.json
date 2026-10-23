@@ -1,0 +1,32 @@
+{
+  "frames": 100,
+  "accepted": 100,
+  "geometry_accepted": 100,
+  "mean_contact_fraction": [
+    0.6483333306014538,
+    0.6416666638851166
+  ],
+  "peak_hand_force": 153.26446533203125,
+  "nearest_hand": 0.039629828929901134,
+  "stiffness_range": [
+    100.0,
+    999.9999389648438
+  ],
+  "maximum_joint_limit_violation_rad": 0.0,
+  "box_displacement": 0.17328715324401855,
+  "device": "selected CUDA GPU",
+  "minimum_accepted_simultaneous_contact_fraction": 0.0,
+  "size": [
+    0.3499999940395355,
+    0.8500000238418579,
+    0.30000001192092896
+  ],
+  "support": null,
+  "contract_digest": "7e8f46184a4baf295f42613c63b21389826b2ff1427877863248e38e08d17a41",
+  "source_mode": "single",
+  "anchor_inset": 0.15,
+  "source_sha256": "3279b5d789d57655fdf27f678fd641dac4575601f981438a03cf76c890b782ff",
+  "maximum_hand_target_error_m": 0.018556125436064896,
+  "maximum_accepted_hand_target_error_m": 0.018556125436064896,
+  "sha256": "de8f6f5905af0cf33bcca3bdf9e7cb4cb17f1c00221e1edb58d474104081861c"
+}

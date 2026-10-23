@@ -1,0 +1,583 @@
+{
+  "source_repository": "/home/hwanhee/ksh/stage1_fix",
+  "snapshot_time": "2026-10-05T22:52:53.043467",
+  "files": [
+    {
+      "path": "tokenhsi/env/tasks/humanoid.py",
+      "sha256": "07b3608ec87d8501b79a4c030cdf710d8457bc1025503c9cb4b211d38995c1b4"
+    },
+    {
+      "path": "tokenhsi/env/tasks/base_task.py",
+      "sha256": "b43ad85990486c66ac5b56af11416c339e9a2c530deddd6dd2e85f123eb1f609"
+    },
+    {
+      "path": "tokenhsi/env/tasks/__init__.py",
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/humanoid_amp.py",
+      "sha256": "21a271b18827a1f11a577197f959c8ac71e6319a9b1a4a877834f49c3fa0fa74"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task_wrappers.py",
+      "sha256": "be3001d8b341118c556d1ccdc9d91f5c4f8ba4edd31cabb8db63f1f015a3f4c2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task.py",
+      "sha256": "33db038a7183fa74025fa6e11bbfbcaca54f10f72e52e97910196060f84000d2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py",
+      "sha256": "3267ebc9896c3dabedbc4da5e7ecd1804e73b34ba5c73e72de2f37669cd9e1f3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_traj.py",
+      "sha256": "61db1fb19e881df70b87c592c079c860c8f3d57a24314bc7eaaab6e376eab360"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py",
+      "sha256": "edc0f5be85c9ab43fbe1938f0792f5f264d9e455c3551aebfd36d018c6501df0"
+    },
+    {
+      "path": "tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py",
+      "sha256": "6d942e993b76fe53af1595072c216daf775bc713613159971be0674539e3bf85"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_climb_carry.py",
+      "sha256": "e3620cbf210b0c794a30e6179a093bcf3a6e73fa9cd94ad0be08091834f6cd0a"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_sit_carry.py",
+      "sha256": "c5275bd8cf33f298c556cef627192b2567e2394297d74014de20ec1a735d7318"
+    },
+    {
+      "path": "tokenhsi/env/tasks/comp_interaction_skills/humanoid_comp_traj_carry.py",
+      "sha256": "6904967f2333c522512209e91e2ac299ab59835fc43efba691e029a9610acbed"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_task/humanoid_traj_sit_carry_climb.py",
+      "sha256": "355d6dd2cf159850783f99d95b401276103f3cb0c6cbc096933ec651de2f1575"
+    },
+    {
+      "path": "tokenhsi/env/tasks/longterm_task_completion/humanoid_longterm_4basicskills.py",
+      "sha256": "19fca0c3ee200588621a0344ed3ca3120d4a3732797ff8aa6fce6a7e4a5d6680"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/box_cleanup_demo.py",
+      "sha256": "dddcc050b2cc65cb351dd3b98f840ec0fa67498a0577e9c04cbaa01429f20df8"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py",
+      "sha256": "2a94497f2fe844833996098e6708284248e692c61cfc4b39bb3176a77f879f22"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma.py",
+      "sha256": "f3860dfc7b1fe7cc67e10d02fc278928f151f72c1382dbc1a605e53f0a2dbbbe"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_features.py",
+      "sha256": "a72314083d7390c9277cc8421115b517acae010079ade7a6d4356220b8f63b9f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_reward.py",
+      "sha256": "e77031f2def7a664696ea3ed8ac0336a48cff8f5c73de17beac4e1304fb4e925"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py",
+      "sha256": "01b1d15a531851670be284246173651d1ea4601badbb3737fab6664ccccbc3ed"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/ontop_task.py",
+      "sha256": "99a799a2896c2d80dff3aaf9445836b6316b23894c2e902ebd504bf5c44aa776"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/vec_task_wrapper_ma.py",
+      "sha256": "af6ec9a8e7c9b9f5d91b610aafdc440efd07791532c467e9de85d211ce10f2d1"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py",
+      "sha256": "631463742f052fbd8536bc2ef9af5cc8d2d8c0558c5874ff6e6a45ec18b1869f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_diagnostics.py",
+      "sha256": "11ef475aa950b10e202cd1b4bdeb89837b2eb105096f8fc663fef9eafc9676ed"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_reward.py",
+      "sha256": "97132dbff7428cda7dda601db128f5d41eb9748538b0b78f552fc7f018e17e70"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py",
+      "sha256": "0250ab8cc13effa8a6a8df4f8f96e1fba9507a743f37f746d96112c2af3bae98"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_task.py",
+      "sha256": "a0b43ceb78e4a8378fffc7b841b9f97ab5d663f6e84be356013776dc8e7f92a3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_task.py",
+      "sha256": "b804440a4c9ec8c009aee8df0949ebd253b900571b2d3bffa817fb7f06bff37f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/size_rsi_cache.py",
+      "sha256": "9689e9e2c252955817e5be17f0d69a32c5edaa2d00e3abe6b5a4f983cbee6710"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_task.py",
+      "sha256": "dafed049345c38a48d63ab31643df3b156a7e745c716157d565d68f034081dc0"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_ground2terrain.py",
+      "sha256": "0905fae47db9db5982a400ff433f543ab378e0d1f480cab163745daa34060d2c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_traj_ground2terrain.py",
+      "sha256": "9460995007c53c673d390924c508b6116abd18afe059db0d650d08daf277febc"
+    },
+    {
+      "path": "tokenhsi/env/tasks/adapt_interaction_skills/humanoid_adapt_carry_box2objs.py",
+      "sha256": "2e318d8602eafdf38a8f07e22cf82b130d145b28d8cd70b4a2d124823864a705"
+    },
+    {
+      "path": "tokenhsi/learning/amp_agent.py",
+      "sha256": "b20fc99f97e14299ed8dc9f01cb4a04b9d650fd3ae86ea5c3e57084c74d557e8"
+    },
+    {
+      "path": "tokenhsi/learning/common_player.py",
+      "sha256": "bd37d2597217e9258dc6fad0a27500e1e7a26c8246643f1a7b5198a7d6199b45"
+    },
+    {
+      "path": "tokenhsi/learning/amp_players.py",
+      "sha256": "ccc382cd71962d2fd3d1252ed9ac18d141289cd63b1579f1c40ca811d69c03f8"
+    },
+    {
+      "path": "tokenhsi/learning/replay_buffer.py",
+      "sha256": "9f4097a1f3ea44d132d18dc0b72a9141051c093b193443e4e9bd578d28844a5c"
+    },
+    {
+      "path": "tokenhsi/learning/amp_network_builder.py",
+      "sha256": "a51179a14690d50467e0161f1afdbe537c1670463d7a20782fe4687c19695d68"
+    },
+    {
+      "path": "tokenhsi/learning/amp_datasets.py",
+      "sha256": "8e2802113413e9d88e31559c1b3b8b233ae1b6f4b6b9e82440eb0f0aa1eeebb7"
+    },
+    {
+      "path": "tokenhsi/learning/common_agent.py",
+      "sha256": "8e90235fef14465040be1bad875fe9f3de69b94f391a2b788e1463ec99620187"
+    },
+    {
+      "path": "tokenhsi/learning/amp_models.py",
+      "sha256": "d92aa96243f8cd10b85b7dca4d11bdd8a67eb02a6242968b2253e260877097db"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/transfer.py",
+      "sha256": "a47072693284688f8e9bd95dec55863e53f4c6d1be758d29c2bab280ad2a99b1"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/stage2_transfer.py",
+      "sha256": "cc5a9f4752d8ca23c26381bb7ca59297709207f150afb0cb225703a5631de588"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/edge_context_encoder.py",
+      "sha256": "d5089a61e6285b38ade2ef8e5da8e95017afa275649e3edf0db68335dfef2fdf"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/coordination_head.py",
+      "sha256": "53094781b05401bd169933de746215226f1cf19884e3292f02d093d534a9e659"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_players.py",
+      "sha256": "b773fbaadf63d578be65951e92240635d4774725704b85933d04c4af5b8f4034"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/scene_normalizer.py",
+      "sha256": "fa36a08cfb9018e9a51130ce5c7626f55e66af17327e1b159e703eed7ea214f4"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/task_role_encoder.py",
+      "sha256": "f495c669e9dec6755091719cff1caf484d9a9dd5ef9be9e941a002e204a472f2"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/amp_network_builder_ma.py",
+      "sha256": "ec7759f4db5202749ebe464c52bdb8d24781cf759019a910f55b29357181de41"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/edge_context_eval.py",
+      "sha256": "cd9980fd1fb010ed80ef7819e59b2b8a022a52aaaf7137300e1d13d454c92c2d"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/box_cleanup_player.py",
+      "sha256": "eddbc59b3a1ad7c70ab68a8421442aec33750bb1eb4dc103a3e57528faf1a317"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_agent.py",
+      "sha256": "008d4b4811e8ebb0c88ce0946273c0e6739de17573af350842734c28124ed421"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/composer.py",
+      "sha256": "03716f77a57353bc5008ba217c66c775e911197be4b766e7485a7dda84265cbe"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/trans_agent.py",
+      "sha256": "46d8322c8203966b5bb6b56accc09d53f0ea6385614102036f797557a2db772e"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_longterm.py",
+      "sha256": "f0e6a6113e5303ea89778916ee1ce08d17a504ea038fbe55f491789ae503bc8f"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_adapt.py",
+      "sha256": "4dae24d8d42b31a8cda12791fc2f9abb8d69700be4c6f6d954f5662a3bb54890"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/trans_players.py",
+      "sha256": "40b57c33012a0c0db13c697fa425804143fccdc76eb7fb1bc81e2021833c2bad"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer.py",
+      "sha256": "efda485e1375fbb3d7a1f86bd182b2585861490e8a08f434b6dbfb4f515577f0"
+    },
+    {
+      "path": "tokenhsi/learning/transformer/amp_network_builder_transformer_comp.py",
+      "sha256": "188f612865a4e39581d6be57eae19b6d7eeedb5b51bf19bcfc54176657f446b2"
+    },
+    {
+      "path": "tokenhsi/utils/logger.py",
+      "sha256": "2f34444692c15106fe6a3ec014fc14e685cbc428490f2956b4188206148b555d"
+    },
+    {
+      "path": "tokenhsi/utils/edge_context_spec.py",
+      "sha256": "038b2e601470c2e37427efd2585e338cf1c861730e5b60a602c5e6d33ce974c2"
+    },
+    {
+      "path": "tokenhsi/utils/edge_scenario_spec.py",
+      "sha256": "a93bb87945e44b252d6fde76c77c1896edb5ee3f9a54772bdde6d1051836ec7e"
+    },
+    {
+      "path": "tokenhsi/utils/gym_util.py",
+      "sha256": "8ee056cda5bb39615d5c7c39b6e6c6b665f38fbe3a5d82af12383fea444fffa9"
+    },
+    {
+      "path": "tokenhsi/utils/task_role_spec.py",
+      "sha256": "c6e12b604c46ea178f3771965aa90eb375e124469d84ab62d298c04c29cc34de"
+    },
+    {
+      "path": "tokenhsi/utils/box_cleanup_spec.py",
+      "sha256": "e8239e2cefdb9148116abab7a9f2f08c2ced614b62fd8d8c4f2018edbdb6da38"
+    },
+    {
+      "path": "tokenhsi/utils/rsi_curriculum.py",
+      "sha256": "bc7d65e88a43851afbbad7ccb4f87ee2b571914512bf5ad5972cfc445944b626"
+    },
+    {
+      "path": "tokenhsi/utils/traj_generator.py",
+      "sha256": "5797dfa6a9f5dd514553f17d35e800f023d50334abb1e3446feb5e512a15cd57"
+    },
+    {
+      "path": "tokenhsi/utils/config.py",
+      "sha256": "b014054baded6020215a1aed5a5147d3d8c77efe507ae81e70adcc493c21d58d"
+    },
+    {
+      "path": "tokenhsi/utils/edge_interaction_spec.py",
+      "sha256": "ff47ee58d22c72aa805b7caf4dd6a58499087a480e42d54b8a5f1ae71b4b21dc"
+    },
+    {
+      "path": "tokenhsi/utils/motion_lib.py",
+      "sha256": "50f28b8f5cc705d520a7a8693dab3f8b57907a8a015d0bdf80f67f8326313d4d"
+    },
+    {
+      "path": "tokenhsi/utils/size_rsi.py",
+      "sha256": "7c5779574eb1a80b830580b37e8fc72a9b0c9d4da9e1468f5e05c63796e676ec"
+    },
+    {
+      "path": "tokenhsi/utils/unified_training.py",
+      "sha256": "c5904fb0e2e6b01e609282b75384985f168d5916b16363cac68d66d574d925e0"
+    },
+    {
+      "path": "tokenhsi/utils/torch_utils.py",
+      "sha256": "834225cad151e0003b4306ad5f3bc6f56f789ab95158a1bb74649b5ebd6e14b4"
+    },
+    {
+      "path": "tokenhsi/utils/edge_stage2_spec.py",
+      "sha256": "88ab36d2274a7ae1ea4f0e79b355a7dc3b7de6c1b0bb28c6bac204a2198b0925"
+    },
+    {
+      "path": "tokenhsi/utils/relation_task_spec.py",
+      "sha256": "dc1498d7014baf089afc34ca475ff8798738302a874f63f6c0d8b630c6131cb1"
+    },
+    {
+      "path": "tokenhsi/utils/__init__.py",
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/utils/parse_task.py",
+      "sha256": "3b8fb6cf263662a6c5839cd8c36bf6bb996adbeeb02fa36123c0c1c2b24bca3e"
+    },
+    {
+      "path": "tokenhsi/utils/ontop_task_spec.py",
+      "sha256": "25248ec0a9b605964ef8929f7615f594e34330b1d16421a019c42f9de2868674"
+    },
+    {
+      "path": "tokenhsi/utils/edge_ontop_spec.py",
+      "sha256": "0beb8dd976088ae7b10ac486afbffa63aced0bb89564e18f7b5901a3fe1c79a7"
+    },
+    {
+      "path": "tokenhsi/utils/traj_generator_custom.py",
+      "sha256": "e31b274cf9d195c9b5a8b7fa91a4c51760903549a2cd9cd324919e9725abb760"
+    },
+    {
+      "path": "tokenhsi/utils/edge_stage1_spec.py",
+      "sha256": "444d6d70dc2e7353064d8b9020bfc9101a70589573776c466a1eafc25140e9a1"
+    },
+    {
+      "path": "tokenhsi/run.py",
+      "sha256": "dfabf435d70f477d7f3e2eb2914397a7dad50dadd84d1df8668c96fbca6c8014"
+    },
+    {
+      "path": "tokenhsi/__init__.py",
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "d0d188f5b08ec03da7fdd0371f39d274e4de5b2f82f68b77ed4aa1bc817c0f11"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_climb.yaml",
+      "sha256": "33c849918a616cc0b56858a1375bb284b923f09685aa479e68e1d5ccbddb40c9"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_traj.yaml",
+      "sha256": "4c457d0cdc76d36e00aa432022334c3f4ded120e3cf1d8135a0e2c344a0819a3"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_carry.yaml",
+      "sha256": "5fcbf8cc6ca58854d1361fe64a97ac3dcdc57625c0746d543f5063146cad9073"
+    },
+    {
+      "path": "tokenhsi/data/cfg/basic_interaction_skills/amp_humanoid_sit.yaml",
+      "sha256": "c809ee354f7913b45c4d61eefa324907312e6e70abb58894a997d12a28333e9c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_climb_carry.yaml",
+      "sha256": "b4e435887844a55ec8d54bc72233007a2a660230b29a21843ef5045d796fdb85"
+    },
+    {
+      "path": "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_sit_carry.yaml",
+      "sha256": "2cac5d261df7e4ef19a5b7d1f24c548495f82b4a9b27a81811d825148409d350"
+    },
+    {
+      "path": "tokenhsi/data/cfg/comp_interaction_skills/amp_humanoid_comp_traj_carry.yaml",
+      "sha256": "eefd26ae4ba62bb0d18ef7cb41a356343346f7e6caf590f3eec37c5cde69e99e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml",
+      "sha256": "9e03850df9e3adda0e97970052ba5dccc26d450ef65770f682a0c0375ceca9ad"
+    },
+    {
+      "path": "tokenhsi/data/cfg/longterm_task_completion/amp_humanoid_longterm_4basicskills_0.yaml",
+      "sha256": "1cf7ae993b29d8975f2aac546a6ae3d2128208e8bf4eb776ac0115302ad697e3"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_stage2_coordination.yaml",
+      "sha256": "6ceaf51af44444d5a3686b77d11f790d9da0d7a708d68d93a51240e0843c595e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_typed_bias.yaml",
+      "sha256": "dc02534d047d00fd4ad5534e121ae986455bd6b6b15bf1c3ba5767098f638030"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum_reward_preserved.yaml",
+      "sha256": "4bee7016a20dc6abbcbf10651ff3bc466baab1f4128f3e95ffda93f3abb8b94c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_shared_edge_encoder.yaml",
+      "sha256": "a22ccab4e54a6dade67a7f969f9cb7c71e6b2803fda5015042470d8d11c6cfdf"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified.yaml",
+      "sha256": "1652638636d459d53c2f4fd1cd716c8692d104c03e424982c37ea680da04202a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_skill_curriculum.yaml",
+      "sha256": "27412b7c832a3598873422152fc4661ad5097c8a8235d5d798a7518a4c000394"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_typed_bias_message.yaml",
+      "sha256": "94270475a6788e95fb697b0f7c47c57332b6a6155ffab55e0ad3e21dd632dd96"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_ontop_putdown.yaml",
+      "sha256": "0e83461f35b9fa2362124ec21eb675636795d4c1c99caa3a6974b16628914bdd"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_paired_at_no_near.yaml",
+      "sha256": "afb7142d7ead84afaf2e224785458f70a80cddcc5576c47e932c8db6014de60f"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_task_message.yaml",
+      "sha256": "b73c5be7bc49398b9326a877a8bdb8eb2e85cb70ac7e17de82ca60d7a6091eb2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_independent_with_climb.yaml",
+      "sha256": "033633998f68b769e99bc7e9bcdf4beb506c1b1d46d27053fe181b67a15272fa"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_stage2_coordination_sit_plane.yaml",
+      "sha256": "43eb32cf1a3cdaee51977786d5a6248a9f0d6d84f18653c56e4249a347ae7aac"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_at_goal_fix.yaml",
+      "sha256": "95fc1e5d85e9b0bbf39838f0e5cee8edd9701e1edf2ba0c64ba06ab634906e06"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_plane.yaml",
+      "sha256": "100b49daa9571b1dc3dbf90fba545f60fb9ab5d448d79bc0eac004123e7e4cf0"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_sit_plane_normalized.yaml",
+      "sha256": "03080f44537f6ac76f6108a4c6218df69a0ebf34f4f3a67ed57c2e6ed8efd9d1"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_slow_near_start.yaml",
+      "sha256": "bcd7434af2f78ca14fb88e45b82cbfb1d482dc245a6d9ff7db9df9e2c1ba0465"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_paired_placement_owner_holding.yaml",
+      "sha256": "7df367b24220cd2c72ab0cb5a95dcd75f7a7ab3dda49bb667b4026d597f41077"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_self_sum.yaml",
+      "sha256": "f94f514bfca64b68b61b2942f7d8ae2b77259fc68c7789c01ddf988cd184112b"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml",
+      "sha256": "91e66987d0d5f2520d3d9114f96451c65c5b3ca19e7a9926761bcd0ce2b7e553"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_paired_placement_no_near.yaml",
+      "sha256": "d7a76615c8977d3e1a42f61059364a7f7bee1e3853c3fed197e2da3f23d4f12c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_owner_holding.yaml",
+      "sha256": "fc2f8a3552d9c462e0e10cb4ddae0277fba8ed11fac1eda6b4260558a65027e2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi.yaml",
+      "sha256": "ed9800e0a7509ba2a35ff4ac4a5715f31ac908a42340e62a9fc5f65e304383f2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_placement_focus.yaml",
+      "sha256": "e8282700faab238bae14bc27e8b38b3bbd6cd325243a7216ba7e42cb60ab2303"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/graphs/stage2_four_agent_pairs.yaml",
+      "sha256": "88fb83dbcf48279cc71b3271c831e38c95da38d69188c1ed72bfdc3935b0bbc1"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/graphs/stage2_three_agent_shared.yaml",
+      "sha256": "47a1b49ca3961c07d3f6670fa88ea997371dc757a8b686fc2cbc7cb49ea0acd7"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_ground2terrain.yaml",
+      "sha256": "c8d0ad3fa6b9b668abd69e27ad4b08a62a9d251071b1aa099a6002306602af9a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_box2objs_table.yaml",
+      "sha256": "39bb031b8eb0018b8ba567801e9c2de8c5f5fc1fc21faeb8c1a1ea317167faae"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_carry_box2objs_chair.yaml",
+      "sha256": "4318dfb3364266bfdcc0a456ef3f5aea49471a848a7d15bd469f9c926ee8336c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/adapt_interaction_skills/amp_humanoid_adapt_traj_ground2terrain.yaml",
+      "sha256": "61d390c7e7d058d11b99dcc09f33ca8ffe20a4353936641982e01e10b6a59ecb"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_size_rsi_typed_bias.yaml",
+      "sha256": "6b639e90f103cb321c6053b832347aa80d2b5812a51320de9a9490d84833241d"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_comp.yaml",
+      "sha256": "2b20779e76df3b8f52e0020759f7fef2b6c9c11c56a0f6740d7469972950527c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task.yaml",
+      "sha256": "de0d4d6a4503937863fbf38257c78ad7c0b171106ecf0bc29f63b5b2b4bf422d"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task.yaml",
+      "sha256": "c502022109070199e9e18443fc4816207022e337b60eeb51d524fb419c97c02e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt_disc3.yaml",
+      "sha256": "b024513663196344e80f465d2f86a1fb05c5d5a65b61ae54cee53df71d340478"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation.yaml",
+      "sha256": "ac636b0b1f78cfcf9ab7a932384a9e18f13ee1e50119bf49a0e564a9c4ffab3e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt.yaml",
+      "sha256": "1ffc72db6152e52a66bfb61746b0cbde96316ddf1441d1ff61bca68c01bca2f6"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_stage2_coordination.yaml",
+      "sha256": "0ccdebbd5c923874048bfa422ae16fce00b3e7cb25e24d6220aac41337dd6ebd"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_size_rsi_task_message.yaml",
+      "sha256": "1131874f648bbed179ecc45bb62e31b15baa6962d71dde76e884e8983491d8ec"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_size_rsi_typed_bias_message.yaml",
+      "sha256": "3743004fd118a07c8934185ffffb4185da197143a91d96c2c7971fe76e0ea9a5"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry.yaml",
+      "sha256": "715ab477ff0116e352ff0a18c5c3af15a6b95cb36594cc5c6f97a7961b1a3aa8"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry_relation_unified_shared_edge_encoder.yaml",
+      "sha256": "25828ff6b4c1717baff673d53dc7fa4cd51b50cdb5e0104ab655effe0e125e9e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_ma_carry_watch.yaml",
+      "sha256": "50933b17a3e8851ddd94e066730cd61fa549d4ffd0ab850df3f34dde2e2ec9aa"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_longterm.yaml",
+      "sha256": "26aff0476c52787d56b8e45bfff867bf716ad77cc6b2d1a6bd30afcb413a4878"
+    },
+    {
+      "path": "tokenhsi/tests/test_size_rsi.py",
+      "sha256": "22326862ec2c48e9320c0e8cb6c016d6da4edf2927387571e98bb85d98e48d8f"
+    },
+    {
+      "path": "tokenhsi/tests/test_typed_edge_bias.py",
+      "sha256": "a16a0bf0ecd5244ef7e8554efb44984ae4f07a54bec555f5f43ebd38b0504d51"
+    },
+    {
+      "path": "tokenhsi/tests/test_typed_edge_message.py",
+      "sha256": "4bd0f559b857a6d10df8269a743ffbc62e7e2ac491a1e7c54972e80f915ddf65"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_unified.py",
+      "sha256": "1f69f560ee593a356be81a88a8864841c2bc37e0e9afed57372bca20b269c632"
+    }
+  ],
+  "cache_seed": {
+    "source": "/home/hwanhee/ksh/stage1_fix/output/rsi_cache/6361a69fcf429a02a66602bb.pkl.gz",
+    "path": "output/rsi_cache/6361a69fcf429a02a66602bb.pkl.gz",
+    "sha256": "9639457572cfed624dc06c2e4c4ac9538f6505ee4ae1b3aea5c5c39ab98d2537"
+  }
+}
