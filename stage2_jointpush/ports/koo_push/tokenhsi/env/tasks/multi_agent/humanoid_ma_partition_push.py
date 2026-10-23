@@ -10,7 +10,7 @@ from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.humanoid_ma_open_push import HumanoidMAOpenPush
 from env.tasks.multi_agent.humanoid_ma_joint_push import cpa_penalty
 from utils.door_reference import rotate, multiply, yaw_from_quat
-from utils.partition_push import nearest_boxes, group_tokens, group_layout, sample_groups, sample_asset_bank, partition_reward, sample_surround_spawn, exclusive_regions
+from utils.partition_push import nearest_boxes, group_tokens, group_layout, sample_groups, sample_asset_bank, partition_reward, sample_surround_spawn, exclusive_regions, hidden_door_region_tokens, sample_virtual_doors
 from utils.open_push_spec import compile_graph
 from utils.edge_ontop_spec import expand_graph
 from utils.edge_stage1_spec import semantic_graph_packet
@@ -24,8 +24,15 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         self._partition_push = self._joint_push = True
         self._joint_cfg = cfg['env']
         self._joint_push_spec = cfg['env']['partitionPush']
+        layout = self._joint_push_spec.get('object_layout', 'regions_and_boxes')
+        if layout not in ('regions_and_boxes', 'hidden_doors_then_regions_v1', 'hidden_doors_scattered_regions_v2', 'task_regions_only_v1'):
+            raise ValueError('Unknown Partition Push object layout: '+layout)
+        self._task_only = layout == 'task_regions_only_v1'
+        self._bank_size = 16 if self._task_only else 24
+        self._hidden_door_tokens = layout in ('hidden_doors_then_regions_v1', 'hidden_doors_scattered_regions_v2')
+        self._scattered_door_tokens = layout == 'hidden_doors_scattered_regions_v2'
         self._amp_family_count = 2
-        if (cfg['env']['numAgents'], cfg['env']['numObjects']) != (4, 8):
+        if (cfg['env']['numAgents'], cfg['env']['numObjects']) != (4, 4 if self._task_only else 8):
             raise ValueError('Partition Push requires 4 humans and 8 object tokens')
         if cfg['env'].get('openPushRSI') or cfg['env']['skillInitProb'] != [1., 0., 0.]:
             raise ValueError('Partition Push requires loco-only initialization')
@@ -35,7 +42,7 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
 
     def _load_box_asset(self):
         spec = self._joint_push_spec
-        self._box_size, self._payload_masses = sample_asset_bank(self.num_envs, spec, self.device)
+        self._box_size, self._payload_masses = sample_asset_bank(self.num_envs, spec, self.device, task_only=self._task_only)
         self._box_assets = []
         for size, mass in zip(self._box_size.flatten(0, 1).cpu().tolist(), self._payload_masses.flatten().cpu().tolist()):
             options = gymapi.AssetOptions()
@@ -45,11 +52,11 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
 
     def _build_env(self, env_id, env_ptr, humanoid_asset):
         HumanoidMA._build_env(self, env_id, env_ptr, humanoid_asset)
-        for box_id in range(24):
+        for box_id in range(self._bank_size):
             pose = gymapi.Transform()
             pose.p = gymapi.Vec3(0., 0.,
                                  float(self._box_size[env_id, box_id, 2])/2)
-            handle = self.gym.create_actor(env_ptr, self._box_assets[env_id*24+box_id], pose,
+            handle = self.gym.create_actor(env_ptr, self._box_assets[env_id*self._bank_size+box_id], pose,
                                            'push_box_'+str(box_id), env_id, 0, 0)
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, handle)
             for prop in props:
@@ -62,39 +69,50 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
 
     def _build_box_tensors(self):
         actors = self.get_num_actors_per_env()
-        self._box_states = self._root_states.view(self.num_envs, actors, 13)[:, 4:28]
+        self._box_states = self._root_states.view(self.num_envs, actors, 13)[:, 4:4+self._bank_size]
         self._box_actor_ids = (actors*torch.arange(self.num_envs, device=self.device, dtype=torch.int32)[:, None]
-                               + torch.arange(24, device=self.device, dtype=torch.int32)[None] + 4)
+                               + torch.arange(self._bank_size, device=self.device, dtype=torch.int32)[None] + 4)
         self._initial_box_states = self._box_states.clone()
         self._build_box_bps()
 
     def _build_marker_state_tensors(self):
         actors = self.get_num_actors_per_env()
-        self._marker_states = self._root_states.view(self.num_envs, actors, 13)[:, 28:32]
+        self._marker_states = self._root_states.view(self.num_envs, actors, 13)[:, 4+self._bank_size:8+self._bank_size]
         self._marker_pos = self._marker_states[..., :3]
         self._marker_actor_ids = (actors*torch.arange(self.num_envs, device=self.device, dtype=torch.int32)[:, None]
-                                  + torch.arange(28, 32, device=self.device, dtype=torch.int32)[None])
+                                  + torch.arange(4+self._bank_size, 8+self._bank_size, device=self.device, dtype=torch.int32)[None])
 
     def get_clean_object_obs_size(self):
         return 40  # Preserve the Stage1 tokenizer; articulation fields are zero.
 
     def _clean_object_features(self, object_local, env_ids):
-        return torch.cat((object_local, object_local.new_zeros(*object_local.shape[:-1], 10)), -1)
+        extra = object_local.new_zeros(*object_local.shape[:-1], 10)
+        if getattr(self, '_hidden_door_tokens', False):
+            extra[:, :4, 2:5] = extra.new_tensor([.78, -.10, 1.])
+            extra[:, :4, 8] = 1.  # Existing Stage1 fixed-door articulation flag.
+            # Joint Push leaves push_eligible at its reset value (zero).
+        return torch.cat((object_local, extra), -1)
 
     def _logical_box_values(self, values, env_ids=None):
         ids = torch.arange(self.num_envs, device=self.device) if env_ids is None else env_ids
         states, sizes, _ = group_tokens(self._box_states[ids], self._box_size[ids],
             self._agent_box_assignment[ids], self._ordinary_keep[ids])
+        if getattr(self, '_hidden_door_tokens', False):
+            doors = self._virtual_door_states[ids] if getattr(self, '_scattered_door_tokens', False) else None
+            states, sizes = hidden_door_region_tokens(states, sizes, doors)
         if values is self._box_states: return states
         if values is self._box_size: return sizes
         if values is self._box_bps:
             signs = self._box_bps.new_tensor([[1,1,-1],[-1,1,-1],[-1,-1,-1],[1,-1,-1],
                                              [1,1,1],[-1,1,1],[-1,-1,1],[1,-1,1]])
-            return sizes[..., None, :]*signs/2
+            corners = sizes[..., None, :]*signs/2
+            if getattr(self, '_hidden_door_tokens', False):
+                corners[:, :4] += corners.new_tensor([.45, 0., 1.02])
+            return corners
         raise ValueError('Unknown partitioned object field')
 
     def _init_relation_runtime(self):
-        graph = expand_graph(compile_graph(self._relation_graph_spec, 4, 8, self.device), self.num_envs)
+        graph = expand_graph(compile_graph(self._relation_graph_spec, 4, self.num_objects, self.device), self.num_envs)
         runtime = SimpleNamespace(graph=graph, tasks=torch.ones(self.num_envs, 4, device=self.device, dtype=torch.long))
         for key in ('phi', 'error'):
             setattr(runtime, key, torch.zeros(self.num_envs, 8, device=self.device))
@@ -104,12 +122,14 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         runtime.suffix = lambda ids=None: semantic_graph_packet(
             graph if ids is None else self._select_graph(ids), self.num_envs if ids is None else len(ids))
         self.relation_runtime = runtime
-        self._agent_box_assignment[:] = 8
+        self._agent_box_assignment[:] = 0 if self._task_only else 8
         self._group_leaders = torch.zeros(self.num_envs,4,device=self.device,dtype=torch.long)
         self._group_counts = torch.full_like(self._group_leaders,4)
-        self._ordinary_keep = torch.arange(4, device=self.device)[None].expand(self.num_envs, -1).clone()
+        self._ordinary_keep = torch.arange(0 if self._task_only else 4, device=self.device)[None].expand(self.num_envs, -1).clone()
         self._local_hands = torch.zeros(self.num_envs, 4, 2, 3, device=self.device)
         self._agent_region_assignment = torch.arange(4, device=self.device)[None].expand(self.num_envs, -1).clone()
+        self._virtual_door_states = torch.zeros(self.num_envs, 4, 13, device=self.device)
+        self._virtual_door_states[..., 6] = 1.
 
     def _select_graph(self, ids):
         from utils.edge_ontop_spec import select_graph
@@ -121,7 +141,7 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
     def get_open_push_contract(self):
         return dict(revision=2, policy='partition_push_ca4', partition=self._joint_push_spec,
             manifest_sha256=hashlib.sha256(Path(self.cfg['env']['motion_file']).read_bytes()).hexdigest(),
-            expert_mapping=self.cfg['env']['ampExpertMapping'], initial_ordinary_boxes=8, active_ordinary_boxes=4, task_groups=[1,4], task_tokens=4, bank_size=24,
+            expert_mapping=self.cfg['env']['ampExpertMapping'], initial_ordinary_boxes=0 if self._task_only else 8, active_ordinary_boxes=0 if self._task_only else 4, task_groups=[1,4], task_tokens=4, bank_size=self._bank_size,
             friction=self.cfg['env']['pushBox']['friction'], plane=self.cfg['env']['plane'])
 
     def validate_inference_checkpoint(self, checkpoint):
@@ -176,8 +196,9 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         points[..., 1] = -size[...,1,None]/2
         self._local_hands[ids] = points
         graph = self.relation_runtime.graph
-        graph.edge_dst[ids, ::2] = strip+4
-        graph.edge_src[ids, 1::2] = strip+4
+        token_offset = 8 if getattr(self, '_hidden_door_tokens', False) else 4
+        graph.edge_dst[ids, ::2] = strip+token_offset
+        graph.edge_src[ids, 1::2] = strip+token_offset
 
     def _compute_clean_scene_obs(self, env_ids=None):
         ids = torch.arange(self.num_envs, device=self.device) if env_ids is None else env_ids
@@ -191,13 +212,13 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         self._reset_ref_slots = {}; self._reset_ref_motion_ids = {}; self._reset_ref_motion_times = {}
         groups = sample_groups(n, self._joint_push_spec['coupled_probability'], self.device,
                                self._joint_push_spec.get('group_preset','random_scenario'))
-        expected, counts, ranks = group_layout(groups)
+        expected, counts, ranks = group_layout(groups, bank_offset=0 if getattr(self, '_task_only', False) else 8)
         self._group_leaders[ids] = groups; self._group_counts[ids] = counts
         boxes = self._initial_box_states[ids].clone(); boxes[..., 7:] = 0
         boxes[..., 2] = self._box_size[ids, :, 2]/2
         # All bank candidates begin parked. Only the four remaining ordinary boxes
         # and one task box per sampled group are placed into the scene.
-        boxes[...,0] = 1000.+torch.arange(24,device=self.device,dtype=boxes.dtype)*8
+        boxes[...,0] = 1000.+torch.arange(getattr(self, '_bank_size', 24),device=self.device,dtype=boxes.dtype)*8
         boxes[...,1] = 1000.
         yaw = torch.rand(n,device=self.device)*2*torch.pi
         q = boxes.new_zeros(n,4); q[:,2]=(yaw/2).sin(); q[:,3]=(yaw/2).cos()
@@ -208,7 +229,7 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         radius = 24+6*torch.rand(n,8,device=self.device)
         ordinary = torch.stack((radius*angle.cos(),radius*angle.sin()),-1)
         order = torch.rand(n,8,device=self.device).argsort(-1)
-        keep = order[:,:4]; self._ordinary_keep[ids] = keep
+        keep = order[:,:0 if getattr(self, '_task_only', False) else 4]; self._ordinary_keep[ids] = keep
         rows = torch.arange(n,device=self.device)[:,None]
         boxes[rows,keep,:2] = ordinary.gather(1,keep[...,None].expand(-1,-1,2))
         local_stations = boxes.new_tensor([[-8.,-8.,0.],[8.,-8.,0.],[-8.,8.,0.],[8.,8.,0.]])
@@ -253,15 +274,76 @@ class HumanoidMAPartitionPush(HumanoidMACarry):
         local_goal[...,1] = lo+(hi-lo)*torch.rand(n,4,device=self.device)
         local_goal = local_goal.gather(1,groups[...,None].expand(-1,-1,3))
         self._tar_pos[ids] = selected[...,:3]+rotate(q[:,None].expand(n,4,4),local_goal)
-        self.relation_runtime.graph.edge_dst[ids,1::2] = 12+groups
+        self.relation_runtime.graph.edge_dst[ids,1::2] = 4+self.num_objects+groups
         self.relation_runtime.done[ids] = False
         self._select_regions(ids, reassign=True)
+        if getattr(self, '_scattered_door_tokens', False):
+            self._virtual_door_states[ids] = sample_virtual_doors(
+                self._box_states[ids[:, None], self._agent_box_assignment[ids]],
+                self._box_size[ids[:, None], self._agent_box_assignment[ids]],
+                self._humanoid_root_states[ids])
         self._reset_env_tensors(ids)
         self._compute_observations(ids)
         self._compute_amp_observations(ids)
         self._hist_amp_obs_buf[ids] = self._curr_amp_obs_buf[ids,:,None]
         if getattr(self, 'viewer', None) is not None and (ids == 0).any():
             self._place_partition_camera()
+
+    def render(self, sync_frame_time=False):
+        if self.viewer is not None and hasattr(self, '_agent_region_assignment'):
+            self._draw_partition_ownership()
+        super().render(sync_frame_time)
+
+    def _draw_partition_ownership(self):
+        """Paint owned strips with dense surface lines, without adding physics actors."""
+        import numpy as np
+        self.gym.clear_lines(self.viewer)
+        box_colors = np.asarray(self._AGENT_COLOR_PALETTE, dtype=np.float32) * .55
+        for eid, env in enumerate(self.envs):
+            assignment = self._agent_box_assignment[eid].detach().cpu().tolist()
+            regions = self._agent_region_assignment[eid].detach().cpu().tolist()
+            states, sizes, _ = group_tokens(self._box_states[eid:eid+1],
+                self._box_size[eid:eid+1], self._agent_box_assignment[eid:eid+1],
+                self._ordinary_keep[eid:eid+1])
+            for bid in set(assignment + self._ordinary_keep[eid].detach().cpu().tolist()):
+                owners = [a for a, box in enumerate(assignment) if box == bid]
+                color = gymapi.Vec3(*box_colors[owners[0]]) if len(owners) == 1 else gymapi.Vec3(.25, .25, .25)
+                self.gym.set_rigid_body_color(env, self._box_handles[eid*self._bank_size+bid],
+                                             0, gymapi.MESH_VISUAL, color)
+            vertices, colors = [], []
+            for agent, region in enumerate(regions):
+                # Region states follow the box pose; lift the coating to avoid z fighting.
+                half = sizes[0, region].detach().cpu().numpy()/2
+                half += .004
+                local = []
+                for axis in range(3):
+                    u, v = [i for i in range(3) if i != axis]
+                    for side in (-1, 1):
+                        for value in np.linspace(-half[u], half[u], max(2, int(2*half[u]/.008)+1)):
+                            a = np.zeros(3); b = np.zeros(3)
+                            a[axis] = b[axis] = side*half[axis]
+                            a[u] = b[u] = value
+                            a[v], b[v] = -half[v], half[v]
+                            local.extend((a, b))
+                local = torch.as_tensor(np.asarray(local), device=self.device, dtype=states.dtype)
+                pose = states[0, region]
+                world = rotate(pose[3:7].expand(len(local), -1), local) + pose[:3]
+                vertices.append(world.detach().cpu().numpy().reshape(-1, 2, 3))
+                colors.append(np.tile(box_colors[agent], (len(local)//2, 1)))
+            # Draw above each owned strip so shared-box ownership stays visible.
+            roots = self._humanoid_root_states[eid, :, :3].clone()
+            roots[:, 2] += .2
+            region_ids = self._agent_region_assignment[eid]
+            endpoints = states[0, region_ids, :3].clone()
+            top = endpoints.new_zeros(self.num_agents, 3)
+            top[:, 2] = sizes[0, region_ids, 2]/2 + .06
+            endpoints += rotate(states[0, region_ids, 3:7], top)
+            links = torch.stack((roots, endpoints), 1)
+            vertices.append(links.detach().cpu().numpy())
+            colors.append(np.asarray(self._AGENT_COLOR_PALETTE[:self.num_agents], dtype=np.float32)*.75)
+            vertices = np.concatenate(vertices).astype(np.float32)
+            colors = np.concatenate(colors).astype(np.float32)
+            self.gym.add_lines(self.viewer, env, len(vertices), vertices, colors)
 
     def _init_camera(self):
         # The useful scene positions are assigned at reset, after construction.

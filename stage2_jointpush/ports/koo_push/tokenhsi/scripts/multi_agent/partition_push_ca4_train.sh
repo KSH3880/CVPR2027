@@ -4,7 +4,7 @@ set -eu
 PROJECT_ROOT=$(cd "$TOKENHSI_ROOT/../../.." && pwd)
 MODE=${PARTITION_PUSH_MODE:-train}
 CFG_ENV=${PARTITION_PUSH_ENV_CONFIG:-tokenhsi/data/cfg/multi_agent/partition_push_ca4.yaml}
-CFG_TRAIN=tokenhsi/data/cfg/train/rlg/partition_push_ca4.yaml
+CFG_TRAIN=${PARTITION_PUSH_TRAIN_CONFIG:-tokenhsi/data/cfg/train/rlg/partition_push_ca4.yaml}
 OUT=${OUTPUT_PATH:-$PROJECT_ROOT/runs/jointpush/partition_push_$MODE}
 set -- --task_graph push
 if [ "$MODE" = train ]; then
@@ -37,5 +37,5 @@ if [ -x /usr/bin/g++-11 ]; then export CXX=${TOKENHSI_CXX:-/usr/bin/g++-11}; fi
 exec python tokenhsi/scripts/multi_agent/partition_push_launch.py --task HumanoidMAPartitionPush \
  --cfg_env "$CFG_ENV" --cfg_train "$CFG_TRAIN" \
  --motion_file "${PARTITION_PUSH_MOTION_FILE:-tokenhsi/data/partition_push_motions.yaml}" \
- --num_agents 4 --num_envs "${NUM_ENVS:-1024}" --num_objects 8 \
+ --num_agents 4 --num_envs "${NUM_ENVS:-1024}" \
  --output_path "$OUT" --experiment PartitionPushCa4 --no_video "$@"

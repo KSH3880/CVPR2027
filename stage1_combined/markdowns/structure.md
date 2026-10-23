@@ -178,3 +178,9 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 `rsi_native/view_table_sit.py`는 native Table의 검사 통과 착석 RSI와 SIT 목표점/20cm 구를 로컬 viewer에 표시한다. 조작·명령은 [RSI README](../rsi_native/README.md#로컬-table-sit-착석-확인).
 
 `utils/native_rsi.py`, `rsi_native/build_training_bank.py`, `rsi_native/view_reset_snapshot.py`는 native RSI의 실제 물체 pose 배치·보정 AMP history·두 사람 실제 reset viewer를 제공한다.
+
+`rsi_native/{repair_support,support}.py`와 `utils/rsi_support.py`는 source 발 지면 보정·수평 지지 근접·Box 부유 RSI 재추출을 담당한다. 최신 실행 bank/검증은 [혼합 FT 상세](reference/box_chair_table_mixed_full_ft.md#지지-상태를-반영한-rsi-수정-2026-10-23)를 따른다.
+
+`rsi_native/{front_filter,foot_surface,validate_reset}.py`, `utils/{chair_front,native_foot_guard}.py`는 정면 제한·발/표면 교차·무학습 reset 검증을 담당한다. 최신 review는 [RSI README](../rsi_native/README.md#최신-검증review-학습-보류).
+
+`rsi_native/{ik,ik_preview}.py`는 탈락한 완료 자세의 다리 접촉 IK 보정과 물리 통과 후보의 보정 전/후 snapshot을 제공한다. 기존 실행 RSI cache는 자동 변경하지 않는다.

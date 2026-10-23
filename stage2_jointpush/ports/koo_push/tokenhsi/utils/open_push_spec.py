@@ -104,7 +104,8 @@ def validate_env(env):
     if 'partitionPush' in env:
         from copy import deepcopy
         spec = env['partitionPush']
-        if (env['numAgents'], env['numObjects']) != (4, 8) or spec['physical_boxes'] != 8 or spec['max_group_size'] != 4:
+        task_only = spec.get('object_layout') == 'task_regions_only_v1'
+        if (env['numAgents'], env['numObjects']) != (4, 4 if task_only else 8) or spec['physical_boxes'] != (0 if task_only else 8) or spec['max_group_size'] != 4:
             raise ValueError('Partition Push needs 4 agents, 8 physical boxes, 8 object tokens')
         if spec['version'] != 2 or not 0 <= spec['coupled_probability'] <= 1:
             raise ValueError('Expected variable-group Push version2 and a valid probability')
@@ -114,7 +115,7 @@ def validate_env(env):
             if not 0 < lo <= hi: raise ValueError('Invalid partition box range')
         if not 0 < spec['mass_per_agent'][0] <= spec['mass_per_agent'][1]:
             raise ValueError('Invalid mass range')
-        if env['stateInit'] != 'Random' or env.get('openPushRSI') or env['skillInitProb'] != [1.,0.,0.]:
+        if env['stateInit'] not in ('Random', 'Start') or env.get('openPushRSI') or env['skillInitProb'] != [1.,0.,0.]:
             raise ValueError('Partition Push uses loco-only reset')
         proxy = deepcopy(env)
         proxy.pop('partitionPush')

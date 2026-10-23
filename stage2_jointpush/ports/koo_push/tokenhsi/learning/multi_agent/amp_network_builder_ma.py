@@ -255,6 +255,8 @@ class RelationTransformerLayer(nn.Module):
                 p95 = torch.quantile(flat_logits, 0.95)
                 p99 = torch.quantile(flat_logits, 0.99)
         attn = torch.softmax(attn, dim=-1)
+        if getattr(self, "capture_attention", False):
+            self.last_attention = attn[:1].detach()
         if collect_diagnostics:
             with torch.no_grad():
                 p = attn[:32].detach().float()
@@ -839,7 +841,10 @@ class RelationEncoder(nn.Module):
                 geo_score = geo_score.index_select(2, token_order).index_select(3, token_order)
             if geo_message is not None:
                 geo_message = geo_message.index_select(2, token_order).index_select(3, token_order)
+        capture = getattr(self, "capture_attention", False)
+        attention_maps = []
         for i, layer in enumerate(self.layers):
+            layer.capture_attention = capture
             rel_bias = None if relation_bias is None else relation_bias[i]
             diagnostics_label = None
             if (self.gta_enabled and self.gta_diagnostics_first_forward
@@ -850,6 +855,14 @@ class RelationEncoder(nn.Module):
             if collect:
                 self.last_diagnostics.update({'layer{}/{}'.format(i, k): v
                                                for k, v in layer.last_diagnostics.items()})
+
+            if capture:
+                weights = layer.last_attention
+                if inverse_order is not None:
+                    weights = weights.index_select(-2, inverse_order).index_select(-1, inverse_order)
+                attention_maps.append(weights[0])
+        if capture:
+            self.last_attention = torch.stack(attention_maps)
 
         if inverse_order is not None:
             x = x.index_select(1, inverse_order)

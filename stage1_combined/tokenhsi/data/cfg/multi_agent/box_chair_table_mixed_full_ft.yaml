@@ -349,7 +349,7 @@ env:
     trainable: all_layers
     chair_geometry_version: 2
     sit_pelvis_clearance: 0.1
-    initialization: box_size_screened_plus_native_audited_RSI_50pct
+    initialization: front_supported_foot_surface_filtered_full_motion_RSI
     task_mix:
       box_sit_climb: 0.3333333333333333
       chair_sit_climb: 0.3333333333333333
@@ -374,8 +374,12 @@ env:
     - sit
     - climb
     native_rsi:
-      bank: output/rsi_cache_native_chair_table_20261023
+      bank: output/rsi_cache_native_front_foot_20261023
       probability: 0.5
+      late_probability: 0.7
+      require_support: true
+      strict_foot_collision: true
+    chair_front_only: true
 sim:
   substeps: 2
   physx:

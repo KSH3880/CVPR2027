@@ -59,18 +59,20 @@ def test_contact_height_and_group_gate():
 
 @pytest.mark.parametrize('leaders', [(0,0,0,0),(0,0,2,2),(0,0,0,3),(0,1,2,3),(0,1,1,1)])
 @pytest.mark.parametrize('spawn_mode', [None, 'surround_independent'])
-def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spawn_mode):
+@pytest.mark.parametrize('hidden_doors', [False, True, 'scattered', 'task_only'])
+def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spawn_mode, hidden_doors):
     """Exercise actual task reset without importing Isaac Gym or creating a sim."""
     import ast
     from types import SimpleNamespace
     from utils.door_reference import rotate
+    from utils.partition_push import hidden_door_region_tokens, sample_virtual_doors
     path = Path(__file__).resolve().parents[1]/'env/tasks/multi_agent/humanoid_ma_partition_push.py'
     cls = next(node for node in ast.parse(path.read_text()).body if isinstance(node, ast.ClassDef))
     methods = [node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in
                ('_reset_envs', '_select_regions', '_logical_box_values')]
     namespace = dict(torch=torch, rotate=rotate, nearest_boxes=nearest_boxes, group_tokens=group_tokens, group_layout=group_layout,
                      sample_groups=lambda n,*args: torch.tensor(leaders)[None].expand(n,-1),
-                     sample_surround_spawn=sample_surround_spawn, exclusive_regions=exclusive_regions)
+                     sample_surround_spawn=sample_surround_spawn, exclusive_regions=exclusive_regions, hidden_door_region_tokens=hidden_door_region_tokens, sample_virtual_doors=sample_virtual_doors)
     for method in methods:
         exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
     class Fake:
@@ -78,16 +80,24 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     for name in ('_reset_envs', '_select_regions', '_logical_box_values'):
         setattr(Fake, name, namespace[name])
     task = Fake(); task.num_envs = 3; task.device = 'cpu'
+    task._task_only = hidden_doors == 'task_only'
+    task._bank_size = 16 if task._task_only else 24
+    task.num_objects = 4 if task._task_only else 8
+    task._hidden_door_tokens = hidden_doors in (True, 'scattered')
+    task._scattered_door_tokens = hidden_doors == "scattered"
+    task._virtual_door_states = torch.zeros(3,4,13)
+    task._virtual_door_states[...,6] = 1
+    token_offset = 8 if task._hidden_door_tokens else 4
     task._joint_push_spec = dict(spawn_distance=[1.,2.], goal_distance=[2.2,5.],coupled_probability=.8)
     if spawn_mode is not None:
         task._joint_push_spec['spawn_mode'] = spawn_mode
-    task._initial_box_states = torch.zeros(3,24,13); task._initial_box_states[...,6] = 1
+    task._initial_box_states = torch.zeros(3,task._bank_size,13); task._initial_box_states[...,6] = 1
     task._box_states = task._initial_box_states.clone()
-    task._box_size, task._payload_masses = sample_asset_bank(3,dict(size_min=[1.,1.8,1.2],size_max=[1.3,2.2,1.5],mass_per_agent=[20.,30.]))
+    task._box_size, task._payload_masses = sample_asset_bank(3,dict(size_min=[1.,1.8,1.2],size_max=[1.3,2.2,1.5],mass_per_agent=[20.,30.]),task_only=task._task_only)
     task._group_leaders = torch.zeros(3,4,dtype=torch.long)
     task._group_counts = torch.zeros(3,4,dtype=torch.long)
-    task._box_bps = torch.zeros(3,24,8,3)
-    task._ordinary_keep = torch.arange(4)[None].expand(3,-1).clone()
+    task._box_bps = torch.zeros(3,task._bank_size,8,3)
+    task._ordinary_keep = torch.arange(0 if task._task_only else 4)[None].expand(3,-1).clone()
     task._local_hands = torch.zeros(3,4,2,3)
     task._humanoid_root_states = torch.zeros(3,4,13)
     task._kinematic_humanoid_rigid_body_states = torch.zeros(3,4,1,13)
@@ -97,7 +107,7 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     task._curr_amp_obs_buf = torch.zeros(3,4,5)
     task._hist_amp_obs_buf = torch.zeros(3,4,9,5)
     spec=dict(sampler='two_agent_open_push',semantic_only=True,task_probabilities={'OPEN':0.,'PUSH':1.})
-    task.relation_runtime = SimpleNamespace(graph=expand_graph(compile_graph(spec,4,8),3),done=torch.ones(3,4,dtype=torch.bool))
+    task.relation_runtime = SimpleNamespace(graph=expand_graph(compile_graph(spec,4,task.num_objects),3),done=torch.ones(3,4,dtype=torch.bool))
     def actors(ids):
         task._humanoid_root_states[ids,:,:2] = task._spawn_roots[ids]
         task._kinematic_humanoid_rigid_body_states[ids,:,0] = task._humanoid_root_states[ids]
@@ -108,14 +118,14 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     untouched = task._box_states[1].clone()
     task._reset_envs(torch.tensor([0,2]))
     torch.testing.assert_close(task._box_states[1], untouched)
-    expected,counts,_ = group_layout(torch.tensor(leaders)[None].expand(2,-1))
+    expected,counts,_ = group_layout(torch.tensor(leaders)[None].expand(2,-1),bank_offset=0 if task._task_only else 8)
     assert torch.equal(task._agent_box_assignment[[0,2]],expected)
     assert torch.equal(task._group_counts[[0,2]],counts)
     regions = task._agent_region_assignment[[0,2]]
     assert regions.sort(-1).values.eq(torch.arange(4)).all()
     assert torch.equal(expected.gather(1, regions), expected)
-    assert torch.equal(task.relation_runtime.graph.edge_dst[[0,2],::2], regions+4)
-    assert torch.equal(task.relation_runtime.graph.edge_src[[0,2],1::2], regions+4)
+    assert torch.equal(task.relation_runtime.graph.edge_dst[[0,2],::2], regions+token_offset)
+    assert torch.equal(task.relation_runtime.graph.edge_src[[0,2],1::2], regions+token_offset)
     # Crossing over another region cannot steal its ownership within the episode.
     fixed_regions = task._agent_region_assignment.clone()
     fixed_hands = task._local_hands.clone()
@@ -124,20 +134,24 @@ def test_reset_replaces_four_ordinary_boxes_and_preserves_other_env(leaders, spa
     assert torch.equal(task._agent_region_assignment, fixed_regions)
     torch.testing.assert_close(task._local_hands, fixed_hands)
     active = task._box_states[[0,2],:,0].abs()<100
-    assert active.sum(-1).eq(len(set(leaders))+4).all()
-    assert (task._box_states[[0,2],:8,0] > 900).sum(-1).eq(4).all()
+    assert active.sum(-1).eq(len(set(leaders))+(0 if task._task_only else 4)).all()
+    if not task._task_only:
+        assert (task._box_states[[0,2],:8,0] > 900).sum(-1).eq(4).all()
     logical = task._logical_box_values(task._box_states, torch.tensor([0,2]))
-    assert logical.shape == (2,8,13)
+    assert logical.shape == (2,task.num_objects,13)
     assert (logical[...,0].abs()<100).all()  # parked boxes cannot leak into obs
     sizes = task._logical_box_values(task._box_size, torch.tensor([0,2]))
-    assert (sizes[:,:4,0]>=1).all() and (sizes[:,:4,0]<=1.3).all()
-    assert torch.equal(task.relation_runtime.graph.edge_dst[[0,2],1::2],12+torch.tensor(leaders)[None].expand(2,-1))
+    region_sizes = sizes[:,4:] if task._hidden_door_tokens else sizes[:,:4]
+    assert (region_sizes[...,0]>=1).all() and (region_sizes[...,0]<=1.3).all()
+    assert torch.equal(task.relation_runtime.graph.edge_dst[[0,2],1::2],4+task.num_objects+torch.tensor(leaders)[None].expand(2,-1))
     # A second reset on just one scene cannot alter other scenes' assignments.
     untouched_assignment = task._agent_box_assignment[2].clone()
     untouched_regions = task._agent_region_assignment[2].clone()
+    untouched_doors = task._virtual_door_states[2].clone()
     task._reset_envs(torch.tensor([0]))
     assert torch.equal(task._agent_box_assignment[2],untouched_assignment)
     assert torch.equal(task._agent_region_assignment[2],untouched_regions)
+    torch.testing.assert_close(task._virtual_door_states[2],untouched_doors)
 
 
 def test_exclusive_regions_resolve_shared_nearest_and_global_conflict():
@@ -298,3 +312,121 @@ def test_ablation_uses_per_person_size_and_mass(tmp_path,monkeypatch):
     assert restored['size_min']==restored['size_max']==[1.2,2.,1.35]
     assert restored['mass_per_agent']==[25.,25.]
     assert restored['coupled_probability']==.8
+
+
+def test_hidden_door_region_tokens_geometry_and_source_immutable():
+    from utils.partition_push import hidden_door_region_tokens
+    states = torch.randn(3, 8, 13)
+    sizes = torch.rand(3, 8, 3) + 1
+    original = states.clone()
+    result, shape = hidden_door_region_tokens(states, sizes)
+    torch.testing.assert_close(states, original)
+    torch.testing.assert_close(result[:, 4:], states[:, :4])
+    torch.testing.assert_close(shape[:, 4:], sizes[:, :4])
+    torch.testing.assert_close(result[:, :4, :2], states[:, 4:, :2])
+    assert result[:, :4, 2].eq(0).all() and result[:, :4, 7:].eq(0).all()
+    torch.testing.assert_close(shape[:, :4], sizes.new_tensor([.9,.06,1.96]).expand(3,4,3))
+
+
+def test_hidden_door_features_and_graph_match_token_order():
+    import ast
+    from types import SimpleNamespace
+    path = Path(__file__).resolve().parents[1]/'env/tasks/multi_agent/humanoid_ma_partition_push.py'
+    tree = ast.parse(path.read_text())
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef))
+    method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == '_clean_object_features')
+    namespace = dict(torch=torch)
+    exec(compile(ast.Module(body=[method],type_ignores=[]),str(path),'exec'),namespace)
+    local = torch.randn(2,8,30)
+    out = namespace['_clean_object_features'](SimpleNamespace(_hidden_door_tokens=True),local,None)
+    torch.testing.assert_close(out[..., :30],local)
+    assert out[:, :4, 38].eq(1).all()
+    torch.testing.assert_close(out[:, :4, 32:35],out.new_tensor([.78,-.1,1.]).expand(2,4,3))
+    assert out[:, 4:, 30:].eq(0).all()
+    # Existing CA4 must bind to region tokens after the four hidden doors.
+    env = yaml.safe_load((path.parents[3]/'data/cfg/multi_agent/partition_push_ca4.yaml').read_text())['env']
+    graph = expand_graph(compile_graph(env['relationGraph'],4,8),2)
+    graph.edge_dst[:,::2] = torch.arange(4)+8
+    graph.edge_src[:,1::2] = torch.arange(4)+8
+    bundles = PushAtCoordination().bundles(semantic_graph_packet(graph,2),4)
+    assert bundles[...,2].tolist() == [[8,9,10,11]]*2
+
+
+def test_scattered_virtual_doors_are_static_independent_and_have_clearance():
+    from utils.partition_push import sample_virtual_doors, hidden_door_region_tokens
+    boxes = torch.zeros(256,4,13);boxes[...,6]=1
+    boxes[...,:2]=torch.tensor([[-8.,-8.],[8.,-8.],[-8.,8.],[8.,8.]])
+    sizes=torch.full((256,4,3),2.)
+    roots=boxes.clone();roots[...,1]-=3
+    doors=sample_virtual_doors(boxes,sizes,roots)
+    assert doors[...,2].eq(0).all() and doors[...,7:].eq(0).all()
+    torch.testing.assert_close(doors[...,3:7].norm(dim=-1),torch.ones(256,4))
+    assert doors[...,:2].abs().max()<=12
+    pair=torch.cdist(doors[...,:2],doors[...,:2]);pair.diagonal(dim1=1,dim2=2).fill_(float('inf'))
+    assert pair.min()>2
+    assert torch.cdist(doors[...,:2],roots[...,:2]).min()>1.5
+    assert torch.cdist(doors[...,:2],boxes[...,:2]).min()>2**.5+.75
+    states=torch.zeros(256,8,13);states[...,6]=1;states[:,4:,:2]=100
+    result,_=hidden_door_region_tokens(states,torch.ones(256,8,3),doors)
+    torch.testing.assert_close(result[:,:4],doors)
+    assert not torch.equal(result[:,:4,:2],states[:,4:,:2])
+
+
+def test_task_only_profile_has_no_ordinary_assets_and_valid_four_token_contract():
+    path=Path(__file__).resolve().parents[1]/'data/cfg/multi_agent/partition_push_task_only_ca4.yaml'
+    env=yaml.safe_load(path.read_text())['env']
+    validate_env(env)
+    assert env['numObjects']==4 and env['stateInit']=='Start'
+    assert env['partitionPush']['physical_boxes']==0
+    assert env['partitionPush']['spawn_distance']==[.3,.8]
+    size,mass=sample_asset_bank(7,env['partitionPush'],task_only=True)
+    assert size.shape==(7,16,3) and mass.shape==(7,16)
+    members=torch.arange(1,5).repeat(4)
+    assert (mass/members>=20).all() and (mass/members<=30).all()
+    graph=expand_graph(compile_graph(env['relationGraph'],4,4),7)
+    graph.edge_dst[:,::2]=torch.arange(4)+4
+    graph.edge_src[:,1::2]=torch.arange(4)+4
+    graph.edge_dst[:,1::2]=torch.arange(4)+8
+    bundles=PushAtCoordination().bundles(semantic_graph_packet(graph,7),4)
+    assert bundles[...,2].tolist()==[[4,5,6,7]]*7
+    assert bundles[...,3].tolist()==[[8,9,10,11]]*7
+
+
+@pytest.mark.parametrize('ordinary_count', [0, 4])
+def test_viewer_links_each_agent_to_current_owned_strip(ordinary_count):
+    import ast
+    import numpy as np
+    from types import SimpleNamespace
+    from utils.door_reference import rotate
+    path=Path(__file__).resolve().parents[1]/'env/tasks/multi_agent/humanoid_ma_partition_push.py'
+    cls=next(n for n in ast.parse(path.read_text()).body if isinstance(n,ast.ClassDef))
+    method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name=='_draw_partition_ownership')
+    namespace=dict(torch=torch,rotate=rotate,group_tokens=group_tokens,
+                   gymapi=SimpleNamespace(Vec3=lambda *v:v,MESH_VISUAL=0))
+    exec(compile(ast.Module(body=[method],type_ignores=[]),str(path),'exec'),namespace)
+    calls=[]
+    gym=SimpleNamespace(clear_lines=lambda *a:None,set_rigid_body_color=lambda *a:None,
+                        add_lines=lambda viewer,env,n,vertices,colors:calls.append((env,vertices,colors)))
+    states=torch.zeros(2,24,13);states[...,6]=1
+    states[0,:,5]=2**-.5;states[0,:,6]=2**-.5
+    states[1,:,:3]=torch.tensor([3.,4.,.7])
+    roots=torch.randn(2,4,13)
+    assignment=torch.tensor([[8,8,9,9],[8,8,9,9]])
+    regions=torch.tensor([[1,0,3,2],[0,1,2,3]])
+    keep=torch.arange(ordinary_count)[None].expand(2,-1)
+    palette=((.54,.85,.2),(.28,.55,.9),(.9,.6,.2),(.8,.35,.75))
+    task=SimpleNamespace(viewer=1,envs=[0,1],gym=gym,device='cpu',num_agents=4,_bank_size=24,
+        _box_handles=list(range(48)),_box_states=states,_box_size=torch.ones(2,24,3),
+        _agent_box_assignment=assignment,_agent_region_assignment=regions,_ordinary_keep=keep,
+        _humanoid_root_states=roots,_AGENT_COLOR_PALETTE=palette,_agent_color=lambda i:palette[i])
+    namespace['_draw_partition_ownership'](task)
+    tokens,sizes,_=group_tokens(states,task._box_size,assignment,keep)
+    for env,vertices,colors in calls:
+        links=torch.from_numpy(vertices[-4:])
+        expected_start=roots[env,:,:3].clone();expected_start[:,2]+=.2
+        torch.testing.assert_close(links[:,0],expected_start)
+        ids=regions[env];top=torch.zeros(4,3);top[:,2]=sizes[env,ids,2]/2+.06
+        expected_end=tokens[env,ids,:3]+rotate(tokens[env,ids,3:7],top)
+        torch.testing.assert_close(links[:,1],expected_end)
+        np.testing.assert_allclose(colors[-4:],np.asarray(palette)*.75,rtol=1e-6)
+        assert np.isfinite(vertices).all()

@@ -66,24 +66,26 @@ def sample_groups(n, probability, device='cpu', preset='random_scenario'):
     return groups
 
 
-def group_layout(groups):
+def group_layout(groups, bank_offset=8):
     same = groups[..., None] == groups[:, None, :]
     counts = same.sum(-1)
     ids = torch.arange(4, device=groups.device)
     ranks = (same & (ids[None, None, :] < ids[None, :, None])).sum(-1)
     # Four candidate leaders x group sizes1..4, after the eight ordinary boxes.
-    physical = 8+4*groups+counts-1
+    physical = bank_offset+4*groups+counts-1
     return physical, counts, ranks
 
 
-def sample_asset_bank(n, spec, device='cpu'):
+def sample_asset_bank(n, spec, device='cpu', task_only=False):
     lo = torch.tensor(spec['size_min'], device=device)
     hi = torch.tensor(spec['size_max'], device=device)
-    sizes = lo+torch.rand(n, 24, 3, device=device)*(hi-lo)
-    members = torch.cat((torch.ones(8, device=device), torch.arange(1,5,device=device).repeat(4)))
+    bank_size = 16 if task_only else 24
+    sizes = lo+torch.rand(n, bank_size, 3, device=device)*(hi-lo)
+    members = torch.arange(1,5,device=device).repeat(4)
+    if not task_only: members = torch.cat((torch.ones(8, device=device), members))
     sizes[..., 0] *= members
     mass_lo, mass_hi = spec['mass_per_agent']
-    masses = (mass_lo+torch.rand(n,24,device=device)*(mass_hi-mass_lo))*members
+    masses = (mass_lo+torch.rand(n,bank_size,device=device)*(mass_hi-mass_lo))*members
     return sizes, masses
 
 
@@ -95,7 +97,7 @@ def group_tokens(states, sizes, assignment, keep):
     rows = torch.arange(len(states), device=states.device)[:, None]
     physical = states[rows, parents]
     token_sizes = sizes[rows, parents].clone()
-    offsets = physical.new_zeros(len(states),8,3)
+    offsets = physical.new_zeros(len(states),parents.shape[1],3)
     offsets[:, :4, 0] = token_sizes[:, :4, 0]*((rank+.5)/count-.5)
     token_sizes[:, :4, 0] /= count
     delta = rotate(physical[...,3:7], offsets)
@@ -157,3 +159,47 @@ def partition_reward(roots, hands, boxes, goals, sizes, assignment, local_hands,
     return dict(reward=reward, phi=torch.stack((contact_phi, at_phi), -1),
         success=success, done=at, targets=targets, group_phi=group_phi,
         state=state, progress=progress)
+
+
+def hidden_door_region_tokens(states, sizes, door_states=None):
+    """Closed-door observation proxies followed by the four task regions.
+
+    Explicit door_states provide independent static poses (v2). Without them,
+    retain the old ordinary-token anchors for v1 checkpoint compatibility.
+    No physical actor is added; geometry matches door_hold.urdf.
+    """
+    order = torch.tensor([4, 5, 6, 7, 0, 1, 2, 3], device=states.device)
+    states = states[:, order].clone()
+    sizes = sizes[:, order].clone()
+    if door_states is not None:
+        states[:, :4] = door_states
+    states[:, :4, 2] = 0
+    states[:, :4, 7:] = 0
+    sizes[:, :4] = sizes.new_tensor([.9, .06, 1.96])
+    return states, sizes
+
+
+def sample_virtual_doors(boxes, sizes, roots):
+    """Scatter four static, ground-level door poses around the task workspace."""
+    n = len(boxes)
+    lo = boxes[..., :2].amin(1) - 4.
+    hi = boxes[..., :2].amax(1) + 4.
+    result = boxes.new_zeros(n, 4, 13)
+    for slot in range(4):
+        pending = torch.ones(n, dtype=torch.bool, device=boxes.device)
+        for _ in range(128):
+            rows = pending.nonzero().flatten()
+            if not len(rows): break
+            xy = lo[rows] + torch.rand(len(rows), 2, device=boxes.device)*(hi[rows]-lo[rows])
+            box_clear = ((xy[:, None]-boxes[rows, :, :2]).norm(dim=-1)
+                         > sizes[rows, :, :2].norm(dim=-1)/2 + .75).all(-1)
+            root_clear = (torch.cdist(xy[:, None], roots[rows, :, :2]).squeeze(1) > 1.5).all(-1)
+            separated = ((xy[:, None]-result[rows, :slot, :2]).norm(dim=-1) > 2.).all(-1)
+            good = box_clear & root_clear & separated
+            result[rows[good], slot, :2] = xy[good]
+            pending[rows[good]] = False
+        if pending.any(): raise RuntimeError('Cannot scatter virtual doors with clearance')
+    yaw = torch.rand(n, 4, device=boxes.device)*2*torch.pi
+    result[..., 5] = (yaw/2).sin()
+    result[..., 6] = (yaw/2).cos()
+    return result

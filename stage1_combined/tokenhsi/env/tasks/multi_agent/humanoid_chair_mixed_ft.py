@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import torch
 from isaacgym import gymapi
+from isaacgym.torch_utils import quat_rotate,quat_from_angle_axis
+from utils.chair_front import front_allowed
 from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.humanoid_chair_ft import HumanoidChairFT
 from env.tasks.multi_agent.size_rsi_cache import SizeRsiCache
@@ -160,6 +162,15 @@ class HumanoidChairMixedFT(HumanoidChairFT):
 
     def _reset_boxes(self, env_ids):
         super()._reset_boxes(env_ids)
+        if self.cfg['env']['chairFT'].get('chair_front_only',False):
+            rows=env_ids.repeat_interleave(self.num_agents);owners=torch.arange(self.num_agents,device=self.device).repeat(len(env_ids));physical=self._scenario_physical_object(rows,owners);chair=self._chair_kinds[rows,physical]==2
+            r,o,p=rows[chair],owners[chair],physical[chair]
+            if len(r):
+                direction=self._humanoid_root_states[r,o,:2]-self._box_states[r,p,:2]
+                facing=-self._chair_features[r,p,1:3]
+                yaw=torch.atan2(direction[:,1],direction[:,0])-torch.atan2(facing[:,1],facing[:,0])
+                axis=torch.zeros(len(r),3,device=self.device);axis[:,2]=1
+                self._box_states[r,p,3:7]=quat_from_angle_axis(yaw,axis)
         options=self.cfg['env']['chairFT'].get('native_rsi')
         if options and (not self._is_eval or options.get('viewer',False)):
             if not hasattr(self,'_native_pool'):
@@ -178,6 +189,32 @@ class HumanoidChairMixedFT(HumanoidChairFT):
             bodies=self._kinematic_humanoid_rigid_body_states[ids,...,:3]
             distance=torch.cdist(bodies[:,0],bodies[:,1]).amin(dim=(-1,-2))
             bad|=active&(distance<.15)
+        if self.cfg['env']['chairFT'].get('native_rsi',{}).get('require_support',False):
+            from utils.rsi_support import load_support_points,box_supported
+            if not hasattr(self,'_support_shapes'):
+                self._support_shapes=load_support_points('tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml',self.device)
+                self._box_unsupported_rejections=0
+            for skill in ['sit','climb']:
+                slots=self._reset_ref_slots.get(skill)
+                if slots is None:continue
+                r,o=slots;p=self._scenario_physical_object(r,o);keep=self._chair_kinds[r,p]==0
+                r,o,p=r[keep],o[keep],p[keep]
+                if not len(r):continue
+                ok=box_supported(self._kinematic_humanoid_rigid_body_states[r,o],self._box_states[r,p],self._box_size[r,p],self._support_shapes)
+                local=torch.searchsorted(ids,r)
+                bad[local[~ok]]=True;self._box_unsupported_rejections+=int((~ok).sum())
+        if self.cfg['env']['chairFT'].get('chair_front_only',False):
+            rows=ids.repeat_interleave(self.num_agents);owners=torch.arange(self.num_agents,device=self.device).repeat(len(ids));physical=self._scenario_physical_object(rows,owners);chair=self._chair_kinds[rows,physical]==2
+            r,o,p=rows[chair],owners[chair],physical[chair]
+            inv=self._box_states[r,p,3:7].clone();inv[:,:3]*=-1
+            local=quat_rotate(inv,self._humanoid_root_states[r,o,:3]-self._box_states[r,p,:3])
+            ok=front_allowed(local,self._chair_seats[r,p],-self._chair_features[r,p,1:3])
+            bad[torch.searchsorted(ids,r[~ok])]=True
+        options=self.cfg['env']['chairFT'].get('native_rsi',{})
+        if options.get('strict_foot_collision',False):
+            from utils.native_foot_guard import NativeFootGuard
+            if not hasattr(self,'_native_foot_guard'):self._native_foot_guard=NativeFootGuard(self,options['bank'])
+            bad|=torch.tensor(self._native_foot_guard.rejected(ids),device=self.device)
         return bad
 
     def _save_native_rsi_snapshot(self, folder):
@@ -193,17 +230,28 @@ class HumanoidChairMixedFT(HumanoidChairFT):
         for category in [0,1,2]:
             for task in [1,2]:
                 valid=(actual==category)&(tasks==task)
-                if category:valid&=pool.active[rows,owners]
+                if category:
+                    valid&=pool.active[rows,owners]
+                    preferred=valid&(pool.lowering[rows,owners] if task==1 else ~pool.phase[rows,owners])
+                    if preferred.any():valid=preferred
                 else:
                     advanced=torch.zeros(self.num_envs,self.num_agents,device=self.device,dtype=torch.bool)
                     for skill in ['sit','climb']:
                         slots=self._reset_ref_slots.get(skill)
                         if slots is not None:advanced[slots]=True
                     valid&=advanced[rows,owners]
-                found=torch.nonzero(valid).flatten()
-                if len(found):chosen.append((int(rows[found[0]]),category,task,int(owners[found[0]])))
+                if category:
+                    base=(actual==category)&(tasks==task)&pool.active[rows,owners]
+                    early=base&~pool.phase[rows,owners]
+                    if task==1 and (early&pool.lowering[rows,owners]).any():early&=pool.lowering[rows,owners]
+                    for stage,mask in [('approach',early),('late',base&pool.phase[rows,owners])]:
+                        found=torch.nonzero(mask).flatten()
+                        if len(found):chosen.append((int(rows[found[0]]),category,task,int(owners[found[0]]),stage))
+                else:
+                    found=torch.nonzero(valid).flatten()
+                    if len(found):chosen.append((int(rows[found[0]]),category,task,int(owners[found[0]]),'box_reference'))
         selected=torch.tensor([x[0] for x in chosen],device=self.device)
         def cpu(x):return x.detach().cpu().numpy()
-        np.savez_compressed(folder/'rsi_reset_snapshot.npz',humans=cpu(self._kinematic_humanoid_rigid_body_states[selected]),root=cpu(self._humanoid_root_states[selected]),dof=cpu(self._dof_pos[selected]),dof_vel=cpu(self._dof_vel[selected]),objects=cpu(self._box_states[selected]),sizes=cpu(self._box_size[selected]),kinds=cpu(self._chair_kinds[selected]),goal=cpu(diag['target'][selected]),amp=cpu(self._amp_obs_buf[selected]))
-        metadata={'scenes':[dict(env=x[0],category=x[1],task=x[2],owner=x[3],asset_keys=self._native_asset_keys[x[0]]) for x in chosen], 'native_counts':pool.counts,'active_native_slots':int(pool.active.sum()),'native_amp_history_max_error':float((self._hist_amp_obs_buf[pool.active]-pool.history[pool.active]).abs().max()),'amp_finite':bool(torch.isfinite(self._amp_obs_buf).all()),'source':self.cfg['env']['chairFT']['source_checkpoint']}
+        np.savez_compressed(folder/'rsi_reset_snapshot.npz',humans=cpu(self._kinematic_humanoid_rigid_body_states[selected]),root=cpu(self._humanoid_root_states[selected]),dof=cpu(self._dof_pos[selected]),dof_vel=cpu(self._dof_vel[selected]),objects=cpu(self._box_states[selected]),sizes=cpu(self._box_size[selected]),kinds=cpu(self._chair_kinds[selected]),goal=cpu(diag['target'][selected]),goal_valid=cpu(self.relation_runtime.graph.edge_valid[selected]),amp=cpu(self._amp_obs_buf[selected]))
+        metadata={'scenes':[dict(env=x[0],category=x[1],task=x[2],owner=x[3],stage=x[4],asset_keys=self._native_asset_keys[x[0]]) for x in chosen], 'native_counts':pool.counts,'active_native_slots':int(pool.active.sum()),'active_nonphase':int((pool.active&~pool.phase).sum()),'active_sit_lowering':int(pool.lowering.sum()),'native_amp_history_max_error':float((self._hist_amp_obs_buf[pool.active]-pool.history[pool.active]).abs().max()),'amp_finite':bool(torch.isfinite(self._amp_obs_buf).all()),'native_foot_scene_rejections':getattr(getattr(self,'_native_foot_guard',None),'rejections',0),'chair_front_only':self.cfg['env']['chairFT'].get('chair_front_only',False),'box_unsupported_rejections':getattr(self,'_box_unsupported_rejections',0),'source':self.cfg['env']['chairFT']['source_checkpoint']}
         (folder/'rsi_reset_validation.json').write_text(json.dumps(metadata,indent=2))

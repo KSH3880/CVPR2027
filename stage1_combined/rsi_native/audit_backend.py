@@ -7,6 +7,8 @@ from isaacgym import gymapi,gymtorch
 from evaluation.finetuned.backend import EvaluationTask
 from learning.multi_agent.chair_ft_agent import ChairFTPlayer
 from rsi_native.geometry import NativeGeometry,collision_samples
+from rsi_native.support import supported
+from rsi_native.foot_surface import FootSurface
 
 
 class NativeRsiAuditTask(EvaluationTask):
@@ -38,6 +40,7 @@ class NativeRsiAuditPlayer(ChairFTPlayer):
         manifest=json.loads((bank/'manifest.json').read_text());names=manifest['body_names'];N=t.num_envs;entries=t._audit_assets;A=len(entries)
         assert N==2048 and t.num_agents==1 and t.num_objects==1
         shapes=collision_samples('tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml',names)
+        foot_surface=FootSurface('tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml',names)
         geometry=[NativeGeometry(e['path'],shapes) for e in entries]
         original_root=t._root_states.clone();original_dof=t._dof_state.clone();rows_by_asset=[torch.nonzero(t._audit_ids==i).flatten() for i in range(A)]
         steps=max(1,round(.5/t.sim_params.dt));short_steps=max(1,round(.1/t.sim_params.dt));report=[]
@@ -47,7 +50,7 @@ class NativeRsiAuditPlayer(ChairFTPlayer):
         for skill in ['sit','climb']:
             data=[dict(np.load(bank/e['id']/(skill+'.npz'))) for e in entries]
             candidates=[np.flatnonzero(d['static_pass']) for d in data]
-            metrics=[{key:np.full(len(d['clip']),np.nan) for key in ['root_displacement','root_speed','head_force','joint_excess','final_clearance','final_floor','goal_error']} for d in data]
+            metrics=[{key:np.full(len(d['clip']),np.nan) for key in ['root_displacement','root_speed','head_force','joint_excess','final_clearance','final_floor','goal_error','final_support','foot_crossing']} for d in data]
             for m in metrics:m['short_pass']=np.zeros(len(m['root_displacement']),dtype=bool);m['hold_pass']=m['short_pass'].copy()
             rounds=max((math.ceil(len(c)/len(r)) for c,r in zip(candidates,rows_by_asset)),default=0)
             for block in range(rounds):
@@ -69,7 +72,7 @@ class NativeRsiAuditPlayer(ChairFTPlayer):
                 ok=torch.isfinite(state).all(-1)&torch.isfinite(joint).all(-1)&(excess<=.03)
                 targets=t._dof_pos.contiguous().clone()
                 t.gym.set_actor_root_state_tensor(t.sim,gymtorch.unwrap_tensor(t._root_states));t.gym.set_dof_state_tensor(t.sim,gymtorch.unwrap_tensor(t._dof_state));t.gym.set_dof_position_target_tensor(t.sim,gymtorch.unwrap_tensor(targets))
-                max_head=torch.zeros(len(rows),device=t.device);max_disp=max_head.clone();short_ok=None
+                max_head=torch.zeros(len(rows),device=t.device);max_disp=max_head.clone();short_ok=None;path_cross=torch.zeros(len(rows),device=t.device,dtype=torch.bool)
                 for frame in range(steps):
                     t.gym.simulate(t.sim);t.gym.fetch_results(t.sim,True);t._refresh_sim_tensors()
                     current=t._humanoid_root_states[rows,0]
@@ -77,6 +80,15 @@ class NativeRsiAuditPlayer(ChairFTPlayer):
                     max_head=torch.maximum(max_head,t._contact_forces[rows,0,head].norm(dim=-1))
                     finite=torch.isfinite(current).all(-1)&torch.isfinite(t._dof_state.reshape(N,1,-1)[rows,0]).all(-1)
                     ok&=finite&(max_head<=200)&((current[:,7:10]-initial[:,7:10]).norm(dim=-1)<=3.)
+                    if manifest.get('foot_triangle_tolerance') is not None and frame+1 in (1,2,3,short_steps,steps):
+                        pos=cpu(t._rigid_body_pos[rows,0])-cpu(t._env_origins[rows])[:,None];rot=cpu(t._rigid_body_rot[rows,0]);cursor=0
+                        for asset,(valid,asset_rows) in enumerate(zip(candidates,rows_by_asset)):
+                            count=max(0,min(len(asset_rows),len(valid)-block*len(asset_rows)))
+                            if not count:continue
+                            body=np.concatenate([pos[cursor:cursor+count],rot[cursor:cursor+count],np.zeros((count,t.num_bodies,6))],-1)
+                            crossed=foot_surface.crossing(body,geometry[asset],entries[asset]['bbox'][2]/2)
+                            path_cross[cursor:cursor+count]|=torch.tensor(crossed,device=t.device);cursor+=count
+                        ok&=~path_cross
                     if frame+1==short_steps:short_ok=cpu(ok&(max_disp<=.15))
                 final=t._humanoid_root_states[rows,0];passed=cpu(ok&(max_disp<=.30)&(final[:,7:10].norm(dim=-1)<=2.))
                 current_body=cpu(t._rigid_body_pos[rows,0])-cpu(t._env_origins[rows])[:,None]
@@ -90,8 +102,13 @@ class NativeRsiAuditPlayer(ChairFTPlayer):
                     clearance,floor=geometry[asset].check(current_body[sel],current_rot[sel],e['bbox'][2]/2)
                     target=np.r_[e['seat'][:2],e['bbox'][2]/2+e['seat'][2]+(.1 if skill=='sit' else .94)]
                     error=np.linalg.norm(finalroot[sel]-target,axis=-1)
+                    body_for_support=np.concatenate([current_body[sel],current_rot[sel],np.zeros((*current_body[sel].shape[:2],6))],-1)
+                    contact,_=supported(body_for_support,geometry[asset],e['bbox'][2]/2)
+                    crossed=foot_surface.crossing(body_for_support,geometry[asset],e['bbox'][2]/2)
                     stable=passed[sel]&(clearance>=-.015)&(floor>=-.02)&(~data[asset]['phase'][selected]|(error<=.25))
-                    values=dict(root_displacement=disp[sel],root_speed=speed[sel],head_force=headforce[sel],joint_excess=joint_excess[sel],final_clearance=clearance,final_floor=floor,goal_error=error,short_pass=short_ok[sel],hold_pass=stable)
+                    if manifest.get('support_mode'):stable&=contact
+                    if manifest.get('foot_triangle_tolerance') is not None:stable&=~crossed
+                    values=dict(root_displacement=disp[sel],root_speed=speed[sel],head_force=headforce[sel],joint_excess=joint_excess[sel],final_clearance=clearance,final_floor=floor,goal_error=error,final_support=contact,foot_crossing=crossed|cpu(path_cross)[sel],short_pass=short_ok[sel],hold_pass=stable)
                     for key,value in values.items():metrics[asset][key][selected]=value
                     offset+=count
                 print('RSI_PHYSICS',skill,block+1,'/',rounds,'tested',len(rows),'short',int(short_ok.sum()),'hold',int(sum(m['hold_pass'].sum() for m in metrics)),flush=True)
@@ -103,7 +120,7 @@ class NativeRsiAuditPlayer(ChairFTPlayer):
                 np.savez_compressed(folder/(skill+'_accepted.npz'),**accepted)
                 report.append(dict(asset=e['id'],category=e['category'],skill=skill,total=len(usable),static_pass=int(d['static_pass'].sum()),short_pass=int(m['short_pass'].sum()),hold_pass=int(m['hold_pass'].sum()),usable_phase=int(usable.sum()),mesh_watertight=geometry[asset].watertight))
             (out/'physics_report.json').write_text(json.dumps(report,indent=2))
-        (out/'manifest.json').write_text(json.dumps(dict(source_bank=str(bank),assets=entries,protocol='native_mesh_RSI_candidate_audit_v1',optimizer_steps=0,geometry_limitations='sampled capsules/feet with parity on potentially open render meshes; PhysX VHACD collision checked by rollout, not an exact volumetric collision proof',short_seconds=short_steps*t.sim_params.dt,hold_seconds=steps*t.sim_params.dt,thresholds=dict(head_force=200,root_displacement=.30,root_speed=2.,geometry_depth=.015,floor=.02)),indent=2))
+        (out/'manifest.json').write_text(json.dumps(dict(source_bank=str(bank),assets=entries,chair_front_only=manifest.get('chair_front_only'),foot_triangle_tolerance=manifest.get('foot_triangle_tolerance'),support_mode=manifest.get('support_mode'),support_tolerance=manifest.get('support_tolerance'),body_names=names,protocol='native_mesh_RSI_candidate_audit_v1',optimizer_steps=0,geometry_limitations='sampled capsules/feet with parity on potentially open render meshes; PhysX VHACD collision checked by rollout, not an exact volumetric collision proof',short_seconds=short_steps*t.sim_params.dt,hold_seconds=steps*t.sim_params.dt,thresholds=dict(head_force=200,root_displacement=.30,root_speed=2.,geometry_depth=.015,floor=.02)),indent=2))
         lines=['# Native chair/table RSI audit','', '| Category/task | Assets | Assets with usable phase | Accepted phase candidates |','|---|---:|---:|---:|']
         for cat in ['Chair','Table']:
             for skill in ['sit','climb']:

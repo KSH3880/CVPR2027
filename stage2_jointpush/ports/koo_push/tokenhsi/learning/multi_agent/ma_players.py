@@ -38,6 +38,28 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         self._disc_reward_w = config["disc_reward_w"]
         return
 
+    def get_action(self, obs_dict, is_determenistic=False):
+        directory = os.environ.get('PARTITION_PUSH_ATTENTION_DIR')
+        if not directory:
+            return super().get_action(obs_dict, is_determenistic)
+        if not hasattr(self, '_attention_recorder'):
+            from utils.attention_capture import AttentionRecorder
+            self._attention_recorder = AttentionRecorder(directory,
+                interval=int(os.environ.get('ATTENTION_EVERY', '10')),
+                max_samples=int(os.environ.get('ATTENTION_SAMPLES', '32')))
+        recorder = self._attention_recorder
+        encoder = self.model.a2c_network.actor_encoder
+        capture = recorder.should_capture()
+        encoder.capture_attention = capture
+        try:
+            action = super().get_action(obs_dict, is_determenistic)
+            if capture:
+                recorder.save(encoder.last_attention, self.env.task)
+        finally:
+            encoder.capture_attention = False
+            recorder.step += 1
+        return action
+
     def run(self):
         # record one clip of the checkpoint being tested, so a headless run still
         # produces something watchable

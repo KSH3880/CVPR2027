@@ -1,5 +1,41 @@
 ## 2026-10-23
 
+### IK 없이 기존 RSI로 78k 본학습 시작
+
+- 사용자 명시 승인으로 기존 `output/rsi_cache_native_front_foot_20261023` 사용, 두 IK bank 미적용. 78k 소스·Box/Chair/Table 균등·SIT/CLIMB·전체 레이어·2048환경·lr2e-5 유지.
+- GPU0 wrapper3032593, 출력 `output/box_chair_table_mixed_full_ft/local_78k_noik_20261023_174510/`, 실행 기록 `../runs/box_chair_table_78k_noik_20261023_174510/active_run.json`. 초기화 후 연속4회 update/fps 확인. 추가 평가/검사 실행하지 않았다.
+
+### 미세 보정 RSI 재생성·viewer 교체
+
+- 사용자 요청으로 관절±0.1rad/root 총2cm 제한으로 실패 phase236개를 재생성해 정적110개 통과(관절최대0.1rad·root최대1.999cm). 별도 `output_etc/check/native_rsi_small_ik_20261023`에 보존하며, preview에 `--static-bank` 옵션을 추가해 물리 재검사 전임을 명시한다. 대량 PhysX/AMP 검사와 학습은 실행하지 않고 기존 실행 cache는 유지한다.
+
+### 사용자 피드백: RSI IK를 미세 보정으로 제한
+
+- 기존 ±0.8rad/축별8cm는 과도한 변경으로 사용자 기각. 관절 축당±0.1rad·root 총 이동2cm 이내, 원자세 penalty 강화. 이 범위에서 해결되지 않는 자세는 제외한다. preview도 최대 변경 대신 최소 변경 후보를 선택한다.
+- 기존 IK v3 결과/viewer는 과거 검토 자료이며 채택하지 않는다. 이 제한으로 후보를 재생성하거나 추가 검사는 실행하지 않았고 학습/실행 cache도 변경하지 않았다.
+
+### Native RSI 관절 접촉 IK 구현·검증 (학습 보류)
+
+- 사용자 요청으로 `rsi_native/ik.py` 추가. 다리18DOF·root XYZ bounded least-squares로 발 접촉/좌판·상판 footprint·collision·원자세를 함께 맞춘다. 상체·heading 유지, 관절 축당±0.8rad/root 축당±8cm. 원본 실패 자세·delta 보존. 열린 mesh 판정 한계와 기존15mm proxy/20mm floor/2mm foot-edge 허용은 유지한다.
+- 기존 audit 실패 phase에서 물체/과제별 서로 다른 clip 최대2개씩, 총236개 시도→정적164→2048환경0.1/0.5초 PhysX67개→과거9프레임 geometry/foot-edge·AMP finite까지45개 통과. Chair SIT30/CLIMB5·Table SIT6/CLIMB4. 기존 완료 후보0이던 Table SIT1종 복구. 모든 탈락 자세를 복구한 결과는 아니다.
+- `build_training_bank.py`는 IK delta를 source clamp 후 history에도 적용하고 limit/velocity/FK를 정합, history 관통 후보 제외. 실행 cache/YAML은 변경하지 않았다. CPU13개 통과, batching 최적화 후 IK 테스트 재통과. 최종 audit rc0/optimizer0, 상세 `output_etc/check/native_rsi_ik_physics_20261023_v3/REPORT.md`.
+- `ik_preview.py`가 물리 통과 후보의 BEFORE/AFTER8장면 export. 로컬 viewer 화면 확인 `output_etc/check/native_rsi_ik_local_view_20261023_v3/`, N/P 전후 전환·SPACE 고정PD·R reset. AFTER는 물리 통과 기준이며 history 통과와는 별도다. 사용자가 검토 후 결정하도록 **학습은 시작하지 않았다**.
+
+### 발 관통·의자 정면 제한 검증 완료, 사용자 지시로 학습 보류
+
+- 앞서 승인된 수정 절차로 supported 학습3015658/3015685를 종료. foot mesh 모서리와 실제 native 물체 삼각형 교차 검사를2mm 기준으로 추가하고, 단독2048환경의1/2/3/6/30step에도 적용했다. `NativeFootGuard`는 실제 reset에서 자기·상대 에이전트의 발과 장면의 모든 native 물체를 검사한다. 열린 얇은 상판도 edge 교차로 검출하며, 완전한 체적 무충돌 보장은 아니다.
+- 의자49종의 front가 실제 등받이 반대임을 mesh로 대조. 접근은 정면±45도, 중앙12cm 착석/상판 상태는 허용한다. 뒤쪽 접근을 좌판 중심180도 회전 후 재검사하고, loco 초기화도 정면이 되도록 배치한다. 실행 준비 bank `output/rsi_cache_native_front_foot_20261023`, `chair_front_only`/`strict_foot_collision` 설정.
+- CPU22개 통과. native 물리 audit rc0 `output_etc/check/native_rsi_front_foot_physics_20261023_v3/`. 최종2048환경 reset은 `validate_reset.py`로 **optimizer0·정책행동0** 검증: accepted발교차0·의자정면위반0·실제1step후 발교차0, AMP history오차0/전체finite. native활성1368·중간/접근941, 장면발교차2건·Box부유100건 재추출. 결과 `output_etc/check/native_rsi_front_foot_review_validation/REPORT.md`.
+- 완료 phase 보존 물체: Chair SIT47/49·CLIMB28/49, Table SIT9/10·CLIMB5/10. phase 없는 모션은 안전 접근 pool로 대체하므로 late draw70%가 완료 자세70%를 의미하지 않는다. 모든59종에 안전 후보는 있다.
+- Viewer를 root/DOF tensor reset으로 바꾸고 CPU 환경 좌표계 원점 중복을 수정, 활성 목표만 표시. 접근/완료10장면, 초록=정면·빨강=뒤쪽. 최종 로컬 viewer `output_etc/check/native_rsi_front_foot_final_review/`. **사용자가 RSI 확인 후 학습을 결정한다고 지시했으므로 본학습은 재시작하지 않았다.**
+
+### 지면·물체 지지 보정 후 RSI 재검증·78k 재시작
+
+- 사용자 승인으로 full-motion 학습 그룹3012276 종료. 물체 높이 차이에 따른 constant-Z 이동을 중간 과정 전체에 적용해 발이 뜨는 실제 문제를 확인했다. 원본FK상 지면을 딛던 nonphase 발은5mm로 투영하고 지지점 수직속도를 제거한다. `support.py`에서 발/골반의 지면/수평 mesh면 근접3cm를 요구하고 벽면 접촉·부유는 제외한다. history 각 프레임도 같은 방식으로 보정한다.
+- 수정 후보 native2048환경0.1/0.5초 PhysX 재검증 rc0. phase-only 필터를 제거한 full-safe bank에 Chair SIT10629/CLIMB1273, Table SIT1753/CLIMB224개 보존. 기존 Box RSI도 발mesh/골반 sphere 지지 필터로 부유 reset을 재추출한다. 실행bank `output/rsi_cache_native_supported_20261023/`, late70/full30·source78k·Box/Table/Chair균등·전체FT 유지.
+- CPU19개·통합2048환경1epoch rc0. native활성1381/nonphase745, Box 부유104건 재추출, AMP history 오차0/전체finite. Table/Chair SIT snapshot 최저발5mm, native4조건 지지검사true 확인. 검증 `output_etc/check/native_rsi_supported_78k_smoke/`, 새 viewer Table SIT부터 표시·스크린샷확인 `output_etc/check/native_rsi_supported_view/`.
+- 사용자 승인대로 78k부터 본학습 재시작: wrapper3015658, `output/box_chair_table_mixed_full_ft/local_78k_supported_rsi_20261023_163941/`, 실행기록 `../runs/box_chair_table_78k_supported_rsi_20261023_163941/active_run.json`. 연속4회차 update 확인. 앞선 잘못된 bank/학습/검증은 보존하고 활성 기준에서 제외한다.
+
 ### 78k 소스·native RSI/AMP 통합 후 혼합 본학습 시작
 
 - 사용자 승인으로 기존 Table SIT viewer 종료. 78k checkpoint의 epoch78000·73k와 모델key/shape동일 확인 후 혼합 FT 소스를78k로 변경했다. Box/Table/Chair 목표 각1/3·SIT/CLIMB50:50·전체레이어·lr2e-5·2048환경 유지.
