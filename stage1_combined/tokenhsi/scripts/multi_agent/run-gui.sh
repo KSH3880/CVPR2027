@@ -14,7 +14,7 @@
 #   X11VNC              full path to the x11vnc binary
 #   NOVNC_DIR           directory containing vnc.html
 #   WEBSOCKIFY          full path to the websockify executable
-#   TOKENHSI_CONDA_ENV  conda env to search for websockify   default "tokenhsi_jhh"
+#   TOKENHSI_CONDA_ENV  conda env to search for websockify   default "tokenhsi118"
 #   TOKENHSI_GPU        NVIDIA GPU index or UUID for both CUDA and rendering.
 
 set -e
@@ -23,7 +23,7 @@ ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 WEB_PORT=${PORT:-6080}
 RESOLUTION=${RESOLUTION:-1600x900x24}
 VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
-CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_jhh}
+CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi118}
 
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
     echo "usage: TOKENHSI_GPU=0 run-gui.sh <command> [args...]"

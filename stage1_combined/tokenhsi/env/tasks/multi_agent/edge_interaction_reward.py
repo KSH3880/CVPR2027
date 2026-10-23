@@ -11,7 +11,7 @@ from env.tasks.multi_agent.edge_ontop_reward import (
 
 
 def evaluate_interaction_edges(
-    hands, feet, roots, objects, sizes, goals, graph, config, char_h
+    hands, feet, roots, objects, sizes, goals, graph, config, char_h, climb_targets=None
 ):
     phi, diag = evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config)
     n, m, o = (roots.shape[0], graph.num_agents, graph.num_objects)
@@ -30,6 +30,8 @@ def evaluate_interaction_edges(
     sit_target[..., 2] = top_z + float(config["sit"]["pelvis_clearance"])
     climb_target = support[..., :3].clone()
     climb_target[..., 2] = top_z + float(char_h)
+    if climb_targets is not None:
+        climb_target = climb_targets[batch, (dst - m).clamp(0, o - 1)]
     target = torch.where(sit[..., None], sit_target, climb_target)
     delta = human - target
     climb_scale = config.get("climb", {}).get(
@@ -42,7 +44,7 @@ def evaluate_interaction_edges(
     feet_z = feet.mean(-2)[..., 2][batch, src.clamp(0, m - 1)]
     feet_error = (feet_z - top_z).abs()
     progress_target_xy = torch.where(
-        sit[..., None], sit_target[..., :2], support[..., :2]
+        sit[..., None], sit_target[..., :2], climb_target[..., :2]
     )
     distance_xy = (human[..., :2] - progress_target_xy).norm(dim=-1)
     p = config["progress"]

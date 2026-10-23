@@ -8,7 +8,7 @@ if [ $# -lt 1 ] || [ ! -f "$1" ]; then
 fi
 export TOKENHSI_GPU=${TOKENHSI_GPU:-0}
 export PORT=${PORT:-6081}
-export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_jhh}
+export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi118}
 export VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
 export OUTPUT_PATH=${OUTPUT_PATH:-output_etc/check/stage2_shared_region_success/eval}
 export HEADLESS=0

@@ -15,7 +15,12 @@ class ChairFTAgent(MAAgent):
         self.running_mean_std.load_state_dict(checkpoint['running_mean_std'],strict=True)
         self._amp_input_mean_std.load_state_dict(checkpoint['amp_input_mean_std'],strict=True)
         if self.normalize_value:self.value_mean_std.load_state_dict(checkpoint['reward_mean_std'],strict=True)
-        names=freeze_except_chair(self.model)
+        self._full_finetune = task.cfg['env']['chairFT'].get('trainable') == 'all_layers'
+        if self._full_finetune:
+            self.model.requires_grad_(True)
+            names=[name for name,p in self.model.named_parameters() if p.requires_grad]
+        else:
+            names=freeze_except_chair(self.model)
         for group in self.optimizer.param_groups:group['params']=[p for p in group['params'] if p.requires_grad]
         self._frozen={name:p.detach().cpu().clone() for name,p in self.model.named_parameters() if not p.requires_grad}
         self._initial_chair={name:p.detach().cpu().clone() for name,p in self.model.named_parameters() if p.requires_grad}
@@ -27,6 +32,8 @@ class ChairFTAgent(MAAgent):
         self.set_train()
     def set_train(self):
         super().set_train()
+        if getattr(self, "_full_finetune", False):
+            return
         self.model.eval()
         for enc in (self.model.a2c_network.actor_encoder,self.model.a2c_network.critic_encoder):
             enc.tokenizers[1].chair.train()
@@ -47,10 +54,10 @@ class ChairFTAgent(MAAgent):
                 prefix=enc+'.tokenizers.1.'+kind+'.'
                 branches[enc+'.'+kind]=sum(v for k,v in self._gradients.items() if prefix in k)
         if not all(v>0 for v in branches.values()):raise RuntimeError('Dead tokenizer branch: '+str(branches))
-        for kind,module in self._normalizers.items():
+        for kind,module in ({} if self._full_finetune else self._normalizers).items():
             for name,value in module.state_dict().items():
                 if not torch.equal(value.detach().cpu(),self._normalizer_initial[kind][name]):raise RuntimeError('Normalizer changed: '+kind+'.'+name)
-        Path(self.experiment_dir,'chair_freeze_validation.json').write_text(json.dumps({'normalizers_unchanged':list(self._normalizers),'frozen_tensors_unchanged':len(self._frozen),'branch_gradient_l1':branches,'trainable_max_deltas':deltas,'epoch':self.epoch_num},indent=2))
+        Path(self.experiment_dir,'chair_freeze_validation.json').write_text(json.dumps({'normalizers_unchanged':[] if self._full_finetune else list(self._normalizers), 'all_layers_trainable':self._full_finetune,'frozen_tensors_unchanged':len(self._frozen),'branch_gradient_l1':branches,'trainable_max_deltas':deltas,'epoch':self.epoch_num},indent=2))
     def train_epoch(self):
         result=super().train_epoch()
         if hasattr(self,'_frozen') and (not self._checked or self.epoch_num%100==0):self.verify_frozen();self._checked=True

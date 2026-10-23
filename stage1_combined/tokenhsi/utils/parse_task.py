@@ -86,7 +86,10 @@ def parse_task(args, cfg, cfg_train, sim_params):
     cfg_task = cfg["env"]
     cfg_task["seed"] = cfg["seed"]
 
-    if args.task == "HumanoidChairFT":
+    if args.task == "HumanoidChairMixedFT":
+        from env.tasks.multi_agent.humanoid_chair_mixed_ft import HumanoidChairMixedFT
+        task_class = HumanoidChairMixedFT
+    elif args.task == "HumanoidChairFT":
         from env.tasks.multi_agent.humanoid_chair_ft import HumanoidChairFT
         task_class = HumanoidChairFT
     elif args.task == "HumanoidMAStage1Push":

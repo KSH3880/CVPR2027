@@ -156,3 +156,25 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 `../evaluation/climb_mixed/`: 원본 category-balanced CLIMB 혼합 샘플링, metadata 목표, 두 frozen 정책 paired 평가 런처. 에셋과 실제 평가 backend/산출물은 프로젝트 runs/climb_mixed_eval_20261022/에 준비.
 
 현재 기본 물체 평가는 `../evaluation/object_comparison/`의 종류별 독립 SIT/CLIMB 비교다. `climb_mixed/`는 이전 혼합 방식 코드로 보존한다.
+
+## Object comparison 목표 전체FT
+
+`chair_table_eval_full_ft` YAML/train/test/VNC와 `test_chair_table_eval_goal.py`: Chair좌판/Table metadata의 CLIMB 목표를 별도로 선택해 object_comparison과 일치시키며, SIT는 기존 좌판/상판 목표를 유지한다.
+
+## Fine-tuned 정책 점/영역 평가
+
+`evaluation/finetuned/`는 현재35D tokenizer checkpoint를1명/1native물체 평가에 연결한다. Chair26/Table8·SIT/CLIMB·512환경×3seed, root점/영역ever 기준과 trace재채점을 사용한다. 기존public/73k backend와 paired 비교는 하지 않는다.
+
+## Native chair/table RSI 후보 검사
+
+`rsi_native/`는 물체별 retarget, 관절한계 보정·FK, native mesh 정적 검사와 PhysX 짧은 hold 검사를 제공한다. 정적/단독 물리 audit 후 보정 AMP history를 만들어 혼합 FT reset에 연결한다. 절차와 한계는 [README](../rsi_native/README.md)를 따른다.
+
+## Box·Chair·Table 혼합 전체 FT
+
+`box_chair_table_mixed_full_ft` YAML/train/test/VNC는 Box·Chair·Table 목표를 각1/3로 혼합한다. `HumanoidChairMixedFT`가 native 환경의 두 목표를 chair/table 하나씩 배정하고 Box 환경의 크기·reward·RSI는 기존 경로로 유지한다. [설정 상세](reference/box_chair_table_mixed_full_ft.md).
+
+`utils/chair_geometry.py::table_box_token_inputs`는 Table의 관측 bbox 윗면을 metadata로 보정하고 Box tokenizer로 라우팅한다. 물리·reward용 geometry와 Chair 추가 입력은 유지한다.
+
+`rsi_native/view_table_sit.py`는 native Table의 검사 통과 착석 RSI와 SIT 목표점/20cm 구를 로컬 viewer에 표시한다. 조작·명령은 [RSI README](../rsi_native/README.md#로컬-table-sit-착석-확인).
+
+`utils/native_rsi.py`, `rsi_native/build_training_bank.py`, `rsi_native/view_reset_snapshot.py`는 native RSI의 실제 물체 pose 배치·보정 AMP history·두 사람 실제 reset viewer를 제공한다.

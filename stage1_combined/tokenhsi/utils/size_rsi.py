@@ -30,7 +30,9 @@ def task_probabilities(sizes, ranges=SIZE_RANGES):
     for task, prior in zip(TASKS, TASK_PROBS):
         bounds = torch.tensor(ranges[task], device=sizes.device).mul(20).round().long()
         eligible = ((grid >= bounds[:, 0]) & (grid <= bounds[:, 1])).all(-1)
-        count = (bounds[:, 1] - bounds[:, 0] + 1).prod()
+        counts = bounds[:, 1] - bounds[:, 0] + 1
+        # Fixed three axes; avoid the NVRTC reduction on CUDA 11.8/Blackwell.
+        count = counts[0] * counts[1] * counts[2]
         weights.append(eligible * (prior / count))
     weights = torch.stack(weights, -1)
     if (weights.sum(-1) == 0).any():

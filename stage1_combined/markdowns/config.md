@@ -27,6 +27,8 @@
 | [stage1_v2_fixed_push_360_raw.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_360_raw.yaml) | [stage1_v2_fixed_push_360_raw.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_360_raw.yaml) |
 | [stage1_v2_fixed_push_360_raw_cuboid.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_360_raw_cuboid.yaml) | [stage1_v2_fixed_push_360_raw_cuboid.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_360_raw_cuboid.yaml) |
 | [chair_sit_climb_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_sit_climb_ft.yaml) | [chair_sit_climb_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_sit_climb_ft.yaml) |
+| [chair_table_eval_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_table_eval_full_ft.yaml) | [chair_table_eval_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_table_eval_full_ft.yaml) |
+| [box_chair_table_mixed_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/box_chair_table_mixed_full_ft.yaml) | [box_chair_table_mixed_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/box_chair_table_mixed_full_ft.yaml) |
 
 ## 학습
 
@@ -72,6 +74,9 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cu
 ```bash
 # chair_sit_climb_ft
 bash tokenhsi/scripts/multi_agent/chair_sit_climb_ft_train.sh
+
+# chair_table_eval_full_ft
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/chair_table_eval_full_ft_train.sh
 ```
 
 ### noVNC 학습 시각화 — 4환경
@@ -110,6 +115,9 @@ TOKENHSI_GPU=5 PORT=6080 bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v
 
 # stage1_v2_fixed_push_360_raw_cuboid
 TOKENHSI_GPU=5 PORT=6080 bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v2_fixed_push_360_raw_cuboid 2 4 4
+
+# box_chair_table_mixed_full_ft
+bash tokenhsi/scripts/multi_agent/box_chair_table_mixed_full_ft_train.sh
 ```
 
 ## 로컬 추론
@@ -154,6 +162,12 @@ TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push
 ```bash
 # chair_sit_climb_ft
 HEADLESS=0 bash tokenhsi/scripts/multi_agent/chair_sit_climb_ft_test.sh "$CKPT"
+
+# chair_table_eval_full_ft
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/chair_table_eval_full_ft_test.sh "$CKPT"
+
+# box_chair_table_mixed_full_ft
+HEADLESS=0 bash tokenhsi/scripts/multi_agent/box_chair_table_mixed_full_ft_test.sh "$CKPT"
 ```
 
 ## 서버 VNC 추론
@@ -200,6 +214,12 @@ TOKENHSI_GPU=5 PORT=6081 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 b
 ```bash
 # chair_sit_climb_ft
 PORT=6083 bash tokenhsi/scripts/multi_agent/chair_sit_climb_ft_vnc.sh "$CKPT"
+
+# chair_table_eval_full_ft
+TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/chair_table_eval_full_ft_vnc.sh "$CKPT"
+
+# box_chair_table_mixed_full_ft
+bash tokenhsi/scripts/multi_agent/box_chair_table_mixed_full_ft_vnc.sh "$CKPT"
 ```
 
 ## 추론 옵션
@@ -268,6 +288,8 @@ Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, 
 의자 좌판·등받이 FT의 상세 조건과 현재 실행은 [상위 README](../../README.md)를 따른다.
 
 물체별 독립 SIT/CLIMB 평가(Box/Chair/Cabinet/Table): [실행·조건](../evaluation/object_comparison/README.md). 저장소 루트에서 `python3 evaluation/object_comparison/run_eval.py`를 실행한다.
+
+현재35D tokenizer fine-tuned checkpoint의 Chair/Table 점·영역 평가: [실행·조건](../evaluation/finetuned/README.md). `python evaluation/finetuned/run_eval.py --checkpoint <checkpoint.pth>`를 사용한다.
 
 ## 독립 폴더 실행 위치
 

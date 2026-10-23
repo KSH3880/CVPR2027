@@ -1,3 +1,58 @@
+## 2026-10-23
+
+### 78k 소스·native RSI/AMP 통합 후 혼합 본학습 시작
+
+- 사용자 승인으로 기존 Table SIT viewer 종료. 78k checkpoint의 epoch78000·73k와 모델key/shape동일 확인 후 혼합 FT 소스를78k로 변경했다. Box/Table/Chair 목표 각1/3·SIT/CLIMB50:50·전체레이어·lr2e-5·2048환경 유지.
+- `build_training_bank.py`가 통과 native 후보의9프레임 참조를 native32 관절한계로 보정하고 FK/velocity·동일 rigid retarget으로 AMP를 재생성한다. `utils/native_rsi.py`에서 실제 물체yaw/XY로 배치하고50% 확률 적용, 누락asset/task는 loco 대체. 장면 재시도에 두 사람 body-point15cm 필터를 추가. 실행bank `output/rsi_cache_native_chair_table_20261023/`.
+- CPU13개 통과, GPU2048환경1epoch rc0. 초기 native활성1285슬롯, AMP history 오차0·전체finite·sourceepoch78000, frozen0 확인. 로그 `output_etc/check/native_rsi_78k_train_smoke.log`. 실제 reset6조건 snapshot을 로컬 viewer에 표시·화면확인 완료(`output_etc/check/native_rsi_78k_view/`). N/P 전환·SPACE 고정PD·R reset. viewer 유지.
+- 사용자 요청으로 GPU0 본학습 시작: wrapperPID2998041, `output/box_chair_table_mixed_full_ft/local_78k_rsi_20261023_144809/`, 실행기록 `../runs/box_chair_table_78k_rsi_20261023_144809/active_run.json`. 연속4회차 update 로그 확인. 장기 policy 성공률은 아직 평가하지 않았다.
+
+### Table SIT 목표·착석 RSI 로컬 viewer
+
+- 사용자 요청으로 `rsi_native/view_table_sit.py`를 추가하고 로컬 DISPLAY:0에 실행. 실제 native Table9종·humanoid를 불러와 검사 통과 RSI 자세와 SIT 목표(상판+.10), 점 성공20cm 구, 골반 위치를 표시한다. N/P 물체 전환, SPACE 고정PD 물리, R reset. 정책 추론·학습은 실행하지 않는다.
+- 로컬 실행 `VIEWER_READY`와 스크린샷 육안 확인 완료. 첫 table의 초기 root-goal 거리2.11cm. 산출물 `output_etc/check/table_sit_local_view_20261023/`와 동명log. Table1종은 통과 RSI가 없어 제외했다. viewer는 사용자 확인을 위해 실행 상태로 유지한다.
+
+### Table 관측 bbox 상판 보정·Box tokenizer 공유
+
+- 사용자 요청으로 혼합 FT에 `table_input_bbox: metadata_top_box_tokenizer`를 설정했다. Table 관측의 bbox 상단Z만 dataset tarSitPos.z로 맞추고 관측 flag/추가descriptor를0으로 보내 Box30D tokenizer를 공유한다. Chair35D branch 유지. 물리 bbox·mesh·RSI·reward/평가 목표·pose는 변경하지 않는다. 옵션이 없는 이전 checkpoint는 기존 입력 유지.
+- 학습10/평가8개 Table metadata와 bbox 꼭짓점, 아래면/XY·속도·Box/Chair 불변·입력 원본 불변을 검사했다. 혼합·목표 회귀 포함 CPU9개 통과(`output_etc/check/table_box_input_regression.log`). 본학습 미실행, native RSI 통합은 별도 미완료.
+
+### Box·Chair·Table 목표 비율 균등화
+
+- 사용자 요청으로 Box75%/native25%를 폐기하고 세 물체군 목표 비율을 각1/3로 수정했다. native환경 비율2/3, 각환경 chair/table 목표 하나씩이므로2048환경의4096목표는 Box1366/Chair1365/Table1365다. SIT/CLIMB50:50 유지. CPU 혼합 경로7개 통과(`output_etc/check/box_native_equal_ratio_cpu.log`), 본학습 미실행.
+- Box heading은 기존대로 pose7의 quaternion을 통해 GTA transform/attention에 전달된다. 30D Box tokenizer 자체에는 각도 항목이 없으며 local 선속도3+각속도3+bbox24다. 입력 코드는 변경하지 않았다.
+
+### Box도 SIT/CLIMB만 학습하도록 범위 확정
+
+- 사용자 답변에 맞춰 `box_chair_table_mixed_full_ft`의 전 물체 과제를 SIT/CLIMB50:50으로 수정하고 AT·ON_TOP을 제외했다. AMP 분포도 기존 Chair/Table SIT/CLIMB 설정으로 정렬했다. Box75%/native25%, Box 크기·reward·RSI 경로는 유지한다. 명시적 `training_tasks`에 한해 validator가 전용 확률을 허용한다.
+- RSI 캐시의 기존 task확률이 YAML을 덮는 문제도 수정하고 회귀 검사 추가. CPU8개 통과. GPU2048환경 1회차 rc0: Box SIT1549/CLIMB1523, native SIT509/CLIMB515, AT·ON_TOP0개. 최종 로그 `output_etc/check/box_chair_table_sit_climb_smoke_v2.log`. 앞선 smoke는 실패/과거 검증으로 보존한다. native RSI reset/AMP 통합 전, 본학습 미실행.
+
+### Box·Chair·Table 기존 혼합 설정 복원
+
+- 사용자 요청으로 `box_chair_table_mixed_full_ft` YAML/train/test/VNC를 추가. Box75%는 stage1_v2_fixed task확률·크기·reward·size-aware RSI 유지, native25%는 chair/table 목표 하나씩 SIT/CLIMB50:50. native goal은 object_comparison, 새35D tokenizer·73k 소스·전체레이어 FT 유지.
+- `HumanoidChairMixedFT`의 native 자산 배정을 table까지 확장하고 metadata/seat를 제공. 기존chair-only 혼합 동작과 Box 경로 보존. CPU7개·wrapper 문법 통과. GPU2048환경 한 회차 rc0: Box1536/native512, table512/chair512 목표, Box크기 불변, frozen0·actor/critic 새tokenizer gradient 양수 확인. 로그 `output_etc/check/box_chair_table_mixed_smoke.log`.
+- 본학습은 실행하지 않음. native RSI bank는 아직 reset/AMP history 통합 전이라 해당 구성은 native loco 초기화로 명시. 상세 `markdowns/reference/box_chair_table_mixed_full_ft.md`.
+
+### Native chair/table RSI 후보 구성·검사
+
+- `rsi_native/`에 SIT20/CLIMB7 참조의 native chair49/table10별 retarget·관절한계 보정·전신 FK·mesh 검사와 별도 PhysX audit를 추가했다. object_state의 z는 지면 원점이며 지지면을 참조 자세에서 추정한다. 참조 손 위치와32DOF FK 차이 최대23.1cm도 재계산했다. 원본 후보·실패 결과를 보존한다.
+- CPU geometry/FK4개 통과. GPU2048환경·1명/1native물체·0.1/0.5초 고정PD 검사 rc0·optimizer0. 보정 후 통과 물체/후보: Chair SIT49/49·9472, CLIMB48/49·663, Table SIT9/10·1753, CLIMB9/10·111. 3개 asset/task 조합은 후보가 없어 제외 목록에 기록했다.
+- 결과 `output_etc/check/native_rsi_physics_20261023_v8/REPORT.md`, 원본/보정 bank와 정적 검사도 check 아래 보존. 통과는 장기 정책 안정성·정확한 체적 무충돌 보장이 아니다. 두 사람/주변물체 reset·보정 AMP history는 아직 연결하지 않았고 학습은 재시작하지 않았다.
+
+### Fine-tuned tokenizer 정책용 단독 점/영역 평가
+
+- `evaluation/finetuned/`에 35D tokenizer checkpoint용 1명/1고정물체 어댑터와 runner를 추가했다. Chair26/Table8 각각 SIT/CLIMB, 512환경×평가 seed0/1/2·900step·종료 frame을 포함한 root 점/영역 ever를 측정한다. 기존 public/73k와 paired 비교는 하지 않는다. 초기 상태·trace·hash·종료 frame 검증과 독립 float64 재채점을 기록한다.
+- 사용자 승인으로 로컬 viewer를 종료하고 학습은 유지했다. 평가 대상은 화면의 8600회차로 고정했다. 정식 결과 경로는 `output_etc/check/finetuned_eval_8600_formal/`, 실행 로그는 `../runs/checks/chair_full_ft/finetuned_formal.log`다.
+- 평가 Table8에서 metadata와 bbox 높이 차이를 검출했다. object_comparison CLIMB의 의자 판정을 tokenizer 라우팅 flag 대신 실제 물체 종류로 수정했다. 학습 Table10은 두 높이가 같아 수치상 영향이 없다. 전체 chair75/train-table10/test-table8 목표 회귀와 점/영역 판정 CPU3개 통과. 네 조건의 소규모 GPU rollout과 trace 재채점도 통과했다.
+
+## 2026-10-22
+
+### Object comparison 목표점에 맞춘 Chair/Table 전체FT
+
+- 사용자 승인으로 metadata-all 학습 PID2869928을 종료. `chair_table_eval_full_ft` YAML/train/test/VNC 추가: Chair SIT/CLIMB=좌판+.10/.94, Table SIT=bbox상판+.10, Table CLIMB=metadata+.94로 `evaluation/object_comparison/prepare.py`의 목표점과 정렬했다. SIT와 기존 물리 지지면·feet/영역 학습 조건은 유지한다.
+- CPU3개 통과: 전체chair75/table10 목표 대조, 기존metadata목표회귀·SIT불변. GPU2048환경 epoch1/저장 rc=0, 최대목표높이오차2.4e-7m·frozen0·actor/critic 새tokenizer gradient양수. 저장 모델16환경/16step 추론 rc=0. 로그 `../runs/checks/chair_full_ft/evalgoal_{train,eval}.log`.
+- 기존 결과를 resume하지 않고 73000부터 새 본학습 시작. GPU0 PID2883544, 2048환경·전체레이어·lr2e-5·20,000회. 실행 기록 `../runs/chair_table_eval_full_ft_20261022_212639/active_run.json`, 출력 `output/chair_table_eval_full_ft/local_20261022_212639/`.
+
 ## 2026-10-22
 
 ### 물체 종류별 독립 SIT/CLIMB 평가

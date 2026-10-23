@@ -182,3 +182,25 @@ bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_vnc.sh \
 - 재개·test/VNC는 새 raw checkpoint를 사용한다. 기존 고정 크기 checkpoint를 새 wrapper의 resume/test에 넣으면 거부한다. 기존 wrapper와 checkpoint는 기존 물성·기본 보정을 유지한다.
 - RSI 원본7clip·11시각을 재사용한다. 관절·높이·속도는 바꾸지 않고, 초기 사람-상자 침투가 예상될 때만 전신을 미는 면 바깥쪽으로 최소 이동해5mm 여유를 확보한다. 기존 ref NPY·공용 RSI cache는 재생성하지 않는다.
 - 실행 명령은 [config](config.md), 크기별 검증 범위와 구현 내용은 [구현 메모](reference/stage1_push_raw.md)를 따른다.
+
+## 의자 SIT/CLIMB 전체 레이어 fine-tuning
+
+`chair_sit_climb_full_ft`는 73000에서 새35D chair tokenizer로 전이한 뒤 전체 actor·critic·AMP 판별자·sigma를 학습하고 scene/AMP/value 정규화 통계를 업데이트한다. 학습률2e-5·SIT/CLIMB50:50·2명/2048환경/4물체·20,000iteration이다. 새 tokenizer의 기존30D 열은 원본에서 복사하고 추가5D 열은0으로 시작한다. 전용 train/test/VNC 명령은 [config](config.md)를 따른다. 일반73000 초기 weight를 전용 test에 넣지 않고, 전체FT가 저장한 checkpoint를 사용한다. 확인 학습은 `TOKENHSI_GPU=0 CHECK=1 bash tokenhsi/scripts/multi_agent/chair_sit_climb_full_ft_train.sh`를 사용한다.
+
+이 머신의 tokenhsi118/CUDA11.8에서는 RTX5090의 NVRTC 타깃 오류를 피하도록 전체FT 전용 wrapper가 `PYTORCH_JIT=0`을 기본 적용한다. 호환 환경에서는 `PYTORCH_JIT=1`로 변경할 수 있다. 짧은 추론은 `CHAIR_TEST_ENVS=1 CHAIR_REPEATS=1 EPISODE_LENGTH=16`을 추가한다.
+
+## 의자·box 통합 전체 FT
+
+`chair_mixed_full_ft`는 stage1_v2_fixed의 env/sim을 복원하고 chairFT 옵션만 추가한다. 전체2048환경 중1536개는 기존 box SIT/CLIMB/AT/ON_TOP,512개는 의자 SIT/CLIMB50:50이다. 원래 box의 task prior는 SIT10%/CLIMB25%/AT32.5%/ON_TOP32.5%이며 실제 추첨은 기존 크기 조건을 따른다. box의 RSI·물리·보상은 기존 경로를 사용하고 의자는 box RSI에서 제외해 loco로 초기화한다. 새35D tokenizer와 전체 모델을73000부터 학습한다. 처음에는 `output/rsi_cache_stage1_v2`의 누락 profile을 생성하므로 첫 optimizer 갱신까지 시간이 걸릴 수 있다.
+
+## Chair/Table SIT/CLIMB 전체FT
+
+`chair_table_full_ft`는 기존 box/AT/ON_TOP 혼합을 사용하지 않는다. 환경별 대상 chair1개/table1개에 사람을 무작위 배정하고 주변2개도 chair/table로만 구성한다. SIT/CLIMB50:50·2명/2048환경/4물체·loco시작·물체고정이며 box용RSI캐시는 생성하지 않는다. 둘 다 새35D tokenizer를 사용한다. table의 등받이방향은0, 지지점은bbox 상판중앙, 지지영역은상판XY크기다. chair는기존좌판메타데이터를쓴다. 전체레이어·정규화통계·sigma를73000부터 학습한다(lr2e-5·20,000회). 의자train49/test26을 사용하며 table10종은train/test공용이므로 table수치를미관측모델일반화로해석하지않는다.
+
+## CLIMB metadata 목표
+
+`chair_table_metadata_full_ft`는 chair/table 모두 CLIMB 목표를 원본 TokenHSI 식 `(object_x, object_y, object_z + config.tarSitPos.z + char_h)`로 사용한다(char_h=0.94). SIT와 tokenizer 입력, 물리적 좌판/상판, feet/영역 성공 조건은 유지한다. Chair CLIMB는 기존 좌판+.94보다 약10cm 높다. 현재 table10종은 metadata와bbox상판높이가동일하므로 수치차이는없다. 이전checkpoint를resume하지않고73000부터새로학습한다.
+
+## 물체별 평가 목표에 맞춘 Chair/Table 전체FT
+
+`chair_table_eval_full_ft`는 `evaluation/object_comparison/prepare.py`와 목표점을 맞춘다. Chair SIT/CLIMB는 좌판+0.10/0.94m, Table SIT는 bbox상판+0.10m, Table CLIMB는 metadata tarSitPos.z+0.94m다. 73000부터 새로 시작하며 이전 metadata-all checkpoint를 resume하지 않는다. 사람2명/2048환경/대상chair1개·table1개/주변chair·table2개, 전체레이어 학습·lr2e-5·20,000회는 유지한다. 이 변경은 학습 목표점 정렬이며, 학습의 feet/영역 조건을 평가의 root점/영역ever 기준으로 대체하는 것은 아니다.

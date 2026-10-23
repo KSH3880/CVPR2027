@@ -4,7 +4,7 @@
 # Nothing here is machine specific -- everything is discovered or overridable:
 #
 #   TOKENHSI_CONDA_ENV  conda env to activate.
-#                       Default: "tokenhsi_jhh".
+#                       Default: "tokenhsi118".
 #                       Set this if you named your env something else.
 #   CONDA_BASE          conda install prefix, if auto-detection fails
 #                       (e.g. CONDA_BASE=/opt/miniconda3).
@@ -26,7 +26,7 @@ TOKENHSI_ROOT=$(cd "$(dirname "$_tokenhsi_self")/../../.." && pwd)
 export TOKENHSI_ROOT
 
 # --- conda environment -----------------------------------------------------
-TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_jhh}
+TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi118}
 
 if [ "${CONDA_DEFAULT_ENV:-}" != "$TOKENHSI_CONDA_ENV" ]; then
     conda_base=${CONDA_BASE:-}
