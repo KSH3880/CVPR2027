@@ -38,9 +38,10 @@ class HumanoidChairMixedFT(HumanoidChairFT):
         HumanoidMACarry._load_box_asset(self)
         self._original_box_sizes = self._box_size.clone()
         fraction = float(self.cfg['env']['chairFT']['chair_environment_fraction'])
-        if not 0 < fraction < 1:
+        if not 0 < fraction < 1 and not (fraction == 1 and self.cfg['env']['chairFT'].get('sit_only',False)):
             raise ValueError('chair_environment_fraction must be between zero and one')
         count = max(1, min(self.num_envs - 1, round(self.num_envs * fraction))) if self.num_envs > 1 else 1
+        if fraction == 1: count = self.num_envs
         self._chair_env_mask = torch.arange(self.num_envs, device=self.device) < count
         self._native_asset_keys = [['']*self.num_objects for _ in range(self.num_envs)]
         self._chair_features = torch.zeros(self.num_envs, self.num_objects, EXTRA, device=self.device)

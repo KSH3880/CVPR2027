@@ -1,0 +1,512 @@
+{
+  "metadata_source": "bones_seed/metadata/seed_metadata_v002_temporal_labels.jsonl",
+  "crop_rule": "Start at 0; stop before first stop-pushing/arm-release event. Existing two converted files are retained unchanged.",
+  "clips": {
+    "push_obstacle_180_001__A344_M": {
+      "start": 0.0,
+      "end": 10.65,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.3,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 2.3,
+          "end_time": 10.65,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 10.65,
+          "end_time": 12.45,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 12.45,
+          "end_time": 15.4,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_002__A342": {
+      "start": 0.0,
+      "end": 11.65,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 2.85,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 11.65,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.65,
+          "end_time": 15.6,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    "push_obstacle_180_002__A342_M": {
+      "start": 0.0,
+      "end": 11.65,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 2.85,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.85,
+          "end_time": 11.65,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.65,
+          "end_time": 15.6,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    "push_obstacle_180_002__A344": {
+      "start": 0.0,
+      "end": 11.7,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.8,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_002__A344_M": {
+      "start": 0.0,
+      "end": 11.7,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.8,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_003__A342": {
+      "start": 0.0,
+      "end": 11.733333,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.666667,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.666667,
+          "end_time": 2.9,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.9,
+          "end_time": 11.733333,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.733333,
+          "end_time": 13.9,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    "push_obstacle_180_003__A342_M": {
+      "start": 0.0,
+      "end": 11.733333,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.666667,
+          "description": "A person standing upright leans forward while raising their arms and placing their hands firmly on the obstacle."
+        },
+        {
+          "start_time": 1.666667,
+          "end_time": 2.9,
+          "description": "A person leaning forward with their hands on the object begins to walk ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 2.9,
+          "end_time": 11.733333,
+          "description": "A person leaning forward with their hands on the object walks ahead while steadily pushing the obstacle forward."
+        },
+        {
+          "start_time": 11.733333,
+          "end_time": 13.9,
+          "description": "A person rises to stand upright while lowering their arms by their side after pushing the obstacle."
+        }
+      ]
+    },
+    "push_obstacle_180_003__A344": {
+      "start": 0.0,
+      "end": 11.3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.3,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 11.3,
+          "end_time": 15.25,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_003__A344_M": {
+      "start": 0.0,
+      "end": 11.3,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 2.2,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 2.2,
+          "end_time": 11.3,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 11.3,
+          "end_time": 15.25,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_101__A341": {
+      "start": 0.0,
+      "end": 12.2,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 12.2,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.2,
+          "end_time": 13.766667,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.766667,
+          "end_time": 14.766667,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_101__A341_M": {
+      "start": 0.0,
+      "end": 12.2,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 12.2,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.2,
+          "end_time": 13.766667,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.766667,
+          "end_time": 14.766667,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_101__A343": {
+      "start": 0.0,
+      "end": 15.6,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.6,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.6,
+          "end_time": 15.6,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 15.6,
+          "end_time": 17.6,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_101__A343_M": {
+      "start": 0.0,
+      "end": 15.6,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.6,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.6,
+          "end_time": 15.6,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 15.6,
+          "end_time": 17.6,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_102__A341": {
+      "start": 0.0,
+      "end": 11.7,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.75,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.75,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.65,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_102__A341_M": {
+      "start": 0.0,
+      "end": 11.7,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.75,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.75,
+          "end_time": 11.7,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 11.7,
+          "end_time": 13.35,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 13.35,
+          "end_time": 14.65,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_102__A343": {
+      "start": 0.0,
+      "end": 14.2,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.95,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.95,
+          "end_time": 14.2,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.2,
+          "end_time": 17.15,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_102__A343_M": {
+      "start": 0.0,
+      "end": 14.2,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.95,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.95,
+          "end_time": 14.2,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.2,
+          "end_time": 17.15,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_103__A341": {
+      "start": 0.0,
+      "end": 12.85,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 12.85,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.85,
+          "end_time": 14.1,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 14.1,
+          "end_time": 15.15,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_103__A341_M": {
+      "start": 0.0,
+      "end": 12.85,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.45,
+          "description": "A person standing upright pushes against an obstacle in front."
+        },
+        {
+          "start_time": 1.45,
+          "end_time": 12.85,
+          "description": "A person slowly walks forward while pushing an obstacle with both hands."
+        },
+        {
+          "start_time": 12.85,
+          "end_time": 14.1,
+          "description": "A person stops pushing an obstacle with both hands before standing upright."
+        },
+        {
+          "start_time": 14.1,
+          "end_time": 15.15,
+          "description": "A person standing upright lowers their arms by their sides."
+        }
+      ]
+    },
+    "push_obstacle_180_103__A343": {
+      "start": 0.0,
+      "end": 14.9,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 14.9,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.9,
+          "end_time": 16.75,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    },
+    "push_obstacle_180_103__A343_M": {
+      "start": 0.0,
+      "end": 14.9,
+      "events": [
+        {
+          "start_time": 0.0,
+          "end_time": 1.9,
+          "description": "The person leans forward with both arms bent, preparing to push an object."
+        },
+        {
+          "start_time": 1.9,
+          "end_time": 14.9,
+          "description": "The person pushes the object forward while slowly stepping to apply force."
+        },
+        {
+          "start_time": 14.9,
+          "end_time": 16.75,
+          "description": "The person brings their arms back off the object and begins to rise and stand upright."
+        }
+      ]
+    }
+  }
+}

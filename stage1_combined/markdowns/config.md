@@ -30,6 +30,9 @@
 | [chair_table_eval_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_table_eval_full_ft.yaml) | [chair_table_eval_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_table_eval_full_ft.yaml) |
 | [box_chair_table_mixed_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/box_chair_table_mixed_full_ft.yaml) | [box_chair_table_mixed_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/box_chair_table_mixed_full_ft.yaml) |
 
+| [chair_sit_only_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_sit_only_full_ft.yaml) | [chair_sit_only_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_sit_only_full_ft.yaml) |
+| [tokenhsi_sit_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/tokenhsi_sit_full_ft.yaml) | [tokenhsi_sit_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/tokenhsi_sit_full_ft.yaml) |
+
 ## 학습
 
 새 학습은 아래 환경변수를 해제한 뒤 해당 명령을 실행한다. PUSH·PUSH 360은 Stage1 fixed60000, PUSH raw·raw cuboid는 `output/stage1/Stage1V2Fixed_00073000.pth`에서 시작한다. 기존 PUSH 전이와 학습 재개는 [USAGE](USAGE.md#push-360도-접근-전이)를 따른다.
@@ -118,6 +121,12 @@ TOKENHSI_GPU=5 PORT=6080 bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v
 
 # box_chair_table_mixed_full_ft
 bash tokenhsi/scripts/multi_agent/box_chair_table_mixed_full_ft_train.sh
+
+# chair_sit_only_full_ft
+bash tokenhsi/scripts/multi_agent/chair_sit_only_full_ft_train.sh
+
+# tokenhsi_sit_full_ft
+bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_train.sh
 ```
 
 ## 로컬 추론
@@ -168,6 +177,12 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/chair_table_eval_ful
 
 # box_chair_table_mixed_full_ft
 HEADLESS=0 bash tokenhsi/scripts/multi_agent/box_chair_table_mixed_full_ft_test.sh "$CKPT"
+
+# chair_sit_only_full_ft
+HEADLESS=0 bash tokenhsi/scripts/multi_agent/chair_sit_only_full_ft_test.sh "$CKPT"
+
+# tokenhsi_sit_full_ft
+HEADLESS=0 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_test.sh "$CKPT"
 ```
 
 ## 서버 VNC 추론
@@ -220,6 +235,12 @@ TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/chair_table_eval_full
 
 # box_chair_table_mixed_full_ft
 bash tokenhsi/scripts/multi_agent/box_chair_table_mixed_full_ft_vnc.sh "$CKPT"
+
+# chair_sit_only_full_ft
+PORT=6083 bash tokenhsi/scripts/multi_agent/chair_sit_only_full_ft_vnc.sh "$CKPT"
+
+# tokenhsi_sit_full_ft
+PORT=6083 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_vnc.sh "$CKPT"
 ```
 
 ## 추론 옵션

@@ -20,3 +20,7 @@ __pycache__/
 /metrics/
 *.npz
 *.npy
+
+/chair_sit_only_active_run.json
+
+/tokenhsi_sit_active_run.json

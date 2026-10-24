@@ -184,3 +184,9 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 `rsi_native/{front_filter,foot_surface,validate_reset}.py`, `utils/{chair_front,native_foot_guard}.py`는 정면 제한·발/표면 교차·무학습 reset 검증을 담당한다. 최신 review는 [RSI README](../rsi_native/README.md#최신-검증review-학습-보류).
 
 `rsi_native/{ik,ik_preview}.py`는 탈락한 완료 자세의 다리 접촉 IK 보정과 물리 통과 후보의 보정 전/후 snapshot을 제공한다. 기존 실행 RSI cache는 자동 변경하지 않는다.
+
+`tokenhsi/env/tasks/multi_agent/humanoid_chair_sit_only_ft.py`: 78k 기반 전체 FT용 chair SIT 전용 환경. `chair_sit_only_full_ft.yaml` 및 동명train/test/vnc wrapper 사용. 상세 [chair_sit_only_ft.md](reference/chair_sit_only_ft.md).
+
+原본 TokenHSI 학습/공식eval 설정 감사: [reference/tokenhsi_train_eval_settings.md](reference/tokenhsi_train_eval_settings.md). 실제모드별초기화·360도배치·10초Short horizon·공식반복집계 구분.
+
+현재 기본 학습: `tokenhsi/env/tasks/multi_agent/humanoid_tokenhsi_sit_ft.py`, 원본 보상 `tokenhsi/utils/tokenhsi_sit_reward.py`, CLIMB 없는 데이터 `tokenhsi/data/dataset_tokenhsi_sit_only.yaml`. 상세 [reference/tokenhsi_sit_ft.md](reference/tokenhsi_sit_ft.md).

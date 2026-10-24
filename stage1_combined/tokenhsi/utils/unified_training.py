@@ -100,7 +100,7 @@ def validate_unified_env(env):
         )
     chair_only = env.get("chairFT") and "chair_environment_fraction" not in env["chairFT"]
     sit_climb_only = env.get("chairFT", {}).get("training_tasks") == ["sit", "climb"]
-    expected_probs = [0., .5, .5, 0., 0.] if chair_only or sit_climb_only else list(TASK_PROBS)
+    expected_probs = [0., 1., 0., 0., 0.] if env.get("chairFT", {}).get("sit_only",False) else ([0., .5, .5, 0., 0.] if chair_only or sit_climb_only else list(TASK_PROBS))
     if list(env["relationGraph"]["template_probabilities"].values()) != expected_probs:
         raise ValueError("Stage1 task proportions do not match the contract")
     native_sampling = uses_tokenhsi_sampling(env)

@@ -1,0 +1,186 @@
+# Motion datasets, please use your own paths
+amass_dir: "/YOUR_PATH/datasets/AMASS"
+samp_pkl_dir: "/YOUR_PATH/datasets/samp"
+omomo_dir: "/YOUR_PATH/datasets/OMOMO/data"
+
+motions:
+  loco:
+    - "ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B11_-_walk_turn_left_(135)_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B12_-_walk_turn_right_(90)_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B13_-_walk_turn_right_(45)_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B14_-_walk_turn_right_(135)_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B15_-_walk_turn_around_(same_direction)_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B16_-_walk_turn_change_direction_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B1_-_stand_to_walk_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B2_-_walk_to_stand_t2_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B3_-_walk1_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii.npz"
+    - "BMLrub+__+rub001+__+0017_circle_walk_stageii.npz"
+    - "SFU+__+0008+__+0008_Walking002_stageii.npz"
+    - "SFU+__+0005+__+0005_Walking001_stageii.npz"
+    - "SFU+__+0007+__+0007_Walking001_stageii.npz"
+    - "KIT+__+11+__+WalkInClockwiseCircle09_stageii.npz"
+
+  loco_stairs:
+    - "KIT+__+167+__+downstairs04_stageii.npz"
+    - "KIT+__+167+__+upstairs_downstairs01_stageii.npz"
+    - "KIT+__+183+__+upstairs10_stageii.npz"
+    - "KIT+__+359+__+downstairs04_stageii.npz"
+    - "KIT+__+359+__+downstairs06_stageii.npz"
+    - "KIT+__+359+__+upstairs09_stageii.npz"
+    - "KIT+__+359+__+upstairs_downstairs03_stageii.npz"
+    - "KIT+__+424+__+upstairs03_stageii.npz"
+    - "KIT+__+424+__+upstairs05_stageii.npz"
+    - "KIT+__+513+__+downstairs06_stageii.npz"
+    - "KIT+__+513+__+downstairs07_stageii.npz"
+    - "KIT+__+513+__+upstairs07_stageii.npz"
+    - "KIT+__+183+__+downstairs01_stageii.npz"
+    - "KIT+__+167+__+downstairs05_stageii.npz"
+    - "KIT+__+3+__+downstairs05_stageii.npz"
+    - "KIT+__+424+__+downstairs01_stageii.npz"
+    - "KIT+__+513+__+upstairs_downstairs06_stageii.npz"
+    - "KIT+__+423+__+upstairs09_stageii.npz"
+    - "KIT+__+424+__+upstairs01_stageii.npz"
+    - "KIT+__+3+__+upstairs_downstairs01_stageii.npz"
+
+  carry:
+    - "ACCAD+__+Female1Walking_c3d+__+B19_-_walk_to_pick_up_box_stageii.npz"
+    - "ACCAD+__+Female1General_c3d+__+A5_-_pick_up_box_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B21_-_put_down_box_to_walk_stageii.npz"
+    - "ACCAD+__+Female1Walking_c3d+__+B20_-_walk_with_box_stageii.npz"
+
+  omomo:
+    - "sub7_largebox_006"
+    - "sub7_largebox_007"
+    - "sub7_largebox_008"
+    - "sub7_largebox_009"
+    - "sub7_largebox_010"
+    - "sub7_largebox_011"
+    - "sub7_largebox_042"
+    - "sub7_largebox_043"
+    - "sub7_largebox_044"
+    - "sub7_largebox_045"
+    - "sub7_largebox_046"
+    - "sub7_largebox_047"
+    - "sub7_smallbox_046"
+    - "sub7_smallbox_047"
+    - "sub7_smallbox_048"
+    - "sub7_smallbox_049"
+    - "sub7_smallbox_051"
+
+  climb:
+    - "CMU+__+83+__+83_27_stageii.npz"
+    - "CMU+__+141+__+141_08_stageii.npz"
+    - "CMU+__+107+__+107_10_stageii.npz"
+    - "CMU+__+36+__+36_14_stageii.npz"
+    - "CMU+__+36+__+36_04_stageii.npz"
+    - "CMU+__+40+__+40_08_stageii.npz"
+    - "KIT+__+3+__+upstairs01_stageii.npz"
+    - "KIT+__+572+__+stomp_left01_stageii.npz"
+    - "KIT+__+572+__+stomp_right01_stageii.npz"
+    - "EKUT+__+265+__+BEAMN01_stageii.npz"
+    - "Eyes_Japan_Dataset+__+ichige+__+jump-13-matrix-ichige_stageii.npz"
+
+  sit:
+    - file: "chair_mo_stageII"
+      start: 60
+      end: 480
+      stateInitRange: 0.7142
+    - file: "chair_mo001_stageII"
+      start: 60
+      end: 480
+      stateInitRange: 0.6714
+    - file: "chair_mo002_stageII"
+      start: 60
+      end: 420
+      stateInitRange: 0.5
+    - file: "chair_mo003_stageII"
+      start: 60
+      end: 480
+      stateInitRange: 0.7
+    - file: "chair_mo004_stageII"
+      start: 60
+      end: 480
+      stateInitRange: 0.7142
+    - file: "chair_mo005_stageII"
+      start: 42
+      end: 480
+      stateInitRange: 0.8082
+    - file: "chair_mo006_stageII"
+      start: 48
+      end: 480
+      stateInitRange: 0.7808
+    - file: "chair_mo007_stageII"
+      start: 48
+      end: 480
+      stateInitRange: 0.7083
+    - file: "chair_mo008_stageII"
+      start: 120
+      end: 360
+      stateInitRange: 0.525
+    - file: "chair_mo009_stageII"
+      start: 60
+      end: 420
+      stateInitRange: 0.55
+    - file: "chair_mo010_stageII"
+      start: 90
+      end: 480
+      stateInitRange: 0.5077
+    - file: "chair_mo011_stageII"
+      start: 60
+      end: 600
+      stateInitRange: 0.7777
+    - file: "chair_mo012_stageII"
+      start: 30
+      end: 360
+      stateInitRange: 0.6181
+    - file: "chair_mo013_stageII"
+      start: 90
+      end: 540
+      stateInitRange: 0.6266
+    - file: "chair_mo014_stageII"
+      start: 78
+      end: 420
+      stateInitRange: 0.4736
+    - file: "chair_mo015_stageII"
+      start: 60
+      end: 480
+      stateInitRange: 0.7428
+    - file: "chair_mo016_stageII"
+      start: 60
+      end: 420
+      stateInitRange: 0.7
+    - file: "chair_mo017_stageII"
+      start: 60
+      end: 420
+      stateInitRange: 0.5833
+    - file: "chair_mo018_stageII"
+      start: 60
+      end: 540
+      stateInitRange: 0.8125
+    - file: "chair_mo019_stageII"
+      start: 60
+      end: 420
+      stateInitRange: 0.75
+    - file: "armchair001_stageII"
+      start: 220
+      end: 450
+      stateInitRange: 0.5652
+    - file: "armchair003_stageII"
+      start: 230
+      end: 500
+      stateInitRange: 0.4444
+    - file: "armchair010_stageII"
+      start: 60
+      end: 300
+      stateInitRange: 0.625
+    - file: "armchair012_stageII"
+      start: 120
+      end: 450
+      stateInitRange: 0.6363
+    - file: "armchair018_stageII"
+      start: 220
+      end: 400
+      stateInitRange: 0.5555

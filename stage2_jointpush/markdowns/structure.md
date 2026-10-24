@@ -1,17 +1,6 @@
-## koo_1021 Partial Stage2
+## 현재 Partial 구현
 
-- `../jointpush/scripts/koo_partial_prepare.py`: Stage1BasePush 표현·AMP를 유지한 Partial Stage2 config/workspace 생성.
-- `../jointpush/scripts/koo_partial_run.py`: 기존 ksh_partition_scene를 재사용하며 source를 바꾸지 않는 5-task/PUSH graph·Stage2 strict transfer/동결·저장 계약·업데이트 검사.
-- `../jointpush/scripts/koo_partial_{train,test,vnc}.sh`, `koo_partial_launch.sh`: Stage1 resume와 별도인 Partial Stage2 실행.
-- `../jointpush/PARTIAL_KOO_1021.md`: 환경·명령·checkpoint와 검증 범위.
-
-## koo_1021 Stage1BasePush
-
-- `../jointpush/ports/koo_1021/`: ec09d71 고정 원본 및 Stage1BasePush port.
-- `../jointpush/koo_1021_manifest.json`: 파일 무결성/고정 커밋.
-- `../jointpush/scripts/koo_1021_{prepare,train,test,vnc}.sh`: 준비·Stage1 resume·평가·서버 viewer.
-- `../jointpush/scripts/koo_1021_prepare.py`, `koo_1021_common.sh`, `koo_1021_runtime.sh`: CPU checkpoint 계약 검사와 로컬 경로 adapter.
-- `../jointpush/KOO_1021.md`: 업로드 경로·학습/추론/VNC 명령·검증 범위.
+현재 RawCuboid Partial의 코드·보상·실행 명령은 `../../jointpush/partial/`, `../../jointpush/scripts/partial_*`와 [안내](../../jointpush/README.md)를 따른다. 새 partial은 여기의 KSH/기존 Koo port에 의존하지 않는다. 아래 경로는 기존 viewer·분석용이다.
 
 ## KSH Depth180 9000 Partial viewer
 

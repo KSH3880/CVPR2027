@@ -1,0 +1,255 @@
+{
+  "contract": {
+    "revision": 3,
+    "push_arm_retarget": "shoulder_rotation_v1",
+    "motion_hashes": {
+      "push": [
+        "5459336b1e94036e3c0a5155c89419cb08d37f042598eb5375177ccfd5563932",
+        "ec5fb47016214883c55fe98abbe623f98a145cee33e1f75fdb387a08156cea86",
+        "38f2302df648e861e61187b06b438417460d68c97778a9bdb9bc60375a55f39b",
+        "6a9d98335b708435f358aec29ba4428acc9fe56edb01562c71972047de0cd32e",
+        "14b6bc6b90872af625cf1f5cda1e76134dd276c7c1672e23a6de4a0641263084",
+        "20aa94e4d981db81dec78c5db29b8bc5ebb1889dcedc408556ac0abfc59518e3",
+        "cdb0ec18014291659b3adf09234d2794a867eaa22b226c1ca38987cae1303a43",
+        "3624699f84114462f14e167172f63b08c1f709a273c376f02242aa0523a254e3",
+        "f177f5dedd9ebc7c9dcf8d5fcc0e3902d35fcda44ba5638c4a3ba564db51f5b7",
+        "d374df64b37beef3bf55a05722b4948f8641e1a4a7937e1fd8a9d5bc93515e4d",
+        "962a56788b0e4e957e8cc572dc8c4422316346c2b92a97f902d63355187774d5",
+        "1b2b2146754315e8f95f6f108086714ec321935fb587cb7654f126c8b55abd58",
+        "1e202de929130931b378e2be27cedf994d851614fb1b1e118685ed433d8e8746",
+        "ec7285d2ceb6ddc5d9177809fb26ebc795edd331476c137f7c013e7442c1a146",
+        "5f3d3b6a07282c3585d84a068a69861e0bc206ee220a24993e408fe7756a93a7",
+        "7acc1b0633f4397d26aa10abe472c66c2e28ebb4618685e523857c3056f8565b",
+        "d7e49b5b8a4c07d0e442afe2b5f1b54d358321bbbdb517014b8d2c0ada30975d",
+        "5a2ba42e17efc101a75702965163b9b6923a94f9cba977e109a94cafd1386ea9",
+        "5fe24a5444c3878bab80a29e6de342eac3eb2c11f629084ec61209ba5d58a937",
+        "8cbc0c4e48ac2a8cc7af122bff2d7b2df11cb65bceebdd359ec0c148253419d7",
+        "bdedc3b473246c68335df105b5ead7b8f978c44a068b3002d1ed5a1a4e4fb6dc"
+      ]
+    },
+    "push_box": {
+      "size": [
+        1.3,
+        1.3,
+        1.3
+      ],
+      "mass": 25.0,
+      "friction": 0.6
+    },
+    "reward": {
+      "mode": "state_relation_edge_stage1_v1",
+      "schema_version": 12,
+      "stage1_variant": "stage1_open_push",
+      "state_reward_weight": 0.4,
+      "progress_reward_weight": 0.2,
+      "success_reward_weight": 0.2,
+      "task_sharing": {
+        "self": 0.9,
+        "teammate": 0.1
+      },
+      "success": {
+        "saturation": "current_success",
+        "terminate_when_all_subgoals_done": false
+      },
+      "observation": {
+        "graph_packet_fields": [
+          "valid",
+          "src",
+          "dst",
+          "relation",
+          "owner"
+        ]
+      },
+      "diagnostics": {
+        "enabled": true,
+        "sample_envs": 2,
+        "log_interval": 30
+      },
+      "push": {
+        "target_distance": 2.0,
+        "goal_tolerance": 0.15,
+        "ground_tolerance": 0.08,
+        "max_tilt": 0.35,
+        "max_speed": 0.2,
+        "max_angular_speed": 0.3,
+        "hand_distance": 0.18,
+        "hand_lateral_offset": 0.2,
+        "hand_target_height": 0.8,
+        "min_hand_force": 0.5,
+        "min_box_force": 0.5,
+        "min_contact_progress": 0.05
+      }
+    },
+    "stand_off": 0.06,
+    "layout": {
+      "push_x": -4.0,
+      "lane_spacing": 10.0
+    },
+    "push_scene": {
+      "arena_center": [
+        -4.0,
+        0.0
+      ],
+      "arena_radius": 8.0,
+      "min_station_distance": 12.0,
+      "owner_loco_distance_range": [
+        1.0,
+        2.0
+      ]
+    },
+    "push_goal": {
+      "sampling": "box_forward_uniform",
+      "distance_range": [
+        2.0,
+        5.0
+      ]
+    },
+    "push_contact": "goal_opposite_faces_v2",
+    "push_size_randomization": null,
+    "push_contact_point": {
+      "height_range_m": [
+        0.6175,
+        0.6175
+      ],
+      "rsi_clip_coverage": "pd_survivors"
+    }
+  },
+  "screen": "inherited_20kg_PD_12_steps",
+  "candidates": {
+    "push": [
+      {
+        "motion_id": 0,
+        "time": 9.600000500679016,
+        "phase": 0.9028213166144201,
+        "box_progress": 0.7673981191222571
+      },
+      {
+        "motion_id": 1,
+        "time": 6.400000333786011,
+        "phase": 0.5501432664756447,
+        "box_progress": 0.467621776504298
+      },
+      {
+        "motion_id": 1,
+        "time": 6.533333674073219,
+        "phase": 0.5616045845272206,
+        "box_progress": 0.4773638968481375
+      },
+      {
+        "motion_id": 1,
+        "time": 7.733333736658096,
+        "phase": 0.664756446991404,
+        "box_progress": 0.5650429799426934
+      },
+      {
+        "motion_id": 2,
+        "time": 6.400000333786011,
+        "phase": 0.5501432664756447,
+        "box_progress": 0.467621776504298
+      },
+      {
+        "motion_id": 2,
+        "time": 6.533333674073219,
+        "phase": 0.5616045845272206,
+        "box_progress": 0.4773638968481375
+      },
+      {
+        "motion_id": 2,
+        "time": 7.733333736658096,
+        "phase": 0.664756446991404,
+        "box_progress": 0.5650429799426934
+      },
+      {
+        "motion_id": 5,
+        "time": 8.000000417232513,
+        "phase": 0.6837606837606838,
+        "box_progress": 0.5811965811965812
+      },
+      {
+        "motion_id": 6,
+        "time": 8.000000417232513,
+        "phase": 0.6837606837606838,
+        "box_progress": 0.5811965811965812
+      },
+      {
+        "motion_id": 19,
+        "time": 11.70000061020255,
+        "phase": 0.785234899328859,
+        "box_progress": 0.6674496644295301
+      },
+      {
+        "motion_id": 20,
+        "time": 11.70000061020255,
+        "phase": 0.785234899328859,
+        "box_progress": 0.6674496644295301
+      }
+    ]
+  },
+  "point_screen": {
+    "source_bank": "tokenhsi/data/push_fixed130_fixed_face_midpoint_goal3to5_bank.json",
+    "source_sha256": "0a21273904877dca3f30d8b29bfbf985268dc734992c7da30f591d5c0f126f7c",
+    "screen_heights_m": [
+      0.585,
+      0.6175,
+      0.65
+    ],
+    "scenes_per_candidate_per_height": 2,
+    "control_steps": 12,
+    "dt_s": 0.03333333507180214,
+    "criteria": "Both initial hands within0.18m of height-specific reference targets; finite; root>0.65m; drift<0.45m; boxheight within0.08m; foot support and hand proximity observed in both independent scenes at each height.",
+    "source_candidates": 943,
+    "extra_geometry_candidates": 84,
+    "excluded_rsi_motion_ids": [
+      7,
+      8
+    ],
+    "amp_expert_clips_unchanged": 21,
+    "limitations": "Three sampled heights, finite short PD screen; not continuous-height proof, long-term policy success or 5degree guarantee. RSI excludes clips with no surviving poses; all AMP experts retained."
+  },
+  "reused_pd_screen": {
+    "bank": "tokenhsi/data/push_fixed130_anchor_goal3to5_bank.json",
+    "sha256": "14bc28bff1a9b62ab05fa735ae7d7411c72dd65622b458cf295aa990ef42f717",
+    "reason": "Fixed height is one of the donor screened heights; same geometry/retargeting/motions; reward-only variant"
+  },
+  "height_alignment_screen": {
+    "source_bank": "tokenhsi/data/push_fixed130_point_goal3to5_bank.json",
+    "source_sha256": "28516eae52ccc87fb6ca854b081c37a0292077601a7bebcdeb6e08d4a36d2be5",
+    "height_band_m": [
+      0.585,
+      0.65
+    ],
+    "source_candidates": 408,
+    "accepted_candidates": 11,
+    "motion_ids": [
+      0,
+      1,
+      2,
+      5,
+      6,
+      19,
+      20
+    ],
+    "scenes_per_candidate": 2,
+    "control_steps": 12,
+    "criteria": "Reference and first simulated step midpoint in band in both scenes; finite/no reset/root>0.65m/drift<0.45m/boxheight within0.08m; foot support and hand-face proximity observed.",
+    "limitations": "Initial height alignment only; subsequent zero-action PD steps need not stay in the band. Fewer RSI clips; all21 AMP experts unchanged."
+  },
+  "goal_range_provenance": {
+    "source_bank": "tokenhsi/data/push_fixed130_point_zband_heightmatch_goal3to5_bank.json",
+    "source_sha256": "d4ee7f884dee09d8f9f20d1cb8af4ac6ac61691f3c98a21e20ce1afb339848d4",
+    "method": "Reuse identical height-screened poses; only goal radius changes from 3--5 to 2--5m. No new all-candidate PD screen."
+  },
+  "straight_goal_provenance": {
+    "source_bank": "tokenhsi/data/push_fixed130_point_zband_heightmatch_goal2to5_bank.json",
+    "source_sha256": "a17ebcdbb72040a93c6d787e8962aaad81f43898a841695c21897d60dff3aab7",
+    "method": "Reuse the same 11 height-screened reference poses under rigid XY/yaw transforms; goals follow initial box-local +Y instead of arbitrary bearings. No new all-candidate PD screen."
+  },
+  "mass_change_provenance": {
+    "source_bank": "tokenhsi/data/push_fixed130_point_zband_heightmatch_straight_goal2to5_bank.json",
+    "source_sha256": "5cdf64fe911394e08038037ec2145335b4d1e772cc68e5f4f58bb04589f8229c",
+    "source_mass_kg": 20.0,
+    "mass_kg": 25.0,
+    "method": "Reuse the same 11 reference poses; only box mass changes. Original PD screening records below were obtained at 20kg.",
+    "all_candidate_25kg_PD_screen": false
+  }
+}

@@ -1,3 +1,28 @@
+## 2026-10-24
+
+### 1명1의자 원본TokenHSI SIT 환경으로 재시작
+사용자승인으로기존GPU5 학습3450803/3450704 종료. 최종지시1명1의자에맞춰tokenhsi_sit_full_ft 추가. 원본걷기/SIT 참조50:50·의자1~5m/360도·참조의자pose·보상AST동일·10초/IET 적용. nativecache/정면필터제외. AMP YAML을걷기12+sit20으로분리하고teacher SIT family만실제샘플링(CLIMB미로딩),78k형태호환라벨3차원유지. 78k부터fullFT20kiteration GPU5. CPU13개 및2048환경1iteration rc0,loadedlib2개/AMPfinite/초기1040대1008/source78k/frozen0/gradient확인. 설정 markdowns/reference/tokenhsi_sit_ft.md, 실행 tokenhsi_sit_active_run.json. baseline/ksh/기존산출물보존.
+
+## 2026-10-24
+
+### Chair SIT +6100 학습 조건 일치 평가
+사용자 요청으로 같은6100 weight를 저장된 학습 환경에서 재평가. 독립사본에서 train49의자/2048환경×2명/4의자/SIT100%/정면/RSI50%/원래600step 약20초 유지, 학습은 계속 실행. seed42 단일4096명 시도, 점ever33.94%·영역ever33.18%; 초기이미성공21.90%/21.97%, 초기실패자새성공15.54%/14.77%. RSI그룹점67.23%,loco그룹0.15%. AMP history오차0/finite 및 독립NumPy64 첫episode·종료frame 재채점통과. 첫tensor/dict인터페이스실패기록보존. 결과 ../runs/chair_sit_trainmatch_eval_20261024_124625/REPORT.md.
+
+## 2026-10-24
+
+### 原본 TokenHSI 학습/평가 설정 감사
+사용자요청으로공식Stage1 train/eval YAML·reset·player를직접대조해 reference/tokenhsi_train_eval_settings.md에정리. SIT eval360도·1~5m,CLIMB1~10m,학습각interaction/loco50:50 vs eval loco전용(reference sampling자체는유지),SIT/CLIMB299step≈9.97초,IET train만,eval seed0한프로세스3repeat확인. 객체split/종류별개수,목표/보상/점성공,물리/네트워크전체원본설정JSON도 runs/tokenhsi_train_eval_settings_20261024/에보존. baseline·학습프로세스·평가코드는수정하지않음.
+
+## 2026-10-24
+
+### Chair SIT full FT +6100 단독 평가
+사용자요청으로78000시작FT의추가6100회정기저장본을고정복사해1명1의자·test26·512환경×seed0/1/2·loco/RSI없음·30초점/영역ever평가. 두지표모두1/1536,0.07±0.11%. 전3trace재채점통과,학습과actor/taskrole/selfobs/scene정규화동일성점검. 학습2명/4의자/정면RSI와단독평가조건차이명시; 학습유지. 상세 ../runs/chair_sit_ft_eval_20261024_122404/REPORT.md.
+
+## 2026-10-23
+
+### 78k chair SIT 전용 전체 모델 FT
+사용자요청으로78000weight·native_front_foot RSI 기반 chair SIT100% 전용환경추가. 2명×2048환경·4물체모두의자, CLIMB/Box/Table목표제외. 기존혼합모드는유지하고sit_only opt-in만SIT확률1·chair fraction1 허용. 학습random_scenario계약유지. 전체층/정규화학습,lr2e-5,20kiteration. 검증1iteration rc0: SIT4096/CLIMB0,RSI누락0·AMP오차0/finite,source78k·frozen0 및gradient확인. 초기잘못된preset의실패로그는보존. 관련CPU10개 통과. GPU5 본학습 연속update/fps 및 source78000·SIT4096/CLIMB0·frozen0·native RSI active2063 확인. 본학습실행정보 chair_sit_only_active_run.json, 상세 markdowns/reference/chair_sit_only_ft.md.
+
 ## 2026-10-23
 
 ### IK 없이 기존 RSI로 78k 본학습 시작

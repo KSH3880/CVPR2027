@@ -5,3 +5,6 @@ __pycache__/
 ports/koo_native_y2m/tokenhsi/data/**/motions/
 ports/koo_native_y2m/output/
 ports/koo_native_y2m/output_etc/
+
+# Snapshot config manifests are source, motion payloads remain external.
+!ports/jhh_raw_cuboid/tokenhsi/data/dataset*.yaml

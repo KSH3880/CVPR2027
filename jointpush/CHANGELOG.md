@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-10-23
+
+### TensorBoard 현재/이전 Partial 비교
+
+- 사용자 요청으로6016전용TensorBoard만 비교모드로 재시작했다. 현재 RawCuboid rear180과 이전Koo Partial summaries를 별도run으로 연결하며 event원본/학습은 수정하지 않았다. 비교경로와서버설정은 runs/jointpush/tensorboard_raw_cuboid, tmux tensorboard_partial_comparison이다.
+
+### 현재 GPU6 Partial TensorBoard 제공
+
+- 사용자 요청으로 현재 실행의 summaries를 읽는 전용TensorBoard를 localhost6016/tmux tensorboard_partial_gpu6에 실행했다. GPU는 사용하지 않고 기존서버/학습/MPS는 유지한다. HTTP scalar API에서85태그와 접촉/group gate/AT성공/goal거리/보상 표시를 확인했다. 설정과로그는 runs/jointpush/tensorboard_raw_cuboid에 기록했다.
+
+### GPU6 rear180 Partial 본학습 실행
+
+- 사용자 요청으로 실행 중이던 자체 viewer만 종료하고 GPU6에서4명/2048환경 Partial Stage2를 시작했다. RawCuboid22500 Stage1 base, 후방180°/그룹·구역 랜덤 배정, 인당20~30kg 및 실제 공동상자 AT progress/양손group gate를 유지한다. 기존GPU6 타 평가·GPU5 학습과 MPS daemon은 유지한다.
+- GPU6 전용 MPS pipe 자동검증·strict165tensor전이/새104tensor·coord gradient387.86·2epoch 후 actor/RMS불변/coord업데이트 및 startup 저장을 확인했다. 충돌은 enable=true, root XY 최근접거리0.7m 미만에서 coefficient0.5 선형페널티다. 최신 세션/실험/weight경로는 runs/jointpush/latest_partial_training.json 참조.
+
+### Partial 인당 질량20~30kg 복원
+
+- 사용자 요청으로 GPU6 zero-shot viewer3050304만 종료했다. 새 prepare와 준비된 rear180 workspace의 partitionPush.mass_per_agent를20~30kg로 변경했다. 그룹 n명에 대해 실제 질량n×U(20,30)kg이며1/2/3/4인 각각20~30/40~60/60~90/80~120kg다. baseline checkpoint/원본jhh 물성·마찰·배정·출발은 변경하지 않는다.
+
+### GPU6 native zero-shot viewer 장치 매핑 수정
+
+- 사용자 invalid device ordinal 보고의 원인은 단일visible CUDA0과 물리번호를 사용한 player(cuda5)의 불일치였다. 기존 jhh runtime은 GUI에서도 MPS/Mesa 경로를 다시 활성화하므로 local launcher에서 native GUI helper와 MPS 탐색 제외를 적용하고, unfiltered CUDA/Vulkan 순서의 물리index를 sim/RL/player/current CUDA에 모두 지정했다. 원본 snapshot/jhh 및 학습 경로는 수정하지 않았다.
+- GPU6 기존 Python client가 없는 것을 확인한 뒤1환경 zero-shot viewer를 실행했다. CUDA7장 공개/sim·RL·policy cuda6/Vulkan6, 환경변수상 MPS pipe/log 없음과 checkpoint strict transfer·rollout·noVNC6086을 확인했다. GPU5 기존학습3729650/MPS4104165와 GPU6 MPS2946883은 유지한다. 기록 runs/jointpush/partial_zeroshot_gpu6_20261023_153601. 새 본학습은 실행하지 않았다.
+
+### Goal 반대쪽180도 출발·중복 없는 랜덤 배정
+
+- 사용자 요청으로 위치를 실제 상자→goal 반대 방향 중심±90°에서 샘플링한다. 기존 중심반경1.65~6m·상자 외접원+0.45m clearance·사람 최소0.9m·독립heading은 유지한다.
+- 거리 기반 구역 최적화·최근접 상자 확인/재샘플링을 제거했다. 랜덤 그룹에 물리 상자와 중복 없는 랜덤 station을 먼저 배정하고, 같은 그룹의 구역은 균등 랜덤 순열로 겹치지 않게 배정한다. 공동 상자 공유만 허용하며 다른 그룹의 할당은 분리한다. 구역은 reset 때만 재배정한다. partitionPush.version4/별도 rear180 workspace로 이전reset checkpoint와 구분한다.
+- CPU13회귀 통과:2048샘플 후방180°/clearance/비중첩·4096그룹 중복검사·랜덤 구역24순열 확인. 실제CPU32환경24step/finite·4인8토큰 strict복원·반원/그룹 내 고정구역 assertion 통과. 학습·MPS/외부jhh는 변경하지 않았다.
+
+### RawCuboid baseline 기준 Partial Joint Push 재구성
+
+- 사용자 지정 jhh의 stage1_v2_fixed_push_360_raw_cuboid/22500회 checkpoint를 로컬에 복사해 고정했다. 원본230파일과 checkpoint hash 불변을 확인했다. 새 partial은 로컬 source snapshot·geometry·scene·reward·실행 wrapper로 독립했으며 외부 및 stage2_jointpush 코드를 수정하지 않는다.
+- RawCuboid midpoint/1.04m/실제 힘과 물리tick OR·navigation·0.2×contact/AT 보상·AMP33/67·물성15~20kg/마찰0.3/크기분포를 유지한다. 그룹 인원만큼 X·질량을 확장하고 모든 구성원의 양손이 실제 goal 쪽으로 미는 뒷면에 있어야 AT state/progress/success gate가 열린다. AT progress는 분할 token이 아닌 실제 공동 상자 중심과 공통 goal로 계산한다. 접근/contact는 gate 이전에도 학습된다. 같은 그룹90/10 공유, baseline 선형 충돌을 사용한다.
+- CPU9회귀·4/32환경24물리step·strict transfer165개/새coord104개·coordination gradient L1=33.059/optimizer update·actor/RMS불변 통과. 검증 결과는 runs/jointpush/raw_cuboid_partial_20261023. 새 GPU/PPO/GUI/본학습은 실행하지 않았다.
+- 기존 koo_partial_* 및 koo_1021_* 전용 코드·복사본17항목을 제거하고 runs/jointpush/retired_koo_partial_20261023.tar.gz로 보관했다. 기존 weight·결과와 과거Native분석은 보존했다. 이전 partial 실행 중인 프로세스가 없음을 확인했다.
+
 ## 2026-10-22
 
 ### 7000iter 무개입 4인 viewer 명령

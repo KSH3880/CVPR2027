@@ -1,27 +1,6 @@
-## koo_1021 기반 Partial Joint Push Stage2 (2026-10-22)
+## 현재 Partial Joint Push (2026-10-23)
 
-실제 사용자 요청의 partial 학습은 [전용 안내](../../jointpush/PARTIAL_KOO_1021.md)를 따른다. 아래 Stage1 resume와 구분한다.
-
-```bash
-TOKENHSI_GPU=5 bash jointpush/scripts/koo_partial_train.sh jointpush/checkpoints/koo_1021/Stage1BasePush_00007500.pth
-TOKENHSI_GPU=5 HEADLESS=0 KOO_PARTIAL_WORK=/path/to/training/workspace bash jointpush/scripts/koo_partial_test.sh /path/to/Stage2.pth
-TOKENHSI_GPU=5 PORT=6086 KOO_PARTIAL_WORK=/path/to/training/workspace bash jointpush/scripts/koo_partial_vnc.sh /path/to/Stage2.pth
-```
-
-4인/2048환경·group partial/8object token·동결 Stage1 encoder+새 coordination/새 optimizer다. 최신 실행 경로는 `runs/jointpush/koo_partial_stage2_20261022/latest_training.json`이다.
-
-## koo_1021 Stage1BasePush (2026-10-22)
-
-원본 2명·상자4개 실행 준비는 [별도 안내](../../jointpush/KOO_1021.md)를 참조한다. 기본 업로드는 `jointpush/checkpoints/koo_1021/Stage1BasePush.pth`다.
-
-```bash
-bash jointpush/scripts/koo_1021_prepare.sh
-TOKENHSI_GPU=5 bash jointpush/scripts/koo_1021_train.sh
-TOKENHSI_GPU=5 HEADLESS=0 bash jointpush/scripts/koo_1021_test.sh
-TOKENHSI_GPU=5 PORT=6086 bash jointpush/scripts/koo_1021_vnc.sh
-```
-
-train은 해당 Stage1 checkpoint의 optimizer 포함 resume이며 Stage2 partial 학습은 아니다. 업로드 전 GPU 실행/strict restore 미검증, 원본 점유GPU 시작 거부를 유지한다.
+현재 partial은 jhh RawCuboid baseline 기준으로 `jointpush/`에 독립 구현했다. [현재 설정·학습·로컬/서버 viewer 명령](../../jointpush/README.md)을 따른다. 이전 `koo_partial_*`, `koo_1021_*` 진입점은 정리했다. 아래는 기존 환경/분석 기록이다.
 
 ## KSH Depth180 9000 Partial Joint Push viewer (2026-10-22)
 
