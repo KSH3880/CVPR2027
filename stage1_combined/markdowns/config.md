@@ -259,6 +259,11 @@ PORT=6083 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_vnc.sh "$CKPT"
 TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects PORT=6083 bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_vnc.sh "$CKPT"
 ```
 
+```bash
+# chair_hold_at_full_ft 평가: 512환경×독립seed0/1/2,30초
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_eval.sh "$CKPT"
+```
+
 ## 추론 옵션
 
 아래 옵션을 test/VNC 명령의 `bash` 앞에 붙인다. 기본 시작 동작은 `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`이다. 기본 과제는 일반 설정에서 `random_scenario`, PUSH 계열에서 `push`다.

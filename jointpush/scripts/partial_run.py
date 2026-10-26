@@ -78,7 +78,9 @@ import utils.shared_support as shared
 _original_contract=shared.checkpoint_contract
 def contract(env):
  if 'partitionPush' not in env:return _original_contract(env)
- return dict(adapter='raw_cuboid_partial_v1',source_manifest_sha256=hashlib.sha256((ROOT/'jointpush/jhh_source_manifest.json').read_bytes()).hexdigest(),partition=env['partitionPush'],reward=env['partialReward'],template_rsi=env['templateRsi'],graph=env['relationGraph'],agents=4,objects=8)
+ result=dict(adapter='raw_cuboid_partial_v1',source_manifest_sha256=hashlib.sha256((ROOT/'jointpush/jhh_source_manifest.json').read_bytes()).hexdigest(),partition=env['partitionPush'],reward=env['partialReward'],template_rsi=env['templateRsi'],graph=env['relationGraph'],agents=4,objects=8)
+ if env['pushBox'].get('surface_mode'):result['box_surfaces']=env['pushBox']
+ return result
 shared.checkpoint_contract=contract
 import utils.stage2_spec as stage2_spec
 _original_check=stage2_spec.check_checkpoint

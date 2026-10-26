@@ -204,3 +204,8 @@ bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_vnc.sh \
 ## 물체별 평가 목표에 맞춘 Chair/Table 전체FT
 
 `chair_table_eval_full_ft`는 `evaluation/object_comparison/prepare.py`와 목표점을 맞춘다. Chair SIT/CLIMB는 좌판+0.10/0.94m, Table SIT는 bbox상판+0.10m, Table CLIMB는 metadata tarSitPos.z+0.94m다. 73000부터 새로 시작하며 이전 metadata-all checkpoint를 resume하지 않는다. 사람2명/2048환경/대상chair1개·table1개/주변chair·table2개, 전체레이어 학습·lr2e-5·20,000회는 유지한다. 이 변경은 학습 목표점 정렬이며, 학습의 feet/영역 조건을 평가의 root점/영역ever 기준으로 대체하는 것은 아니다.
+
+
+## Native Chair HOLDING+AT 78k zero-shot
+
+전용 `evaluation/hold_at/run_eval.py`에 원본78k `--checkpoint`와 ChairFT의 `--template-checkpoint`를 함께 전달한다. template는env/sim/train설정만제공하며모델tensor/normalizer는원본78k파일의byte-identical사본에서직접복원한다. tokenizer30D유지·가중치변환/업데이트없음. 실행·trace·통계는 [평가README](../evaluation/hold_at/README.md).

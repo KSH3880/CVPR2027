@@ -1,5 +1,20 @@
 ## 2026-10-26
 
+### Chair 논문88.8%와공개코드측정97.85% 구분정정
+사용자지적으로논문Table3/4.2.2와공개소스재대조. Chair종류·test27·공개모델은맞지만논문랜덤orientation/10×10m와공개코드front사람정렬/9×9m차이확인. 저장initial에서도정렬/±4.5m확인,기록I/O제거후eval루프AST원본동일. 97.85%를논문재현으로표현한것정정;공개checkpoint/code의현서버측정값으로한정. 수치차이원인은미확정·추가GPU실험없음. runs/tokenhsi_chair_official_20261026_160009/PAPER_AUDIT.md 및paper_audit.json.
+
+### 原본 TokenHSI Chair 공식환경 평가
+사용자후속요청으로공통MA장면대신baseline원본HumanoidAdaptCarryBox2Objs/환경YAML/player3repeat루프를독립사본에서실행. Chair10k/base40k·GPU5·test27·512환경·seed0·600step(20초),위치20cm+updot≥.86615직립성공과원본물체조기종료유지. 성공501/503/499,운영0회제외1·2평균97.85%(반복sample std0.55%p;독립seed산포아님),전체3회평균도97.85%. 3trace성공/precision독립재채점·32/64ever·599시간종료·checkpoint/source해시통과. 기록runs/tokenhsi_chair_official_20261026_160009/REPORT.md. 평가client자연종료후기존Chair3359530/PUSH2013210·MPS유지,baseline/ksh미수정.
+
+### 原본 TokenHSI Chair carry 공통 AT 평가
+사용자요청으로공개ckpt_stage2_objShape_chair.pth(epoch10000)/baseStage1(epoch40000)발견. 원본265D관측/RMS/102tensor strict복원·가중치동결·CPUbitwise동일확인후공통native AT512×seed0/1/2/test27/30초평가. GPU5만사용,기존두학습유지하이번평가한정세번째잡사용자승인. 성공500/506/504,98.31±0.60%(평가seed표본std). 전seedrc0·trace재채점·32/64ever·899시간종료·해시/통계검산통과. 이전78kzero31.64±1.86%와세seed초기root/DOF/object/modelID/goal등모든배열exact일치. 종료후MPSclient2013210/3359530만남음,학습/MPS/ksh미변경. runs/tokenhsi_chair_hold_at_20261026_prepared/REPORT.md 및validation.json.
+
+### 原본78k Chair HOLDING+AT zero-shot 정식평가
+사용자요청GPU0순차512환경×독립seed0/1/2/test27/1명1동적의자/30초/native초기분포. 원본78kbyte-identical·30D토크나이저/normalizer직접복원,ChairFT는env/sim/train템플릿만제공하도록옵션추가. AT점=영역ever171/163/152(총486/1536),31.64±1.86%(평가seed표본표준편차). 전seedrc0·trace재채점·32/64ever·899시간종료·초기root상이·각seed27종포함·해시/통계검산통과. 기존GPU5Chair3359530/PUSH2013210·MPS/ksh보존. runs/chair_hold_at_78k_zeroshot_20261026_153255/REPORT.md 및validation.json.
+
+### Native Chair HOLDING+AT 단독 평가 정리
+사용자지정docs/evaluation_single.md의AT위치≤20cm/점=영역/첫episode종료frame포함ever·30초·512×독립seed0/1/2·ddof1을evaluation/hold_at에분리. native학습1~5m/front/바닥배치유지와일반박스AT분포차이명시. 저장env/sim/30D모델고정,독립checkpoint/코드/test27사본·trace/DOF/해시/재채점기록. CPU5개통과,GPU0의4환경900step검증rc0·899시간종료/406낙상·전trace32/64재채점통과. runs/chair_hold_at_eval_smoke_20261026_152916;첫runtime pipefail실패는이전run에보존후기존runtime과동일한셸옵션으로수정. 정식512×3미실행,GPU5학습·MPS·ksh미변경.
+
 ### Chair HOLDING+AT 78k GPU5 본학습 시작
 사용자실행승인. 원본동적ArmChair공유데이터train63/test27발견후runs독립코드·에셋사본준비,실제경로/1인학습허용/접촉4M/CUDA동기화정상종료보완. 2048환경1회PPO·저장·자연종료,finite/actor·critic30D각6tensor업데이트확인. 78kfresh전이전체FT/lr2e-5/20k/500저장본학습PID3359530/GPU5시작,첫update·양tokenizergradient확인. 기존PUSH2013210/MPS유지,ksh미변경. runs/chair_hold_at_78k_20261026_135444/REPORT.md 및 chair_hold_at_active_run.json.
 

@@ -1,4 +1,6 @@
 from types import SimpleNamespace
+from pathlib import Path
+from .box_asset import write_box_asset
 from isaacgym import gymapi, gymtorch
 import torch
 from env.tasks.multi_agent.humanoid_ma import HumanoidMA
@@ -19,7 +21,15 @@ class PartitionSceneBase(HumanoidMACarry):
                 options = gymapi.AssetOptions()
                 options.density = mass / (size[0]*size[1]*size[2])
                 options.angular_damping = options.linear_damping = .01
-                self._box_assets.append(self.gym.create_box(self.sim, *size, options))
+                if self.cfg['env']['pushBox'].get('surface_mode') == 'bottom_plate_v1':
+                    path = write_box_asset(Path.cwd()/'physics_assets', size, mass, self.cfg['env']['pushBox']['bottom_thickness'])
+                    options.density = 0.
+                    asset = self.gym.load_asset(self.sim, str(path.parent), path.name, options)
+                    assert self.gym.get_asset_rigid_body_count(asset) == 1
+                    assert self.gym.get_asset_rigid_shape_count(asset) == 2
+                    self._box_assets.append(asset)
+                else:
+                    self._box_assets.append(self.gym.create_box(self.sim, *size, options))
 
     def _build_env(self, env_id, env_ptr, humanoid_asset):
             HumanoidMA._build_env(self, env_id, env_ptr, humanoid_asset)
@@ -30,9 +40,19 @@ class PartitionSceneBase(HumanoidMACarry):
                 handle = self.gym.create_actor(env_ptr, self._box_assets[env_id*24+box_id], pose,
                                                'push_box_'+str(box_id), env_id, 0, 0)
                 props = self.gym.get_actor_rigid_shape_properties(env_ptr, handle)
-                for prop in props:
-                    prop.friction = self.cfg['env']['pushBox']['friction']; prop.restitution = 0.
+                surface = self.cfg['env']['pushBox']
+                for shape_id, prop in enumerate(props):
+                    prop.friction = (surface['bottom_friction'] if shape_id == 1 else surface['friction']) if surface.get('surface_mode') == 'bottom_plate_v1' else surface['friction']
+                    prop.restitution = 0.
                 self.gym.set_actor_rigid_shape_properties(env_ptr, handle, props)
+                if surface.get('surface_mode') == 'bottom_plate_v1':
+                    body = self.gym.get_actor_rigid_body_properties(env_ptr, handle)
+                    expected_mass = float(self._payload_masses[env_id, box_id])
+                    assert len(body) == 1 and abs(body[0].mass-expected_mass) < max(.001, expected_mass*1e-5)
+                    actual = self.gym.get_actor_rigid_shape_properties(env_ptr, handle)
+                    assert abs(actual[0].friction-surface['friction']) < 1e-6 and abs(actual[1].friction-surface['bottom_friction']) < 1e-6
+                    if env_id == box_id == 0:
+                        print('PARTIAL_BOX_SURFACES_VERIFIED', dict(mass=body[0].mass, body_friction=actual[0].friction, bottom_friction=actual[1].friction, rigid_bodies=1, collision_shapes=2), flush=True)
                 self._box_handles.append(handle)
             if self._enable_markers:
                 for agent in range(self.num_agents):

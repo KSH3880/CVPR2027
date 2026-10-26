@@ -2,6 +2,12 @@
 
 ## 2026-10-26
 
+### RSI uniform11500 baseline 및 밑판 전용 마찰
+
+- 사용자 요청으로 jhh RSI uniform 실험의 최신 numbered checkpoint11500을 CPU확인·로컬복사·strict Stage1계약검사했다. 원본/기존결과는 보존하며 새Stage2 epoch0/1024환경×4명/인당15~25kg를 유지한다.
+- 로컬 Partial에 한 rigid body·두 충돌box URDF를 선택적으로 추가했다. 본체0.9·밑판1cm0.3 마찰, 전체 cuboid 질량/관성/크기/COM 및 기존actor/body인덱싱을 보존한다. surface_mode가 없는 구 workspace의 물리는 그대로이며 새checkpoint계약에는 surface설정을 포함한다. prepare 기본baseline을RSI uniform으로 갱신했다.
+- CPU4환경8step에서 strict165tensor전이/104coord추가·gradient37.9167·actor/RMS불변·유한관측/action/물리·질량/두shape마찰을 확인했다. MPS terminate_client로 기존PID2861739만 종료(성공0)했고 다른클라이언트3349106·서버2946883를 유지했다. GPU6 새실행에서 coord gradient399.312와2epoch actor/RMS동결·coord업데이트·startup저장을 확인했다. TensorBoard current_uniform11500_bottom03을 연결하고 최신경로/PID를 latest_partial_training.json에 기록했다.
+
 ### 원본과 전체 agent 샘플 수 일치
 
 - 사용자 요청으로 Partial 기본 env를 2048에서1024로 줄였다. 4명×1024=4096 rows로 원본2명×2048과 같으며 horizon32/minibatch16384는 유지한다. 기존 workspace는 보존하고 baseline36000에서 새 optimizer/epoch0로 다시 시작한다.

@@ -71,3 +71,9 @@ Scalars에서 `relation/partial_push/goal_distance`(작을수록 좋음), `relat
 현재6016 TensorBoard는 `current_rawcuboid_rear180`와 `previous_koo_partial` 두run을 함께 읽는다. Runs에서 둘 다 선택하면 공통tag의곡선이겹친다. 원본event는수정하지않고비교링크만사용한다. 이전/현재의episode상한600/1200과보상식차이로같은수치의성능비교보다추이를확인한다.
 
 2026-10-25 재학습: jhh RawCuboid run의 최신 numbered/일반 저장본은 모두epoch36000이었다. 해당baseline에서 Stage2를epoch0·새optimizer/identitycoord로 새로 시작했으며 이전Partial14000은 로드하지 않는다. 인당질량은20~30에서15~25kg로 낮췄다. 최신실행은 latest_partial_training.json 기준이다.
+
+### 2026-10-26 RSI uniform baseline 교체
+
+현재 baseline은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` 최신11500이며 새 prepare의 기본 소스도 해당 실험이다. 학습은 새Stage2 epoch0,1024환경×4명,인당15~25kg를 유지한다. 실제 상자는 단일 rigid body/두 collision shape로 만들어 본체마찰0.9와 바닥1cm invisible sole마찰0.3을 분리한다. 전체 시각/관측 크기·질량·중심·관성은 원래 cuboid와 같다. sole도 같은 rigid body이므로 contact force·박스 tensor 인덱싱은 유지된다. 이전 workspace는 surface_mode가 없어 기존 단일shape 물리를 유지한다.
+
+새 실행 workspace는 `runs/jointpush/uniform11500_bottom03_20261026/workspace`이며 최신 상태는 `runs/jointpush/latest_partial_training.json`을 따른다. 원본 jhh는 읽기/복사만 했다. Stage2 RSI는 계속 loco-only이고 uniform push RSI 개선은 가져온Stage1 학습 이력이다.

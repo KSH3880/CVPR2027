@@ -412,3 +412,10 @@ plane_max/range는 SIT·CLIMB·ON_TOP만 평가하며 AT는 제외한다. SIT/CL
 ## 14. 현재 워크스페이스 구현
 
 73000 물체 교체 평가에 적용한 독립 구현과 실행 방법은 [SINGLE_MATCH.md](../runs/repro_stage1_73000_20261022/SINGLE_MATCH.md)를 따른다. `eval_carry_objects.py`도 이 평가기로 연결된다. 박스 환경과 의자/테이블 payload 교체 변형은 구분하며, 과거 2인/final 결과는 이 프로토콜 결과로 사용하지 않는다.
+
+
+## 15. Native Chair HOLDING+AT 파인튜닝 평가
+
+현재 Chair 파인튜닝의 전용 평가 구현·실행·검증은 [hold_at/README.md](../stage1_combined/evaluation/hold_at/README.md)를 따른다. `native_chair_hold_at_30s_v1`: 사람1명·동적ArmChair1개·test27·512환경×독립seed0/1/2·30초·첫episode종료frame포함ever. 의자중심과목표XYZ의3D거리≤20cm이며 **AT 점/영역은동일**하다. 파지·직립·접촉·정지·손놓기·유지시간조건은추가하지않는다.
+
+이는 본문의 일반 박스AT와 같은 초기분포가 아니다. 현재 native학습의 사람–의자1~5m·metadata front정렬·바닥목표를 유지하며, 도착XY는사람/의자와 squared distance≥2m² rejection을 사용한다. 본문의 박스AT1~10m·랜덤yaw·선반높이와 결과를 동일조건으로 합치지 않는다. 기존16환경 viewer/test의 학습용own_success를 이 평가 수치로 사용하지 않는다.
