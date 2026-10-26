@@ -86,7 +86,10 @@ def parse_task(args, cfg, cfg_train, sim_params):
     cfg_task = cfg["env"]
     cfg_task["seed"] = cfg["seed"]
 
-    if args.task == "HumanoidMAStage1Push":
+    if args.task == 'HumanoidMAStage1JointPush':
+        from env.tasks.multi_agent.humanoid_ma_stage1_jointpush import HumanoidMAStage1JointPush
+        task_class = HumanoidMAStage1JointPush
+    elif args.task == "HumanoidMAStage1Push":
         from env.tasks.multi_agent.humanoid_ma_stage1_push import HumanoidMAStage1Push
         task_class = HumanoidMAStage1Push
     elif args.task == "HumanoidMASharedSupport":

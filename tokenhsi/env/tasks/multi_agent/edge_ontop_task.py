@@ -598,11 +598,15 @@ class SampledOnTopTaskMixin:
             "sampling/physical_failures": self._sampling_failures.clone(),
         }
         names = ("holding", "sit", "climb", "holding_at", "holding_ontop")
+        if self.cfg['env'].get('jointPush') is not None:
+            names += ('push_at',)
         for i, name in enumerate(names, 1):
             out["sampling/template_" + name] = c[i] / (self.num_agents * den)
         shared_index = 1 + len(names)
         out["sampling/shared_primary_object"] = c[shared_index] / den
         relations = ("holding", "at", "ontop", "sit", "climb")
+        if self.cfg['env'].get('jointPush') is not None:
+            relations += ('push_contact',)
         for offset, name in enumerate(relations, shared_index + 1):
             out["sampling/relation_" + name] = c[offset] / (self.num_agents * den)
         out["sampling/rsi_sit_attempts"] = self._rsi_attempts[0].clone()

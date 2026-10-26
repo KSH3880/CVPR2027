@@ -135,6 +135,9 @@ class MAAgent(amp_agent.AMPAgent):
             task._relation_graph_spec, task.num_agents, task.num_objects
         )
         weights["relation_experiment_config"] = self._relation_experiment_config
+        if task.cfg['env'].get('jointPush') is not None:
+            from utils.stage1_jointpush import contract
+            weights['stage1_jointpush_contract'] = contract(task.cfg['env'])
         if getattr(task, "_shared_support", False):
             from utils.shared_support import checkpoint_contract
             weights["shared_support_contract"] = checkpoint_contract(task.cfg["env"])
@@ -146,6 +149,10 @@ class MAAgent(amp_agent.AMPAgent):
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
+        if task.cfg['env'].get('jointPush') is not None:
+            from utils.stage1_jointpush import contract
+            if weights.get('stage1_jointpush_contract') != contract(task.cfg['env']):
+                raise ValueError('Resume requires this stage1_jointpush contract; use other checkpoints for evaluation')
         if getattr(task, "_stage2", False):
             from utils.stage2_spec import check_checkpoint
             check_checkpoint(weights, task.cfg["env"])

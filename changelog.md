@@ -2,6 +2,20 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-26
+
+### Stage1 jointpush 평가를 loco100%로 확정
+
+- 사용자 요청으로 SIT/CLIMB/AT/ONTOP/PUSH 평가를 모두 loco100%로 변경했다. 학습 과제별 RSI·AMP는 유지하며, 평가의 과제 비율·크기/물성·loco 사람/상자/목표 샘플링·간섭 검사는 학습과 동일하다. 평가에서는 과제 중간 RSI와 기존 과제 RSI 캐시 생성을 사용하지 않는다. 아래 최초 구현의 평가 RSI 설정을 대체한다.
+- CPU45개 통과. 실제 CPU Isaac Gym에서 다섯 과제 및 기본 혼합 preset 각각32회 reset·64명 모두 loco, 접촉 RSI0명을 확인했다. 각 preset에서 제공 PTH 정책16step·AMP4계열·finite 출력 및 gradient 검사를 통과했고, PUSH의2~10m 거리·20kg·마찰0.4도 유지됐다. 검증 로그/JSON은 `output_etc/check/stage1_jointpush/eval_loco_*`에 저장했다. 실행 명령은 동일하며 본학습은 실행하지 않았다.
+
+### Stage1 jointpush 스크래치 설정·기존 PUSH PTH 평가 연결
+
+- 사용자 확정에 따라 로컬 Stage1 네 과제와 KOO PUSH를 결합한 `stage1_jointpush` 환경/학습 YAML·train/test/VNC를 추가했다. teacher·자동 checkpoint 전이 없이 스크래치 학습하며, 기존 실험은 기존 경로를 사용한다. Stage2 coupled는 포함하지 않는다.
+- 과제 prior SIT/CLIMB/AT/ONTOP/PUSH=10/20/25/20/25, PUSH 20kg·마찰0.4·167종 cuboid·밑판 없음. loco 사람→상자와 loco/접촉 RSI 상자→목표를 각각 반경2~10m·360°로 제안하고 간섭 시 다시 샘플링한다. 기존 참조 사람 위치/yaw·SUPPORT 배치 규칙을 사용하며, 평가도 과제별 RSI/AMP와 배치 설정을 유지한다. 상세는 [명세](markdowns/reference/stage1_jointpush.md), 명령은 [config](markdowns/config.md)에 기록했다.
+- CPU 테스트45개 및 기존 PUSH 회귀3개 통과. 제공된 `Stage1PushFinetune_00010500.pth`의165개 모델 항목을 변환 없이 strict 로드했고, CPU Isaac Gym에서 PUSH·기존 과제·PUSH+ONTOP 장면을 각각3회×12step 평가했다. 실제32회 reset에서 두 RSI 경로·거리·참조 yaw·20kg/마찰0.4/단일 충돌 형상을 확인했다. 정책16step의 고정 목표·finite 출력, AMP4계열512×1330 입력, 새 모델158개 parameter tensor의 gradient 업데이트도 확인했다. [검증 결과](output_etc/check/stage1_jointpush/simulator/simulator_verification.json).
+- 2048환경 확인 학습은 초기화 후 기존 과제 RSI 크기5441개 캐시 생성 단계에서 이 작업의 프로세스만 종료했다. 전체 PPO 반복·장시간 성능·GUI/VNC 실행은 미검증이며 본학습은 시작하지 않았다. 로그는 `output_etc/check/stage1_jointpush/`에 보존했다. shell 구문 및 diff 검사 통과.
+
 ## 2026-10-25
 
 ### RSI uniform18K 감시·조건부10–15kg/20cm/130° 전환

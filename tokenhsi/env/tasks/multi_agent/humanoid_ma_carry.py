@@ -60,6 +60,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         self, cfg, sim_params, physics_engine, device_type, device_id, headless
     ):
         self._shared_support = cfg["env"].get("sharedSupport") is not None
+        self._match_train_sampling = cfg['env'].get('jointPush') is not None
         self._stage2 = cfg["env"].get("stage2") is not None or self._shared_support
         self._relation_cfg = cfg["env"]["relationReward"]
         validate_relation_config(self._relation_cfg)
@@ -85,7 +86,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         )
         self._task_role_swap = bool(getattr(cfg["args"], "task_role_swap", False))
         allowed_presets = SCENARIO_PRESETS
-        if hasattr(self, "_push_options"):
+        if hasattr(self, "_push_options") or self._match_train_sampling:
             allowed_presets = (*allowed_presets, "push")
         if self._stage2:
             from utils.stage2_spec import PRESETS
@@ -237,6 +238,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 "HOLDING_ON_TOP": {"loco", "pickUp", "carryWith", "putDown"},
             }
             templates = scenario_templates(self._relation_graph_spec)
+            if self._match_train_sampling:
+                expected['PUSH_AT'] = {'loco', 'push'}
             for rows in (self._template_rsi,):
                 if rows is None:
                     continue
@@ -318,12 +321,16 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 N * M, device=self.device, dtype=torch.float
             )
             self._success_threshold = cfg["env"]["eval"]["successThreshold"]
-            self._skill = cfg["env"]["eval"]["skill"]
-            self._skill_init_prob = torch.tensor(
-                cfg["env"]["eval"]["skillInitProb"],
-                device=self.device,
-                dtype=torch.float,
-            )
+            if self._match_train_sampling:
+                self._skill_init_prob.zero_()
+                self._skill_init_prob[self._skill.index('loco')] = 1.
+            else:
+                self._skill = cfg["env"]["eval"]["skill"]
+                self._skill_init_prob = torch.tensor(
+                    cfg["env"]["eval"]["skillInitProb"],
+                    device=self.device,
+                    dtype=torch.float,
+                )
         from utils.task_role_spec import task_size_probabilities as task_probabilities
 
         self._size_template_probabilities = task_probabilities(
@@ -335,11 +342,12 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
 
             cache_class = getattr(self, "_solo_cache_class", SizeRsiCache)
             self._size_rsi_cache = cache_class(self)
+            num_templates = 6 if self._match_train_sampling else 5
             self._size_rsi_requested = torch.zeros(
-                5, len(self._skill), device=self.device
+                num_templates, len(self._skill), device=self.device
             )
             self._size_rsi_executed = torch.zeros_like(self._size_rsi_requested)
-            self._size_rsi_fallbacks = torch.zeros(5, device=self.device)
+            self._size_rsi_fallbacks = torch.zeros(num_templates, device=self.device)
             self._size_rsi_success_counts = torch.zeros(2, 5, 2, device=self.device)
             self._size_rsi_pending_post = torch.zeros(
                 N, dtype=torch.bool, device=self.device

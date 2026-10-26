@@ -73,6 +73,9 @@ def preserve_amp_labels(raw, normalized, steps, num_families=3):
 
 
 def validate_unified_env(env):
+    if env.get('jointPush') is not None:
+        from utils.stage1_jointpush import validate_env
+        return validate_env(env)
     if env.get("sharedSupport") is not None:
         from utils.shared_support import validate_env
         return validate_env(env)

@@ -25,6 +25,8 @@ PRESETS = (
 
 
 def scenario_templates(spec):
+    if spec.get('sampler') == 'stage1_jointpush':
+        return CLIMB_TEMPLATES + ('PUSH_AT',)
     return CLIMB_TEMPLATES
 
 
@@ -192,7 +194,7 @@ def classify_templates(graph, slot_env, slot_agent, with_climb=True):
     )
     rel = graph.edge_relation[slot_env]
     has = lambda value: ((rel == value) & owned).any(-1)
-    return torch.where(
+    result = torch.where(
         has(SIT),
         1,
         torch.where(
@@ -203,6 +205,7 @@ def classify_templates(graph, slot_env, slot_agent, with_climb=True):
             ),
         ),
     )
+    return torch.where(has(12), 5, result)
 
 
 def agent_object_indices(graph, slot_env, slot_agent):
@@ -211,7 +214,7 @@ def agent_object_indices(graph, slot_env, slot_agent):
     )
     rel = graph.edge_relation[slot_env]
     target = torch.where(
-        (rel == HOLDING) | (rel == SIT) | (rel == CLIMB) | (rel == 11), graph.edge_dst[slot_env], 0
+        (rel == HOLDING) | (rel == SIT) | (rel == CLIMB) | (rel == 11) | (rel == 12), graph.edge_dst[slot_env], 0
     )
     return target.masked_fill(~owned, 0).amax(-1) - graph.num_agents
 
@@ -245,7 +248,7 @@ def paired_placement_success(success, graph):
             graph.edge_src,
             graph.edge_dst,
         )
-    holding = valid & (relation == HOLDING)
+    holding = valid & ((relation == HOLDING) | (relation == 12))
     placement = valid & ((relation == AT) | (relation == ON_TOP))
     paired = (
         holding[:, :, None]

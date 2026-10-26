@@ -209,3 +209,30 @@ TOKENHSI_GPU=0 bash output_etc/check/push_attention_six_20261022/run.sh
 ```
 
 현재 결과 뷰어는 서버8767 포트를 포워딩한 뒤 `http://localhost:8767/`에서 연다. 레이어·head·시간·actor/critic·run을 선택하며 QK, softmax(QK), bias, QK+bias, softmax(QK+bias)를 비교한다. 실행기는 현재 머신의 `DISPLAY=:2`를 기본으로 쓰며 환경변수로 변경할 수 있다.
+
+## Stage1 jointpush 체크포인트와 환경
+
+- `stage1_jointpush_train.sh`는 기본 스크래치 학습이며 PTH를 자동 전이하지 않는다. `RESUME_CHECKPOINT`는 동일 jointpush 계약으로 저장한 모델만 받는다.
+- 평가 기본 PTH는 `pth/Stage1PushFinetune_00010500.pth`다. 모델과 입력/AMP 정규화 통계만 읽고, 환경은 현재 `stage1_jointpush.yaml`을 사용한다. 따라서 저장된 옛 목표·과제 비율을 복원하지 않는다.
+- 모든 과제의 평가는 loco100%다. 학습의 과제별 RSI 비율은 유지하고, 과제 비율·물성·loco 배치/목표 샘플링은 평가에서도 동일하게 사용한다.
+- 이 checkout 검증 환경은 `TOKENHSI_CONDA_ENV=tokenhsi_jhh`다. wrapper의 공통 기본값은 유지하며 다른 머신에서는 설치된 환경 이름을 지정한다.
+- `SIM_DEVICE=cpu`는 평가 스크립트에서 CPU 물리/정책을 선택한다. `EPISODE_LENGTH`는 짧은 평가용 horizon override다.
+- PUSH 모션은 `tokenhsi/data/jointpush_motions/`의 로컬 심링크로 연결한다. 실제 NPY는 Git에 포함하지 않으며 RSI bank가 모션·캐릭터·mesh 해시와 상자 물성을 검사한다. 기존 과제 RSI 캐시는 최초 실행 시 필요한 크기별 후보를 생성할 수 있다.
+
+평가의 loco100%·실제 물성·AMP 연결 검사는 아래처럼 실행한다. `--task_graph`를 `sit`, `climb`, `carry_at`, `carry_ontop`, `random_scenario`로 바꾸면 해당 과제도 확인할 수 있다. 새 모델의 actor/critic/discriminator gradient 검사도 포함하지만 PPO 학습 반복을 대신하지는 않는다.
+
+```bash
+TOKENHSI_CONDA_ENV=tokenhsi_jhh PYTHONDONTWRITEBYTECODE=1 bash -c '
+. tokenhsi/scripts/multi_agent/runtime_env.sh
+python tokenhsi/tests/check_stage1_jointpush.py \
+  --task HumanoidMAStage1JointPush \
+  --cfg_env tokenhsi/data/cfg/multi_agent/stage1_jointpush.yaml \
+  --cfg_train tokenhsi/data/cfg/train/rlg/stage1_jointpush.yaml \
+  --motion_file tokenhsi/data/dataset_stage1_jointpush.yaml \
+  --checkpoint pth/Stage1PushFinetune_00010500.pth \
+  --task_graph push --num_envs 1 --num_agents 2 --num_objects 4 \
+  --sim_device cpu --pipeline cpu --rl_device cpu \
+  --test --eval --headless --no_video --seed 42 \
+  --output_path output_etc/check/stage1_jointpush/eval_loco_push
+'
+```

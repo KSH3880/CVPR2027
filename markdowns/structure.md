@@ -153,3 +153,17 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 - `tokenhsi/scripts/multi_agent/push_uniform_18k_monitor.{py,sh}`: 기존 서비스30분 감시·18K 평가·조건부 종료/새 서비스 시작.
 - `tokenhsi/tests/test_push_light130.py`: 질량·spawn 면/각도·PUSH 성공 보상·기존 과제 보존 검증.
 - [설정·전환 기준](reference/stage1_push_light130.md).
+
+## Stage1 jointpush
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage1_jointpush.yaml` | 기존 Stage1 + KOO PUSH 스크래치 설정 |
+| `tokenhsi/env/tasks/multi_agent/{humanoid_ma_stage1_jointpush,jointpush_reward}.py` | 혼합 과제·학습 RSI/평가 loco·면 CONTACT/AT 보상 |
+| `tokenhsi/utils/{stage1_jointpush,jointpush_scene,jointpush_geometry,jointpush_rsi,jointpush_rsi_geometry}.py` | 크기/과제·360° 거리/간섭·KOO RSI 연결 |
+| `tokenhsi/data/{dataset_stage1_jointpush.yaml,stage1_jointpush_rsi_bank.json}` | 모션 경로·원본 KOO 선별 후보 |
+| `tokenhsi/scripts/multi_agent/stage1_jointpush_{train,test,vnc}.sh` | 스크래치 학습·기존 PTH 평가·VNC |
+| `tokenhsi/tests/test_stage1_jointpush.py` | 샘플링·보상·기존 PTH 호환 검사 |
+| `tokenhsi/tests/check_stage1_jointpush.py` | 실제 reset·물성·AMP·PTH 정책·스크래치 gradient 검사 |
+
+세부 설정과 원본 출처는 [Stage1 jointpush](reference/stage1_jointpush.md)를 따른다.

@@ -87,7 +87,7 @@ def load_cfg(args):
     from utils.unified_training import validate_stage1_network
 
     validate_stage1_network(cfg["env"], cfg_train)
-    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport", "HumanoidMAStage1Push"):
+    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport", "HumanoidMAStage1Push", "HumanoidMAStage1JointPush"):
         from utils.output_paths import resolve_output_path
 
         is_eval = args.test or args.eval or getattr(args, "play", False)
@@ -109,6 +109,8 @@ def load_cfg(args):
         cfg["env"]["numObjects"] = args.num_objects
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
+    if cfg['env'].get('jointPush') is not None and (eval_skills_arg or eval_skill_probs_arg):
+        raise ValueError('stage1_jointpush evaluation uses loco starts only; omit eval skill overrides')
     if bool(eval_skills_arg) != bool(eval_skill_probs_arg):
         raise ValueError(
             "--eval_skills and --eval_skill_probs must be specified together"
@@ -194,6 +196,8 @@ def load_cfg(args):
         cfg_train["params"]["config"]["max_epochs"] = args.max_iterations
     cfg_train["params"]["config"]["num_actors"] = cfg["env"]["numEnvs"]
     cfg_train["params"]["config"]["device"] = args.rl_device
+    if cfg['env'].get('jointPush') is not None:
+        cfg_train['params']['config']['device_name'] = args.rl_device
     cfg["env"]["render_device"] = args.render_device
     cfg["env"]["task_plan"] = args.cfg_task_plan
     seed = cfg_train["params"].get("seed", -1)
