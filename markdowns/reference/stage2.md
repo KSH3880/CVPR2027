@@ -17,7 +17,7 @@
 
 현재 stage1 encoder/task residual MLP의 모든 tensor를 strict 복사한다. Actor encoder와 관측 RMS는 동결하고, actor/critic 뒤에 identity 초기화한 human SA4를 추가한다. Critic·SA·행동/value head·discriminator를 학습하는 경로다. 공유 payload→target의 중복 task bias는 한 번의 bias와 같게 평균한다.
 
-기본 전이 파일은 `stage1/Stage1V2Fixed_00030500.pth`다. 더 학습한 파일은 **새 stage2 시작 전** `STAGE1_CHECKPOINT`로 지정한다. 기존 stage2 재개에는 `RESUME_CHECKPOINT`를 쓴다. 전이와 재개를 혼용하지 않는다. 기본 명령은 [config](../config.md), 저장된 환경을 명시적으로 바꾸는 옵션은 `STAGE2_ENV_CONFIG`다.
+기본 전이 파일은 `output/stage1/Stage1V2Fixed_00060000.pth`다. 더 학습한 파일은 **새 stage2 시작 전** `STAGE1_CHECKPOINT`로 지정한다. 기존 stage2 재개에는 `RESUME_CHECKPOINT`를 쓴다. 전이와 재개를 혼용하지 않는다. 기본 명령은 [config](../config.md), 저장된 환경을 명시적으로 바꾸는 옵션은 `STAGE2_ENV_CONFIG`다.
 
 ## 공동 RSI 데이터
 

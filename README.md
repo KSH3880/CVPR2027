@@ -21,7 +21,7 @@ TOKENHSI_GPU=0 HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_test
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_vnc.sh "$CKPT" 2 1 4 10
 ```
 
-실행 스크립트는 `runtime_env.sh`로 `tokenhsi` conda 환경과 CUDA를 준비한다. 원본 레포 `/home/cvlab/Desktop/CVPR2027/stage1_message`와 공유 데이터는 보존하고, 본학습은 `output/`, 모든 확인·평가 결과는 `output_etc/check/`에 저장한다.
+실행 스크립트는 `runtime_env.sh`로 `tokenhsi_sm120` conda 환경과 CUDA를 준비한다. 원본 레포 `/home/cvlab/Desktop/CVPR2027/stage1_message`와 공유 데이터는 보존하고, 본학습은 `output/`, 모든 확인·평가 결과는 `output_etc/check/`에 저장한다.
 
 원본 단일인 TokenHSI 태스크·데이터 전처리는 별도로 유지한다. 큰 모션·물체 데이터와 SMPL 모델은 Git에 포함되지 않으며 설치 안내를 따른다.
 

@@ -374,4 +374,4 @@ sim:
 experiment:
   name: stage2
   transfer:
-    checkpoint: stage1/Stage1V2Fixed_00030500.pth
+    checkpoint: output/stage1/Stage1V2Fixed_00060000.pth

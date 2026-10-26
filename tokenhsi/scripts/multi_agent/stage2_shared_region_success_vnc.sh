@@ -6,8 +6,9 @@ if [ $# -lt 1 ] || [ ! -f "$1" ]; then
   echo 'Provide an existing Stage2 checkpoint.pth' >&2
   exit 1
 fi
-export TOKENHSI_GPU=${TOKENHSI_GPU:-5}
-export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
+export TOKENHSI_GPU=${TOKENHSI_GPU:-0}
+export PORT=${PORT:-6081}
+export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_sm120}
 export VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
 export OUTPUT_PATH=${OUTPUT_PATH:-output_etc/check/stage2_shared_region_success/eval}
 export HEADLESS=0

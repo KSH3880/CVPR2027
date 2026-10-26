@@ -17,6 +17,7 @@ def run_edge_context_eval(player):
     for repeat in range(task.cfg["args"].eval_repeats):
         obs = player.env_reset()
         player.get_batch_size(obs["obs"], 1)
+        evaluation_context = task.evaluation_context() if hasattr(task, 'evaluation_context') else None
         alive = torch.ones(N, dtype=torch.bool, device=player.device)
         final = torch.zeros(N, M, dtype=torch.bool, device=player.device)
         ever = torch.zeros_like(final)
@@ -84,6 +85,8 @@ def run_edge_context_eval(player):
             },
             scene_termination_rate=terminated.float().mean().item(),
         )
+        if evaluation_context is not None:
+            metrics.update(task.evaluation_metrics(final, ever, evaluation_context))
         if task.cfg["env"].get("relationReward", {}).get("stage1_variant") in (
             "stage1",
             "stage1_v2",

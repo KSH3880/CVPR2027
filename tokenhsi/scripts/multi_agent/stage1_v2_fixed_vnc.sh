@@ -7,7 +7,8 @@ if [ $# -lt 1 ] || [ $# -gt 5 ] || [ ! -f "$1" ]; then
   echo "Provide an existing checkpoint.pth; paths are relative to the repository root." >&2
   exit 1
 fi
-export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
+export PORT=${PORT:-6081}
+export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_sm120}
 export VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
 export OUTPUT_PATH=${OUTPUT_PATH:-output_etc/check/stage1_v2_fixed/eval}
 export TASK_GRAPH=${TASK_GRAPH:-random_scenario}

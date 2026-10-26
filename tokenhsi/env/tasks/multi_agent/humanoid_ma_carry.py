@@ -85,6 +85,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         )
         self._task_role_swap = bool(getattr(cfg["args"], "task_role_swap", False))
         allowed_presets = SCENARIO_PRESETS
+        if hasattr(self, "_push_options"):
+            allowed_presets = (*allowed_presets, "push")
         if self._stage2:
             from utils.stage2_spec import PRESETS
             allowed_presets = PRESETS
@@ -93,7 +95,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             allowed_presets = PRESETS
         if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
-        ) not in ("stack", "agent"):
+        ) not in ("stack", "agent", "overview"):
             raise ValueError("Unknown Stage1 graph preset or camera mode")
         if not (cfg["args"].test or cfg["args"].eval):
             expected_shape = (4, 8) if self._stage2 else (2, 4)
@@ -325,7 +327,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         from utils.task_role_spec import task_size_probabilities as task_probabilities
 
         self._size_template_probabilities = task_probabilities(
-            self._box_size[:, :M], cfg["env"]["box"]["build"]["taskSizeRanges"]
+            getattr(self, "_rsi_asset_sizes", self._box_size)[:, :M], cfg["env"]["box"]["build"]["taskSizeRanges"]
         )
         self._init_relation_runtime()
         if not self._is_eval:
@@ -1080,10 +1082,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 self._skill_init_prob, num_samples=num_slots, replacement=True
             )
         for uid, sk_name in enumerate(self._skill):
-            curr_motion_lib = self._motion_lib[sk_name]
             sel = (sk_ids == uid).nonzero().squeeze(-1)
             if len(sel) == 0:
                 continue
+            curr_motion_lib = self._motion_lib[sk_name]
             curr_env = slot_env[sel]
             curr_agent = slot_agent[sel]
             offset = self._agent_spawn_offsets[curr_agent] + self._env_origins[curr_env]
@@ -1440,7 +1442,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             print("Unsupported character config file: {s}".format(asset_file))
             assert False
         if self.cfg["env"].get("ampTaskConditioning", False):
-            self._num_amp_obs_per_step += 3
+            self._num_amp_obs_per_step += getattr(self, "_amp_num_families", 3)
         return
 
     def get_num_amp_obs(self):
@@ -1452,20 +1454,26 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if ext == ".yaml":
             with open(os.path.join(os.getcwd(), motion_file), "r") as f:
                 motion_config = yaml.load(f, Loader=yaml.SafeLoader)
-            self._skill_categories = list(motion_config["motions"].keys())
+            self._skill_categories = self._motion_skills_to_load(list(motion_config["motions"].keys()))
             self._motion_lib = {}
             for skill in self._skill_categories:
-                self._motion_lib[skill] = MotionLib(
-                    motion_file=motion_file,
-                    skill=skill,
-                    dof_body_ids=self._dof_body_ids,
-                    dof_offsets=self._dof_offsets,
-                    key_body_ids=self._key_body_ids.cpu().numpy(),
-                    device=self.device,
-                )
+                self._motion_lib[skill] = self._create_motion_lib(motion_file, skill)
         else:
             raise NotImplementedError
         return
+
+    def _motion_skills_to_load(self, available):
+        if not self.cfg['args'].eval:
+            return available
+        from utils.evaluation_motion import active_eval_skills
+        requested = active_eval_skills(self.cfg['env']['eval'])
+        if requested - set(available):
+            raise ValueError('Unknown evaluation motion skills: ' + str(sorted(requested - set(available))))
+        return [name for name in available if name in requested]
+
+    def _create_motion_lib(self, motion_file, skill):
+        return MotionLib(motion_file, skill, self._dof_body_ids, self._dof_offsets,
+                         self._key_body_ids.cpu().numpy(), self.device)
 
     def _amp_family(self, env_ids=None, slot_agent=None):
         from utils.unified_training import family_from_templates
@@ -1507,7 +1515,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 len(indices), self._num_amp_obs_steps, -1
             )
             labels = family[indices, None].expand(-1, self._num_amp_obs_steps)
-            result[indices] = append_family(motion_obs, labels).flatten(1)
+            result[indices] = append_family(motion_obs, labels, getattr(self, "_amp_num_families", 3)).flatten(1)
         return result
 
     def fetch_amp_obs_demo(self, num_samples):
@@ -1600,7 +1608,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         labels = self._amp_family(slot_env, slot_agent).repeat_interleave(
             self._num_amp_obs_steps - 1
         )
-        amp_obs_demo = append_family(amp_obs_demo, labels)
+        amp_obs_demo = append_family(amp_obs_demo, labels, getattr(self, "_amp_num_families", 3))
         self._hist_amp_obs_buf[slot_env, slot_agent] = amp_obs_demo.view(
             slot_env.shape[0], self._num_amp_obs_steps - 1, self._num_amp_obs_per_step
         )
@@ -1636,7 +1644,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             )
             from utils.unified_training import append_family
 
-            obs = append_family(obs, self._amp_family())
+            obs = append_family(obs, self._amp_family(), getattr(self, "_amp_num_families", 3))
             self._curr_amp_obs_buf[:] = obs.view(N, M, self._num_amp_obs_per_step)
         else:
             K = env_ids.shape[0]
@@ -1659,7 +1667,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             )
             from utils.unified_training import append_family
 
-            obs = append_family(obs, self._amp_family(env_ids))
+            obs = append_family(obs, self._amp_family(env_ids), getattr(self, "_amp_num_families", 3))
             self._curr_amp_obs_buf[env_ids] = obs.view(K, M, self._num_amp_obs_per_step)
         return
 

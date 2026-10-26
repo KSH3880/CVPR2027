@@ -23,7 +23,7 @@ class HumanoidMAStage2(HumanoidMACarry):
         self._stage2_amp_libs = {
             name: MotionLib(path, name, self._dof_body_ids, self._dof_offsets,
                             self._key_body_ids.cpu().numpy(), self.device)
-            for name in ('backward', 'sideways')}
+            for name in (() if self._is_eval else ('backward', 'sideways'))}
 
     def _load_box_asset(self):
         # Wider simulator spacing must not enlarge the Stage1 distractor arena.

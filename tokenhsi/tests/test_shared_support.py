@@ -172,7 +172,7 @@ def test_transfer_padding_mask_and_permutation():
         value_size=1, num_agents=4, num_objects=12, observation_mode='clean_scene',
         scene_entity_sizes=[223,30,1], scene_kinematic_size=7, scene_arena_scale=16.,
         relation_reward_mode=ENV['relationReward']['mode'], relation_graph_spec=ENV['relationGraph'], device='cpu')
-    checkpoint = torch.load(ROOT/'stage1/Stage1V2Fixed_00030500.pth', map_location='cpu', weights_only=False)
+    checkpoint = torch.load(ROOT/'output/stage1/Stage1V2Fixed_00060000.pth', map_location='cpu', weights_only=False)
     model = nn.Module(); model.a2c_network = net
     report = transfer_stage1(model, checkpoint)
     assert len(report['copied']) == len(checkpoint['model'])

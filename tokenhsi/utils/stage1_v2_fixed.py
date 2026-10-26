@@ -61,9 +61,17 @@ def main():
         source_path = Path(args.checkpoint).resolve().parent.parent / 'relation_config.yaml'
     else:
         source_path = DEFAULT_CONFIG
-    if not source_path.is_file():
-        parser.error('Saved config missing: {}. Set STAGE1_V2_FIXED_ENV_CONFIG explicitly.'.format(source_path))
-    source = yaml.safe_load(source_path.read_text())
+    if source_path.is_file():
+        source = yaml.safe_load(source_path.read_text())
+    elif args.checkpoint:
+        import torch
+        source = torch.load(args.checkpoint, map_location='cpu', weights_only=False).get(
+            'relation_experiment_config')
+        if not source:
+            parser.error('Checkpoint has no saved config; set STAGE1_V2_FIXED_ENV_CONFIG explicitly.')
+        source_path = Path(args.checkpoint)
+    else:
+        parser.error('Saved config missing: {}'.format(source_path))
     native = yaml.safe_load(DEFAULT_CONFIG.read_text())
     resolved = resolve_config(source, native)
     output_dir = Path(args.output_dir)

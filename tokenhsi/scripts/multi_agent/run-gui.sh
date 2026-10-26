@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run a command on a temporary Xvfb display and expose it through noVNC.
 #
-#   TOKENHSI_GPU=5 sh tokenhsi/scripts/multi_agent/run-gui.sh \
+#   TOKENHSI_GPU=0 sh tokenhsi/scripts/multi_agent/run-gui.sh \
 #     sh tokenhsi/scripts/multi_agent/ma_carry_test.sh <checkpoint> 2 1 3
 #
 # Every external dependency is auto-detected on PATH and in the usual system /
@@ -14,7 +14,7 @@
 #   X11VNC              full path to the x11vnc binary
 #   NOVNC_DIR           directory containing vnc.html
 #   WEBSOCKIFY          full path to the websockify executable
-#   TOKENHSI_CONDA_ENV  conda env to search for websockify   default "tokenhsi"
+#   TOKENHSI_CONDA_ENV  conda env to search for websockify   default "tokenhsi_sm120"
 #   TOKENHSI_GPU        NVIDIA GPU index or UUID for both CUDA and rendering.
 
 set -e
@@ -22,18 +22,20 @@ set -e
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 WEB_PORT=${PORT:-6080}
 RESOLUTION=${RESOLUTION:-1600x900x24}
-VNC_DIR=${VNC_DIR:-}
-CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
+VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
+CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_sm120}
 
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
-    echo "usage: TOKENHSI_GPU=5 run-gui.sh <command> [args...]"
+    echo "usage: TOKENHSI_GPU=0 run-gui.sh <command> [args...]"
     exit 0
 fi
 if [ "${1:-}" = -- ]; then shift; fi
 if [ $# -eq 0 ]; then
-    echo "usage: TOKENHSI_GPU=5 run-gui.sh <command> [args...]" >&2
+    echo "usage: TOKENHSI_GPU=0 run-gui.sh <command> [args...]" >&2
     exit 1
 fi
+
+. "$ROOT/tokenhsi/scripts/multi_agent/runtime_env.sh"
 
 # Resolve the same physical GPU for CUDA and Vulkan before starting services.
 . "$ROOT/tokenhsi/scripts/multi_agent/gui_gpu_env.sh"
@@ -51,6 +53,13 @@ if [ -z "${X11VNC:-}" ]; then
 fi
 if [ -z "$X11VNC" ] && [ -n "$VNC_DIR" ]; then
     X11VNC=$(first_executable "$VNC_DIR/usr/bin/x11vnc" "$VNC_DIR/bin/x11vnc" || true)
+fi
+
+if [ -z "${XVFB:-}" ]; then
+    XVFB=$(command -v Xvfb || true)
+fi
+if [ -z "$XVFB" ]; then
+    XVFB=$(first_executable "$VNC_DIR/usr/bin/Xvfb" "$VNC_DIR/bin/Xvfb" || true)
 fi
 
 # noVNC: wherever vnc.html lives.
@@ -76,7 +85,7 @@ if [ -z "$WEBSOCKIFY" ]; then
         "${NOVNC_DIR:-}/utils/websockify/run" || true)
 fi
 
-command -v Xvfb >/dev/null || { echo "Xvfb not found on PATH" >&2; exit 1; }
+[ -n "$XVFB" ] || { echo "Xvfb not found; set XVFB=/path/to/Xvfb or VNC_DIR" >&2; exit 1; }
 [ -n "$X11VNC" ] || { echo "x11vnc not found; set X11VNC=/path/to/x11vnc or VNC_DIR" >&2; exit 1; }
 [ -n "$WEBSOCKIFY" ] || { echo "websockify not found; set WEBSOCKIFY=/path/to/websockify" >&2; exit 1; }
 [ -n "${NOVNC_DIR:-}" ] && [ -f "$NOVNC_DIR/vnc.html" ] || \
@@ -113,10 +122,20 @@ VNC_LOG=$GUI_LOG_DIR/tokenhsi_gui_${WEB_PORT}_x11vnc.log
 WEB_LOG=$GUI_LOG_DIR/tokenhsi_gui_${WEB_PORT}_websockify.log
 
 cleanup() {
+    if [ -n "${COMMAND_PID:-}" ]; then
+        kill -- "-$COMMAND_PID" 2>/dev/null || true
+        wait "$COMMAND_PID" 2>/dev/null || true
+    fi
     kill ${XVFB_PID:-} ${VNC_PID:-} ${WEB_PID:-} 2>/dev/null || true
     wait ${XVFB_PID:-} ${VNC_PID:-} ${WEB_PID:-} 2>/dev/null || true
+    if [ -n "${tokenhsi_cuda_compat:-}" ]; then
+        rm -f "$tokenhsi_cuda_compat/libcuda.so"
+        rmdir "$tokenhsi_cuda_compat" 2>/dev/null || true
+    fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 wait_for_port() {
     pid=$1
@@ -137,15 +156,6 @@ wait_for_port() {
     return 1
 }
 
-Xvfb "$DISPLAY_NAME" -screen 0 "$RESOLUTION" -nolisten tcp >"$XVFB_LOG" 2>&1 &
-XVFB_PID=$!
-for _ in $(seq 1 30); do
-    [ -e "/tmp/.X11-unix/X$DISPLAY_NUM" ] && break
-    kill -0 "$XVFB_PID" 2>/dev/null || { echo "Xvfb failed; log: $XVFB_LOG" >&2; exit 1; }
-    sleep 0.1
-done
-[ -e "/tmp/.X11-unix/X$DISPLAY_NUM" ] || { echo "Xvfb did not start; log: $XVFB_LOG" >&2; exit 1; }
-
 # A user-local x11vnc (unpacked .deb) needs its own libs on the search path;
 # a system-installed one does not.
 X11VNC_LIBS=""
@@ -156,6 +166,15 @@ if [ -n "$VNC_DIR" ]; then
         fi
     done
 fi
+
+LD_LIBRARY_PATH="${X11VNC_LIBS}${X11VNC_LIBS:+:}${LD_LIBRARY_PATH:-}" "$XVFB" "$DISPLAY_NAME" -screen 0 "$RESOLUTION" -nolisten tcp >"$XVFB_LOG" 2>&1 &
+XVFB_PID=$!
+for _ in $(seq 1 30); do
+    [ -e "/tmp/.X11-unix/X$DISPLAY_NUM" ] && break
+    kill -0 "$XVFB_PID" 2>/dev/null || { echo "Xvfb failed; log: $XVFB_LOG" >&2; exit 1; }
+    sleep 0.1
+done
+[ -e "/tmp/.X11-unix/X$DISPLAY_NUM" ] || { echo "Xvfb did not start; log: $XVFB_LOG" >&2; exit 1; }
 
 LD_LIBRARY_PATH="${X11VNC_LIBS}${X11VNC_LIBS:+:}${LD_LIBRARY_PATH:-}" "$X11VNC" \
     -display "$DISPLAY_NAME" -rfbport "$VNC_PORT" -localhost -nopw -forever \
@@ -178,4 +197,6 @@ echo " 종료     Ctrl+C"
 echo "=============================================================="
 
 cd "$ROOT"
-DISPLAY="$DISPLAY_NAME" HEADLESS=0 "$@"
+setsid env DISPLAY="$DISPLAY_NAME" HEADLESS=0 "$@" &
+COMMAND_PID=$!
+wait "$COMMAND_PID"

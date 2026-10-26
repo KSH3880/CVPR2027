@@ -196,6 +196,11 @@ def build_alg_runner(algo_observer):
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_adapt', lambda **kwargs : amp_network_builder_transformer_adapt.AMPTransformerMultiTaskAdaptBuilder())
     runner.model_builder.network_factory.register_builder('amp_transformer_multi_task_longterm', lambda **kwargs : amp_network_builder_transformer_longterm.AMPTransformerMultiTaskLongTermTaskCompletionBuilder())
 
+    from learning.multi_agent.stage1_push_agent import Stage1PushAgent, Stage1PushPlayer
+    from learning.multi_agent.stage1_push_network import Stage1PushBuilder
+    runner.algo_factory.register_builder('ma_push', lambda **kwargs: Stage1PushAgent(**kwargs))
+    runner.player_factory.register_builder('ma_push', lambda **kwargs: Stage1PushPlayer(**kwargs))
+    runner.model_builder.network_factory.register_builder('amp_multi_agent_push', lambda **kwargs: Stage1PushBuilder())
     runner.algo_factory.register_builder('ma', lambda **kwargs : ma_agent.MAAgent(**kwargs))
     runner.player_factory.register_builder('ma', lambda **kwargs : ma_players.MAPlayerContinuous(**kwargs))
     from learning.multi_agent.shared_support_network import SharedSupportBuilder
@@ -225,6 +230,9 @@ def main():
 
     if args.minibatch_size != -1:
         cfg_train['params']['config']['minibatch_size'] = args.minibatch_size
+        if cfg_train['params']['algo']['name'] in ('ma', 'ma_push'):
+            cfg_train['params']['config']['amp_minibatch_size'] = min(
+                cfg_train['params']['config']['amp_minibatch_size'], args.minibatch_size)
         
     if args.motion_file:
         cfg['env']['motion_file'] = args.motion_file

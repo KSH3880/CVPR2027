@@ -15,7 +15,7 @@ if [ ! -f "$ENV_CONFIG" ]; then
   exit 1
 fi
 set -- --num_agents "${2:-4}" --num_envs "${3:-1}" --num_objects "${4:-8}" --eval_repeats "${5:-10}" --task_graph "${TASK_GRAPH:-random_scenario}"
-if [ "${HEADLESS:-0}" != 0 ]; then set -- "$@" --headless; fi
+if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then set -- "$@" --episode_length "$EPISODE_LENGTH"; fi
 python tokenhsi/run.py --task HumanoidMAStage2 --cfg_env "$ENV_CONFIG" \
   --cfg_train tokenhsi/data/cfg/train/rlg/stage2.yaml \

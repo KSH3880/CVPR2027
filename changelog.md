@@ -2,7 +2,195 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-25
+
+### RSI uniform18K 감시·조건부10–15kg/20cm/130° 전환
+
+- 사용자 확인에 따라30분 간격 사용자 서비스 `tokenhsi-push-rsi-uniform-18k-monitor-20261025.service`를 시작했다. 기존 학습/PID1894083은 유지하며18000 저장본을 동일 초기512건·200초·평균/확률 행동으로 평가한다. 평균 성공≥115/512와10초 정체≤255/512를 모두 회복하면 유지하고, 하나라도 미달이면 기존 서비스만 종료한 뒤 새 variant를 fixed78000·새 optimizer/epoch으로 시작한다.
+- `stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130` 환경/학습 YAML·train/test/VNC·물성 bank를 분리했다. 같은 부피 선형 질량10–15kg·PUSH 성공/보상/평가 수평 반경20cm(기존 높이 오차1mm 유지)·밀기 면 정면±65°를 적용한다. RSI uniform2–12m·보행2–10m·KL0·2048환경을 유지한다. 기존 variant 성공 조건·물성·모션·bank는 보존한다.
+- CPU74개 통과(없는60000 fixture 대신 실제78000을 읽어 전이를 검증; 별칭/원본 변경 없음). GPU2048환경에서 실제 질량10.159–14.623kg·spawn 최대64.994°·RSI/보행 거리·teacher 미생성과 성공 반경을 확인했다. epoch2→3/optimizer96→144 재개, 각271 scalar·모델/optimizer finite·1환경8step 추론을 통과했다. [검증](output_etc/check/push_light130_20261025/validation.json).
+- 감시기는13K 기준 유지/14K 악화 전환 판정과 잘못된 PID·평가 물성 거부를 확인했다. 현재 `waiting_for_18000`·기존/감시 서비스 active·`Linger=yes`·보호된 Stage2 학습 유지 상태다.18K 평가·조건부 종료·다음 본학습은 아직 실행하지 않았다. [감시 상태](output_etc/check/push_uniform_18k_monitor_20261025/activation_validation.json), [전환 명세](markdowns/reference/stage1_push_light130.md).
+
+## 2026-10-24
+
+### KL0 본학습 서비스 재시작
+
+- 사용자 요청으로20:05의 CUDA illegal memory access 종료를 확인하고20:16에 기존 사용자 서비스를 재시작했다. 저장 checkpoint가 없어 원본 fixed78000에서 동일 KL0·2048환경·RSI2~12m·loco2~10m로 새로 시작했다. 기존 로그/출력은 보존했다.
+- 학습 PID1894083의 epoch1/frame0~epoch13·271개 scalar finite·KL loss0·새 구간 traceback 없음과 MPS 연결·`Linger=yes`를 확인했다. 다른 repo의 Stage2 PID1888896과 원본 checkpoint를 보존했다. 오류의 근본 원인은 확정하지 않았다. [검증](output_etc/check/push_uniform_kl0_restart_20261024_201610/validation.json).
+
+### KL0·RSI 균등 거리 본학습을 fixed78000에서 새로 시작
+
+- 사용자 요청으로 기존 cuboid 서비스/PID1525611을 중단하고, `rsi_uniform`을 원본 `Stage1V2Fixed_00078000.pth`에서 전이해 새 optimizer·epoch으로 시작했다. KL0·GPU0·2048환경·2명·4물체, RSI2~12m·loco2~10m를 적용하고 PUSH/RESUME checkpoint·확인학습 제한을 해제했다.
+- 사용자 서비스 `tokenhsi-push-rsi-uniform-kl0-20261024-194136.service`·학습 PID1862738의 실행과 `Linger=yes`·MPS 연결, 원본 epoch78000 전이 보고서와 epoch1/frame0~epoch17·271개 scalar finite·KL loss0을 확인했다. 원본 checkpoint hash·다른 repo의 Stage2 학습을 보존하고 기존 cuboid 종료/GPU 해제를 검증했다. 현재 실행·상태·로그 명령을 config에 반영했다. [검증](output_etc/check/push_uniform_kl0_fresh_20261024_194136/validation.json).
+
+### KL0 teacher 생략·RSI 시작 상한12m
+
+- 사용자 요청으로 KL 계수0에서 teacher 생성·복제·전용 checkpoint 로드를 생략하고, 관측 마스크 처리 전에 즉시 반환한다. 원본 fixed에서 학생 모델을 처음 전이하는 데 필요한 로드는 유지한다. 기본 계수0.001과 양수 계수의 동작은 유지하며 실행 예시에 `TEACHER_KL_COEF=0`을 명시했다.
+- 사용자 확인에 따라 `rsi_uniform`의 `rsi.goal_distance_max`를12m로 분리하고 loco 상한10m를 유지했다. 장면 간격은 두 상한의 최댓값을 고려하며, 새 거리 설정은 명시적 전이에서만 차이를 허용한다. 이전 checkpoint의 일반 resume는 저장된 거리를 유지한다.
+- CPU66개 통과. GPU0·2048환경의 전이/재개에서 teacher 생성·복제·전용 로드0회와 KL loss0, RSI1025명2.006~11.995m·loco1023명2.004~9.999m를 확인했다. epoch2→4/optimizer step96→192·각271 scalar 및 모델/optimizer finite·1환경8step 추론을 검증했다. 기존 본학습은 유지했으며 새 본학습은 시작하지 않았다. [검증](output_etc/check/push_teacher0_rsi12_20261024/validation.json).
+
+### Cuboid RSI 균등 거리 variant
+
+- 사용자 명세에 따라 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` config·train/test/VNC를 분리했다. 기본 false인 `rsi.uniform_goal_distance`가 참이면 RSI의 clip 진행도에 따른 상자 이동을 생략하고, epoch0부터 최종 커리큘럼을 사용한다. 보상·물성·bank·RSI 비율·1200step을 유지하며 config/structure/USAGE에 연결했다.
+- cuboid의 명시적 모델 전이에서만 새 RSI flag 차이를 허용하고, 일반 resume 계약은 유지했다. 실제 checkpoint 전이에 필요했던 동일 teacher의 상대/절대경로 비교를 보정했다. 관련 CPU60개·shell 구문 검사를 통과했다.
+- GPU0·2048환경에서 RSI1025명의 거리2.005~9.996m·1m 구간별10.8~13.9%와 epoch0 최종 단계를 확인했다. cuboid24500 모델/정규화 그대로 전이·fresh optimizer, epoch2 저장→epoch4/optimizer step96→192 재개, 모델/optimizer·각271 scalar finite와1환경8step 추론을 검증했다. 기존 cuboid 본학습·원본 설정/bank/보상/모션을 보존했으며 새 본학습·GUI viewer는 시작하지 않았다. [검증](output_etc/check/push_rsi_uniform_20261024/validation.json).
+
+## 2026-10-23
+
+### Cuboid PUSH 물성·보상 설계 문서
+
+- 사용자 요청으로 [cuboid 전용 문서](markdowns/reference/push_cuboid_reward_design.md)에 크기·부피별 질량·본체/밑판 마찰과 접촉/AT 보상식·성공·포화·페널티·AMP 합산만 정리하고 structure에 연결했다.
+- 실행 중인 환경 YAML과 현재 PUSH 설정 일치·실제 보상 호출 경로, 예시 수치·문서 링크·diff를 확인했다. 문서만 변경했으며 학습 코드/config·프로세스는 유지하고 새 학습/시뮬레이션은 실행하지 않았다.
+
+### 정육면체 raw 중단·cuboid 백그라운드 재개
+
+- 사용자 요청으로 정육면체 raw 서비스와 학습 PID397999만 중단하고, cuboid의 최신 epoch13000 저장본에서 모델·optimizer·epoch을 재개했다. GPU0·2048환경·2명·4물체를 유지하며 별도 출력의 `launch.sh`에 실행 명령을 보존하고 config의 상태·로그 명령을 갱신했다.
+- 사용자 서비스 `tokenhsi-push-cuboid-resume-20261023-203500.service`·학습 PID1525611의 실행과 `Linger=yes`, MPS 연결, epoch13001~13008·271개 scalar finite를 확인했다. 저장된 PUSH 설정 일치·확인학습 제한 해제·raw 프로세스/GPU 점유 해제와 다른 repo의 Stage2 학습 유지를 검증했다. [검증](output_etc/check/push_cuboid_resume_20261023_203500/validation.json).
+
+## 2026-10-22
+
+### 실제1환경·6명·5과제 attention 시각화
+
+- 사용자 요청으로 정육면체9000/cuboid8000을 SIT·CLIMB·carryAT·carryONTOP·PUSH-loco·PUSH-RSI의6명 장면에서 각각600step 평가했다. 운영2명 PUSH 환경/학습 코드는 유지하고 평가 전용 장면에서 H6/O7/G6 전체19×19의 QK·QK softmax·bias·QK+bias·최종 softmax를 actor/critic4개 레이어·2개 head·41시각에 저장했다. PNG·실제 장면/확대 MP4·인터랙티브 뷰어와 실행 명령은 [진단 보고서](output_etc/check/push_attention_six_20261022/report.md)에 둔다.
+- 실제 simulator1환경·6명·7상자, 모델 strict 로드, 캡처 출력/원래 레이어 오차0·action 오차0, token 순서 고정 action 차이8.4e-7 이하·독립 softmax 오차3.6e-7 이하를 확인했다. 브라우저의 선택기·10개 행렬 렌더·H264 실제 재생과 최종43개 검사를 통과했다. 본학습 코드/config/checkpoint 및 두 학습 서비스는 보존했다. attention 연결과 행동 성공의 해석은 구분한다.
+
+## 2026-10-21
+
+### PUSH 두 학습의 MPS 연결·백그라운드 재시작
+
+- 사용자 요청으로 기존12~20kg 서비스만 중단하고 해당 run의 최신 저장본(epoch1000)에서 모델·optimizer·epoch을 재개했다. 중단된 cuboid는 fixed78000 전이로 새로 시작했다. 원래 출력과 설정을 보존하고 별도 출력에 실행 명령·로그를 저장했으며 config의 상태/로그 명령을 갱신했다.
+- GPU0·각2048환경의 사용자 서비스 `tokenhsi-push-{raw,cuboid}-mps-20261021-162424.service`를 실행하고 로그아웃 후에도 유지되도록 linger를 활성화했다. 두 Python PID397999/397998이 같은 MPS 서버388225에 연결되고 raw epoch1001~1016·cuboid epoch1~17 및 각각271개 scalar finite임을 확인했다. MPS 속도 향상은 측정하지 않았다. [검증](output_etc/check/push_mps_restart_20261021_162424/validation.json).
+
+### GPU0 MPS 활성화
+
+- 현재 머신에서 MPS 데몬이 없고 두 학습이 비MPS로 실행 중임을 확인한 뒤 기존 helper로 GPU0의 사용자 전용 MPS를 시작했다. 서버PID388225·CUDA 행렬 연산 클라이언트의 실제 연결·GPU PhysX3규격 통과를 확인했다. 다음 실행은 runtime_env에서 자동 연결한다.
+- 기존12~20kg PID232133·직육면체 PID383531과 GPU compute mode는 유지했다. 실행 중인 학습은 자동 전환되지 않으며 속도 향상은 측정하지 않았다. config 공통 규칙에 시작/조회 명령을 기록했다. [검증](output_etc/check/mps_enable_20261021/validation.json).
+
+### PUSH 직육면체·부피별15~20kg·1200step
+
+- 사용자 요청으로 `stage1_v2_fixed_push_360_raw_cuboid` config·train/test/VNC·bank를 분리했다. X1.2~1.7m, Y/Z1.45~1.7m를 추출·정렬해 Y≥Z를 보장하고 부피에15~20kg을 선형 대응한다. 본체0.9·밑판0.3/1cm/전체 폭·기존 RSI/보상/커리큘럼을 유지하며 PUSH는1200step이다. 실행 명령은 config, 계산식은 raw 참고 문서에 기록했다.
+- CPU57개와 GPU3규격의 질량·직육면체 관성·마찰·접지 검사를 통과했다. 기존4종 sampler의4096개 샘플과 RNG는 bitwise 동일했다. fixed78000에서2048환경 확인학습1회 업데이트(epoch2 저장)·271개 scalar/모델 finite·실제 상자2048개의 범위/질량 매핑, 저장본의1환경·8step 한도 추론을 확인했다. 기존12~20kg 학습·이전 설정/bank/원본 checkpoint를 보존했으며 새 본학습은 시작하지 않았다. [검증](output_etc/check/push_cuboid_20261021/validation.json).
+
+### PUSH 20~25kg 실험 중단
+
+- 사용자 요청으로 `tokenhsi-push-mass20to25-20261021-144954.service`만 중단했다. 대상 cwd·학습 config를 확인하고 wrapper/Python PID324484/324511 종료와 GPU 점유 해제를 검증했다. 기존12~20kg 학습 PID232133은 계속 실행 중이며 소스·설정·결과 파일을 보존했다. [확인](output_etc/check/push_mass20to25_20261021/stop.json).
+
+### PUSH 20~25kg 질량 variant·백그라운드 풀 학습
+
+- 사용자 요청으로 `stage1_v2_fixed_push_360_raw_mass20to25` 환경/학습 config·전용 train/test/VNC·물성 bank를 분리했다. 1.2/1.45/1.7m에20/22.5/25kg을 선형 대응하며 본체0.9·밑판0.3·RSI·보상·1800step을 유지한다. 실행·시각화·서비스/로그 명령을 config 맨 아래에 추가했다.
+- CPU31개와 GPU9개 물성 비교를 통과했다. 새 실제 실행의 상자2048개 질량 매핑·fixed78000 전이·2048환경·5epoch/271개 scalar finite를 확인했다. `tokenhsi-push-mass20to25-20261021-144954.service`로 GPU0 백그라운드 풀 학습 중이며 기존12~20kg 학습과 원본 설정·bank·checkpoint·보상/RSI 코드를 보존했다. [검증](output_etc/check/push_mass20to25_20261021/validation.json).
+
+### PUSH 밑판 전체 폭·백그라운드 풀 학습
+
+- 사용자 요청으로 밑판의 가로/세로를 상자와 같게 변경했다(`inset: 0.0`). 두께1cm·본체0.9/판0.3·외곽 크기/질량/관성을 유지하고 이전 bank를 보존했다. `config.md`는 현재 raw PUSH의 학습·학습 시각화·추론·실행 중인 서비스/로그 명령으로 좁혔다.
+- CPU31개와 GPU3크기 물리 비교를 통과했다. 판0.3의 감속 기반 실효 마찰은약0.6368이다. GPU0·2명·2048환경·4물체 풀 학습을 fixed78000에서 새 optimizer/epoch으로 시작했고9epoch·271개 로그 scalar finite·실제 밑판2048개의 가로/세로 일치를 확인했다. 대화 세션과 분리된 사용자 systemd 서비스 `tokenhsi-push-raw-full-20261021-130725.service`로 실행하며 기존 학습은 유지했다. [검증](output_etc/check/push_bottom_plate_full_20261021/validation.json).
+
+### PUSH raw 본체0.9·안쪽 밑판0.3
+
+- 사용자 요청으로 raw PUSH 담당 상자만 본체 마찰0.9·밑판0.3인 하나의 강체/두 충돌 형상으로 변경했다. 밑판은 두께1cm·가장자리1.5cm 안쪽이며 외곽 크기·접지 높이·질량·중심·정육면체 관성을 유지한다. 이전 bank/config·기존 과제 상자·사람·ground plane은 보존했다. fixed78000 풀 학습/4환경 학습 시각화 명령을 config에 명시했다.
+- CPU48개 통과. GPU PhysX에서1.2/1.45/1.7m·12/16/20kg의 판0.3/판0.9/원래 상자를 비교했고, 판0.3의 감속 기반 실효 마찰은0.6373~0.6375였다. 실제 혼합2환경·16step에서 PUSH0.9/0.3·기존 상자1.0·발1.0·땅1.0, 질량·관측/보상 finite를 확인했다. optimizer 갱신0회이며 사용자 최종 요청에 따라 본학습·학습 시각화·백그라운드 학습은 시작하지 않았다. [검증](output_etc/check/push_bottom_plate_20261021/validation.json).
+
+### PUSH raw 양손 공통 면 XY 접촉 보상
+
+- 사용자 합의에 따라 raw CONTACT state와 유효 접촉에서 손 중점·기준 높이·높이 허용폭/감점을 제거했다. 같은 지정 면의 XY 투영까지 양손 거리를 계산해 더 먼 거리 `d`로 `exp(-10*d*d)`를 사용하고, 면 가장자리 초과 거리도 포함한다. 유효 접촉은 양손 거리≤18cm와 기존0.5N 법선 힘 조건을 사용한다. 면 재선택 없이 기존 면·접근/AT/AMP·RSI 배치를 유지하며 이전 checkpoint는 저장된 보상을 복원한다.
+- 관련 CPU43개 통과. 중점/높이 무관성·유한 면 가장자리·더 먼 손·동일 면 유지·손별/상자 힘 조건·상자 회전/기울기·실제 환경의 보상 호출·기존 보상/전이/포화를 확인했다. GPU 시뮬레이션·학습은 실행하지 않았다. [검증](output_etc/check/push_face_xy_20261021/validation.json).
+
+### PUSH raw 크기별12~20kg·fixed78000 전이
+
+- 사용자 요청으로 raw 시작 checkpoint를 `output/stage1/Stage1V2Fixed_00078000.pth`로 변경하고, 한 변1.2~1.7m에 질량12~20kg을 선형 대응시켰다(1.45m→16kg). 새 물성 bank를 분리하고 학습/noVNC 명령을 갱신했다. 기존 bank·원본 checkpoint·RSI 후보와 모션은 보존했다.
+- 관련 CPU24개 통과. 질량 범위·크기별 단조 증가·선형 대응·기존 독립 질량 샘플러와 고정 물성·전이 계약을 확인했다. 실제 fixed78000의 actor/critic/discriminator 전이와 기존 과제 출력 비교도 통과했다. 기존 GPU 작업을 유지하기 위해 시뮬레이션·학습은 실행하지 않았다. [검증](output_etc/check/push_mass_by_size_20261021/validation.json).
+
+### PUSH 15kg 비교 시각화
+
+- 질량 비교 실험 폴더에15kg noVNC 실행기를 추가했다. 기존 raw checkpoint의 상자 생성 질량만 바꾸고, 기본 접촉 RSI·100회·300step의 기존 평가 흐름을 사용한다. 명령은 USAGE와 config 링크에 기록했다.
+- 11000epoch 저장본으로1환경·8step 화면 없는 추론을 완료하고 simulator 실제 질량 두 개가15kg임을 확인했다. 학습 코드/config·실행 중인 학습은 변경하지 않았고 GUI viewer는 실행하지 않았다.
+
+### PUSH raw 테스트 시각화 명령
+
+- `config.md`의 raw 로컬/VNC 명령에 현재 학습 run의 `RAW_CKPT`를 별도로 지정하고, 원본 RSI·접촉 자세 시작·1환경·100회·최대300step을 명시했다.
+- 참조 checkpoint(epoch10500)의 raw 설정·물성·호환 계약, 실행 파일/경로·문서 링크·쉘 구문을 확인했다. 학습·viewer는 실행하지 않았다.
+
+## 2026-10-20
+
+### PUSH 원본 RSI·1.04m 접촉점·가변 정육면체
+
+- `stage1_v2_fixed_push_360_raw` config/train/test/VNC를 분리했다. 원본 RSI/AMP 이력·접촉 높이1.04m·한 변1.2~1.7m·질량25~30kg을 적용하고, 실제 크기의 면/바닥 위치와 모든 사람 충돌 형상의 최소 수평 후퇴를 계산한다. 기존 과제/비율/KL·기존 checkpoint·공용 cache/원본 NPY는 유지한다. 기존 PUSH는 명시적 warm-start로 전이한다.
+- CPU47개 통과. 51크기×11후보×3질량+무작위365건의 실제 FK/별도 GPU PhysX2048건에서 초기 침투0·후퇴 최대6.784mm·1초 PD 최대 기울기0.740도·머리 충격0N을 확인했다. 실제2048환경 epoch2/frame262144 저장과 모델/542 scalar finite·입력/AMP 정규화 불변, 1환경64회128쌍의 초기 침투/머리 충격0·최대 기울기3.964도와 원본 관절/속도/AMP 이력·실제 물성을 확인했다.
+- 기존 보정 reset의 이전 상태 bitwise 동일·새 wrapper/4환경 배치 전달을 확인했다. 본학습·GUI viewer는 시작하지 않았고 기존 학습은 유지했다. [구현·검증 범위](markdowns/reference/stage1_push_raw.md), [자료](output_etc/check/push_raw_variable_20261020/).
+
+### PUSH 추론의 원본 RSI 선택 옵션
+
+- test/VNC에 `PUSH_RSI_MODE=corrected|raw`와 직접 실행 인자 `--push_rsi_mode`를 추가했다. 기본 보정을 유지하고 `raw`에서 원본 관절·손 높이·참조 속도 및 초기 AMP 이력을 사용한다. 선별 bank·상자/goal 배치·보상·checkpoint 계약은 유지하며 직접 학습 실행의 raw override는 거부한다. [사용법](markdowns/USAGE.md#push-추론-rsi-자세).
+- 관련 CPU31개 통과. 1환경 추론에서 원본11후보의 반환 상태와 관절·속도·9프레임 AMP 이력 일치,8회 원본 reset의 손 높이 약0.958~1.093m를 확인했다. 옵션 생략 시 이전 보정 모드의 root·관절·속도·상자·goal·선별 시각이 bitwise 동일했다. 학습 재실행·공용 cache 변경은 하지 않았다.
+- 사용자 checkpoint와100회·300step 인자로6081 원본 RSI noVNC를 실행하고 HTTP200/WebSocket101/RFB·실화면·움직임을 확인했다. 기존 본학습은 유지했다. [검증](output_etc/check/push_rsi_raw_20261020/raw/validation.json), [기본값 비교](output_etc/check/push_rsi_raw_20261020/default/validation.json), [viewer](output_etc/check/push_rsi_raw_20261020/viewer_validation.json).
+
+### PUSH RSI 실제 reset·초기 충돌 정밀 분석
+
+- 원래 샘플러와 배치를 유지한2048환경 학습 rollout·1환경 테스트64회에서 접촉 RSI1016/128명을 관측했다. 원본의 머리 침투는0이었으며 팔 높이 보정 후 손 기준 정렬로 몸이41~52cm 전진하면서 reset의 머리 침투가1016/1016·128/128로 나타났다. 상자 초기 바닥 간격은 수치 오차 수준이며 기울기/속도0이었다.
+- 같은 초기 상태의 머리/사람 접촉 제외·2cm 낙하·초기 속도0 대조로 바닥보다 초기 사람-상자 침투가 지배적임을 확인했다. [정밀 분석·MP4](markdowns/reference/stage1_push_rsi_collision_audit.md), [원시 수치](output_etc/check/push_rsi_precise_20261020/summary.json). 본학습·학습 코드/config·모션/캐시는 변경하지 않았고 optimizer 갱신0회다.
+
+### PUSH 참조 모션 전체 MP4
+
+- 현재 AMP의 밀기21개·보행4개를 native humanoid 정면/측면 MP4로 변환했다. 접촉 RSI 원본7개·후보11시각을 표시하고 [영상 목록](output_etc/check/push_ref_motion_mp4_20261020/videos/README.md)과 전체 ZIP을 생성했다. 원본 사람 모션 재생이며 상자/goal 궤적·reset 팔 보정·정책/물리 rollout은 포함하지 않는다.
+- 1280×720·30fps·총8740프레임의 전체 디코딩, PUSH bank와 원본21개 hash 일치, ZIP 무결성을 확인했다. 학습 코드/config·원본 모션은 변경하지 않았다. [검증](output_etc/check/push_ref_motion_mp4_20261020/validation.json).
+
+### PUSH 초기 충돌·크기별 RSI 설계 메모
+
+- [별도 설계 문서](markdowns/reference/stage1_push_size_rsi_plan.md)에 기존 초기 충돌 진단 근거, 정육면체 1.0~1.5m·접촉 높이50%·질량20~25kg 조건과 크기별 RSI 보정·캐시·검증 방향을 정리했다. 선형 질량 매핑과 11종 크기는 제안으로 구분했다.
+- 문서와 구조 안내만 갱신했다. 링크·diff를 확인했으며 코드/config 변경·캐시 생성·학습/시뮬레이션은 실행하지 않았다.
+
+### PUSH 테스트/VNC의 에피소드 길이 인자
+
+- PUSH/PUSH 360 test/VNC 명령 마지막에 `[episode_steps]`를 추가했다. 마지막 인자 → `EPISODE_LENGTH` → 저장 설정 순으로 적용하며 기존 생략 동작을 유지한다. [사용법](markdowns/USAGE.md#push-추론-에피소드-길이)을 추가하고 config의 인자 안내를 갱신했다.
+- VNC 명시/생략 인자 전달4건·길이 우선순위3건·셸 구문·diff 검사를 통과했다. 기존8500 checkpoint의 RSI 시작1환경·16step headless 추론을 확인했다. 학습과 VNC viewer는 실행하지 않았다. [검증](output_etc/check/push_episode_argument/forwarding.json).
+
 ## 2026-10-19
+
+### PUSH 360 추론의 직선 배치 옵션
+
+- test/VNC에 `PUSH_SPAWN_MODE=random|straight`를 추가했다. 기본 360도 생성과 미는 면 뒤쪽 직선 생성을 선택하며 보행 반경 1.65~6m·목표 거리·RSI·학습 커리큘럼은 유지한다. checkpoint 설정과 별도의 추론 인자로 적용하고 학습/구 PUSH의 직선 override는 거부한다. 사용법은 [USAGE](markdowns/USAGE.md#push-360-추론-배치)에 기록했다.
+- 관련 CPU29개 통과. 기존 midpoint500 checkpoint로 두 모드 각각4환경·2회·16step GPU 추론에서 위치 범위·관측 finite와 직선 횡오차 최대 약1.3e-6m를 확인했다. 공개 test wrapper의 직선1환경·16step도 통과했다. 학습·VNC viewer는 실행하지 않았다. [검증](output_etc/check/push_straight_spawn/validation.json).
+
+### 실행 가이드·테스트 시각화 명령 정리
+
+- `config.md`를 새 학습·4환경 학습 시각화·1환경 테스트 시각화 기준으로 정리했다. PUSH 기본 학습은 fixed60000에서 새로 시작하며 PUSH 전이/재개는 USAGE로 연결한다. 실제 PUSH360 midpoint500 checkpoint 예시와 과제/시작 동작 기본값·PUSH 옵션을 반영하고 중복 로딩 설명을 제거했다.
+- 문서 섹션 순서·링크·스크립트/체크포인트 경로·셸 구문과 선택 checkpoint의 navigation/midpoint 설정을 확인했다. 문서 변경이며 학습·시뮬레이션은 실행하지 않았다.
+
+### PUSH 접촉 상태 점수를 양손 중점 오차로 변경
+
+- 새 학습용 `stage1_v2_fixed_push_360`에 `contact_midpoint_only: true`를 적용했다. 상태 점수의 개별 손-면 거리 항을 제외하고 중점 XY 오차·기존 Z 허용 구간만 사용한다. 유효 접촉의 거리/힘 판정과 옵션이 없는 기존 설정은 유지한다. 이전 PUSH/360 모델은 `PUSH_CHECKPOINT`로 전이하고 일반 resume는 저장 보상을 복원한다.
+- CPU191개 통과. 손별 거리가 달라도 중점이 같으면 상태 점수가 같고 유효 접촉 판정은 유지됨을 확인했다. PUSH1500의 새 보상 전이 계약·diff 검사 통과. 이번 보상 변경의 GPU 재학습은 실행하지 않았다. [검증](output_etc/check/push_midpoint_reward/validation.json).
+
+### PUSH 360도 접근·장거리 목표
+
+- `stage1_v2_fixed_push_360` 전용 설정/train/test/VNC를 추가했다. 최종 목표 2~10m·보행 root 반경1.65~6m·360도, 지정 면까지의 우회 접근 보상·초기 겹침 재추첨을 적용한다. 0/1000/3000 epoch에 범위를 확대하고 평가는 최종 범위다. PUSH1800step·기존 과제600step, 기존/PUSH50:50·물성·AMP·RSI를 유지한다.
+- `PUSH_CHECKPOINT`로 기존 PUSH 모델/정규화를 가져오고 새 optimizer/epoch으로 시작한다. 일반 resume는 저장 epoch의 단계를 첫 reset부터 복원하며, 구 PUSH checkpoint의 직접 재개/평가는 전용 wrapper에서 거부한다. 기존 본학습은 유지했다. [구현 메모](markdowns/reference/stage1_push_360.md).
+- CPU190개 통과. PUSH1500 전이의 모델/정책·AMP RMS 일치·새 optimizer, 2048환경 짧은 학습/저장·모델/gradient/271 scalar finite·teacher/RMS 불변과 단계별 범위를 확인했다. 최종 박스 간격 보완 후64환경 보행/RSI·각16step 평가,4환경 학습 재개와1환경 평가 noVNC의 실제 장면/움직임·HTTP200/WebSocket101/RFB를 확인했다. 초기 진단값 자료형 오류는 수정 후 재실행했고, 장기 수렴은 미평가다. [검증](output_etc/check/push360_setup/validation.json).
+
+### 테스트 task별 모션 로딩 축소
+
+- 테스트/VNC는 양수 확률의 시작 skill만 읽는다. PUSH 보행은 4clip만 로드하고 PUSH RSI는 선별 bank의 7clip만 로드·검증하며 원본 motion ID를 매핑한다. 보행 테스트의 불필요한 PUSH bank/21clip 검사와 Stage2 테스트의 backward/sideways expert 로딩을 생략했다. 학습 로딩은 유지한다.
+- CPU178개 통과. PUSH 보행4/PUSH RSI7/SIT20 모션의 각각1환경·16step headless 평가, 별도6082 포트의1환경 PUSH noVNC 실제 장면·움직임·HTTP200/WebSocket101/RFB를 확인했다. 기존 학습·6081 viewer는 유지했다. Stage2 보조 expert 제외는 정적/CPU 경로만 확인했다. [검증](output_etc/check/eval_motion_load_20261019/validation.json).
+
+### PUSH 상자 질량 25kg
+
+- 사용자 요청으로 `stage1_v2_fixed_push`의 담당 PUSH 상자 질량을 20→25kg으로 변경했다. 크기·마찰·기존 과제 물성은 유지한다. 기존 20kg RSI bank를 보존하고 후보 11개를 재사용하는 25kg 전용 bank와 변경 이력을 분리했다.
+- 관련 CPU12개 통과. 2048환경에서 simulator rigid-body 질량 약25.000004kg·관측/모델/loss/gradient finite·짧은 학습/저장과 teacher/RMS 불변을 확인했다. 25kg 전 후보 PD 재선별은 하지 않았다. [검증 기록](output_etc/check/stage1_push_mass25/runtime_audit.json).
+
+### Stage1 fixed 기반 PUSH fine-tuning
+
+- `stage1_v2_fixed_push` 전용 환경/학습 config와 train/test/VNC를 추가했다. 기존/PUSH 환경군 50:50·상자 로컬 면의 수직 목표 2~5m·접촉 보상/물성/RSI/AMP를 분리하고 기존 config 경로를 유지했다.
+- fixed60000 전이에서 기존 가중치를 보존하고 5-task/4-family로 확장한다. 새 optimizer·학습률1e-5, 기존 과제에만 동결 teacher KL, 정책/AMP 입력 정규화 고정을 적용했다. PUSH resume는 optimizer/epoch을 복원하고 비율/KL override를 허용한다.
+- CPU167개·기존 4과제 전이 출력 비교 통과. 2048환경 epoch2/frame262144 저장, teacher/RMS 불변·모델/loss/gradient finite·PUSH 임베딩 갱신, 4환경 epoch3 resume, headless 평가와 4환경 학습/1환경 테스트 noVNC의 실제 렌더·움직임·HTTP200/WebSocket101/RFB·종료 정리를 확인했다. 장기 수렴·기존 성공률 보존은 미평가다.
+- [구현 메모](markdowns/reference/stage1_push.md), [검증 기록](output_etc/check/stage1_v2_fixed_push_setup/validation.json). 본학습은 시작하지 않았고 검증 프로세스는 종료했다.
+
+### tokenhsi_sm120 실행 환경과 noVNC
+
+- 현재 서버의 `tokenhsi_sm120`·GPU0에 맞춰 conda/공유 라이브러리와 데이터 링크 12개를 연결했다. 로컬 Xvfb/x11vnc·noVNC 탐색, 실행별 프로세스 종료와 포트 정리를 보완했다. 원본 데이터·참고 repo는 수정하지 않았다.
+- 여섯 컨피그의 headless 학습/테스트, 공통 `train_vnc.sh`의 실제 4환경 학습과 첫 4환경 overview 카메라, 기존 VNC의 1환경 테스트를 연결했다. 시각화 학습만 PPO/AMP minibatch를 조정하고 본학습 YAML의 배치는 유지한다. 학습/테스트 VNC 기본 포트는 6080/6081이다.
+- 사용자 제공 `output/stage1/Stage1V2Fixed_00060000.pth`를 Stage2 세 설정의 기본 전이에 반영했다. 별도 이동한 fixed checkpoint는 내부 저장 env/sim도 복원한다. 실행 명령은 [config](markdowns/config.md), 환경·옵션은 [USAGE](markdowns/USAGE.md)에 갱신했다.
+- CPU 155개 통과. Stage1 세 설정은 2048환경, 공유 받침 두 설정은 1024환경의 짧은 학습·저장/재로드·headless 테스트·4환경 학습 noVNC·1환경 테스트 noVNC를 확인했다. 10개 학습 checkpoint의 상태/loss finite·동결 actor 불변과 실제 렌더/움직임·HTTP200/WebSocket101/RFB·종료 정리를 확인했다. 초기 실행 중 수정한 셸의 종료 오류는 최종 스크립트 재실행으로 해소했다.
+- 기본 Stage2는 단독/공동 RSI 최초 생성 중 사용자의 검증 중단 요청으로 종료했다. 생성된 캐시는 유지했으며 기본 Stage2의 optimizer 학습·최종 테스트/viewer는 미검증이다. 이번 검증 프로세스와 포트는 모두 종료했고 기존 서버 프로세스는 보존했다. 장기 학습 성능은 평가하지 않았다. [검증 요약](output_etc/check/runtime_setup_20261019/validation.json), [실행 결과](output_etc/check/runtime_setup_20261019/matrix.json).
 
 ### 공유 받침 토큰 예산과 distractor 유지
 

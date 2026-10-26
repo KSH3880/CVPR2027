@@ -87,7 +87,7 @@ def load_cfg(args):
     from utils.unified_training import validate_stage1_network
 
     validate_stage1_network(cfg["env"], cfg_train)
-    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport"):
+    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport", "HumanoidMAStage1Push"):
         from utils.output_paths import resolve_output_path
 
         is_eval = args.test or args.eval or getattr(args, "play", False)
@@ -242,7 +242,7 @@ def get_args(benchmark=False):
             "name": "--task_camera",
             "type": str,
             "default": "stack",
-            "help": "OnTop viewer camera: stack or agent",
+            "help": "Viewer camera: stack, agent or overview (first four environments)",
         },
         {
             "name": "--task_graph",
@@ -377,6 +377,18 @@ def get_args(benchmark=False):
             "type": str,
             "default": "",
             "help": "Comma-separated evaluation skill probabilities",
+        },
+        {
+            "name": "--push_spawn_mode",
+            "type": str,
+            "default": "random",
+            "help": "PUSH 360 evaluation walking spawn: random or straight behind the pushing face",
+        },
+        {
+            "name": "--push_rsi_mode",
+            "type": str,
+            "default": "",
+            "help": "PUSH evaluation RSI pose override: corrected or raw; defaults to the environment config",
         },
         {
             "name": "--no_video",

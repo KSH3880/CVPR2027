@@ -211,7 +211,7 @@ def agent_object_indices(graph, slot_env, slot_agent):
     )
     rel = graph.edge_relation[slot_env]
     target = torch.where(
-        (rel == HOLDING) | (rel == SIT) | (rel == CLIMB), graph.edge_dst[slot_env], 0
+        (rel == HOLDING) | (rel == SIT) | (rel == CLIMB) | (rel == 11), graph.edge_dst[slot_env], 0
     )
     return target.masked_fill(~owned, 0).amax(-1) - graph.num_agents
 

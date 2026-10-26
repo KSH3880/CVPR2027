@@ -1,146 +1,168 @@
-# 실행 가이드
+# PUSH 실행 가이드
 
 모든 명령은 저장소 루트에서 실행한다.
 
 ## 공통 규칙
 
-- Config·스크립트·실행 옵션 변경 시 아래 표와 학습·로컬 추론·VNC 명령을 함께 갱신한다. 새 컨피그는 표와 각 명령 목록의 맨 아래에 추가한다. 실험별 설명·별도 섹션을 늘리지 않는다.
-- 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 지정한다. 기존 프로세스는 임의 종료·재시작하지 않는다.
-- 학습 인자: `[agents] [envs] [objects]`. stage1 계열은 **2명·2048환경·4물체**, stage2는 **4명·1024환경·8물체**를 사용한다. 공유 받침 두 실험은 **4명·1024환경**이며 마지막 인자는 총 obj 토큰 수(기본·최소 `12`)다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
-- 추론 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 해당 실험의 checkpoint를 사용한다. test/VNC는 학습 당시 저장된 `relation_config.yaml`을 기본으로 읽는다.
-- 본학습은 `output/`, 확인 학습·test·VNC 결과는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이고 해당 실험의 환경 수(stage1 계열 2048, stage2 계열 1024)를 유지한다.
-- 화면 없는 평가는 로컬 추론 명령의 `HEADLESS=0`을 `HEADLESS=1`로 바꾼다. 추가 옵션·resume·checkpoint 예외는 [USAGE](USAGE.md)를 따른다.
+- conda 환경은 `tokenhsi_sm120`이며 wrapper가 자동 활성화한다.
+- GPU는 `TOKENHSI_GPU`로 지정한다. 본학습은 2명·2048환경·4물체, 학습 시각화는 4환경, 추론은 1환경이다.
+- GPU0 MPS는 `source mps/shell.sh` 후 `mps_start 0`으로 켜고 `mps_status 0`으로 확인한다. 새 실행은 자동 연결하며 이미 실행 중인 학습에는 재시작 전까지 적용되지 않는다.
+- 새 학습은 fixed78000에서 시작한다. cuboid checkpoint 전이·재개·추가 옵션은 [USAGE](USAGE.md#push-원본-rsi가변-정육면체)를 따른다.
+- 본학습은 `output/`, 학습 시각화·추론은 `output_etc/check/`에 저장한다.
 
 ## 현재 컨피그
 
 | 환경 Config | 학습 Config |
 | --- | --- |
-| [stage1.yaml](../tokenhsi/data/cfg/multi_agent/stage1.yaml) | [stage1.yaml](../tokenhsi/data/cfg/train/rlg/stage1.yaml) |
-| [stage1_v2.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2.yaml) | [stage1_v2.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2.yaml) |
-| [stage1_v2_fixed.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml) | [stage1_v2_fixed.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed.yaml) |
-| [stage2.yaml](../tokenhsi/data/cfg/multi_agent/stage2.yaml) | [stage2.yaml](../tokenhsi/data/cfg/train/rlg/stage2.yaml) |
-| [stage2_shared_full_success.yaml](../tokenhsi/data/cfg/multi_agent/stage2_shared_full_success.yaml) | [stage2_shared_full_success.yaml](../tokenhsi/data/cfg/train/rlg/stage2_shared_full_success.yaml) |
-| [stage2_shared_region_success.yaml](../tokenhsi/data/cfg/multi_agent/stage2_shared_region_success.yaml) | [stage2_shared_region_success.yaml](../tokenhsi/data/cfg/train/rlg/stage2_shared_region_success.yaml) |
+| [stage1_v2_fixed_push_360_raw.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_360_raw.yaml) | [stage1_v2_fixed_push_360_raw.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_360_raw.yaml) |
+| [stage1_v2_fixed_push_360_raw_mass20to25.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_360_raw_mass20to25.yaml) | [stage1_v2_fixed_push_360_raw_mass20to25.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_360_raw_mass20to25.yaml) |
+| [stage1_v2_fixed_push_360_raw_cuboid.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_360_raw_cuboid.yaml) | [stage1_v2_fixed_push_360_raw_cuboid.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_360_raw_cuboid.yaml) |
+| [stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform.yaml) | [stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform.yaml) |
+| [stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130.yaml](../tokenhsi/data/cfg/multi_agent/stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130.yaml) | [stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130.yaml](../tokenhsi/data/cfg/train/rlg/stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130.yaml) |
 
 ## 학습
 
-필요한 컨피그의 한 줄만 실행한다.
+새로 시작할 때 먼저 실행한다.
 
 ```bash
-# stage1
-TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_train.sh 2 2048 4
+unset CHECK MAX_ITERATIONS OUTPUT_PATH PUSH_CHECKPOINT RESUME_CHECKPOINT STAGE1_PUSH_ENV_CONFIG STAGE1_CHECKPOINT MINIBATCH_SIZE OLD_TASK_FRACTION TEACHER_KL_COEF
 
-# stage1_v2
-TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_v2_train.sh 2 2048 4
+# stage1_v2_fixed_push_360_raw
+TOKENHSI_GPU=0 HEADLESS=1 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_train.sh 2 2048 4
 
-# stage1_v2_fixed
-TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_train.sh 2 2048 4
+# stage1_v2_fixed_push_360_raw_mass20to25
+TOKENHSI_GPU=0 HEADLESS=1 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_mass20to25_train.sh 2 2048 4
 
-# stage2
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_train.sh 4 1024 8
+# stage1_v2_fixed_push_360_raw_cuboid
+TOKENHSI_GPU=0 HEADLESS=1 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_train.sh 2 2048 4
 
-# stage2_shared_full_success
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_full_success_train.sh 4 1024 12
+# stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform
+TOKENHSI_GPU=0 HEADLESS=1 TEACHER_KL_COEF=0 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform_train.sh 2 2048 4
 
-# stage2_shared_region_success
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_region_success_train.sh 4 1024 12
+# stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130
+TOKENHSI_GPU=0 HEADLESS=1 TEACHER_KL_COEF=0 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130_train.sh 2 2048 4
 ```
+
+백그라운드 학습 상태·로그. `rsi_uniform`은 fixed78000에서 KL0·새 optimizer/epoch으로 시작한 GPU0 MPS 사용자 서비스이며 로그아웃 후에도 유지된다. raw·20~25kg variant·기존 cuboid는 중단 상태다.
+
+```bash
+# stage1_v2_fixed_push_360_raw
+systemctl --user status tokenhsi-push-raw-mps-20261021-162424.service --no-pager
+tail -f output/stage1_v2_fixed_push_360_raw_full_plate_mps_resume_20261021_162424/train.log
+
+# stage1_v2_fixed_push_360_raw_mass20to25
+systemctl --user status tokenhsi-push-mass20to25-20261021-144954.service --no-pager
+tail -f output/stage1_v2_fixed_push_360_raw_mass20to25_20261021_144954/train.log
+
+# stage1_v2_fixed_push_360_raw_cuboid
+systemctl --user status tokenhsi-push-cuboid-resume-20261023-203500.service --no-pager
+tail -f output/stage1_v2_fixed_push_360_raw_cuboid_mps_resume_20261023_203500/train.log
+
+# stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform
+systemctl --user status tokenhsi-push-rsi-uniform-kl0-20261024-194136.service --no-pager
+tail -f output/stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform_kl0_fixed78000_20261024_194136/train.log
+systemctl --user status tokenhsi-push-rsi-uniform-18k-monitor-20261025.service --no-pager
+
+# stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130
+systemctl --user status tokenhsi-push-cuboid-m10to15-r20cm-a130-20261025.service --no-pager
+```
+
+18K 감시·조건부 전환은 [절차](reference/stage1_push_light130.md)를 따른다. 다음 variant 서비스는 전환 조건 충족 후 생성한다.
+
+### noVNC 학습 시각화 — 4환경
+
+별도 4환경 학습이다. 위 초기화 명령을 먼저 실행한다. 6080 포트를 포워딩한다.
+
+```bash
+# stage1_v2_fixed_push_360_raw
+TOKENHSI_GPU=0 PORT=6080 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v2_fixed_push_360_raw 2 4 4
+
+# stage1_v2_fixed_push_360_raw_mass20to25
+TOKENHSI_GPU=0 PORT=6082 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v2_fixed_push_360_raw_mass20to25 2 4 4
+
+# stage1_v2_fixed_push_360_raw_cuboid
+TOKENHSI_GPU=0 PORT=6084 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v2_fixed_push_360_raw_cuboid 2 4 4
+
+# stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform
+TOKENHSI_GPU=0 PORT=6086 TEACHER_KL_COEF=0 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform 2 4 4
+
+# stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130
+TOKENHSI_GPU=0 PORT=6088 TEACHER_KL_COEF=0 STAGE1_CHECKPOINT=output/stage1/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130 2 4 4
+```
+
+`http://localhost:6080/vnc.html?autoconnect=1&resize=remote`
+
+20~25kg variant: `http://localhost:6082/vnc.html?autoconnect=1&resize=remote`
+
+직육면체 variant: `http://localhost:6084/vnc.html?autoconnect=1&resize=remote`
+
+RSI 균등 거리 variant: `http://localhost:6086/vnc.html?autoconnect=1&resize=remote`
+
+10–15kg·20cm·130° variant: `http://localhost:6088/vnc.html?autoconnect=1&resize=remote`
 
 ## 로컬 추론
 
-`CKPT`를 실행할 컨피그의 checkpoint 경로로 바꾸고 한 줄만 실행한다.
+`CKPT`·`CKPT_MASS20TO25`·`CKPT_CUBOID`·`CKPT_RSI_UNIFORM`·`CKPT_LIGHT130`에 각 학습에서 저장된 checkpoint 경로를 지정한다. 마지막 두 인자는 반복 횟수·최대 제어 step이다.
 
 ```bash
-CKPT='/absolute/path/to/checkpoint.pth'
+# stage1_v2_fixed_push_360_raw
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_test.sh "$CKPT" 2 1 4 100 300
 
-# stage1
-TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_test.sh "$CKPT" 2 1 4 10
+# stage1_v2_fixed_push_360_raw_mass20to25
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_mass20to25_test.sh "$CKPT_MASS20TO25" 2 1 4 100 300
 
-# stage1_v2
-TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_v2_test.sh "$CKPT" 2 1 4 10
+# stage1_v2_fixed_push_360_raw_cuboid
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_test.sh "$CKPT_CUBOID" 2 1 4 100 1200
 
-# stage1_v2_fixed
-TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_test.sh "$CKPT" 2 1 4 10
+# stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform_test.sh "$CKPT_RSI_UNIFORM" 2 1 4 100 1200
 
-# stage2
-TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_test.sh "$CKPT" 4 1 8 10
-
-# stage2_shared_full_success
-TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_shared_full_success_test.sh "$CKPT" 4 1 12 10
-
-# stage2_shared_region_success
-TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_shared_region_success_test.sh "$CKPT" 4 1 12 10
+# stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130_test.sh "$CKPT_LIGHT130" 2 1 4 100 1200
 ```
+
+화면 없는 평가는 `HEADLESS=1`을 사용한다.
 
 ## 서버 VNC 추론
 
+각 checkpoint를 지정하고 사용하는 포트를 포워딩한다.
+
 ```bash
-CKPT='/absolute/path/to/checkpoint.pth'
+# stage1_v2_fixed_push_360_raw
+TOKENHSI_GPU=0 PORT=6081 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_vnc.sh "$CKPT" 2 1 4 100 300
 
-# stage1
-TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_vnc.sh "$CKPT" 2 1 4 10
+# stage1_v2_fixed_push_360_raw_mass20to25
+TOKENHSI_GPU=0 PORT=6083 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_mass20to25_vnc.sh "$CKPT_MASS20TO25" 2 1 4 100 300
 
-# stage1_v2
-TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_v2_vnc.sh "$CKPT" 2 1 4 10
+# stage1_v2_fixed_push_360_raw_cuboid
+TOKENHSI_GPU=0 PORT=6085 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_vnc.sh "$CKPT_CUBOID" 2 1 4 100 1200
 
-# stage1_v2_fixed
-TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_vnc.sh "$CKPT" 2 1 4 10
+# stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform
+TOKENHSI_GPU=0 PORT=6087 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform_vnc.sh "$CKPT_RSI_UNIFORM" 2 1 4 100 1200
 
-# stage2
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_vnc.sh "$CKPT" 4 1 8 10
-
-# stage2_shared_full_success
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_full_success_vnc.sh "$CKPT" 4 1 12 10
-
-# stage2_shared_region_success
-TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_shared_region_success_vnc.sh "$CKPT" 4 1 12 10
+# stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130
+TOKENHSI_GPU=0 PORT=6089 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130_vnc.sh "$CKPT_LIGHT130" 2 1 4 100 1200
 ```
+
+`http://localhost:6081/vnc.html?autoconnect=1&resize=remote`
+
+20~25kg variant: `http://localhost:6083/vnc.html?autoconnect=1&resize=remote`
+
+직육면체 variant: `http://localhost:6085/vnc.html?autoconnect=1&resize=remote`
+
+RSI 균등 거리 variant: `http://localhost:6087/vnc.html?autoconnect=1&resize=remote`
+
+10–15kg·20cm·130° variant: `http://localhost:6089/vnc.html?autoconnect=1&resize=remote`
 
 ## 추론 옵션
 
-아래 옵션을 test/VNC 명령의 `bash` 앞에 붙인다. 기본값은 `TASK_GRAPH=random_scenario EVAL_SKILLS=loco`다.
-
-**TASK_GRAPH — 수행할 과제**
-
-| 값 | 동작 |
+| 옵션 | 값 |
 | --- | --- |
-| `random_scenario` | 사람마다 과제 무작위 선택 |
-| `sit` | 모두 SIT |
-| `climb` | 모두 CLIMB |
-| `sit_climb` | 사람 순서대로 SIT·CLIMB 교대 |
-| `carry_at` | 각자 물체를 자기 목표 위치로 운반 |
-| `carry_ontop` | 각자 물체를 받침 위로 운반 |
+| `TASK_GRAPH` | `push` |
+| `EVAL_SKILLS` | `loco`: 접근 시작 / `push`: 접촉 RSI 시작 |
+| `EVAL_SKILL_PROBS` | 단일 skill은 `1.0`, 혼합은 `0.5,0.5` 등 |
+| `PUSH_SPAWN_MODE` | `random`(기본) / `straight`: 보행 시작 위치 |
+| `PUSH_RSI_MODE` | `raw`(기본) / `corrected`: 접촉 RSI 자세 |
+| 6명 attention 진단 | [실행·뷰어](USAGE.md#6명5과제-attention-진단): 한 환경의 H6/O7/G6 전체 토큰·레이어/head별 비교 |
 
-`holding_at`은 `carry_at`, `holding_ontop`은 `carry_ontop`과 같다.
-
-**EVAL_SKILLS — 시작할 참조 동작**
-
-| 값 | 초기 동작 |
-| --- | --- |
-| `loco` | 걷기·접근 |
-| `sit` | 앉기 |
-| `climb` | 오르기 |
-| `pickUp` | 물체 집기 |
-| `carryWith` | 물체를 들고 운반 |
-| `putDown` | 물체 내려놓기 |
-| `climbNoRSI` | 별도 Climb 참조 모션 묶음 |
-| `omomo` | OMOMO 운반 참조 모션 묶음 |
-
-여러 skill은 쉼표로 나열하고 `EVAL_SKILL_PROBS`를 같은 순서·개수로 지정한다. 하나만 지정하면 기본 확률은 `1.0`이다. skill은 사람별로 추첨하며 과제별 자동 배정이나 정확한 모션 프레임 고정은 아니다.
-
-```bash
-# AT 운반 — 접근부터 시작
-TASK_GRAPH=carry_at EVAL_SKILLS=loco
-
-# AT 운반 — 들고 있는 동작에서 시작
-TASK_GRAPH=carry_at EVAL_SKILLS=carryWith
-
-# ON_TOP 운반 — 접근 50%, 운반 50%
-TASK_GRAPH=carry_ontop EVAL_SKILLS=loco,carryWith EVAL_SKILL_PROBS=0.5,0.5
-```
-
-Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, `one_pair_at`, `one_pair_ontop`, `all_solo`, `sit`, `climb`, `carry_at`, `carry_ontop`을 지원한다. `carry_at`·`carry_ontop`은 전원 단독 운반이며, 공동 구성을 고정하려면 pair preset을 쓴다.
-
-공동 그룹의 `EVAL_SKILLS`는 `loco`, `pickUp`, `carryWith`, `putDown`을 지원한다. Stage2 ON_TOP에는 `putDown`을 지정하지 않는다. SIT/CLIMB 참조 동작은 해당 전원 단독 preset에서 사용한다.
-
-공유 받침 두 실험은 `random_scenario`, `all_solo`, `all_shared`, `sit`, `climb`, `carry_at`, `carry_ontop`, `shared_sit`, `shared_climb`, `shared_ontop`을 지원하며, `EVAL_SKILLS=loco`만 사용한다. `shared_*`는 전원이 하나의 받침을 공유한다.
+혼합 시작: `EVAL_SKILLS=loco,push EVAL_SKILL_PROBS=0.5,0.5`.

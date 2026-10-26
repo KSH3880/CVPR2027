@@ -11,10 +11,13 @@ set -- --task_graph random_scenario
 if [ -n "${MAX_ITERATIONS:-}" ]; then set -- "$@" --max_iterations "$MAX_ITERATIONS"; fi
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then set -- "$@" --checkpoint "$RESUME_CHECKPOINT" --resume 1; fi
 set -- "$@" --seed "${SEED:-42}"
+set -- "$@" --task_camera "${TASK_CAMERA:-stack}"
+if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
+if [ -n "${MINIBATCH_SIZE:-}" ]; then set -- "$@" --minibatch_size "$MINIBATCH_SIZE"; fi
 python ./tokenhsi/run.py --task HumanoidMACarry \
   --cfg_train tokenhsi/data/cfg/train/rlg/stage1.yaml \
   --cfg_env "${STAGE1_ENV_CONFIG:-tokenhsi/data/cfg/multi_agent/stage1.yaml}" \
   --motion_file tokenhsi/data/dataset_loco_sit_carry_climb.yaml \
   --num_envs "$NUM_ENVS" --num_agents "$NUM_AGENTS" --num_objects "$NUM_OBJECTS" \
   --output_path "$OUTPUT_PATH" \
-  --experiment Stage1TokenHSISampling --headless --no_video "$@"
+  --experiment Stage1TokenHSISampling --no_video "$@"

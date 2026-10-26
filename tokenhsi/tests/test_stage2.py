@@ -66,7 +66,7 @@ def test_stage1_transfer_identity_and_gradients():
         relation_reward_mode=ENV['relationReward']['mode'], relation_graph_spec=ENV['relationGraph'], device='cpu')
     model = nn.Module()
     model.a2c_network = net
-    source = ROOT/'stage1/Stage1V2Fixed_00030500.pth'
+    source = ROOT/'output/stage1/Stage1V2Fixed_00060000.pth'
     if not source.exists():
         pytest.skip('Local Stage1 checkpoint is required for transfer verification')
     checkpoint = torch.load(source, map_location='cpu', weights_only=False)

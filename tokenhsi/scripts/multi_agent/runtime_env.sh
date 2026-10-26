@@ -4,7 +4,7 @@
 # Nothing here is machine specific -- everything is discovered or overridable:
 #
 #   TOKENHSI_CONDA_ENV  conda env to activate.
-#                       Default: the env you already activated, else "tokenhsi".
+#                       Default: "tokenhsi_sm120".
 #                       Set this if you named your env something else.
 #   CONDA_BASE          conda install prefix, if auto-detection fails
 #                       (e.g. CONDA_BASE=/opt/miniconda3).
@@ -26,13 +26,7 @@ TOKENHSI_ROOT=$(cd "$(dirname "$_tokenhsi_self")/../../.." && pwd)
 export TOKENHSI_ROOT
 
 # --- conda environment -----------------------------------------------------
-# If the caller is already inside a conda env and did not ask for a specific
-# one, stay where we are instead of guessing a name.
-if [ -z "${TOKENHSI_CONDA_ENV:-}" ] && [ -n "${CONDA_DEFAULT_ENV:-}" ] \
-    && [ "${CONDA_DEFAULT_ENV}" != "base" ]; then
-    TOKENHSI_CONDA_ENV=$CONDA_DEFAULT_ENV
-fi
-TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
+TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_sm120}
 
 if [ "${CONDA_DEFAULT_ENV:-}" != "$TOKENHSI_CONDA_ENV" ]; then
     conda_base=${CONDA_BASE:-}
@@ -63,6 +57,8 @@ if [ "${CONDA_DEFAULT_ENV:-}" != "$TOKENHSI_CONDA_ENV" ]; then
     fi
 fi
 export TOKENHSI_CONDA_ENV
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 cd "$TOKENHSI_ROOT" || exit 1
 

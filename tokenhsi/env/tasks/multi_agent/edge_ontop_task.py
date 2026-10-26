@@ -753,14 +753,17 @@ class SampledOnTopTaskMixin:
         return result
 
     def _update_camera(self):
-        if getattr(self.cfg["args"], "task_camera", "stack") != "stack":
+        camera = getattr(self.cfg["args"], "task_camera", "stack")
+        if camera not in ("stack", "overview"):
             return super()._update_camera()
         if not hasattr(self, "_box_states"):
             return super()._update_camera()
         from isaacgym import gymapi
 
+        count = min(4, self._humanoid_root_states.shape[0]) if camera == "overview" else 1
         points = torch.cat(
-            [self._humanoid_root_states[0, :, :3], self._logical_box_values(self._box_states)[0, :, :3]], 0
+            [self._humanoid_root_states[:count, :, :3].reshape(-1, 3),
+             self._logical_box_values(self._box_states)[:count, :, :3].reshape(-1, 3)], 0
         )
         low = points.amin(0)
         high = points.amax(0)
@@ -774,7 +777,7 @@ class SampledOnTopTaskMixin:
                 gymapi.Vec3(
                     float(center[0]) + radius * 0.65,
                     float(center[1]) - radius,
-                    2.8 + radius * 0.2,
+                    2.8 + radius * (0.8 if camera == "overview" else 0.2),
                 ),
                 gymapi.Vec3(*center.tolist()),
             )

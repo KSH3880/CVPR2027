@@ -26,7 +26,7 @@ class MAAgent(amp_agent.AMPAgent):
         task = self.vec_env.env.task
         from utils.unified_training import preserve_amp_labels
 
-        normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps)
+        normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps, getattr(task, '_amp_num_families', 3))
         return normalized
 
     def __init__(self, base_name, config):
@@ -366,7 +366,7 @@ class MAAgent(amp_agent.AMPAgent):
             pool = buffer._data_buf["amp_obs"][:count] if count else reference[:0]
             fallback = reference if key == "amp_obs_replay" else None
             matched = sample_family_matched(
-                pool, reference, task._num_amp_obs_steps, fallback
+                pool, reference, task._num_amp_obs_steps, fallback, getattr(task, '_amp_num_families', 3)
             )
             batch_dict[key] = matched.view(scene_count, M, amp_dim)
         self.set_train()
@@ -501,6 +501,8 @@ class MAAgent(amp_agent.AMPAgent):
                 + self.bounds_loss_coef * b_loss
                 + self._disc_coef * disc_loss
             )
+            if hasattr(self, '_actor_preservation_loss'):
+                loss = loss + self._actor_preservation_loss(obs_batch, mu, sigma)
             a_info["actor_loss"] = a_loss
             a_info["actor_clip_frac"] = a_clip_frac
             c_info["critic_loss"] = c_loss

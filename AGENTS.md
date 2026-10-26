@@ -14,10 +14,10 @@
 
 ## 실행과 검증
 
-- 학습 환경 수는 RTX PRO 6000 기준 stage1 계열 **2048**, 사용자 지정 4명 stage2는 **1024**다. 메모리 절약을 이유로 자동 축소하지 않는다. 짧은 검증도 학습 반복 횟수만 줄인다. 평가·VNC 환경 수는 별도로 지정한다.
+- 학습 환경 수는 RTX PRO 6000 기준 stage1 계열 **2048**, 사용자 지정 4명 stage2는 **1024**다. 메모리 절약을 이유로 자동 축소하지 않는다. 짧은 검증도 학습 반복 횟수만 줄인다. 사용자 요청의 noVNC 학습 시각화만 4환경으로 실행하며 `train_vnc.sh`가 배치를 맞춘다. 테스트 시각화는 1환경이다.
 
 - GPU는 명령 앞의 `TOKENHSI_GPU=5`처럼 환경변수로 한 번 지정한다. VNC wrapper와 내부 학습·평가에 같은 설정을 전달한다. 실행 전 `nvidia-smi`로 점유를 확인하며 기존 학습 프로세스를 임의 종료·재시작하지 않는다.
-- 이 서버의 conda 환경은 `tokenhsi`; 실행 준비는 `tokenhsi/scripts/multi_agent/runtime_env.sh`를 사용한다. Isaac Gym을 직접 import할 때는 torch보다 먼저 한다.
+- 이 서버의 conda 환경은 `tokenhsi_sm120`; 실행 준비는 `tokenhsi/scripts/multi_agent/runtime_env.sh`를 사용한다. Isaac Gym을 직접 import할 때는 torch보다 먼저 한다.
 - 공유 데이터 원본 `/home/hwanhee/CVPR2027/TokenHSI`는 읽기 전용으로 취급한다. 이 repo의 데이터는 심링크로 연결한다.
 - reward 비교 실험은 config, train/test 스크립트, output 이름을 분리한다. 현재 실험·기본 명령은 `markdowns/config.md`, checkpoint 호환·추가 옵션은 `markdowns/USAGE.md`를 따른다.
 - 새 실행용 config를 추가할 때는 전용 `<실험명>_train.sh`, `<실험명>_test.sh`(로컬 viewer: `HEADLESS=0`, 화면 없는 평가: `HEADLESS=1`), `<실험명>_vnc.sh`(서버 viewer)를 함께 만든다. `markdowns/config.md` 컨피그 표의 맨 아래에 한 행을 추가하고, 학습·로컬 추론·서버 VNC의 각 명령 목록 맨 아래에 한 줄씩 추가한다. 각 명령 바로 위에 `# <컨피그 이름>`을 쓰고 컨피그 사이에는 빈 줄 하나를 둔다. 설계 명세만 요청받은 경우에는 실행 가능 여부를 명확히 구분한다.
