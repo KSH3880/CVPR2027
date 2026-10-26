@@ -2,6 +2,37 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-26
+
+### mix226 두 설정의 actor SELF/NONE bias 0 비교 실험
+
+- `stage2_before_ground_mix226_actorbias0_1200`·`stage2_before_ground_mix226_atprogress_actorbias0_1200` env/train YAML·전용 train/test/VNC를 추가했다. actor human SA4의 모든 head에서 SELF/NONE은 상수0, BEFORE만 학습 파라미터로 저장한다. critic의 세 관계 bias·기반별 보상/샘플링·20/20/60·1200스텝·PPO·Stage1 동결은 유지하고 두 실험 모두 fixed78000에서 새로 시작한다. 기존/신규 및 서로 다른 progress checkpoint의 혼용을 차단했다. [설계](markdowns/reference/stage2_before.md#actor-selfnone-bias-0), [명령](markdowns/config.md).
+- CPU65개 통과(기존30500 fixture 부재 전이 테스트1개 제외). 두 전용 train 모두 GPU0·4명/1024환경/8물체·CHECK=1로 epoch2/frame262144 저장 완료. actor SELF/NONE 상수0·BEFORE 갱신, critic 세 관계 갱신, actor encoder73 tensor/RMS 동결·action head 갱신, 모델/scalar finite·물리 배치 실패0 확인. 전용 test로 각각4환경·32step·강제 더 가까운 모드 재로드 완료. [CPU](output_etc/check/before_actor_bias0_20261026/cpu.log), [저장본 검증](output_etc/check/before_actor_bias0_20261026/training_validation.json). GUI/VNC 실화면·장기 수렴은 미검증이며 본학습은 시작하지 않았다. 기존 두 본학습과 원본 checkout은 보존했다.
+
+## 2026-10-25
+
+### mix226 BEFORE 후행 progress를 선행 AT 목표로 변경
+
+- `stage2_before_ground_mix226_atprogress_1200` env/train YAML·전용 train/test/VNC를 추가했다. 현재 mix226의 과제/크기 추첨·20/20/60 거리 혼합·1200스텝·PPO·모델/관측을 유지하고, BEFORE 후행 SIT/CLIMB의 사람 XY 및 ON_TOP 자기 payload XY의 progress 목적지만 선행 AT 목표로 바꾼다. gate가 열려도 목표 기준을 유지하며 기존 상자 크기/buffer·가중치·성공 포화·state/success gate·HOLDING·단독 과제는 보존한다. 새 실험만 BEFORE 과제별 gate/raw_success/success 스텝 지표를 추가했다. [설계](markdowns/reference/stage2_before.md#선행-at-목표-progress-stage2_before_ground_mix226_atprogress_1200), [명령](markdowns/config.md).
+- 사용자 선택대로 현재 mix226과 같은 fixed78000에서 새로 전이하도록 기본값을 설정했다. 기존 실험과 output·환경 옵션·checkpoint 계약을 분리했다. 사용자 지정 mix226 저장 config와 비교해 런타임 추가 필드를 제외한 환경 차이는 `before.progress_target` 하나임을 확인했다. 기존 본학습과 원본 checkout은 변경/재시작하지 않았다.
+- CPU59개 통과(기존30500 fixture가 없는 전이 테스트1개 제외). GPU0에서32환경·4구성·각16step으로 후행3과제×3거리모드, 실제 목표 연결, 나머지 기하/보상 입력 보존, partial reset·AMP/추론 finite·가중치 불변을 확인했다. [CPU](output_etc/check/stage2_before_ground_mix226_atprogress_1200/cpu.log), [물리 검사](output_etc/check/stage2_before_ground_mix226_atprogress_1200/physics/validation.json).
+- 표준4명·1024환경·8물체 CHECK=1 학습/저장(epoch2/frame262144) 완료. encoder73 tensor/RMS 동결·action head 갱신·274종 scalar/model finite·물리 배치 실패0, 모드20.62/20.33/59.05%를 확인했다. 전용 test로 저장본4환경·32step·강제 더 가까운 모드 재로드 정상 종료. 셸/Python 문법·문서 경로·diff 확인. [학습 검사](output_etc/check/stage2_before_ground_mix226_atprogress_1200/training_validation.json), [재로드](output_etc/check/stage2_before_ground_mix226_atprogress_1200/reload.log). GUI/VNC 실화면·장기 수렴은 미검증이며 본학습은 시작하지 않았다.
+
+## 2026-10-24
+
+### BEFORE 20/20/60·상자 기준 AT 운반 거리·1200스텝
+
+- `stage2_before_ground_mix226_1200` env/train YAML과 전용 train/test/VNC를 추가했다. BEFORE 쌍별20/20/60, 선행 상자→AT 목표1~10/1~10/1~5m, 후행 ON_TOP의 선행 상자 거리·자기 payload 거리1~5/1~2.5/1~1.25m를 적용한다. 나머지 거리는 합의 표를 따르며 단독 목표·그룹 추첨·loco·보상·Stage1 전이/동결·PPO·1200스텝은 유지한다. 기존 실험과 output/checkpoint 계약을 분리했다. [배치 표](markdowns/reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix226_1200), [명령](markdowns/config.md).
+- CPU48개 통과(없는30500 fixture에 의존하는 기존 전이 테스트1개 제외). GPU0에서32환경·4구성·각16step으로 후행3과제×3모드 거리, AT 운반 거리/사람 제외 영역, 단독 목표, 초기 gate·부분 reset·AMP/추론 finite·가중치 불변을 확인했다.8환경·동일4구성에서 viewer 옵션2의 강제 더 가까운 배치도 통과했다. [물리 검사](output_etc/check/stage2_before_ground_mix226_1200/physics/validation.json), [강제 모드 검사](output_etc/check/stage2_before_ground_mix226_1200/short_viewer/validation.json).
+- 표준4명·1024환경·8물체 CHECK=1 학습/저장(epoch2/frame262144) 완료. 실제 모드20.43/20.28/59.29%, actor encoder73 tensor·관측 RMS 동결, action head 갱신,265종 scalar/model finite, 물리 배치 실패0을 확인했다. 새 test wrapper로 저장본4환경·32step·옵션2 재로드 정상 종료. [학습 검사](output_etc/check/stage2_before_ground_mix226_1200/training_validation.json), [재로드 로그](output_etc/check/stage2_before_ground_mix226_1200/reload.log). 셸/Python 문법·문서 링크·diff 확인. GUI/VNC 실화면·장기 수렴은 미검증이며 본학습은 시작하지 않았다. 원본 checkout·기존 학습 프로세스는 보존했다.
+
+## 2026-10-23
+
+### mix334 viewer 더 가까운 모드 선택
+
+- mix334 전용 test/VNC의 `BEFORE_FOLLOWER_NEAR=2`를 추가했다. 평가에서 BEFORE 쌍에 더 가까운 모드를 고정해 선행1~5m·후행1~2.5m·ON_TOP 자기 상자1~2.5m를 사용한다. 기본0의30/30/40·기존1의가까운 모드·단독 배치·학습·저장 계약은 유지한다. 직접 실행은 `--before_follower_short`이며 학습/비호환 혼합/근접 옵션 동시 사용은 거부한다. [명령](markdowns/USAGE.md#stage2-before-mix334-1200).
+- CPU43개 통과(기존30500 파일 의존 전이 테스트1개 제외). GPU0의8환경·4구성·각16step에서 전 BEFORE 쌍 mode2·거리·부분 reset·AMP/추론 finite·가중치 불변을 확인했다. 실제 mix33412500 저장본을 전용 test·옵션2·4환경·32step으로 재로드해 정상 종료했다. [물리 검사](output_etc/check/mix334_short_viewer_20261023/physics/validation.json), [재로드](output_etc/check/mix334_short_viewer_20261023/reload.log). 셸 문법·문서 경로·diff 확인. 실제 GUI/VNC 화면은 검사하지 않았으며 기존 학습/viewer는 유지했다.
+
 ## 2026-10-22
 
 ### BEFORE 30/30/40 거리 혼합·1200스텝

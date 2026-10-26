@@ -104,3 +104,11 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유
 세부 계약은 [BEFORE 참고](reference/stage2_before.md)에 있다.
 
 `stage2_before_ground_mix334_1200`은 같은 `before_sampling.py`의 3단계 거리 모드와 선행 접근 거리 축소를 사용한다. env/train YAML과 전용 train/test/VNC는 각각 `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before_ground_mix334_1200.yaml`, `tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_{train,test,vnc}.sh`에 있다.
+
+`stage2_before_ground_mix226_1200`의 env/train YAML과 전용 train/test/VNC도 같은 디렉터리에 있다. `before_sampling.py`의 20/20/60·ON_TOP 전용 거리·상자 기준 AT 목표 샘플러를 `humanoid_ma_before.py`에서 BEFORE 쌍에만 적용한다. `tokenhsi/tests/test_before_mix226.py`는 분포·거리·목표 제외 영역·기존 설정/체크포인트 분리를, `check_before.py`는 실제 배치와 단독 목표 보존을 검사한다.
+
+
+`stage2_before_ground_mix226_atprogress_1200`의 env/train YAML과 전용 train/test/VNC는 같은 디렉터리에 있다. `before_reward.py`의 `predecessor_at_progress`와 `humanoid_ma_before.py`의 기하 평가 연결이 BEFORE 후행 progress의 목적지만 선행 AT 목표로 바꾼다. `test_before_atprogress.py`는 보상·gate·과제/edge/부분 배치 보존·checkpoint 분리를, `check_before.py`는 물리 환경의 목표 연결과 부분 reset을 검사한다.
+
+
+`stage2_before_ground_mix226_actorbias0_1200`과 `stage2_before_ground_mix226_atprogress_actorbias0_1200`은 같은 위치의 전용 env/train YAML·train/test/VNC를 사용한다. `relationGraph.actor_human_bias`를 `stage2_network_builder.py`에서 actor coordination에만 전달하며 `human_coordination.py`가 BEFORE bias만 파라미터로 저장한다. `test_before_actor_bias0.py`는 고정 0·gradient·actor/critic 분리·초기 출력 동등성·체크포인트 분리를 검사한다.

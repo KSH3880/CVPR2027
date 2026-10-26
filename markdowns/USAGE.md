@@ -152,4 +152,42 @@ bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_test.sh \
 
 `stage2_before_ground_mix334_1200`은 GPU0·4명·1024환경·8물체, 최대1200스텝의 별도 실험이다. [배치 표](reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix334_1200)와 [학습·로컬·VNC 명령](config.md)을 따른다. 세 전용 wrapper를 사용하고 환경 재정의는 `BEFORE_GROUND_MIX334_1200_ENV_CONFIG`로 지정한다. test/VNC는 저장본 옆 `relation_config.yaml`을 기본으로 읽는다.
 
-Stage1 source는 mix50와 같은 형제 checkout의 fixed73000이며 `STAGE1_CHECKPOINT`로 지정할 수 있다. `RESUME_CHECKPOINT`에는 이 새 실험의 저장본만 사용한다. 기존 ground/mix50를 직접 재개하는 설정이 아니다. 기본 평가는30/30/40이고, `BEFORE_FOLLOWER_NEAR=1`은 가운데 가까운 모드만 선택한다(더 가까운 모드 강제가 아님). `EPISODE_LENGTH`는 평가에만 적용하며 기본은1200이다. 단독 배치·학습 비율·저장 계약은 평가 옵션으로 변경하지 않는다.
+Stage1 source는 mix50와 같은 형제 checkout의 fixed73000이며 `STAGE1_CHECKPOINT`로 지정할 수 있다. `RESUME_CHECKPOINT`에는 이 새 실험의 저장본만 사용한다. 기존 ground/mix50를 직접 재개하는 설정이 아니다. 기본 평가는30/30/40이고, `BEFORE_FOLLOWER_NEAR=0`은 기본 혼합, `1`은 가운데 가까운 모드, `2`는 더 가까운 모드만 선택한다. `2`는 이 mix334 전용 test/VNC에서 지원하며 선행1~5m·후행1~2.5m·ON_TOP 자기 상자1~2.5m다. BEFORE 쌍에만 적용하고 거리 순서는 강제하지 않는다. 직접 실행 옵션은 `--before_follower_short`이며 학습·지원하지 않는 혼합 설정·`--before_follower_near`와의 동시 사용은 거부한다. `EPISODE_LENGTH`는 평가에만 적용하며 기본은1200이다. 단독 배치·학습 비율·저장 계약은 평가 옵션으로 변경하지 않는다.
+
+```bash
+# stage2_before_ground_mix334_1200 — 더 가까운 BEFORE 배치 viewer
+HEADLESS=0 BEFORE_FOLLOWER_NEAR=2 TOKENHSI_GPU=0 \
+SEED=240 TASK_GRAPH=random_scenario EVAL_SKILLS=loco \
+OUTPUT_PATH=output_etc/check/stage2_before_ground_mix334_1200/short_viewer \
+bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_test.sh \
+"output/stage2_before_ground_mix334_1200/Stage2BeforeGroundMix334_1200_22-10-51-15/nn/Stage2BeforeGroundMix334_1200.pth" 4 1 8 10
+```
+
+서버 VNC는 같은 환경변수로 위 스크립트를 `stage2_before_ground_mix334_1200_vnc.sh`로 바꾼다.
+
+## Stage2 BEFORE mix226 1200
+
+`stage2_before_ground_mix226_1200`은 GPU0·4명·1024환경·8물체·1200스텝의 별도 실험이다. [배치 표](reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix226_1200)와 [학습·로컬·VNC 명령](config.md)을 따른다. 기본 Stage1 source는 fixed73000이고 `STAGE1_CHECKPOINT`로 바꿀 수 있다. `RESUME_CHECKPOINT`에는 이 실험의 저장본만 사용하며 기존 mix334를 직접 resume할 수 없다.
+
+전용 train/test/VNC를 사용한다. 환경 재정의는 `BEFORE_GROUND_MIX226_1200_ENV_CONFIG`, 평가 길이 재정의는 `EPISODE_LENGTH`다. test/VNC는 저장본 옆 `relation_config.yaml`을 기본으로 읽는다. `BEFORE_FOLLOWER_NEAR=0`은20/20/60 혼합, `1`은 가까운 모드, `2`는 더 가까운 모드다. `2`는 BEFORE 선행 접근/운반1~5m·후행 SIT/CLIMB1~2.5m·ON_TOP 두 거리1~1.25m를 사용한다. 단독 과제는 영향을 받지 않는다. 직접 실행의 `--before_follower_short`는 mix334와 mix226 평가에서만 지원하며 `--before_follower_near`와 동시에 쓸 수 없다.
+
+```bash
+# stage2_before_ground_mix226_1200 — 더 가까운 BEFORE 배치 viewer
+TOKENHSI_GPU=0 HEADLESS=0 BEFORE_FOLLOWER_NEAR=2 SEED=240 TASK_GRAPH=random_scenario EVAL_SKILLS=loco bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_1200_test.sh "$CKPT" 4 1 8 10
+```
+
+`CKPT`에는 새 mix226 저장본 경로를 넣는다. 화면 없는 평가는 `HEADLESS=1`, 서버 viewer는 같은 환경변수로 `stage2_before_ground_mix226_1200_vnc.sh`를 사용한다.
+
+
+## Stage2 BEFORE mix226 AT progress 1200
+
+`stage2_before_ground_mix226_atprogress_1200`은 mix226의 배치·과제 추첨·1200스텝을 유지하고 BEFORE 후행 progress의 목적지만 선행 AT 목표 XY로 바꾸는 별도 실험이다. 기본 Stage1 source는 현재 mix226 실행과 같은 fixed78000이며 새로 시작한다. [설계](reference/stage2_before.md#선행-at-목표-progress-stage2_before_ground_mix226_atprogress_1200), [학습·로컬·VNC 명령](config.md)을 따른다.
+
+전용 train/test/VNC와 `BEFORE_GROUND_MIX226_ATPROGRESS_1200_ENV_CONFIG`를 사용한다. `STAGE1_CHECKPOINT`로 전이 source를 지정할 수 있다. `RESUME_CHECKPOINT`에는 이 새 실험의 저장본만 사용하며 기존 mix226과 직접 resume/평가 설정을 섞을 수 없다. test/VNC는 저장본 옆 `relation_config.yaml`을 읽는다. `HEADLESS=0/1`, `BEFORE_FOLLOWER_NEAR=0/1/2`, `EPISODE_LENGTH`, `TASK_GRAPH`, `EVAL_SKILLS`는 기존 mix226과 같은 의미다. 체크 실행은 `CHECK=1`로 하고 산출물은 `output_etc/check/`에 둔다.
+
+
+## Stage2 BEFORE actor SELF/NONE bias 0
+
+`stage2_before_ground_mix226_actorbias0_1200`은 기존 mix226, `stage2_before_ground_mix226_atprogress_actorbias0_1200`은 AT progress 설정에서 actor 사람 간 attention의 SELF/NONE bias만 0으로 고정한다. 두 실험 모두 기본 source는 fixed78000이며 Stage2를 새로 학습한다. [설계](reference/stage2_before.md#actor-selfnone-bias-0), [학습·로컬·VNC 명령](config.md)을 따른다.
+
+전용 환경 override는 각각 `BEFORE_GROUND_MIX226_ACTORBIAS0_1200_ENV_CONFIG`, `BEFORE_GROUND_MIX226_ATPROGRESS_ACTORBIAS0_1200_ENV_CONFIG`다. `STAGE1_CHECKPOINT`로 source를 지정한다. `RESUME_CHECKPOINT`는 각 실험에서 생성한 저장본만 지원하며 기존 full-bias 저장본과 교환하지 않는다. test/VNC는 저장본 옆 config를 읽고 train config의 bias/progress 계약도 검사한다. `HEADLESS=0/1`, `BEFORE_FOLLOWER_NEAR=0/1/2`, `EPISODE_LENGTH`, `TASK_GRAPH`, `EVAL_SKILLS`는 기반 실험과 같다. `CHECK=1` 확인 실행은 `output_etc/check/`에 저장한다.

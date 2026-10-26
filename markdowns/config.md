@@ -25,6 +25,10 @@
 | [stage2_before_ground.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground.yaml) | [stage2_before_ground.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground.yaml) |
 | [stage2_before_ground_mix50.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix50.yaml) | [stage2_before_ground_mix50.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix50.yaml) |
 | [stage2_before_ground_mix334_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix334_1200.yaml) | [stage2_before_ground_mix334_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix334_1200.yaml) |
+| [stage2_before_ground_mix226_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_1200.yaml) | [stage2_before_ground_mix226_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_1200.yaml) | [stage2_before_ground_mix226_atprogress_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_1200.yaml) |
+| [stage2_before_ground_mix226_actorbias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_actorbias0_1200.yaml) | [stage2_before_ground_mix226_actorbias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_actorbias0_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml) | [stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml) |
 
 ## 학습
 
@@ -60,6 +64,18 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_trai
 
 # stage2_before_ground_mix334_1200
 env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00073000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00073000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_actorbias0_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_actorbias0_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_actorbias0_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -98,6 +114,18 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground
 
 # stage2_before_ground_mix334_1200
 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_1200
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_1200
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_actorbias0_1200
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_actorbias0_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_actorbias0_1200
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -134,6 +162,18 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_vnc.
 
 # stage2_before_ground_mix334_1200
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_actorbias0_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_actorbias0_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_actorbias0_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -188,3 +228,9 @@ Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, 
 `stage2_before`·`stage2_before_ground`는 인원 N≥1·물체 M≥N을 지원하며 기본값은 4명·8물체다. `EVAL_SKILLS=loco`만 지원한다. `TASK_GRAPH`는 `random_scenario`, `before_sit`, `before_climb`, `before_stack`(가능한 최대 2인 쌍, 홀수의 마지막 1명은 단독), `one_pair_sit`, `one_pair_climb`, `one_pair_stack`(1쌍), `all_solo`, `sit`, `climb`, `carry_at`, `carry_ontop`이다. pair preset은 2명 이상, 전원 `carry_ontop`은 물체 2N개 이상이 필요하다. 후행·ON_TOP 자기 상자의 근접 무작위 평가는 `BEFORE_FOLLOWER_NEAR=1`을 test/VNC 앞에 붙인다. 거리 규칙과 추가 옵션은 [USAGE](USAGE.md#stage2-before-평가-옵션)를 따른다.
 
 `stage2_before_ground_mix50`는 같은 인원·물체·TASK_GRAPH 옵션을 사용한다. 기본 test/VNC는 50/50 혼합이며 `BEFORE_FOLLOWER_NEAR=1`을 붙이면 BEFORE 쌍에 학습의 가까운 배치만 적용한다. 전용 checkpoint와 기본 혼합 배치 안내는 [USAGE](USAGE.md#stage2-before-5050-혼합-배치)를 따른다.
+
+`stage2_before_ground_mix334_1200` viewer의 거리 모드 선택은 [추가 실행 옵션](USAGE.md#stage2-before-mix334-1200)을 따른다.
+
+`stage2_before_ground_mix226_1200` viewer의 거리 모드 선택은 [추가 실행 옵션](USAGE.md#stage2-before-mix226-1200)을 따른다.
+
+`stage2_before_ground_mix226_atprogress_1200`의 추가 실행 옵션은 [USAGE](USAGE.md#stage2-before-mix226-at-progress-1200)를 따른다.

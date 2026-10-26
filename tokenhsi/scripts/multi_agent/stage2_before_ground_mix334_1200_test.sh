@@ -16,7 +16,12 @@ if [ ! -f "$ENV_CONFIG" ]; then
   exit 1
 fi
 set -- --num_agents "${2:-4}" --num_envs "${3:-1}" --num_objects "${4:-8}" --eval_repeats "${5:-10}" --task_graph "${TASK_GRAPH:-random_scenario}"
-if [ "${BEFORE_FOLLOWER_NEAR:-0}" = 1 ]; then set -- "$@" --before_follower_near; fi
+case "${BEFORE_FOLLOWER_NEAR:-0}" in
+  0) ;;
+  1) set -- "$@" --before_follower_near ;;
+  2) set -- "$@" --before_follower_short ;;
+  *) echo 'BEFORE_FOLLOWER_NEAR must be 0 (mixture), 1 (near), or 2 (short)' >&2; exit 1 ;;
+esac
 if [ "${HEADLESS:-0}" != 0 ]; then set -- "$@" --headless; fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then set -- "$@" --episode_length "$EPISODE_LENGTH"; fi
 python tokenhsi/run.py --task HumanoidMABefore --cfg_env "$ENV_CONFIG" \

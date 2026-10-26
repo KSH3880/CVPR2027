@@ -109,7 +109,15 @@ def load_cfg(args):
         cfg["env"]["numObjects"] = args.num_objects
     if cfg["env"].get("before") is not None:
         training = cfg_train["params"]["config"]
-        if training['name'] in ('Stage2BeforeGround', 'Stage2BeforeGroundMix50', 'Stage2BeforeGroundMix334_1200') and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
+        actor_bias0_names = ('Stage2BeforeGroundMix226ActorBias0_1200',
+                             'Stage2BeforeGroundMix226ATProgressActorBias0_1200')
+        at_progress_names = ('Stage2BeforeGroundMix226ATProgress_1200',
+                             'Stage2BeforeGroundMix226ATProgressActorBias0_1200')
+        mix226_names = ('Stage2BeforeGroundMix226_1200', 'Stage2BeforeGroundMix226ATProgress_1200') + actor_bias0_names
+        expected_bias = 'before_only' if training['name'] in actor_bias0_names else 'all'
+        if cfg['env']['relationGraph'].get('actor_human_bias', 'all') != expected_bias:
+            raise ValueError('BEFORE actor_human_bias does not match the experiment training config')
+        if training['name'] in ('Stage2BeforeGround', 'Stage2BeforeGroundMix50', 'Stage2BeforeGroundMix334_1200') + mix226_names and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
             raise ValueError('stage2_before_ground requires a ground_only environment/checkpoint')
         if training['name'] == 'Stage2BeforeGroundMix50':
             from utils.before_sampling import DISTANCE_MIXTURE
@@ -121,6 +129,17 @@ def load_cfg(args):
                 raise ValueError('stage2_before_ground_mix334_1200 requires the 30/30/40 distance mixture')
             if not is_eval and cfg['env']['episodeLength'] != 1200:
                 raise ValueError('stage2_before_ground_mix334_1200 training requires 1200 steps')
+        if training['name'] in mix226_names:
+            from utils.before_sampling import MIX226_DISTANCE_MIXTURE
+            if cfg['env']['before'].get('distance_mixture') != MIX226_DISTANCE_MIXTURE:
+                raise ValueError('stage2_before_ground_mix226_1200 requires the 20/20/60 distance mixture')
+            if not is_eval and cfg['env']['episodeLength'] != 1200:
+                raise ValueError('stage2_before_ground_mix226_1200 training requires 1200 steps')
+        at_progress = cfg['env']['before'].get('progress_target', 'current_box')
+        expected_target = ('predecessor_at_goal' if training['name'] in at_progress_names
+                           else 'current_box')
+        if at_progress != expected_target:
+            raise ValueError('BEFORE progress_target does not match the experiment training config')
         training["minibatch_size"] = training.get("scene_minibatch_size", 4096) * cfg["env"]["numAgents"]
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
@@ -152,11 +171,17 @@ def load_cfg(args):
         cfg["env"]["video"]["enable"] = False
     if getattr(args, "transfer_checkpoint", ""):
         cfg["experiment"]["transfer"]["checkpoint"] = args.transfer_checkpoint
-    if getattr(args, "before_follower_near", False):
+    before_short = getattr(args, "before_follower_short", False)
+    if getattr(args, "before_follower_near", False) or before_short:
         if not args.eval or 'before' not in cfg['env']:
-            raise ValueError('--before_follower_near requires BEFORE evaluation')
+            raise ValueError('BEFORE distance overrides require BEFORE evaluation')
         if cfg['env']['eval']['skill'] != ['loco']:
-            raise ValueError('--before_follower_near requires EVAL_SKILLS=loco')
+            raise ValueError('BEFORE distance overrides require EVAL_SKILLS=loco')
+    if before_short:
+        from utils.before_sampling import THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE
+        if (getattr(args, 'before_follower_near', False)
+                or cfg['env']['before'].get('distance_mixture') not in (THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE)):
+            raise ValueError('--before_follower_short requires the 30/30/40 or 20/20/60 mixture without --before_follower_near')
 
     cfg["name"] = args.task
     cfg["headless"] = args.headless
@@ -383,6 +408,8 @@ def get_args(benchmark=False):
         },
         {"name": "--before_follower_near", "action": "store_true", "default": False,
          "help": "BEFORE loco evaluation with randomized follower-near placement"},
+        {"name": "--before_follower_short", "action": "store_true", "default": False,
+         "help": "Three-mode BEFORE evaluation: force the saved config's shortest distance mode"},
         {
             "name": "--eval_repeats",
             "type": int,

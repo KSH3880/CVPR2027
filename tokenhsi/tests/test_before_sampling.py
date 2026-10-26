@@ -183,3 +183,18 @@ def test_short_leader_keeps_payload_fixed_and_preserves_direction():
     torch.testing.assert_close((moved-box).norm(dim=-1), torch.linspace(1., 5., 1000))
     torch.testing.assert_close((moved-box)/(moved-box).norm(dim=-1, keepdim=True), torch.tensor([[.6, .8]]).expand(1000, -1))
     assert torch.equal(box, original) and torch.equal(state, torch.get_rng_state())
+
+
+def test_force_short_selects_only_before_pairs_without_rng_or_config_changes():
+    pre = torch.tensor([[-1, 0, -1, 2], [-1, -1, -1, -1]])
+    mixture = deepcopy(THREE_WAY_DISTANCE_MIXTURE)
+    state = torch.get_rng_state()
+    modes = sample_distance_modes(pre, mixture, force_short=True)
+    assert torch.equal(modes, torch.tensor([[0, 2, 0, 2], [0, 0, 0, 0]]))
+    assert torch.equal(state, torch.get_rng_state())
+    assert mixture == THREE_WAY_DISTANCE_MIXTURE
+    for bad in (None, DISTANCE_MIXTURE):
+        with pytest.raises(ValueError, match='30/30/40'):
+            sample_distance_modes(pre, bad, force_short=True)
+    with pytest.raises(ValueError, match='force_near'):
+        sample_distance_modes(pre, mixture, force_near=True, force_short=True)

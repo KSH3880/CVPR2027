@@ -25,8 +25,13 @@ def task_relations(packet, num_agents):
 
 
 class CoordinationBlock(nn.Module):
-    def __init__(self, width, heads, feedforward_dim, relations):
+    def __init__(self, width, heads, feedforward_dim, relations, bias_mode="all"):
         super().__init__()
+        if bias_mode not in ("all", "before_only"):
+            raise ValueError("Unknown human attention bias mode")
+        if bias_mode == "before_only" and relations != 3:
+            raise ValueError("before_only requires NONE/SELF/BEFORE relations")
+        self.bias_mode = bias_mode
         self.attention = nn.MultiheadAttention(
             width, heads, dropout=0.0, batch_first=True
         )
@@ -37,10 +42,17 @@ class CoordinationBlock(nn.Module):
             nn.ReLU(),
             nn.Linear(feedforward_dim, width),
         )
-        self.relation_bias = nn.Parameter(torch.zeros(heads, relations))
+        # before_only stores only BEFORE: fixed NONE/SELF are not parameters.
+        self.relation_bias = nn.Parameter(torch.zeros(heads, 1 if bias_mode == "before_only" else relations))
+
+    def effective_relation_bias(self):
+        if self.bias_mode == "before_only":
+            return torch.cat((self.relation_bias.new_zeros(self.relation_bias.shape[0], 2),
+                              self.relation_bias), dim=-1)
+        return self.relation_bias
 
     def forward(self, humans, tokens, relations, padding):
-        bias = self.relation_bias[:, relations].permute(1, 0, 2, 3)
+        bias = self.effective_relation_bias()[:, relations].permute(1, 0, 2, 3)
         bias = bias.masked_fill(padding, float("-inf")).flatten(0, 1)
         query = self.query_norm(humans)
         if tokens is None:
@@ -86,13 +98,16 @@ class HumanCoordination(nn.Module):
         feedforward_dim=128,
         shuffle_human_order=False,
         before=False,
+        bias_mode="all",
     ):
         super().__init__()
+        if bias_mode == "before_only" and not before:
+            raise ValueError("before_only bias requires BEFORE coordination")
         self.shuffle_human_order = shuffle_human_order
         self.before = before
         self.blocks = nn.ModuleList(
             [
-                CoordinationBlock(width, heads, feedforward_dim, 3)
+                CoordinationBlock(width, heads, feedforward_dim, 3, bias_mode=bias_mode)
                 for _ in range(num_layers)
             ]
         )

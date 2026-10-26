@@ -17,13 +17,21 @@ SPEC = dict(pairing_probability=.8, follower_weights=[1., 1., 1.],
 
 def validate_env(env):
     from utils.unified_training import validate_unified_env
-    from utils.before_sampling import DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE
+    from utils.before_sampling import DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE
     if env['numAgents'] < 1 or env['numObjects'] < env['numAgents']:
         raise ValueError('BEFORE requires numAgents >= 1 and numObjects >= numAgents')
     before = dict(env['before'])
+    if env['relationGraph'].get('actor_human_bias', 'all') not in ('all', 'before_only'):
+        raise ValueError('Unknown BEFORE actor_human_bias')
     mixture = before.pop('distance_mixture', None)
-    if mixture is not None and mixture not in (DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE):
-        raise ValueError('BEFORE distance mixture requires the agreed 50/50 or 30/30/40 ranges')
+    progress_target = before.pop('progress_target', 'current_box')
+    if progress_target not in ('current_box', 'predecessor_at_goal'):
+        raise ValueError('Unknown BEFORE progress_target')
+    if progress_target == 'predecessor_at_goal' and (
+            mixture != MIX226_DISTANCE_MIXTURE or env['box']['reset']['platformMode'] != 'ground_only'):
+        raise ValueError('BEFORE AT-goal progress requires the ground 20/20/60 configuration')
+    if mixture is not None and mixture not in (DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE):
+        raise ValueError('BEFORE distance mixture requires the agreed 50/50, 30/30/40 or 20/20/60 ranges')
     if before != SPEC or env['relationGraph']['sampler'] != SAMPLER:
         raise ValueError('BEFORE configuration differs from the agreed contract')
     if any(row != [1.] + [0.]*7 for row in env['templateRsi'].values()):
@@ -32,6 +40,7 @@ def validate_env(env):
         raise ValueError('BEFORE evaluation requires loco only')
     base = deepcopy(env)
     base.pop('before')
+    base['relationGraph'].pop('actor_human_bias', None)
     reset = base['box']['reset']
     if reset['platformMode'] == 'ground_only':
         if reset['randomHeight'] is not False or reset['randomHeightProb'] != 0.:
@@ -134,8 +143,13 @@ def sample_graph(sizes, ranges, preset='random_scenario', num_objects=None):
 
 
 def checkpoint_contract(env):
-    return dict(version=1, before=env['before'], template_rsi=env['templateRsi'],
+    contract = dict(version=1, before=env['before'], template_rsi=env['templateRsi'],
                 sizes=env['box']['build']['taskSizeRanges'], reset=env['box']['reset'])
+    # Preserve legacy contracts byte-for-byte when the option is absent/default.
+    mode = env['relationGraph'].get('actor_human_bias', 'all')
+    if mode != 'all':
+        contract['actor_human_bias'] = mode
+    return contract
 
 
 def pack_objects(parents, valid, num_objects=None):

@@ -65,6 +65,49 @@ Actor/critic의 human SA4는 SELF/NONE/BEFORE 세 관계를 사용한다. B quer
 
 최소 거리는1m를 유지한다. 더 가까운 모드에서 선행 상자는 고정하고 선행 사람의 기존 방사 방향·반경을1~10m에서1~5m로 선형 변환한다. 이후 후행과 ON_TOP 자기 상자를 각자 독립 각도·반경으로 배치한다. AT 목표는 기존 샘플러로 최종 사람/상자 배치 후 생성한다. 후행이 반드시 선행보다 가깝게 나오도록 정렬하지 않으며, 겹침 검사에 따른 거부 추첨은 그대로다. 거리 기준은 선행 상자의 초기 위치이고, AT 도착 위치까지의 운반 거리는 별도로 축소하지 않는다.
 
-`relation/sampling/before_original_fraction`, `before_medium_fraction`, `before_short_fraction`은 새 BEFORE 쌍의 세 모드 비율이다. `before_near_fraction`은 두 가까운 모드를 합친 비율(기대70%), `before_pairs`는 분모이며 배치 재시도는 중복 집계하지 않는다. 기본 test/VNC도30/30/40을 사용한다. `BEFORE_FOLLOWER_NEAR=1`은 기존 mix50와 같은 의미로 가운데 모드(선행1~10m·후행/자기 상자1~5m)만 선택한다.
+`relation/sampling/before_original_fraction`, `before_medium_fraction`, `before_short_fraction`은 새 BEFORE 쌍의 세 모드 비율이다. `before_near_fraction`은 두 가까운 모드를 합친 비율(기대70%), `before_pairs`는 분모이며 배치 재시도는 중복 집계하지 않는다. 기본 test/VNC도30/30/40을 사용한다. `BEFORE_FOLLOWER_NEAR=1`은 기존 mix50와 같은 의미로 가운데 모드(선행1~10m·후행/자기 상자1~5m)만 선택한다. mix334 전용 test/VNC의 `BEFORE_FOLLOWER_NEAR=2`는 더 가까운 모드(선행1~5m·후행/자기 상자1~2.5m)만 선택한다. 평가에서만 BEFORE 쌍의 모드를 고정하며 저장 config와 학습 분포는 유지한다.
 
 기본 source는 형제 checkout의 fixed73000이다. 기존 ground/mix50 checkpoint와 직접 resume하지 않으며 새 실험의 저장본으로만 재개한다. 결과는 `output/stage2_before_ground_mix334_1200/`에 저장한다. 학습은1200스텝을 검사하며, 평가는 `EPISODE_LENGTH`로 재정의할 수 있다. 실행은 [config](../config.md), 추가 옵션은 [USAGE](../USAGE.md#stage2-before-mix334-1200)를 따른다.
+
+## 바닥 BEFORE 거리 혼합: stage2_before_ground_mix226_1200
+
+BEFORE 쌍마다 기존20%·가까움20%·더 가까움60%를 추첨한다. 아래 거리는 초기 사람 root와 상자 중심, AT 목표의 수평 XY 거리다. 모드는 물리 배치 재시도 중 유지한다.
+
+| 역할/과제 | 기존20% | 가까움20% | 더 가까움60% |
+| --- | --- | --- | --- |
+| 선행 AT 사람 → 자기 상자 | 1~10m | 1~10m | 1~5m |
+| 선행 AT 상자 → AT 목표 | 1~10m | 1~10m | 1~5m |
+| 후행 SIT → 선행 상자 | 1~5m | 1~5m | 1~2.5m |
+| 후행 CLIMB → 선행 상자 | 1~10m | 1~5m | 1~2.5m |
+| 후행 ON_TOP → 선행 상자 | 1~5m | 1~2.5m | 1~1.25m |
+| ON_TOP 자기 상자 → 후행 사람 | 1~5m | 1~2.5m | 1~1.25m |
+
+기존 선행 상자 위치를 유지하고 더 가까운 모드에서 선행 사람을 당기는 방식은 mix334와 같다. 각 반지름은 구간 균등, 방향은 독립 무작위이며 선행·후행 거리 순서를 강제하지 않는다. ON_TOP 자기 상자는 최종 후행 사람 위치가 기준이며 선행 상자까지의 운반 거리 자체를 제한하는 것은 아니다.
+
+BEFORE 선행 AT 목표는 초기 상자 중심에서 위 거리로 뽑으며 환경 중심 ±4.5m 사각형으로 제한하지 않는다. 선행 사람과 목표 사이 최소1m 제외 조건 및 기존 물리 겹침 재시도는 유지하므로 승인된 최종 배치의 분포는 조건부다. 목표 Z는 상자 반높이인 바닥 목표를 유지한다. 후행의 대상은 선행이 옮기는 같은 상자다.
+
+단독 과제는 기존 초기화와 환경 중심 AT/ON_TOP 목표 샘플러를 유지한다. BEFORE/단독 그룹 추첨·전원 loco·보상/gate·Stage1 동결/전이·PPO는 변경하지 않으며 전체 장면의 에피소드 상한은1200스텝이다. `before_original_fraction`, `before_medium_fraction`, `before_short_fraction`은20/20/60, `before_near_fraction`은 두 가까운 모드 합계인80%를 기대한다.
+
+기본 source는 형제 checkout의 fixed73000이며 결과는 `output/stage2_before_ground_mix226_1200/`에 저장한다. 기존 ground/mix50/mix334 checkpoint와 직접 resume하지 않고 이 실험의 저장본으로만 재개한다. test/VNC의 `BEFORE_FOLLOWER_NEAR=0/1/2`는 기본 혼합/가까움/더 가까움을 선택하며 AT 운반 거리도 해당 모드를 따른다. 실행은 [config](../config.md), 추가 옵션은 [USAGE](../USAGE.md#stage2-before-mix226-1200)를 따른다.
+
+
+## 선행 AT 목표 progress: stage2_before_ground_mix226_atprogress_1200
+
+mix226의 과제/역할 추첨·크기 조건·20/20/60 거리 혼합·loco 초기화·1200스텝·PPO·모델/관측을 유지한다. 현재 mix226 본학습과 같은 fixed78000에서 새로 전이하며 actor encoder와 관측 RMS를 동결한다. 기존 실험과 config/train/test/VNC/output/checkpoint 계약을 분리한다.
+
+`before.progress_target: predecessor_at_goal`을 설정한다. BEFORE 후행 SIT/CLIMB의 사람 root XY 또는 ON_TOP의 자기 payload XY에서 선행 AT 목표 XY까지 거리로 progress를 계산한다. 원래 대상 상자의 XY bbox 반경과 기존 task별 buffer(SIT/CLIMB0.3m, ON_TOP0.1m), sigma1, progress 가중치0.2를 유지한다. 따라서 `0.2/(1+max(distance-radius,0))`이며 정지해 있어도 현재 근접도에 따른 보상을 받는다. 별도 보상항이나 대기 영역은 추가하지 않는다.
+
+선행 AT gate가 열려도 progress는 AT 목표 기준을 유지한다. state/success는 실제 대상 상자에 대한 기존 기하와 현재 AT gate를 따르며, 실제 성공 시 기존 progress 포화도 유지한다. ON_TOP의 HOLDING 전체와 선행/단독 edge는 변경하지 않는다. 목표점 중앙을 비우도록 강제하는 보상은 없다. 선행 목표는 기존 전체 장면 관측에 포함되며 별도 후행 입력은 추가하지 않는다.
+
+`before_reward.py`의 `predecessor_at_progress`가 graph의 prerequisite AT edge에서 목표를 찾는다. `humanoid_ma_before.py`는 공통 기하 계산 후 progress만 교체하며 논리 물체 순열과 부분 reset에도 같은 경로를 사용한다. 기존 `distance_xy`, `target`, state/success 기하는 실제 상자 기준을 유지한다. 새 실험의 `relation/before/{sit,climb,ontop}/{gate,raw_success,success}`는 BEFORE 후행만 집계한 스텝 평균이며 에피소드 성공률이 아니다. 기존 합산 지표도 유지한다.
+
+결과는 `output/stage2_before_ground_mix226_atprogress_1200/`에 저장한다. 기존 mix226 checkpoint와 직접 resume하지 않는다. 실행은 [config](../config.md), 옵션은 [USAGE](../USAGE.md#stage2-before-mix226-at-progress-1200)를 따른다.
+
+
+## Actor SELF/NONE bias 0
+
+`stage2_before_ground_mix226_actorbias0_1200`과 `stage2_before_ground_mix226_atprogress_actorbias0_1200`은 각각 mix226 및 AT progress를 기반으로 `relationGraph.actor_human_bias: before_only`만 추가한다. 두 실험 모두 현재 비교와 같은 fixed78000에서 Stage2를 새로 시작한다. actor scene encoder·관측 RMS 동결, 4명·1024환경·8물체, 20/20/60 거리 혼합·1200스텝·보상·PPO는 각 기반 설정을 유지한다.
+
+actor의 human coordination 4 layer × 2 head에서 NONE(0)·SELF(1) bias는 상수 0이며 BEFORE(2)만 학습한다. `CoordinationBlock.relation_bias`는 이 모드에서 `[heads, 1]` BEFORE 파라미터만 저장한다. `effective_relation_bias()`가 `[0, 0, BEFORE]` 테이블을 만들어 attention에 사용하므로 SELF/NONE을 위한 optimizer 상태·학습 파라미터가 없다. 분석 도구는 raw 파라미터의 3열을 가정하지 않고 이 메서드로 실제 bias를 읽는다. critic은 기존 `[heads, 3]` SELF/NONE/BEFORE 모두 학습한다. QK/V·action head·critic의 기존 학습 경로는 유지한다.
+
+기존 옵션 미지정은 `all`로 처리하며 계산·파라미터 형태·기존 checkpoint 계약을 보존한다. 새 mode는 BEFORE checkpoint 계약에 기록하고 train/test 설정 불일치를 거부한다. 두 새 실험끼리도 progress 계약이 다르므로 교차 resume하지 않는다. 결과는 각각 동명의 `output/<컨피그>/`에 저장한다. 실행은 [config](../config.md), 옵션은 [USAGE](../USAGE.md#stage2-before-actor-selfnone-bias-0)를 따른다.

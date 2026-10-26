@@ -3,8 +3,43 @@ import torch
 from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
 from env.tasks.multi_agent.edge_context_reward import owner_sum, goal_success
-from utils.edge_ontop_spec import select_graph
+from utils.edge_ontop_spec import select_graph, batched, ON_TOP
+from utils.edge_interaction_spec import SIT, CLIMB
 from utils.edge_scenario_spec import paired_placement_success
+
+
+def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, config):
+    """Retarget only dependent SIT/CLIMB/ON_TOP proximity, in either gate state.
+
+    Keep the actual support's size/buffer and every non-dependent edge intact.
+    Geometry for state/success remains object-relative in the ordinary evaluator.
+    """
+    n, m, o = len(roots), graph.num_agents, graph.num_objects
+    relation, valid, src, dst = [batched(getattr(graph, name), n) for name in
+        ('edge_relation', 'edge_valid', 'edge_src', 'edge_dst')]
+    prereq = graph.prereq_mask
+    if prereq.dim() == 2:
+        prereq = prereq.unsqueeze(0).expand(n, -1, -1)
+    dependent = valid & prereq.any(-1) & ((relation == SIT) | (relation == CLIMB) | (relation == ON_TOP))
+    rows, edges = dependent.nonzero(as_tuple=True)
+    predecessor_edge = prereq[rows, edges].long().argmax(-1)
+    goal = dst[rows, predecessor_edge] - m - o
+    source = src[rows, edges]
+    top = relation[rows, edges] == ON_TOP
+    source_xy = torch.where(top[:, None],
+        objects[rows, (source-m).clamp(0, o-1), :2],
+        roots[rows, source.clamp(0, m-1), :2])
+    distance = (source_xy - goals[rows, goal, :2]).norm(dim=-1)
+    p = config['progress']
+    radius = torch.full_like(distance, float(p.get('delta', 0.)))
+    if 'bbox_buffers' in p:
+        buffers = p['bbox_buffers']
+        radius = sizes[rows, dst[rows, edges]-m, :2].norm(dim=-1)/2
+        radius += torch.where(top, float(buffers['ON_TOP']),
+            torch.where(relation[rows, edges] == SIT, float(buffers['SIT']), float(buffers['CLIMB'])))
+    result = progress.clone()
+    result[rows, edges] = 1 / (1 + (distance-radius).clamp_min(0)/p['sigma'])
+    return result
 
 
 class BeforeRuntime(Stage1ContextRuntime):

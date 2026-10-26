@@ -16,6 +16,7 @@ class Stage2Builder(AMPMultiAgentBuilder):
         def __init__(self, params, **kwargs):
             graph = kwargs['relation_graph_spec']
             base = deepcopy(graph)
+            base.pop('actor_human_bias', None)
             base['sampler'] = 'two_agent_four_object_independent_unified'
             base['edge_capacity'] = 4
             kwargs['relation_graph_spec'] = base
@@ -25,7 +26,8 @@ class Stage2Builder(AMPMultiAgentBuilder):
                 encoder.relation_graph_spec = graph
                 encoder.context_fusion = TaskTypeEmbeddingFusion(merge_shared=True)
             before = graph['sampler'] == 'stage2_before_groups'
-            self.coordination = HumanCoordination(shuffle_human_order=True, before=before)
+            self.coordination = HumanCoordination(shuffle_human_order=True, before=before,
+                bias_mode=graph.get('actor_human_bias', 'all'))
             self.critic_coordination = HumanCoordination(shuffle_human_order=True, before=before)
             initialize = self.init_factory.create(name="default")
             for branch in (self.coordination, self.critic_coordination):

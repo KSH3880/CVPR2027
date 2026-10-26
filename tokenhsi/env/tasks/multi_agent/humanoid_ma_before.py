@@ -6,9 +6,10 @@ import torch
 from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.humanoid_ma_shared_support import LocoRsi, HumanoidMASharedSupport
 from utils.before_spec import sample_graph, pack_objects, task_objects
-from utils.edge_ontop_spec import copy_graph_rows, permute_graph
+from utils.edge_ontop_spec import copy_graph_rows, permute_graph, select_graph
 from utils.stage1_sampling import sample_goal_xy
-from utils.before_sampling import sample_distance_modes, sample_follower_modes, shorten_leader_xy
+from utils.before_sampling import (sample_distance_modes, sample_follower_modes,
+    shorten_leader_xy, sample_before_goal_xy)
 
 
 class HumanoidMABefore(HumanoidMACarry):
@@ -61,6 +62,20 @@ class HumanoidMABefore(HumanoidMACarry):
         self.relation_runtime = BeforeRuntime(self.num_envs, self.relation_runtime.graph,
                                               self._relation_cfg, self.device)
 
+    def _evaluate_ontop_context(self, env_ids=None):
+        phi, diag = super()._evaluate_ontop_context(env_ids)
+        if self.cfg['env']['before'].get('progress_target') == 'predecessor_at_goal':
+            from env.tasks.multi_agent.before_reward import predecessor_at_progress
+            bodies = (self._rigid_body_pos if env_ids is None
+                      else self._kinematic_humanoid_rigid_body_states[env_ids, ..., :3])
+            graph = (self.relation_runtime.graph if env_ids is None
+                     else select_graph(self.relation_runtime.graph, env_ids))
+            goals = self._tar_pos if env_ids is None else self._tar_pos[env_ids]
+            diag['progress'] = predecessor_at_progress(diag['progress'], bodies[..., 0, :],
+                self._logical_box_values(self._box_states, env_ids),
+                self._logical_box_values(self._box_size, env_ids), goals, graph, self._relation_cfg)
+        return phi, diag
+
     def _sample_episode_graph(self, ids):
         m = self.num_agents
         graph, predecessor, templates = sample_graph(self._box_size[ids, :m],
@@ -69,7 +84,8 @@ class HumanoidMABefore(HumanoidMACarry):
         # Draw once per episode graph; physical placement retries retain the mode.
         mixture = self.cfg['env']['before'].get('distance_mixture')
         force_near = self._is_eval and getattr(self.cfg['args'], 'before_follower_near', False)
-        modes = sample_distance_modes(predecessor, mixture, force_near)
+        force_short = self._is_eval and getattr(self.cfg['args'], 'before_follower_short', False)
+        modes = sample_distance_modes(predecessor, mixture, force_near, force_short)
         self._before_distance_modes[ids] = modes
         self._before_near_pairs[ids] = modes > 0
         if mixture is not None:
@@ -118,23 +134,40 @@ class HumanoidMABefore(HumanoidMACarry):
         es = ids[row]
         first = self._before_predecessor[es, human]
         modes = self._before_distance_modes[es, human]
+        mixture = self.cfg['env']['before'].get('distance_mixture')
         short = modes == 2
         se, leader = es[short], first[short]
         leader_xy = self._humanoid_root_states[se, leader, :2]
         delta = shorten_leader_xy(leader_xy, self._box_states[se, leader, :2]) - leader_xy
         self._humanoid_root_states[se, leader, :2] += delta
         self._kinematic_humanoid_rigid_body_states[se, leader, :, :2] += delta[:, None]
-        desired = sample_follower_modes(self._box_states[es, first, :2], self._templates[es, human], modes)
+        desired = sample_follower_modes(self._box_states[es, first, :2], self._templates[es, human], modes, mixture)
         delta = desired-self._humanoid_root_states[es, human, :2]
         self._humanoid_root_states[es, human, :2] += delta
         self._kinematic_humanoid_rigid_body_states[es, human, :, :2] += delta[:, None]
         top = self._templates[es, human] == 4
         self._box_states[es[top], human[top], :2] = sample_follower_modes(
-            desired[top], self._templates[es[top], human[top]], modes[top])
+            desired[top], self._templates[es[top], human[top]], modes[top], mixture, payload=True)
         if (getattr(self.cfg['args'], 'before_follower_near', False)
                 and self.cfg['env']['before'].get('distance_mixture') is None):
             from env.tasks.multi_agent.before_follower_near import apply_layout
             apply_layout(self, ids)
+
+    def _reset_task(self, ids):
+        super()._reset_task(ids)
+        mixture = self.cfg['env']['before'].get('distance_mixture')
+        if mixture is None or 'leader_goal_distance' not in mixture:
+            return
+        row, follower = (self._before_predecessor[ids] >= 0).nonzero(as_tuple=True)
+        es = ids[row]
+        if not len(es):
+            return
+        leader = self._before_predecessor[es, follower]
+        payload = self._scenario_physical_object(es, leader)
+        goal = self._scenario_goal(es, leader)
+        self._tar_pos[es, goal, :2] = sample_before_goal_xy(
+            self._humanoid_root_states[es, leader, :2], self._box_states[es, payload, :2],
+            self._before_distance_modes[es, follower], mixture)
 
     def _configure_ontop_targets(self, ids):
         row, human = ((self._templates[ids] == 4) & (self._before_predecessor[ids] < 0)).nonzero(as_tuple=True)
@@ -152,6 +185,12 @@ class HumanoidMABefore(HumanoidMACarry):
             key = 'before/'+name
             self._edge_metric_sums[key] = self._edge_metric_sums.get(key, 0)+(values & dependent).sum()
             self._edge_metric_denominators[key] = self._edge_metric_denominators.get(key, 0)+dependent.sum()
+            if self.cfg['env']['before'].get('progress_target') == 'predecessor_at_goal':
+                for relation, skill in ((9, 'sit'), (10, 'climb'), (8, 'ontop')):
+                    mask = dependent & (self.relation_runtime.graph.edge_relation == relation)
+                    split_key = 'before/'+skill+'/'+name
+                    self._edge_metric_sums[split_key] = self._edge_metric_sums.get(split_key, 0)+(values & mask).sum()
+                    self._edge_metric_denominators[split_key] = self._edge_metric_denominators.get(split_key, 0)+mask.sum()
 
     def _consume_sampling_diagnostics(self):
         result = super()._consume_sampling_diagnostics()

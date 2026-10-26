@@ -19,6 +19,41 @@ from learning.multi_agent.stage2_network_builder import transfer_stage1
 from learning.multi_agent.scene_normalizer import SceneRunningMeanStd
 
 
+def check_at_progress(task, env_ids=None):
+    if task.cfg['env']['before'].get('progress_target') != 'predecessor_at_goal':
+        return {}
+    from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
+    from utils.edge_ontop_spec import select_graph
+    ids = torch.arange(task.num_envs, device=task.device) if env_ids is None else env_ids
+    phi, diag = task._evaluate_ontop_context(env_ids)
+    native_phi, native = HumanoidMACarry._evaluate_ontop_context(task, env_ids)
+    torch.testing.assert_close(phi, native_phi, rtol=0, atol=0)
+    for key in native:
+        if key != 'progress':
+            torch.testing.assert_close(diag[key], native[key], rtol=0, atol=0)
+    graph = select_graph(task.relation_runtime.graph, ids)
+    dependent = graph.prereq_mask.any(-1)
+    assert torch.equal(diag['progress'][~dependent], native['progress'][~dependent])
+    rows, edges = dependent.nonzero(as_tuple=True)
+    es, follower = ids[rows], graph.edge_owner[rows, edges]
+    leader = task._before_predecessor[es, follower]
+    assert (leader >= 0).all()
+    goal = task._scenario_goal(es, leader)
+    bodies = (task._rigid_body_pos if env_ids is None
+              else task._kinematic_humanoid_rigid_body_states[ids, ..., :3])
+    root = bodies[rows, follower, 0, :2]
+    source = task._scenario_physical_object(es, follower)
+    top = task._templates[es, follower] == 4
+    point = torch.where(top[:, None], task._box_states[es, source, :2], root)
+    distance = (point-task._tar_pos[es, goal, :2]).norm(dim=-1)
+    support = task._scenario_physical_object(es, leader)
+    radius = task._box_size[es, support, :2].norm(dim=-1)/2 + torch.where(top, .1, .3)
+    expected = 1/(1+(distance-radius).clamp_min(0))
+    torch.testing.assert_close(diag['progress'][rows, edges], expected)
+    return dict(dependent_edges=len(rows), progress_goal_verified=True,
+                state_success_geometry_unchanged=True, other_progress_unchanged=True)
+
+
 def check_layout(task):
     from utils.task_role_spec import task_graph_packet
     from learning.multi_agent.human_coordination import human_relations
@@ -36,6 +71,7 @@ def check_layout(task):
         payload = task._scenario_physical_object(rows, owner)
         torch.testing.assert_close(task._tar_pos[rows, goal, 2], task._box_size[rows, payload, 2]/2)
     pairs = 0
+    distances = []
     for env in range(task.num_envs):
         assert len(mapping[env].unique()) == o
         count = int(task._task_token_count[env])
@@ -62,27 +98,52 @@ def check_layout(task):
                 elif task.cfg['env']['before'].get('distance_mixture') is not None:
                     near = bool(task._before_near_pairs[env,human])
                     mode = int(task._before_distance_modes[env,human])
+                    if getattr(task.cfg['args'], 'before_follower_short', False):
+                        assert mode == 2
                     if task.cfg['args'].before_follower_near:
                         assert near
                     maximum = 5. if near or template == 1 else 10.
                     if mode == 2:
                         maximum = 2.5
+                    mixture = task.cfg['env']['before']['distance_mixture']
+                    if template == 4 and 'ontop_follower_distance' in mixture:
+                        maximum = mixture['ontop_follower_distance'][mode][1]
                     distance = (task._humanoid_root_states[env,[pre,human],:2]
                                 - task._box_states[env,pre,:2]).norm(dim=-1)
                     leader_max = 5. if mode == 2 else 10.
                     assert 1.-1e-5 <= distance[0] <= leader_max+1e-5
                     assert 1.-1e-5 <= distance[1] <= maximum+1e-5
+                    goal = task._scenario_goal(torch.tensor([env], device=task.device),
+                                               torch.tensor([pre], device=task.device))[0]
+                    transport = (task._tar_pos[env, goal, :2]-task._box_states[env, pre, :2]).norm()
+                    if 'leader_goal_distance' in mixture:
+                        assert 1.-1e-5 <= transport <= mixture['leader_goal_distance'][mode][1]+1e-5
+                        assert (task._tar_pos[env, goal, :2]-task._humanoid_root_states[env, pre, :2]).norm() >= 1.-1e-5
+                    record = dict(template=template, mode=mode, leader=float(distance[0]),
+                                  follower=float(distance[1]), transport=float(transport))
                     if template == 4:
                         own_distance = (task._box_states[env,human,:2]
                                         - task._humanoid_root_states[env,human,:2]).norm()
                         assert 1.-1e-5 <= own_distance <= maximum+1e-5
+                        record['payload'] = float(own_distance)
+                    distances.append(record)
             elif template < 3:
                 assert mapping[env,target-m] == human+template*m
             elif template == 4:
                 assert mapping[env,target-m] == 3*m+human
+            if pre < 0 and not (task._before_predecessor[env] == human).any():
+                # Solo goals retain the environment-centered square sampler.
+                if template == 3:
+                    goal = task._scenario_goal(torch.tensor([env], device=task.device),
+                                               torch.tensor([human], device=task.device))[0]
+                    xy = task._tar_pos[env, goal, :2]
+                    assert ((xy-task._env_origins[env, :2]).abs() <= 4.50001).all()
+                elif template == 4:
+                    xy = task._box_states[env, mapping[env,target-m], :2]
+                    assert ((xy-task._env_origins[env, :2]).abs() <= 4.50001).all()
     assert int((relations == 2).sum()) == pairs
     assert not task._before_near_pairs[task._before_predecessor < 0].any()
-    return dict(pairs=pairs, near_pairs=int(task._before_near_pairs.sum()),
+    return dict(pairs=pairs, near_pairs=int(task._before_near_pairs.sum()), distances=distances,
                 distance_modes=task._before_distance_modes.tolist(),
                 task_tokens=task._task_token_count.tolist(),
                 distractors=(o-task._task_token_count).tolist())
@@ -120,6 +181,7 @@ def main():
             task.reset_buf[:] = 1
             obs = env.reset()
             layout = check_layout(task)
+            progress_check = check_at_progress(task)
             phi, diag = task._evaluate_relations()
             result = task.relation_runtime.step(phi, diag['progress'], diag['z_error'], diag['feet_height_error'], diag['region_error'])
             dependent = task.relation_runtime.graph.prereq_mask.any(-1)
@@ -135,13 +197,18 @@ def main():
                 obs, reward, done, info = env.step(mu)
                 if not all(torch.isfinite(x).all() for x in (mu,value,obs,reward)):
                     raise RuntimeError('Non-finite BEFORE rollout')
+            check_at_progress(task)
             untouched = task._root_states.view(task.num_envs,-1,13)[1:].clone()
             untouched_modes = task._before_distance_modes[1:].clone()
             task._reset_envs(torch.tensor([0],device=task.device))
             assert torch.equal(untouched_modes, task._before_distance_modes[1:])
+            if getattr(args, 'before_follower_short', False):
+                assert (task._before_distance_modes[task._before_predecessor >= 0] == 2).all()
             if not torch.equal(untouched,task._root_states.view(task.num_envs,-1,13)[1:]):
                 raise RuntimeError('Partial reset changed another environment')
-            results.append(dict(preset=preset,groups=groups,templates=templates,reward=float(reward.mean()),finite=True,**layout))
+            check_at_progress(task, torch.tensor([0],device=task.device))
+            results.append(dict(preset=preset,groups=groups,templates=templates,reward=float(reward.mean()),finite=True,
+                                progress_check=progress_check,**layout))
     if any(not torch.equal(value,before[key]) for key,value in model.state_dict().items()):
         raise RuntimeError('Validation changed weights')
     from utils.relation_task_spec import checkpoint_metadata
