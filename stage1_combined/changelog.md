@@ -1,3 +1,46 @@
+## 2026-10-26
+
+### Chair HOLDING+AT 78k GPU5 본학습 시작
+사용자실행승인. 원본동적ArmChair공유데이터train63/test27발견후runs독립코드·에셋사본준비,실제경로/1인학습허용/접촉4M/CUDA동기화정상종료보완. 2048환경1회PPO·저장·자연종료,finite/actor·critic30D각6tensor업데이트확인. 78kfresh전이전체FT/lr2e-5/20k/500저장본학습PID3359530/GPU5시작,첫update·양tokenizergradient확인. 기존PUSH2013210/MPS유지,ksh미변경. runs/chair_hold_at_78k_20261026_135444/REPORT.md 및 chair_hold_at_active_run.json.
+
+### Chair HOLDING+AT 78k 준비 (학습 보류)
+사용자요청으로1명1동적ArmChair/2048환경/원본초기·목표분포/기존HOLDING_AT보상설정유지. 78k의actor/critic30D토크나이저와전체165tensor·normalizer strict복원,35D확장없음. 전용train/test/vnc·문서추가. CPU추론/부분reset/정면/목표분포검증통과,optimizer0/GPU미사용. 원본dynamic ArmChair데이터미발견으로train은GPU연결전경로검사exit2,실제시뮬레이션미검증. 기존MPS/잡미변경. 상세 markdowns/reference/chair_hold_at_ft.md.
+
+### 사용자요청 SIT MPS 안전중단
+GPU5 SIT1887068만 MPS terminate_client4104165/1887068 성공코드0확인후프로세스종료. MPS로그Client termination succeeded,기존PUSH2013210 및서버유지,새fatal/reset없음. 마지막32k저장본보존,활성JSON stopped_by_user. 원시mps_stop_request.json은해당run에보존.
+
+### 최신32k 우리점·영역평가
+GPU5,최신32000고정복사·동일30초512×독립seed0/1/2·test26·1명1고정의자평가. 점82.23±0.34%,영역82.68±0.49%,20k95.51/95.64%보다낮음. 전trace재채점통과·rc0,초기배열비교보존,기존학습유지. runs/chair_sit_point_region_32000_20261026_130917/REPORT.md.
+
+### SIT 23k/26k/29k 우리점·영역평가
+사용자요청GPU5,기존20k와동일30초·512×seed0/1/2·test26·1명1고정의자 평가총9개rc0. 점/영역23k85.94±1.56/86.20±1.47%,26k86.98±0.79/87.17±0.69%,29k83.66±0.41/84.11±0.49%. 20k95.51/95.64%보다모두낮음. 전trace독립재채점통과,초기배열비교validation.json보존,학습및다른작업유지. runs/chair_sit_point_region_23k_26k_29k_20261026_122850/REPORT.md.
+
+### 78k zero-shot 두 SIT 평가
+사용자요청GPU5,원본30D bbox/tokenizer/normalizer그대로인78k고정평가. 원본조건10초·seed0×3repeat 점0회제외46.58±4.56%(전체47.01±3.30). 우리30초512×seed0/1/2 점53.32±0.00%,영역57.29±0.30%. 점273/273/273이나초기root배열서로다름확인. 전체trace독립재채점통과·rc0,기존학습유지. runs/chair_sit_78k_zeroshot_dual_20261026_115055/REPORT.md. catalog경로첫실패보완후공통평가재실행.
+
+### 20k Chair SIT 기존점·영역평가
+사용자요청기존FrozenChairSit/single_match평가기그대로복제,20k checkpoint만교체.GPU5,의자test26균등복원추출·각seed26종포함,512×독립seed0/1/2·30초·첫episodeever. 점95.51±0.34%,영역95.64±0.23%,성공488/491/488과489/491/489. 3trace독립재채점/목표오차0/32·64ever/해시검증통과. 10초TokenHSI반복평가와구분. runs/chair_sit_point_region_20k_20261026_113657/REPORT.md. 학습유지.
+
+### 최신30500 Chair SIT 평가
+사용자요청GPU5,학습유지하며30500고정복사·기존동일TokenHSI조건평가. 3회78.91/79.88/79.10%, 전체79.30±0.52%,0회제외79.49±0.55%;20k90.82%대비11.33%p하락. 독립trace재채점모두일치·rc0·자연종료. runs/chair_sit_tokenhsi_eval_30500_20261026_110059/REPORT.md. 기존학습/다른GPU작업유지.
+
+## 2026-10-25
+
+### 저장500으로 즉시 재시작
+사용자즉시중단지시로1881817 SIGTERM/종료확인후20k저장본에서전체상태재개. 새run runs/tokenhsi_sit_resume20k_save500_20261025_192226, GPU5/1명1의자2048환경/무제한유지. 실제저장config save_frequency500,max_epochs=.inf와첫20001gradient확인. 다음정기저장20500. 직전미저장진행분은복원되지않음.
+
+### Chair SIT 저장주기500 준비
+사용자지시로기본train YAML save_frequency500변경. 현재프로세스는메모리내100유지하므로실행중파일은미변경, run/train_save500.yaml에무제한재개설정준비. 운영규칙상체크포인트후중단/재시작승인대기.
+
+### Chair SIT 20k에서 무제한 재개
+사용자지시로GPU5에서20k체크포인트모델/optimizer/normalizer/epoch복원, max_epochs=.inf로종료횟수해제. 1명1의자2048환경/fullFT/lr2e-5/원본SIT환경유지,100회저장. runs/tokenhsi_sit_resume20k_unlimited_20261025_191957/run.sh 및env/train YAML보존. 초기transfer는78k,실제resume20k분리(FT를transfer소스로쓴첫실패보존). 첫20001학습update및양쪽tokenizergradient비영확인. 활성JSON갱신.
+
+### Chair SIT +7000 동일 조건 평가
+사용자요청 GPU5,20k와동일코드/설정에서7k만교체. 3회77.15/80.66/81.84%, 전체79.88±2.44%, 0회제외81.25±0.83%. 20k90.82±1.38%대비9.57%p낮음. 전trace독립재채점통과·rc0. runs/chair_sit_tokenhsi_eval_7k_20261025_191048/REPORT.md. 기존GPU작업유지.
+
+### Chair SIT 최종20000 TokenHSI 조건 평가
+GPU5 본학습 자연종료/최종20000저장 확인. runs/chair_sit_tokenhsi_eval_20261025_182833 독립사본으로 test26·1명1의자·512환경·loco_sit100%·거리1~5m/360도·300step·seed0프로세스내3repeat 평가. 점ever90.04/91.80/89.84%, 3회90.56±1.08%, 운영0회제외평균90.82%. NumPy64 첫episode/종료frame 재채점전부일치·rc0. 우리정책구조유지, 공개TokenHSI정책결과아님. 상세 runs REPORT, 실행코드는독립사본에보존. MPS공통파일누락첫실패로그보존후보완. 활성학습JSON completed로갱신.
+
 ## 2026-10-24
 
 ### 1명1의자 원본TokenHSI SIT 환경으로 재시작

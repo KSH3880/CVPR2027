@@ -11,7 +11,7 @@ if [ "$MODE" = train ]; then
   free=$(nvidia-smi -i "$TOKENHSI_GPU" --query-gpu=memory.free --format=csv,noheader,nounits)
   clients=$(nvidia-smi --query-compute-apps=gpu_uuid,process_name --format=csv,noheader)
   count=$(printf '%s\n' "$clients" | awk -F, -v gpu="$gpu_uuid" '{gsub(/^[ \t]+|[ \t]+$/,"",$1)} $1==gpu && $2~/python/ {n++} END{print n+0}')
-  [ "$free" -ge 50000 ] && [ "$count" -le 1 ] || { echo 'Partial 2048-env launch requires >=50GiB free and at most one existing Python client.' >&2; exit 1; }
+  [ "$free" -ge 50000 ] && [ "$count" -le 1 ] || { echo 'Partial training launch requires >=50GiB free and at most one existing Python client.' >&2; exit 1; }
 fi
 if [ "$HEADLESS" = 0 ]; then
  export TOKENHSI_GUI_GPU_MODE=native
@@ -42,8 +42,8 @@ if [ "$HEADLESS" = 0 ]; then
  echo "[Partial native viewer] GPU=$TOKENHSI_GUI_GPU_INDEX CUDA/Vulkan/policy aligned; MPS bypassed"
 fi
 if [ "$MODE" = train ]; then
- NUM_ENVS=${NUM_ENVS:-2048}
- [ "$NUM_ENVS" = 2048 ] || { echo 'Keep training environments at 2048'; exit 1; }
+ NUM_ENVS=${NUM_ENVS:-1024}
+ [ "$NUM_ENVS" = 1024 ] || { echo 'Use 1024 environments × 4 agents to match baseline 4096 agent rows'; exit 1; }
  OUTPUT_PATH=${OUTPUT_PATH:-$PARTIAL_WORK/output/partial_training}
  if [ -n "${RESUME_CHECKPOINT:-}" ]; then args+=(--checkpoint "$RESUME_CHECKPOINT" --resume 1); fi
  if [ -n "${MAX_ITERATIONS:-}" ]; then args+=(--max_iterations "$MAX_ITERATIONS"); fi

@@ -84,7 +84,7 @@ params:
     score_to_win: 20000
     max_epochs: 20000
     save_best_after: 10
-    save_frequency: 100
+    save_frequency: 500
     save_intermediate: true
     print_stats: true
     grad_norm: 1.0

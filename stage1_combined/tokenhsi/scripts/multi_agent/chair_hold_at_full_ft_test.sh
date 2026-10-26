@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -eu
+export TOKENHSI_GPU=${TOKENHSI_GPU:-5} TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_jhh} PYTHONDONTWRITEBYTECODE=1
+export PYTORCH_JIT=${PYTORCH_JIT:-1}
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+. "$SCRIPT_DIR/runtime_env.sh"
+CKPT=$(realpath "$1")
+export OUTPUT_PATH=${OUTPUT_PATH:-$TOKENHSI_ROOT/../runs/chair_hold_at_eval_$(date +%Y%m%d_%H%M%S)/output_etc/check/eval}
+mkdir -p "$OUTPUT_PATH"
+python - "$CKPT" "$OUTPUT_PATH/env.yaml" <<'CFG'
+import sys,torch,yaml
+from pathlib import Path
+c=torch.load(sys.argv[1],map_location='cpu',weights_only=False)['relation_experiment_config']
+cfg={k:c[k] for k in ('env','sim')};cfg['env']['holdAtFT']['asset_split']='test'
+Path(sys.argv[2]).write_text(yaml.safe_dump(cfg,sort_keys=False))
+CFG
+if [ "${HEADLESS:-1}" = 0 ]; then . "$SCRIPT_DIR/gui_gpu_env.sh"; fi
+set -- --task_graph holding_at --seed "${SEED:-42}"
+if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
+python tokenhsi/run.py --task HumanoidChairHoldAtFT \
+ --cfg_train tokenhsi/data/cfg/train/rlg/chair_hold_at_full_ft.yaml --cfg_env "$OUTPUT_PATH/env.yaml" \
+ --motion_file tokenhsi/data/dataset_tokenhsi_hold_at.yaml --checkpoint "$CKPT" \
+ --num_agents 1 --num_envs "${CHAIR_TEST_ENVS:-16}" --num_objects 1 \
+ --test --eval --eval_repeats "${CHAIR_REPEATS:-1}" --eval_skills loco --eval_skill_probs 1.0 \
+ --output_path "$OUTPUT_PATH" --no_video "$@"

@@ -190,3 +190,5 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 原본 TokenHSI 학습/공식eval 설정 감사: [reference/tokenhsi_train_eval_settings.md](reference/tokenhsi_train_eval_settings.md). 실제모드별초기화·360도배치·10초Short horizon·공식반복집계 구분.
 
 현재 기본 학습: `tokenhsi/env/tasks/multi_agent/humanoid_tokenhsi_sit_ft.py`, 원본 보상 `tokenhsi/utils/tokenhsi_sit_reward.py`, CLIMB 없는 데이터 `tokenhsi/data/dataset_tokenhsi_sit_only.yaml`. 상세 [reference/tokenhsi_sit_ft.md](reference/tokenhsi_sit_ft.md).
+
+Chair HOLDING+AT: `humanoid_chair_hold_at_ft.py`는 원본 동적 ArmChair 배치, 기존 30D 관측/관계 보상을 사용한다. `hold_at_ft_agent.py`와 `utils/hold_at_ft.py`는 78k strict 전이, 동명 YAML/train/test/vnc는 전용 실행 경로다. [상세](reference/chair_hold_at_ft.md).

@@ -43,7 +43,11 @@ def resolve_output_path(experiment, mode, requested='', check=False,
             path = checks / experiment / mode
         elif _under(path, production):
             path = checks / path.relative_to(production)
-        if not _under(path.resolve(), checks):
+        # New standalone experiments keep all artifacts under the project runs tree.
+        runs = root.parent / 'runs'
+        run_check = (_under(path.resolve(), runs) and
+                     ('output_etc', 'check') in tuple(zip(path.parts, path.parts[1:])))
+        if not _under(path.resolve(), checks) and not run_check:
             raise ValueError('Verification output must be under ' + str(checks))
     elif path is None:
         path = production / experiment

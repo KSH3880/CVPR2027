@@ -1,0 +1,22 @@
+{
+  "status": "running",
+  "gpu": 5,
+  "supervisor_pid": 3359402,
+  "run": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444",
+  "log": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444/train.log",
+  "source_epoch": 78000,
+  "object_input_size": 30,
+  "num_envs": 2048,
+  "num_agents": 1,
+  "num_objects": 1,
+  "max_epochs": 20000,
+  "save_frequency": 500,
+  "learning_rate": 2e-05,
+  "trainable": "all_layers",
+  "mps_pipe": "/tmp/mps-test-1003/gpu5/pipe",
+  "seed": 42,
+  "training_pid": 3359530,
+  "experiment_dir": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444/train/ChairHoldAtFullFT_26-13-57-27",
+  "verified_at": "2026-10-26T13:58:17.851618",
+  "first_update_verified": true
+}

@@ -32,6 +32,7 @@
 
 | [chair_sit_only_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_sit_only_full_ft.yaml) | [chair_sit_only_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_sit_only_full_ft.yaml) |
 | [tokenhsi_sit_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/tokenhsi_sit_full_ft.yaml) | [tokenhsi_sit_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/tokenhsi_sit_full_ft.yaml) |
+| [chair_hold_at_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_hold_at_full_ft.yaml) | [chair_hold_at_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_hold_at_full_ft.yaml) |
 
 ## 학습
 
@@ -129,6 +130,11 @@ bash tokenhsi/scripts/multi_agent/chair_sit_only_full_ft_train.sh
 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_train.sh
 ```
 
+```bash
+# chair_hold_at_full_ft
+TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_train.sh
+```
+
 ## 로컬 추론
 
 모니터가 연결된 로컬 viewer다. `CKPT`는 사용할 컨피그의 checkpoint로 지정한다. 아래 경로는 PUSH raw 예시다.
@@ -183,6 +189,11 @@ HEADLESS=0 bash tokenhsi/scripts/multi_agent/chair_sit_only_full_ft_test.sh "$CK
 
 # tokenhsi_sit_full_ft
 HEADLESS=0 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_test.sh "$CKPT"
+```
+
+```bash
+# chair_hold_at_full_ft
+HEADLESS=0 TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_test.sh "$CKPT"
 ```
 
 ## 서버 VNC 추론
@@ -241,6 +252,11 @@ PORT=6083 bash tokenhsi/scripts/multi_agent/chair_sit_only_full_ft_vnc.sh "$CKPT
 
 # tokenhsi_sit_full_ft
 PORT=6083 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_vnc.sh "$CKPT"
+```
+
+```bash
+# chair_hold_at_full_ft
+TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects PORT=6083 bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_vnc.sh "$CKPT"
 ```
 
 ## 추론 옵션

@@ -206,6 +206,9 @@ def build_alg_runner(algo_observer):
     runner.algo_factory.register_builder('chair_ft', lambda **kwargs: ChairFTAgent(**kwargs))
     runner.player_factory.register_builder('chair_ft', lambda **kwargs: ChairFTPlayer(**kwargs))
     runner.model_builder.network_factory.register_builder('amp_chair_ft', lambda **kwargs: ChairFTBuilder())
+    from learning.multi_agent.hold_at_ft_agent import HoldAtFTAgent
+    runner.algo_factory.register_builder('hold_at_ft', lambda **kwargs: HoldAtFTAgent(**kwargs))
+    runner.player_factory.register_builder('hold_at_ft', lambda **kwargs: ma_players.MAPlayerContinuous(**kwargs))
     runner.algo_factory.register_builder('ma', lambda **kwargs : ma_agent.MAAgent(**kwargs))
     runner.player_factory.register_builder('ma', lambda **kwargs : ma_players.MAPlayerContinuous(**kwargs))
     from learning.multi_agent.shared_support_network import SharedSupportBuilder
@@ -252,7 +255,11 @@ def main():
     runner = build_alg_runner(algo_observer)
     runner.load(cfg_train)
     runner.reset()
-    runner.run(vargs)
+    try:
+        runner.run(vargs)
+    finally:
+        if args.task == "HumanoidChairHoldAtFT" and torch.cuda.is_initialized():
+            torch.cuda.synchronize()
 
     return
 

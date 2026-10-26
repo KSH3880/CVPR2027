@@ -10,7 +10,7 @@ def validate_stage1_platform_config(env):
     if reset.get('platformMode') not in (None, 'carry_payload_tokenhsi'):
         raise ValueError('Unknown platformMode')
     if selected and (reset.get('randomHeight') is not True
-                     or reset.get('randomHeightProb') != .5
+                     or reset.get('randomHeightProb') != (0. if env.get('holdAtFT', {}).get('ground_only') else .5)
                      or reset.get('minPlatformHeight') != 0.
                      or reset.get('maxTopSurfaceHeight') != 1.2
                      or reset.get('testRandomArenaSpawn') is not False
@@ -41,6 +41,11 @@ def reset_stage1_platforms(task, env_ids):
     Reference source poses are never lifted. ON_TOP retains its physical support.
     """
     from utils.edge_scenario_spec import classify_templates
+
+    if task.cfg['env'].get('holdAtFT', {}).get('ground_only'):
+        task._platform_pos[env_ids] = task._platform_default_pos[env_ids]
+        task._tar_platform_pos[env_ids] = task._tar_platform_default_pos[env_ids]
+        return
 
     task._platform_pos[env_ids] = task._platform_default_pos[env_ids]
     task._tar_platform_pos[env_ids] = task._tar_platform_default_pos[env_ids]

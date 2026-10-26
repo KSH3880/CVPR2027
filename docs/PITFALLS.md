@@ -224,3 +224,7 @@ rc=0 으로 끝난다. 죽은 것은 새 토큰 하나뿐이라 나머지가 그
 
 새 입력·새 토큰을 추가하면 2 iteration 짜리로 이것부터 돌린다. 체크포인트로도 잡힌다 --
 학습 뒤에도 가중치 max 가 `1/sqrt(fan_in)` 과 정확히 일치하면 한 번도 안 움직인 것이다.
+
+## MPS 클라이언트를 SIGTERM으로 종료하면 다른 학습도 실패할 수 있음 (2026-10-25)
+
+GPU5 SIT1881817을SIGTERM한직후0.2초내기존PUSH685104가MPS fatal/sticky error및CUDA illegal memory access로종료. daemon PID가살아있어도내부GPUcontextreset이가능하므로daemon생존만으로영향없음을판단하지않는다. MPS사용작업은GPU동기화된정상종료또는설치버전에맞는공식MPS client종료절차를사용하고단순signal종료를피한다. NVIDIA근거: https://docs.nvidia.com/deploy/mps/when-to-use-mps.html . 원시근거 runs/gpu5_mps_incident_20261025_203531/REPORT.md.

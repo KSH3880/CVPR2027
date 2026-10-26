@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-26
+
+### 원본과 전체 agent 샘플 수 일치
+
+- 사용자 요청으로 Partial 기본 env를 2048에서1024로 줄였다. 4명×1024=4096 rows로 원본2명×2048과 같으며 horizon32/minibatch16384는 유지한다. 기존 workspace는 보존하고 baseline36000에서 새 optimizer/epoch0로 다시 시작한다.
+- GPU6 MPS 공식 terminate_client 2946883 1996870의 성공코드0을 확인한 뒤 기존 학습만 종료됐다. 다른 클라이언트922451와 MPS 서버2946883는 유지한다. 인당15~25kg·reward·배정·출발 설정과 jhh 원본은 변경하지 않았다. 새 GPU6 PID2861739에서 coordination gradient457.97, 2epoch 후 actor/RMS동결·coord업데이트·startup저장을 확인했다. TensorBoard current_base36000_e1024로 연결했다.
+
+## 2026-10-25
+
+### 최신 baseline36000에서 저질량 Partial 파인튜닝 새 시작
+
+- 사용자 정정에 따라 이전Partial14000을 resume하지 않고 jhh stage1_v2_fixed_push_360_raw_cuboid의 최신36000 baseline에서 새Stage2를 시작했다. numbered/일반checkpoint 모두epoch36000/frame4718592000을CPU확인하고 로컬복사·원본contract검사를 통과했다. 인당질량은15~25kg,4명/2048환경·기존reward/gate/후방180/랜덤배정을 유지한다.
+- 별도 workspace raw_cuboid_partial_base36000_mass15to25_20261025, GPU6 전용MPS/새tmux·새optimizer·identitycoord/epoch0다. CPU4환경8step strict165tensor/새104coord/gradient38.996·actor/RMS불변과 GPU첫coord gradient405.44를 확인했다. jhh/이전weight·결과·다른작업/MPS daemon은 수정하지 않았다. 최신실행메타데이터는 runs/jointpush/latest_partial_training.json.
+
 ## 2026-10-23
 
 ### TensorBoard 현재/이전 Partial 비교

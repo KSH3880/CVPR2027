@@ -4,8 +4,8 @@
 
 ## 준비된 baseline
 
-- 로컬 checkpoint: `jointpush/checkpoints/jhh_raw_cuboid/Stage1V2FixedPush360RawCuboid_00022500.pth`.
-- 준비된 workspace: `runs/jointpush/raw_cuboid_partial_rear180_20261023/workspace/`.
+- 로컬 checkpoint: `jointpush/checkpoints/jhh_raw_cuboid/Stage1V2FixedPush360RawCuboid_00036000.pth`.
+- 준비된 workspace: `runs/jointpush/raw_cuboid_partial_base36000_mass15to25_20261025/workspace/`.
 - Stage1 actor encoder와 scene RMS를 전이·동결하고, 새4층 coordination을 identity 초기화한다. action head·critic·discriminator는 원래 Stage2 방식대로 학습하며 Stage1 optimizer/epoch는 이어받지 않는다.
 - 새 학습은 PUSH 전용이다. baseline의 SIT/CLIMB/carry 혼합은 제외하되 5개 task embedding/4family AMP 규격은 유지한다. AMP expert는 baseline과 같이 push_loco33%/PUSH67%, RSI는 partial 기존 방침대로 loco-only다.
 
@@ -13,7 +13,7 @@
 
 사람4명, object token8개(담당 분할4+여분4), 물리 bank24개다. coupled 확률0.8로1~4명 그룹을 정하고 같은 그룹은 실제 상자 하나를 함께 민다. 분할은 관측/손 목표용이며 보상에서 실제 상자 위치를 바꾸지 않는다. attention에서 다른 agent나 상자를 강제로 가리는 mask는 없다.
 
-1인분 크기는 baseline의 X1.2~1.7/Y1.45~1.7/Z1.45~1.7m이고 Y≥Z를 만족한다. n인 그룹은 X와 질량만 n배: 질량 n×U(20,30)kg, 마찰0.3. 접촉 기준 높이는 바닥에서1.04m다. 목표는 실제 상자 중심의 초기 로컬+Y 방향2~10m. 출발 위치는 상자 중심에서 goal 반대쪽을 중심으로 ±90°(후방180°), 몸 heading은360도 랜덤이다. 중심 반경1.65~6m 중 상자 외접원+0.45m clearance를 만족하는 구간에서 샘플링한다. 에피소드1200step, 학습2048환경이다. Stage1의 epoch별 시작방향 curriculum 대신 후방180° 랜덤 출발을 사용한다. 그룹과 물리 상자 위치는 거리와 무관하게 랜덤 배정한다. 그룹 내 분할 구역도 랜덤 순열로 중복 없이 배정하고 에피소드 동안 고정한다. 최근접 상자 검사나 거리 기반 재배정은 사용하지 않는다. 공동 구성원의 실제 상자 공유는 의도된 것이며 서로 다른 그룹이 같은 상자를 맡지는 않는다.
+1인분 크기는 baseline의 X1.2~1.7/Y1.45~1.7/Z1.45~1.7m이고 Y≥Z를 만족한다. n인 그룹은 X와 질량만 n배: 질량 n×U(15,25)kg, 마찰0.3. 접촉 기준 높이는 바닥에서1.04m다. 목표는 실제 상자 중심의 초기 로컬+Y 방향2~10m. 출발 위치는 상자 중심에서 goal 반대쪽을 중심으로 ±90°(후방180°), 몸 heading은360도 랜덤이다. 중심 반경1.65~6m 중 상자 외접원+0.45m clearance를 만족하는 구간에서 샘플링한다. 에피소드1200step, 학습1024환경×4명=4096 agent rows로 원본2048환경×2명과 맞춘다. Stage1의 epoch별 시작방향 curriculum 대신 후방180° 랜덤 출발을 사용한다. 그룹과 물리 상자 위치는 거리와 무관하게 랜덤 배정한다. 그룹 내 분할 구역도 랜덤 순열로 중복 없이 배정하고 에피소드 동안 고정한다. 최근접 상자 검사나 거리 기반 재배정은 사용하지 않는다. 공동 구성원의 실제 상자 공유는 의도된 것이며 서로 다른 그룹이 같은 상자를 맡지는 않는다.
 
 보상은 RawCuboid의 contact/AT state·progress·success 각각0.2를 사용한다. contact의 midpoint-only 연속 점수·1.04m 높이/±0.0325m 허용·유한 면 거리/양손 반력/상자 반력 조건과 physics tick별 접촉 OR 누적을 유지한다. 담당 분할 구역 중앙이 각 agent의 접촉 기준점이다. 접근 progress는 실제 전체 상자 장애물을 우회하여 담당 뒷면 구역으로 가는 baseline navigation 거리다.
 
@@ -34,9 +34,9 @@ bash -c 'source jointpush/scripts/partial_common.sh; "$PARTIAL_PYTHON" jointpush
 # 새 workspace 준비: 생략 시 지정 RawCuboid run의 최신 numbered checkpoint 사용
 python jointpush/scripts/partial_prepare.py --workspace runs/jointpush/my_partial/workspace
 
-# 준비된22500회 baseline을 사용해 새 Stage2 학습
+# 준비된36000회 baseline을 사용해 새 Stage2 학습
 TOKENHSI_GPU=6 \
-PARTIAL_WORK=/home/hwanhee/juan/CVPR2027/runs/jointpush/raw_cuboid_partial_rear180_20261023/workspace \
+PARTIAL_WORK=/home/hwanhee/juan/CVPR2027/runs/jointpush/raw_cuboid_partial_base36000_mass15to25_20261025/workspace \
 bash jointpush/scripts/partial_train.sh
 
 # 저장된 Stage2 checkpoint headless 평가
@@ -69,3 +69,5 @@ CPU13개 회귀(후방180°/비중첩/랜덤 배정4개 추가): 한 손 오배�
 Scalars에서 `relation/partial_push/goal_distance`(작을수록 좋음), `relation/partial_push/contact`, `relation/partial_push/group_gate`, `relation/partial_push/at_success`와 `reward_terms/`를 확인한다. at_success는 agent-step 비율이며 episode 성공률이 아니다. 대부분 scalar의 Step축은 누적frame이고 `episode_lengths/iter`의 Step축은iteration이다.10초마다 새 로그를 읽는다.
 
 현재6016 TensorBoard는 `current_rawcuboid_rear180`와 `previous_koo_partial` 두run을 함께 읽는다. Runs에서 둘 다 선택하면 공통tag의곡선이겹친다. 원본event는수정하지않고비교링크만사용한다. 이전/현재의episode상한600/1200과보상식차이로같은수치의성능비교보다추이를확인한다.
+
+2026-10-25 재학습: jhh RawCuboid run의 최신 numbered/일반 저장본은 모두epoch36000이었다. 해당baseline에서 Stage2를epoch0·새optimizer/identitycoord로 새로 시작했으며 이전Partial14000은 로드하지 않는다. 인당질량은20~30에서15~25kg로 낮췄다. 최신실행은 latest_partial_training.json 기준이다.
