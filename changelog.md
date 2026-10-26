@@ -2,6 +2,75 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-26
+
+### 공유용 PUSH 담당 물체·원본 SUPPORT 분리
+
+- 사용자확정대로원본Stage1 실제4상자(담당2+SUPPORT2)를유지하고, 큰PUSH물성을담당물체에만적용했다. SUPPORT는X/Y0.4~0.8/Z0.25~0.5m·밀도100/마찰1.0·원본reset/ON_TOP배치로복원하고일반distractor의PUSH경로간섭만재샘플링한다. 숨겨진actor pool은추가하지않는다.
+- config변경은 `distractor_mode` 한키이며보상/네트워크/과제비율/PUSH물리/RSI2~10m·±45°/초기model·RMS동일성을확인했다. 불가능한RSI목표장면은기존전체reset재시도로보내도록보완했다. CPU16회귀·PUSH1280agent/RSI645건2.017~9.999m·44.93°·strict복원/물리24step·혼합2560agent의ON_TOP420건/일반distractor배치·실제밀도/마찰통과. 새Support초기본을별도생성하고기존파일은보존했다. GPU/PPO/본학습미실행.
+
+### PUSH RSI Uniform 팀 공유용 설정과 가이드
+
+- `stage1_push_rsi_uniform` 전용 환경/학습/source YAML·train/test/VNC·CPU 데이터확인/초기화 명령과 루트 팀 가이드를 추가했다. 기존 실험의 모델/보상/물리는 보존하고1200step을환경YAML에명시했다. 새출력은 `output/stage1_base_push_rsi_uniform/`이며 GitHub에없는모션/원본78000준비와계약규칙을문서화했다.
+- 회귀13개·실제팀CPU검사명령exit0(1280agent reset/RSI627건·정책물리24step)·데이터131파일·원본SHA·새계약preflight 통과. 공유용초기모델/RMS는직전uniform전이본과tensor동일, YAML989→482줄·문법/링크/diff검사통과. Git commit/push와GPU/PPO학습은미실행이다.
+
+### stage1_push_koo 복사본의 RSI 목표거리 분리
+
+- 사용자복사본을stage1_push_koo로이름변경하고PUSH RSI만목표2~10m/정면±45°균등제안·경로거부검사·상자진행도이동생략으로변경했다. 보행/기존과제/보상/물리/네트워크/초기화는GPU1기반을보존하며전용출력·1200step train기본·비교문서를추가했다. 원본저장소와GPU1학습은변경하지않는다.
+- CPU12회귀·실제CPU1280agent reset/RSI627건2.013~9.995m·최대44.93°·상자불변/부분reset·20kg/마찰0.4·strict모델/RMS복원/정책물리24step finite 통과. 원본핵심10파일SHA와보상/네트워크/학습YAML/bank불변확인(원본안내문2개는별도평가작업추가로검증중변경됨). 새78000전이본·별도출력준비, GPU/PPO/본학습미실행. [비교](markdowns/push_rsi_uniform_comparison.md)·[검사](output_etc/check/push_rsi_uniform/REPORT.md).
+
+### PUSH 1800step GPU0 재평가
+
+- GPU0 3seed모두exit0/저장궤적재채점일치로완료했다. 3072agent중1754성공(57.10±2.11%p),1200step의51.66%대비+5.44%p/167추가성공이다. 3seed초기root/상자/크기/목표/binding/DOF와앞1199step의agent별ever가모두이전평가와일치했다. 거리별비교·실패마지막20초의거리감소는출력폴더 `PUSH_COMPARISON.{md,json,png}`에정리했다. GPU1학습PID/로그증가를실행전후확인했다.
+
+- 사용자요청으로같은9000회모델의PUSH만1800step·512환경×seed0/1/2·기존거리별채점으로별도출력/tmux `koo_eval_push9000_1800`에시작했다. 기존4과제900step평가와GPU1학습은보존했다. batch에과제목록/PUSH horizon옵션·계획run수표시를추가하고,명시적동시평가는이평가기client/4GiB여유일때만허용한다. CPU성공식4회귀·CLI/문법/diff통과. 실제실행검증은아래후속기록참조.
+
+### PUSH fine-tune9000회 GPU0 평가·PUSH 거리별 채점
+
+- 사용자지정기준 `markdowns/evaluation_single.md`에서점/영역ever·기존4과제900step·512환경×seed0/1/2·loco첫episode를적용하고PUSH만1200step·초기상자→목표XY거리1m구간별성공률/표본수/진행률/도달시간을추가했다. AT9규격·SIT/CLIMB고정asset은평가프로세스에만적용한다. 현재모델의2인/4상자계약을유지해1인baseline과직접동등비교하지않으며전용명세 `evaluation_push_finetune.md`에차이를기록했다.
+- CPU6회귀·5과제각2환경/7step정책·실제checkpoint복원/고정상자pose/종료집계·저장궤적독립재채점일치·문법/diff통과. GPU0 native/headless 본평가를tmux `koo_eval_push9000`에시작했다. 출력 `output/stage1_base_push_finetune_eval9000_20261026`,PUSH3seed를먼저실행하며완료run마다 `RESULTS.md`/`summary.json`을갱신한다. GPU1학습PID/로그진행확인,최종완료결과는아직미확인이다.
+
+### 학습1200step 재개 준비·PUSH 목표거리 확인
+
+- 후속사용자승인으로 `koo_train:0`에서9000회저장본·1200step·GPU1 MPS·2048환경으로실제재개했다. 확인당시기존학습은이미종료돼추가종료명령없이시작했다. 새run `output/stage1_base_push_finetune_stable_ep1200/Stage1PushFinetune_26-11-17-19`, 로그는상위폴더`train.log`다. 원본저장본epoch9000/frame1179648000/optimizer164상태·SHA확인, 실제MPS client·CLI/저장config1200·epoch9001→9002·에피소드37tag/NaN·Inf없음을확인했다. 과거run/저장본은보존한다.
+
+- `TOKENHSI_TRAIN_EPISODE_LENGTH=1200`을 기존train CLI에 연결하고 별도출력 `output/stage1_base_push_finetune_stable_ep1200/launch.sh`를 준비했다. 기본은명시적9000저장본이며 기존학습lock을공유해 실행중학습을덮치지않는다. 셸문법·인자전달·CLI기본600/override1200·diff확인, 학습중단/재개는미실행이다.
+- 현재PUSH 상자→목표는최소1m·목표XY±4.5m/정면±45°/경로여유의거부샘플링이며 별도거리최대값은없다. seed42 CPU2048scene의RSI전4096상자에서1.000~19.088m·평균7.824m를확인했다(관측표본이며최대설정값아님). 사람→상자1~10m와구분한다.
+
+### 시각화 에피소드1200step 옵션
+
+- 요청에 따라 Stage1 PUSH test/VNC에 `TOKENHSI_VIEWER_EPISODE_LENGTH` 양의정수 override를 추가했다. 기존CLI `--episode_length`로전달하며 학습600step은유지한다. 셸문법·인자전달·CLI config덮어쓰기·diff확인, GPU시각화실행없음.
+
+### 과제별 에피소드 성공률·PUSH 진행 기록 및 GPU1 MPS 시작
+
+- 후속 사용자 승인으로 `koo_train:0`의 기존 학습을 Ctrl-C로 종료하고 명시적9000회 저장본에서 GPU1 MPS·2048환경으로 재개했다. `output/stage1_base_push_finetune_stable/resume9000_20261026.sh`/동명`.log`, 새 run은 `Stage1PushFinetune_26-10-06-23`다. epoch9001→9002/frame연속 진행·MPS client연결·과제별성공률/PUSH거리·진행률/loco·RSI tag 실제기록을 확인했다. 과거run과9000저장본은 보존한다.
+
+- 스텝 성공 상태 비율과 구분하도록 과제별 완료 agent 수·종료/ever 성공률을 추가했다. PUSH는 RSI 후 초기거리·종료 잔여거리·거리감소·정규화 진행률/최대진행률과 loco/RSI별 집계를 기록한다. 기존 보상/성공판정/모델 계약은 유지한다. 현재 실행에 hot reload되지 않으므로 재개 이후부터 기록하며 기존 학습을 임의 중단하지 않았다.
+- 관련 CPU20회귀 및 실제 CPU player checkpoint/RMS 복원·정책24step 통과. GPU/PPO 재실행은 하지 않았다. 사용자 요청으로 GPU1 전용 MPS daemon/server를 시작했고 기존 학습 PID 생존·TensorBoard 갱신을 확인했다. 현재 학습은 native CUDA로 시작되어 MPS client가 아니며 자동 편입되지 않는다.
+
+## 2026-10-23
+
+### PUSH 바닥/높이 비율 1.1·167크기·마찰0.4 파인튜닝 준비
+
+- 사용자 확정대로 PUSH XY각1.60~2.20m/0.1m·Z1.45~1.70m/0.05m 및min(X,Y)≥1.1Z의167종·20kg/마찰0.4를 별도stable bank/전이본/출력에 적용했다. 경로간격3.5m, 기존과제/RSI·50:50과제비율·CONTACT각0.2·목표고정은 유지한다. 물성적용은Y=2m휴리스틱에서PUSH과제asset mask로 바꿔 새Y범위에도20kg/마찰0.4가 적용되도록 했다.
+- CPU73회귀·167크기/±45°와정면 기하475,449배치 위반0·949후보/두owner 초기0.1초PD316,966상태 전부통과·실제질량/마찰 확인. 원본78000회SHA/기존162텐서를 보존한 새전이본과CPU player 모델/RMS복원·24step·PUSH보행history연결을 확인했다. GPU/PPO/확인용학습/본학습은 사용자 요청대로 실행하지 않고 GPU1 명령만 제공한다.
+- PUSH만의 새 RSI영상은 `output_etc/check/stage1_push_finetune_stable/push_rsi_candidates.mp4`:949프레임·720p/30FPS·31.63초·좌우45°/정면·정확한XYZ표기·원래목표까지잔여거리다. 전체디코딩/대표화면/메타/문법/diff를 확인했다. CPU초기자세열이며 정책rollout/장기전도안정성 검증은 아니다. 같은 폴더 `REPORT.md` 참조. 과거18종bank/영상/전이본은 보존한다.
+
+### Stage1 PUSH 12000회 정육면체 viewer
+
+- 직육면체X1.2~1.7/Y·Z1.45~1.7m·Y≥Z 요청에 viewer 전용 `TOKENHSI_VIEWER_PUSH_BOX_RANGES` 추가. 연속균등값의Y/Z정렬로제약보장·20kg/상자마찰0.4유지·최대크기scene배치검사적용, 원본YAML/bank보존. 실제asset경로CPU10000상자범위/Y≥Z/질량·정육면체회귀·최대크기2048scene·문법/diff통과. GPU1 학습/MPS 없음 확인 후 VNC6115 명령 제공, 새GPU 실행 없음.
+- 정육면체1.3~1.5m 요청에 `TOKENHSI_VIEWER_PUSH_CUBE_SIDES=1.3,1.4,1.5` 추가. XY독립/단일크기 옵션과 동시사용 거부, 실제asset설정 CPU검사에서 XYZ동일·3종범위·20kg 확인 및 문법/diff통과. GPU1 학습/MPS 없음 확인 후 VNC6114 명령 제공, 새GPU 실행 없음.
+- XY가변 요청에 viewer 전용 `TOKENHSI_VIEWER_PUSH_XY_RANDOM=1` 추가: 네 상자X/Y각1~1.5m/0.1m 독립배정·Z1.5m/20kg/마찰0.4 유지. 실제asset설정 경로 CPU검사로 범위/독립성/Z고정/질량·기존정육면체경로 보존 확인, 문법/diff검사 통과. GPU1 학습/MPS 없음 확인 후 VNC6112 명령 제공, 새GPU rollout은 실행하지 않았다.
+- 후속요청으로 viewer 전용 `TOKENHSI_VIEWER_PUSH_CUBE_SIDE=1.5`·`TOKENHSI_VIEWER_PUSH_CUBE_FRICTION=0.4`를 추가했다. 네 상자크기고정·20kg보존·실제asset 생성/shape마찰설정 경로를 CPU stub으로 확인하고 문법/diff를 검사했다. GPU1 학습/Python CUDA client·MPS daemon 없음 확인, GPU 재실행 없이 VNC6111 명령을 제공했다. 새조건GPU rollout은 미검증이다.
+- 사용자 요청으로 평가전용 `TOKENHSI_VIEWER_PUSH_CUBES=1`을 추가했다. X=Y=Z/한 변1.0~1.5m 6종을 실제asset·관측/접촉크기에 적용하고 네 상자20kg/마찰0.6을 보존한다. native GUI/test·PUSH_AT/loco·16환경 이하로 제한하며 기존학습YAML/체크포인트 계약은 변경하지 않았다.
+- GPU1에 기존학습/Python CUDA client·MPS daemon이 없음을 확인하고 native/MPS우회·1환경·12000회 저장본·VNC6109를 실행했다. CPU6종크기/질량계산·문법/diff·checkpoint계약/모델복원·실제정책step과 생성asset20kg/마찰0.6을 확인했다. 현재담당상자1.2/1.3m, 여분1.4/1.2m다. 실행명령/로그는 `output/stage1_base_push_cube_view_20261023/`, tmux는 `koo_stage1_cube_view_20261023`. 정육면체에서의 장기성공률 검증은 아니다.
+
+### 원본 Stage1 78000회에서 PUSH 50% 파인튜닝 준비·PUSH RSI 영상
+
+- `stage1_push_finetune` env/train/test/VNC·별도출력/전이를 추가했다. PUSH50%·SIT5%/CLIMB12.5%/AT·ON_TOP각16.25%, CONTACT각0.2다. PUSH 출발1~10m·환경중심목표XY±4.5m/상자정면±45°·X1~1.5/Y2/Z1.3~1.5m18종·20kg/마찰0.5를 적용했다. 기존4과제의RSI확률/선별/모션은보존하고PUSH보행4개를별도library/AMP history로분리했다.
+- 원본78000회SHA/모델162개텐서·기존embedding/AMP열을보존하고PUSH행/열은carry_at/carry에서초기화했다. optimizer/epoch/frame/best reward는초기화한전이본을별도저장했다. CPU73회귀·PUSH기하51,246배치위반0·초기0.1초PD34,164상태전부통과·모델/RMS strict player복원/24step/PUSH보행history연결확인. 최초목표고정·RSI10m중4m진행시6m잔여를검증했다.
+- 최종영상은 `output_etc/check/stage1_push_finetune/push_rsi_candidates.mp4`: PUSH949후보만·clip0/3/4/8·720p/30FPS/31.63초. 후보는승인bank와동일하며새크기/±45°와잔여거리를표시한다. 전체디코딩/프레임수·대표화면·문법/diff확인. CPU초기자세열이며정책rollout/장기균형·GPU/PPO·본학습은실행하지않았다. 상세는같은폴더 `REPORT.md`.
+
 ## 2026-10-22
 
 ### Stage1 PUSH 5500회 정책 VNC

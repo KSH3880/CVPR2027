@@ -1,5 +1,7 @@
 # TokenHSI-MultiAgent
 
+**PUSH RSI Uniform 공유 실험:** [팀 실행 가이드](PUSH_RSI_UNIFORM_GUIDE.md) · [전용 환경 config](ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_push_rsi_uniform.yaml).
+
 Multi-agent extension of [**TokenHSI**](https://github.com/liangpan99/TokenHSI) (CVPR 2025 Oral) —
 Pan et al., *Unified Synthesis of Physical Human-Scene Interactions through Task Tokenization*.
 

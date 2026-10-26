@@ -3,10 +3,17 @@
 stage1_base_push_run() {
   local mode=$1
   shift
-  local scripts root port checkpoint agents envs objects output
+  local scripts root port checkpoint agents envs objects output variant experiment manifest
   scripts=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   root=$(cd "$scripts/../../.." && pwd)
   port="$root/ports/stage1_base_push"
+  variant=${TOKENHSI_STAGE1_PUSH_VARIANT:-stage1_base_push}
+  case "$variant" in
+    stage1_base_push) experiment=Stage1BasePush; manifest=dataset_stage1_base_push.yaml ;;
+    stage1_push_finetune) experiment=Stage1PushFinetune; manifest=dataset_stage1_push_finetune.yaml ;;
+    stage1_push_rsi_uniform) experiment=Stage1PushRsiUniform; manifest=dataset_stage1_push_finetune.yaml ;;
+    *) echo 'Unknown Stage1 PUSH variant' >&2; return 1 ;;
+  esac
   export TOKENHSI_GPU=${TOKENHSI_GPU:-1}
   export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_koo}
   if [ "$mode" = train ]; then
@@ -26,6 +33,12 @@ stage1_base_push_run() {
     fi
     output=${OUTPUT_PATH:-output/stage1_base_push}
     set -- --headless --task_graph random_scenario
+    if [ -n "${TOKENHSI_TRAIN_EPISODE_LENGTH:-}" ]; then
+      case "$TOKENHSI_TRAIN_EPISODE_LENGTH" in
+        *[!0-9]*|0*) echo 'TOKENHSI_TRAIN_EPISODE_LENGTH must be a positive integer without leading zeros' >&2; return 1 ;;
+      esac
+      set -- "$@" --episode_length "$TOKENHSI_TRAIN_EPISODE_LENGTH"
+    fi
     if [ -n "${MAX_ITERATIONS:-}" ]; then set -- "$@" --max_iterations "$MAX_ITERATIONS"; fi
     if [ -n "${RESUME_CHECKPOINT:-}" ]; then
       checkpoint=$(realpath -e "$RESUME_CHECKPOINT") || return 1
@@ -43,6 +56,12 @@ stage1_base_push_run() {
       --eval_skills "${EVAL_SKILLS:-loco}" --eval_skill_probs "${EVAL_SKILL_PROBS:-1.0}" \
       --task_graph "${TASK_GRAPH:-push_at}" --task_camera stack
     if [ "${HEADLESS:-0}" != 0 ]; then set -- "$@" --headless; fi
+    if [ -n "${TOKENHSI_VIEWER_EPISODE_LENGTH:-}" ]; then
+      case "$TOKENHSI_VIEWER_EPISODE_LENGTH" in
+        *[!0-9]*|0) echo 'TOKENHSI_VIEWER_EPISODE_LENGTH must be a positive integer' >&2; return 1 ;;
+      esac
+      set -- "$@" --episode_length "$TOKENHSI_VIEWER_EPISODE_LENGTH"
+    fi
   fi
   . "$scripts/runtime_env.sh"
   case "$output" in /*) ;; *) output="$root/$output" ;; esac
@@ -52,12 +71,12 @@ stage1_base_push_run() {
   esac
   export PYTHONPATH="$port/tokenhsi:$port${PYTHONPATH:+:$PYTHONPATH}"
   cd "$port"
-  if [ -n "${checkpoint:-}" ]; then python preflight.py "$checkpoint" "$mode" || return 1; fi
+  if [ -n "${checkpoint:-}" ]; then python preflight.py "$checkpoint" "$mode" "$variant" || return 1; fi
   if [ -n "${SEED:-}" ]; then set -- "$@" --seed "$SEED"; fi
   python tokenhsi/run.py --task HumanoidMAStage1Push \
-    --cfg_env tokenhsi/data/cfg/multi_agent/stage1_base_push.yaml \
-    --cfg_train tokenhsi/data/cfg/train/rlg/stage1_base_push.yaml \
-    --motion_file tokenhsi/data/dataset_stage1_base_push.yaml \
+    --cfg_env "tokenhsi/data/cfg/multi_agent/$variant.yaml" \
+    --cfg_train "tokenhsi/data/cfg/train/rlg/$variant.yaml" \
+    --motion_file "tokenhsi/data/$manifest" \
     --num_agents "$agents" --num_envs "$envs" --num_objects "$objects" \
-    --experiment Stage1BasePush --output_path "$output" --no_video "$@"
+    --experiment "$experiment" --output_path "$output" --no_video "$@"
 }

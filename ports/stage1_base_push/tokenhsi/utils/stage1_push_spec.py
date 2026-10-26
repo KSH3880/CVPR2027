@@ -14,6 +14,13 @@ PUSH_TASK = 4
 TEMPLATES = CLIMB_TEMPLATES + ('PUSH_AT',)
 
 
+def stable_push_profiles():
+    """XY 0.1m grid, Z 0.05m grid; integer comparison avoids boundary drift."""
+    return [[x/20., y/20., z/20.] for x in range(32,45,2)
+            for y in range(32,45,2) for z in range(29,35)
+            if 10*min(x,y) >= 11*z]
+
+
 def original_spec(spec):
     original = deepcopy(spec)
     original['sampler'] = 'two_agent_four_object_independent_unified'
@@ -58,7 +65,8 @@ def validate_env(env):
     if tuple(env['templateRsi']) != TEMPLATES:
         raise ValueError('Keep all original template RSI rows plus PUSH_AT')
     extension = env['pushExtension']
-    if extension['revision'] != 1 or extension['contact_weights'] != [.4, .2, .2]:
+    finetune = extension.get('sampling_profile') == 'stage1_square_cone_v1'
+    if extension['revision'] != 1 or extension['contact_weights'] != ([.2, .2, .2] if finetune else [.4, .2, .2]):
         raise ValueError('Use current CONTACT state/progress/success weights')
     from utils.unified_training import EXPERT_PROBS
     mapping=env['ampExpertMapping']
@@ -69,19 +77,39 @@ def validate_env(env):
     probability=env['openPushRSI']['interaction_probability']
     if env['templateRsi']['PUSH_AT']!=[1-probability]+[0.]*7+[probability]:
         raise ValueError('PUSH_AT RSI row and native interaction probability must agree')
+    if env['openPushRSI'].get('uniform_goal_distance', False):
+        if not finetune or env['openPushRSI'].get('goal_distance_range') != [2., 10.]:
+            raise ValueError('This uniform RSI variant requires fine-tune and 2..10m bounds')
+    mode = extension.get('distractor_mode')
+    if mode not in (None, 'stage1_support_v1'):
+        raise ValueError('Unknown PUSH distractor layout')
+    if mode == 'stage1_support_v1' and not finetune:
+        raise ValueError('Stage1 support distractors require the fine-tune sampler')
     box = env['pushBox']
     expected = [[round(1. + i / 10, 1), 2., 1.3] for i in range(6)]
-    if box['size_profiles'] != expected or box['mass'] != 20. or box['friction'] != .6:
-        raise ValueError('Preserve current PUSH Y2m/X1~1.5m/Z1.3m/20kg/friction0.6')
+    friction = .6
+    if finetune:
+        expected = [[round(1.+i/10,1),2.,round(1.3+j/10,1)] for i in range(6) for j in range(3)]
+        friction = .5
+        if extension.get('geometry_profile') == 'stable_footprint_v1':
+            expected, friction = stable_push_profiles(), .4
+            if box['size'] != [2.2,2.2,1.7] or env['pushScene']['path_separation'] != 3.5:
+                raise ValueError('Stable PUSH requires conservative 2.2m footprint / 3.5m paths')
+        if env['pushScene']['random_at_goal'] != dict(sampling='stage1_square_cone',reach=4.5,
+                min_distance=1.,agent_clearance=.5,half_angle_degrees=45.):
+            raise ValueError('Fine-tune requires the Stage1 square with a forward +/-45 degree cone')
+    if box['size_profiles'] != expected or box['mass'] != 20. or box['friction'] != friction:
+        raise ValueError('PUSH size profiles, mass or friction differ from this experiment')
 
 
 def sample_asset_sizes(n, env, device):
-    """Size posterior keeps old tasks on their old sizes; PUSH uses its six sizes."""
+    """Keep legacy task sizes and sample the configured PUSH profile family."""
     from utils.size_rsi import task_probabilities, STAGE1_V2_RANGES
     probs = torch.tensor(list(env['relationGraph']['template_probabilities'].values()), device=device)
     seeds = torch.multinomial(probs, n * 2, replacement=True).reshape(n, 2)
     sizes = torch.empty(n, 4, 3, device=device)
     profiles = torch.tensor(env['pushBox']['size_profiles'], device=device)
+    native_support = env['pushExtension'].get('distractor_mode') == 'stage1_support_v1'
     for owner in range(2):
         for template, name in enumerate(TEMPLATES):
             rows = (seeds[:, owner] == template).nonzero().flatten()
@@ -89,12 +117,16 @@ def sample_asset_sizes(n, env, device):
                 continue
             if template == PUSH_TEMPLATE:
                 sizes[rows, owner] = profiles[torch.randint(len(profiles), (len(rows),), device=device)]
-                sizes[rows, owner + 2] = profiles[torch.randint(len(profiles), (len(rows),), device=device)]
+                if not native_support:
+                    sizes[rows, owner + 2] = profiles[torch.randint(len(profiles), (len(rows),), device=device)]
             else:
                 for axis, (lo, hi) in enumerate(STAGE1_V2_RANGES[name]):
                     sizes[rows, owner, axis] = torch.randint(round(lo*20), round(hi*20)+1, (len(rows),), device=device)/20
                 for axis, (lo, hi) in enumerate(STAGE1_V2_RANGES['SUPPORT']):
                     sizes[rows, owner+2, axis] = torch.randint(round(lo*20), round(hi*20)+1, (len(rows),), device=device)/20
+    if native_support:
+        for axis, (lo, hi) in enumerate(STAGE1_V2_RANGES['SUPPORT']):
+            sizes[:, 2:, axis] = torch.randint(round(lo*20), round(hi*20)+1, (n, 2), device=device)/20
     posterior = torch.zeros(n, 2, 6, device=device)
     push = seeds == PUSH_TEMPLATE
     posterior[..., PUSH_TEMPLATE] = push

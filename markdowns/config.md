@@ -1,8 +1,16 @@
 # Multi-Agent Carry 실행 가이드
 
+**이복사본의현재실험은 [PUSH RSI2~10m](#push-rsi-uniform-copy)이다. 아래원본GPU1의실행상태·과거명령은복사이력이며현재복사본학습상태가아니다.**
+
 현재 실행 가능한 실험은 원본 1번과 Stage 1 **27·28·30·31·32·33·34·35·36·37번 및 paired/unified 변형**, Stage 2 **29번 및 SIT plane 변형**이다. 과거 9~26번 config와 전용 실행 스크립트는 정리했다. 모든 명령은 저장소 루트에서 실행한다.
 
 ## 공통 규칙
+
+- PUSH만1800step GPU0 재평가: `TOKENHSI_GPU=0 TOKENHSI_EVAL_TASKS=push_at TOKENHSI_EVAL_PUSH_EPISODE_LENGTH=1800 bash tokenhsi/scripts/multi_agent/evaluate_stage1_push_finetune.sh output/stage1_base_push_finetune_stable/Stage1PushFinetune_24-01-18-44/nn/Stage1PushFinetune_00009000.pth output/stage1_base_push_finetune_eval9000_1800_20261026`. seed0/1/2·512환경·거리별집계를유지한다. tmux `koo_eval_push9000_1800`, 결과는위폴더 `RESULTS.md`/`summary.json`이다. 기존eval과병행시평가client검증/4GiB여유를조건으로 `TOKENHSI_EVAL_CONCURRENT=1`을명시한다. 현재실행중중복시작금지. [명세](evaluation_push_finetune.md#push-1800step-재평가).
+
+- PUSH fine-tune9000회 GPU0 평가: [전용 프로토콜](evaluation_push_finetune.md). 기존4과제900step/PUSH1200step·512환경×3seed·2인/4상자 유지·점/영역ever 및 PUSH초기거리1m구간별집계다. 실행은 `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/evaluate_stage1_push_finetune.sh`, tmux `koo_eval_push9000`, 결과는 `output/stage1_base_push_finetune_eval9000_20261026/{RESULTS.md,summary.json}`에 완료run마다 갱신한다. 현재실행중중복시작하지않는다. 1인single_match와환경/표본수가다르므로직접동등비교하지않는다.
+
+- Stage1 78000회에서 PUSH 추가 파인튜닝: [PUSH 50% + 기존 4과제 50%](#stage1-push-finetune). 기존 과제의 RSI/모션은 원본 유지, 새 물성·방향 검사는 PUSH에 한정한다.
 
 - 서버에서 복사한 object tokenizer `carry_chair_copied_adapter` 500epoch 로컬 resume: [전용 명령·검증 범위](#object-tokenizer-local-resume). `ports/ksh_object_finetune` 복사본·2048환경을 사용한다.
 
@@ -38,6 +46,85 @@
 
 ## 현재 실험
 
+<a id="push-rsi-uniform-copy"></a>
+
+### PUSH RSI Uniform — 공유용 전용 config
+
+현재 공유용 config 이름은 **`stage1_push_rsi_uniform`** 이다. [팀 실행 가이드](../PUSH_RSI_UNIFORM_GUIDE.md)에 환경 준비·데이터·초기화·학습·평가 명령을 정리했다. 복사본의 종전 `stage1_push_finetune` config와 출력은 이전 기록용으로 남겨 둔다.
+
+| 환경 config | 학습 config | 스크립트 |
+| --- | --- | --- |
+| `ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_push_rsi_uniform.yaml` | `ports/stage1_base_push/tokenhsi/data/cfg/train/rlg/stage1_push_rsi_uniform.yaml` | `tokenhsi/scripts/multi_agent/stage1_push_rsi_uniform_{train,test,vnc}.sh` |
+
+공유용 출력은 `output/stage1_base_push_rsi_uniform/`이다. 실제4상자중PUSH담당에만큰PUSH물성을적용하고, 나머지2개는원본Stage1 SUPPORT 크기/밀도/마찰로생성해ON_TOP받침또는일반distractor로reset배치한다. 새계약 `distractor_mode: stage1_support_v1`과새초기본을사용하며종전큰여분상자checkpoint는직접resume하지않는다. 새 config는1200step을 YAML에 명시하며, 모델/보상/물리는 GPU1 기반과 같다. 내부 bank 계약은 `stage1_push_rsi_uniform_source.yaml`을 사용한다. GPU0은 예시이며 실행 전 점유를 확인한다.
+
+```bash
+# 원본78000과 모션 파일 확인 및 CPU 초기 전이본 생성
+bash tokenhsi/scripts/multi_agent/prepare_stage1_push_rsi_uniform.sh
+# CPU 회귀 + 실제 CPU 시뮬레이션 검사
+bash tokenhsi/scripts/multi_agent/check_stage1_push_rsi_uniform.sh
+# 학습: 이번 작업에서는 실행하지 않음
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_rsi_uniform_train.sh 2 2048 4
+# 로컬 추론 / 화면 없는 평가 / VNC
+TOKENHSI_GPU=0 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_VIEWER_LOW_VRAM=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_push_rsi_uniform_test.sh <checkpoint.pth> 2 1 4 10
+TOKENHSI_GPU=0 HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage1_push_rsi_uniform_test.sh <checkpoint.pth> 2 1 4 10
+TOKENHSI_GPU=0 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_VIEWER_LOW_VRAM=1 RESOLUTION=1280x720x24 PORT=6116 bash tokenhsi/scripts/multi_agent/stage1_push_rsi_uniform_vnc.sh <checkpoint.pth> 2 1 4 10
+```
+
+초기checkpoint는 `output/stage1_base_push_rsi_uniform/resume/Stage1PushRsiUniformSupport_from78000.pth`이다. 과거 GPU1·JHH 및 종전복사본 저장본은 계약 차이로 직접resume할 수 없다. 아래 과거run/PID/절대경로는 복사된 원본 이력이다.
+
+<a id="stage1-push-finetune"></a>
+
+### Stage1 78000회 → PUSH 50% 파인튜닝
+
+학습1200step 전환은 `TOKENHSI_TRAIN_EPISODE_LENGTH=1200`으로 지정한다. 사용자 승인으로 `koo_train:0`에서 전용launcher `bash output/stage1_base_push_finetune_stable_ep1200/launch.sh`를 실행해 GPU1 MPS·2048환경·9000회에서 재개했다. 새run은 `output/stage1_base_push_finetune_stable_ep1200/Stage1PushFinetune_26-11-17-19`, 로그는 상위폴더 `train.log`다. 저장config episodeLength1200·epoch9001→9002·새에피소드지표37개 실제기록을확인했다. 실행중중복시작하지않는다. 다른저장본은 명령앞에 `RESUME_CHECKPOINT=<저장본>`을지정한다. 기존600step학습과동일lock을사용해중복실행을거부한다. 시각화길이는별도로아래옵션을지정한다. episodeLength는모델/PUSH checkpoint계약에포함되지않으며 기존optimizer/epoch/frame을복원한다. 라이브simulator/AMP replay는복원하지않는다.
+
+상자→목표거리에는최소1m만있고별도최대거리설정은없다. 환경중심목표XY±4.5m·상자정면±45°·경로여유를만족하는목표를샘플링한다. seed42 CPU2048scene/4096상자의RSI전실측은평균7.824m·범위1.000~19.088m다(이최댓값은표본값). 사람→상자출발거리1~10m와다르며 RSI시에는이미진행한거리만큼실제남은거리가짧아진다.
+
+시각화 에피소드 길이는 `TOKENHSI_VIEWER_EPISODE_LENGTH=1200`으로 평가/test/VNC에만 덮어쓴다. 학습YAML 기본은600step이며 현재학습은 위launcher의 CLI로1200step을적용한다. 예시(실행 전 GPU점유확인, 현재GPU1학습과분리해GPU0선택):
+
+```bash
+TOKENHSI_GPU=0 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_CONDA_ENV=tokenhsi_koo \
+TOKENHSI_VIEWER_LOW_VRAM=1 TOKENHSI_VIEWER_EPISODE_LENGTH=1200 \
+TOKENHSI_VIEWER_RENDER_EVERY=2 TOKENHSI_VIEWER_DRAW_SYNC=0 \
+RESOLUTION=1280x720x24 PORT=6108 OUTPUT_PATH=output/stage1_base_push_finetune_view9000_1200 \
+bash tokenhsi/scripts/multi_agent/stage1_push_finetune_vnc.sh \
+output/stage1_base_push_finetune_stable/Stage1PushFinetune_24-01-18-44/nn/Stage1PushFinetune_00009000.pth 2 1 4 100000
+```
+
+기존6108뷰어가 실행 중이면 그 뷰어 터미널에서 종료한 뒤 실행한다. 학습 tmux는 유지한다. 1200은최대길이이며 넘어짐 등 조기종료는 유지된다. 옵션 전달/CLI config 덮어쓰기 확인, 새GPU viewer실행은 하지 않았다.
+
+2026-10-26 사용자 승인으로 `koo_train:0`에서9000회 저장본을 재개했다. 새 run은 `output/stage1_base_push_finetune_stable/Stage1PushFinetune_26-10-06-23`, 실행파일은 같은 상위폴더 `resume9000_20261026.sh`, 로그는 `resume9000_20261026.log`다. GPU1 MPS client·2048환경·9001→9002 및 아래 지표의 실제 TensorBoard 기록을 확인했다. 실행 중 중복 시작하지 않는다. 해당 실행파일은9000회부터 재시작하는 고정 명령이며 향후 최신상태 resume에는 `RESUME_CHECKPOINT=<새run의최신저장본>`을 사용한다.
+
+2026-10-26 추가한 에피소드 기록은 **코드를 새로 로드한 학습/재개부터** TensorBoard `relation/episode/<과제>/`에 남는다. 기존 실행에 자동 반영되지 않으며 기록 전 구간을 복원하지 않는다. 과제는 `sit`, `climb`, `holding_at`, `holding_ontop`, `push_at`이고 `completed_agents`(완료된 agent 에피소드 수), `final_success`(종료 시 성공률), `ever_success`(초기 RSI 상태를 포함해 한 번이라도 성공한 비율)를 기록한다. 성공 조건은 기존 required-goal 판정을 그대로 쓰며 보상·정책·checkpoint 계약을 바꾸지 않는다. 여러 iteration을 합칠 때 성공률은 `completed_agents`로 가중한다. 완료 표본이 없으면 count만0으로 기록하고 성공률은 생략한다.
+
+PUSH에는 `start_distance_m`, `remaining_distance_m`, `distance_reduction_m`, `progress_fraction`, `best_progress_fraction`도 기록한다. 모두 완료된 PUSH agent 에피소드의 평균이며 XY 상자→고정목표 거리 기준이다. 진행률은 `clamp((초기거리-잔여거리)/초기거리,0,1)`이고 최대진행률은 에피소드 중 최대값이다. 초기거리는 **RSI 적용 후**이므로 RSI로 미리 이동한 거리를 정책 실적으로 세지 않는다. 거리감소는 멀어지면 음수가 된다. `push_at_loco`와 `push_at_rsi`로 시작모드별 성공률·진행도도 분리한다. 기존 `relation/edge/*/own_success`는 스텝 상태 비율로, 위 에피소드 성공률과 다르다.
+
+전용 env/train은 `ports/stage1_base_push/tokenhsi/data/cfg/{multi_agent,train/rlg}/stage1_push_finetune.yaml`이다. PUSH 50%, SIT 5%, CLIMB 12.5%, AT/ON_TOP 각16.25%로 기존 네 과제의 상대 비율을 유지한다. 기존 과제의 보상·RSI 확률/선별 및 원본 모션 묶음을 유지하고 `dataset_stage1_push_finetune.yaml`에 PUSH21개와 PUSH 전용 보행4개(`push_loco`)만 추가한다. 과거 PUSH100%/12000회 실행과 출력·checkpoint 계약을 분리한다.
+
+PUSH 출발은 담당 사람으로부터1~10m, 목표는 환경 중심 XY각±4.5m 정사각형 안에서 사람/초기상자와각1m 이상·상자 로컬+Y 기준±45°를 동시에 만족하도록 거부 샘플링한다. 전체 경로/다른 사람과의 여유도 검사하므로 수용 분포는 완전 균등하지 않다. X/Y각1.60~2.20m(0.1m격자)·Z1.45~1.70m(0.05m격자), min(X,Y)≥1.1×Z인167종·크기무관20kg·마찰0.4이며 **기존 과제의 작은 상자 크기/물성은 원본 그대로**다. CONTACT state/progress/success각0.2(합0.6), 기존 AT각0.2를 사용한다. 바닥마찰1.0·600step·2048환경이다.
+
+PUSH RSI는 승인된clip0/3/4/8의949후보·원본DOF/속도·loco/PUSH50/50·각클립후반30%를70% 확률로 요청한다. clip7만 제외하며 추가발2cm필터는 없다. 최초 목표는 고정하고 상자만 `initial + box_progress*(goal-initial)`로 옮긴다. 따라서 초기10m·RSI4m 진행이면 **6m가 남고 목표를 새로10m 앞에 두지 않는다**. 새bank는 `ports/stage1_base_push/tokenhsi/data/stage1_push_finetune_stable_rsi_bank.json`이며 새167크기/양담당자0.1초CPU PD316,966상태 및 ±45°경계/정면 기하475,449배치를 검사를 모두 통과했다. 실제 결과는 아래 보고서에 기록한다. 경로간격은3.5m로 늘렸다. 장기균형/학습성공 검증은 아니다.
+
+원본 `ports/stage1_base_push/weights/Stage1V2Fixed_00078000.pth`에서 전이한 저장본은 `output/stage1_base_push_finetune_stable/resume/Stage1PushFinetuneStable_from78000.pth`다. 모델162개텐서·기존과제embedding4행·기존AMP입력/정규화를 보존하고, 새PUSH embedding은carry_at행·새AMP family열/RMS는carry에서 초기화한다. optimizer 누적상태·epoch/frame·best reward는 초기화하며 live simulator/replay는 복원하지 않는다. 원본SHA는 전이JSON에 기록한다. 사용자 요청으로 GPU 확인용 학습/본학습은 실행하지 않고 명령만 제공한다. CPU 검사와 RSI 영상 생성만 수행한다. 과거18종/마찰0.5 bank·전이본·영상은 보존하며 현재실험과 계약이 다르다.
+
+```bash
+# PUSH만 CPU 기하/초기물리 검사 및 RSI 영상 재생성; 기존과제 RSI 재검사는 하지 않는다.
+bash tokenhsi/scripts/multi_agent/check_stage1_push_finetune.sh
+bash tokenhsi/scripts/multi_agent/review_stage1_push_finetune.sh
+bash tokenhsi/scripts/multi_agent/check_stage1_push_finetune_player.sh
+# 본학습 명령. 실행 상태/로그는 아래 보고서를 확인하고 중복 실행하지 않는다.
+env -u RESUME_CHECKPOINT -u MAX_ITERATIONS TOKENHSI_GPU=1 TOKENHSI_CONDA_ENV=tokenhsi_koo SEED=42 bash tokenhsi/scripts/multi_agent/stage1_push_finetune_train.sh 2 2048 4
+# 확인용: 별도출력/2048환경, 전이본epoch0에서2회
+TOKENHSI_GPU=1 OUTPUT_PATH=output/stage1_base_push_finetune_stable_check_train MAX_ITERATIONS=2 bash tokenhsi/scripts/multi_agent/stage1_push_finetune_train.sh 2 2048 4
+# 로컬 추론 / 화면 없는 평가 / 서버 VNC (실행 전 로컬GPU 보호규칙 확인)
+TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_VIEWER_LOW_VRAM=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_push_finetune_test.sh output/stage1_base_push_finetune_stable/resume/Stage1PushFinetuneStable_from78000.pth 2 1 4 10
+TOKENHSI_GPU=1 HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage1_push_finetune_test.sh output/stage1_base_push_finetune_stable/resume/Stage1PushFinetuneStable_from78000.pth 2 1 4 10
+TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_VIEWER_LOW_VRAM=1 RESOLUTION=1280x720x24 PORT=6108 bash tokenhsi/scripts/multi_agent/stage1_push_finetune_vnc.sh output/stage1_base_push_finetune_stable/resume/Stage1PushFinetuneStable_from78000.pth 2 1 4 10
+```
+
+학습재개는 `RESUME_CHECKPOINT=<이실험저장본>`으로 지정한다. 평가 기본은PUSH/loco시작이며 `TASK_GRAPH=random_scenario`로 혼합과제 평가를 선택할 수 있다. [PUSH RSI 영상](../output_etc/check/stage1_push_finetune_stable/push_rsi_candidates.mp4)·[검사보고서](../output_etc/check/stage1_push_finetune_stable/REPORT.md). 영상은CPU 초기자세열이며 정책/물리rollout이 아니다. 원본Stage1 pth·기존PUSH 저장본은 직접resume하지 않는다. 전이도구 `prepare_finetune.py`는 port cwd/PYTHONPATH에서 `bank`(최초1회), `transfer`(검증된bank필수)를 제공하며 기존파일을 덮어쓰지 않는다.
+
 <a id="stage1-base-push"></a>
 
 ### 원본 Stage 1 네트워크·4상자 + PUSH_AT
@@ -60,6 +147,41 @@ TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_CONDA_ENV=tokenhsi_koo TOKE
 RSI [검수 영상](../output_etc/check/stage1_base_push_rsi_review/stage1_push_rsi_review.mp4)·[보고서](../output_etc/check/stage1_base_push_rsi_review/REPORT.md): 실제4상자 reset8장면+PUSH949후보, CPU 초기자세55.6초다. 사용자 검수 대기이며 정책 rollout 영상은 아니다. 재생성: `bash output_etc/check/stage1_base_push_rsi_review/launch.sh`.
 
 VNC 접속 `http://localhost:6107/vnc.html?autoconnect=1&resize=remote`. 2026-10-22 실제5500회 정책 viewer 실행은 `bash output/stage1_base_push_view_20261022/launch.sh`이며 tmux `koo_stage1_push_view_20261022`가 살아 있으면 중복 실행하지 않는다. GPU1 native/MPS 우회·저메모리1환경·loco 시작·1280×720이며 실제 정책 step/화면 및 실행 후 기존학습 진행을 확인했다. 로그/캡처는 같은 폴더 `viewer.log`/`preview.png`다. 관측 시 GPU1 여유523MiB·학습FPS 감소가 있었고 장기 병행 안전성을 보장하지 않는다.
+
+12000회 정육면체 viewer: `bash output/stage1_base_push_cube_view_20261023/launch.sh`. GPU1 native·저메모리1환경·loco 시작·VNC6109이며 `TOKENHSI_VIEWER_PUSH_CUBES=1`로 실제 asset/크기관측/접촉 크기를 X=Y=Z, 한 변1.0~1.5m/0.1m격자6종에서 생성 시 배정한다(episode reset마다 크기가 바뀌지는 않는다). 네 상자 모두20kg/마찰0.6을 유지한다. 학습 설정/저장본 계약은 보존하며 native GUI/test·PUSH_AT/loco·16환경 이하만 허용한다. 크기가 바뀐 interaction RSI는 사용하지 않는다. tmux `koo_stage1_cube_view_20261023`, 로그는 같은 폴더 `viewer.log`. 접속: `http://localhost:6109/vnc.html?autoconnect=1&resize=remote`.
+
+정육면체 크기/마찰 고정은 같은 viewer 전용 옵션 `TOKENHSI_VIEWER_PUSH_CUBE_SIDE=1.5 TOKENHSI_VIEWER_PUSH_CUBE_FRICTION=0.4`다. `TOKENHSI_VIEWER_PUSH_CUBES=1`과 함께 사용하며 네 상자 모두1.5m/20kg/마찰0.4로 만든다. 크기1~1.5m·유한한 비음수 마찰만 허용한다. 바닥마찰은 바꾸지 않는다. 예시(사용자 직접 실행, 기존 프로세스 종료 없음):
+
+XY 독립 가변은 여기에 `TOKENHSI_VIEWER_PUSH_XY_RANDOM=1`을 추가한다. 네 상자의 X/Y를 각각1.0~1.5m/0.1m격자에서 생성 시 독립 배정하고 Z는 `TOKENHSI_VIEWER_PUSH_CUBE_SIDE` 값으로 고정한다. 크기는 reset마다 변경되지 않는다. 아래 명령에 이 옵션을 추가하고 `PORT=6112 OUTPUT_PATH=output/stage1_base_push_xy_friction04_view`로 실행하면 Z1.5m/20kg/상자마찰0.4의 별도 viewer다.
+
+정육면체 후보크기 제한은 `TOKENHSI_VIEWER_PUSH_CUBE_SIDES=1.3,1.4,1.5`다. `TOKENHSI_VIEWER_PUSH_CUBES=1`과 함께 사용하고 `TOKENHSI_VIEWER_PUSH_XY_RANDOM=0`, `TOKENHSI_VIEWER_PUSH_CUBE_SIDE`는 unset해야 한다. 각 상자XYZ를 같은 값으로 배정한다. 아래 명령의 고정SIDE를 이 SIDES로 바꾸고 `PORT=6114 OUTPUT_PATH=output/stage1_base_push_cubes13to15_friction04_view`로 실행한다(20kg/상자마찰0.4 유지).
+
+직육면체 범위·Y≥Z viewer는 다음과 같다. X1.2~1.7m, Y/Z각1.45~1.7m의 **연속값**으로 생성 시 배정하고 Y/Z를 큰값/작은값 순서로 놓아 Y≥Z를 보장한다(정육면체일 필요 없음). `BOX_RANGES` 순서는 xmin,xmax,ymin,ymax,zmin,zmax이며 현재Y/Z범위가같은 경우만 지원한다. 실제크기/질량/상자마찰은로그에 기록한다. 네 상자20kg/마찰0.4 유지, scene배치검사는 최대1.7m 크기로 수행하고 source YAML/bank는 변경하지 않는다. CPU10000상자범위/Y≥Z/20kg·최대크기2048scene 검사통과, 새GPU rollout은 미검증이다.
+
+```bash
+env -u TOKENHSI_VIEWER_PUSH_CUBE_SIDE -u TOKENHSI_VIEWER_PUSH_CUBE_SIDES \
+TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_CONDA_ENV=tokenhsi_koo \
+TOKENHSI_VIEWER_LOW_VRAM=1 TOKENHSI_VIEWER_PUSH_CUBES=1 TOKENHSI_VIEWER_PUSH_XY_RANDOM=0 \
+TOKENHSI_VIEWER_PUSH_BOX_RANGES=1.2,1.7,1.45,1.7,1.45,1.7 \
+TOKENHSI_VIEWER_PUSH_CUBE_FRICTION=0.4 \
+TOKENHSI_VIEWER_RENDER_EVERY=2 TOKENHSI_VIEWER_DRAW_SYNC=0 \
+RESOLUTION=1280x720x24 PORT=6115 OUTPUT_PATH=output/stage1_base_push_ygez_view \
+bash tokenhsi/scripts/multi_agent/stage1_base_push_vnc.sh \
+output/stage1_base_push/Stage1BasePush_21-15-46-33/nn/Stage1BasePush_00012000.pth 2 1 4 100000
+```
+
+`BOX_RANGES`는 기존SIDE/SIDES/XY_RANDOM과동시사용하지않는다. 이전정육면체명령으로돌아갈때는 `TOKENHSI_VIEWER_PUSH_BOX_RANGES`를 unset한다.
+
+```bash
+TOKENHSI_GPU=1 TOKENHSI_GUI_GPU_MODE=native TOKENHSI_CONDA_ENV=tokenhsi_koo \
+TOKENHSI_VIEWER_LOW_VRAM=1 TOKENHSI_VIEWER_PUSH_CUBES=1 \
+TOKENHSI_VIEWER_PUSH_CUBE_SIDE=1.5 TOKENHSI_VIEWER_PUSH_CUBE_FRICTION=0.4 \
+TOKENHSI_VIEWER_RENDER_EVERY=2 TOKENHSI_VIEWER_DRAW_SYNC=0 \
+RESOLUTION=1280x720x24 PORT=6111 \
+OUTPUT_PATH=output/stage1_base_push_cube15_friction04_view \
+bash tokenhsi/scripts/multi_agent/stage1_base_push_vnc.sh \
+output/stage1_base_push/Stage1BasePush_21-15-46-33/nn/Stage1BasePush_00012000.pth 2 1 4 100000
+```
 
 짧은 학습은 별도 `OUTPUT_PATH=output/stage1_base_push_check_train MAX_ITERATIONS=2`와2048환경을 사용한다. 기존570D/6000회 PUSH 및 원본4과제 checkpoint 직접사용은 거부한다. 장기성능은 별도 평가하며 GPU 실행 전에 [로컬 보호 규칙](#local-vnc-viewer)을 따른다.
 
@@ -193,6 +315,7 @@ output/push_contact_face_at_tilt_soft_3to5m/PushContactFaceATTiltSoft3to5m_18-18
 | ksh typed bias | [typed_bias.yaml](../ports/ksh_stage1/tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_typed_bias.yaml) | size RSI + typed attention bias |
 | ksh typed message | [typed_bias_message.yaml](../ports/ksh_stage1/tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_unified_size_rsi_typed_bias_message.yaml) | typed bias + typed value message |
 | 1 | [amp_humanoid_ma_carry.yaml](../tokenhsi/data/cfg/multi_agent/amp_humanoid_ma_carry.yaml) | 원본 multi-agent carry 기준 |
+| Stage1 PUSH fine-tune | [stage1_push_finetune.yaml](../ports/stage1_base_push/tokenhsi/data/cfg/multi_agent/stage1_push_finetune.yaml) | 원본78000회 전이·PUSH50%/기존4과제50%·[train/test/VNC](#stage1-push-finetune) |
 | 27 | [approach_scenario_independent_with_climb.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_independent_with_climb.yaml) | 독립 물체·goal binding, 점 기준 성공 |
 | 28 | [approach_scenario_stage1_plane.yaml](../tokenhsi/data/cfg/multi_agent/approach_scenario_stage1_plane.yaml) | 27번의 ON_TOP·CLIMB을 상판 영역 성공으로 변경; Stage 2 기본 출발점 |
 | 29 | [approach_stage2_coordination.yaml](../tokenhsi/data/cfg/multi_agent/approach_stage2_coordination.yaml) | Stage 1 checkpoint에서 협력 graph 학습 |

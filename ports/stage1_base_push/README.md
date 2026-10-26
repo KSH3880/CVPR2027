@@ -1,5 +1,9 @@
 # Stage 1 원본 + PUSH_AT
 
+공유용 `stage1_push_rsi_uniform`은원본Stage1의4상자구조(담당2개+SUPPORT2개)다. 큰PUSH20kg/마찰0.4는PUSH담당물체에만적용한다. SUPPORT는원본크기·밀도100·마찰1.0이며ON_TOP받침또는일반distractor로reset배치한다. 아래과거설정과구분한다.
+
+이checkout의현재fine-tune은PUSH RSI상자이동을생략하고목표2~10m/정면±45°를제안하는복사본이다. 아래내용은원본이력도포함한다. [현재실행](../../markdowns/config.md#push-rsi-uniform-copy)·[GPU1/JHH비교](../../markdowns/push_rsi_uniform_comparison.md).
+
 `KSH3880/CVPR2027`의 `stage1_stage2_base`, commit `28f02b3278f0a3e703cfa22a1e8cc376bb8ec512`에서 가져온 별도 실행본이다. 원본 파일 목록과 Git blob hash는 `UPSTREAM.json`에 있다. 실행 cwd와 Python 경로를 이 폴더로 제한하며, 메인 체크아웃의 실행 중 PUSH 학습 코드는 수정하지 않는다. 데이터는 메인 체크아웃으로 상대 심링크 연결한다.
 
 원본 `stage1_v2_fixed.yaml`의 SIT·CLIMB·carry_at·carry_ontop, 해당 graph/RSI/보상 구현과 원본 config를 보존한다. `carry_at`을 교체하지 않고 `PUSH_AT`을 별도 과제로 추가한다. 기본 과제 확률은 기존 과제 0%, PUSH_AT 100%이며 Stage 2/coupled 학습은 사용하지 않는다.
@@ -56,3 +60,7 @@ bash tokenhsi/scripts/multi_agent/stage1_base_push_vnc.sh <Stage1BasePush.pth> 2
 VNC 접속: `http://localhost:6107/vnc.html?autoconnect=1&resize=remote`. 실행 전 [로컬 viewer 보호 규칙](../../markdowns/config.md#local-vnc-viewer)을 따른다. 새 경로의 GPU/PPO/GUI·학습 병행 안전성·정책 성능은 미검증이다. 학습/MPS 종료나 재시작은 수행하지 않았다.
 
 검증 결과는 [REPORT.md](../../output/stage1_base_push_check/REPORT.md)에 기록한다. 무학습 fixture는 성공한 학습 정책이 아니며 성능 평가에 사용하지 않는다.
+
+## PUSH50% 파인튜닝
+
+`stage1_push_finetune.yaml`은 사용자 제공 `weights/Stage1V2Fixed_00078000.pth`의 기존4과제 가중치를 보존하고 PUSH를 추가하는 별도실험이다. PUSH50%·SIT5%/CLIMB12.5%/AT·ON_TOP각16.25%이며 기존과제 RSI/모션/보상을 유지한다. CONTACT각0.2, PUSH크기는XY1.6~2.2m/Z1.45~1.7m·min(X,Y)≥1.1Z의167종, 20kg/마찰0.4다. 출발1~10m·환경중심XY±4.5m목표/로컬+Y±45°·최초목표고정은유지한다. 현재bank/전이본/출력은stable이름으로구분한다. [명령·검증·실행상태](../../markdowns/config.md#stage1-push-finetune).

@@ -4,6 +4,8 @@ from dataclasses import replace
 from pathlib import Path
 import json
 import hashlib
+import os
+import math
 import yaml
 from isaacgym import gymapi, gymtorch
 import torch
@@ -38,11 +40,60 @@ class LegacyRsiCache:
 class HumanoidMAStage1Push(HumanoidMACarry):
     def __init__(self, cfg, *args, **kwargs):
         validate_env(cfg['env'])
+        self._viewer_cubes = os.environ.get('TOKENHSI_VIEWER_PUSH_CUBES') == '1'
+        self._viewer_xy_random = os.environ.get('TOKENHSI_VIEWER_PUSH_XY_RANDOM') == '1'
+        self._viewer_cube_side = os.environ.get('TOKENHSI_VIEWER_PUSH_CUBE_SIDE')
+        self._viewer_cube_friction = os.environ.get('TOKENHSI_VIEWER_PUSH_CUBE_FRICTION')
+        cube_sides = os.environ.get('TOKENHSI_VIEWER_PUSH_CUBE_SIDES')
+        box_ranges = os.environ.get('TOKENHSI_VIEWER_PUSH_BOX_RANGES')
+        self._viewer_box_ranges = None
+        if box_ranges is not None:
+            if (not self._viewer_cubes or self._viewer_xy_random
+                    or self._viewer_cube_side is not None or cube_sides is not None):
+                raise ValueError('BOX_RANGES requires CUBES=1 without other size overrides')
+            values = [float(value) for value in box_ranges.split(',')]
+            if (len(values) != 6 or not all(math.isfinite(value) for value in values)
+                    or any(not 1. <= values[i] <= values[i+1] <= 1.7 for i in (0, 2, 4))
+                    or values[2:4] != values[4:6]):
+                raise ValueError('BOX_RANGES needs xmin,xmax,ymin,ymax,zmin,zmax in [1,1.7], equal Y/Z ranges')
+            self._viewer_box_ranges = values
+        self._viewer_cube_sides = [1., 1.1, 1.2, 1.3, 1.4, 1.5]
+        if cube_sides is not None:
+            if not self._viewer_cubes or self._viewer_xy_random or self._viewer_cube_side is not None:
+                raise ValueError('CUBE_SIDES requires CUBES=1 without XY_RANDOM or fixed CUBE_SIDE')
+            self._viewer_cube_sides = [float(value) for value in cube_sides.split(',')]
+            if not all(math.isfinite(value) and 1. <= value <= 1.5 for value in self._viewer_cube_sides):
+                raise ValueError('Viewer cube sides must be in [1.0, 1.5] metres')
+        if self._viewer_xy_random and (not self._viewer_cubes or self._viewer_cube_side is None):
+            raise ValueError('Viewer XY random sizes require CUBES=1 and CUBE_SIDE for fixed Z')
+        if not self._viewer_cubes and (self._viewer_cube_side is not None or self._viewer_cube_friction is not None):
+            raise ValueError('Cube side/friction overrides require TOKENHSI_VIEWER_PUSH_CUBES=1')
+        if self._viewer_cube_side is not None:
+            self._viewer_cube_side = float(self._viewer_cube_side)
+            if not math.isfinite(self._viewer_cube_side) or not 1. <= self._viewer_cube_side <= 1.5:
+                raise ValueError('Viewer cube side must be in [1.0, 1.5] metres')
+        if self._viewer_cube_friction is not None:
+            self._viewer_cube_friction = float(self._viewer_cube_friction)
+            if not math.isfinite(self._viewer_cube_friction) or self._viewer_cube_friction < 0.:
+                raise ValueError('Viewer cube friction must be finite and nonnegative')
+        if self._viewer_cubes:
+            args_config = cfg.get('args')
+            if (not getattr(args_config, 'test', False)
+                    or getattr(args_config, 'headless', True)
+                    or os.environ.get('TOKENHSI_GUI_GPU_MODE') != 'native'
+                    or getattr(args_config, 'task_graph', None) != 'push_at'
+                    or getattr(args_config, 'eval_skills', None) != 'loco'
+                    or cfg['env']['numEnvs'] > 16):
+                raise ValueError('Viewer cubes require native GUI test, PUSH_AT/loco and <=16 environments')
         self._amp_family_count = 4
         self._solo_cache_class = LegacyRsiCache
         self._push_spec = cfg['env']['pushExtension']
         self._source_push_env = yaml.safe_load(Path(self._push_spec['source_env']).read_text())['env']
         self._source_push_env['motion_file'] = 'tokenhsi/data/dataset_push_native_phase_xy.yaml'
+        if cfg['env'].get('_native_geometry_check'):
+            if getattr(cfg.get('args'), 'device', None) != 'cpu':
+                raise ValueError('Unscreened RSI inspection is CPU-only')
+            self._source_push_env['_native_geometry_check'] = True
         self._contact_cfg = dict(push=self._push_spec['physical_push'],
             contact_at=self._push_spec['contact'], push_at=self._push_spec['push_at'])
         super().__init__(cfg, *args, **kwargs)
@@ -54,12 +105,41 @@ class HumanoidMAStage1Push(HumanoidMACarry):
             self.cfg['env']['pushScene']['owner_anchor_xy'])
 
     def _load_box_asset(self):
+        size_env = self.cfg['env']
+        if self._task_graph_preset != 'random_scenario':
+            name = {'push_at':'PUSH_AT','holding_at':'HOLDING_AT',
+                    'holding_ontop':'HOLDING_ON_TOP','sit':'SIT','climb':'CLIMB'}.get(self._task_graph_preset)
+            if name is not None:
+                size_env = deepcopy(size_env)
+                size_env['relationGraph']['template_probabilities'] = {
+                    key:float(key == name) for key in TEMPLATES}
         self._box_size, self._push_size_probabilities = sample_asset_sizes(
-            self.num_envs, self.cfg['env'], self.device)
+            self.num_envs, size_env, self.device)
+        push_owners = self._push_size_probabilities[...,5] > 0
+        support_mask = (torch.zeros_like(push_owners) if self.cfg['env']['pushExtension'].get(
+            'distractor_mode') == 'stage1_support_v1' else push_owners)
+        self._push_asset_mask = torch.cat((push_owners, support_mask), -1)
+        if self._viewer_cubes:
+            if self._viewer_box_ranges is not None:
+                bounds = self._box_size.new_tensor(self._viewer_box_ranges).reshape(3, 2)
+                self._box_size = bounds[:, 0] + torch.rand_like(self._box_size) * (bounds[:, 1]-bounds[:, 0])
+                # Equal Y/Z ranges: sorting gives uniform samples over the allowed Y>=Z triangle.
+                yz = self._box_size[..., 1:].sort(dim=-1, descending=True).values
+                self._box_size[..., 1:] = yz
+            elif self._viewer_cube_side is not None:
+                self._box_size.fill_(self._viewer_cube_side)
+            else:
+                sides = torch.tensor(self._viewer_cube_sides, device=self.device)
+                indices = torch.randint(len(sides), self._box_size.shape[:2], device=self.device)
+                self._box_size = sides[indices, None].expand(-1, -1, 3).clone()
+            if self._viewer_xy_random:
+                self._box_size[..., :2] = torch.randint(10, 16,
+                    (*self._box_size.shape[:2], 2), device=self.device) / 10.
+            print('[viewer boxes] actual box XYZ (m):', self._box_size.cpu().tolist(), flush=True)
         self._box_scale = self._box_size / self._box_size.new_tensor(self._build_base_size)
         flat = self._box_size.flatten(0, 1)
-        push = flat[:, 1] == 2.
-        self._box_density = torch.where(push, 20./flat.prod(-1), 100.)
+        push = torch.ones_like(flat[:, 1], dtype=torch.bool) if self._viewer_cubes else self._push_asset_mask.flatten()
+        self._box_density = torch.where(push, self.cfg['env']['pushBox']['mass']/flat.prod(-1), 100.)
         self._box_assets = []
         cache = {}
         for index, dims in enumerate(flat.cpu().tolist()):
@@ -77,12 +157,17 @@ class HumanoidMAStage1Push(HumanoidMACarry):
     def _build_box(self, env_id, object_id, env_ptr):
         super()._build_box(env_id, object_id, env_ptr)
         handle = self._box_handles[-1]
-        if float(self._box_size[env_id, object_id, 1]) == 2.:
+        if self._viewer_cubes or bool(self._push_asset_mask[env_id, object_id]):
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, handle)
             for prop in props:
-                prop.friction = .6
+                prop.friction = (self._viewer_cube_friction if self._viewer_cubes
+                    and self._viewer_cube_friction is not None else self.cfg['env']['pushBox']['friction'])
                 prop.restitution = 0.
             self.gym.set_actor_rigid_shape_properties(env_ptr, handle, props)
+        if self._viewer_cubes:
+            mass = sum(p.mass for p in self.gym.get_actor_rigid_body_properties(env_ptr, handle))
+            friction = [p.friction for p in self.gym.get_actor_rigid_shape_properties(env_ptr, handle)]
+            print(f'[viewer cubes] env={env_id} box={object_id} mass={mass} friction={friction}', flush=True)
         # Non-overlapping initial actors before the inherited fixed-shelf warmup.
         state = self.gym.get_actor_rigid_body_states(env_ptr, handle, gymapi.STATE_ALL)
         state['pose']['p']['x'][:] = 5. * object_id
@@ -94,6 +179,8 @@ class HumanoidMAStage1Push(HumanoidMACarry):
         motion = yaml.safe_load(Path(motion_file).read_text())['motions']
         probabilities = self.cfg['env']['relationGraph']['template_probabilities']
         names = ('loco', 'push') if probabilities['PUSH_AT'] == 1. else tuple(motion)
+        if self._push_spec.get('sampling_profile') == 'stage1_square_cone_v1' and 'push_loco' not in names:
+            names = tuple(names) + ('push_loco',)
         self._skill_categories = list(motion)
         self._motion_lib = {name: MotionLib(motion_file=motion_file, skill=name,
             dof_body_ids=self._dof_body_ids, dof_offsets=self._dof_offsets,
@@ -107,17 +194,43 @@ class HumanoidMAStage1Push(HumanoidMACarry):
         self._push_bank = NativePushBank(self._source_push_env['openPushRSI'],
             self._motion_lib, self._source_push_env)
         self._push_plan = self._box_states.clone()
+        self._push_initial_plan = self._box_states.clone()
         self._push_goals = self._tar_pos.clone()
         self._push_generator = torch.Generator(device=self.device).manual_seed(torch.initial_seed())
         self._rsi_interaction = torch.zeros(self.num_envs, 2, dtype=torch.bool, device=self.device)
         self._rsi_late = torch.zeros_like(self._rsi_interaction)
+        self._uniform_rsi_failed = torch.zeros_like(self._rsi_interaction[:, 0])
         self._push_hits = torch.zeros_like(self._rsi_interaction)
+        from utils.stage1_episode_metrics import Stage1EpisodeMetrics
+        self._task_episode_metrics = Stage1EpisodeMetrics(self.num_envs, self.num_agents, self.device)
+
+    def _push_goal_distance(self):
+        return (self._box_states[:, :2, :2] - self._tar_pos[..., :2]).norm(dim=-1)
+
+    def _reset_relation_history(self, ids):
+        super()._reset_relation_history(ids)
+        env, agent = self._expand_slots(ids)
+        templates = classify_templates(self.relation_runtime.graph, env, agent).reshape(len(ids), self.num_agents)
+        self._task_episode_metrics.reset(ids, templates, self._rsi_interaction[ids],
+            self._push_goal_distance()[ids], self.relation_runtime.done[ids])
+
+    def _finish_relation_diagnostics(self):
+        super()._finish_relation_diagnostics()
+        self._task_episode_metrics.finish(self.reset_buf.bool(), self._push_goal_distance(),
+                                         self.relation_runtime.done)
+
+    def consume_relation_diagnostics(self):
+        result = super().consume_relation_diagnostics()
+        result.update(self._task_episode_metrics.consume())
+        return result
 
     def _sample_episode_graph(self, ids):
         weights = self._size_template_probabilities[ids]
         preset = self._task_graph_preset
         if preset == 'random_scenario':
             template = torch.multinomial(weights.flatten(0, 1), 1).reshape(len(ids), 2)
+            if not (weights.gather(-1, template[...,None]).squeeze(-1)>0).all():
+                raise RuntimeError('Task sampler selected a zero-probability template')
         else:
             name = {'push_at':'PUSH_AT', 'holding_at':'HOLDING_AT',
                     'holding_ontop':'HOLDING_ON_TOP', 'sit':'SIT', 'climb':'CLIMB'}.get(preset)
@@ -143,15 +256,24 @@ class HumanoidMAStage1Push(HumanoidMACarry):
 
     def _reset_actors(self, ids):
         from utils.stage1_push_scene import sample_four_box_scene
-        xy, q, goals = sample_four_box_scene(len(ids), self._source_push_env,
+        scene_env = self._source_push_env
+        if self._viewer_box_ranges is not None:
+            scene_env = deepcopy(scene_env)
+            maximum = self._viewer_box_ranges[1::2]
+            scene_env['pushBox']['size'] = maximum
+            scene_env['pushScene']['path_separation'] = max(
+                scene_env['pushScene']['path_separation'], math.hypot(*maximum[:2]) + .3)
+        xy, q, goals = sample_four_box_scene(len(ids), scene_env,
                                              self.device, self._push_generator)
         self._push_plan[ids] = self._initial_box_states[ids]
         self._push_plan[ids, :, :2] = xy
         self._push_plan[ids, :, 3:7] = q
         self._push_plan[ids, :, 2] = self._box_size[ids, :, 2]/2
         self._push_plan[ids, :, 7:] = 0.
+        self._push_initial_plan[ids] = self._push_plan[ids]
         self._push_goals[ids, :, :2] = goals
         self._push_goals[ids, :, 2] = self._box_size[ids, :2, 2]/2
+        self._uniform_rsi_failed[ids] = False
         self._rsi_interaction[ids] = False
         self._rsi_late[ids] = False
         return super()._reset_actors(ids)
@@ -169,11 +291,25 @@ class HumanoidMAStage1Push(HumanoidMACarry):
             if skills != ['loco']:
                 raise ValueError('PUSH evaluation starts from loco; train RSI is not an eval skill override')
             interaction.zero_()
+        if self.cfg['env']['openPushRSI'].get('uniform_goal_distance', False) and interaction.any():
+            from utils.stage1_push_scene import resample_uniform_rsi_goals
+            active = torch.zeros_like(self._rsi_interaction)
+            active[e[interaction], a[interaction]] = True
+            ids = e[interaction].unique()
+            sampled_goals, failed = resample_uniform_rsi_goals(
+                self._push_plan[ids], self._push_goals[ids], active[ids],
+                self._source_push_env, self._push_generator,
+                self.cfg['env']['openPushRSI']['goal_distance_range'],
+                check_spares=self._push_spec.get('distractor_mode') != 'stage1_support_v1',
+                return_failures=True)
+            self._push_goals[ids] = sampled_goals
+            self._uniform_rsi_failed[ids] = failed
         for skill, selected in (('loco', ~interaction), ('push', interaction)):
             ee, aa = e[selected], a[selected]
             if not len(ee):
                 continue
-            lib = self._motion_lib[skill]
+            lib = self._motion_lib['push_loco' if skill == 'loco' and
+                self._push_spec.get('sampling_profile') == 'stage1_square_cone_v1' else skill]
             if not self._is_eval:
                 kind=torch.full_like(ee,PUSH_TEMPLATE)
                 selected_skill=torch.full_like(ee,self._skill.index(skill))
@@ -182,8 +318,10 @@ class HumanoidMAStage1Push(HumanoidMACarry):
             if skill == 'push':
                 sample = self._push_bank.sample('push', len(ee))
                 mids, times = sample['motion_id'].long(), sample['time']
-                delta = self._push_goals[ee, aa] - self._push_plan[ee, aa, :3]
-                self._push_plan[ee, aa, :3] += sample['box_progress'][:, None]*delta
+                from utils.stage1_push_scene import advance_rsi_box
+                if not self.cfg['env']['openPushRSI'].get('uniform_goal_distance', False):
+                    self._push_plan[ee, aa, :3] = advance_rsi_box(
+                        self._push_initial_plan[ee, aa, :3], self._push_goals[ee, aa], sample['box_progress'])
                 self._rsi_interaction[ee, aa] = True
                 self._rsi_late[ee, aa] = sample['late_requested']
             else:
@@ -222,12 +360,37 @@ class HumanoidMAStage1Push(HumanoidMACarry):
 
     def _reset_boxes(self, ids):
         env, agent = self._push_slots(ids)
-        if len(env) != 2*len(ids):
+        native_support = self._push_spec.get('distractor_mode') == 'stage1_support_v1'
+        if native_support or len(env) != 2*len(ids):
             super()._reset_boxes(ids)
         else:
             self._platform_pos[ids] = self._platform_default_pos[ids]
             self._box_states[ids] = self._push_plan[ids]
         self._box_states[env, agent] = self._push_plan[env, agent]
+        # A PUSH owner's additional physical box must stay outside its corridor
+        # even when the other owner is assigned a legacy task.
+        if not native_support:
+            self._box_states[env, agent+2] = self._push_plan[env, agent+2]
+
+    def _configure_ontop_targets(self, ids):
+        super()._configure_ontop_targets(ids)
+        if self._push_spec.get('distractor_mode') != 'stage1_support_v1':
+            return
+        from utils.stage1_push_scene import clear_unused_stage1_supports
+        ee, aa = self._expand_slots(ids)
+        templates = classify_templates(self.relation_runtime.graph, ee, aa).reshape(len(ids), 2)
+        clear_unused_stage1_supports(self, ids, templates)
+
+    def _ontop_scene_infeasible(self, ids):
+        bad = super()._ontop_scene_infeasible(ids)
+        bad |= self._uniform_rsi_failed[ids]
+        if self._push_spec.get('distractor_mode') == 'stage1_support_v1':
+            from utils.stage1_push_scene import support_push_paths_clear
+            ee, aa = self._expand_slots(ids)
+            push = classify_templates(self.relation_runtime.graph, ee, aa).reshape(len(ids), 2) == PUSH_TEMPLATE
+            bad |= ~support_push_paths_clear(self._box_states[ids], self._box_size[ids],
+                self._tar_pos[ids], push).all(-1)
+        return bad
 
     def _reset_task(self, ids):
         super()._reset_task(ids)
@@ -277,7 +440,9 @@ class HumanoidMAStage1Push(HumanoidMACarry):
 
     def _compute_reward(self, actions):
         self.relation_runtime.contact.copy_(self._push_hits)
-        return super()._compute_reward(actions)
+        result = super()._compute_reward(actions)
+        self._task_episode_metrics.observe(self._push_goal_distance(), self.relation_runtime.done)
+        return result
 
     def _amp_family(self, env_ids=None, slot_agent=None):
         family = super()._amp_family(env_ids, slot_agent)
@@ -288,6 +453,15 @@ class HumanoidMAStage1Push(HumanoidMACarry):
             env_ids = env_ids.repeat_interleave(2)
         template = classify_templates(self.relation_runtime.graph,env_ids,slot_agent)
         return torch.where(template == PUSH_TEMPLATE, 3, family)
+
+    def _init_amp_obs_ref(self, slots, motion_ids, motion_times, skill_name):
+        if skill_name != 'loco' or self._push_spec.get('sampling_profile') != 'stage1_square_cone_v1':
+            return super()._init_amp_obs_ref(slots,motion_ids,motion_times,skill_name)
+        env,agent = slots
+        push = classify_templates(self.relation_runtime.graph,env,agent) == PUSH_TEMPLATE
+        for mask,name in ((~push,'loco'),(push,'push_loco')):
+            if mask.any():
+                super()._init_amp_obs_ref((env[mask],agent[mask]),motion_ids[mask],motion_times[mask],name)
 
     def _fetch_conditioned_amp_demo(self, num_samples):
         from utils.unified_training import append_family
@@ -303,7 +477,8 @@ class HumanoidMAStage1Push(HumanoidMACarry):
             for index,name in enumerate(self.cfg['env']['skill']):
                 dest=rows[selected==index]
                 if not len(dest):continue
-                lib=self._motion_lib[name]; mids=lib.sample_motions(len(dest))
+                library_name = 'push_loco' if value == 3 and name == 'loco' and self._push_spec.get('sampling_profile') == 'stage1_square_cone_v1' else name
+                lib=self._motion_lib[library_name]; mids=lib.sample_motions(len(dest))
                 history=self.dt*(self._num_amp_obs_steps-1)
                 times=lib.sample_time(mids,truncate_time=history)+history
                 obs=self.build_amp_obs_demo(mids,times,lib).reshape(len(dest),self._num_amp_obs_steps,-1)
