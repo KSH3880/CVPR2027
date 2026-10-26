@@ -31,7 +31,8 @@ class EvaluationTask(HumanoidChairFT):
     def _load_box_asset(self):
         opts=self.cfg['env']['chairFT']['point_evaluation'];entries=opts['catalog']
         self._category=opts['category'];self._action=opts['action'];N=self.num_envs
-        ids=torch.multinomial(torch.full((len(entries),),1/len(entries),device=self.device),N,replacement=True)
+        weights=torch.tensor([e.get('sampling_weight',1/len(entries)) for e in entries],device=self.device)
+        ids=torch.multinomial(weights,N,replacement=True)
         self._evaluation_ids=ids;self._evaluation_catalog=entries
         def values(key):return torch.tensor([e[key] for e in entries],device=self.device,dtype=torch.float32)[ids,None]
         self._box_size=values('bbox');self._box_scale=self._box_size/torch.tensor(self._build_base_size,device=self.device)

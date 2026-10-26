@@ -98,7 +98,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         ) not in ("stack", "agent", "overview"):
             raise ValueError("Unknown Stage1 graph preset or camera mode")
         if not (cfg["args"].test or cfg["args"].eval):
-            expected_shape = (1, 1) if (cfg["env"].get("chairFT", {}).get("tokenhsi_sit_environment", False) or cfg["env"].get("holdAtFT")) else ((4, 8) if self._stage2 else (2, 4))
+            expected_shape = ((1, 1) if (cfg["env"].get("chairFT", {}).get("tokenhsi_sit_environment", False) or cfg["env"].get("chairFT", {}).get("tokenhsi_climb_environment", False) or cfg["env"].get("holdAtFT")) else ((4, 8) if self._stage2 else (2, 4)))
             if self._shared_support:
                 expected_shape = (4, cfg["env"]["numObjects"])
             if self._task_graph_preset != "random_scenario" or (

@@ -1,0 +1,21 @@
+{
+  "pid": 3162413,
+  "gpu": 0,
+  "started_at": "2026-10-24T16:15:25.510713+09:00",
+  "command": [
+    "bash",
+    "tokenhsi/scripts/multi_agent/tokenhsi_climb_full_ft_train.sh"
+  ],
+  "cwd": "/home/injesus1010/repos/CVPR2027/stage1_combined",
+  "output_path": "/home/injesus1010/repos/CVPR2027/runs/tokenhsi_climb_78k_20261024/train",
+  "log_path": "/home/injesus1010/repos/CVPR2027/runs/tokenhsi_climb_78k_20261024/train.log",
+  "source_checkpoint": "/home/injesus1010/repos/CVPR2027/stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth",
+  "source_epoch": 78000,
+  "num_envs": 2048,
+  "num_agents": 1,
+  "num_objects": 1,
+  "learning_rate": 2e-05,
+  "additional_iterations": 20000,
+  "environment": "tokenhsi118",
+  "jit": 0
+}

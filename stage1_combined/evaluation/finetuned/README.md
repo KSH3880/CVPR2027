@@ -18,3 +18,11 @@ python evaluation/finetuned/run_eval.py --checkpoint <checkpoint.pth>
 ```
 
 `--gpu` 기본0, `--output`은 새 `output_etc/check/` 실행 경로를 지정한다. `summary.json`/`REPORT.md`에 결과를 기록한다. 기존 출력 폴더는 재사용하지 않는다. `launch_case.py`는 해당 프로세스에서만 평가 task/player를 등록한다.
+
+## CLIMB 3종 혼합 Ours 평가
+
+`--categories Mixed --actions CLIMB`는 기존 Ours의30초/512환경×seed0/1/2/첫episode 점·영역 평가를독립실행한다. Box18/Cabinet9/Table8 테스트자산을종류각1/3·종류내균등복원추출한다. Box/Cabinet 단독종류도선택가능하다. Mixed의35D adapter 추가5입력은기존CLIMB FT와같이0이며원본bbox/pose는유지한다. 점목표는metadata높이+.94m,영역은물체로컬XY내부80%및목표Z±.20m다. TokenHSI의10초/seed0/3repeat 원본루프와다르며두평가의표준편차는서로다른산포다.
+
+## 원본30D 가중치 직접 평가
+
+`--original30d`는 원본30D task관측과 amp_multi_agent/MAPlayer를 선택한다. ChairTokenizer/입력확장/가중치변환없이78k원본checkpoint를직접load한다. 각case의 original30_policy_verified.json이모델전체key/shape/value와scene RMS의strict/exact를확인한다. 장면geometry와Ours30초/3seed/첫episode평가는유지하며추가descriptor열은정책입력에들어가지않는다. 옵션없는기존35D경로는유지한다.
