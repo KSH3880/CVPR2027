@@ -42,6 +42,19 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 checkpoint, checkpoint_metadata(self.env.task._relation_cfg)
             )
             check_agent_collision_checkpoint(checkpoint, self.env.task.cfg["env"])
+            if getattr(self.env.task, '_joint_stage2', False):
+                from learning.multi_agent.stage2_jointpush_network import transfer_stage1
+                from utils.stage2_jointpush import check_checkpoint
+                if 'stage2_jointpush_contract' in checkpoint:
+                    check_checkpoint(checkpoint, self.env.task.cfg['env'])
+                    return super().restore(fn)
+                self._checkpoint_fn = fn
+                self._stage2_transfer_report = transfer_stage1(self.model, checkpoint)
+                if self.normalize_input:
+                    self.running_mean_std.load_state_dict(checkpoint['running_mean_std'], strict=True)
+                if self._normalize_amp_input:
+                    self._amp_input_mean_std.load_state_dict(checkpoint['amp_input_mean_std'], strict=True)
+                return
             if getattr(self.env.task, "_stage2", False):
                 from utils.stage2_spec import check_checkpoint
                 check_checkpoint(checkpoint, self.env.task.cfg["env"])
@@ -57,7 +70,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
-                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) else 1,
+                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) and not getattr(task, "_joint_stage2", False) else 1,
             ).to(self.device)
             self.running_mean_std.eval()
         return

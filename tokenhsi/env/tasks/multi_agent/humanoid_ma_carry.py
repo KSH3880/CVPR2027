@@ -59,6 +59,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
     def __init__(
         self, cfg, sim_params, physics_engine, device_type, device_id, headless
     ):
+        self._joint_stage2 = cfg['env'].get('stage2JointPush') is not None
         self._shared_support = cfg["env"].get("sharedSupport") is not None
         self._match_train_sampling = cfg['env'].get('jointPush') is not None
         self._stage2 = cfg["env"].get("stage2") is not None or self._shared_support
@@ -94,6 +95,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if self._shared_support:
             from utils.shared_support import PRESETS
             allowed_presets = PRESETS
+        if self._joint_stage2:
+            from utils.stage2_jointpush import PRESETS
+            allowed_presets = PRESETS
         if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
         ) not in ("stack", "agent", "overview"):
@@ -118,6 +122,8 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if self._shared_support:
             from utils.shared_support import capacities
             self.num_physical_objects = capacities(cfg["env"])[1]
+        if self._joint_stage2:
+            self.num_physical_objects = cfg['env']['stage2JointPush']['physical_boxes']
         assert (
             self.num_objects >= num_agents
         ), "numObjects ({}) must be >= numAgents ({})".format(

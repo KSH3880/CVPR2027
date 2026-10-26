@@ -167,3 +167,31 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 | `tokenhsi/tests/check_stage1_jointpush.py` | 실제 reset·물성·AMP·PTH 정책·스크래치 gradient 검사 |
 
 세부 설정과 원본 출처는 [Stage1 jointpush](reference/stage1_jointpush.md)를 따른다.
+
+## Stage2 jointpush
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/utils/stage2_jointpush.py` | 순차 그룹·단독 과제 샘플링, 구역 할당/상태, 공동 뒤쪽 면 gate |
+| `tokenhsi/learning/multi_agent/stage2_jointpush_network.py` | PUSH 가중치 전이·동결, 실제 공유 그룹 기반 coordination |
+| `tokenhsi/tests/test_stage2_jointpush.py` | 그룹 분포·구역/GTA용 상태·gate·전이/identity 검사 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush.yaml` | 4명·1024환경·8 object 토큰, Stage1 PUSH 전이 |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2_jointpush.py`, `stage2_jointpush_reward.py` | 24개 후보 bank·미사용 격리, 물리 공유/구역 관측, gate 적용 AT |
+| `tokenhsi/utils/stage2_jointpush_scene.py` | 사람 고정·32후보 배치, coupled 뒤쪽/목표 cone·swept rectangle, 단독 Stage1 경로 검사 |
+| `tokenhsi/scripts/multi_agent/stage2_jointpush_{train,test,vnc}.sh` | GPU5 학습·Stage1 제로샷/Stage2 추론 |
+| `tokenhsi/tests/check_stage2_jointpush.py` | 학습 업데이트 없는 전이·1024환경 reset/추론·부분 reset·viewer 검사 |
+
+사용자가 미사용 후보 격리를 승인했다. 상세 계약은 [Stage2 jointpush](reference/stage2_jointpush.md), 실행법은 [config](config.md)에 있다.
+
+## Stage2 jointpush RSI
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush_rsi.yaml` | 단독 Stage1 RSI·coupled 그룹 RSI 학습, 평가 loco100% |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2_jointpush_rsi.py` | 기존 Stage2의 RSI 초기화 연결·물리 상자/목표 유지 |
+| `tokenhsi/env/tasks/multi_agent/jointpush_solo_rsi_cache.py` | 4명·24 actor bank에 맞춘 기존 과제 RSI 캐시/후반 프레임 샘플링 |
+| `tokenhsi/utils/stage2_jointpush_rsi.py` | 그룹별 RSI 선택·구역 뒤쪽 손 목표·사람 간 충돌 검사 |
+| `tokenhsi/scripts/multi_agent/stage2_jointpush_rsi_{train,test,vnc}.sh` | GPU5 학습·Stage1 제로샷/Stage2 평가·VNC |
+| `tokenhsi/tests/{test,check}_stage2_jointpush_rsi.py` | CPU 계약·실제 초기화/AMP/평가·optimizer 업데이트 없는 학습 연결 검사 |
+
+초기화·캐시·검증 범위는 [Stage2 jointpush RSI](reference/stage2_jointpush_rsi.md)를 따른다.

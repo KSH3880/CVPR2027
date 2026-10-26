@@ -22,7 +22,7 @@ class VecTaskPythonWrapperMA(VecTaskPythonWrapper):
         return self.num_agents
 
     def _policy_observation(self):
-        if getattr(self.task, "_stage2", False) and not getattr(self.task, "_shared_support", False):
+        if getattr(self.task, "_stage2", False) and not getattr(self.task, "_shared_support", False) and not getattr(self.task, "_joint_stage2", False):
             obs = self.task.obs_buf
             views = obs.reshape(-1, obs.shape[-1]//self.num_agents)
             return clip_scene_observation(views, self.num_agents, self.task.num_objects,

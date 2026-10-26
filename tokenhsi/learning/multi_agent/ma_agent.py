@@ -68,7 +68,7 @@ class MAAgent(amp_agent.AMPAgent):
                 normalized_sizes=task.get_scene_normalized_entity_sizes(),
                 kinematic_size=task.get_scene_kinematic_size(),
                 extra_passthrough_size=task.get_relation_suffix_size(),
-                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) else 1,
+                num_views=task.num_agents if getattr(task, "_stage2", False) and not getattr(task, "_shared_support", False) and not getattr(task, "_joint_stage2", False) else 1,
             ).to(self.ppo_device)
         assert (
             not self.is_rnn
@@ -93,6 +93,8 @@ class MAAgent(amp_agent.AMPAgent):
     def _init_stage2(self, task):
         import json
         from learning.multi_agent.stage2_network_builder import transfer_stage1, freeze_actor
+        if getattr(task, '_joint_stage2', False):
+            from learning.multi_agent.stage2_jointpush_network import transfer_stage1
         args = task.cfg["args"]
         if args.resume <= 0 and not (args.test or args.eval):
             path = task.cfg["experiment"]["transfer"]["checkpoint"]
@@ -138,7 +140,10 @@ class MAAgent(amp_agent.AMPAgent):
         if task.cfg['env'].get('jointPush') is not None:
             from utils.stage1_jointpush import contract
             weights['stage1_jointpush_contract'] = contract(task.cfg['env'])
-        if getattr(task, "_shared_support", False):
+        if getattr(task, '_joint_stage2', False):
+            from utils.stage2_jointpush import checkpoint_contract
+            weights['stage2_jointpush_contract'] = checkpoint_contract(task.cfg['env'])
+        elif getattr(task, "_shared_support", False):
             from utils.shared_support import checkpoint_contract
             weights["shared_support_contract"] = checkpoint_contract(task.cfg["env"])
         elif getattr(task, "_stage2", False):
@@ -154,7 +159,10 @@ class MAAgent(amp_agent.AMPAgent):
             if weights.get('stage1_jointpush_contract') != contract(task.cfg['env']):
                 raise ValueError('Resume requires this stage1_jointpush contract; use other checkpoints for evaluation')
         if getattr(task, "_stage2", False):
-            from utils.stage2_spec import check_checkpoint
+            if getattr(task, '_joint_stage2', False):
+                from utils.stage2_jointpush import check_checkpoint
+            else:
+                from utils.stage2_spec import check_checkpoint
             check_checkpoint(weights, task.cfg["env"])
             if weights.get("validation_only") and not (task.cfg["args"].test or task.cfg["args"].eval):
                 raise ValueError("Validation transfer snapshots cannot resume training")

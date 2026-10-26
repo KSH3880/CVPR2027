@@ -25,7 +25,7 @@ PRESETS = (
 
 
 def scenario_templates(spec):
-    if spec.get('sampler') == 'stage1_jointpush':
+    if spec.get('sampler') in ('stage1_jointpush', 'stage2_jointpush'):
         return CLIMB_TEMPLATES + ('PUSH_AT',)
     return CLIMB_TEMPLATES
 

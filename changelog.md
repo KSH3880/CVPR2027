@@ -4,6 +4,26 @@
 
 ## 2026-10-26
 
+### Stage2 jointpush RSI variant 연결
+
+- `stage2_jointpush_rsi` 환경/학습 YAML·train/test/VNC를 추가했다. 단독은 Stage1 과제별 RSI·유효/후반 프레임 샘플링을 사용하고, coupled는 그룹 단위 loco50/push50·사람별 독립 프레임으로 초기화한다. 구역별 실제 뒤쪽 면에 사람만 정렬하며 물리 PUSH 상자/목표를 유지하고, 전체 상자 침투·멤버 간 충돌을 검사한다.
+- 기존 네 과제의 RSI 캐시를 4명·24 actor bank에 연결하고 추가 크기 캐시는 별도 경로에 저장한다. 그룹/과제·물성·보상·AMP·PPO를 유지하며 기본 eval은 같은 loco 배치/목표 샘플러에서 loco100%다. 기존 loco 전용 Stage2는 유지한다. 명령·구조·상세 RSI 명세를 갱신했다.
+- 관련 CPU20개·shell 구문·diff 검사 통과. GPU5·1024환경 실제 무작위 PUSH 크기의 단독/coupled RSI 및 평가8종 loco100%, 상자/목표 유지·참조 관절·AMP·정책16step·부분 reset을 확인했다. 기존 네 과제 RSI/혼합 및 학습 초기화 연결은 이미 screening된 Stage1 크기를 동일 물리 상자에 적용한 fixture로 검증했다. Stage1 전이·동결·lr2e-5·finite 출력을 확인했으며 학습 루프를 검사 함수로 대체해 optimizer step은0회다.
+- GPU5·1환경 VNC 렌더/PNG·정책 추론 통과. 결과는 `output_etc/check/stage2_jointpush_rsi/`에 있다. 전체 무작위 크기의 새 RSI 캐시 생성·PPO 업데이트·장기 안정성은 미검증이며 최초 실행 시 누락 캐시 생성 시간이 필요할 수 있다.
+
+### Stage2 jointpush 실행 연결·Stage1 PUSH 제로샷
+
+- 승인한 24개 후보 bank(장면5~8개·미사용16~19개 격리), 순차80/20 그룹·단독10/20/25/20/25, 학습/평가 loco100%, X/질량 인원수 배를 환경에 연결했다. 구역 관측/GTA·구역 CONTACT·물리 중심 AT·전원 접촉 gate, 사람 고정32후보·coupled 뒤쪽180°/목표±45°·직사각형 경로 검사를 적용했다. 단독 PUSH의 기존 경로 조건과 네 단독 과제 sampler/플랫폼을 유지한다.
+- 환경/학습 YAML·train/test/VNC·전이/정규화/clip/checkpoint 계약을 연결했다. Stage1 PUSH checkpoint를 평가에 직접 입력하면165개 항목과 정규화 통계를 전이하고 coordination은 identity로 초기화한다. GPU5 기본 명령과 옵션은 config, 계약은 reference/stage2_jointpush.md에 기록했다.
+- CPU46개·shell 구문·diff 검사 통과. GPU5·1024환경에서 공동/단독/각 과제/혼합8종 reset, 거리·뒤쪽·목표 cone·질량20/40/60/80kg·마찰0.4, 정책16step finite/고정 목표·GTA passthrough·부분 reset·AMP4096×1330을 확인했다. 1024환경 학습 초기화 경로의 전이·actor encoder/scene RMS 동결·장면 minibatch4096·lr2e-5도 통과했다. 검증 함수가 학습 루프를 대체했으며 optimizer step은0회다.
+- GPU5·1환경 VNC에서4명 공동 상자의 렌더·정책16step·PNG 캡처를 확인했고 해당 검증 viewer는 종료했다. 결과는 `output_etc/check/stage2_jointpush/{simulator,train_init,viewer}/`에 있다. 본학습/PPO 업데이트·공동 성공률·장기 안정성·후보 bank의 순수 비용 차이는 미검증이다.
+
+### Stage2 jointpush 공통 모듈·GPU5 물리 교체 API 검증
+
+- 사용자 요청으로 Stage2 연결을 시작하되 본학습은 실행하지 않았다. 순차80/20·2~남은 인원 균등 그룹, 단독10/20/25/20/25, 중복 없는 구역 할당, 공유 상자 운동을 반영한 토큰 상태, coupled 전원 양손18cm 뒤쪽 면 gate를 독립 모듈로 준비했다. PUSH165개 parameter 항목 전이·actor encoder 동결·identity coordination의 정책 출력 일치를 포함한 CPU5개 검사를 통과했다.
+- GPU5·GPU PhysX·1024환경(상자만 생성)에서 X전용 벡터 scale 인자가 거부되고 스칼라 전체 scale만 허용됨을 확인했다. 개별 actor 삭제 API와 rigid shape의 치수 변경 필드도 없다.2step finite를 확인했고 이 검증 simulator는 종료했다. [결과](output_etc/check/stage2_jointpush/actor_probe/result.json).
+- 이후 사용자가 후보 bank·미사용 격리를 승인했다. 아래 준비 단계의 미완료 사항은 새 연결 항목으로 갱신했다. 기존 Stage1·학습 프로세스는 보존했다.
+
 ### Stage1 jointpush 평가를 loco100%로 확정
 
 - 사용자 요청으로 SIT/CLIMB/AT/ONTOP/PUSH 평가를 모두 loco100%로 변경했다. 학습 과제별 RSI·AMP는 유지하며, 평가의 과제 비율·크기/물성·loco 사람/상자/목표 샘플링·간섭 검사는 학습과 동일하다. 평가에서는 과제 중간 RSI와 기존 과제 RSI 캐시 생성을 사용하지 않는다. 아래 최초 구현의 평가 RSI 설정을 대체한다.
