@@ -16,6 +16,8 @@ def validate_scene(env):
             raise ValueError('Random AT goals require dedicated PUSH+AT')
         radial=goal.get('sampling') in ('box_radial','box_forward')
         fields={'sampling','min_distance','max_distance','agent_clearance'} if radial else {'reach','min_distance','agent_clearance'}
+        if goal.get('sampling') == 'stage1_square_cone':
+            fields = {'sampling', 'reach', 'min_distance', 'agent_clearance', 'half_angle_degrees'}
         numbers={k:v for k,v in goal.items() if k!='sampling'}
         if set(goal)!=fields or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<=0 for v in numbers.values()):
             raise ValueError('Invalid random AT goal bounds')
@@ -124,6 +126,11 @@ def random_at_goal_valid(positions,quaternions,goals,env):
     else:
         near=((goals-anchors).norm(dim=-1)>=g['min_distance']) & (distance>=g['min_distance'])
         within=((goals-anchors).abs()<=g['reach']).all(-1)
+        if g.get('sampling') == 'stage1_square_cone':
+            # Original Stage1 square is centred on the environment, not each owner.
+            within = (goals.abs() <= g['reach']).all(-1)
+            direction = (goals-positions)/distance.clamp_min(1e-8)[...,None]
+            within &= (direction*forward_xy(quaternions)).sum(-1) >= math.cos(math.radians(g['half_angle_degrees']))-1e-6
     # Include the 1.5m RSI/person corridor behind each box and the full AT path.
     direction=forward_xy(quaternions)
     if env['relationReward'].get('push_at',{}).get('hand_reference')=='goal_opposite_surface_xy':
@@ -149,7 +156,9 @@ def sample_random_at_scene(count,env,device,generator):
     pending=torch.arange(count,device=device)
     spec=env['pushScene'];g=spec['random_at_goal']
     anchors=positions.new_tensor(spec['owner_anchor_xy'])
-    for _ in range(128):
+    # Joint square/cone/path rejection accepts fewer draws than a radial goal.
+    attempts = 2048 if g.get('sampling') == 'stage1_square_cone' else 128
+    for _ in range(attempts):
         if not len(pending):break
         xy,q=sample_layout(len(pending),env,device,generator)
         if g.get('sampling') in ('box_radial','box_forward'):
@@ -160,6 +169,8 @@ def sample_random_at_scene(count,env,device,generator):
             target=xy+radius[...,None]*direction
         else:
             target=anchors+(2*torch.rand(len(pending),2,2,device=device,generator=generator)-1)*g['reach']
+            if g.get('sampling') == 'stage1_square_cone':
+                target = target - anchors
         valid=random_at_goal_valid(xy,q,target,env)
         accepted=pending[valid]
         positions[accepted]=xy[valid];quaternions[accepted]=q[valid];goals[accepted]=target[valid]

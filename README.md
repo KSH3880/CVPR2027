@@ -1,5 +1,7 @@
 # TokenHSI-MultiAgent
 
+**현재 GPU1 PUSH 파인튜닝 (`koo_1021`):** [팀 실행·GitHub 전달 가이드](STAGE1_PUSH_FINETUNE_GUIDE.md) · [학습 설정 명세](markdowns/stage1_push_finetune_settings.md).
+
 Multi-agent extension of [**TokenHSI**](https://github.com/liangpan99/TokenHSI) (CVPR 2025 Oral) —
 Pan et al., *Unified Synthesis of Physical Human-Scene Interactions through Task Tokenization*.
 

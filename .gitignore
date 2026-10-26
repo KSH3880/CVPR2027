@@ -74,6 +74,7 @@ desktop.ini
 # ---------------------------------------------------------------------------
 /output/
 /output_etc/
+/ports/stage1_base_push/output/
 runs/
 wandb/
 tensorboard/

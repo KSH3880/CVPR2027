@@ -1,5 +1,17 @@
 # 레포 구조
 
+원본 `koo_1021`의 현재 GPU1 학습 공유 문서는 루트 [STAGE1_PUSH_FINETUNE_GUIDE.md](../STAGE1_PUSH_FINETUNE_GUIDE.md)와 [설정 명세](stage1_push_finetune_settings.md)다. `stage1_push_finetune`의 실효1200step·원본 진행도 RSI·여분상자 물성과 별도 복사본의 차이를 설명한다. 이번 정리는 실행 코드나 YAML을 바꾸지 않는다.
+
+`tokenhsi/scripts/multi_agent/view_push_eval_case.sh`는 `evaluate_single_match.py`의 `--visualize --plan-env-index`로저장된PUSH평가초기상태중1개를선택해1인정책을viewer로재실행한다. 장면선택시kinematic/root/box/graph/모션정보를같이슬라이스하며평가원자료를덮어쓰지않는다.
+
+`ports/stage1_base_push/evaluate_push_starts.py`는 실제1인 PUSH의 direct/around 두 조건을 GPU에서 동시 실행하고 각조건3seed·거리별 결과를 저장한다. `tokenhsi/utils/push_start_evaluation.py`(port아래)는 공통CPU장면에서 사람만 목표축 양편으로 이동·회전하며 속도/kinematic pose도 맞추고 초기배치를 검증한다. 진입점은 `tokenhsi/scripts/multi_agent/evaluate_push_starts.sh`, [명세](evaluation_single_push_compare.md#정면돌아가기-시작-쌍-평가).
+
+`ports/stage1_base_push/evaluate_finetune.py`는평가프로세스한정AT9규격/SIT·CLIMB고정상자·첫episode궤적/관절초기상태저장과점/영역ever재채점, `evaluate_finetune_batch.py`는5과제×3seed별도프로세스직렬실행과중간결과저장이다. `tokenhsi/utils/finetune_evaluation.py`(port아래)는성공식·PUSH거리1m구간별집계·저장궤적재채점·배치통계를담당한다. 진입점은 `tokenhsi/scripts/multi_agent/evaluate_stage1_push_finetune.sh`, 명세는 [evaluation_push_finetune.md](evaluation_push_finetune.md), CPU회귀는port의 `tests/test_finetune_evaluation.py`다. 원본1인평가와현재2인환경의차이는명세에분리기록한다.
+
+`ports/stage1_base_push/tokenhsi/utils/stage1_episode_metrics.py`는 완료 agent 기준 과제별 종료/ever 성공률 및 PUSH 잔여거리·진행률/최대진행률·loco/RSI 분리를 누적한다. `humanoid_ma_stage1_push.py`의 reset/reward/종료/consume hook에서 연결하며 기존 TensorBoard writer를 통해 기록한다. `tests/test_stage1_episode_metrics.py`는 과제 분모·부분 reset·진행 회귀·RSI 시작거리·진행 중 consume 보존을 CPU로 검사한다. 2026-10-26 재개한학습부터 실제기록중이며 현재1200step launcher는 `output/stage1_base_push_finetune_stable_ep1200/launch.sh`다.
+
+`ports/stage1_base_push/`의 `stage1_push_finetune.yaml`(env/train)·`stage1_push_finetune_source.yaml`은 원본78000회에서 PUSH50%+기존4과제50%로 파인튜닝하는 별도설정이다. 현재PUSH는XY1.6~2.2/Z1.45~1.7m·min(X,Y)≥1.1Z의167종·20kg/마찰0.4이며 `stable_push_profiles()`가격자/제약을정의한다. `dataset_stage1_push_finetune.yaml`은 기존모션그룹을 그대로 두고 PUSH21개/PUSH전용보행4개만 추가한다. `prepare_finetune.py`는 새RSI계약/원본보존전이, `audit_finetune_geometry.py`·`check_finetune_rsi.py`는PUSH기하/초기CPU물리, `review_finetune.py`는PUSH후보만CPU영상, `tests/test_stage1_push_finetune.py`는분포/정면cone/목표고정/보상/AMP전이 회귀다. root의 `stage1_push_finetune_{train,test,vnc}.sh` 및 `check_stage1_push_finetune{,_player}.sh`·`review_stage1_push_finetune.sh`가 실행진입점이다. [설정·명령](config.md#stage1-push-finetune).
+
 `ports/stage1_base_push/`는 GitHub `stage1_stage2_base`의 독립 스냅샷·원본Stage1 config와 추가 `stage1_base_push.yaml`(env/train)을 포함한다. `utils/stage1_push_spec.py`는 기존과제ID 보존·추가PUSH graph/크기/전용checkpoint 계약, `env/tasks/multi_agent/humanoid_ma_stage1_push.py`는4상자·원본reset/RSI 확장·PUSH 연결, `stage1_push_reward.py`는 원본AT+현재CONTACT 보상을 담당한다. 새과제 embedding1행과 별도PUSH AMP family1칸(4family/1330D)을 추가하고 원본TaskActionFusion/GTA 구조를 유지한다. `verify.sh`는CPU회귀, `check_scene.py`/`check_player.py`는CPU물리·평가/player·무학습fixture 복원 검사다. root의 `tokenhsi/scripts/multi_agent/stage1_base_push_{train,test,vnc}.sh`가 private cwd/Python경로를 고정한다. [명령](config.md#stage1-base-push), [상세](../ports/stage1_base_push/README.md).
 
 `output_etc/check/stage1_base_push_rsi_review/`의 `render_review.py`·`launch.sh`는 실제4상자 CPU reset 및 동일bank949후보를 합친 검수영상 생성 진입점이며 `review.json`에 출처와 검수대기를 기록한다.

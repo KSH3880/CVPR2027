@@ -56,3 +56,7 @@ bash tokenhsi/scripts/multi_agent/stage1_base_push_vnc.sh <Stage1BasePush.pth> 2
 VNC 접속: `http://localhost:6107/vnc.html?autoconnect=1&resize=remote`. 실행 전 [로컬 viewer 보호 규칙](../../markdowns/config.md#local-vnc-viewer)을 따른다. 새 경로의 GPU/PPO/GUI·학습 병행 안전성·정책 성능은 미검증이다. 학습/MPS 종료나 재시작은 수행하지 않았다.
 
 검증 결과는 [REPORT.md](../../output/stage1_base_push_check/REPORT.md)에 기록한다. 무학습 fixture는 성공한 학습 정책이 아니며 성능 평가에 사용하지 않는다.
+
+## PUSH50% 파인튜닝
+
+`stage1_push_finetune.yaml`은 사용자 제공 `weights/Stage1V2Fixed_00078000.pth`의 기존4과제 가중치를 보존하고 PUSH를 추가하는 별도실험이다. PUSH50%·SIT5%/CLIMB12.5%/AT·ON_TOP각16.25%이며 기존과제 RSI/모션/보상을 유지한다. CONTACT각0.2, PUSH크기는XY1.6~2.2m/Z1.45~1.7m·min(X,Y)≥1.1Z의167종, 20kg/마찰0.4다. 출발1~10m·환경중심XY±4.5m목표/로컬+Y±45°·최초목표고정은유지한다. 현재bank/전이본/출력은stable이름으로구분한다. [명령·검증·실행상태](../../markdowns/config.md#stage1-push-finetune).

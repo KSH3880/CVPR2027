@@ -1,6 +1,7 @@
 """CPU evaluation entrypoint and checkpoint roundtrip using an untrained policy."""
 import isaacgym  # Must precede torch.
 import json
+import os
 from pathlib import Path
 import torch
 import run as entry
@@ -29,16 +30,27 @@ task=player.env.task
 obs=player.env_reset()
 player.get_batch_size(obs['obs'],1)
 assert task.get_obs_size()==634 and task.num_objects==4
+if task.cfg['env']['pushExtension'].get('sampling_profile') == 'stage1_square_cone_v1':
+    from utils.unified_training import append_family
+    slots = task._reset_ref_slots.get('loco')
+    if slots is not None:
+        ee,aa = slots
+        ids = task._reset_ref_motion_ids['loco']
+        times = task._reset_ref_motion_times['loco']
+        raw = task.build_amp_obs_demo(ids,times,task._motion_lib['push_loco']).reshape(len(ids),10,-1)[:,1:].reshape(-1,129)
+        expected = append_family(raw,torch.full((len(raw),),3),4).reshape(len(ids),9,-1)
+        torch.testing.assert_close(task._hist_amp_obs_buf[ee,aa],expected)
 out=Path(args.output_path)
 out.mkdir(parents=True,exist_ok=True)
-checkpoint=out/'validation_only_untrained.pth'
-torch.save(dict(model=player.model.state_dict(),
-    running_mean_std=player.running_mean_std.state_dict(),
-    amp_input_mean_std=player._amp_input_mean_std.state_dict(),
-    relation_metadata=checkpoint_metadata(task._relation_cfg),
-    agent_collision_config=agent_collision_config(task.cfg['env']),
-    stage1_push_contract=checkpoint_contract(task.cfg['env']),
-    validation_only=True),checkpoint)
+checkpoint=Path(os.environ['TOKENHSI_CHECKPOINT']) if os.environ.get('TOKENHSI_CHECKPOINT') else out/'validation_only_untrained.pth'
+if not os.environ.get('TOKENHSI_CHECKPOINT'):
+    torch.save(dict(model=player.model.state_dict(),
+        running_mean_std=player.running_mean_std.state_dict(),
+        amp_input_mean_std=player._amp_input_mean_std.state_dict(),
+        relation_metadata=checkpoint_metadata(task._relation_cfg),
+        agent_collision_config=agent_collision_config(task.cfg['env']),
+        stage1_push_contract=checkpoint_contract(task.cfg['env']),
+        validation_only=True),checkpoint)
 player.restore(str(checkpoint))
 resets=[]
 for _ in range(24):
@@ -49,7 +61,7 @@ for _ in range(24):
     assert torch.isfinite(observation).all() and torch.isfinite(reward).all()
     resets=done.nonzero().flatten()
 assert not task._rsi_interaction.any()
-report=dict(untrained_policy=True, cpu=True, observation=634, tokens=8,
+report=dict(untrained_policy=not bool(os.environ.get('TOKENHSI_CHECKPOINT')), cpu=True, observation=634, tokens=8,
             amp_input=task.get_num_amp_obs(), player_steps=24,
             model_and_rms_checkpoint_restore=True, loco_start=True)
 (out/'player_audit.json').write_text(json.dumps(report,indent=2))

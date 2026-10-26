@@ -3,6 +3,13 @@ import torch
 from utils.push_scene import sample_random_at_scene, forward_xy, segment_distance
 
 
+def advance_rsi_box(initial_position, fixed_goal, progress):
+    """Advance along the original segment; never resample or translate the goal."""
+    if not torch.isfinite(progress).all() or ((progress < 0) | (progress > 1)).any():
+        raise ValueError('RSI box progress must be in [0, 1]')
+    return initial_position + progress[..., None] * (fixed_goal-initial_position)
+
+
 def sample_four_box_scene(count, env, device, generator):
     xy, q, goals = sample_random_at_scene(count, env, device, generator)
     positions = torch.empty(count, 4, 2, device=device)
@@ -11,9 +18,13 @@ def sample_four_box_scene(count, env, device, generator):
     rotations[:, :2] = q
     rotations[:, 2:, 3] = 1.
     rear = xy - 1.5 * forward_xy(q)
+    direction = forward_xy(q)
+    if env['pushScene']['random_at_goal'].get('sampling') == 'stage1_square_cone':
+        direction = (goals-xy)/(goals-xy).norm(dim=-1,keepdim=True)
+        rear = xy - 1.5*direction
     # Also protect all later RSI positions along each complete box trajectory.
     starts = torch.cat((rear, xy), 1)
-    ends = torch.cat((goals - 1.5 * forward_xy(q), goals), 1)
+    ends = torch.cat((goals - 1.5 * direction, goals), 1)
     radius = torch.tensor(env['pushBox']['size'][:2], device=device).norm()/2
     anchors = torch.tensor(env['pushScene']['owner_anchor_xy'], device=device)
     for box in (2, 3):
