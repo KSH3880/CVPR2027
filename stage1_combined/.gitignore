@@ -24,3 +24,12 @@ __pycache__/
 /chair_sit_only_active_run.json
 
 /tokenhsi_sit_active_run.json
+
+# Dedicated native Table HOLDING+AT motion recipe
+!/tokenhsi/data/dataset_table_hold_at.yaml
+
+/table_hold_at_active_run.json
+
+/table_tokenhsi_ft_active_run.json
+
+/table_adaptation_active_run.json

@@ -33,6 +33,10 @@
 | [chair_sit_only_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_sit_only_full_ft.yaml) | [chair_sit_only_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_sit_only_full_ft.yaml) |
 | [tokenhsi_sit_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/tokenhsi_sit_full_ft.yaml) | [tokenhsi_sit_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/tokenhsi_sit_full_ft.yaml) |
 | [chair_hold_at_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/chair_hold_at_full_ft.yaml) | [chair_hold_at_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/chair_hold_at_full_ft.yaml) |
+| [table_carry_rsi_full_ft.yaml](../tokenhsi/data/cfg/multi_agent/table_carry_rsi_full_ft.yaml) | [table_carry_rsi_full_ft.yaml](../tokenhsi/data/cfg/train/rlg/table_carry_rsi_full_ft.yaml) |
+| [table_tokenhsi_ft.yaml](../tokenhsi/data/cfg/multi_agent/table_tokenhsi_ft.yaml) | [table_tokenhsi_ft.yaml](../tokenhsi/data/cfg/train/rlg/table_tokenhsi_ft.yaml) |
+| [table_adapt_residual.yaml](../tokenhsi/data/cfg/multi_agent/table_adapt_residual.yaml) | [table_adapt_residual.yaml](../tokenhsi/data/cfg/train/rlg/table_adapt_residual.yaml) |
+| [table_adapt_tokenizer.yaml](../tokenhsi/data/cfg/multi_agent/table_adapt_tokenizer.yaml) | [table_adapt_tokenizer.yaml](../tokenhsi/data/cfg/train/rlg/table_adapt_tokenizer.yaml) |
 
 ## 학습
 
@@ -135,6 +139,24 @@ bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_train.sh
 TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_train.sh
 ```
 
+```bash
+# table_carry_rsi_full_ft
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_carry_rsi_full_ft_train.sh
+```
+
+```bash
+# table_tokenhsi_ft
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_tokenhsi_ft_train.sh
+```
+
+```bash
+# table_adapt_residual
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_adapt_residual_train.sh
+
+# table_adapt_tokenizer
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_adapt_tokenizer_train.sh
+```
+
 ## 로컬 추론
 
 모니터가 연결된 로컬 viewer다. `CKPT`는 사용할 컨피그의 checkpoint로 지정한다. 아래 경로는 PUSH raw 예시다.
@@ -194,6 +216,24 @@ HEADLESS=0 bash tokenhsi/scripts/multi_agent/tokenhsi_sit_full_ft_test.sh "$CKPT
 ```bash
 # chair_hold_at_full_ft
 HEADLESS=0 TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_test.sh "$CKPT"
+```
+
+```bash
+# table_carry_rsi_full_ft
+TOKENHSI_GPU=0 HEADLESS=0 TABLE_RSI_VIEW=1 TABLE_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/table_carry_rsi_full_ft_test.sh "$CKPT"
+```
+
+```bash
+# table_tokenhsi_ft
+TOKENHSI_GPU=0 HEADLESS=0 TABLE_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/table_tokenhsi_ft_test.sh "$CKPT"
+```
+
+```bash
+# table_adapt_residual
+TOKENHSI_GPU=0 HEADLESS=0 TABLE_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/table_adapt_residual_test.sh "$CKPT"
+
+# table_adapt_tokenizer
+TOKENHSI_GPU=0 HEADLESS=0 TABLE_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/table_adapt_tokenizer_test.sh "$CKPT"
 ```
 
 ## 서버 VNC 추론
@@ -264,7 +304,27 @@ TOKENHSI_GPU=5 HOLD_AT_OBJECT_ROOT=tokenhsi/data/dataset_dynamic_objects PORT=60
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/chair_hold_at_full_ft_eval.sh "$CKPT"
 ```
 
+```bash
+# table_carry_rsi_full_ft
+TOKENHSI_GPU=0 TABLE_RSI_VIEW=1 PORT=6083 bash tokenhsi/scripts/multi_agent/table_carry_rsi_full_ft_vnc.sh "$CKPT"
+```
+
+```bash
+# table_tokenhsi_ft
+TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/table_tokenhsi_ft_vnc.sh "$CKPT"
+```
+
+```bash
+# table_adapt_residual
+TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/table_adapt_residual_vnc.sh "$CKPT"
+
+# table_adapt_tokenizer
+TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/table_adapt_tokenizer_vnc.sh "$CKPT"
+```
+
 ## 추론 옵션
+
+Table carry 정식 평가(최신 번호 checkpoint 자동선택·512환경×3seed): `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_hold_at_full_ft_eval.sh`. 특정 모델은 뒤에 `"$CKPT"`를 붙인다. [조건·출력](../evaluation/table_hold_at/README.md).
 
 아래 옵션을 test/VNC 명령의 `bash` 앞에 붙인다. 기본 시작 동작은 `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`이다. 기본 과제는 일반 설정에서 `random_scenario`, PUSH 계열에서 `push`다.
 

@@ -1,4 +1,33 @@
+## 2026-10-27
+
+### Residual800회 공통평가
+사용자요청GPU0·학습유지,800회번호checkpoint고정·test9/512×독립seed0·1·2/30초/AT20cm첫episode ever. 성공234/212/234명, **44.27±2.48%**(평가seed표본std),zero-shot26.50%대비+17.77%p. 동결153tensor/sceneRMS 원본78k exact확인. 전seedrc0/trace재채점·32/64ever/해시·통계검산통과. 초기모션/물체동일·origin제외좌표0.05mm이내일치. ../runs/table_residual_eval800_20261027/REPORT.md 및validation.json.
+
+### Residual만총10k로연장·tokenizer취소
+사용자최신지시. 비교supervisor3634212만종료하고residual3634237유지,tokenizer미실행. 실행중max1000은유지한채정상1000저장후optimizer/모델/전체RMS/epoch/frame full-state재개→총10000을수행할별도resume_code/continuation supervisor3637486준비·실행. 같은full_experiment_name/TB6013유지,기존메타/1000저장본archive. real restore의CPU검증으로실제epoch2checkpoint 모델/RMS/optimizer18상태/frame exact확인. 미래재개때도검증기록. 시뮬레이터/replay재초기화는별도. reference/table_adaptation_compare.md 및runs/table_adaptation_compare_20261027/state.json.
+
+### Frozen encoder residual/tokenizer 두pilot 시작
+사용자요청으로Table3544421만중단(MPS미사용확인). 기존78k actor/critic encoder·action head·sigma·전체scene RMS동결,정책은zero-init additive residual 또는복사초기화별도object tokenizer만학습. critic value head/fresh discriminator공통학습. 원본carry보상/PPO계수/4096환경/seed42유지,각1000회·100회저장순차비교. CPU초기출력동등/2backward·동결확인,각4096환경2PPO rc0/저장/finite/frozen153tensor·RMS6tensor exact,각1환경추론rc0. residual본pilot시작,정상종료후tokenizer. 상세reference/table_adaptation_compare.md 및 ../runs/table_adaptation_compare_20261027/REPORT.md. 정식eval의adapter network복원지원추가.
+
+### TokenHSI Table 설정 FT12100 공통평가
+사용자요청GPU0·학습유지,최신저장12100고정복사·test9/512×독립seed0·1·2/30초/AT20cm첫episode ever. 성공9/17/13명, 2.54±0.78%(평가seed표본std). zero-shot26.50±.56%보다낮음. 전seedrc0·trace재채점/32·64ever/원본SHA/통계검산통과. 초기모션/모델동일,origin제외좌표0.05mm이내일치. ../runs/table_tokenhsi_eval_20261027_latest/REPORT.md 및validation.json.
+
 ## 2026-10-26
+
+### RSI 제외·원본TokenHSI Table recipe로 본학습
+사용자최종요청. 우리78k/30D/GTA·graph입력유지,원본7보상·종료함수AST동일/PPO·AMP계수전항목동일/4096환경/AMPscale3/에너지OFF/물체낙하종료/걷기50:50. 원본동결adaptation에대응해actor물체tokenizer만학습·critic학습·fresh판별자/AMP RMS,old actor/sigma/사람RMS동결. CPU3개·4096환경1PPO저장rc0/finite·frozen74tensor exact/학습91tensor변경/양gradient확인후GPU0 PID3544421 본학습시작·연속update확인. 원본max1m/save100유지,구학습·RSI실험미재개. 새TB6012. 상세reference/table_tokenhsi_ft.md 및 ../runs/table_tokenhsi_20261026/REPORT.md.
+
+### HOLDING_AT Table carry RSI 적용·검증
+사용자요청대로보상/30D입력/원본78k계수유지,B20 carryWith 모션양팔native32 IK·실제mesh상판아랫면지지·9frame보정AMP이력추가. 정적·2048환경0.3초물리검증통과train16/21모델37자세/test4/9모델6자세만뱅크공개. 미지원모델명시적loco fallback(요청50%,실제약38%);viewer는검증test4subset. CPU2개·2048환경1회PPO/저장/finite/양gradient·2048부분reset/history exact통과. 본학습미시작·기존학습중단유지. 상세reference/table_carry_rsi.md 및 ../runs/table_rsi_20261026/REPORT.md.
+
+### Table viewer 상대 체크포인트 경로 수정
+사용자제보: runtime_env의cd 이후realpath로프로젝트루트상대경로실패. runtime진입전realpath -e로고정하고인자검사/LD_LIBRARY_PATH초기화추가. 실제3000회파일존재·shell구문확인. GPU viewer미실행.
+
+### Table78k zero-shot 평가 및 FT3000 비교
+사용자요청GPU0/원본78k가중치·normalizer/FT는env템플릿만사용/test9/512×seed0·1·2/30초. AT점=영역ever134/134/139명, 26.50±0.56%(평가seed표본std). FT3000의0/0/0과세seed초기root·DOF·물체·modelID·목표전배열exact일치. 전trace재채점·32/64ever·원본해시·통계검산통과. 동일조건FT성능저하확인,원인미확정·학습유지. ../runs/table_hold_at_78k_zeroshot_20261026/REPORT.md 및validation.json.
+
+### Table carry 최신 PTH 전용 평가
+Chair hold_at 평가와동일한AT20cm/첫episode종료frame포함ever/30초/512×독립seed0·1·2/ddof1로evaluation/table_hold_at 및전용eval wrapper추가. Table test9·무작위yaw·학습env/모델/normalizer고정,최신번호PTH자동선택/byte동일사본/trace·해시재채점. Chair평가기준4함수AST동일·CPU5개통과. GPU0/최신3000회/4환경900step실행rc0·899시간종료/32·64ever/전trace재채점통과(성능평가아님). 정식512×3미실행,기존학습유지. runs/table_hold_at_eval_smoke_20261026/validation.json 및evaluation/table_hold_at/README.md.
 
 ### Chair 논문88.8%와공개코드측정97.85% 구분정정
 사용자지적으로논문Table3/4.2.2와공개소스재대조. Chair종류·test27·공개모델은맞지만논문랜덤orientation/10×10m와공개코드front사람정렬/9×9m차이확인. 저장initial에서도정렬/±4.5m확인,기록I/O제거후eval루프AST원본동일. 97.85%를논문재현으로표현한것정정;공개checkpoint/code의현서버측정값으로한정. 수치차이원인은미확정·추가GPU실험없음. runs/tokenhsi_chair_official_20261026_160009/PAPER_AUDIT.md 및paper_audit.json.

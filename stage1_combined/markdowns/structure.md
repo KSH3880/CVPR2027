@@ -194,3 +194,11 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 Chair HOLDING+AT: `humanoid_chair_hold_at_ft.py`는 원본 동적 ArmChair 배치, 기존 30D 관측/관계 보상을 사용한다. `hold_at_ft_agent.py`와 `utils/hold_at_ft.py`는 78k strict 전이, 동명 YAML/train/test/vnc는 전용 실행 경로다. [상세](reference/chair_hold_at_ft.md).
 
 `evaluation/hold_at/`는 native Chair HOLDING+AT의30초·512×3 단독평가다. `run_eval.py` 독립사본/seed실행, `backend.py` 첫episode deterministic rollout, `metrics.py` AT위치/ever/재채점/통계를담는다. [실행·명세](../evaluation/hold_at/README.md). 학습/기존viewer와분리된 `chair_hold_at_full_ft_eval.sh` 사용.
+
+`evaluation/table_hold_at/`와 `table_hold_at_full_ft_eval.sh`는 Chair와 같은 AT20cm/30초/512×3 첫episode ever 기준의 Table 전용 평가·최신번호checkpoint 선택·독립사본·trace 재채점을 제공한다. [평가 안내](../evaluation/table_hold_at/README.md).
+
+Table carry RSI: `rsi_native/{table_carry,check_table_carry,merge_table_carry,check_table_rsi_reset}.py`는 B20 기반 native32 팔 IK/mesh 접촉/물리 선별/부분reset 검증을 담당한다. `tokenhsi/utils/table_carry_rsi.py`와 `humanoid_table_carry_rsi_ft.py`는 HOLDING_AT 보상·30D 입력을 유지하며 보정 자세와 AMP history를 적용한다. [상세](reference/table_carry_rsi.md).
+
+`humanoid_table_tokenhsi_ft.py`와 `utils/tokenhsi_table_kernels.py`는 원본Table 보상·종료함수를 우리78k 장면에 연결한다. `table_tokenhsi_ft_agent.py`는 actor 물체토크나이저 adaptation/critic·새판별자 학습과 동결을 관리한다. 전용 `table_tokenhsi_ft.yaml`/train/test/vnc 사용. [설정](reference/table_tokenhsi_ft.md).
+
+`table_adaptation_network.py`/`table_adaptation_agent.py`는 기존78k encoder·action head·scene RMS를동결하고action residual 또는복사초기화한새물체tokenizer만정책학습한다. `table_adapt_{residual,tokenizer}.yaml` 및전용train/test/vnc, CPU검증 `check_table_adaptation_cpu.py`. [설계·실행](reference/table_adaptation_compare.md).

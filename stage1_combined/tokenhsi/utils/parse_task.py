@@ -89,6 +89,15 @@ def parse_task(args, cfg, cfg_train, sim_params):
     if args.task == "HumanoidTokenHSIClimbFT":
         from env.tasks.multi_agent.humanoid_tokenhsi_climb_ft import HumanoidTokenHSIClimbFT
         task_class = HumanoidTokenHSIClimbFT
+    elif args.task == "HumanoidTableCarryRsiFT":
+        from env.tasks.multi_agent.humanoid_table_carry_rsi_ft import HumanoidTableCarryRsiFT
+        task_class = HumanoidTableCarryRsiFT
+    elif args.task == "HumanoidTableTokenHSIFT":
+        from env.tasks.multi_agent.humanoid_table_tokenhsi_ft import HumanoidTableTokenHSIFT
+        task_class = HumanoidTableTokenHSIFT
+    elif args.task == "HumanoidTableHoldAtFT":
+        from env.tasks.multi_agent.humanoid_table_hold_at_ft import HumanoidTableHoldAtFT
+        task_class = HumanoidTableHoldAtFT
     elif args.task == "HumanoidChairHoldAtFT":
         from env.tasks.multi_agent.humanoid_chair_hold_at_ft import HumanoidChairHoldAtFT
         task_class = HumanoidChairHoldAtFT

@@ -207,6 +207,14 @@ def build_alg_runner(algo_observer):
     runner.player_factory.register_builder('chair_ft', lambda **kwargs: ChairFTPlayer(**kwargs))
     runner.model_builder.network_factory.register_builder('amp_chair_ft', lambda **kwargs: ChairFTBuilder())
     from learning.multi_agent.hold_at_ft_agent import HoldAtFTAgent
+    from learning.multi_agent.table_adaptation_agent import TableAdaptationAgent
+    from learning.multi_agent.table_adaptation_network import TableAdaptationBuilder
+    runner.algo_factory.register_builder('table_adaptation', lambda **kwargs: TableAdaptationAgent(**kwargs))
+    runner.player_factory.register_builder('table_adaptation', lambda **kwargs: ma_players.MAPlayerContinuous(**kwargs))
+    runner.model_builder.network_factory.register_builder('amp_table_adaptation', lambda **kwargs: TableAdaptationBuilder())
+    from learning.multi_agent.table_tokenhsi_ft_agent import TableTokenHSIFTAgent
+    runner.algo_factory.register_builder('table_tokenhsi_ft', lambda **kwargs: TableTokenHSIFTAgent(**kwargs))
+    runner.player_factory.register_builder('table_tokenhsi_ft', lambda **kwargs: ma_players.MAPlayerContinuous(**kwargs))
     runner.algo_factory.register_builder('hold_at_ft', lambda **kwargs: HoldAtFTAgent(**kwargs))
     runner.player_factory.register_builder('hold_at_ft', lambda **kwargs: ma_players.MAPlayerContinuous(**kwargs))
     runner.algo_factory.register_builder('ma', lambda **kwargs : ma_agent.MAAgent(**kwargs))
@@ -258,7 +266,7 @@ def main():
     try:
         runner.run(vargs)
     finally:
-        if args.task == "HumanoidChairHoldAtFT" and torch.cuda.is_initialized():
+        if args.task in ("HumanoidChairHoldAtFT", "HumanoidTableHoldAtFT", "HumanoidTableCarryRsiFT", "HumanoidTableTokenHSIFT") and torch.cuda.is_initialized():
             torch.cuda.synchronize()
 
     return
