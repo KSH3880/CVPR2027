@@ -154,7 +154,7 @@ def inverse_rotate(q, vector):
     return rotate(inverse, vector)
 
 
-def group_contact_gate(hands, boxes, sizes, goals, groups, tolerance=.18, success_distance=.2, z_tolerance=.001):
+def group_contact_gate(hands, boxes, sizes, goals, groups, tolerance=.18, success_distance=.2, z_tolerance=.001, goal_saturation=False):
     q = boxes[..., None, 3:7].expand(*hands.shape[:-1], 4)
     local = inverse_rotate(q, hands-boxes[..., None, :3])
     excess_x = (local[..., 0].abs()-sizes[..., None, 0]/2).clamp_min(0)
@@ -169,4 +169,6 @@ def group_contact_gate(hands, boxes, sizes, goals, groups, tolerance=.18, succes
     on_face = (distance <= tolerance).all(-1) & (local[..., 1] <= 0).all(-1) & (aligned | at_position)
     same = groups[:, :, None] == groups[:, None, :]
     gate = (on_face[:, None, :] | ~same).all(-1)
+    if goal_saturation:
+        gate = gate | at_position
     return torch.where(group_sizes(groups) > 1, gate, True)

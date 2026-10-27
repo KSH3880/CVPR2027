@@ -198,7 +198,9 @@ class HumanoidMAStage2JointPush(HumanoidMACarry):
         ids = torch.arange(self.num_envs,device=self.device) if env_ids is None else env_ids
         bodies = self._rigid_body_pos[ids] if env_ids is None else self._kinematic_humanoid_rigid_body_states[ids,...,:3]
         distance,_,hands,boxes,sizes = self._contact_geometry(ids,bodies)
-        self.relation_runtime.gate[ids] = spec.group_contact_gate(hands,boxes,sizes,self._tar_pos[ids],self._groups[ids])
+        self.relation_runtime.gate[ids] = spec.group_contact_gate(
+            hands, boxes, sizes, self._tar_pos[ids], self._groups[ids],
+            goal_saturation=self.cfg['env']['stage2JointPush'].get('goal_saturation', False))
         owner = self.relation_runtime.graph.edge_owner[ids]
         relation = self.relation_runtime.graph.edge_relation[ids]
         root_distance = (bodies[:,:,0,:2]-self._logical_box_values(self._box_states,ids)[:,:4,:2]).norm(dim=-1)

@@ -109,6 +109,10 @@ def load_cfg(args):
         cfg["env"]["numObjects"] = args.num_objects
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
+    if getattr(args, "eval_push_rsi", False):
+        if args.task != "HumanoidMAStage2JointPushRsi" or not (args.test and args.eval):
+            raise ValueError('--eval_push_rsi requires Stage2JointPushRsi --test --eval')
+        print('[Stage2 PUSH RSI diagnostic] PUSH starts: RSI 100%; other tasks: loco 100%')
     if cfg['env'].get('jointPush') is not None and (eval_skills_arg or eval_skill_probs_arg):
         raise ValueError('stage1_jointpush evaluation uses loco starts only; omit eval skill overrides')
     if bool(eval_skills_arg) != bool(eval_skill_probs_arg):
@@ -369,6 +373,12 @@ def get_args(benchmark=False):
             "type": int,
             "default": 3,
             "help": "Number of evaluation repeats",
+        },
+        {
+            "name": "--eval_push_rsi",
+            "action": "store_true",
+            "default": False,
+            "help": "Stage2 jointpush RSI diagnostic evaluation: start all PUSH groups in contact RSI",
         },
         {
             "name": "--eval_skills",

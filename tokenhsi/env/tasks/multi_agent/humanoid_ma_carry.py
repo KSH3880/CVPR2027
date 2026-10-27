@@ -1414,6 +1414,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                     gymapi.MESH_VISUAL,
                     self._agent_color(owner),
                 )
+            if hasattr(self, '_joint'):
+                from env.tasks.multi_agent.push_goal_markers import update_push_goal_markers
+                update_push_goal_markers(self,env_ids,graph,at_edges,goal_slots)
             ids.append(self._marker_actor_ids[env_ids].contiguous().view(-1))
         self._platform_states[env_ids, :, 3:6] = 0.0
         self._platform_states[env_ids, :, 6] = 1.0

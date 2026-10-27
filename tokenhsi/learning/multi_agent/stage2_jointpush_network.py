@@ -18,6 +18,15 @@ class Stage2JointPushBuilder(Stage1PushBuilder):
                         initialize(layer.weight)
                         torch.nn.init.zeros_(layer.bias)
                 branch.init_identity()
+            if params.get('use_internal_adaptation', False):
+                self.action_adapters = torch.nn.ModuleList([
+                    torch.nn.Linear(layer.in_features, layer.out_features)
+                    for layer in self.action_head[0] if isinstance(layer, torch.nn.Linear)
+                ])
+                for adapter in self.action_adapters:
+                    torch.nn.init.zeros_(adapter.weight)
+                    torch.nn.init.zeros_(adapter.bias)
+                self.action_head.requires_grad_(False)
 
         def _encode(self, encoder, coordination, obs):
             m = self.num_agents
@@ -33,7 +42,17 @@ class Stage2JointPushBuilder(Stage1PushBuilder):
 
         def eval_actor(self, obs):
             humans = self._encode(self.actor_encoder, self.coordination, obs)
-            mu = self.action_head(humans).reshape(len(obs)*self.num_agents, -1)
+            if hasattr(self, 'action_adapters'):
+                adapters = iter(self.action_adapters)
+                for layer in self.action_head[0]:
+                    if isinstance(layer, torch.nn.Linear):
+                        humans = layer(humans) + next(adapters)(humans)
+                    else:
+                        humans = layer(humans)
+                mu = self.action_head[1](humans)
+            else:
+                mu = self.action_head(humans)
+            mu = mu.reshape(len(obs)*self.num_agents, -1)
             return mu, mu*0+self.sigma_act(self.sigma)
 
         def eval_critic(self, obs):
@@ -45,7 +64,8 @@ def transfer_stage1(model, checkpoint):
     source, target = checkpoint['model'], model.state_dict()
     copied, added = [], []
     for name, value in target.items():
-        if name.startswith(('a2c_network.coordination.', 'a2c_network.critic_coordination.')):
+        if name.startswith(('a2c_network.coordination.', 'a2c_network.critic_coordination.',
+                            'a2c_network.action_adapters.')):
             added.append(name)
             continue
         if name not in source or value.shape != source[name].shape:

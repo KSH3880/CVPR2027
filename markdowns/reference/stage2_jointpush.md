@@ -37,3 +37,23 @@ test/VNC에 Stage1 PUSH `.pth`를 직접 주면 coordination을 identity로 초�
 ## 검증 범위
 
 GPU5·1024환경 reset/정책 추론과1환경 VNC를 검사한다. `check_stage2_jointpush.py`의 학습 경로 검사는 `MAAgent.train`을 검사 함수로 교체하여 optimizer step을 실행하지 않는다. PPO 학습 속도·장기 안정성·공동 과제 성공률 검증과는 구분한다. CUDA allocator 수치는 PyTorch 할당량이며 PhysX·드라이버 메모리 전체가 아니다. 격리 후보가 없는 동일 장면과의 비용 비교는 수행하지 않았다.
+
+## PUSH 목표 표시
+
+jointpush viewer의 PUSH 목표는 기존 중심점에 지름20cm 구형 테두리를 더한다. 물리 marker actor의 크기는 바꾸지 않는다. 목표 XY에 반경35cm 바닥 링과 목표 높이까지 세로선을 함께 표시한다. 단독은 담당 사람 색, coupled는 노란색이며 공통 목표 슬롯당 하나만 표시한다. 일반 carry AT 마커는 기존 지름6cm·사람 색을 유지한다. `stage2_jointpush_rsi`도 같은 표시를 사용한다. 정책 관측·보상·성공 거리 설정은 변경하지 않는다.
+
+## 목표 도착 시 gate 면제 설정
+
+`stage2_jointpush_goal_saturation`과 `stage2_jointpush_rsi_goal_saturation`은 각각 일반/RSI 원본에서 `stage2JointPush.goal_saturation: true`만 추가한 보상 비교 설정이다. 과제 샘플링·초기화·PPO는 각 원본과 같고, RSI 캐시는 기존 경로를 재사용한다. 실행 config·스크립트·출력 디렉터리는 분리한다.
+
+공유 상자 중심이 목표에서 3D 거리20cm 이내이고 높이 오차1mm 이내이면 전원 접촉 gate를 면제한다. 이때 AT 성공과 짝지어진 CONTACT의 state/progress/success가 모두 포화되어 사람별 과제 보상은1.2다(패널티·task/AMP 혼합 전). 목표 밖에서는 기존 전원 접촉 gate를 적용한다. 성공 이력을 영구 유지하지 않으며 상자가 목표에서 벗어나면 다시 gate 조건을 검사한다. 진단 `group_gate`는 도착 면제를 포함한 유효 gate다. 기존 설정은 옵션이 없으므로 기존 동작을 유지한다.
+
+기본 학습은 기존과 동일하게 Stage1 PUSH checkpoint에서 시작한다. 새 옵션은 Stage2 checkpoint 계약에도 포함되므로 기존 일반/RSI Stage2 checkpoint를 새 설정으로 직접 resume/test하면 계약 불일치로 거절된다. 새 설정에서 생성된 checkpoint로 재개·평가한다.
+
+## 내부 action adapter 비교 설정
+
+`stage2_jointpush_goal_saturation_adapter`는 일반 loco 기반 목표 포화 설정의 actor 학습 방식을 바꾼다. Stage1 actor encoder와 기존 action head 전체(64→1024→512→32)를 동결하고, 사람 간 attention4층 및 앞의 두 Linear에 병렬로 더하는 adapter(64→1024, 1024→512)를 학습한다. 각 adapter는 bias를 포함한 Linear 하나이며 기존 Linear 출력과 합한 뒤 ReLU를 적용한다. 최종32D 출력에는 adapter를 추가하지 않는다.
+
+Adapter weight/bias는0, coordination은 identity로 초기화하여 전이 직후 같은 관측에 대한 Stage1 action mean을 유지한다. 동결 head를 통과하는 gradient는 차단하지 않아 앞단 attention과 adapter가 학습된다. Critic·critic coordination·AMP discriminator 및 scene/AMP 정규화 처리는 기존 Stage2와 같다. 단독·공동 모두 같은 adapter를 사용하므로 학습 후 단독 행동 보존까지 보장하지는 않는다.
+
+환경의 `stage2JointPush.action_adapter: tokenhsi_internal`과 학습 network의 `use_internal_adaptation: true`를 함께 사용한다. 기존 설정은 adapter를 생성하지 않는다. 보상·샘플링·loco 초기화·PPO는 `stage2_jointpush_goal_saturation`과 동일하다. checkpoint 계약 및 모델 구조가 달라 기존 Stage2 checkpoint를 직접 resume하지 않으며, Stage1 PUSH에서 새로 전이하거나 이 adapter 설정의 checkpoint를 재개한다. 기본 wrapper 전이 경로는 기존10500이고, 문서의 비교 실행 명령은 사용자가 실행 중인 기준에 맞춰14000을 명시한다.

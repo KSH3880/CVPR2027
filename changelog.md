@@ -2,6 +2,28 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-27
+
+### Stage2 목표 포화·TokenHSI 내부 adapter 비교 설정
+
+- 사용자 요청으로 `stage2_jointpush_goal_saturation_adapter` 환경/학습 YAML·train/test/VNC를 추가했다. 일반 loco 목표 포화 설정의 보상·샘플링·PPO를 유지하면서 기존 action head 전체를 동결하고 두 hidden Linear에 0 초기화 병렬 adapter를 더한다. 사람 간 attention·critic·AMP 학습은 유지하며 기존 설정에는 adapter를 생성하지 않는다. 새 모델 계약과 별도 출력 경로를 사용하고, 문서 명령은 Stage1 14000 전이를 명시했다.
+- CPU14개에서 설정 동등성·14k 165개 항목 전이·초기 출력·동결/gradient·모델 복원을 확인했다. GPU5·1024환경의 실제 학습 초기화 경로에서 head/encoder optimizer 제외·adapter/attention 포함·lr2e-5·loco 시작 및8step 정책/critic 유한값을 확인했다. 초기 action mean 최대 차이는2.44e-6이었다. 학습 루프를 검사 함수로 대체하여 PPO/optimizer 업데이트0회이며 기존 학습은 유지했다. 결과는 `output_etc/check/stage2_jointpush_goal_saturation_adapter/`에 있다. shell 구문·diff 검사 통과.
+
+### Stage2 일반·RSI 목표 도착 시 gate 면제 비교 설정
+
+- 사용자 승인한 `stage2_jointpush_goal_saturation`·`stage2_jointpush_rsi_goal_saturation`을 별도 환경/학습 YAML·train/test/VNC·출력 이름으로 연결했다. 목표 거리20cm·높이 오차1mm 이내에서는 접촉 gate를 면제하여 AT·CONTACT를 포화시키고, 목표 밖에서는 기존 gate를 적용한다. 영구 성공 latch는 없으며 기존 설정·샘플링·RSI/PPO와 RSI 캐시 경로는 유지한다. 새 옵션은 Stage2 checkpoint 계약에 포함한다.
+- CPU12개·shell 구문·설정 경로/문서 링크·diff 검사 통과. GPU5·각1024환경에서 Stage1 10500 전이 후 일반 loco/RSI 진단 초기화 각각8step 정책 추론의 유한값, 목표 위치를 상자 중심으로 놓았을 때 CONTACT 성공 없이 과제 보상1.2, 원래 목표 복원 시 성공 해제를 확인했다. 최초 검증 harness의 feet 진단 키 오류를 수정한 뒤 두 경로 모두 통과했다. 결과는 `output_etc/check/stage2_jointpush_goal_saturation/`에 있다. PPO 업데이트·본학습은 실행하지 않았다.
+
+### jointpush PUSH 목표 표시 개선
+
+- 사용자 요청으로 PUSH 목표에 지름20cm 구형 테두리·반경35cm 바닥 링·목표 높이까지 세로선을 추가했다. 단독은 담당 사람 색, coupled는 노란색으로 공통 목표 슬롯당 하나만 표시한다. Stage1/Stage2 jointpush viewer에 적용하며 물리 actor 크기·관측·보상·gate는 유지한다.
+- GPU5·1환경·Stage2 4500 checkpoint에서 공동/단독 PUSH와 일반 AT를 각각8step 실행하고 목표 수1/4/0·색상·기존 marker scale·유한 보상·렌더 이미지를 확인했다. 결과는 `output_etc/check/stage2_jointpush_rsi/push_goal_markers/`에 있다. PPO 업데이트 없이 기존 학습 프로세스를 유지했다.
+
+### Stage2 jointpush RSI 진단 추론 옵션
+
+- 사용자 요청으로 test/VNC에 `PUSH_RSI=1`(직접 CLI `--eval_push_rsi`)을 연결했다. 평가 모드를 유지하면서 단독·coupled PUSH는 접촉 RSI100%, 다른 과제는 loco100%로 시작한다. 기본 loco 평가·학습 RSI 비율·checkpoint 계약을 유지하며 기존 네 과제 RSI 캐시는 생성하지 않는다. 실행 옵션·명세·구조 문서를 갱신했다.
+- CPU20개·shell 구문·diff 검사 통과. GPU5·1024환경의 Stage2 4000 checkpoint로 옵션 ON7종/기본OFF3종 reset·16step 정책 추론·부분 reset·유한값·PUSH 참조 관절/AMP를 검증했다. 혼합 ON에서 PUSH3521명만 RSI, 나머지575명은 loco였다. Stage1 11000 제로샷·1환경 VNC에서도4명 공동 RSI 렌더/PNG를 확인했다. optimizer step0회, 기존 학습 프로세스 유지. 결과는 `output_etc/check/stage2_jointpush_rsi/eval_rsi_option/`에 있다.
+
 ## 2026-10-26
 
 ### Stage2 jointpush RSI variant 연결

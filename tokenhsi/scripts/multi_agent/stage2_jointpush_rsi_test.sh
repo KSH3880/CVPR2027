@@ -8,6 +8,11 @@ tokenhsi_select_output stage2_jointpush_rsi eval
 JOINTPUSH_CHECKPOINT=${1:-pth/Stage1PushFinetune_00010500.pth}
 set -- --num_agents "${2:-4}" --num_envs "${3:-1}" --num_objects "${4:-8}" --eval_repeats "${5:-10}"
 set -- "$@" --task_graph "${TASK_GRAPH:-random_scenario}" --task_camera "${TASK_CAMERA:-stack}" --seed "${SEED:-42}"
+case "${PUSH_RSI:-0}" in
+  0) ;;
+  1) set -- "$@" --eval_push_rsi ;;
+  *) echo 'PUSH_RSI must be 0 or 1' >&2; exit 2 ;;
+esac
 if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
 if [ -n "${EPISODE_LENGTH:-}" ]; then set -- "$@" --episode_length "$EPISODE_LENGTH"; fi
 if [ "${SIM_DEVICE:-}" = cpu ]; then set -- "$@" --sim_device cpu --pipeline cpu --rl_device cpu; fi

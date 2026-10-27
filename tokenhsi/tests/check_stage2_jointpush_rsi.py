@@ -16,6 +16,7 @@ def check(player):
     task = player.env.task
     ids = torch.arange(task.num_envs,device=task.device)
     report = dict(environments=task.num_envs,evaluation=task._is_eval,optimizer_steps=0,
+        eval_push_rsi=task._eval_push_rsi,
         legacy_size_fixture=os.environ.get('RSI_CHECK_LEGACY_FIXTURE') == '1',resets=[])
     presets = os.environ.get('RSI_CHECK_PRESETS','all_coupled,push').split(',')
     for preset in presets:
@@ -34,11 +35,17 @@ def check(player):
         assert ((distance[loco] >= 2-1e-4)&(distance[loco] <= 10+1e-4)).all()
         same = task._groups[:,:,None] == task._groups[:,None]
         assert ((task._interaction[:,:,None] == task._interaction[:,None]) | ~same).all()
-        if task._is_eval:
+        if task._is_eval and task._eval_push_rsi:
+            torch.testing.assert_close(task._interaction,push)
+            assert set(task._reset_ref_slots) <= {'loco','push'}
+            assert task._bank is not None and not hasattr(task,'_size_rsi_cache')
+        elif task._is_eval:
             assert not task._interaction.any() and set(task._reset_ref_slots) == {'loco'}
             assert task._bank is None and not hasattr(task,'_size_rsi_cache')
-        elif push.any():
-            assert task._interaction.any() and loco.any()
+        if (not task._is_eval or task._eval_push_rsi) and push.any():
+            assert task._interaction.any()
+            if not task._is_eval:
+                assert loco.any()
             es,owners = task._reset_ref_slots['push']
             mids,times = task._reset_ref_motion_ids['push'],task._reset_ref_motion_times['push']
             reference = task._motion_lib['push'].get_motion_state(mids,times)[2]
@@ -77,6 +84,8 @@ def check(player):
     torch.testing.assert_close(task._box_states[1::2],before[1::2])
     directory = Path(task.cfg['args'].output_path)
     directory.mkdir(parents=True,exist_ok=True)
+    if task.viewer is not None:
+        task.gym.write_viewer_image_to_file(task.viewer,str(directory/'viewer.png'))
     (directory/'verification.json').write_text(json.dumps(report,indent=2))
     print('PASS stage2_jointpush_rsi',json.dumps(report),flush=True)
 
@@ -128,7 +137,8 @@ if __name__ == '__main__':
     original_load = entry.load_cfg
     def load_cfg(args):
         cfg,train,logdir = original_load(args)
-        cfg['env']['stage2JointPush']['solo_rsi_cache_directory'] = 'output_etc/check/stage2_jointpush_rsi/solo_cache'
+        if not args.eval:
+            cfg['env']['stage2JointPush']['solo_rsi_cache_directory'] = 'output_etc/check/stage2_jointpush_rsi/solo_cache'
         return cfg,train,logdir
     entry.load_cfg = load_cfg
     original_apply = HumanoidMAStage2JointPushRsi._apply_push_rsi

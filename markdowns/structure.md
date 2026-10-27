@@ -178,6 +178,7 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 | `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush.yaml` | 4명·1024환경·8 object 토큰, Stage1 PUSH 전이 |
 | `tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2_jointpush.py`, `stage2_jointpush_reward.py` | 24개 후보 bank·미사용 격리, 물리 공유/구역 관측, gate 적용 AT |
 | `tokenhsi/utils/stage2_jointpush_scene.py` | 사람 고정·32후보 배치, coupled 뒤쪽/목표 cone·swept rectangle, 단독 Stage1 경로 검사 |
+| `tokenhsi/env/tasks/multi_agent/push_goal_markers.py` | jointpush PUSH 목표20cm 구형 테두리·바닥 링/세로선, 공동 노란색·그룹당1개 |
 | `tokenhsi/scripts/multi_agent/stage2_jointpush_{train,test,vnc}.sh` | GPU5 학습·Stage1 제로샷/Stage2 추론 |
 | `tokenhsi/tests/check_stage2_jointpush.py` | 학습 업데이트 없는 전이·1024환경 reset/추론·부분 reset·viewer 검사 |
 
@@ -191,7 +192,28 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 | `tokenhsi/env/tasks/multi_agent/humanoid_ma_stage2_jointpush_rsi.py` | 기존 Stage2의 RSI 초기화 연결·물리 상자/목표 유지 |
 | `tokenhsi/env/tasks/multi_agent/jointpush_solo_rsi_cache.py` | 4명·24 actor bank에 맞춘 기존 과제 RSI 캐시/후반 프레임 샘플링 |
 | `tokenhsi/utils/stage2_jointpush_rsi.py` | 그룹별 RSI 선택·구역 뒤쪽 손 목표·사람 간 충돌 검사 |
-| `tokenhsi/scripts/multi_agent/stage2_jointpush_rsi_{train,test,vnc}.sh` | GPU5 학습·Stage1 제로샷/Stage2 평가·VNC |
+| `tokenhsi/scripts/multi_agent/stage2_jointpush_rsi_{train,test,vnc}.sh` | GPU5 학습·Stage1 제로샷/Stage2 평가·VNC, `PUSH_RSI=1` 진단 옵션 |
 | `tokenhsi/tests/{test,check}_stage2_jointpush_rsi.py` | CPU 계약·실제 초기화/AMP/평가·optimizer 업데이트 없는 학습 연결 검사 |
 
 초기화·캐시·검증 범위는 [Stage2 jointpush RSI](reference/stage2_jointpush_rsi.md)를 따른다.
+
+## Stage2 jointpush 목표 포화 비교
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush{,_rsi}_goal_saturation.yaml` | 일반/RSI 각각 목표 도착 시 gate 면제, 기존 설정과 출력 분리 |
+| `tokenhsi/scripts/multi_agent/stage2_jointpush{,_rsi}_goal_saturation_{train,test,vnc}.sh` | 두 설정의 학습·평가·VNC 실행 |
+| `tokenhsi/tests/test_stage2_jointpush_goal_saturation.py` | 목표 도착·손 떼기·목표 이탈·높이 오차 및 기존 설정 동등성 검사 |
+
+상세 규칙은 [Stage2 jointpush](reference/stage2_jointpush.md#목표-도착-시-gate-면제-설정)를 따른다.
+
+## Stage2 jointpush 내부 action adapter
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush_goal_saturation_adapter.yaml` | 일반 loco·목표 포화 보상에 동결 action head와 두 병렬 adapter 적용 |
+| `tokenhsi/learning/multi_agent/stage2_jointpush_network.py` | 선택적 내부 adapter 생성·전이·동결·추론 |
+| `tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_{train,test,vnc}.sh` | 별도 학습·평가·VNC 출력 |
+| `tokenhsi/tests/test_stage2_jointpush_adapter.py` | 설정 동등성·14k 전이 초기 출력·동결/gradient·모델 복원 검사 |
+
+상세 구조는 [Stage2 jointpush](reference/stage2_jointpush.md#내부-action-adapter-비교-설정)를 따른다.

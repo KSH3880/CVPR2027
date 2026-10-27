@@ -30,6 +30,8 @@ RSI 뒤의 사람은 접촉 거리에서 시작하므로 최종 사람→상자 
 
 기본 eval은 학습과 같은 그룹·과제 비율·상자 크기/물성·loco 사람/상자/목표 샘플러를 사용하고 모든 과제를 loco100%로 초기화한다. RSI bank/크기별 캐시를 생성하지 않는다. `TASK_GRAPH`로 특정 과제를 선택하면 해당 평가 분포만 달라진다.
 
+`PUSH_RSI=1`을 test/VNC에 지정하면 진단용으로 PUSH만 접촉 RSI100%로 시작한다. coupled는 그룹 전원이 배치되며 다른 과제는 loco100%다. 직접 실행 인자는 `--eval_push_rsi`이고 이 task의 `--test --eval`에서만 허용한다. 평가 모드를 유지하고 학습 업데이트·기존 네 과제 RSI 캐시 생성은 하지 않는다. 옵션을 생략하면 기존 loco 평가다.
+
 학습 시 기존 Stage1의 크기별 RSI 캐시를 재사용하고, 부족한 크기는 동일한 물리 screening으로 생성한다. Stage2 추가 캐시는 `env.stage2JointPush.solo_rsi_cache_directory`인 `output/rsi_cache_stage2_jointpush_rsi`에 저장한다. 기존 캐시가 포괄하지 않는 크기가 많으면 첫 학습 초기화가 오래 걸릴 수 있다. 이후 같은 크기/계약은 저장된 캐시를 재사용한다.
 
 Stage1 PUSH checkpoint의 전이·제로샷은 기존 Stage2와 같다. RSI variant와 loco variant의 일반 resume 계약은 구분한다.
