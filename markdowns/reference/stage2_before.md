@@ -111,3 +111,57 @@ mix226의 과제/역할 추첨·크기 조건·20/20/60 거리 혼합·loco 초�
 actor의 human coordination 4 layer × 2 head에서 NONE(0)·SELF(1) bias는 상수 0이며 BEFORE(2)만 학습한다. `CoordinationBlock.relation_bias`는 이 모드에서 `[heads, 1]` BEFORE 파라미터만 저장한다. `effective_relation_bias()`가 `[0, 0, BEFORE]` 테이블을 만들어 attention에 사용하므로 SELF/NONE을 위한 optimizer 상태·학습 파라미터가 없다. 분석 도구는 raw 파라미터의 3열을 가정하지 않고 이 메서드로 실제 bias를 읽는다. critic은 기존 `[heads, 3]` SELF/NONE/BEFORE 모두 학습한다. QK/V·action head·critic의 기존 학습 경로는 유지한다.
 
 기존 옵션 미지정은 `all`로 처리하며 계산·파라미터 형태·기존 checkpoint 계약을 보존한다. 새 mode는 BEFORE checkpoint 계약에 기록하고 train/test 설정 불일치를 거부한다. 두 새 실험끼리도 progress 계약이 다르므로 교차 resume하지 않는다. 결과는 각각 동명의 `output/<컨피그>/`에 저장한다. 실행은 [config](../config.md), 옵션은 [USAGE](../USAGE.md#stage2-before-actor-selfnone-bias-0)를 따른다.
+
+
+## AT progress 후행 carryWith RSI 50/50
+
+`stage2_before_ground_mix226_atprogress_carry50_1200`은 AT progress 226의 거리20/20/60·1200스텝·보상·모델·전체 관계 bias 학습을 유지한다. 같은 fixed78000에서 전이한다. `before.follower_carry_rsi={probability: 0.5, skill: carryWith}`를 checkpoint 계약에 포함해 기존 실험과 혼용을 막는다.
+
+graph마다 BEFORE ON_TOP 후행만 50% carryWith를 요청하며 물리 배치 재시도 중 선택은 유지한다. 나머지 사람과 loco 후행의 배치는 기존과 같다. carryWith는 프레임의 사람·자기 상자 상대 자세를 보존해 후행 위치로 평행이동하고 함께 yaw 회전한다. 후행→선행 상자 거리와 선행 접근/운반 거리만 기존 mode를 따르며, RSI 자기 상자는 손에 들린 위치를 사용해 loco의 1~5/1~2.5/1~1.25m 배치를 생략한다. 클립 끝 목표나 선행 클립 시간 동기화는 사용하지 않는다. 시작 후에는 정책이 행동한다.
+
+`BeforeCarryRsiCache`는 carryWith만 실제 payload 크기별 기존 단독 물리 screening(.1초)과 기하 검사를 수행한다. 공중 payload(바닥8cm 초과)·기존 HOLDING 조건·BEFORE 몸 관통 조건을 만족한 프레임만 균등 샘플링하며 클립을 리타게팅하지 않는다. 유효 프레임 없는 크기는 loco로 fallback하고 횟수와 실현 비율을 기록한다. 50%는 요청 확률이며 사용 가능률이 낮으면 실현 비율은 낮아질 수 있다. 초기 손-물체 상대 자세와 장기 정책 파지 성공은 별개다.
+
+기본 평가에는 RSI를 넣지 않으며 별도 `--before_carry_rsi mix|carry`로만 활성화한다. 학습 gate·단독 행동·Stage1 encoder/RMS 동결은 유지한다. 실행 옵션은 [USAGE](../USAGE.md#stage2-before-mix226-at-progress-carry50)에 있다.
+
+## 단독·BEFORE 전체 Stage1 RSI
+
+`stage2_before_ground_mix226_atprogress_fullrsi_1200`은 AT progress mix226 기반의 별도 실험이다. Stage1 fixed78000에서 새로 전이하며, 기존4명/1024환경/8토큰·1200스텝·20/20/60·ground-only·보상/gate·전체 관계 bias·동결 정책을 유지한다. 단독의 높이/선반까지 원본 Stage1로 돌리는 실험은 아니다.
+
+모든 역할에서 Stage1의 과제별 templateRsi를 사용한다: HOLDING=50%loco/50%pickUp, SIT=50%loco/50%sit, CLIMB=50%loco/50%climb, AT/ON_TOP=50%loco/10%pickUp/30%carryWith/10%putDown. RSI 프레임은70% 확률로 유효 행동 구간의 마지막30%,30% 확률로 전체 유효 프레임에서 선택한다. 후반 후보가 없으면 전체 유효 프레임으로 대체한다. loco에는 행동 후반 우선 추첨을 적용하지 않는다.
+
+순서는 graph·역할·실제 물체 binding→쌍별 거리 모드→사람별 시작 행동→크기에 맞는 프레임→배치다. 크기 fallback은 Stage1의 `resolve_skills`를 그대로 사용한다. 이미 가능한 요청은 유지하며 불가능한 요청만 원래 가중치×사용 가능 mask로 재추첨한다. 물리 재시도 중 graph·거리 모드·처음 요청한 행동은 다시 추첨하지 않는다. 합성 배치가8회 실패한 경우 불가능한 후행 자세가 명확하면 해당 후행만, 그 외 장면 기하 충돌이면 해당 장면의 선택된 비-loco 행동을 제외하고 동일 가중치 규칙으로 재추첨한다. 재시도는 최대64회이며 모두 실패하면 오류로 중단한다. 이 합성 fallback은 크기 fallback과 별도로 기록하며, 최종 적용 분포는 요청 비율과 다를 수 있다.
+
+단독 AT와 ON_TOP의 자유 목표 XY는 Stage1의 환경 중심±4.5m/사람·payload1m 제외를 사용한다. 단독 putDown 목표/받침은 클립 종료 위치다. ground-only를 유지하며 RSI source 자체의 클립 높이는 보존한다.
+
+BEFORE 선행 loco의 접근 거리와 loco/pickUp/carryWith의 상자→AT 목표 거리는 기존226 모드다. 선행 RSI의 사람↔상자 상대 자세는 보존하고, putDown 목표는 클립 종료 위치를 사용한다. 후행 loco는 기존 거리표, ON_TOP pickUp/carryWith는 사람+자기 payload 묶음을 선행 상자 주변으로 이동한다. 후행 sit/climb/putDown은 선행 상자를 대상으로 XY/yaw만 정렬한다. 사람을 높이 이동/기울여 들린 받침에 억지로 맞추지 않으며, 받침이 바닥에서 벗어나거나 기울어진 조합은 재시도/fallback한다. 공유 상자의 실제 상태는 선행만 결정한다. ON_TOP putDown payload가 이미 선행 AT 목표 위에 있는 것은 빈 목표 공간 heuristic의 예외로 허용하되 상자/사람 관통 검사는 유지한다.
+
+`before_full_rsi_cache.py`는 모든 단독 bank 및 가능한 같은 환경의 선행·후행 상자 크기 조합을 사전 검사한다. Stage1과 같은 native0.1초 PD 유지·속도/변위·body-point/발 높이/fall 검사를 사용하며, 캐시 유효성이 장기 물리 안정성이나 두 사람의 합성 장면 안정성을 보장하지는 않는다. 장면 reset에서는 별도의 공유 상자/사람 기하 검사를 수행한다. AMP reference history에는 실제 선택된 클립/시점을 사용하며, XY/yaw 변환은 heading-local AMP 특징을 보존한다.
+
+평가 전용 `both_carry`는 BEFORE ON_TOP 쌍의 두 사람에게 carryWith를 요청한다. 실제 크기/배치 검사를 유지하며 적용 불가한 사람만 loco로 fallback한다. 다른 과제/단독은 loco다. `mix`와 학습의 Stage1 확률·후반 프레임 선택은 유지한다. 사용법은 [USAGE](../USAGE.md#stage2-before-mix226-at-progress-full-rsi)에 있다.
+
+`rsi/{solo,leader,follower}/{holding,sit,climb,at,ontop}/{skill}_{requested,executed}`와 `size_fallback`, `placement_fallback`, `rsi/late_branch_fraction`으로 실제 분포를 확인한다. 후반 branch 비율은 재시도 중 프레임 선택도 포함한다. 평가 기본은 전원loco, `BEFORE_FULL_RSI=mix`만 학습 혼합을 사용한다. 전원loco에서의 BEFORE 성공과 RSI 시작 성공은 분리해 비교한다.
+
+## AT progress 공유 action head adapter
+
+`stage2_before_ground_mix226_atprogress_adapter_1200`은 AT progress 226 설정에서 `relationGraph.actor_head_adapter: tokenhsi_internal_v1`만 추가한다. 거리20/20/60·loco 시작·1200step·후행 AT progress·gate·학습률2e-5·전체 SELF/NONE/BEFORE bias를 유지한다. Stage1 V2 Fixed78000에서 새로 전이하며 기존 Stage2 학습 가중치를 이어받지 않는다.
+
+actor의 Stage1 encoder/RMS와 action head 세 Linear를 동결한다. 사람 SA4와 공유 adapter 두 개를 학습하고 critic/AMP의 학습 정책은 유지한다. TokenHSI `amp_network_builder_transformer_adapt.py`의 내부 adapter처럼 hidden Linear 출력에 병렬 선형 보정을 더한 뒤 기존 ReLU를 적용한다.
+
+```text
+x  = human SA4 output (64)
+h1 = ReLU(frozen Linear1(x)  + Adapter1(x))   # 64 → 1024
+h2 = ReLU(frozen Linear2(h1) + Adapter2(h1))  # 1024 → 512
+mu = frozen Linear3(h2)                     # 512 → 32
+```
+
+Adapter1·2는 bias를 포함한 full-size Linear이고 weight/bias 모두0에서 시작한다. 별도 activation·출력층 adapter·관계별 분기는 없다. 단독/선행/후행 및 모든 스킬/관계에 같은 두 adapter를 사용한다. `requires_grad=False`인 head를 통과해서도 SA에 gradient를 전달한다. 초기 adapter 기여0은 초기 정책을 보존하지만 학습 이후 출력 변화나 기존 능력 보존을 보장하는 제약은 아니다.
+
+기존 action head의 checkpoint key를 유지해 Stage1 tensor 전체를 복사한다. 새 `action_adapters.*`만 SA와 함께 새로 초기화하며 체크포인트 계약에 adapter 종류를 포함해 기존 head 학습형과 혼용을 거부한다. resume 시 head 동결·adapter optimizer 구성을 다시 적용한다.
+
+## Adapter actor·critic SELF/NONE bias 0
+
+`stage2_before_ground_mix226_atprogress_adapter_bias0_1200`은 공유 adapter 설정에서 `relationGraph.actor_human_bias`와 `critic_human_bias`를 모두 `before_only`로 지정한다. actor/critic 사람 SA4의 각 layer/head에서 NONE·SELF는 상수0이고 BEFORE만 학습한다. 각 block의 bias 파라미터는 `[heads, 1]`이며 forward에서 앞에0 두 열을 붙이므로 optimizer 업데이트·resume 후에도 SELF/NONE이 바뀌지 않는다. Actor와 critic의 BEFORE bias·QKV 가중치는 서로 별개다.
+
+Stage1의 actor/critic 모두 SELF/NONE 관계 bias0 규칙을 Stage2 사람 SA에도 적용하는 비교다. QK 점수·attention 자체를0으로 만들지 않으며, adapter Linear의 bias와 일반 Linear bias는 이 옵션의 대상이 아니다. 기존 Stage1 encoder의 관계 bias 계산은 유지한다.
+
+기반 adapter 실험의 encoder/RMS·head3층 동결, 공유 Adapter1·2의0 초기화·학습, critic/AMP 학습, AT progress·거리20/20/60·loco·1200step·학습률2e-5는 그대로다. 같은 fixed78000에서 새로 시작한다. 기존 actor-only bias0 실험의 critic은 계속 전체 관계 bias를 학습한다. 새 설정은 actor/critic bias 모드를 checkpoint 계약에 포함하므로 기존 adapter·actor-only 체크포인트와 혼용할 수 없다.

@@ -2,7 +2,56 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-27
+
+### Adapter actor·critic SELF/NONE bias0
+
+- `stage2_before_ground_mix226_atprogress_adapter_bias0_1200` env/train YAML·전용 train/test/VNC를 추가했다. 기존 adapter 설정에서 actor·critic 사람 SA4 모두 SELF/NONE bias는 상수0, BEFORE bias만 학습한다. critic 모드 옵션과 checkpoint 계약을 추가했으며 기존 actor-only 실험과 기본 adapter의 동작은 유지한다. fixed78000 새 전이·공유 adapter·encoder/RMS/head 동결·거리20/20/60·loco·AT progress·1200step·학습률2e-5는 기반과 같다. [설계](markdowns/reference/stage2_before.md#adapter-actorcritic-selfnone-bias-0), [명령](markdowns/config.md).
+- CPU73개 통과(기존30500 source 전이 테스트2개 제외; 새 전이 테스트 및 실제78000 전이 통과). 초기 actor/critic 출력 동등성·양쪽 BEFORE/QK gradient·고정0·adapter gradient·head 동결·checkpoint 혼용 거부를 검사했다. GPU0/MPS·4명/1024환경/8물체 CHECK 학습 epoch2/frame262144에서 encoder73/head6 tensor·RMS 동결, actor/critic 모든 layer/head의 SELF/NONE 정확한0·BEFORE bias/SA/adapter 갱신, finite·물리 배치 최종 실패0을 확인했다. [CPU](output_etc/check/before_adapter_bias0_20261027/cpu.log), [학습](output_etc/check/before_adapter_bias0_20261027/training_validation.json).
+- 전용 test로 BEFORE ON_TOP·더 가까움·4환경·32step headless 재로드, 전용 train으로1024환경 resume epoch3/frame393216을 확인했다. 재개 후에도 양쪽 SELF/NONE0·encoder/head/RMS 동결·adapter optimizer step96→144·finite·물리 실패0을 검증했다. [재개](output_etc/check/before_adapter_bias0_20261027/resume_validation.json). 셸/Python 문법·문서 경로/순서·diff 확인. 본학습은 실행하지 않았고 기존 두 학습 프로세스를 유지했다. GUI/VNC 실화면·장기 성능은 미검증이다.
+
+### AT progress 공유 action head adapter
+
+- `stage2_before_ground_mix226_atprogress_adapter_1200` env/train YAML·전용 train/test/VNC를 추가했다. AT progress226의20/20/60·loco·1200step·보상/gate·전체 관계 bias·학습률2e-5를 유지하고 fixed78000에서 새로 전이한다. actor encoder/RMS와 head3층을 동결하며 SA4·공유 hidden Linear adapter2개를 학습한다. adapter는 weight/bias0에서 시작해 기존 Linear 출력과 더한 뒤 ReLU를 적용한다. critic/AMP 정책은 유지하며 checkpoint 계약을 분리했다. [설계](markdowns/reference/stage2_before.md#at-progress-공유-action-head-adapter), [명령](markdowns/config.md).
+- CPU95개 통과(로컬30500 source를 사용하는 기존 전이 테스트2개 제외; 새 전이 테스트와 실제78000 전이 별도 통과). GPU0/MPS·4명/1024환경/8물체 CHECK 학습 epoch2/frame262144에서 actor encoder73 tensor·head6 tensor·RMS가 source와 정확히 동일하고 adapter4 tensor·SA·critic head 갱신, 모델/scalar finite·physical reset 실패0을 확인했다. [CPU](output_etc/check/before_adapter_20261027/cpu.log), [회귀](output_etc/check/before_adapter_20261027/cpu_regression.log), [학습 검증](output_etc/check/before_adapter_20261027/training_validation.json).
+- 전용 test의 BEFORE ON_TOP·더 가까움·4환경·32step headless 재로드, 전용 train의1024환경 resume epoch3/frame393216을 확인했다. 재개 후 encoder/head/RMS 동결·adapter optimizer step96→144·갱신·finite·물리 실패0을 확인했다. [재개 검증](output_etc/check/before_adapter_20261027/resume_validation.json). 셸/Python 문법·문서 경로·diff 확인. 본학습은 시작하지 않았고 기존 두 학습 프로세스를 유지했다. GUI/VNC 실화면과 장기 성능은 미검증이다.
+
+- carry50 기존2500 epoch 재개 명령을 [USAGE](markdowns/USAGE.md#stage2-before-mix226-at-progress-carry50)에 추가했다. 실제 체크포인트 존재와 train wrapper의 `RESUME_CHECKPOINT → --checkpoint/--resume 1` 연결을 확인했으며 학습은 실행하지 않았다.
+
+### AT progress actor 피처·행동 출력 변화 진단
+
+- AT progress19500·seed6101·32환경 random_scenario·loco·최초 에피소드1200step 상한에서10step마다 actor encoder/사람 SA4 출력과 head 대입 출력을 수집했다. encoder73 tensor/RMS가 source78000과 정확히 동일하며 검사 중 모델 가중치·학습 프로세스는 유지했다. 같은 관측의 encoder→SA4 상대 L2 변화(사람별 평균)는 단독 ON_TOP17.45%, BEFORE ON_TOP30.86%, 후행 SIT23.85%, CLIMB24.33%였다. BEFORE ON_TOP의 SA1~4 누적 변화는10.53/17.64/25.50/30.86%, 최종 cosine0.9493이었다.
+- BEFORE ON_TOP 중 자기 상자1m 이내·HOLDING 미충족 구간의 피처 변화32.75%, HOLDING 충족 구간18.89%였다. 같은 관측에서 source head(encoder 출력) 대비 현재 head(SA4 출력)의 clip 후 action 상대 RMS 차이는 단독 ON_TOP24.96%, BEFORE ON_TOP67.54%였다. 현재 head에 encoder 출력을 직접 넣었을 때도 source head 대비43.57% 차이가 났다. 이는 피처/출력 변화량이며 실패 원인이나 성능 하락률로 해석하지 않는다. [결과·정의](output_etc/check/atprogress_features_20261027/summary.json).
+
+### BEFORE ON_TOP 운반·내려놓기 정책 분리 진단
+
+- AT progress19500/carry50 2500/full RSI4500을 공통 loco sampler·seed6101·32환경(before_stack64쌍)·1200step 상한으로 비교했다. 체크포인트별 원래 계약 검증 후 RSI 초기화 외 환경 설정의 동등성, 실제 초기 root/dof/상자/목표/graph/크기 동일성을 확인했다. HOLDING+상자 바닥8cm 이상을 연속0.1초 만족한 집기는14/6/3명, 같은 조건3초 유지는14/6/1명, raw/gated ON_TOP은 모두0명이었다. finite·가중치 불변을 확인했다. [결과와 판정 기준](output_etc/check/three_loco_ontop_20261027/summary.json).
+- full RSI4000·seed42·32환경·before_stack에서 동일 초기 장면의 후행만 현재 정책/coordination 우회/Stage1 encoder+head로 비교했다. carry 시작40명의 ON_TOP은 모두0명이며, 종료 시 선행 목표 거리 중앙값은18.50/5.73/2.75m였다. 원래 Stage1 제어도 해당 BEFORE 배치에서는 파지를 오래 유지하지 못해 attention 한 부분만의 문제로 확정하지 않았다. 받침40개 중30개는 Stage1 SUPPORT 크기 범위 밖이었다. [비교](output_etc/check/ontop_policy_diagnosis_20261027/comparison.json).
+- 검사 전용으로 선행을 putDown 후반·후행을 목표 근처로 배치한 동일 장면 비교에서 현재 정책은 carry 후행52명 중1명 ON_TOP 성공(연속24.6초), Stage1 후행 대입은 gated 성공0명이었다. 이 배치는 선행 phase·목표·후행 거리를 함께 바꾸며, 선행 프레임은 기존 기하 검사를 거치지만 별도 native 물리 캐시를 만들지 않았다. 학습/공용 캐시/보상·gate는 변경하지 않았다. [종합](output_etc/check/ontop_policy_diagnosis_20261027/summary.json).
+- 선행 목표/현재 상자를 각각 XY1m 옮긴 관측 진단에서 후행 action 변화 RMS 평균은0.0034/0.0494였다. 목표 정보에 반응은 있으나 올바른 활용을 증명하지 않는다. carry50 과거1500 평가도 carry 유지52/57(연속3초)·ON_TOP0/57로 같은 후반 구간 실패가 있었음을 재확인했다. 작은 표본이며 캐시 불안정·크기 분포·목표 정보 활용·보상 신호 중 단일 원인은 아직 확정하지 않았다.
+
+### Full RSI 집기·물리 진단과 선후행 carryWith 뷰어
+
+- full RSI test/VNC에 평가 전용 `BEFORE_FULL_RSI=both_carry`를 연결했다. BEFORE ON_TOP 쌍의 선행 AT/후행 ON_TOP 모두 carryWith를 요청하고, 다른 사람과 크기/배치 fallback은 loco다. 콘솔에 실제 적용 쌍 수를 출력한다. 학습 확률·현재 프로세스·공용 캐시·checkpoint 계약은 유지했다. [사용법](markdowns/USAGE.md#stage2-before-mix226-at-progress-full-rsi).
+- CPU7개 통과. 전용 test wrapper에서 seed42·before_stack·더 가까움·4명/1환경·32step headless 재로드 및 두 쌍 모두 carryWith 적용을 확인했다. GUI 실화면은 미검증이다. [로그](output_etc/check/fullrsi_pickup_diagnosis_20261027/viewer_smoke.log). 셸/Python 문법·diff 확인.
+- full RSI4000을 32환경·before_stack·seed42·최대1200step에서 mix/both_carry로 진단했다. mix 후행 carryWith19/19는 HOLDING 조건을 연속3초 이상 유지했으나 ON_TOP은 모든 초기화에서0/64였다. loco 후행27/30은 자기 상자1m 이내에 접근했지만 HOLDING은7/30이었다. actor encoder73 tensor/RMS는 source78000과 동일하고 모델·rollout은 finite였다. [결과](output_etc/check/fullrsi_pickup_diagnosis_20261027/summary.json).
+- 물리 안정성은 완전 통과로 판단하지 않았다. 별도0.1초 PD 유지에서 mix128명 중 carryWith4명, both_carry128명 중 carryWith9명이 native 변위/속도 기준을 초과했다. mix 실패4명은 주변 물체/사람을 분리해도 실패했고, 기존 유효 캐시 프레임4개 중3개는 native 물리 재검사에서도 탈락했다. 캐시와 실제 배치의 안정성 차이는 미해결이며 학습 캐시를 덮어쓰지 않았다. 이는 모든 ON_TOP 실패의 원인으로 확정한 결과는 아니다. [분리 검사](output_etc/check/fullrsi_pickup_diagnosis_20261027/mix/isolation.json), [재검사](output_etc/check/fullrsi_pickup_diagnosis_20261027/mix/native_rescreen.json).
+
 ## 2026-10-26
+
+### AT progress mix226 단독·BEFORE 전체 Stage1 RSI
+
+- 본학습 실행 확인 중 env YAML의 표시용 `experiment.name`이 기반 AT progress 이름으로 남은 것을 fullrsi 이름으로 정정했다. 실행 이름은 train config/CLI를 사용하므로 기존 실행·output·학습 동작에 영향은 없으며, 실행 중 설정/프로세스는 변경하지 않았다. YAML 전후 env/sim/전이 설정 동일·diff를 확인했다.
+
+- `stage2_before_ground_mix226_atprogress_fullrsi_1200` env/train YAML·전용 train/test/VNC를 추가했다. 단독/선행/후행에 Stage1 과제별 RSI와70% 후반 프레임 선택·크기 fallback을 적용하며, BEFORE 공유 상자의 XY/yaw 배치·합성 재시도/fallback을 분리했다. 관계/거리 모드 고정·ground-only·현재 gate/AT progress·1200스텝·fixed78000 전이/동결을 유지한다. [설계](markdowns/reference/stage2_before.md#단독before-전체-stage1-rsi), [명령](markdowns/config.md), [평가 옵션](markdowns/USAGE.md#stage2-before-mix226-at-progress-full-rsi).
+- CPU75개 통과(기존30500 fixture 부재 테스트1개 제외). GPU0·4명/1024환경/8물체 전용 train CHECK epoch2/frame262144 저장, actor encoder73 tensor/RMS 동결·action head 갱신·모델/scalar finite·physical reset 실패0 확인. 32환경·8구성×16step에서 단독/BEFORE·loco/mix·클립 상대 자세·자유 거리·AT progress·AMP·부분 reset 보존·가중치 불변을 검증했다. [CPU](output_etc/check/before_fullrsi_20261026/cpu.log), [학습](output_etc/check/before_fullrsi_20261026/training_validation.json), [물리](output_etc/check/before_fullrsi_20261026/physics/validation.json).
+- 실제 요청/실행·크기/합성 fallback을 역할·과제별로 기록한다. 확인 학습의 후행 SIT/CLIMB RSI 실현은23.3/25.8%, ON_TOP putDown은5.4%였다(요청50/50/10%); 들린/기울어진 공유 받침과 장면 충돌 때문에 감소한다. 크기 캐시19,819조건 중 carryWith33/727·putDownOnTop6/16,180만 프레임이 없었다. 검증한 캐시를 공식 공용 경로 `output/rsi_cache_before_full`에 준비했다. [캐시 설치](output_etc/check/before_fullrsi_20261026/cache_installed.json). 전용 test의 loco/mix 각각4환경·32step 재로드 완료. 셸/Python 문법·문서 경로·diff를 확인했다. 장기 수렴과 GUI/VNC 실화면은 미검증이며 기존 본학습·원본 checkout은 유지했다.
+
+### AT progress mix226 BEFORE ON_TOP 후행 carryWith RSI
+
+- `stage2_before_ground_mix226_atprogress_carry50_1200` env/train YAML·전용 train/test/VNC를 추가했다. AT progress 226을 기반으로 거리20/20/60 추첨과 독립적으로 BEFORE ON_TOP 후행만 loco/carryWith50/50을 요청한다. RSI 사람·자기 payload를 함께 이동/회전하고 RSI payload의 바닥 거리 재샘플링은 생략한다. 선행·단독·SIT/CLIMB·loco 배치·1200스텝·gate/보상·전체 관계 bias는 유지하며 fixed78000에서 새 Stage2로 시작한다. 기존 체크포인트와 계약을 분리했다. [설계](markdowns/reference/stage2_before.md#at-progress-후행-carrywith-rsi-5050), [명령](markdowns/config.md), [추론 옵션](markdowns/USAGE.md#stage2-before-mix226-at-progress-carry50).
+- 실제 크기별 carryWith 전용 물리/기하 캐시와 사용 불가 시 loco fallback을 추가했다. 평가 기본은 loco이며 `BEFORE_CARRY_RSI=mix/carry`만 후행 RSI를 켠다. 평가 skill 목록과 독립적인 carry pool·AMP history 초기화를 검증했다. 확인 학습에서 유효 슬롯3479/4096, 요청979/1912(51.2%)·적용826/1912(43.2%)·fallback153이었다. 50%는 요청 확률이며 상자 크기 분포를 바꾸지 않아 실현 비율은 낮을 수 있다.
+- CPU69개 통과(기존30500 fixture 부재 테스트1개 제외). GPU0·4명/1024env/8물체 CHECK 학습 epoch2/frame262144 저장, Stage1 actor encoder73 tensor/RMS 동결·action head 갱신·finite·배치 실패0 확인. 32env·6구성의 거리/RSI 상대 자세·대상 제한·기본 loco·AMP/추론·부분 reset 보존 검사와 전용 test의 loco/carry 재로드(각4env·32step) 통과. [CPU](output_etc/check/before_carry50_20261026/cpu.log), [학습](output_etc/check/before_carry50_20261026/training_validation.json), [물리](output_etc/check/before_carry50_20261026/physics_final/validation.json). 장기 수렴·GUI/VNC 실화면은 미검증이며 본학습은 실행하지 않았다. 기존 학습·원본 checkout은 보존했다.
 
 ### mix226 두 설정의 actor SELF/NONE bias 0 비교 실험
 

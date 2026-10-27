@@ -26,6 +26,13 @@ def scene_infeasible(task, ids):
     source = task._agent_box_assignment[ids]
     source_radius = radius.gather(1, source)
     other = torch.arange(task.num_physical_objects, device=ids.device)[None, None] != source[..., None]
+    if task.cfg['env'].get('before', {}).get('full_rsi') is not None:
+        # A dependent putDown payload may already be above its leader's AT goal.
+        # Box/body collision checks still apply; this is only the empty-goal XY heuristic.
+        pre = task._before_predecessor[ids]
+        row, follower = ((pre >= 0) & (task._templates[ids] == 4)
+                         & (task._full_rsi_skill[ids] == 7)).nonzero(as_tuple=True)
+        other[row, pre[row, follower], task._agent_box_assignment[ids[row], follower]] = False
     bad |= ((task._templates[ids] == 3)[..., None] & active[:, None] & other &
             (distance < source_radius[..., None]+radius[:, None]+.25)).flatten(1).any(-1)
     return bad | ~torch.isfinite(bodies).flatten(1).all(-1)

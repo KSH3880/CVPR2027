@@ -29,6 +29,10 @@
 | [stage2_before_ground_mix226_atprogress_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_1200.yaml) | [stage2_before_ground_mix226_atprogress_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_1200.yaml) |
 | [stage2_before_ground_mix226_actorbias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_actorbias0_1200.yaml) | [stage2_before_ground_mix226_actorbias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_actorbias0_1200.yaml) |
 | [stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml) | [stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_actorbias0_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_carry50_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_carry50_1200.yaml) | [stage2_before_ground_mix226_atprogress_carry50_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_carry50_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_fullrsi_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_fullrsi_1200.yaml) | [stage2_before_ground_mix226_atprogress_fullrsi_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_fullrsi_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_adapter_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_adapter_1200.yaml) | [stage2_before_ground_mix226_atprogress_adapter_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_adapter_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml) | [stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml) |
 
 ## 학습
 
@@ -76,6 +80,18 @@ env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=
 
 # stage2_before_ground_mix226_atprogress_actorbias0_1200
 env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_carry50_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_fullrsi_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_fullrsi_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_adapter_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_adapter_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_adapter_bias0_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_adapter_bias0_1200_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -126,6 +142,18 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground
 
 # stage2_before_ground_mix226_atprogress_actorbias0_1200
 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_carry50_1200
+HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_fullrsi_1200
+HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_fullrsi_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_adapter_1200
+HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_adapter_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_adapter_bias0_1200
+HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_adapter_bias0_1200_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -174,6 +202,18 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_act
 
 # stage2_before_ground_mix226_atprogress_actorbias0_1200
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_actorbias0_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_carry50_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_fullrsi_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_fullrsi_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_adapter_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_adapter_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_adapter_bias0_1200
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_adapter_bias0_1200_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -234,3 +274,5 @@ Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, 
 `stage2_before_ground_mix226_1200` viewer의 거리 모드 선택은 [추가 실행 옵션](USAGE.md#stage2-before-mix226-1200)을 따른다.
 
 `stage2_before_ground_mix226_atprogress_1200`의 추가 실행 옵션은 [USAGE](USAGE.md#stage2-before-mix226-at-progress-1200)를 따른다.
+
+`stage2_before_ground_mix226_atprogress_fullrsi_1200`의 RSI·선후행 carryWith 뷰어 옵션은 [USAGE](USAGE.md#stage2-before-mix226-at-progress-full-rsi)를 따른다.

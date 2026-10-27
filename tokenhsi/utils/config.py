@@ -109,11 +109,29 @@ def load_cfg(args):
         cfg["env"]["numObjects"] = args.num_objects
     if cfg["env"].get("before") is not None:
         training = cfg_train["params"]["config"]
+        adapter_name = 'Stage2BeforeGroundMix226ATProgressAdapter_1200'
+        adapter_bias0_name = 'Stage2BeforeGroundMix226ATProgressAdapterBias0_1200'
+        expected_adapter = 'tokenhsi_internal_v1' if training['name'] in (adapter_name, adapter_bias0_name) else None
+        if cfg['env']['relationGraph'].get('actor_head_adapter') != expected_adapter:
+            raise ValueError('BEFORE actor_head_adapter does not match the experiment training config')
+        carry_rsi_name = 'Stage2BeforeGroundMix226ATProgressCarry50_1200'
+        expected_carry = (dict(probability=.5, skill='carryWith')
+                          if training['name'] == carry_rsi_name else None)
+        if cfg['env']['before'].get('follower_carry_rsi') != expected_carry:
+            raise ValueError('BEFORE carry RSI does not match the experiment training config')
         actor_bias0_names = ('Stage2BeforeGroundMix226ActorBias0_1200',
+                             'Stage2BeforeGroundMix226ATProgressActorBias0_1200', adapter_bias0_name)
+        expected_critic_bias = 'before_only' if training['name'] == adapter_bias0_name else 'all'
+        if cfg['env']['relationGraph'].get('critic_human_bias', 'all') != expected_critic_bias:
+            raise ValueError('BEFORE critic_human_bias does not match the experiment training config')
+        full_rsi_name = 'Stage2BeforeGroundMix226ATProgressFullRSI_1200'
+        from utils.before_full_rsi import SPEC as full_rsi_spec
+        expected_full = full_rsi_spec if training['name'] == full_rsi_name else None
+        if cfg['env']['before'].get('full_rsi') != expected_full:
+            raise ValueError('BEFORE full RSI does not match the experiment training config')
+        at_progress_names = (adapter_bias0_name, adapter_name, full_rsi_name, carry_rsi_name, 'Stage2BeforeGroundMix226ATProgress_1200',
                              'Stage2BeforeGroundMix226ATProgressActorBias0_1200')
-        at_progress_names = ('Stage2BeforeGroundMix226ATProgress_1200',
-                             'Stage2BeforeGroundMix226ATProgressActorBias0_1200')
-        mix226_names = ('Stage2BeforeGroundMix226_1200', 'Stage2BeforeGroundMix226ATProgress_1200') + actor_bias0_names
+        mix226_names = ('Stage2BeforeGroundMix226_1200', 'Stage2BeforeGroundMix226ATProgress_1200') + actor_bias0_names + (carry_rsi_name, full_rsi_name, adapter_name)
         expected_bias = 'before_only' if training['name'] in actor_bias0_names else 'all'
         if cfg['env']['relationGraph'].get('actor_human_bias', 'all') != expected_bias:
             raise ValueError('BEFORE actor_human_bias does not match the experiment training config')
@@ -171,6 +189,11 @@ def load_cfg(args):
         cfg["env"]["video"]["enable"] = False
     if getattr(args, "transfer_checkpoint", ""):
         cfg["experiment"]["transfer"]["checkpoint"] = args.transfer_checkpoint
+    if getattr(args, 'before_full_rsi', 'loco') != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('full_rsi')):
+        raise ValueError('--before_full_rsi mix/both_carry requires the full RSI evaluation config')
+    carry_mode = getattr(args, 'before_carry_rsi', 'loco')
+    if carry_mode != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('follower_carry_rsi')):
+        raise ValueError('--before_carry_rsi mix/carry requires the carry RSI evaluation config')
     before_short = getattr(args, "before_follower_short", False)
     if getattr(args, "before_follower_near", False) or before_short:
         if not args.eval or 'before' not in cfg['env']:
@@ -408,6 +431,10 @@ def get_args(benchmark=False):
         },
         {"name": "--before_follower_near", "action": "store_true", "default": False,
          "help": "BEFORE loco evaluation with randomized follower-near placement"},
+        {"name": "--before_full_rsi", "type": str, "choices": ["loco", "mix", "both_carry"], "default": "loco",
+         "help": "Full Stage1 RSI evaluation: loco, training mix, or both ON_TOP pair members carrying"},
+        {"name": "--before_carry_rsi", "type": str, "choices": ["loco", "mix", "carry"], "default": "loco",
+         "help": "BEFORE ON_TOP follower evaluation initialization; default loco"},
         {"name": "--before_follower_short", "action": "store_true", "default": False,
          "help": "Three-mode BEFORE evaluation: force the saved config's shortest distance mode"},
         {

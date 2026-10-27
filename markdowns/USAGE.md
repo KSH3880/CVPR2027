@@ -191,3 +191,43 @@ TOKENHSI_GPU=0 HEADLESS=0 BEFORE_FOLLOWER_NEAR=2 SEED=240 TASK_GRAPH=random_scen
 `stage2_before_ground_mix226_actorbias0_1200`은 기존 mix226, `stage2_before_ground_mix226_atprogress_actorbias0_1200`은 AT progress 설정에서 actor 사람 간 attention의 SELF/NONE bias만 0으로 고정한다. 두 실험 모두 기본 source는 fixed78000이며 Stage2를 새로 학습한다. [설계](reference/stage2_before.md#actor-selfnone-bias-0), [학습·로컬·VNC 명령](config.md)을 따른다.
 
 전용 환경 override는 각각 `BEFORE_GROUND_MIX226_ACTORBIAS0_1200_ENV_CONFIG`, `BEFORE_GROUND_MIX226_ATPROGRESS_ACTORBIAS0_1200_ENV_CONFIG`다. `STAGE1_CHECKPOINT`로 source를 지정한다. `RESUME_CHECKPOINT`는 각 실험에서 생성한 저장본만 지원하며 기존 full-bias 저장본과 교환하지 않는다. test/VNC는 저장본 옆 config를 읽고 train config의 bias/progress 계약도 검사한다. `HEADLESS=0/1`, `BEFORE_FOLLOWER_NEAR=0/1/2`, `EPISODE_LENGTH`, `TASK_GRAPH`, `EVAL_SKILLS`는 기반 실험과 같다. `CHECK=1` 확인 실행은 `output_etc/check/`에 저장한다.
+
+
+## Stage2 BEFORE mix226 AT progress carry50
+
+`stage2_before_ground_mix226_atprogress_carry50_1200`은 AT progress 226 기반의 별도 실험이다. 기본 source는 fixed78000이며 새 Stage2로 시작한다. `RESUME_CHECKPOINT`에는 이 carry50 실험의 저장본만 사용한다. 환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_CARRY50_1200_ENV_CONFIG`다. 기본 명령은 [config](config.md)에 있다.
+
+기존2500 epoch 저장본에서 재개하는 예시는 아래와 같다. Stage1 전이 경로를 다시 지정할 필요가 없으며, 기본 output 아래 새 실행 폴더에 이어서 저장한다.
+
+```bash
+env -u CHECK -u MAX_ITERATIONS -u OUTPUT_PATH \
+TOKENHSI_GPU=0 \
+RESUME_CHECKPOINT=output/stage2_before_ground_mix226_atprogress_carry50_1200/Stage2BeforeGroundMix226ATProgressCarry50_1200_26-16-58-05/nn/Stage2BeforeGroundMix226ATProgressCarry50_1200_00002500.pth \
+bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50_1200_train.sh 4 1024 8
+```
+
+학습은 BEFORE ON_TOP 후행만 loco/carryWith를 50/50 요청한다. 크기에 맞는 유효 carryWith 프레임이 없는 경우 loco로 fallback하며 `sampling/before_carry_eligible/requested/executed/fallback`과 `before_carry_fraction`을 기록한다. 캐시는 해당 실제 상자 크기·모션·물리/검사 코드별로 분리된다. 본학습 캐시는 `output/rsi_cache_before_carry/`, 확인·평가 캐시는 각 `output_etc/check/` 출력 아래에 저장한다.
+
+평가 기본은 `BEFORE_CARRY_RSI=loco`다. `mix`는 후행 ON_TOP 50/50 요청, `carry`는 후행 ON_TOP 전원 carryWith 요청이며 둘 다 크기별 사용 가능 여부를 검사한다. 선행·단독·SIT/CLIMB는 항상 loco이고 `EVAL_SKILLS=loco`를 유지한다. 직접 옵션은 `--before_carry_rsi loco|mix|carry`다. `BEFORE_FOLLOWER_NEAR=0/1/2`, `EPISODE_LENGTH`, `HEADLESS=0/1`은 기존과 같다. 예: `BEFORE_CARRY_RSI=carry BEFORE_FOLLOWER_NEAR=2 HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50_1200_test.sh "$CKPT" 4 1 8 10`.
+
+## Stage2 BEFORE mix226 AT progress full RSI
+
+`stage2_before_ground_mix226_atprogress_fullrsi_1200`은 단독·BEFORE 모든 과제에 Stage1 V2 Fixed의 RSI 선택을 적용한다. AT/ON_TOP은 loco/pickUp/carryWith/putDown=50/10/30/10, SIT/CLIMB은 loco/해당 행동=50/50이다. 새 학습의 기본 source는 fixed78000이며 기존 226·AT progress·carry50 checkpoint와 resume/eval 계약이 다르다. 실행 명령은 [config](config.md)에 있다.
+
+평가 기본은 `BEFORE_FULL_RSI=loco`로 전원 loco 시작이다. `BEFORE_FULL_RSI=mix`를 test/VNC 명령 앞에 붙이면 학습과 같은 과제별 RSI·후반 프레임 선택·fallback을 사용한다. `BEFORE_FULL_RSI=both_carry`는 BEFORE ON_TOP 쌍의 선행 AT와 후행 ON_TOP 모두 carryWith를 요청하고, 나머지는 loco로 시작한다. 크기별 유효 프레임이 없거나 배치 재시도를 소진하면 해당 사람은 loco로 fallback한다. 콘솔의 `[BEFORE both_carry]`에서 실제 선행/후행/양쪽 적용 쌍 수를 확인한다. 이 옵션은 평가 전용이며 학습 설정·체크포인트 계약을 바꾸지 않는다.
+
+모든 경우 `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`을 유지한다(과제별 혼합은 별도 옵션으로 결정). 직접 옵션은 `--before_full_rsi loco|mix|both_carry`다. `BEFORE_FOLLOWER_NEAR=0/1/2`는 자유롭게 샘플링할 거리만 혼합/가까움/더 가까움으로 선택하며 RSI의 사람·물체 상대 자세를 바꾸지 않는다. `EPISODE_LENGTH`를 생략하면 학습·평가 모두1200스텝이다. 양쪽 carryWith 뷰어 예: `HEADLESS=0 BEFORE_FULL_RSI=both_carry BEFORE_FOLLOWER_NEAR=2 TOKENHSI_GPU=0 SEED=42 TASK_GRAPH=before_stack EVAL_SKILLS=loco bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_fullrsi_1200_test.sh "$CKPT" 4 1 8 10`. VNC도 같은 환경변수를 전용 `_vnc.sh`에 전달한다.
+
+첫 실행은 실제 asset 크기와 가능한 BEFORE 받침 조합의 물리 RSI 캐시를 생성한다. 본학습 캐시는 `output/rsi_cache_before_full`, 확인 실행은 해당 `output_etc/check/.../full_rsi_cache`를 사용한다. 크기/행동당 캐시가 없는 경우 검사하며, 등록된 크기에 유효 프레임이 없는 경우 fallback한다. 자세·충돌 검사의 한계와 분포는 [설계](reference/stage2_before.md#단독before-전체-stage1-rsi)에 있다.
+
+## Stage2 BEFORE mix226 AT progress adapter
+
+`stage2_before_ground_mix226_atprogress_adapter_1200`은 [공유 내부 adapter](reference/stage2_before.md#at-progress-공유-action-head-adapter) 전용 설정이다. 학습/로컬 추론/VNC의 기본 명령은 [config](config.md)에 있다. 기본 Stage1 source는 fixed78000이다. 기존 AT progress/carry50/full RSI 체크포인트를 이 wrapper로 resume하지 않는다.
+
+새 실험에서 저장된 checkpoint만 `RESUME_CHECKPOINT=<adapter checkpoint.pth>`로 이어받는다. 평가 환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_ADAPTER_1200_ENV_CONFIG`이며 기본은 checkpoint 옆 `relation_config.yaml`이다. `BEFORE_FOLLOWER_NEAR=0/1/2`, `HEADLESS`, `TASK_GRAPH`, `EVAL_SKILLS`, `EPISODE_LENGTH`는 기반 AT progress와 같다. 초기화는 loco이며 carry/full RSI는 포함하지 않는다.
+
+## Stage2 BEFORE adapter actor·critic bias0
+
+`stage2_before_ground_mix226_atprogress_adapter_bias0_1200`은 actor·critic 사람 SA 모두 SELF/NONE bias0인 [별도 adapter 실험](reference/stage2_before.md#adapter-actorcritic-selfnone-bias-0)이다. 기본 학습/test/VNC 명령은 [config](config.md)에 있다. Stage1 fixed78000에서 새로 시작하며 resume에는 이 실험에서 저장한 checkpoint만 사용한다.
+
+평가 환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_ADAPTER_BIAS0_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1/2`, `HEADLESS`, `TASK_GRAPH`, `EVAL_SKILLS`, `EPISODE_LENGTH`는 기반 adapter와 같다. 별도 지정이 없으면 checkpoint 옆 `relation_config.yaml`을 읽는다.

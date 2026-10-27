@@ -23,6 +23,25 @@ def validate_env(env):
     before = dict(env['before'])
     if env['relationGraph'].get('actor_human_bias', 'all') not in ('all', 'before_only'):
         raise ValueError('Unknown BEFORE actor_human_bias')
+    if env['relationGraph'].get('critic_human_bias', 'all') not in ('all', 'before_only'):
+        raise ValueError('Unknown BEFORE critic_human_bias')
+    if env['relationGraph'].get('actor_head_adapter') not in (None, 'tokenhsi_internal_v1'):
+        raise ValueError('Unknown BEFORE actor_head_adapter')
+    from utils.before_full_rsi import SPEC as FULL_SPEC, TEMPLATE_RSI
+    full = before.pop('full_rsi', None)
+    if full is not None and (full != FULL_SPEC or env['templateRsi'] != TEMPLATE_RSI
+            or env['sizeAwareRsi']['lateProbability'] != .7
+            or env['sizeAwareRsi']['lateFraction'] != .3):
+        raise ValueError('Full BEFORE RSI requires the Stage1 probabilities and late frames')
+    if full is not None:
+        if before.get('initialization') != 'stage1_rsi':
+            raise ValueError('Full BEFORE RSI requires initialization=stage1_rsi')
+        before['initialization'] = 'loco'  # Normalize only for the legacy base contract below.
+    carry_rsi = before.pop('follower_carry_rsi', None)
+    if full is not None and carry_rsi is not None:
+        raise ValueError('Full RSI and follower-only carry RSI are mutually exclusive')
+    if carry_rsi is not None and carry_rsi != dict(probability=.5, skill='carryWith'):
+        raise ValueError('BEFORE follower_carry_rsi requires carryWith 50/50')
     mixture = before.pop('distance_mixture', None)
     progress_target = before.pop('progress_target', 'current_box')
     if progress_target not in ('current_box', 'predecessor_at_goal'):
@@ -32,15 +51,21 @@ def validate_env(env):
         raise ValueError('BEFORE AT-goal progress requires the ground 20/20/60 configuration')
     if mixture is not None and mixture not in (DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE):
         raise ValueError('BEFORE distance mixture requires the agreed 50/50, 30/30/40 or 20/20/60 ranges')
+    if carry_rsi is not None and (progress_target != 'predecessor_at_goal' or mixture != MIX226_DISTANCE_MIXTURE):
+        raise ValueError('BEFORE carry RSI requires mix226 AT progress')
+    if full is not None and progress_target != 'predecessor_at_goal':
+        raise ValueError('Full BEFORE RSI requires mix226 AT progress')
     if before != SPEC or env['relationGraph']['sampler'] != SAMPLER:
         raise ValueError('BEFORE configuration differs from the agreed contract')
-    if any(row != [1.] + [0.]*7 for row in env['templateRsi'].values()):
+    if full is None and any(row != [1.] + [0.]*7 for row in env['templateRsi'].values()):
         raise ValueError('BEFORE requires loco-only initialization')
     if env['eval']['skill'] != ['loco'] or env['eval']['skillInitProb'] != [1.]:
         raise ValueError('BEFORE evaluation requires loco only')
     base = deepcopy(env)
     base.pop('before')
     base['relationGraph'].pop('actor_human_bias', None)
+    base['relationGraph'].pop('critic_human_bias', None)
+    base['relationGraph'].pop('actor_head_adapter', None)
     reset = base['box']['reset']
     if reset['platformMode'] == 'ground_only':
         if reset['randomHeight'] is not False or reset['randomHeightProb'] != 0.:
@@ -149,6 +174,13 @@ def checkpoint_contract(env):
     mode = env['relationGraph'].get('actor_human_bias', 'all')
     if mode != 'all':
         contract['actor_human_bias'] = mode
+    critic_mode = env['relationGraph'].get('critic_human_bias', 'all')
+    if critic_mode != 'all':
+        contract['critic_human_bias'] = critic_mode
+    if env['relationGraph'].get('actor_head_adapter') is not None:
+        contract['actor_head_adapter'] = env['relationGraph']['actor_head_adapter']
+    if env['before'].get('full_rsi') is not None:
+        contract['size_aware_rsi'] = env['sizeAwareRsi']
     return contract
 
 

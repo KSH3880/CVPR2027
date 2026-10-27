@@ -17,6 +17,8 @@ class Stage2Builder(AMPMultiAgentBuilder):
             graph = kwargs['relation_graph_spec']
             base = deepcopy(graph)
             base.pop('actor_human_bias', None)
+            base.pop('critic_human_bias', None)
+            base.pop('actor_head_adapter', None)
             base['sampler'] = 'two_agent_four_object_independent_unified'
             base['edge_capacity'] = 4
             kwargs['relation_graph_spec'] = base
@@ -28,7 +30,8 @@ class Stage2Builder(AMPMultiAgentBuilder):
             before = graph['sampler'] == 'stage2_before_groups'
             self.coordination = HumanCoordination(shuffle_human_order=True, before=before,
                 bias_mode=graph.get('actor_human_bias', 'all'))
-            self.critic_coordination = HumanCoordination(shuffle_human_order=True, before=before)
+            self.critic_coordination = HumanCoordination(shuffle_human_order=True, before=before,
+                bias_mode=graph.get('critic_human_bias', 'all'))
             initialize = self.init_factory.create(name="default")
             for branch in (self.coordination, self.critic_coordination):
                 for layer in branch.modules():
@@ -44,8 +47,11 @@ class Stage2Builder(AMPMultiAgentBuilder):
         def eval_actor(self, obs):
             humans = self._humans(self.actor_encoder, obs)
             humans = self.coordination(humans, None, obs[:, -5*self.num_agents:], None)
-            mu = self.action_head(humans).reshape(len(obs)*self.num_agents, -1)
+            mu = self._actor_actions(humans).reshape(len(obs)*self.num_agents, -1)
             return mu, mu*0 + self.sigma_act(self.sigma)
+
+        def _actor_actions(self, humans):
+            return self.action_head(humans)
 
         def eval_critic(self, obs):
             humans = self._humans(self.critic_encoder, obs)
@@ -66,7 +72,8 @@ def transfer_stage1(model, checkpoint):
     target = model.state_dict()
     copied, added = [], []
     for key in target:
-        if key.startswith(('a2c_network.coordination.', 'a2c_network.critic_coordination.')):
+        if key.startswith(('a2c_network.coordination.', 'a2c_network.critic_coordination.',
+                           'a2c_network.action_adapters.')):
             added.append(key)
             continue
         if key not in source or source[key].shape != target[key].shape:
@@ -81,7 +88,11 @@ def transfer_stage1(model, checkpoint):
 
 
 def freeze_actor(model):
+    frozen_head = hasattr(model.a2c_network, 'action_adapters')
     for name, parameter in model.named_parameters():
-        if name.startswith('a2c_network.actor_encoder.'):
+        if name.startswith('a2c_network.actor_encoder.') or (
+                frozen_head and name.startswith('a2c_network.action_head.')):
             parameter.requires_grad_(False)
     model.a2c_network.actor_encoder.eval()
+    if frozen_head:
+        model.a2c_network.action_head.eval()

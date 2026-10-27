@@ -112,3 +112,15 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유
 
 
 `stage2_before_ground_mix226_actorbias0_1200`과 `stage2_before_ground_mix226_atprogress_actorbias0_1200`은 같은 위치의 전용 env/train YAML·train/test/VNC를 사용한다. `relationGraph.actor_human_bias`를 `stage2_network_builder.py`에서 actor coordination에만 전달하며 `human_coordination.py`가 BEFORE bias만 파라미터로 저장한다. `test_before_actor_bias0.py`는 고정 0·gradient·actor/critic 분리·초기 출력 동등성·체크포인트 분리를 검사한다.
+
+
+`stage2_before_ground_mix226_atprogress_carry50_1200`의 전용 env/train YAML·train/test/VNC는 위와 같은 디렉터리에 있다. `env/tasks/multi_agent/before_carry_rsi.py`는 carryWith 전용 크기별 물리 캐시를, `utils/before_carry_rsi.py`는 후행 선택을 담당한다(`tokenhsi/` 기준). `humanoid_ma_before.py`에서 RSI 사람/상자를 함께 배치하며 `test_before_carry_rsi.py`는 선택·변환·설정/체크포인트 분리를, `check_before_carry_rsi.py`는 GPU 배치·AMP·부분 reset·loco/RSI 평가를 검사한다.
+
+- `tokenhsi/utils/before_full_rsi.py`: 단독·BEFORE 전체 Stage1 RSI 확률·실험 계약과 평가 전용 선후행 carryWith 선택.
+- `tokenhsi/env/tasks/multi_agent/before_full_rsi{,_cache}.py`: 실제 물체 binding별 물리 프레임 캐시·역할 배치·크기/합성 fallback·진단.
+- `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before_ground_mix226_atprogress_fullrsi_1200.yaml`, 동명 train/test/VNC: 전체 RSI 별도 실행 경로.
+- `tokenhsi/tests/test_before_full_rsi.py`, `check_before_full_rsi.py`: CPU 계약/확률·GPU reset/추론/부분 reset 검증.
+
+`stage2_before_ground_mix226_atprogress_adapter_1200`의 env/train YAML·전용 train/test/VNC는 같은 디렉터리에 있다. `before_network.py`가 actor hidden Linear1·2의 공유 0-init adapter를 추가하며 `stage2_network_builder.py`가 Stage1 전이와 기존 head 전체 동결을 처리한다. `test_before_adapter.py`는 초기 출력 동등성·gradient·동결·전이·checkpoint 분리를 검사한다.
+
+`stage2_before_ground_mix226_atprogress_adapter_bias0_1200`은 adapter 기반 actor·critic SELF/NONE bias0 비교 설정으로 같은 위치의 env/train YAML·train/test/VNC를 사용한다. `stage2_network_builder.py`에서 `actor_human_bias`·`critic_human_bias`를 각각 전달하고 `before_spec.py`에서 checkpoint 계약을 분리한다. `test_before_adapter_bias0.py`는 양쪽 고정0·BEFORE/QK gradient·전이·동결·재로드를 검사한다.
