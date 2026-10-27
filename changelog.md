@@ -2,7 +2,68 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-24
+
+### Bridge PUSH4 근접·직선 혼합 학습
+
+- 승인한 `stage2_bridge_push4_mix50` env/train YAML·전용 train/test/VNC를 추가했다. 기존 무대 밖 시작50%·목표 잔여 거리0.1~1.5m 근접 시작50%이며, 근접의 절반은 crosser→다리 완성 목표→자기 과제 상자를 직선으로 배치한다. 거리/직선 모드는 기하·물리 배치 재시도 중 유지한다. 운반 최종 목표는 별도로 무작위 배치한다. 보상·물성·4명·1024환경·Stage1 raw13500 전이/동결은 유지하고 세 배치 군의 추첨·종료 결과 지표를 추가했다. [계약](markdowns/reference/stage2_bridge.md#stage2_bridge_push4_mix50), [명령](markdowns/config.md).
+- CPU47개 통과(기존 transfer2개 제외). 기존 sampler의 동일 난수·입력 결과가 tensor 단위로 동일하다. 1024환경 GPU에서32step·근접 거리·BEFORE gate·AMP·부분 reset·재시도 모드 보존·가중치 불변을 확인했다. 직선은 gap 양쪽 경계에서 다리 측면까지20cm 이상 확보하도록 검사한다. 접촉 RSI 손-면 거리 최대8.9cm다. [물리 검사](output_etc/check/stage2_bridge_push4_mix50/physics_final/validation.json).
+- 표준 train으로4명·1024환경 CHECK 학습·저장(epoch2/frame262144)을 완료했다. actor encoder73 tensor·관측 RMS 동결, action head 갱신, 모델·266 scalar finite를 확인했다. 저장본의 표준 test4환경·64step headless 재로드도 완료했다. [학습 검사](output_etc/check/stage2_bridge_push4_mix50/training_validation.json), [재로드](output_etc/check/stage2_bridge_push4_mix50/final_reload.log). 장기 정책 성능은 아직 평가하지 않았다.
+- 기존 BridgePush4 서비스의 cwd·전체 인자를 확인해 PID1511633을 중단했고 정규 epoch8500을 포함한 결과는 보존했다. 직선 경계 검사 보완 전의 초기 실행은 중단해 `output_etc/check/stage2_bridge_push4_mix50/interrupted_launch/`에 보관했다.
+- GPU0에서 user systemd `tokenhsi-bridge-push4-mix50-20261024.service`로 본학습을 시작했다. 현재 run은 `output/stage2_bridge_push4_mix50/Stage2BridgePush4Mix50_24-20-10-03/`이며 Stage1 raw13500에서 새로 전이했다. CHECK/MAX_ITERATIONS/RESUME 미설정·max_epochs1000000·4명/1024환경, TensorBoard epoch9·266 scalar finite를 확인했다. Linger=yes로 대화·SSH 종료 후에도 유지된다. [실행 검사](output_etc/check/stage2_bridge_push4_mix50/launch_validation.json).
+
+## 2026-10-23
+
+### 4명 의존 Bridge PUSH 학습
+
+- 사용자 승인 구성으로 `stage2_bridge_push4` env/train·train/test/VNC를 추가했다. 4명·1024환경·8물체·1200step, 다리 PUSH1명+crosser1명+독립2명이다. crosser는 SIT/CLIMB/AT 운반 각1/3, 독립 과제는 SIT/CLIMB/AT 운반/PUSH 각1/4이며 두 독립 과제의 A/B/바닥 위치를 섞는다. crosser→다리 담당자만 BEFORE이며 SELF/NONE을 함께 학습한다.
+- 두 무대 XY 크기4~8m를 독립 추첨하고 에피소드마다 두 무대 위치·겹침 영역의 다리 목표·사람·상자를 다시 배치한다. 사람/상자/목표의 내부 여유와 겹침 검사를 추가했으며 직선 배치는 강제하지 않는다. 작은 무대의 큰 PUSH 상자는 밀기 방향과 사람 뒤쪽 공간을 함께 샘플링한다. 사용자 추가 지시로 기존처럼 다리 양쪽5cm 여유를 유지한다. PUSH 상자 크기·질량·물성과 Stage1 raw13500 전이는 유지한다. [계약](markdowns/reference/stage2_bridge.md#stage2_bridge_push4).
+- 관련 CPU42개 통과(기존 transfer 테스트2개 제외), 1024환경 GPU 초기 지형/접촉 자세·gate·AMP·16step 추론·부분 reset·가중치 불변과 16환경64step 추론을 확인했다. 손의 상자 면 거리 최댓값8.9cm다. 별도 외력 삽입 검사16/16이 목표20cm 이내에 도달했다. 외력 검사는 정책 성능 평가가 아니다.
+- 표준 train의4명·1024환경 CHECK 학습·저장(epoch2/frame262144) 완료. actor encoder73 tensor·관측 RMS 불변, action head 갱신, 모델·250 scalar finite를 확인했다. 표준 test로4환경·64step headless 재로드 완료. [학습 검사](output_etc/check/stage2_bridge_push4/training_validation.json), [로그](output_etc/check/stage2_bridge_push4/).
+- 기존 bridge push PID1018095의 cwd·전체 인자를 확인한 후 SIGTERM으로 중단했다(마지막 정규 저장 epoch7500). GPU0에서 `tokenhsi-bridge-push4-20261023.service`로 새 본학습을 시작했다. `output/stage2_bridge_push4/Stage2BridgePush4_23-20-10-50/`의 TensorBoard epoch34·250 scalar finite 기록을 확인했다. user systemd와 Linger=yes로 대화/SSH 종료와 독립적으로 실행한다. 다른 raw PUSH 학습은 유지했다. 장기 수렴은 미검증이다.
+- 서로 다른 초기 장면10개를 실제 Isaac Gym 카메라로 촬영했다. [모아보기](output_etc/check/stage2_bridge_push4/scenes/overview.jpg), [갤러리](output_etc/check/stage2_bridge_push4/scenes/index.html), [장면 정보](output_etc/check/stage2_bridge_push4/scenes/scenes.json), [원본 묶음](output_etc/check/stage2_bridge_push4/bridge_push4_scenes.zip).
+
+
+### Bridge 중간 분석(phase 1 4000epoch·phase 2 3500epoch)
+
+- phase 2 자동 평가(같은 seed·512환경 첫 에피소드, 결정적 행동): 의존 장면 crosser320명의 연결 전 추락은0.756(500)→0.169(1000)→0.125(2000)→0.216(3500), 연결은0.23→0.74~0.85다. gap 앞 정지 비율은0.02로 낮다. 그러나 생존자가 연결 전에 가장자리로 다가가는 속도 중앙값이0.94(epoch0)→0.47(500)→0.20(1000)→0.04m/s(3500)로 줄어, 시작 위치 근처에서 기다린다(연결 시 가장자리 거리 중앙값1.7m). 500epoch의 "기다리지 않음" 판단은 1000epoch 이후 바뀌었고, 커리큘럼 전환 조건(연결 전 추락≥60%)도 충족하지 않는다. 연결 후 건넌 비율은 의존0.44·다리 있음0.52·의존 없음0.55에서 정체이고, 연결 후 추락이0.5~0.6이다. 관측의 선행 index는 에피소드 동안 고정이고 gate는 보상에만 쓰인다. 따라서 대기를 끝내는 신호는 다리 상자 토큰이나 바닥 사람 토큰에서 와야 하며, 어느 쪽인지는 확인하지 않았다. [평가](output_etc/check/stage2_bridge_push/eval_waiting/envs512/).
+- phase 1: 다리가 오는 장면의 생존은0.895지만, 도착 후 건넌 비율은0.075(epoch0 0.228), 다리 있는 장면은0.096(0.240)이다. 4000epoch까지 회복이 없고, 학습 로그의 건넌 비율도0.16~0.17에서 멈췄다. 건너지 않고 서 있는 국소해로 판단한다. [평가](output_etc/check/stage2_bridge_scripted/eval_waiting/envs512/epoch4000.json).
+- phase 2 epoch3500 crosser 시야 ablation(같은 장면, crosser 행동만 가린 view로 계산하고 바닥 사람은 원래 view): 의존 장면 연결 전 추락은 기준0.22, 바닥 사람 가림0.88, coordination만 가림0.85, encoder만 가림0.28, 다리 상자 가림0.18, 둘 다0.86이다. 바닥 사람을 가리면 연결 전 접근 속도가0.05→0.86m/s로 돌아간다. 다리를 가려도 건너는 시각은 연결 시각을 따른다(기울기1.05→1.33, r0.46→0.49, 연결 전 건넘0). 대기·출발 신호는 학습된 HumanCoordination의 crosser→바닥 사람 attention을 거친다. 다만 다리가 이미 있고 바닥 사람이 다른 상자를 미는 장면에서도 crosser는 6.2초 뒤 건넌다(다리 있음3.4초, coordination 가림3.1초). 의존 여부와 관계없이 미는 동안 기다리는 경향이 섞여 있다. 가리지 않은 경로의 행동 차이는9e-7이다. [ablation](output_etc/check/stage2_bridge_push/eval_ablation/).
+- epoch4000에서 같은 ablation을 반복했다. 연결 전 추락은 기준0.15, 바닥 사람 가림0.87, coordination만0.88, encoder만0.28, 다리 가림0.16으로 epoch3500과 같은 결론이다. 기준 정책의 의존 장면 crosser 결과는 연결 전 추락15%, 건너고 유지27%, 건넌 뒤 추락0.6%, 연결 후 건너다 추락50%, 연결 후 출발 안 함0.6%, 바닥 사람 종료 등7%다. 건넌 시각은0.88×연결 시각+8.8초(r0.72)이고 연결 후 지연 중앙값은8.0초다. 연결 후 건너다 추락하는 비율은 다리 있음(43%)·의존 없음(48%) 장면과 비슷하다. `evaluate.py` 저장 항목에 사람별 건넌 시각·장면·연결 후 추락을 추가했다. [ablation](output_etc/check/stage2_bridge_push/eval_ablation/).
+- epoch4000 기준 정책의 다리 정렬 분석(같은 장면, `evaluate.py` 저장 항목에 시작·착지·목표 상자·추락 위치·gap 통과 y 추가): crosser 시작점→자기 상자 직선이 다리 윗면을 지나는 장면이60%다. 연결된 crosser 중 직선이 다리 안쪽으로0.3m 이상 들어가면 건넌 비율이 의존0.60·다리 있음0.92·의존 없음0.69다. 직선이 다리를0.3~1.0m 벗어나면0.15·0.06·0.06이고, 1m 넘게 벗어나면0이다. 건넌 사람의 직선 경로 오프셋(중앙값-0.41m)과 실제 gap 통과 오프셋(-0.42m)이 같다. 건너다 떨어진 사람의94%는 다리 옆에서 떨어졌다(다리 가장자리 밖 중앙값0.55m). crosser는 언제 갈지는 바닥 사람에게서 배웠지만, 다리 쪽으로 방향을 바꾸지 않고 자기 상자로 직진한다.
+- 사용자 요청으로 phase 1 학습(PID968050)을 중단했다. 마지막 저장본은 `Stage2BridgeScripted_00004000.pth`이고 phase 2 학습과 평가 watcher는 유지한다.
+
 ## 2026-10-22
+
+### Bridge 중간 분석(phase 1 약900epoch·phase 2 500epoch)
+
+- 학습 지표(phase 1, epoch구간 0-100→800-918): 다리 도착까지 생존0.32→0.58, 도착 전 추락0.27→0.17, gap 앞 정지0.001→0.08, 성공0.04→0.14다. 도착 후 추락은0.23으로 변화가 없다.
+- phase 2 500epoch를 전이 직후 정책과 같은 seed·512환경 첫 에피소드에서 비교했다(결정적 행동). 의존 장면 crosser320명에서 다리 연결0.069→0.231, 연결 전 추락0.859→0.756, gap 앞 정지 시간 비율0.003이고 연결 시각 평균은6.5→4.2초다. crosser는 기다리지 않고, 연결 증가는 바닥 사람이 더 빨리 민 결과다. 다리 있음·의존 없는 push의 건넌 비율은0.51→0.48·0.52→0.56로 거의 변하지 않았다. 학습 로그의 장면별 비율은 기록 구간에 끝난 에피소드 기준이라 초반에 짧은 에피소드가 과대 반영된다. [평가](output_etc/check/stage2_bridge_push/eval_waiting/envs512/).
+- phase 1 1000epoch 자동 평가(같은 장면): 다리가 오는 장면에서 도착 전 추락18.3→9.3%, 도착까지 생존63.5→81.4%로 기다림은 늘었다. 도착 후 건넌 비율은22.8(epoch0)→10.6→6.0%, 다리 있는 장면은24.0→13.9→11.1%로 계속 줄었고, 정지 위치의 시작 거리 기울기는0.75→0.92다. 건너지 않고 서 있는 쪽으로 수렴할 가능성이 있다. [평가](output_etc/check/stage2_bridge_scripted/eval_waiting/envs512/epoch1000.json).
+
+### Bridge phase 1 500epoch 대기 행동 평가
+
+- 사용자 요청으로 phase 1 저장본(epoch500)과 전이 직후 정책을 같은 seed·512환경 첫 에피소드에서 비교했다(결정적 행동, near start0.2). 다리가 오는 장면의 crosser 816명에서 도착 전 추락35.0→18.3%, 도착까지 생존30.6→63.5%, 1m 밖에서 걸어와 1m 안 정지0→10.4%, 제자리 대기0.1→8.3%였다. 도착 시점 가장자리 거리 중앙값은0.15→1.03m다. 반면 도착 후 건넌 비율은22.8→10.6%로 줄었고 시작부터 다리가 있는 장면도24.0→13.9%였다. 기다림은 생겼지만 건너기는 아직이다. [평가](output_etc/check/stage2_bridge_scripted/eval_waiting/envs512/), [스크립트](output_etc/check/stage2_bridge_scripted/eval_waiting/evaluate.py).
+
+### Bridge phase 2(push 다리) 구현
+
+- `stage2_bridge_push` env/train YAML·train/test/VNC를 추가했다. 바닥 사람이 PUSH raw 정육면체를 채널로 밀어 다리를 만들고 무대 위 사람이 건넌다. 장면은 의존 push60%·다리 있음20%·의존 없는 push20%, 1200step이며 바닥 사람은 push RSI로 시작한다. 의존 장면만 선행 index·`prereq_mask` gate를 둔다. 무대 높이·gap은 환경별 정육면체 한 변에 맞추고 다리 여유는 한쪽5cm다. [계약](markdowns/reference/stage2_bridge.md#stage2_bridge_push-phase-2), [명령](markdowns/config.md).
+- PUSH 이식: `TokenHSI_stage1_push`의 RSI bank 검사·상자 물성·밑판 asset·접촉 기하·접근 거리·raw RSI를 옮기고 환경 단위 판정을 사람 단위로 바꿨다. task packet에 PUSH(task4)를 추가했다. manifest·bank JSON은 복사하고 push motion 폴더는 심링크했다(참고 repo 미수정). 무대 높이를 환경별 tensor로 바꾸는 리팩터 후 phase 1 GPU 검사를 다시 통과했다. [재검사](output_etc/check/stage2_bridge_scripted/physics_refactor/validation.json).
+- CPU: `test_bridge.py`12개가 두 환경 모두 통과했다(PUSH 계약·bank·장면 비율·graph/선행 관계·토큰·접촉 판정 추가). 전체는 207 passed/1 skipped이고 30500 파일 부재 2개만 실패한다. phase 1 CHECK 저장본도 리팩터 후 test로 다시 로드됐다. [로그](output_etc/check/stage2_bridge_push/cpu_full.log).
+- GPU64환경: 4개 preset의 무대 높이/gap·crosser 무대 위·바닥 사람 위치·접촉 자세(손 면 거리 최대8.9cm, 상자 내부 관통0)·의존 장면 초기 gate 닫힘·PUSH packet·AMP family·부분 reset·가중치 불변을 확인했다. 미학습 정책의 의존 push(초기 거리2.4~5.5m, crosser는 무대 B로 옮김)는600step 안에 연결 73~84%, 끼임0~1/64였다. 여유3/5/8cm 사이에 표본 오차를 넘는 차이는 없었다. [검사](output_etc/check/stage2_bridge_push/physics/validation.json), [여유 비교](output_etc/check/stage2_bridge_push/).
+- 사용자 요청으로 `TokenHSI_stage1_push`의 cuboid 학습 서비스(`tokenhsi-push-cuboid-mps-20261021-162424.service`, 마지막 저장 epoch13000)만 중단했다. raw push 학습과 phase 1은 유지했다.
+- 표준 train으로 2048환경 CHECK=1 학습·저장(epoch2/frame262144)을 완료했다. encoder73·관측 RMS 불변, head 갱신, 243 scalar finite, 장면별 지표 기록을 확인했다. 저장본을 test로4환경·64step headless 재로드했다. [학습 검사](output_etc/check/stage2_bridge_push/training_validation.json), [재로드](output_etc/check/stage2_bridge_push/reload.log).
+- GPU0에서 본학습을 시작했다(`output/stage2_bridge_push/Stage2BridgePush_22-22-00-58/`). VNC 화면·장기 수렴은 미검증이다.
+
+### 센서 없는 Bridge phase 1(scripted 다리)
+
+- [bridge 계획](markdowns/bridge_prerequisite_plan.md)의 phase 1로 `stage2_bridge_scripted` env/train YAML과 train/test/VNC를 추가했다. 참고 repo `TokenHSI_square_sensor_dev`의 무대·gap·외력 다리·무대 추락 종료를 센서 없이 옮겼다(코드 복사, 참고 repo 미수정). 2명·2048환경·4물체(과제 상자2·다리·distractor)·600step, 두 무대 장면만(단독 무대 제외), 무대 B 위 SIT/CLIMB 50/50, 다리 여유 한쪽5cm다. 다리는 edge 없는 토큰이고 root 높이는 발밑 지형 기준, 관측 끝에 사람별 선행 index를 둔다. Stage1은 PUSH raw 13500(embedding5·AMP family4)을 전이한다. [계약](markdowns/reference/stage2_bridge.md), [명령](markdowns/config.md).
+- 공용 변경: carry의 `_extra_reset_actor_ids` 훅·`_compute_clean_humanoid_nodes(env_ids)`·bridge 물리 slot+1, AMP family 수 인자화(unified_training/ma_agent/ma_players, 기본3 유지), `HumanCoordination`의 `relations` 인자, bridge checkpoint 계약과 task/network 등록. 기존 실험의 기본 동작은 바꾸지 않았다.
+- CPU: 새 `test_bridge.py` 8개가 `tokenhsi`·`tokenhsi_sm120` 환경 모두 통과했다. 전체는 203 passed/1 skipped이고, 이 checkout에 없는 30500 파일을 쓰는 기존 2개만 실패한다. [로그](output_etc/check/stage2_bridge_scripted/cpu_full.log).
+- GPU16환경: 165 tensor 전이·coordination104 추가, obs636·AMP1330, reset 직후 지형 기준 root 높이0.85~0.96m, 다리 궤적 추종 최대약9.3cm를 확인했다. 연결 다리와 일직선 배치에서 미학습 정책의 81%가300step 안에 건넜고, 다리 없는 gap 위 사람은16/16이18step 안에 종료됐다. 부분 reset·가중치 불변도 확인했다. [물리 검사](output_etc/check/stage2_bridge_scripted/physics/validation.json).
+- 표준 train으로 2048환경 CHECK=1 학습·저장(epoch2/frame262144)을 완료했다. actor encoder73 tensor·관측 RMS 불변, action head 갱신, 216 scalar finite, `relation/bridge/*` 기록을 확인했다. AMP 입력 RMS는 기존 BEFORE와 같이 갱신된다. 저장본을 test로4환경·64step headless 재로드했다. [학습 검사](output_etc/check/stage2_bridge_scripted/training_validation.json), [재로드](output_etc/check/stage2_bridge_scripted/reload.log). 셸 문법·diff를 확인했다.
+- 이 머신의 `tokenhsi` 환경은 CPU torch2.0.0이며 GPU 실행은 `tokenhsi_sm120`(torch2.3.1)이 필요하다. torch2.0.0에서는 eval+no_grad의 MHA fast path가 float relation bias 입력에서 오류를 낸다. 실제 학습 환경 torch2.3.1에서는 학습 경로와 출력 차이가 CUDA 0·CPU 약2e-6이다.
+- GPU0에서 본학습을 시작했다(`output/stage2_bridge_scripted/Stage2BridgeScripted_22-20-59-44/`). 약10분·50epoch에서 scalar 기록을 확인했다. 기존 push 학습2개는 유지했다. VNC 화면·장기 수렴은 미검증이다.
 
 ### BEFORE 30/30/40 거리 혼합·1200스텝
 

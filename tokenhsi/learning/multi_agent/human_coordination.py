@@ -105,9 +105,11 @@ class HumanCoordination(nn.Module):
             nn.init.zeros_(block.ffn[-1].bias)
 
     def forward(
-        self, humans, nodes, packet, edge_encoder, entity_types=None, entity_poses=None
+        self, humans, nodes, packet, edge_encoder, entity_types=None, entity_poses=None,
+        relations=None,
     ):
-        relations = human_relations(packet, humans.shape[1], self.before)
+        if relations is None:
+            relations = human_relations(packet, humans.shape[1], self.before)
         context = humans
         if self.shuffle_human_order:
             order = torch.randperm(humans.shape[1], device=humans.device)

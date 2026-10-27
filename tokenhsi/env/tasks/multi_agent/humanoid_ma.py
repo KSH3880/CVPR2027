@@ -181,14 +181,14 @@ class HumanoidMA(Humanoid):
         return self._policy_obs_mode
 
     def _compute_clean_humanoid_nodes(
-        self, body_pos, body_rot, body_vel, body_ang_vel, env_origins
+        self, body_pos, body_rot, body_vel, body_ang_vel, env_origins, env_ids=None
     ):
         """Return one 223-D heading-local TokenHSI self state per Human.
 
         ``env_origins`` is accepted to keep the task call site stable; absolute position
         belongs exclusively to the separate GTA pose record.
         """
-        del env_origins
+        del env_origins, env_ids
         B, M, nb = body_pos.shape[:3]
         obs = compute_humanoid_observations_max(
             body_pos.reshape(B * M, nb, 3),

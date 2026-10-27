@@ -202,6 +202,8 @@ def build_alg_runner(algo_observer):
     runner.model_builder.network_factory.register_builder('amp_multi_agent_shared_support', lambda **kwargs: SharedSupportBuilder())
     from learning.multi_agent.before_network import BeforeBuilder
     runner.model_builder.network_factory.register_builder('amp_multi_agent_before', lambda **kwargs: BeforeBuilder())
+    from learning.multi_agent.bridge_network import BridgeBuilder
+    runner.model_builder.network_factory.register_builder('amp_multi_agent_bridge', lambda **kwargs: BridgeBuilder())
     from learning.multi_agent.stage2_network_builder import Stage2Builder
     runner.model_builder.network_factory.register_builder('amp_multi_agent_stage2', lambda **kwargs: Stage2Builder())
     runner.model_builder.network_factory.register_builder('amp_multi_agent', lambda **kwargs : amp_network_builder_ma.AMPMultiAgentBuilder())

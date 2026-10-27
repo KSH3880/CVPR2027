@@ -87,7 +87,7 @@ def load_cfg(args):
     from utils.unified_training import validate_stage1_network
 
     validate_stage1_network(cfg["env"], cfg_train)
-    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport", "HumanoidMABefore"):
+    if args.task in ("HumanoidMACarry", "HumanoidMAStage2", "HumanoidMASharedSupport", "HumanoidMABefore", "HumanoidMABridge", "HumanoidMABridgePush", "HumanoidMABridgePush4"):
         from utils.output_paths import resolve_output_path
 
         is_eval = args.test or args.eval or getattr(args, "play", False)

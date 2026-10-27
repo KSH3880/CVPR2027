@@ -26,7 +26,7 @@ class MAAgent(amp_agent.AMPAgent):
         task = self.vec_env.env.task
         from utils.unified_training import preserve_amp_labels
 
-        normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps)
+        normalized = preserve_amp_labels(amp_obs, normalized, task._num_amp_obs_steps, getattr(task, "_amp_num_families", 3))
         return normalized
 
     def __init__(self, base_name, config):
@@ -135,7 +135,10 @@ class MAAgent(amp_agent.AMPAgent):
             task._relation_graph_spec, task.num_agents, task.num_objects
         )
         weights["relation_experiment_config"] = self._relation_experiment_config
-        if getattr(task, "_before", False):
+        if getattr(task, "_bridge_cfg", None) is not None:
+            from utils.bridge_spec import checkpoint_contract
+            weights["bridge_contract"] = checkpoint_contract(task.cfg["env"])
+        elif getattr(task, "_before", False):
             from utils.before_spec import checkpoint_contract
             weights["before_contract"] = checkpoint_contract(task.cfg["env"])
         elif getattr(task, "_shared_support", False):
@@ -342,6 +345,8 @@ class MAAgent(amp_agent.AMPAgent):
 
     def train_epoch(self):
         task = self.vec_env.env.task
+        if hasattr(task, "_bridge_training_step"):
+            task._bridge_training_step = self.epoch_num * self.horizon_length
         play_time_start = time.time()
         with torch.no_grad():
             batch_dict = self.play_steps()
@@ -369,7 +374,7 @@ class MAAgent(amp_agent.AMPAgent):
             pool = buffer._data_buf["amp_obs"][:count] if count else reference[:0]
             fallback = reference if key == "amp_obs_replay" else None
             matched = sample_family_matched(
-                pool, reference, task._num_amp_obs_steps, fallback
+                pool, reference, task._num_amp_obs_steps, fallback, getattr(task, "_amp_num_families", 3)
             )
             batch_dict[key] = matched.view(scene_count, M, amp_dim)
         self.set_train()

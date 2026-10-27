@@ -101,6 +101,11 @@ def validate_env(env):
 
 
 def check_checkpoint(weights, env):
+    if "bridge" in env:
+        from utils.bridge_spec import checkpoint_contract
+        if weights.get("bridge_contract") != checkpoint_contract(env):
+            raise ValueError("Bridge checkpoint contract differs")
+        return
     if "before" in env:
         from utils.before_spec import checkpoint_contract
         if weights.get("before_contract") != checkpoint_contract(env):

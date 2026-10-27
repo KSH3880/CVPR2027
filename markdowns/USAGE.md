@@ -153,3 +153,15 @@ bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_test.sh \
 `stage2_before_ground_mix334_1200`은 GPU0·4명·1024환경·8물체, 최대1200스텝의 별도 실험이다. [배치 표](reference/stage2_before.md#바닥-before-거리-혼합-stage2_before_ground_mix334_1200)와 [학습·로컬·VNC 명령](config.md)을 따른다. 세 전용 wrapper를 사용하고 환경 재정의는 `BEFORE_GROUND_MIX334_1200_ENV_CONFIG`로 지정한다. test/VNC는 저장본 옆 `relation_config.yaml`을 기본으로 읽는다.
 
 Stage1 source는 mix50와 같은 형제 checkout의 fixed73000이며 `STAGE1_CHECKPOINT`로 지정할 수 있다. `RESUME_CHECKPOINT`에는 이 새 실험의 저장본만 사용한다. 기존 ground/mix50를 직접 재개하는 설정이 아니다. 기본 평가는30/30/40이고, `BEFORE_FOLLOWER_NEAR=1`은 가운데 가까운 모드만 선택한다(더 가까운 모드 강제가 아님). `EPISODE_LENGTH`는 평가에만 적용하며 기본은1200이다. 단독 배치·학습 비율·저장 계약은 평가 옵션으로 변경하지 않는다.
+
+
+## Bridge PUSH4 본학습 관리
+
+기존 `tokenhsi-bridge-push4-20261023.service`는 사용자 요청으로 중단했다. 결과는 `output/stage2_bridge_push4/`에 보존한다. 현재 본학습은 근접·직선 혼합 실험 `tokenhsi-bridge-push4-mix50-20261024.service`이며, Stage1 PUSH raw13500에서 새로 시작한다. 4명·1024환경·8물체로 대화·SSH 세션 종료 후에도 유지된다. 일반 실행·평가는 [config](config.md), 배치·과제 계약은 [Bridge 참고](reference/stage2_bridge.md#stage2_bridge_push4_mix50)를 따른다.
+
+```bash
+systemctl --user status tokenhsi-bridge-push4-mix50-20261024.service
+tail -f output/stage2_bridge_push4_mix50/train.log
+```
+
+장면 확인용 원본10장·모아보기·장면별 역할/좌표는 `output_etc/check/stage2_bridge_push4/scenes/`에 있다. 초기 배치 확인용이며 학습된 건너기 성공을 보여주는 자료는 아니다.

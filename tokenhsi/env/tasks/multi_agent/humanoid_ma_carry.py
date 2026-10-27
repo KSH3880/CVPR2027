@@ -96,6 +96,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         if self._before:
             from utils.before_spec import PRESETS
             allowed_presets = PRESETS
+        if cfg["env"].get("bridge") is not None:
+            from utils.bridge_spec import presets
+            allowed_presets = presets(cfg["env"])
         if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
         ) not in ("stack", "agent"):
@@ -121,6 +124,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         self.num_physical_objects = 12 if self._stage2 else self.num_objects
         if self._before:
             self.num_physical_objects = max(4*num_agents, self.num_objects)
+            if cfg["env"].get("bridge") is not None:
+                # Bridge scenes append the bridge (and PUSH decoy) after the ordinary bank.
+                from utils.bridge_spec import extra_physical_objects
+                self.num_physical_objects += extra_physical_objects(cfg["env"])
         if self._shared_support:
             from utils.shared_support import capacities
             self.num_physical_objects = capacities(cfg["env"])[1]
@@ -849,7 +856,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             origins = self._env_origins[env_ids]
         B, M, O = (body_pos.shape[0], self.num_agents, self.num_objects)
         human_nodes = self._compute_clean_humanoid_nodes(
-            body_pos, body_rot, body_vel, body_ang_vel, origins
+            body_pos, body_rot, body_vel, body_ang_vel, origins, env_ids
         )
         box_rot = box_states[..., 3:7]
         box_rot_inv = box_rot.clone()
@@ -1412,7 +1419,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 self._tar_platform_actor_ids[env_ids].contiguous().view(-1),
             ]
         )
-        ids = torch.cat(ids)
+        ids = torch.cat(ids + self._extra_reset_actor_ids(env_ids))
         self.gym.set_actor_root_state_tensor_indexed(
             self.sim,
             gymtorch.unwrap_tensor(self._root_states),
@@ -1420,6 +1427,10 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             len(ids),
         )
         return
+
+    def _extra_reset_actor_ids(self, env_ids):
+        # Subclass actors must join this single indexed root-state call.
+        return []
 
     def _setup_character_props(self, key_bodies):
         super()._setup_character_props(key_bodies)
@@ -1441,7 +1452,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             print("Unsupported character config file: {s}".format(asset_file))
             assert False
         if self.cfg["env"].get("ampTaskConditioning", False):
-            self._num_amp_obs_per_step += 3
+            self._num_amp_obs_per_step += getattr(self, "_amp_num_families", 3)
         return
 
     def get_num_amp_obs(self):
@@ -1508,7 +1519,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 len(indices), self._num_amp_obs_steps, -1
             )
             labels = family[indices, None].expand(-1, self._num_amp_obs_steps)
-            result[indices] = append_family(motion_obs, labels).flatten(1)
+            result[indices] = append_family(motion_obs, labels, getattr(self, "_amp_num_families", 3)).flatten(1)
         return result
 
     def fetch_amp_obs_demo(self, num_samples):
@@ -1601,7 +1612,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
         labels = self._amp_family(slot_env, slot_agent).repeat_interleave(
             self._num_amp_obs_steps - 1
         )
-        amp_obs_demo = append_family(amp_obs_demo, labels)
+        amp_obs_demo = append_family(amp_obs_demo, labels, getattr(self, "_amp_num_families", 3))
         self._hist_amp_obs_buf[slot_env, slot_agent] = amp_obs_demo.view(
             slot_env.shape[0], self._num_amp_obs_steps - 1, self._num_amp_obs_per_step
         )
@@ -1637,7 +1648,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             )
             from utils.unified_training import append_family
 
-            obs = append_family(obs, self._amp_family())
+            obs = append_family(obs, self._amp_family(), getattr(self, "_amp_num_families", 3))
             self._curr_amp_obs_buf[:] = obs.view(N, M, self._num_amp_obs_per_step)
         else:
             K = env_ids.shape[0]
@@ -1660,7 +1671,7 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
             )
             from utils.unified_training import append_family
 
-            obs = append_family(obs, self._amp_family(env_ids))
+            obs = append_family(obs, self._amp_family(env_ids), getattr(self, "_amp_num_families", 3))
             self._curr_amp_obs_buf[env_ids] = obs.view(K, M, self._num_amp_obs_per_step)
         return
 

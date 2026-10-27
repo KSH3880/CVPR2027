@@ -39,7 +39,7 @@ def task_graph_packet(graph, batch_size):
         == torch.arange(graph.num_agents, device=src.device)[None, :, None]
     )
     primary = owned & (
-        (relation[:, None] == 6) | (relation[:, None] == 9) | (relation[:, None] == 10)
+        (relation[:, None] == 6) | (relation[:, None] == 9) | (relation[:, None] == 10) | (relation[:, None] == 11)
     )
     placement = owned & ((relation[:, None] == 7) | (relation[:, None] == 8))
     actor = (src[:, None] * primary).sum(-1)
@@ -52,6 +52,7 @@ def task_graph_packet(graph, batch_size):
         (relation[:, None] * placement).sum(-1) - 5,
         (relation[:, None] * primary).sum(-1) - 9,
     )
+    task = torch.where((owned & (relation[:, None] == 11)).any(-1), 4, task)
     return (
         torch.stack((primary.any(-1), task, actor, payload, target), -1)
         .float()

@@ -6,7 +6,7 @@
 
 - Config·스크립트·실행 옵션 변경 시 아래 표와 학습·로컬 추론·VNC 명령을 함께 갱신한다. 새 컨피그는 표와 각 명령 목록의 맨 아래에 추가한다. 실험별 설명·별도 섹션을 늘리지 않는다.
 - 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 지정한다. 기존 프로세스는 임의 종료·재시작하지 않는다.
-- 학습 인자: `[agents] [envs] [objects]`. stage1 계열은 **2명·2048환경·4물체**, stage2는 **4명·1024환경·8물체**를 사용한다. `stage2_before`·`stage2_before_ground`도 기본값은 같으며 학습·평가에서 인원 N≥1, 물체 M≥N을 지정할 수 있다. 공유 받침 두 실험은 **4명·1024환경**이며 마지막 인자는 총 obj 토큰 수(기본·최소 `12`)다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
+- 학습 인자: `[agents] [envs] [objects]`. stage1 계열은 **2명·2048환경·4물체**, stage2는 **4명·1024환경·8물체**를 사용한다. `stage2_before`·`stage2_before_ground`도 기본값은 같으며 학습·평가에서 인원 N≥1, 물체 M≥N을 지정할 수 있다. 공유 받침 두 실험은 **4명·1024환경**이며 마지막 인자는 총 obj 토큰 수(기본·최소 `12`)다. `stage2_bridge_scripted`·`stage2_bridge_push`는 **2명·2048환경·4물체** 고정이다. `stage2_bridge_push4`·`stage2_bridge_push4_mix50`은 **4명·1024환경·8물체** 고정이다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 추론 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 해당 실험의 checkpoint를 사용한다. test/VNC는 학습 당시 저장된 `relation_config.yaml`을 기본으로 읽는다.
 - 본학습은 `output/`, 확인 학습·test·VNC 결과는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이고 해당 실험의 환경 수(stage1 계열 2048, stage2 계열 1024)를 유지한다.
 - 화면 없는 평가는 로컬 추론 명령의 `HEADLESS=0`을 `HEADLESS=1`로 바꾼다. 추가 옵션·resume·checkpoint 예외는 [USAGE](USAGE.md)를 따른다.
@@ -25,6 +25,10 @@
 | [stage2_before_ground.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground.yaml) | [stage2_before_ground.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground.yaml) |
 | [stage2_before_ground_mix50.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix50.yaml) | [stage2_before_ground_mix50.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix50.yaml) |
 | [stage2_before_ground_mix334_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix334_1200.yaml) | [stage2_before_ground_mix334_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix334_1200.yaml) |
+| [stage2_bridge_scripted.yaml](../tokenhsi/data/cfg/multi_agent/stage2_bridge_scripted.yaml) | [stage2_bridge_scripted.yaml](../tokenhsi/data/cfg/train/rlg/stage2_bridge_scripted.yaml) |
+| [stage2_bridge_push.yaml](../tokenhsi/data/cfg/multi_agent/stage2_bridge_push.yaml) | [stage2_bridge_push.yaml](../tokenhsi/data/cfg/train/rlg/stage2_bridge_push.yaml) |
+| [stage2_bridge_push4.yaml](../tokenhsi/data/cfg/multi_agent/stage2_bridge_push4.yaml) | [stage2_bridge_push4.yaml](../tokenhsi/data/cfg/train/rlg/stage2_bridge_push4.yaml) |
+| [stage2_bridge_push4_mix50.yaml](../tokenhsi/data/cfg/multi_agent/stage2_bridge_push4_mix50.yaml) | [stage2_bridge_push4_mix50.yaml](../tokenhsi/data/cfg/train/rlg/stage2_bridge_push4_mix50.yaml) |
 
 ## 학습
 
@@ -60,6 +64,18 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_trai
 
 # stage2_before_ground_mix334_1200
 env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00073000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_train.sh 4 1024 8
+
+# stage2_bridge_scripted
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi_sm120 bash tokenhsi/scripts/multi_agent/stage2_bridge_scripted_train.sh 2 2048 4
+
+# stage2_bridge_push
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi_sm120 bash tokenhsi/scripts/multi_agent/stage2_bridge_push_train.sh 2 2048 4
+
+# stage2_bridge_push4
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push4_train.sh 4 1024 8
+
+# stage2_bridge_push4_mix50
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push4_mix50_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -98,6 +114,18 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground
 
 # stage2_before_ground_mix334_1200
 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_bridge_scripted
+TOKENHSI_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi_sm120 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_scripted_test.sh "$CKPT" 2 1 4 10
+
+# stage2_bridge_push
+TOKENHSI_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi_sm120 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push_test.sh "$CKPT" 2 1 4 10
+
+# stage2_bridge_push4
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push4_test.sh "$CKPT" 4 1 8 10
+
+# stage2_bridge_push4_mix50
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push4_mix50_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -134,6 +162,18 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix50_vnc.
 
 # stage2_before_ground_mix334_1200
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_bridge_scripted
+TOKENHSI_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi_sm120 bash tokenhsi/scripts/multi_agent/stage2_bridge_scripted_vnc.sh "$CKPT" 2 1 4 10
+
+# stage2_bridge_push
+TOKENHSI_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi_sm120 bash tokenhsi/scripts/multi_agent/stage2_bridge_push_vnc.sh "$CKPT" 2 1 4 10
+
+# stage2_bridge_push4
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push4_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_bridge_push4_mix50
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_bridge_push4_mix50_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -188,3 +228,9 @@ Stage2의 `TASK_GRAPH`는 `random_scenario`, `two_pairs_at`, `two_pairs_ontop`, 
 `stage2_before`·`stage2_before_ground`는 인원 N≥1·물체 M≥N을 지원하며 기본값은 4명·8물체다. `EVAL_SKILLS=loco`만 지원한다. `TASK_GRAPH`는 `random_scenario`, `before_sit`, `before_climb`, `before_stack`(가능한 최대 2인 쌍, 홀수의 마지막 1명은 단독), `one_pair_sit`, `one_pair_climb`, `one_pair_stack`(1쌍), `all_solo`, `sit`, `climb`, `carry_at`, `carry_ontop`이다. pair preset은 2명 이상, 전원 `carry_ontop`은 물체 2N개 이상이 필요하다. 후행·ON_TOP 자기 상자의 근접 무작위 평가는 `BEFORE_FOLLOWER_NEAR=1`을 test/VNC 앞에 붙인다. 거리 규칙과 추가 옵션은 [USAGE](USAGE.md#stage2-before-평가-옵션)를 따른다.
 
 `stage2_before_ground_mix50`는 같은 인원·물체·TASK_GRAPH 옵션을 사용한다. 기본 test/VNC는 50/50 혼합이며 `BEFORE_FOLLOWER_NEAR=1`을 붙이면 BEFORE 쌍에 학습의 가까운 배치만 적용한다. 전용 checkpoint와 기본 혼합 배치 안내는 [USAGE](USAGE.md#stage2-before-5050-혼합-배치)를 따른다.
+
+`stage2_bridge_scripted`는 2명·4물체 고정이며 `EVAL_SKILLS=loco`만 지원한다. `TASK_GRAPH`는 `random_scenario`, `sit`, `climb`(두 사람 모두 무대 B 위 자기 상자)이다. 장면 계약은 [Bridge 참고](reference/stage2_bridge.md)를 따른다.
+
+`stage2_bridge_push`의 `TASK_GRAPH`는 `random_scenario`(의존 push 60%·다리 있음 20%·의존 없는 push 20%), `bridge_push`, `bridge_present`, `decoy_push`이며 `EVAL_SKILLS=loco`만 지원한다. 바닥 사람의 push RSI 시작은 장면 계약에 포함된다.
+
+`stage2_bridge_push4`와 `stage2_bridge_push4_mix50`은 `TASK_GRAPH=random_scenario`, `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`을 사용한다. PUSH 담당자는 raw 접촉 RSI로 초기화한다.

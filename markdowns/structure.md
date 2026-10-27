@@ -1,6 +1,6 @@
 # 레포 구조
 
-Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유 받침 성공 기준 비교 두 개와 `stage2_before`다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
+Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유 받침 성공 기준 비교 두 개, `stage2_before`와 `stage2_bridge_scripted`다. 컨피그 목록·기본 실행 명령·추론 옵션은 [config.md](config.md), 추가 옵션·checkpoint 규칙은 [USAGE.md](USAGE.md)를 따른다.
 
 ## 실행과 설정
 
@@ -104,3 +104,21 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유
 세부 계약은 [BEFORE 참고](reference/stage2_before.md)에 있다.
 
 `stage2_before_ground_mix334_1200`은 같은 `before_sampling.py`의 3단계 거리 모드와 선행 접근 거리 축소를 사용한다. env/train YAML과 전용 train/test/VNC는 각각 `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_before_ground_mix334_1200.yaml`, `tokenhsi/scripts/multi_agent/stage2_before_ground_mix334_1200_{train,test,vnc}.sh`에 있다.
+
+## Bridge 실험
+
+| 경로 | 역할 |
+| --- | --- |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_bridge_scripted.yaml`, `tokenhsi/scripts/multi_agent/stage2_bridge_scripted_{train,test,vnc}.sh` | 2명·2048환경·4물체, 두 무대+외력 다리(센서 없음) |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_bridge.py`, `bridge_geometry.py` | 무대 actor·다리 bank slot·PD 궤적·지형 기준 높이 관측·무대 추락 종료·bridge 지표 |
+| `tokenhsi/utils/bridge_spec.py`, `tokenhsi/learning/multi_agent/bridge_network.py` | 계약 검증·과제/토큰 배치·선행 index 관계와 PUSH Stage1(embedding5·AMP family4) 전이 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_bridge_push.yaml`, `tokenhsi/scripts/multi_agent/stage2_bridge_push_{train,test,vnc}.sh` | 바닥 사람이 정육면체를 밀어 다리를 만드는 phase 2 |
+| `tokenhsi/env/tasks/multi_agent/humanoid_ma_bridge_push.py`, `push_reward.py`, `push_rsi.py` | 장면3종 배치·push RSI·사람별 PUSH 접촉/AT 보상과 BEFORE gate·AMP family·장면별 지표 |
+| `tokenhsi/utils/{stage1_push,push_navigation,push_box_asset}.py`, `tokenhsi/data/dataset_stage1_push.yaml` | PUSH Stage1에서 옮긴 RSI bank 검사·상자 물성/접근 거리·밑판 상자 asset·push motion manifest |
+| `tokenhsi/tests/test_bridge.py`, `check_bridge.py`, `check_bridge_push.py` | CPU 배치/추락/전이/PUSH graph·접촉 계약·GPU reset/다리 추종/건너기/gap 추락/부분 reset 검사 |
+
+세부 계약은 [Bridge 참고](reference/stage2_bridge.md)에 있다.
+
+4명 의존 다리 실험은 `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_bridge_push4.yaml`과 전용 `stage2_bridge_push4_{train,test,vnc}.sh`를 사용한다. `humanoid_ma_bridge_push4.py`는 역할별 물리 bank·무대 이동·높이·사람별 목표를, `bridge_push4_scene.py`는 안전한 내부 배치를, `utils/bridge_push4_spec.py`는 4명 과제/단방향 BEFORE 계약을 담당한다. 검증과 10장 장면 촬영은 `tokenhsi/tests/{test,check}_bridge_push4.py`에 있다.
+
+`stage2_bridge_push4_mix50`은 같은 구현에서 기존 시작50%·근접 시작50%를 섞고, 근접의 절반에 직선 배치를 적용한다. env/train YAML은 `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_bridge_push4_mix50.yaml`, 실행은 전용 `stage2_bridge_push4_mix50_{train,test,vnc}.sh`다.

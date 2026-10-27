@@ -14,7 +14,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         from utils.unified_training import preserve_amp_labels
 
         normalized = preserve_amp_labels(
-            amp_obs, normalized, self.env.task._num_amp_obs_steps
+            amp_obs, normalized, self.env.task._num_amp_obs_steps, getattr(self.env.task, "_amp_num_families", 3)
         )
         return normalized
 
