@@ -1,9 +1,9 @@
 {
-  "status": "running",
+  "status": "starting",
   "gpu": 5,
-  "supervisor_pid": 3359402,
-  "run": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444",
-  "log": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444/train.log",
+  "supervisor_pid": 3960374,
+  "run": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_z5cm_20261026_205729",
+  "log": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_z5cm_20261026_205729/train.log",
   "source_epoch": 78000,
   "object_input_size": 30,
   "num_envs": 2048,
@@ -15,8 +15,7 @@
   "trainable": "all_layers",
   "mps_pipe": "/tmp/mps-test-1003/gpu5/pipe",
   "seed": 42,
-  "training_pid": 3359530,
-  "experiment_dir": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444/train/ChairHoldAtFullFT_26-13-57-27",
-  "verified_at": "2026-10-26T13:58:17.851618",
-  "first_update_verified": true
+  "at_z_tolerance": 0.05,
+  "parent_run": "/home/hwanhee/juan/CVPR2027/runs/chair_hold_at_78k_20261026_135444",
+  "started_at": "2026-10-26T21:20:12.054913"
 }

@@ -69,7 +69,7 @@ env:
         AT: 0.1
         ON_TOP: 0.1
     success:
-      at_z_tolerance: 0.001
+      at_z_tolerance: 0.05  # Chair placement height tolerance: 5 cm
       saturation: paired_placement_current_success
       terminate_when_all_subgoals_done: false
     task_sharing:
@@ -350,7 +350,7 @@ env:
     asset_split: train
     trainable: all_layers
     object_tokenizer_input_size: 30
-    reward: stage1_v2_fixed_unchanged
+    reward: stage1_v2_fixed_at_z_5cm
     initialization: loco_only
     source_distance_range:
     - 1.0

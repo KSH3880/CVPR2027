@@ -16,6 +16,23 @@ class PartitionSceneBase(HumanoidMACarry):
     def _load_box_asset(self):
             spec = self._joint_push_spec
             self._box_size, self._payload_masses = sample_asset_bank(self.num_envs, spec, self.device)
+            import os, json
+            override = os.environ.get('PARTIAL_VIEW_MASS_PER_AGENT')
+            self._view_mass_override = override is not None
+            if override is not None:
+                if not (self.cfg['args'].test or self.cfg['args'].eval):
+                    raise ValueError('Mass override is restricted to test/eval; training is forbidden')
+                low, high = map(float, override.split(','))
+                if not (0 < low <= high < float('inf')):
+                    raise ValueError('Invalid view mass range')
+                old_low, old_high = spec['mass_per_agent']
+                members = torch.arange(1,5,device=self.device).repeat(4)[None]
+                per_agent = self._payload_masses[:,8:] / members
+                unit = ((per_agent-old_low)/(old_high-old_low)).clamp(0,1) if old_high>old_low else torch.zeros_like(per_agent)
+                self._payload_masses[:,8:] = (low+(high-low)*unit)*members
+                report = dict(evaluation_only=True,training_mass_per_agent=spec['mass_per_agent'],view_mass_per_agent=[low,high],ordinary_box_mass_unchanged=True,checkpoint_contract_unchanged=True)
+                Path('physics_override.json').write_text(json.dumps(report,indent=2))
+                print('PARTIAL_VIEW_MASS_OVERRIDE',json.dumps(report),flush=True)
             self._box_assets = []
             for size, mass in zip(self._box_size.flatten(0, 1).cpu().tolist(), self._payload_masses.flatten().cpu().tolist()):
                 options = gymapi.AssetOptions()
@@ -53,6 +70,12 @@ class PartitionSceneBase(HumanoidMACarry):
                     assert abs(actual[0].friction-surface['friction']) < 1e-6 and abs(actual[1].friction-surface['bottom_friction']) < 1e-6
                     if env_id == box_id == 0:
                         print('PARTIAL_BOX_SURFACES_VERIFIED', dict(mass=body[0].mass, body_friction=actual[0].friction, bottom_friction=actual[1].friction, rigid_bodies=1, collision_shapes=2), flush=True)
+                if self._view_mass_override:
+                    actual_mass = self.gym.get_actor_rigid_body_properties(env_ptr,handle)[0].mass
+                    expected_mass = float(self._payload_masses[env_id,box_id])
+                    assert abs(actual_mass-expected_mass) < max(.001,expected_mass*1e-5)
+                    if env_id == 0 and box_id >= 8:
+                        print('PARTIAL_VIEW_ACTUAL_MASS',box_id,actual_mass,flush=True)
                 self._box_handles.append(handle)
             if self._enable_markers:
                 for agent in range(self.num_agents):
@@ -192,6 +215,46 @@ class PartitionSceneBase(HumanoidMACarry):
             if getattr(self, 'viewer', None) is not None and (ids == 0).any():
                 self._place_partition_camera()
 
+    def render(self, sync_frame_time=False):
+            if self.viewer is None:
+                return
+            import os
+            self._update_camera()
+            if self.gym.query_viewer_has_closed(self.viewer):
+                raise SystemExit(0)
+            for event in self.gym.query_viewer_action_events(self.viewer):
+                if event.value <= 0:
+                    continue
+                if event.action == 'partial_next_episode':
+                    self._viewer_next_episode = True
+                elif event.action == 'QUIT':
+                    raise SystemExit(0)
+                elif event.action == 'toggle_viewer_sync':
+                    self.enable_viewer_sync = not self.enable_viewer_sync
+                elif event.action == 'toggle_video_record':
+                    os.makedirs(self.save_video_dir, exist_ok=True)
+                    self.save_video = not self.save_video
+                elif event.action == 'follow':
+                    self._camera_follow_flag = not self._camera_follow_flag
+                elif event.action == 'show_lines':
+                    self._show_lines_flag = not self._show_lines_flag
+            if self.device != 'cpu':
+                self.gym.fetch_results(self.sim, True)
+            if self.enable_viewer_sync:
+                self.gym.step_graphics(self.sim)
+                self.gym.draw_viewer(self.viewer, self.sim, True)
+            else:
+                self.gym.poll_viewer_events(self.viewer)
+
+    def _compute_reset(self):
+            super()._compute_reset()
+            if self.viewer is not None and getattr(self, '_viewer_next_episode', False):
+                # Mark done after the physics step; the player resets every agent
+                # and the shared boxes through the ordinary episode reset path.
+                self.reset_buf[0] = 1
+                self._viewer_next_episode = False
+                print('[Partial viewer] N: next episode requested', flush=True)
+
     def _init_camera(self):
             # The useful scene positions are assigned at reset, after construction.
             self._cam_prev_char_pos = self._humanoid_root_states[0, 0, :3].detach().cpu().numpy().copy()
@@ -231,6 +294,9 @@ class PartitionSceneBase(HumanoidMACarry):
         self._reward_term_sums=torch.zeros(6,device=self.device)
         self._reward_term_count=0
         self._env_origins.zero_()
+        if self.viewer is not None:
+            self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_N, 'partial_next_episode')
+            print('[Partial viewer] Press N for next episode', flush=True)
 
     def _create_envs(self,*args,**kwargs):
         self.num_physical_objects=24

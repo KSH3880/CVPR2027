@@ -89,6 +89,19 @@ def check_partial(weights,env):
  if weights.get('shared_support_contract')!=contract(env):raise ValueError('Partial Joint Push Stage2 contract differs')
 stage2_spec.check_checkpoint=check_partial
 from learning.multi_agent.ma_agent import MAAgent
+# Optional continuation directory contains a filtered copy of prior events.
+if os.environ.get('PARTIAL_TB_LOGDIR'):
+ from tensorboardX import SummaryWriter
+ from rl_games.common import a2c_common
+ _tb_path=Path(os.environ['PARTIAL_TB_LOGDIR']).resolve()
+ _tb_offsets=json.loads((_tb_path/'continuation.json').read_text()).get('time_offset',0)
+ class ContinuedSummaryWriter(SummaryWriter):
+  def __init__(self,*args,**kwargs):
+   super().__init__(str(_tb_path))
+  def add_scalar(self,tag,scalar_value,global_step=None,*args,**kwargs):
+   if tag.endswith('/time') and global_step is not None:global_step+=_tb_offsets
+   return super().add_scalar(tag,scalar_value,global_step,*args,**kwargs)
+ a2c_common.SummaryWriter=ContinuedSummaryWriter
 def digest(module):
  h=hashlib.sha256()
  for name,value in sorted(module.state_dict().items()):h.update(name.encode());h.update(value.detach().cpu().contiguous().numpy().tobytes())
@@ -106,6 +119,26 @@ def init(self,base_name,config):
  assert any(p.requires_grad for p in self.model.a2c_network.coordination.parameters())
  print('PARTIAL_STAGE2_TRAIN_READY',json.dumps(dict(agents=task.num_agents,objects=task.num_objects,envs=task.num_envs,observation=task.get_obs_size(),amp=task.get_num_amp_obs(),frozen_stage1_actor=True,coordination_trainable=True,rsi='loco_only',optimizer_resumed=task.cfg['args'].resume>0)),flush=True)
 MAAgent.__init__=init
+_restore_full=MAAgent.set_full_state_weights
+def restore_full(self,weights):
+ result=_restore_full(self,weights)
+ assert self.epoch_num==weights['epoch'] and self.frame==weights.get('frame',0)
+ assert all(torch.equal(v,weights['model'][k].to(v.device)) for k,v in self.model.state_dict().items())
+ def same(a,b):
+  if isinstance(a,torch.Tensor):return isinstance(b,torch.Tensor) and torch.equal(a,b.to(a.device))
+  if isinstance(a,dict):return a.keys()==b.keys() and all(same(a[k],b[k]) for k in a)
+  if isinstance(a,(list,tuple)):return len(a)==len(b) and all(same(x,y) for x,y in zip(a,b))
+  return a==b
+ assert same(self.optimizer.state_dict(),weights['optimizer'])
+ self._partial_start_epoch=self.epoch_num
+ self._partial_actor_digest=digest(self.model.a2c_network.actor_encoder)
+ self._partial_coord_digest=digest(self.model.a2c_network.coordination)
+ self._partial_rms_digest=digest(self.running_mean_std)
+ report=dict(epoch=self.epoch_num,frame=self.frame,model_restored=True,optimizer_restored=True,optimizer_states=len(self.optimizer.state),tensorboard_logdir=os.environ.get('PARTIAL_TB_LOGDIR',self.summaries_dir))
+ Path(self.experiment_dir,'resume_verification.json').write_text(json.dumps(report,indent=2))
+ print('PARTIAL_STAGE2_RESUME_VERIFIED',json.dumps(report),flush=True)
+ return result
+MAAgent.set_full_state_weights=restore_full
 # Record trainable coordination gradients and verify the frozen encoder is unchanged.
 _calc=MAAgent.calc_gradients
 _seen=False
@@ -123,12 +156,12 @@ MAAgent.calc_gradients=gradients
 _epoch=MAAgent.train_epoch
 def epoch(self):
  result=_epoch(self)
- if self.epoch_num==2:
+ if self.epoch_num==getattr(self,'_partial_start_epoch',0)+2:
   actor_unchanged=digest(self.model.a2c_network.actor_encoder)==self._partial_actor_digest
   rms_unchanged=digest(self.running_mean_std)==self._partial_rms_digest
   coord_changed=digest(self.model.a2c_network.coordination)!=self._partial_coord_digest
   assert actor_unchanged and rms_unchanged and coord_changed
-  report=dict(epoch=self.epoch_num,actor_encoder_unchanged=actor_unchanged,normalizer_unchanged=rms_unchanged,coordination_updated=coord_changed,stage1_optimizer_restored=False)
+  report=dict(epoch=self.epoch_num,actor_encoder_unchanged=actor_unchanged,normalizer_unchanged=rms_unchanged,coordination_updated=coord_changed,stage1_optimizer_restored=False,stage2_optimizer_resumed=hasattr(self,'_partial_start_epoch'))
   Path(self.experiment_dir,'startup_verification.json').write_text(json.dumps(report,indent=2))
   self.save(str(Path(self.experiment_dir,'nn','PartialRawCuboid_startup')))
   print('PARTIAL_STAGE2_UPDATES_VERIFIED',json.dumps(report),flush=True)

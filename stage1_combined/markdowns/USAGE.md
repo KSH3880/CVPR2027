@@ -209,3 +209,5 @@ bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_vnc.sh \
 ## Native Chair HOLDING+AT 78k zero-shot
 
 전용 `evaluation/hold_at/run_eval.py`에 원본78k `--checkpoint`와 ChairFT의 `--template-checkpoint`를 함께 전달한다. template는env/sim/train설정만제공하며모델tensor/normalizer는원본78k파일의byte-identical사본에서직접복원한다. tokenizer30D유지·가중치변환/업데이트없음. 실행·trace·통계는 [평가README](../evaluation/hold_at/README.md).
+
+`chair_hold_at_full_ft`의 다음 실행용 AT 높이 허용 오차는 5cm(`success.at_z_tolerance: 0.05`)다. 이전 실행 사본에는 소급 적용되지 않는다. 상세는 [Chair HOLDING+AT](reference/chair_hold_at_ft.md)를 따른다.

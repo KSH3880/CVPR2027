@@ -1,6 +1,73 @@
 # Changelog
 
+## 2026-10-27
+
+### 사용자 요청으로 GPU 자원 실행 가드 제거
+
+- 새 KSH launcher의 50GiB 여유·Python client 수 차단만 제거했다. GPU6 제한·MPS 연결 검증은 유지한다. shell 구문을 확인했으며 학습은 실행하지 않았다.
+
+### PUSH 목표를 상자 정면에 직선 정렬
+
+- 사용자 요청으로 Stage1 및 Stage2 단독/공동 목표를 상자 로컬+Y로 생성한다. ±45도 목표편차를 없애고 거리2~10m·agent출발위치/그룹구성/PUSH-only/softgate/RSI는유지한다. 새workspace_push_only_aligned에분리해실행중인기존workspace_push_only학습은수정/종료하지않았다.
+- CPU회귀29개와실제CPU4환경 단독/공동/랜덤그룹RSI각16step·부분reset의각도0검사를통과했다. 원본/snapshot은보존한다.
+
+### 목표 도달 성공에서 손 gate 제거 및 CONTACT/AT 완전 포화
+
+- 사용자 요청으로soft adapter의AT성공hard-gate조건을제거했다. 위치성공원래기준20cm/Z1mm를유지하고도달전AT state/progress만soft gate를적용한다. 도달시원래paired처리로CONTACT/AT각state/progress/success최대값과유효gate1을보장한다. 목표를벗어나면포화가해제된다. power/collision은유지한다.
+- workspace_goal45_goal_success와box_goal_position 계약/코드SHA로기존설정을보존·분리했다. CPU26tests(접촉0/gate0도달보상1.2,도달전soft shaping,목표이탈/높이/부분reset)와실제CPU RSI두환경각16step/부분reset을통과했다. 원본/snapshot은수정하지않고학습/뷰어중단을유지했다.
+
+### 정지 viewer의 초기 GPU 렌더 동기화
+
+- reset tensor만쓴상태에서상자/관절그래픽이구pose에남는문제를확인했다. reset후중력/속도0·dt1e-6 동기화1회로변환을반영하고이후물리진행없이정지렌더링한다. 정책step은0이며기록의materialization단계와정지중physics step을구분한다.
+
+### RSI 초기자세 고정 viewer
+
+- 사용자 정정에 따라rollout view만종료하고초기reset자세만렌더링하는평가전용모드를추가했다. policy/env_step/simulate호출없이카메라조작과N(50/50새자세),R(push),L(loco)를지원한다. 학습은중단상태를유지하고원본/snapshot은수정하지않았다.
+
+### PUSH RSI 검사용 viewer50/50
+
+- 사용자 요청으로새goal45환경/Stage1베이스14000의공동4명view를GPU6 native/MPS우회로실행했다. loco50/pushRSI50은그룹단위·에피소드별샘플링이며평가전용PUSH_RSI_MIX로분리한다. 기존100%강제RSI view만교체했고학습은중단상태를유지한다.
+
+### Stage1 및 Stage2 단독 PUSH의 목표 ±45도 재샘플링
+
+- 사용자 지적에 따라 Stage1 sample_layout와 Stage2 단독 sample_push의 후보승인에 상자+Y 대비goal 수평각±45도검사를추가했다. 공동기존cone/배치·거리·물성·RSI는유지한다. snapshot원문함수를로컬adapter에분리복사하고거절조건만추가했으며원본/snapshot은수정하지않았다.
+- 생성설정/launcher를workspace_goal45로분리해이전config를보존한다. Stage1수정config도생성하고bootstrap에서Stage1/Stage2모두지원한다. 각도/adapter SHA를checkpoint계약에포함했다.
+- CPU24tests와실제CPU2환경의공동/단독PUSH RSI각16step·부분reset후목표각도검사를통과했다. 학습은중단상태를유지했다.
+
+### GPU6에서 새 KSH RSI+soft gate 본학습 시작
+
+- 사용자 승인으로 기존Partial PID3873224만 MPS terminate_client 성공0으로 중단했다. 타학습769426·MPS서버2946883는유지한다. 이전weight/로그를보존했다.
+- 새 Stage1PushFinetune14000에서 epoch0/새optimizer,4명×1024환경,인당20kg/마찰0.4,원본혼합과제·RSI와로컬평균soft gate로시작했다. GPU6전용MPS연결을검증했다.
+- 실제coordination gradient401.784·2epoch후actor/RMS불변/coord업데이트/optimizer195state·startup저장을확인했다. TensorBoard current_ksh_jointpush_rsi_soft와 latest_partial_training.json을갱신했다. 새실행은 runs/jointpush/ksh_jointpush_rsi/output/soft_rsi_gpu6_20261027_162444.
+
+### 새 KSH RSI 실험의 shaping gate를 soft로 변경
+
+- 사용자 요청으로 bootstrap 로컬adapter를추가했다. 두손중최대유한면거리 q=exp(-(d/.18)^2)의그룹평균을 AT state/progress에곱한다. 전원hard조건은 최종성공/성공보너스에만유지하고CONTACT·단독과기존성공포화를유지한다. 원본ksh/snapshot·현재학습은변경하지않는다.
+- 생성config에gate설정과adapter SHA를포함해기존hard-gate Stage2계약과분리했다. CPU회귀2개로부분접촉shaping/전원성공/CONTACT·단독불변을확인하고,실제CPU2환경공동/단독RSI 각16step과부분reset을통과했다. 새본학습은시작하지않았다.
+
+### 새 KSH Stage2 jointpush RSI 독립 실행 준비
+
+- 사용자 요청으로 ksh stage1_2_jointpush commit5e30a72의554일반파일·13읽기링크를 독립snapshot으로 보존했다. 원본checkout/수정/GPU실행/학습교체는 하지 않았다. 제공최신Stage1PushFinetune14000을로컬고정하고10500회귀용도보존한다.
+- prepare/train/view/CPUcheck bootstrap을추가했다. 생성manifest에서상대경로130모션을절대경로로정규화하고소스는그대로유지한다. 캐시는복사하고모든출력은runs로돌린다. GPU6 index/UUID검증·학습메모리가드·MPS검증·nativeGUI우회를연결했다.
+- CPU20tests,실제CPU2환경all_coupled/push 각16step·14000복원/원본RSI관절·고정목표·부분reset을통과했다. 별도최신14000 전이/coord gradient·업데이트/actor동결CPU검증도완료했다. 새GPU학습/GUI와전체mixed RSI캐시생성은실행하지않았다. 명령과한계는 KSH_JOINTPUSH.md.
+
+### 질량만 낮춘11500 viewer
+
+- 사용자 요청으로 같은11500 checkpoint의 task상자 질량만 인당15~25→10~15kg으로 변경하는 test/eval전용 PARTIAL_VIEW_MASS_PER_AGENT 옵션을 추가했다. 원래 균등 난수를 재사용해 크기·배치·그룹·ordinary질량·마찰·checkpoint 계약을 보존하며 실제물성 차이를 physics_override.json에 명시한다. 학습사용은 거부한다.
+- CPU1환경2step strict복원/finite관측·정책·실제actor질량 확인을 통과했다. GPU6 nativeviewer만 교체했고 학습/MPS는 유지한다. 별도 view workspace는 runs/jointpush/view11500_mass10to15_20261027_113411/workspace다.
+
 ## 2026-10-26
+
+### Viewer N키로 다음 에피소드
+
+- 사용자 요청으로 Partial viewer에 N키를 등록했다. render에서는 요청만 저장하고 다음 physics step의 정상reset 계산 후 env0을 done처리하므로 네agent/공동상자/goal이 기존 reset경로로 함께 초기화된다. success를 강제하지 않으며 학습/headless에는 적용하지 않는다. 기존 V/L/F/K/Esc 입력과 카메라/그래픽 동작을 유지한다.
+- AST실행프로브로 N입력→deferred reset·1회소비·다른env/headless불변·기존K키를 확인했다. MPS를 사용하지 않는 native viewer만 재시작해 적용했다.
+
+### 이전 baseline36000 Partial5000 resume 및 TensorBoard 연결
+
+- 사용자 요청으로 RSI uniform실험만 공식 MPS terminate_client 성공0으로 중단하고 이전baseline36000/1024환경×4명/인당15~25kg/상자전체마찰0.3 설정의 최신5000 pth를 resume했다. 원본설정을 새 workspace로 복사하며 모델·optimizer195state·epoch5000/frame655360000의 정확한복원을 검증한다.
+- 기존 current_base36000_e1024 TensorBoard 이름을 유지한다. 원본event는 보존하고 checkpoint지점 이전기록425154개를 새연속로그로 복사, 미저장12936개를 제외한다. frame/iter축은 복원step으로 이어지고 time축은 기존max offset을 더한다. CPU전용TensorBoard6016만 캐시갱신을 위해 재시작했다.
+- runtime복원감사와 resume후2epoch actor/RMS동결·coord업데이트 검증을 추가했다. MPS서버2946883·타클라이언트3349106은 유지한다. 경로는 runs/jointpush/latest_partial_training.json.
 
 ### RSI uniform11500 baseline 및 밑판 전용 마찰
 

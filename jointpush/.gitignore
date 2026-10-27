@@ -8,3 +8,9 @@ ports/koo_native_y2m/output_etc/
 
 # Snapshot config manifests are source, motion payloads remain external.
 !ports/jhh_raw_cuboid/tokenhsi/data/dataset*.yaml
+
+# KSH snapshot runtime outputs and payloads are reproducible from its manifest.
+ports/ksh_jointpush/output
+ports/ksh_jointpush/output_etc
+ports/ksh_jointpush/pth
+!ports/ksh_jointpush/tokenhsi/data/dataset*.yaml

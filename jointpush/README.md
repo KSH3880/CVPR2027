@@ -77,3 +77,11 @@ Scalars에서 `relation/partial_push/goal_distance`(작을수록 좋음), `relat
 현재 baseline은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` 최신11500이며 새 prepare의 기본 소스도 해당 실험이다. 학습은 새Stage2 epoch0,1024환경×4명,인당15~25kg를 유지한다. 실제 상자는 단일 rigid body/두 collision shape로 만들어 본체마찰0.9와 바닥1cm invisible sole마찰0.3을 분리한다. 전체 시각/관측 크기·질량·중심·관성은 원래 cuboid와 같다. sole도 같은 rigid body이므로 contact force·박스 tensor 인덱싱은 유지된다. 이전 workspace는 surface_mode가 없어 기존 단일shape 물리를 유지한다.
 
 새 실행 workspace는 `runs/jointpush/uniform11500_bottom03_20261026/workspace`이며 최신 상태는 `runs/jointpush/latest_partial_training.json`을 따른다. 원본 jhh는 읽기/복사만 했다. Stage2 RSI는 계속 loco-only이고 uniform push RSI 개선은 가져온Stage1 학습 이력이다.
+
+현재 실행은 이전 baseline36000 기반 Partial5000 resume로 복귀했다. 1024env×4명/인당15~25kg/단일상자 전체마찰0.3을 복원하며 RSI uniform용 밑판형상을 사용하지 않는다. TensorBoard6016의 `current_base36000_e1024`는 이전기록과 resume기록을 잇는 run이다. 이전원시event는 보존하며 미저장step구간은 새복사본에서만 제외했다. 실제workspace/nn/연속summary경로는 latest_partial_training.json을 따른다.
+
+Partial viewer 창을 클릭한 뒤 **N**을 누르면 다음 에피소드로 넘어간다. 학습에는 영향이 없고 성공 처리 없이 네 agent와 공동상자를 함께 새로 reset한다.
+
+view에서만 질량을 낮추려면 `PARTIAL_VIEW_MASS_PER_AGENT=10,15`를 `partial_vnc.sh` 앞에 지정한다. 담당task상자는 인당10~15kg, ordinary상자 질량/크기/마찰/정책은 유지하며 override는별도 JSON에 기록한다. 이 옵션은 train에서 사용할 수 없다.
+
+새 KSH 브랜치 RSI 실험은 별도 준비 상태이며 현재 학습은 유지한다. [새 실행 설정·명령·검증 범위](KSH_JOINTPUSH.md)를 따른다.

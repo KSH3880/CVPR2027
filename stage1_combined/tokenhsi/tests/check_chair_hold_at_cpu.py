@@ -16,7 +16,30 @@ env=yaml.safe_load((r/'tokenhsi/data/cfg/multi_agent/chair_hold_at_full_ft.yaml'
 train=yaml.safe_load((r/'tokenhsi/data/cfg/train/rlg/chair_hold_at_full_ft.yaml').read_text())
 validate_unified_env(env);validate_stage1_network(env,train)
 base=yaml.safe_load((r/'tokenhsi/data/cfg/multi_agent/stage1_v2_fixed.yaml').read_text())['env']
-assert env['relationReward']==base['relationReward']
+from copy import deepcopy
+expected_reward=deepcopy(base['relationReward'])
+expected_reward['success']['at_z_tolerance']=0.05
+assert env['relationReward']==expected_reward
+# Exercise actual success/saturation code around the new height boundary.
+from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
+from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
+from utils.edge_context_spec import HOLDING,AT
+boundary_graph=compose_canonical_graph(torch.full((4,1),3),num_objects=1)
+rel=boundary_graph.edge_relation
+if rel.ndim==1:rel=rel.unsqueeze(0).expand(4,-1)
+height=torch.tensor([.0011,.0499,.0501,.0])
+phi=torch.where(rel==AT,torch.full(rel.shape,float(torch.exp(torch.tensor(-10*.1**2)))) ,torch.zeros(rel.shape))
+z=torch.where(rel==AT,height[:,None],torch.zeros_like(phi))
+zeros=torch.zeros_like(phi)
+success=interaction_own_success(phi,z,zeros,boundary_graph,env['relationReward'],zeros)
+assert success[rel==AT].tolist()==[True,True,False,True]
+legacy=interaction_own_success(phi,z,zeros,boundary_graph,base['relationReward'],zeros)
+assert legacy[rel==AT].tolist()==[False,False,False,True]
+runtime=Stage1ContextRuntime(4,boundary_graph,env['relationReward'],'cpu')
+result=runtime.step(phi,torch.full_like(phi,.5),z,zeros,zeros)
+assert result['reward_saturated'][rel==HOLDING].tolist()==[True,True,False,True]
+assert result['success_component'][rel==AT].tolist()==[.2,.2,0.,.2] or torch.allclose(result['success_component'][rel==AT],torch.tensor([.2,.2,0.,.2]))
+
 assert HumanoidChairHoldAtFT._compute_reward is HumanoidMACarry._compute_reward
 ckpt=torch.load(r/'checkpoints/Stage1V2Fixed_00078000.pth',map_location='cpu',weights_only=False)
 b=AMPMultiAgentBuilder();b.load(train['params']['network'])
@@ -50,4 +73,4 @@ assert ((xy-t._box_states[ids,0,:2]).square().sum(-1)>=2).all()
 try:object_catalog('/tmp/nonexistent_hold_at_dataset','train','ArmChair_Normal')
 except FileNotFoundError:pass
 else:raise AssertionError('Missing data must fail')
-print(json.dumps(dict(source_epoch=ckpt['epoch'],strict_model_tensors=len(model.state_dict()),object_input=30,normalizer_strict=True,cpu_inference=True,reward_unchanged=True,partial_reset=True,front_alignment=True,original_target_distribution=True,gpu_used=False,optimizer_steps=0)))
+print(json.dumps(dict(source_epoch=ckpt['epoch'],strict_model_tensors=len(model.state_dict()),object_input=30,normalizer_strict=True,cpu_inference=True,reward_only_at_z_tolerance_changed=True,at_z_tolerance=.05,at_height_boundary_and_saturation=True,partial_reset=True,front_alignment=True,original_target_distribution=True,gpu_used=False,optimizer_steps=0)))
