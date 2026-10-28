@@ -105,6 +105,7 @@ nn/
 /tokenhsi/data/dataset_amass_climb/objects/
 /tokenhsi/data/dataset_dynamic_objects/train/
 /tokenhsi/data/dataset_dynamic_objects/test/
+/tokenhsi/data/jointpush_motions/
 
 # Raw motion / mesh blobs anywhere in the tree
 *.npz

@@ -1,3 +1,4 @@
+import math
 import torch
 
 
@@ -48,11 +49,23 @@ def paths_clear(boxes, sizes, goals, roots, push, spec):
     return valid
 
 
+def goal_angles_valid(boxes, goals, push, spec):
+    if spec['goal_angle_degrees'] == 360.:
+        return torch.ones(len(boxes), device=boxes.device, dtype=torch.bool)
+    q = boxes[:, :2, 3:7]
+    forward = torch.stack((-2*q[..., 2]*q[..., 3], 1-2*q[..., 2].square()), -1)
+    delta = goals[..., :2]-boxes[:, :2, :2]
+    cosine = (forward*delta).sum(-1)/delta.norm(dim=-1).clamp_min(1e-8)
+    limit = math.cos(math.radians(spec['goal_angle_degrees']/2))
+    return ((cosine >= limit-1e-6) | ~push).all(-1)
+
+
 def sample_layout(roots, boxes, sizes, push, spec):
     result = boxes.clone()
     goals = boxes[:, :2, :3].clone()
     pending = push.any(-1).nonzero().flatten()
-    for _ in range(512):
+    attempts = 2048 if spec['goal_angle_degrees'] == 90. else 512
+    for _ in range(attempts):
         if not len(pending):
             return result, goals
         active = push[pending]
@@ -69,6 +82,7 @@ def sample_layout(roots, boxes, sizes, push, spec):
         target3 = candidate[:, :2, :3].clone()
         target3[..., :2] = target
         valid = paths_clear(candidate, sizes[pending], target3, roots[pending], active, spec)
+        valid &= goal_angles_valid(candidate, target3, active, spec)
         valid &= (((target-roots[pending, :, :2]).norm(dim=-1) >= spec['goal_min_human_distance']) | ~active).all(-1)
         accepted = pending[valid]
         result[accepted] = candidate[valid]

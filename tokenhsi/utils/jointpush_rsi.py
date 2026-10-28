@@ -23,7 +23,8 @@ class PushBank:
                 or source['motions'] != hashes):
             raise ValueError('KOO RSI bank motion/character geometry mismatch')
         physical = env['jointPush']['box']
-        if (source['box']['mass'] != physical['mass'] or source['box']['friction'] != physical['friction']
+        reference_mass = spec.get('reference_mass', physical.get('mass'))
+        if (source['box']['mass'] != reference_mass or source['box']['friction'] != physical['friction']
                 or source['box']['size_profiles'] != physical['profiles']
                 or payload['screen'] != 'PD_0.1s_all_profiles'):
             raise ValueError('KOO RSI bank physics mismatch')

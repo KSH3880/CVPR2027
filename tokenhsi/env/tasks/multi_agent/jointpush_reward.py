@@ -9,6 +9,17 @@ from env.tasks.multi_agent.edge_interaction_reward import interaction_own_succes
 from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
 
 
+def gate_push_at_progress(progress, distance_xy, previous_boxes, goals, graph, min_delta):
+    relation = batched(graph.edge_relation, progress.shape[0])
+    owner = batched(graph.edge_owner, progress.shape[0])
+    valid = batched(graph.edge_valid, progress.shape[0])
+    push_owner = owner_sum(((relation == PUSH) & valid).to(progress.dtype), graph) > 0
+    mask = (relation == AT) & valid & push_owner.gather(1, owner)
+    previous_distance = (previous_boxes[..., :2] - goals[..., :2]).norm(dim=-1)
+    moving = previous_distance.gather(1, owner) - distance_xy > min_delta
+    return progress * (~mask | moving).to(progress.dtype)
+
+
 class Stage1PushRuntime(Stage1ContextRuntime):
     def __init__(self, *args, contact_weights, **kwargs):
         super().__init__(*args, **kwargs)

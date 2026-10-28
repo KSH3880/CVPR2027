@@ -57,3 +57,13 @@ jointpush viewer의 PUSH 목표는 기존 중심점에 지름20cm 구형 테두�
 Adapter weight/bias는0, coordination은 identity로 초기화하여 전이 직후 같은 관측에 대한 Stage1 action mean을 유지한다. 동결 head를 통과하는 gradient는 차단하지 않아 앞단 attention과 adapter가 학습된다. Critic·critic coordination·AMP discriminator 및 scene/AMP 정규화 처리는 기존 Stage2와 같다. 단독·공동 모두 같은 adapter를 사용하므로 학습 후 단독 행동 보존까지 보장하지는 않는다.
 
 환경의 `stage2JointPush.action_adapter: tokenhsi_internal`과 학습 network의 `use_internal_adaptation: true`를 함께 사용한다. 기존 설정은 adapter를 생성하지 않는다. 보상·샘플링·loco 초기화·PPO는 `stage2_jointpush_goal_saturation`과 동일하다. checkpoint 계약 및 모델 구조가 달라 기존 Stage2 checkpoint를 직접 resume하지 않으며, Stage1 PUSH에서 새로 전이하거나 이 adapter 설정의 checkpoint를 재개한다. 기본 wrapper 전이 경로는 기존10500이고, 문서의 비교 실행 명령은 사용자가 실행 중인 기준에 맞춰14000을 명시한다.
+
+## 밀도3·단독 목표 ±45° 설정
+
+`stage2_jointpush_goal_saturation_density3_cone90`는 `stage2_jointpush_goal_saturation`의 별도 파생 설정이다. PUSH 질량은 `3 × 실제 부피`이며 공동 상자는 기존처럼 가로 길이가 인원수만큼 늘어나므로 질량도 비례한다. 다른 과제의 밀도100·PUSH 마찰0.4·167종 기본 크기·목표 거리2~10m는 유지한다.
+
+단독 목표도 상자 로컬 +Y 기준 ±45°로 생성한다. 공동 목표의 기존 ±45°는 유지하며 두 조건은 학습·평가에 공통 적용된다. 기존 컨피그의 단독360°·고정20kg×인원은 보존한다.
+
+단독 SIT10%·CLIMB20%·HOLDING_AT25%·HOLDING_ON_TOP20%·PUSH25%, coupled PUSH 전용·그룹 추첨·loco100%·40초·넘어짐 종료·목표 포화/gate·학습 파라미터·네트워크는 원본 그대로다. Stage1 fine-tune의 PUSH50%와 접촉 RSI는 가져오지 않는다. `reference_mass: 20.0`은 기존 RSI bank 출처 메타데이터이며 이 loco 설정은 접촉 RSI를 실행하지 않는다.
+
+기본 전이 파일은 `output/stage1_jointpush_density3_cone90_finetune/Stage1JointPushDensity3Cone90Finetune_27-17-59-07/nn/Stage1JointPushDensity3Cone90Finetune_00008000.pth`다. `STAGE1_CHECKPOINT`로 교체할 수 있다. 기존 Stage2 checkpoint의 물성/배치 계약과 다르므로 기존 Stage2 결과를 이 설정의 resume/test 입력으로 섞지 않는다.

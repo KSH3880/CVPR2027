@@ -88,7 +88,25 @@ class MAAgent(amp_agent.AMPAgent):
         )
         if getattr(task, "_stage2", False):
             self._init_stage2(task)
+        elif task.cfg['env'].get('jointPush') and task.cfg.get('experiment', {}).get('transfer'):
+            self._init_jointpush_transfer(task)
         return
+
+    def _init_jointpush_transfer(self, task):
+        if task.cfg['args'].resume > 0:
+            return
+        import json
+        from learning.multi_agent.stage1_push_network import transfer
+        path = task.cfg['experiment']['transfer']['checkpoint']
+        checkpoint = torch.load(path, map_location=self.ppo_device, weights_only=False)
+        amp_stats, report = transfer(self.model, checkpoint)
+        self.running_mean_std.load_state_dict(checkpoint['running_mean_std'], strict=True)
+        self._amp_input_mean_std.load_state_dict(amp_stats, strict=True)
+        if self.normalize_value:
+            self.value_mean_std.load_state_dict(checkpoint['reward_mean_std'], strict=True)
+        report.update(source_checkpoint=path, optimizer='fresh', normalization='update')
+        with open(os.path.join(self.experiment_dir, 'push_transfer_report.json'), 'w') as stream:
+            json.dump(report, stream, indent=2)
 
     def _init_stage2(self, task):
         import json

@@ -7,7 +7,9 @@
 - conda 환경은 `tokenhsi_sm120`이며 wrapper가 자동 활성화한다.
 - GPU는 `TOKENHSI_GPU`로 지정한다. Stage1 본학습은 2명·2048환경·4물체, `stage2_jointpush`·`stage2_jointpush_rsi` 및 `_goal_saturation`·`_goal_saturation_adapter` 버전은 4명·1024환경·8 object 토큰이다. 학습 시각화는 4환경, 추론은 1환경이다.
 - GPU0 MPS는 `source mps/shell.sh` 후 `mps_start 0`으로 켜고 `mps_status 0`으로 확인한다. 새 실행은 자동 연결하며 이미 실행 중인 학습에는 재시작 전까지 적용되지 않는다.
-- 기존 PUSH fine-tuning은 fixed78000에서 시작하며, `stage1_jointpush`는 checkpoint 없이 스크래치 학습한다. `stage2_jointpush`·`stage2_jointpush_rsi` 및 `_goal_saturation`·`_goal_saturation_adapter` 버전은 `STAGE1_CHECKPOINT`에서 전이하며 기본값은 `pth/Stage1PushFinetune_00010500.pth`다. cuboid checkpoint 전이·재개·추가 옵션은 [USAGE](USAGE.md#push-원본-rsi가변-정육면체)를 따른다.
+- 기존 PUSH fine-tuning은 fixed78000에서 시작하며, `stage1_jointpush`·`stage1_jointpush_density3_cone90`는 checkpoint 없이 스크래치 학습한다. `stage2_jointpush`·`stage2_jointpush_rsi` 및 `_goal_saturation`·`_goal_saturation_adapter` 버전은 `STAGE1_CHECKPOINT`에서 전이하며 기본값은 `pth/Stage1PushFinetune_00010500.pth`다. cuboid checkpoint 전이·재개·추가 옵션은 [USAGE](USAGE.md#push-원본-rsi가변-정육면체)를 따른다.
+- `stage1_jointpush_density3_cone90_finetune`와 `stage1_jointpush_density3_cone90_finetune_atprogress_gate`는 `STAGE1_CHECKPOINT`(기본 `pth/Stage1V2Fixed_00078000.pth`)에서 초기화하며 새 optimizer/epoch으로 시작한다. 이어 학습은 `RESUME_CHECKPOINT`를 지정한다.
+- `stage2_jointpush_goal_saturation_density3_cone90`는 밀도3·±45° Stage1의8000 checkpoint에서 전이한다. `STAGE1_CHECKPOINT`로 변경하고, 학습 재개는 `RESUME_CHECKPOINT`를 사용한다.
 - 본학습은 `output/`, 학습 시각화·추론은 `output_etc/check/`에 저장한다.
 
 ## 현재 컨피그
@@ -25,6 +27,10 @@
 | [stage2_jointpush_goal_saturation.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_goal_saturation.yaml) | [stage2_jointpush_goal_saturation.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_goal_saturation.yaml) |
 | [stage2_jointpush_rsi_goal_saturation.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_rsi_goal_saturation.yaml) | [stage2_jointpush_rsi_goal_saturation.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_rsi_goal_saturation.yaml) |
 | [stage2_jointpush_goal_saturation_adapter.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_goal_saturation_adapter.yaml) | [stage2_jointpush_goal_saturation_adapter.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_goal_saturation_adapter.yaml) |
+| [stage1_jointpush_density3_cone90.yaml](../tokenhsi/data/cfg/multi_agent/stage1_jointpush_density3_cone90.yaml) | [stage1_jointpush_density3_cone90.yaml](../tokenhsi/data/cfg/train/rlg/stage1_jointpush_density3_cone90.yaml) |
+| [stage1_jointpush_density3_cone90_finetune.yaml](../tokenhsi/data/cfg/multi_agent/stage1_jointpush_density3_cone90_finetune.yaml) | [stage1_jointpush_density3_cone90_finetune.yaml](../tokenhsi/data/cfg/train/rlg/stage1_jointpush_density3_cone90_finetune.yaml) |
+| [stage2_jointpush_goal_saturation_density3_cone90.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_goal_saturation_density3_cone90.yaml) | [stage2_jointpush_goal_saturation_density3_cone90.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_goal_saturation_density3_cone90.yaml) |
+| [stage1_jointpush_density3_cone90_finetune_atprogress_gate.yaml](../tokenhsi/data/cfg/multi_agent/stage1_jointpush_density3_cone90_finetune_atprogress_gate.yaml) | [stage1_jointpush_density3_cone90_finetune_atprogress_gate.yaml](../tokenhsi/data/cfg/train/rlg/stage1_jointpush_density3_cone90_finetune_atprogress_gate.yaml) |
 
 ## 학습
 
@@ -65,6 +71,18 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=1 STAGE1_CHECKPOINT=pth/
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=1 STAGE1_CHECKPOINT=pth/Stage1PushFinetune_00014000.pth bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_train.sh 4 1024 8
+
+# stage1_jointpush_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_train.sh 2 2048 4
+
+# stage1_jointpush_density3_cone90_finetune
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=1 STAGE1_CHECKPOINT=pth/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_finetune_train.sh 2 2048 4
+
+# stage2_jointpush_goal_saturation_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=1 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_density3_cone90_train.sh 4 1024 8
+
+# stage1_jointpush_density3_cone90_finetune_atprogress_gate
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=1 STAGE1_CHECKPOINT=pth/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_finetune_atprogress_gate_train.sh 2 2048 4
 ```
 
 백그라운드 학습 상태·로그. `rsi_uniform`은 fixed78000에서 KL0·새 optimizer/epoch으로 시작한 GPU0 MPS 사용자 서비스이며 로그아웃 후에도 유지된다. raw·20~25kg variant·기존 cuboid는 중단 상태다.
@@ -130,6 +148,18 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6098 bash tokenhsi/scripts/m
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6100 STAGE1_CHECKPOINT=pth/Stage1PushFinetune_00014000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage2_jointpush_goal_saturation_adapter 4 4 8
+
+# stage1_jointpush_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6102 bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_jointpush_density3_cone90 2 4 4
+
+# stage1_jointpush_density3_cone90_finetune
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6104 STAGE1_CHECKPOINT=pth/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_jointpush_density3_cone90_finetune 2 4 4
+
+# stage2_jointpush_goal_saturation_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6106 bash tokenhsi/scripts/multi_agent/train_vnc.sh stage2_jointpush_goal_saturation_density3_cone90 4 4 8
+
+# stage1_jointpush_density3_cone90_finetune_atprogress_gate
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6108 STAGE1_CHECKPOINT=pth/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/train_vnc.sh stage1_jointpush_density3_cone90_finetune_atprogress_gate 2 4 4
 ```
 
 `http://localhost:6080/vnc.html?autoconnect=1&resize=remote`
@@ -143,6 +173,8 @@ RSI 균등 거리 variant: `http://localhost:6086/vnc.html?autoconnect=1&resize=
 10–15kg·20cm·130° variant: `http://localhost:6088/vnc.html?autoconnect=1&resize=remote`
 
 ## 로컬 추론
+
+`CKPT_ATPROGRESS_GATE`에는 새 AT progress gate 컨피그로 학습한 checkpoint 경로를 지정한다.
 
 `CKPT`·`CKPT_MASS20TO25`·`CKPT_CUBOID`·`CKPT_RSI_UNIFORM`·`CKPT_LIGHT130`에 각 학습에서 저장된 checkpoint 경로를 지정한다. 마지막 두 인자는 반복 횟수·최대 제어 step이다.
 
@@ -179,9 +211,21 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_test.sh pth/Stage1PushFinetune_00014000.pth 4 1 8 10
+
+# stage1_jointpush_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_test.sh pth/Stage1PushFinetune_00014000.pth 2 1 4 10
+
+# stage1_jointpush_density3_cone90_finetune
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_finetune_test.sh pth/Stage1PushFinetune_00014000.pth 2 1 4 10
+
+# stage2_jointpush_goal_saturation_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_density3_cone90_test.sh "$CKPT_STAGE2_D3_CONE90" 4 1 8 10
+
+# stage1_jointpush_density3_cone90_finetune_atprogress_gate
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_finetune_atprogress_gate_test.sh "$CKPT_ATPROGRESS_GATE" 2 1 4 10
 ```
 
-화면 없는 평가는 `HEADLESS=1`을 사용한다.
+화면 없는 평가는 `HEADLESS=1`을 사용한다. `CKPT_STAGE2_D3_CONE90`은 새 Stage2 checkpoint 경로이며, 비워 두면 기본 Stage1 8000의 제로샷 추론이다.
 
 ## 서버 VNC 추론
 
@@ -204,7 +248,7 @@ TOKENHSI_GPU=0 PORT=6087 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 b
 TOKENHSI_GPU=0 PORT=6089 TASK_GRAPH=push EVAL_SKILLS=push EVAL_SKILL_PROBS=1.0 bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_cuboid_rsi_uniform_m10to15_r20cm_a130_vnc.sh "$CKPT_LIGHT130" 2 1 4 100 1200
 
 # stage1_jointpush
-TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=0 PORT=6091 bash tokenhsi/scripts/multi_agent/stage1_jointpush_vnc.sh pth/Stage1PushFinetune_00010500.pth 2 1 4 10
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6091 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_vnc.sh pth/Stage1PushFinetune_00014000.pth 2 1 4 10
 
 # stage2_jointpush
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6093 bash tokenhsi/scripts/multi_agent/stage2_jointpush_vnc.sh pth/Stage1PushFinetune_00010500.pth 4 1 8 10
@@ -220,6 +264,18 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6099 bash tokenhsi/scripts/m
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6101 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_vnc.sh pth/Stage1PushFinetune_00014000.pth 4 1 8 10
+
+# stage1_jointpush_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6103 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_vnc.sh pth/Stage1PushFinetune_00014000.pth 2 1 4 10
+
+# stage1_jointpush_density3_cone90_finetune
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6105 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_finetune_vnc.sh pth/Stage1PushFinetune_00014000.pth 2 1 4 10
+
+# stage2_jointpush_goal_saturation_density3_cone90
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6107 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_density3_cone90_vnc.sh "$CKPT_STAGE2_D3_CONE90" 4 1 8 10
+
+# stage1_jointpush_density3_cone90_finetune_atprogress_gate
+TOKENHSI_CONDA_ENV=tokenhsi_sm120 TOKENHSI_GPU=0 PORT=6109 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_jointpush_density3_cone90_finetune_atprogress_gate_vnc.sh "$CKPT_ATPROGRESS_GATE" 2 1 4 10
 ```
 
 `http://localhost:6081/vnc.html?autoconnect=1&resize=remote`
@@ -236,7 +292,7 @@ RSI 균등 거리 variant: `http://localhost:6087/vnc.html?autoconnect=1&resize=
 
 | 옵션 | 값 |
 | --- | --- |
-| `TASK_GRAPH` | 기존 PUSH: `push`. `stage1_jointpush`: `random_scenario`(기본), `sit`, `climb`, `carry_at`, `carry_ontop`, `push`. `stage2_jointpush`·`stage2_jointpush_rsi` 및 `_goal_saturation`·`_goal_saturation_adapter` 버전: 위 과제 및 `all_solo`, `all_coupled`; 기본 `random_scenario` |
+| `TASK_GRAPH` | 기존 PUSH: `push`. `stage1_jointpush`·`stage1_jointpush_density3_cone90`·`stage1_jointpush_density3_cone90_finetune`·`stage1_jointpush_density3_cone90_finetune_atprogress_gate`: `random_scenario`(기본), `sit`, `climb`, `carry_at`, `carry_ontop`, `push`. `stage2_jointpush`·`stage2_jointpush_rsi` 및 `_goal_saturation`·`_goal_saturation_adapter` 버전: 위 과제 및 `all_solo`, `all_coupled`; 기본 `random_scenario` |
 | `EVAL_SKILLS` | `loco`: 접근 시작 / `push`: 접촉 RSI 시작 |
 | `EVAL_SKILL_PROBS` | 단일 skill은 `1.0`, 혼합은 `0.5,0.5` 등 |
 | `PUSH_SPAWN_MODE` | `random`(기본) / `straight`: 보행 시작 위치 |
@@ -246,7 +302,7 @@ RSI 균등 거리 variant: `http://localhost:6087/vnc.html?autoconnect=1&resize=
 
 혼합 시작: `EVAL_SKILLS=loco,push EVAL_SKILL_PROBS=0.5,0.5`.
 
-`stage1_jointpush` 평가는 모든 과제를 loco 100%로 시작한다. 과제 비율·물성·loco 배치/목표 샘플링은 학습과 같고, 과제 동작 중간에서 시작하는 RSI만 사용하지 않는다. `EVAL_SKILLS`로 덮어쓰지 않으며 화면 없는 평가는 `HEADLESS=1`을 사용한다.
+`stage1_jointpush`·`stage1_jointpush_density3_cone90` 평가는 모든 과제를 loco 100%로 시작한다. 과제 비율·물성·loco 배치/목표 샘플링은 학습과 같고, 과제 동작 중간에서 시작하는 RSI만 사용하지 않는다. `EVAL_SKILLS`로 덮어쓰지 않으며 화면 없는 평가는 `HEADLESS=1`을 사용한다.
 
 `stage2_jointpush`의 test/VNC는 Stage1 PUSH checkpoint를 직접 받을 수 있다. 이 경우 coordination을 identity로 초기화해 추가 학습 없이 평가한다. 기본 `TASK_GRAPH=random_scenario`는 학습의 그룹·과제 분포를 사용하고, `TASK_GRAPH=all_coupled`는 4명 공동 PUSH만 시각화한다. Stage2 학습·평가는 모두 loco 100%다.
 

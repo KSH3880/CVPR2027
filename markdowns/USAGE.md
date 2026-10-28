@@ -213,11 +213,13 @@ TOKENHSI_GPU=0 bash output_etc/check/push_attention_six_20261022/run.sh
 ## Stage1 jointpush 체크포인트와 환경
 
 - `stage1_jointpush_train.sh`는 기본 스크래치 학습이며 PTH를 자동 전이하지 않는다. `RESUME_CHECKPOINT`는 동일 jointpush 계약으로 저장한 모델만 받는다.
+- `stage1_jointpush_density3_cone90_finetune_train.sh`는 `STAGE1_CHECKPOINT`(기본 `pth/Stage1V2Fixed_00078000.pth`)에서 가중치/정규화를 가져오고 optimizer/epoch은 새로 시작한다. `RESUME_CHECKPOINT` 지정 시 전이를 건너뛰고 저장된 파인튜닝을 재개한다. 전이 증거는 실행 폴더의 `push_transfer_report.json`이다.
 - 평가 기본 PTH는 `pth/Stage1PushFinetune_00010500.pth`다. 모델과 입력/AMP 정규화 통계만 읽고, 환경은 현재 `stage1_jointpush.yaml`을 사용한다. 따라서 저장된 옛 목표·과제 비율을 복원하지 않는다.
 - 모든 과제의 평가는 loco100%다. 학습의 과제별 RSI 비율은 유지하고, 과제 비율·물성·loco 배치/목표 샘플링은 평가에서도 동일하게 사용한다.
-- 이 checkout 검증 환경은 `TOKENHSI_CONDA_ENV=tokenhsi_jhh`다. wrapper의 공통 기본값은 유지하며 다른 머신에서는 설치된 환경 이름을 지정한다.
+- 현재 서버의 검증 환경은 `TOKENHSI_CONDA_ENV=tokenhsi_sm120`이다. 다른 머신에서는 설치된 환경 이름을 지정한다.
 - `SIM_DEVICE=cpu`는 평가 스크립트에서 CPU 물리/정책을 선택한다. `EPISODE_LENGTH`는 짧은 평가용 horizon override다.
 - PUSH 모션은 `tokenhsi/data/jointpush_motions/`의 로컬 심링크로 연결한다. 실제 NPY는 Git에 포함하지 않으며 RSI bank가 모션·캐릭터·mesh 해시와 상자 물성을 검사한다. 기존 과제 RSI 캐시는 최초 실행 시 필요한 크기별 후보를 생성할 수 있다.
+- 현재 서버의 PUSH 두 데이터 폴더는 `../TokenHSI_stage1_push/tokenhsi/data/dataset_bones_push{,180}`에서 읽기 전용으로 연결한다. `push_loco`는 이 checkout의 `dataset_amass_loco` 연결을 사용하며, VNC 명령은 현재 서버 환경 `tokenhsi_sm120`과 제공된 14000 checkpoint를 명시한다.
 
 평가의 loco100%·실제 물성·AMP 연결 검사는 아래처럼 실행한다. `--task_graph`를 `sit`, `climb`, `carry_at`, `carry_ontop`, `random_scenario`로 바꾸면 해당 과제도 확인할 수 있다. 새 모델의 actor/critic/discriminator gradient 검사도 포함하지만 PPO 학습 반복을 대신하지는 않는다.
 
@@ -236,3 +238,6 @@ python tokenhsi/tests/check_stage1_jointpush.py \
   --output_path output_etc/check/stage1_jointpush/eval_loco_push
 '
 ```
+
+
+78k·밀도3·cone90 파인튜닝의 현재 지속 실행은 사용자 서비스 `tokenhsi-stage1-jointpush-d3-cone90-ft78k-20261027.service`다. 상태는 `systemctl --user status tokenhsi-stage1-jointpush-d3-cone90-ft78k-20261027.service`, 로그는 `output/stage1_jointpush_density3_cone90_finetune/train.log`에서 확인한다. 이 실행만 중단하려면 `systemctl --user stop tokenhsi-stage1-jointpush-d3-cone90-ft78k-20261027.service`를 사용하며 MPS 서버를 종료하지 않는다.

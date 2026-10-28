@@ -3,13 +3,13 @@ from isaacgym import gymapi
 
 from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.size_rsi_cache import SizeRsiCache
-from env.tasks.multi_agent.jointpush_reward import Stage1PushRuntime, contact_state
-from utils.stage1_jointpush import PUSH, compose_graph, sample_assets
+from env.tasks.multi_agent.jointpush_reward import Stage1PushRuntime, contact_state, gate_push_at_progress
+from utils.stage1_jointpush import PUSH, compose_graph, sample_assets, box_densities
 from utils.edge_scenario_spec import classify_templates
 from utils.edge_ontop_spec import copy_graph_rows
 from utils.jointpush_geometry import push_rsi_hand_targets, rotate, multiply
 from utils.jointpush_rsi_geometry import align_push_pose, safe_place
-from utils.jointpush_scene import sample_layout, place_distractors, support_clear, paths_clear
+from utils.jointpush_scene import sample_layout, place_distractors, support_clear, paths_clear, goal_angles_valid
 
 
 class LegacyCache(SizeRsiCache):
@@ -61,9 +61,7 @@ class HumanoidMAStage1JointPush(HumanoidMACarry):
         self._rsi_asset_sizes = self._box_size.clone()
         self._rsi_asset_sizes[:, :2][self._push_assets] = .4
         self._box_scale = self._box_size/self._box_size.new_tensor(self._build_base_size)
-        density = torch.full((self.num_envs, 4), 100., device=self.device)
-        density[:, :2] = torch.where(self._push_assets,
-            self._joint['box']['mass']/self._box_size[:, :2].prod(-1), density[:, :2])
+        density = box_densities(self._box_size, self._push_assets, self._joint['box'])
         self._box_density = density.flatten()
         self._box_assets = []
         cache = {}
@@ -201,6 +199,7 @@ class HumanoidMAStage1JointPush(HumanoidMACarry):
         spec = self._joint['scene']
         bad |= ~support_clear(boxes, sizes, goals, push, spec).all(-1)
         bad |= ~paths_clear(boxes, sizes, goals, self._humanoid_root_states[ids, :, :3], push, spec)
+        bad |= ~goal_angles_valid(boxes, goals, push, spec)
         distance = (goals[..., :2]-self._humanoid_root_states[ids, :, :2]).norm(dim=-1)
         bad |= ((distance < spec['goal_min_human_distance']) & push).any(-1)
         return bad
@@ -223,6 +222,10 @@ class HumanoidMAStage1JointPush(HumanoidMACarry):
         for key, value in [('progress', progress), ('distance', distance), ('distance_xy', root_distance)]:
             diag[key] = torch.where(mask, value.gather(1, owner), diag[key])
         diag['z_error'] = diag['z_error'].masked_fill(mask, 0.)
+        if env_ids is None and 'at_progress_min_delta' in self._joint:
+            diag['progress'] = gate_push_at_progress(
+                diag['progress'], diag['distance_xy'], self._prev_box_pos,
+                self._tar_pos, graph, self._joint['at_progress_min_delta'])
         return phi, diag
 
     def pre_physics_step(self, actions):

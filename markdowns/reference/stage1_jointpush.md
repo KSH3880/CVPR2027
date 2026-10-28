@@ -38,3 +38,36 @@ AT는 중심3D 거리의 `exp(-10d²)`, XY 접근 `1/(1+max(dxy-0.1,0))`, 성공
 - 원본 RSI bank JSON과 후보를 보존하고 실제 모션/asset/mesh 및20kg·0.4·167종 물성을 검사한다. 새 거리/방향 배치는 원본 bank의 scene 계약과 구분하며 최종 reset 간섭 검사를 적용한다.
 - 학습/평가 명령: [config](../config.md). 체크포인트·환경 옵션: [USAGE](../USAGE.md#stage1-jointpush-체크포인트와-환경).
 - 검증 기록: [changelog](../../changelog.md), `output_etc/check/stage1_jointpush/`.
+
+
+## 밀도3·목표±45° variant
+
+`stage1_jointpush_density3_cone90`는 위 설정에서 PUSH 상자를 밀도3kg/m³로 만들고, 목표 방향을 상자 로컬+Y 기준±45°(총90°)로 제한한다. 질량은 부피×3이며167종 균등 평균18.0014kg, 범위11.136~24.684kg이다. PhysX box asset 생성 시 density를 전달하여 해당 크기의 질량·관성을 계산한다. 다른 과제와 받침은 밀도100을 유지한다.
+
+상자/목표를 기존 방식으로 제안한 뒤 cone 밖이면 그 장면의 PUSH 상자 위치·yaw·목표를 함께 재샘플링한다. 혼합 장면의 비PUSH 상자는 유지하며, 경로·간섭 검사도 유지한다. 최대 시도는2048회다. 거리2~10m·1200step·과제 혼합·RSI 비율·보상·학습 설정은 기반과 같으며, 원본 checkpoint의 square 목표/60초 환경 전체를 복제한 설정은 아니다.
+
+RSI의 `reference_mass: 20.0`은 기존 bank가20kg에서 선별되었다는 출처다. 기존 후보·가중치·모션/asset/mesh 해시·마찰·크기 검사를 유지하며 원본 bank를 변경하지 않는다. 밀도3에서의 새 물리 screening을 뜻하지 않으며, GPU32환경에서 실제 질량/관성, loco/RSI 진단 reset·각32step 추론은 확인했다. 전크기·전후보 RSI screening, 장기 안정성·성공률은 미검증이다.
+
+전용 환경/학습 YAML·train/test/VNC·출력 경로를 사용한다. 학습은 기반과 같이 스크래치이며, test/VNC 기본 입력은14000 checkpoint다. 실행 명령은 [config](../config.md), CPU 검증 결과는 `output_etc/check/stage1_jointpush_density3_cone90/`에 둔다.
+
+
+## Fixed78000 파인튜닝
+
+`stage1_jointpush_density3_cone90_finetune`는 밀도3·목표±45° variant의 물성·장면·RSI·보상·PPO 설정을 유지하고, 78k 전이와 과제 비율만 바꾼다. PUSH50%, SIT5%, CLIMB12.5%, AT16.25%, ONTOP16.25%로 기존78k의 네 과제 비율을 절반으로 줄였다. 이는 환경 생성의 과제/크기 prior이며 PUSH 슬롯은 고정되고 나머지는 크기 조건부로 과제를 재선택하므로 유한 표본의 실제 비율은 약간 다르다.
+
+`experiment.transfer.checkpoint`는 `pth/Stage1V2Fixed_00078000.pth`다. 로컬 원본은 이웃 `TokenHSI_stage1_push/output/stage1/Stage1V2Fixed_00078000.pth`이며 같은 내용으로 이 checkout에 복사했다(SHA256 `f5b1637716611c673dd33f3dd894bf081a7dd88b7025943505d8287eba5ba13f`). 학습 wrapper의 `STAGE1_CHECKPOINT`로 경로를 바꿀 수 있다.
+
+기존 `stage1_push_network.transfer()`로 actor·critic·AMP 가중치를 가져온다. 네 과제 embedding은 보존하고 새 PUSH embedding은 carry AT에서 복사한다. 판별기의 기존132개/frame 입력 연결을 복사하며 추가 PUSH label 연결만0으로 초기화한다. 관측·가치·AMP 정규화 통계도 전이한다. optimizer/epoch은 새로 시작하며, 모든 기존 학습 대상과 정규화 업데이트·학습률2e-5를 유지한다. 별도 teacher KL이나 encoder 동결은 추가하지 않는다.
+
+`RESUME_CHECKPOINT`를 지정하면78k 초기화를 건너뛰고 동일 환경 계약의 파인튜닝 checkpoint를 복원한다. 원래20kg/360° 또는 밀도3/90° 스크래치 결과는 덮어쓰지 않는다. test/VNC의 기본14000 입력은 기존 PUSH 정책 평가용이며 새 학습 결과를 보려면 그 checkpoint 경로를 인자로 준다.
+
+
+## PUSH AT progress 이동 gate
+
+`stage1_jointpush_density3_cone90_finetune_atprogress_gate`는 기존 fine-tune 설정에서 `jointPush.at_progress_min_delta: 0.001`만 추가한다. 78k 초기화·PUSH50%·밀도3·cone90·AMP·CONTACT·동력 비용은 유지한다.
+
+상자 중심과 목표의 수평 거리를 d_t, 감소량을 Δd_t = d_(t-1) - d_t로 둔다. PUSH의 AT progress는 현재 AT 성공이면 0.2, 미달이면 `0.2 * 1[Δd_t > 0.001] / (1 + max(d_t - 0.1, 0))`이다. 1mm와 같은 값은 지급하지 않는다. 성공 시 세 AT 항의 합계0.6과 paired CONTACT 포화는 그대로다. 성공 여부는 현재 step 기준이며 영구 latch가 아니다.
+
+직전 거리는 제어 step 시작 때 저장하는 graph-bound 상자 위치에서 계산한다. 부분 reset에서는 기존 위치 이력을 새 배치로 갱신하며 reset 기하 평가에는 gate를 적용하지 않는다. 일반 carry AT와 다른 과제에는 적용하지 않는다. 30Hz에서 1mm/step은 목표 접근 속도 약0.03m/s에 해당한다. task 가중치0.5는 이후 기존 경로에서 적용한다.
+
+새 설정은 checkpoint 계약에 포함되므로 기존 fine-tune checkpoint의 직접 resume는 계약 불일치로 거부한다. 기본 학습은 기존과 동일한78k 전이로 시작하며, 재개에는 새 설정으로 만든 checkpoint를 사용한다. 추론은 다른 호환 checkpoint도 가능하지만 보상 설정은 이 gate 컨피그를 따른다. 실행 명령은 [config](../config.md)를 따른다.

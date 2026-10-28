@@ -87,7 +87,8 @@ def sample_push(task, ids):
             angle, radius, yaw = draws[..., 0]*2*torch.pi, 2+8*draws[..., 1], draws[..., 2]*2*torch.pi
             center = roots[:, leader, None]+radius[..., None]*torch.stack((angle.cos(),angle.sin()), -1)
             shared = task._members[es, leader] > 1
-            heading = torch.where(shared[:, None], yaw+torch.pi/2+(draws[..., 3]-.5)*torch.pi/2,
+            cone = shared | (task.cfg['env']['jointPush']['scene']['goal_angle_degrees'] == 90.)
+            heading = torch.where(cone[:, None], yaw+torch.pi/2+(draws[..., 3]-.5)*torch.pi/2,
                                   draws[..., 3]*2*torch.pi)
             direction = torch.stack((heading.cos(), heading.sin()), -1)
             goal = center+(2+8*draws[..., 4, None])*direction

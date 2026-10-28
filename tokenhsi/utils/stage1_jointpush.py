@@ -25,18 +25,26 @@ def validate_env(env):
     if (env['numAgents'], env['numObjects']) != (2, 4):
         raise ValueError('stage1_jointpush requires two people and four boxes')
     probs = env['relationGraph']['template_probabilities']
-    if tuple(probs) != TEMPLATES or list(probs.values()) != [0., .1, .2, .25, .2, .25]:
-        raise ValueError('stage1_jointpush task proportions must be 10/20/25/20/25')
+    if tuple(probs) != TEMPLATES or list(probs.values()) not in (
+            [0., .1, .2, .25, .2, .25], [0., .05, .125, .1625, .1625, .5]):
+        raise ValueError('stage1_jointpush requires the scratch mixture or fixed78000/PUSH 50/50 mixture')
     if tuple(env['skill']) != SKILLS + ('push',):
         raise ValueError('stage1_jointpush needs the original skills plus push')
-    if env['jointPush']['box'] != dict(mass=20., friction=.4, profiles=box_profiles()):
-        raise ValueError('stage1_jointpush requires the KOO stable cuboid physics')
+    physical = env['jointPush']['box']
+    if physical not in (dict(mass=20., friction=.4, profiles=box_profiles()),
+                        dict(density=3., friction=.4, profiles=box_profiles())):
+        raise ValueError('stage1_jointpush requires 20kg or density 3, friction 0.4 and the 167 cuboid profiles')
+    if 'density' in physical and env['jointPush']['rsi'].get('reference_mass') != 20.:
+        raise ValueError('Density variant must declare reuse of the 20kg RSI bank')
+    if 'at_progress_min_delta' in env['jointPush']:
+        if not 0. < float(env['jointPush']['at_progress_min_delta']) < float('inf'):
+            raise ValueError('PUSH AT progress gate requires a finite positive distance threshold')
     scene = env['jointPush']['scene']
-    if (scene['source_angle_degrees'] != 360. or scene['goal_angle_degrees'] != 360.
+    if (scene['source_angle_degrees'] != 360. or scene['goal_angle_degrees'] not in (90., 360.)
             or scene['source_distance'] != [2., 10.] or scene['goal_distance'] != [2., 10.]
             or env['eval'].get('sampling') != 'training_loco_only'
             or env['eval']['skill'] != ['loco'] or env['eval']['skillInitProb'] != [1.]):
-        raise ValueError('stage1_jointpush requires 2-10m/360-degree sampling and loco-only evaluation')
+        raise ValueError('stage1_jointpush requires 2-10m sampling, 360/90-degree goals and loco-only evaluation')
     original = deepcopy(env)
     del original['jointPush']
     original['relationGraph']['sampler'] = 'two_agent_four_object_independent_unified'
@@ -85,6 +93,13 @@ def sample_assets(n, env, device, preset='random_scenario'):
         old /= old.sum(-1, keepdim=True)
         posterior[..., :5][~push] = old
     return sizes, posterior
+
+
+def box_densities(sizes, push, physical):
+    density = torch.full(sizes.shape[:-1], 100., device=sizes.device)
+    rho = physical['density'] if 'density' in physical else physical['mass']/sizes[:, :2].prod(-1)
+    density[:, :2] = torch.where(push, rho, density[:, :2])
+    return density
 
 
 def contract(env):

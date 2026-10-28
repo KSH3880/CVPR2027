@@ -71,7 +71,11 @@ def asset_bank(count, env, device):
     members = sizes.new_tensor([1,1,1,1,2,2,3,4])
     sizes[:,16:,0] *= members
     masses = sizes.prod(-1)*100.
-    masses[:,16:] = env['jointPush']['box']['mass']*members
+    physical = env['jointPush']['box']
+    if 'density' in physical:
+        masses[:,16:] = sizes[:,16:].prod(-1)*physical['density']
+    else:
+        masses[:,16:] = physical['mass']*members
     return sizes, masses
 
 
