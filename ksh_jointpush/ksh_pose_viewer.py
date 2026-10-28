@@ -45,7 +45,11 @@ def install():
             distance=max(8.,float((upper[:2]-lower[:2]).norm())*1.2)
             camera=target+target.new_tensor([distance*.35,-distance,distance*.65])
             gym.viewer_camera_look_at(task.viewer,None,gymapi.Vec3(*camera.cpu().tolist()),gymapi.Vec3(*target.cpu().tolist()))
-            print('KSH_POSE_FROZEN',dict(push_probability=probability,interaction=task._interaction[0].cpu().tolist(),controls='N=mix50 R=push L=loco; mouse=camera; Esc=quit'),flush=True)
+            chosen=task._interaction[0]
+            category='PUSH' if chosen.all() else 'LOCO' if (~chosen).all() else 'MIXED'
+            balanced=task.cfg['env']['stage2JointPush'].get('coupled_rsi_selection')=='balanced_group_ternary_v1'
+            controls=('N=equal-thirds' if balanced else 'N=mix50')+' R=push L=loco; mouse=camera; Esc=quit'
+            print('KSH_POSE_FROZEN',dict(category=category,push_probability=probability,interaction=chosen.cpu().tolist(),controls=controls),flush=True)
             return task._root_states.clone(),task._dof_state.clone()
         roots,dofs=reset(.5)
         frames=0

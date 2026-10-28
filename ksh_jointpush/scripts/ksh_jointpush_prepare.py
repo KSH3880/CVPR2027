@@ -6,11 +6,25 @@ ROOT=Path(__file__).resolve().parents[2]
 SOURCE=ROOT/'ksh_jointpush'
 WORK=ROOT/'runs/jointpush/ksh_jointpush_rsi/workspace_push_solo45_coupled0'
 
-def prepare(rsi_mode='group'):
+def prepare(rsi_mode='group', gate_mode='soft', checkpoint_path=None, init_safety='legacy', distractors='legacy'):
+    if distractors not in ('legacy','clear_paths'):
+        raise ValueError('distractors must be legacy or clear_paths')
+    if init_safety not in ('legacy','all_pairs'):
+        raise ValueError('init_safety must be legacy or all_pairs')
+    if gate_mode not in ('soft','hard'):
+        raise ValueError('gate_mode must be soft or hard')
     if rsi_mode not in ('group','agent','balanced'):
         raise ValueError('rsi_mode must be group, agent or balanced')
     suffix={'group':'','agent':'_agent_rsi','balanced':'_balanced_rsi'}[rsi_mode]
-    work = WORK.with_name(WORK.name + suffix)
+    work = WORK.with_name(WORK.name + suffix + ('_hard_gate' if gate_mode == 'hard' else ''))
+    custom_checkpoint=Path(checkpoint_path).expanduser().resolve(strict=True) if checkpoint_path else None
+    if custom_checkpoint:
+        digest=hashlib.sha256(custom_checkpoint.read_bytes()).hexdigest()
+        work=work.with_name(work.name+'_base_'+custom_checkpoint.stem+'_'+digest[:8])
+    if init_safety == 'all_pairs':
+        work=work.with_name(work.name+'_safe_start')
+    if distractors == 'clear_paths':
+        work=work.with_name(work.name+'_clear_paths')
     manifest=json.loads((ROOT/'ksh_jointpush/source_manifest.json').read_text())
     for name,digest in manifest['files'].items():
         local=SOURCE/name
@@ -24,7 +38,7 @@ def prepare(rsi_mode='group'):
         link=SOURCE/name
         if not link.exists() and not link.is_symlink():
             link.parent.mkdir(parents=True,exist_ok=True);link.symlink_to(target,target_is_directory=Path(target).is_dir())
-    # Existing links preserve live training; fresh checkouts use local folders.
+    # Output storage is local to this project; generated configs remain under runs/.
     for name in ('output','output_etc'):
         (SOURCE/name).mkdir(parents=True,exist_ok=True)
     checkpoint_dir=ROOT/'jointpush/checkpoints/ksh_jointpush';checkpoint_dir.mkdir(parents=True,exist_ok=True)
@@ -37,8 +51,8 @@ def prepare(rsi_mode='group'):
             shutil.copy2(original,target)
     broken=[name for name in manifest['data_links'] if not (SOURCE/name).exists()]
     if broken:raise ValueError('Missing dataset links: '+str(broken))
-    checkpoint=ROOT/'jointpush/checkpoints/ksh_jointpush/Stage1PushFinetune_00014000.pth'
-    if hashlib.sha256(checkpoint.read_bytes()).hexdigest()!=manifest['checkpoints'][checkpoint.name]:raise ValueError('Checkpoint changed')
+    checkpoint=custom_checkpoint or ROOT/'jointpush/checkpoints/ksh_jointpush/Stage1PushFinetune_00014000.pth'
+    if not custom_checkpoint and hashlib.sha256(checkpoint.read_bytes()).hexdigest()!=manifest['checkpoints'][checkpoint.name]:raise ValueError('Checkpoint changed')
     work.mkdir(parents=True,exist_ok=True);(work/'configs').mkdir(exist_ok=True)
     env=yaml.safe_load((SOURCE/'tokenhsi/data/cfg/multi_agent/stage2_jointpush_rsi.yaml').read_text())
     env['experiment']['transfer']['checkpoint']=str(checkpoint)
@@ -46,6 +60,9 @@ def prepare(rsi_mode='group'):
     env['env']['jointPush']['scene'].update(cone)
     env['env']['stage2JointPush']['goal_half_angle_degrees']=0.
     env['env']['stage2JointPush']['reward_gate']=dict(mode='mean_hand_face_quality_v1',sigma=.18,success='box_goal_position',implementation_sha256=hashlib.sha256((ROOT/'ksh_jointpush/ksh_soft_gate.py').read_bytes()).hexdigest())
+    if gate_mode == 'hard':
+        implementation=(ROOT/'ksh_jointpush/ksh_hard_gate.py').read_bytes()+(ROOT/'ksh_jointpush/ksh_soft_gate.py').read_bytes()
+        env['env']['stage2JointPush']['reward_gate']=dict(mode='all_hands_face_tolerance_v1',face_tolerance=.18,success='box_goal_position',implementation_sha256=hashlib.sha256(implementation).hexdigest())
     env['env']['stage2JointPush']['task_selection']=dict(mode='push_only_random_groups_v1',implementation_sha256=hashlib.sha256((ROOT/'ksh_jointpush/ksh_push_only.py').read_bytes()).hexdigest())
     if rsi_mode == 'agent':
         env['env']['stage2JointPush']['coupled_rsi_selection']='independent_agents_v1'
@@ -55,6 +72,10 @@ def prepare(rsi_mode='group'):
             rsi_group_state_probabilities=dict(all_push=1/3,mixed=1/3,all_loco=1/3),
             rsi_solo_push_probability=.5,
             rsi_selection_implementation_sha256=hashlib.sha256((ROOT/'ksh_jointpush/ksh_balanced_rsi.py').read_bytes()).hexdigest())
+    if init_safety == 'all_pairs':
+        env['env']['stage2JointPush']['initialization_safety']=dict(mode='all_agent_pairs_v1',minimum_root_distance=.7,body_margin=.005,implementation_sha256=hashlib.sha256((ROOT/'ksh_jointpush/ksh_initialization_safety.py').read_bytes()).hexdigest())
+    if distractors == 'clear_paths':
+        env['env']['stage2JointPush']['distractor_placement']=dict(mode='far_clear_paths_v1',radius=[8.,12.],agent_path_clearance=1.5,push_path_clearance=1.5,implementation_sha256=hashlib.sha256((ROOT/'ksh_jointpush/ksh_distractor_clearance.py').read_bytes()).hexdigest())
     raw=yaml.safe_load((SOURCE/'tokenhsi/data/dataset_stage1_jointpush.yaml').read_text())
     for rows in raw['motions'].values():
         for row in rows:
@@ -85,9 +106,14 @@ def prepare(rsi_mode='group'):
                 count+=1
                 if not (SOURCE/'tokenhsi/data'/row['file']).exists():missing.append(row['file'])
     if missing:raise ValueError('Motion payloads missing: '+str(missing))
-    report=dict(source=str(SOURCE),source_commit=manifest['commit'],workspace=str(work),checkpoint=str(checkpoint),source_epoch=14000,agents=4,objects=8,environments=1024,motion_entries=count,training_started=False,source_files_verified=len(manifest['files']),gpu_used=False)
+    report=dict(source=str(SOURCE),source_commit=manifest['commit'],workspace=str(work),checkpoint=str(checkpoint),source_epoch=int(checkpoint.stem.rsplit('_',1)[-1]),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),agents=4,objects=8,environments=1024,motion_entries=count,training_started=False,source_files_verified=len(manifest['files']),gpu_used=False)
     (work/'preparation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--rsi-mode',choices=['group','agent','balanced'],default='group')
-    prepare(parser.parse_args().rsi_mode)
+    parser.add_argument('--gate-mode',choices=['soft','hard'],default='soft')
+    parser.add_argument('--checkpoint')
+    parser.add_argument('--init-safety',choices=['legacy','all_pairs'],default='legacy')
+    parser.add_argument('--distractors',choices=['legacy','clear_paths'],default='legacy')
+    args=parser.parse_args()
+    prepare(args.rsi_mode,args.gate_mode,args.checkpoint,args.init_safety,args.distractors)

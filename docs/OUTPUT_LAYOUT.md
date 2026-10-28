@@ -17,7 +17,7 @@
 
 48개 경로를 이동하고 checkpoint 931개의 inode·크기 보존을 확인했다. 이동 전후 경로는 같은 파일을 가리킨다. 구 경로는 심링크로 유지하므로 과거 로그·환경 sidecar·checkpoint 참조를 그대로 사용할 수 있다.
 
-실행 중인 KSH 본학습과 TensorBoard가 사용하는 5개 저장 경로는 물리적으로 이동하지 않았다. 새 `output/` 경로가 기존 저장소를 가리킨다. 특히 `ksh_jointpush/output/`·`output_etc/`는 기존 `runs/jointpush/ksh_jointpush_rsi/`를 계속 사용한다. 이 링크는 현재 실행을 보존하기 위한 예외이며 중단·재시작하지 않았다.
+실행 중인 KSH 본학습과 TensorBoard가 사용하는 5개 저장 경로는 물리적으로 이동하지 않았다. 새 `output/` 경로가 기존 저장소를 가리킨다. 당시 `ksh_jointpush/output/`·`output_etc/`도 기존 저장소를 가리켰으나, 아래 후속 정리에서 학습 중단 후 실제 디렉터리로 전환했다.
 
 `ksh_jointpush/`는 최상위 독립 프로젝트다. frozen source·전용 adapter·scripts·tests·[실행 안내](../ksh_jointpush/EXECUTION.md)를 함께 배치했다. 예전 `jointpush/ports/ksh_jointpush`와 전용 실행 파일 경로는 호환 링크로 유지한다. 원본 source manifest의 554개 파일은 해시를 그대로 유지한다.
 
@@ -43,3 +43,9 @@ KSH의 새 실행은 [EXECUTION.md](../ksh_jointpush/EXECUTION.md), 로컬 변�
 [보관 인덱스 및 복원 방법](../runs/archive/cleanup_20261028/INDEX.md), [상세 목록·압축본 해시·유지 이유](../runs/archive/cleanup_20261028/manifest.json).
 
 미사용 상위 실험 폴더 안에 있던 이전 호환 링크도 압축되었으므로, 해당 구 경로는 보관 인덱스에서 찾는다. 현재 프로젝트 `output/` 결과와 실행 중인 경로는 유지한다. 과거 launch-time 경로가 담긴 문서는 역사 기록으로 보존했다.
+
+## 2026-10-28 KSH 학습 중단 후 출력 경로 확정
+
+사용자 요청으로 balanced 학습을 공식 MPS client 종료 후 중단했다. `runs/jointpush/ksh_jointpush_rsi/{output,output_etc}`를 `ksh_jointpush/{output,output_etc}`로 이동하고 프로젝트 쪽 역방향 링크를 제거했다. 구 runs 출력 경로의 호환 링크는 생성하지 않았다. 생성 설정·launch 기록은 runs에 보존한다.
+
+weight 28개의 inode·크기를 이동 전후 대조했고, 학습/평가 bootstrap의 출력 검증 root도 `ksh_jointpush/`로 변경했다. TensorBoard 6016만 새 경로로 재연결했으며 다른 학습과 MPS 서버는 유지했다. 기록: `runs/ksh_output_relocation_20261028.json`.

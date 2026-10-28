@@ -9,7 +9,7 @@ import isaacgym
 import torch
 import utils.output_paths as output_paths
 _resolve=output_paths.resolve_output_path
-_RUN_ROOT=ROOT/'runs/jointpush/ksh_jointpush_rsi'
+_RUN_ROOT=SOURCE
 output_paths.resolve_output_path=lambda experiment,mode,requested='',check=False,max_iterations=0,root=_RUN_ROOT:_resolve(experiment,mode,requested,check,max_iterations,root=_RUN_ROOT)
 if os.environ.get('HEADLESS')=='0':
     if os.environ.get('CUDA_MPS_PIPE_DIRECTORY'):raise ValueError('Native viewer must bypass MPS')
@@ -21,13 +21,20 @@ from ksh_jointpush.ksh_agent_rsi import install as install_agent_rsi
 from ksh_jointpush.ksh_goal_cone import install as install_goal_cone
 install_goal_cone(prepared_env)
 if 'stage2JointPush' in prepared_env:
-    from ksh_jointpush.ksh_soft_gate import install
+    if prepared_env['stage2JointPush'].get('reward_gate',{}).get('mode')=='all_hands_face_tolerance_v1':
+        from ksh_jointpush.ksh_hard_gate import install
+    else:
+        from ksh_jointpush.ksh_soft_gate import install
     install(prepared_env)
 if prepared_env.get('stage2JointPush',{}).get('coupled_rsi_selection')=='balanced_group_ternary_v1':
     from ksh_jointpush.ksh_balanced_rsi import install as install_balanced_rsi
     install_balanced_rsi(prepared_env)
 else:
     install_agent_rsi(prepared_env)
+from ksh_jointpush.ksh_initialization_safety import install as install_initialization_safety
+install_initialization_safety(prepared_env)
+from ksh_jointpush.ksh_distractor_clearance import install as install_distractor_clearance
+install_distractor_clearance(prepared_env)
 from ksh_jointpush.ksh_push_only import install as install_push_only
 install_push_only(prepared_env)
 if os.environ.get('PUSH_RSI_MIX'):
@@ -47,7 +54,10 @@ if os.environ.get('PUSH_RSI_MIX'):
         if prepared_env['stage2JointPush'].get('coupled_rsi_selection')=='balanced_group_ternary_v1':
             from ksh_jointpush.ksh_balanced_rsi import sample_balanced_initialization
             sampler=sample_balanced_initialization
-        self._interaction[ids]=sampler(self._groups[ids],self._templates_by_owner[ids],chosen_probability)
+        if chosen_probability in (0.,1.):
+            self._interaction[ids]=(self._templates_by_owner[ids]==5) & bool(chosen_probability)
+        else:
+            self._interaction[ids]=sampler(self._groups[ids],self._templates_by_owner[ids],chosen_probability)
         print('KSH_VIEW_INIT',dict(push_probability=chosen_probability,push_people=int(self._interaction[ids].sum()),people=len(ids)*self.num_agents),flush=True)
     HumanoidMAStage2JointPushRsi._sample_episode_graph=mixed_episode
 if '--test' not in sys.argv and 'stage2JointPush' in prepared_env:
