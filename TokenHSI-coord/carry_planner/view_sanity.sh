@@ -3,7 +3,7 @@
 set -eo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-PLANNER=${CARRY_PLANNER_SANITY_CKPT:-"$ROOT/runs/carry_planner/sanity_sparse_v16/planner_detour_slow.pth"}
+PLANNER=${CARRY_PLANNER_SANITY_CKPT:-"$ROOT/TokenHSI-coord/output/carry_planner/sanity_sparse_v16/planner_detour_slow.pth"}
 EXECUTOR=${1:-"$ROOT/TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth"}
 
 [ -f "$PLANNER" ] || {

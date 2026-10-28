@@ -1,5 +1,7 @@
 # 직사각형 테이블 상판 아래 파지 fine-tune
 
+본학습 결과는 `output/table_carry/`, 확인 학습·평가·viewer는 `output_etc/check/table_carry/`에 저장한다. 기존 결과 경로는 호환 링크로 유지한다.
+
 [전용 설정·train/test/VNC](../table_carry/README.md): 앵커 SA4 epoch21000 warm start, 공동 AT·든 초기 상태·2048환경·GPU6·학습률1e-5. 기존 박스 모델/추론 전용 교체와 분리한다.
 
 # 전달받은 SA4 기본·앵커 모델

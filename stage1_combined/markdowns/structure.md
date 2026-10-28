@@ -1,5 +1,7 @@
 # 현재 의자 FT 진입점
 
+기존 Chair 본학습 결과는 `output/chair_hold_at_78k_20261026_135444/`와 `output/chair_bbox35_20k_20261022_142206/`에 모았다. 구 경로는 호환 링크로 유지한다. [공통 결과 경로](../../docs/OUTPUT_LAYOUT.md).
+
 `../chair_assets/`: 로컬 의자/테이블 에셋과 catalog. `../checkpoints/Stage1V2Fixed_00073000.pth`: 초기 weight. `../tokenhsi/env/tasks/multi_agent/humanoid_chair_ft.py`: 환경. `../tokenhsi/learning/multi_agent/chair_ft_network.py`: 35D MLP. `../tokenhsi/learning/multi_agent/chair_ft_agent.py`: 동결/검증. 아래는 상속한 전체 코드 구조 참고.
 
 # 레포 구조

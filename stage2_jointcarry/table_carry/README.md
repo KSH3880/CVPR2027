@@ -14,18 +14,18 @@ CVPR2027/stage2_jointcarry에서 실행한다. 물리·pipeline·정책 모두 G
 
 ```bash
 # 새 fine-tune: 기본 source는 로컬 anchor epoch21000, 2048환경/seed42/2000 iteration
-OUTPUT_PATH=../runs/table_carry/my_train bash table_carry/train.sh
+OUTPUT_PATH=output/table_carry/my_train bash table_carry/train.sh
 # 학습 검증: 환경 수는2048 유지, 반복 횟수만 줄임
-MAX_ITERATIONS=2 OUTPUT_PATH=../runs/table_carry/my_check bash table_carry/train.sh
+MAX_ITERATIONS=2 OUTPUT_PATH=output_etc/check/table_carry/my_check bash table_carry/train.sh
 # 동일 table checkpoint에서 이어 학습
-RESUME_CHECKPOINT=/absolute/path/table_checkpoint.pth OUTPUT_PATH=../runs/table_carry/my_resume bash table_carry/train.sh
+RESUME_CHECKPOINT=/absolute/path/table_checkpoint.pth OUTPUT_PATH=output/table_carry/my_resume bash table_carry/train.sh
 # 화면 없는 평가 / VNC
-OUTPUT_PATH=../runs/table_carry/my_eval NUM_ENVS=16 REPEATS=3 bash table_carry/test.sh /absolute/path/table_checkpoint.pth
-PORT=6088 OUTPUT_PATH=../runs/table_carry/my_view bash table_carry/vnc.sh /absolute/path/table_checkpoint.pth
+OUTPUT_PATH=output_etc/check/table_carry/my_eval NUM_ENVS=16 REPEATS=3 bash table_carry/test.sh /absolute/path/table_checkpoint.pth
+PORT=6088 OUTPUT_PATH=output_etc/check/table_carry/my_view bash table_carry/vnc.sh /absolute/path/table_checkpoint.pth
 ```
 
 `table_carry/prepare_rsi.py`는 RSI 후보를 생성한다. 실행하면 출력 pool의 해시가 바뀔 수 있으므로 학습/재개 중에는 다시 생성하지 않는다. config의 `initial_states_sha256`와 일치해야 하며 임의로 계약 검증을 끄지 않는다.
 
-실제 학습 상태·검증 결과·체크포인트는 `runs/table_carry/` 아래 기록을 확인한다. 명령 파일의 존재와 운반 성능 검증은 구분한다.
+본학습 체크포인트는 `output/table_carry/`, 기존 상태·검증 기록은 `../runs/table_carry/`에서 확인한다. 명령 파일의 존재와 운반 성능 검증은 구분한다.
 
 2026-10-19 검증 기록: `../runs/table_carry/VALIDATION.md`(workspace 기준) 및 `current_training.json`. CPU23개·GPU 물리/부분reset·2048환경3epoch 저장/동결/갱신·16환경64step 재로드 통과. 고정 초기 PD는 약1초 전원 파지 후 붕괴하므로 학습 성공이나 장기 안정성은 별도 확인해야 한다.

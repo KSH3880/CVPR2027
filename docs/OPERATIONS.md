@@ -86,7 +86,8 @@ AUTO_RESULTS_<track>.md → EXPERIMENTS_<track>.md 해석` 순서다. steer 원�
 
 - `TokenHSI/`는 원본 baseline이다. 수정하지 않는다.
 - `isaacgym/`, `pytorch-src/`, `pytorch3d-src/`는 빌드용 외부 소스다. 탐색·이동·정리 대상이 아니다.
-- 새 실험 산출물은 `runs/` 아래에 둔다.
+- 본학습 결과(checkpoint·TensorBoard·진단)는 각 프로젝트의 `output/` 아래에 둔다. 검증·평가는 해당 프로젝트의 `output_etc/check/`, 공통 큐·캐시·생성 설정·실행 상태는 `runs/`에 둔다.
+- 실행 중인 경로는 이동하지 않고 새 output 경로로 연결한다. 완료 결과 이동 시 기존 참조용 호환 심링크를 유지한다.
 - `ddp_shim/`과 설치·빌드 경로는 옮기지 않는다.
 - 역할이 끝난 구 문서·백업을 다시 활성 기준으로 만들지 않는다.
 

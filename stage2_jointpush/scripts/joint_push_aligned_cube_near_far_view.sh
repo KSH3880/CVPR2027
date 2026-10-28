@@ -9,5 +9,5 @@ export JOINT_PUSH_PREVIEW_BOX_SIZE=2.6,2.6,2.6 JOINT_PUSH_PREVIEW_BOX_MASS=60
 export JOINT_PUSH_VIEW_SPAWN_DISTANCES=${JOINT_PUSH_VIEW_SPAWN_DISTANCES:-0.8,3.0}
 export JOINT_PUSH_REQUIRE_ALIGNED=1
 export OUTPUT_PATH=${OUTPUT_PATH:-$ROOT/../runs/jointpush/aligned_cube_near_far_view}
-CKPT=${1:-$ROOT/../runs/jointpush/random_shape_resume_gpu6_20261015_223106/training/JointPushRandomShapeMassSoftGateCa4_15-22-31-17/nn/JointPushRandomShapeMassSoftGateCa4_00028000.pth}
+CKPT=${1:-$ROOT/../jointpush/output/random_shape_resume_gpu6_20261015_223106/training/JointPushRandomShapeMassSoftGateCa4_15-22-31-17/nn/JointPushRandomShapeMassSoftGateCa4_00028000.pth}
 exec bash "$ROOT/scripts/joint_push_random_shape_view.sh" "$CKPT"

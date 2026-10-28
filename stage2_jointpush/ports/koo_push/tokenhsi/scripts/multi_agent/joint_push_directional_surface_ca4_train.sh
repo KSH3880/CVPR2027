@@ -5,7 +5,7 @@ if [ "${MAX_ITERATIONS:-}" = 0 ]; then echo "Use a positive MAX_ITERATIONS" >&2;
 . "$(dirname "$0")/runtime_env.sh"
 PROJECT_ROOT=$(cd "$TOKENHSI_ROOT/../../.." && pwd)
 STAGE1_CHECKPOINT=${STAGE1_CHECKPOINT:-$PROJECT_ROOT/runs/jointpush/stage1_sources/OpenPushPush180ContactAtWarmstart_00029000.pth}
-TRAIN_OUTPUT=${OUTPUT_PATH:-$PROJECT_ROOT/runs/jointpush/directional_surface_training}
+TRAIN_OUTPUT=${OUTPUT_PATH:-$PROJECT_ROOT/jointpush/output/directional_surface_training}
 CFG_ENV=tokenhsi/data/cfg/multi_agent/joint_push_directional_surface_ca4.yaml
 set -- --task_graph push
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then

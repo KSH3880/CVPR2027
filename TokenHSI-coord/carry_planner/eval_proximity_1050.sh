@@ -6,7 +6,7 @@ GPU=${1:-0}
 ENVS=${2:-64}
 SEED=${3:-0}
 STAGE_OVERRIDE=${MS_CKPT:-}
-RUN="$ROOT/runs/carry_planner/carry_implicit_curvature05_lr3e4_clip20_3000_s0_r600_resume"
+RUN="$ROOT/TokenHSI-coord/output/carry_planner/carry_implicit_curvature05_lr3e4_clip20_3000_s0_r600_resume"
 set -a
 source "$RUN/run.env"
 set +a

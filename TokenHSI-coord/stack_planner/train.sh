@@ -15,7 +15,7 @@ ENVS=${STACK_PLANNER_ENVS:-2048}
 # logical cuda:0 inside Isaac Gym/PyTorch. Override MA_GPU only for diagnostics.
 GPU=${MA_GPU:-7}
 SEED=${STACK_PLANNER_SEED:-0}
-OUT="$ROOT/runs/stack_planner/$TAG"
+OUT="$ROOT/TokenHSI-coord/output/stack_planner/$TAG"
 INIT=${STACK_PLANNER_INIT:-}
 TASK_CLASS=${STACK_PLANNER_TASK_CLASS:-HumanoidMAStackPlannerTrain}
 export STACK_PLANNER_TASK_CLASS="$TASK_CLASS"

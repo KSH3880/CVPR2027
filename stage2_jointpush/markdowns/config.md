@@ -248,7 +248,7 @@ HEADLESS=0 bash stage2_jointpush/scripts/joint_push_softgate_test.sh /absolute/p
 PORT=6089 bash stage2_jointpush/scripts/joint_push_softgate_view.sh /absolute/path/checkpoint.pth
 ```
 
-Stage1초기값에서새Stage2로시작,동일softgate프로필끼리resume. 산출물 `runs/jointpush/aligned_surround60_softgate_training/`. GPU6/2048환경. 사용자요청으로기존rear-only60kg학습을종료하고tmux `jointpush_softgate`에서새Stage2학습을실행했다. run: `runs/jointpush/aligned_surround60_softgate_training/JointPushAlignedSurround60SoftGateCa4_14-11-37-12/`. 효과비교는같은surround60 hard-gate 설정과같은초기분포에서한다. 현재rear-only7000모델과는시작분포/목표거리도달라softgate만의효과로직접비교하지않는다.
+Stage1초기값에서새Stage2로시작,동일softgate프로필끼리resume. 산출물 `jointpush/output/aligned_surround60_softgate_training/`. GPU6/2048환경. 사용자요청으로기존rear-only60kg학습을종료하고tmux `jointpush_softgate`에서새Stage2학습을실행했다. run: `jointpush/output/aligned_surround60_softgate_training/JointPushAlignedSurround60SoftGateCa4_14-11-37-12/`. 효과비교는같은surround60 hard-gate 설정과같은초기분포에서한다. 현재rear-only7000모델과는시작분포/목표거리도달라softgate만의효과로직접비교하지않는다.
 
 ## 60kg·상자 주변360° 시작 (2026-10-14)
 
@@ -286,7 +286,7 @@ HEADLESS=0 bash stage2_jointpush/scripts/joint_push_random_spawn_test.sh /absolu
 PORT=6087 bash stage2_jointpush/scripts/joint_push_random_spawn_view.sh /absolute/path/checkpoint.pth
 ```
 
-학습 산출물은 `runs/jointpush/aligned_random_spawn60_training/`. 기존40kg run은 변경·중단하지 않는다. 사용자 요청으로 tmux `jointpush60`에서 GPU6/2048환경 신규 Stage2 학습을 시작했다. 기존 Stage2 checkpoint/optimizer/counter를 이어받지 않으며 Stage1 초기값 전이는 유지한다. 같은 프로필끼리만 RESUME_CHECKPOINT로 재개한다. 기존40kg 모델을 이60kg환경으로 전환하는 resume는 지원하지 않는다. test/view는 checkpoint 저장 설정을 복원하므로 과거 모델을 넣으면 과거 환경으로 실행된다.
+학습 산출물은 `jointpush/output/aligned_random_spawn60_training/`. 기존40kg run은 변경·중단하지 않는다. 사용자 요청으로 tmux `jointpush60`에서 GPU6/2048환경 신규 Stage2 학습을 시작했다. 기존 Stage2 checkpoint/optimizer/counter를 이어받지 않으며 Stage1 초기값 전이는 유지한다. 같은 프로필끼리만 RESUME_CHECKPOINT로 재개한다. 기존40kg 모델을 이60kg환경으로 전환하는 resume는 지원하지 않는다. test/view는 checkpoint 저장 설정을 복원하므로 과거 모델을 넣으면 과거 환경으로 실행된다.
 
 ## 공동 Push 접촉면 고정 (2026-10-13)
 
@@ -354,7 +354,7 @@ PORT=6084 bash stage2_jointpush/scripts/joint_push_curve_view.sh
 
 GPU6 고정. 뷰어는6084포트포워딩. `OUTPUT_PATH`, `NUM_ENVS`, `REPEATS`, `STAGE1_CHECKPOINT`, `SEED` 사용 가능. CPU14개 통과, GPU6 16환경600step 평가 rc=0. 실제질량59.999996kg·초기20–30°·lane최대오차2.4e-7m 확인. 공동목표성공0/16,scene종료43.75%. trace30→570step 평균실제목표거리2.325→1.548m. 단일시드작은표본으로곡선제어성공을입증하지않는다. 산출물은 `runs/jointpush/virtual_curve_aligned_check_20261012/`다. 수정전초기배치검사는 `virtual_curve_check_20261012/`에보존했다.
 
-Stage2 재개도 checkpoint 저장 env를 자동 복원하도록 변경했다. 따라서40kg 원본모델은40kg 그대로재개한다. 사용자실수로종료된본학습은2000itercheckpoint에서 `runs/jointpush/training_resume_20261012/`에재개했다. 곡선60kg비교와분리한다.
+Stage2 재개도 checkpoint 저장 env를 자동 복원하도록 변경했다. 따라서40kg 원본모델은40kg 그대로재개한다. 사용자실수로종료된본학습은2000itercheckpoint에서 `jointpush/output/training_resume_20261012/`에재개했다. 곡선60kg비교와분리한다.
 
 ## Stage2 평가 설정 복원 (2026-10-12)
 
@@ -1553,7 +1553,7 @@ TOKENHSI_GPU=6 HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/joint_push_di
 TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_directional_surface_view.sh /absolute/path/checkpoint.pth
 ```
 
-기본 산출물: `runs/jointpush/directional_surface_training/`, `directional_surface_evaluation/`. 기존 랜덤 박스 viewer·checkpoint 설정은 유지한다.
+기본 산출물: `jointpush/output/directional_surface_training/`, `directional_surface_evaluation/`. 기존 랜덤 박스 viewer·checkpoint 설정은 유지한다.
 
 ## 각도별 고정 면·손 목표점 + 높은 박스 (2026-10-19)
 
@@ -1577,7 +1577,7 @@ TOKENHSI_GPU=6 HEADLESS=0 NUM_ENVS=1 bash stage2_jointpush/scripts/joint_push_as
 TOKENHSI_GPU=6 PORT=6090 bash stage2_jointpush/scripts/joint_push_assigned_faces_view.sh /absolute/path/checkpoint.pth
 ```
 
-산출물 기본값은 `runs/jointpush/assigned_faces_training/`, `assigned_faces_evaluation/`. 이전 실험 설정·checkpoint는 변경하지 않았다. 장기 학습은 별도 실행한다.
+산출물 기본값은 `jointpush/output/assigned_faces_training/`, `assigned_faces_evaluation/`. 이전 실험 설정·checkpoint는 변경하지 않았다. 장기 학습은 별도 실행한다.
 
 ## 360° 랜덤 출발·CPA0.5m GPU5 실험 (2026-10-20)
 

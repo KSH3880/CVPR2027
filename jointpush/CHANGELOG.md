@@ -1,6 +1,80 @@
 # Changelog
 
+## 2026-10-28
+
+### 프로젝트별 output 및 KSH 최상위 분리
+
+완료 JointPush 학습 결과를 output에 모으고 사용 중인 결과는 연결만 추가했다. KSH snapshot·전용 adapter/scripts/tests를 ../ksh_jointpush로 분리하고 구 경로 호환 링크를 유지했다. 원본554파일 해시·KSH CPU19tests·이동안전성4tests 통과. 기존 학습/supervisor/TensorBoard 생존과 결과 파일 접근 확인. 상세는 ../docs/OUTPUT_LAYOUT.md.
+
+
+### KSH rollout viewer N키 episode 전환
+
+- 사용자 요청으로 로컬 ksh_viewer_keys.py를추가하고 GUI평가bootstrap에만연결했다. 기존render를유지하며N이벤트만필터링하고다음_compute_reset에서scene0 done을설정,player의일반경로로네agent/공유상자를같이reset한다. 수동skip의success/terminate/precision처리,기존Esc등키·gym객체복구,headless/학습/pose-only보존. 원본snapshot미수정.
+- CPU3tests통과: N키/다른키전달·구독1회·전체agent메트릭·다른scene보존·release무시·headless/학습비영향·다음frame플래그해제. GPUviewer재시작/학습변경없음;다음viewer실행부터적용.
+
+### config.md 원본 VNC/test 경로 viewer wrapper
+
+- 사용자 지정 ports/ksh_jointpush/markdowns/config.md 기반으로 ksh_config_vnc.sh를 추가했다. 매실행 최신checkpoint·저장config·코드의private사본을준비하고원본 stage2_jointpush_rsi_vnc/test 두스크립트 byte동일 유지. JOINTPUSH_ENTRYPOINT에서현재학습adapter/config복원,GUI서비스만 검증된GPU5 native사용. 기본6095/loco100%,PUSH_RSI=1은문서대로push100%;기존6086viewer·학습은미변경,새GPU뷰어는미실행.
+- 5000iter 실제checkpoint를 원본test.sh→entry→bootstrap CPU경로에서복원해1환경4명8토큰 all_coupled/all_solo/random_scenario 각8step·DOF·목표각도·부분reset·loco100검증통과. config_md_view_gpu5_20261028_133751/source/output_etc/check/cpu_check/verification.json 및공식스크립트SHA기록. 첫경로규칙실패로그는이전133717에보존.
+
+### Balanced4000iter GPU5 viewer
+
+- 사용자 요청으로 최신저장4000iter와 학습config를 독립사본 view_balanced_gpu5_20261028_111448에 고정해 GPU5 native CUDA/Vulkan·MPS우회·6086에서 viewer실행(PID2716933). balanced 전원push/혼합/전원loco 각1/3·solo50:50 초기화와 cuda:5 checkpoint복원,실제rollout/화면캡처 확인. GPU6 학습PID1872208 유지. process.json/run.sh/screen.png 기록.
+
 ## 2026-10-27
+
+### balanced RSI 학습으로 재시작
+
+- 사용자 재시작 지시로 기존agent학습1847240만 GPU6 MPS terminate_client2946883/1847240 응답0/종료확인 후전용사본의balanced 학습을 Stage1 14k에서fresh시작했다. 1024환경4명8상자/인당20kg/lr2e-5/seed42/500저장/단독45°공동0° 유지. PID1872208,run train_balanced_rsi_solo45_coupled0_20261027_223501. 기존checkpoint/client769426/MPS보존.
+- 최초공동그룹 추출 전원push382/혼합422/전원loco413 확인. 2epoch후actor/RMS불변·coord업데이트·gradient·optimizer195state/startup저장검증통과. latest_partial_training.json 및해당run startup_verification.json 기록. TensorBoard6016/외부16016 새epoch11확인,이전agent곡선 previous_agent_rsi_222330 보존.
+
+### RSI 그룹 세 상태를 각1/3로 분리
+
+- 사용자 요청으로 KSH_RSI_MODE=balanced를 추가했다. 그룹별 전원push/비자명혼합/전원loco 각1/3,혼합은 유효한비어있지않은부분집합 균등추출,1인그룹은push/loco50:50. 기존group/agent모드 및박스초기화·물성·보상·목표분포는유지한다. 전용workspace_push_solo45_coupled0_balanced_rsi와계약/SHA분리.
+- CPU8tests(2/3/4인확률·혼합구성·solo·interleaved그룹·기존agent/group회귀),실제CPU4환경 all_coupled/all_solo/random_scenario 각8step·참조DOF·공유상자·각도·부분reset통과. output_etc/check/cpu_rsi_mode_balanced/verification.json. 기존agent학습PID1847240 유지,새학습/재시작 없음.
+
+### agent별 독립 RSI 학습 시작
+
+- 사용자 실행 지시로 GPU6/기존MPS에 단독45°·공동0°/PUSH-only/각agent push-loco50:50 학습을 Stage1 14k에서 fresh 시작했다. 1024환경×4명8상자,인당20kg,lr2e-5,seed42,500저장. run=train_agent_rsi_solo45_coupled0_20261027_222330,PID1847240. 기존client769426 및MPS 유지.
+- 실제초기 push2063/loco2033,그룹내혼합767/1024장면을감사로그로확인. coordination gradient391.745,2epoch후actor/RMS불변·coord업데이트·optimizer195state/startup체크포인트 검증통과. startup_verification.json 및 launch_agent_rsi_solo45_coupled0_20261027_222330/launch.json.
+- TensorBoard6016만 새current run으로재연결하고직전곡선은previous_aligned_push_181743로보존했다. 외부16016 API에서새epoch5확인. latest_partial_training.json 갱신.
+
+### 그룹 RSI 유지 및 agent별 독립 RSI 추가
+
+- 사용자 요청으로 KSH_RSI_MODE=group(기존기본)/agent를 분리했다. group env는 직전launch와byte동일하고 원본 sampler/충돌검사를 유지한다. agent는 independent_agents_v1 계약·구현SHA·별도workspace로 각agent push/loco50:50을 독립선택하고 혼합pair를양방향검사한다. 원본ksh/snapshot 및 기존결과는 수정하지 않았다. 단독45°/공동0°·물성·보상·그룹비율 유지.
+- CPU9tests 및 실제CPU4환경 두모드 all_coupled/all_solo/random_scenario 각8step·reference DOF·공유상자·각도·부분reset 검증 통과. agent 공동/혼합에서만 그룹내혼합 확인. 검증코드 loco 참조/Python adapter 설치순서 수정 후 v3통과; 이전실패로그도보존. output_etc/check/cpu_rsi_mode_{group,agent}_v3/verification.json. group checkpoint의agent직접resume거부검증통과. 학습/뷰어 실행 없음.
+
+### 단독 PUSH 목표만 ±45°로 분리
+
+- 사용자 요청으로 scene.solo_goal_half_angle_degrees45를 추가해 Stage1/Stage2 단독 목표에만 적용하고 공동 목표0°는 유지했다. 새 workspace_push_solo45_coupled0 및 launcher 기본값으로 분리해 이전 aligned 설정/체크포인트는 보존한다. 보상·물성·RSI·그룹 확률은 유지하며 학습/뷰어는 실행하지 않았다.
+- 각도 경계·회전·Stage1 분포/직선 회귀/PUSH-only CPU6tests 통과. 실제CPU4환경에서 loco 및PUSH RSI 각각 all_solo/all_coupled/random_scenario16step·부분reset·거리2~10m·단독45/공동0 검증 통과. output_etc/check/cpu_solo45_coupled0{,_rsi}/verification.json 기록.
+- 그룹샘플러 p=.8의 명목 단독은 사람17.7333%, 단독포함장면52%, 전원단독0.8%(배치rejection 전). 20만장면 seed42 MonteCarlo17.7063/51.853/0.7715%와 분석값 확인; 새workspace/sampling_ratio.json.
+
+### 사용자 요청 직선 PUSH 학습 중단
+
+- train_20261027_181743/PID1433533만 GPU6 MPS terminate_client2946883/1433533으로 종료했다. 응답0·server Client termination succeeded·PID/client 제거 확인. 기존client769426/MPS 유지,1000iter 및 기존 checkpoint 보존. 해당run/user_stop.json에 기록.
+
+### 직선 PUSH 1000iter GPU5 viewer
+
+- 사용자 요청으로 최신저장1000iter 모델과 aligned config를 runs/jointpush/ksh_jointpush_rsi/output_etc/check/view_gpu5_20261027_212935에 고정복사했다. GPU6 전용 공용launcher는 유지하고 GPU5/view 전용 로컬launcher로 native CUDA/Vulkan5·MPS 우회·1환경4명8상자·noVNC6086 실행. 정책rollout300step 이상 확인, 현재직선학습PID1433533 유지. 재실행 run.sh와 process.json,screen.png 기록.
+
+### 10월20일 구 TensorBoard 종료
+
+- 사용자 요청으로 partition_surround_cpa05_gpu5_20261020 로그를 제공하던6010/PID1691242만 종료했다. 자식 data server1691264와6010 listener 종료 확인. 원본event/학습·현재6016/외부16016은 유지. 기록 runs/network/tensorboard6016/old6010_stop.json.
+
+### TensorBoard SSH 포워딩 없는 접속
+
+- 사용자 요청으로 기존127.0.0.1:6016 TensorBoard를 유지하고 서버IP163.152.162.122:16016의 TCP proxy를 추가했다. 실행 정보는 runs/network/tensorboard6016/process.json. 서버IP로 페이지·scalars API HTTP200 확인. 학습/MPS/TensorBoard 재시작 없음. 외부 클라이언트 경로는 미검증이며 UFW 조회는 sudo 비밀번호가 필요해 확인하지 못했다.
+
+### TensorBoard 현재 직선 PUSH 로그 표시 복구
+
+- current_ksh_jointpush_rsi_soft 링크가새run으로변경됐지만서버캐시에구mixed86epoch가남아있음을확인했다. TensorBoard6016만재시작하고logdir_spec에서현재run을먼저읽도록했다. HTTP API에서새run523epoch를확인했으며학습/MPS는유지했다.
+
+### Partial13000 Stage1/Stage2 attention 분해 캡처
+
+- 사용자 지정 resume_base36000_e1024_20261026_202814의 PartialRawCuboid_00013000 모델을 원래 설정의 독립 workspace에서 복원했다. GPU5 UUID만 노출하고 MPS 환경변수 해제·기본 pipe 부재를 확인한 native headless 추론으로 4장면/최대121step을 실행한 뒤 정상 종료했다. 기존 학습·MPS 서버는 유지했으며 GPU5 메모리는 실행 전 43210MiB로 반환됐다.
+- 로컬 partial_attention_capture.py는 기존 bootstrap 설치 후 actor Stage1 encoder와 Stage2 human coordination에 읽기 hook을 연결한다. 같은 관측에서 canonical 순서 QK/sqrt(d), additive bias, 합산 logit, softmax attention을 별도 저장한다. rollout의 shuffle RNG는 복구하고 종료된 장면은 이후 샘플에서 제외한다. Stage1은 별도 구 KSH 모델이 아닌 해당 Partial 내부 동결 encoder다.
+- 4장면 모두 step0/30/60/120 캡처, model/RMS 불변, 층 출력 재구성 최대오차2.38e-7·토큰순서 정렬 전후 action 최대오차8.64e-7 검증을 통과했다. snapshot manifest 검사와 새 스크립트 구문 검증도 통과했다. 원시NPZ/상태/검증JSON/PNG/갤러리는 runs/jointpush/attn_view/partial13000_stage1_stage2_20261027_gpu5에 저장한다. 뒤층 QK에는 앞층 bias 효과가 포함되며 attention 확률은 action 기여도와 다르다.
 
 ### 사용자 요청으로 GPU 자원 실행 가드 제거
 

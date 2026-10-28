@@ -1,5 +1,7 @@
 # 레포 구조
 
+Table Carry 본학습 결과와 새 runtime 기본값은 `output/table_carry/`다. 구 경로는 호환 링크로 유지한다. [공통 결과 경로](../../docs/OUTPUT_LAYOUT.md).
+
 현재 실행 실험은 원본 multi-agent carry(1), 독립 Stage 1(27·28·30·31·32·33·34·35·36·37 및 paired AT/placement·unified 독립 5과제), 협력 Stage 2(29 및 SIT plane 변형)다. 실행 명령과 checkpoint 규칙은 [config.md](config.md)에 있다.
 
 ## 테이블 상판 아래 파지 학습

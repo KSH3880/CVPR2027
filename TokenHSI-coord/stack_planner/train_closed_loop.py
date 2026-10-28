@@ -585,7 +585,7 @@ def main():
             "STACK_PLANNER_RETREAT_ONLY must agree"
         )
     output_dir = Path(os.environ.get(
-        "STACK_PLANNER_OUTPUT", str(WORKSPACE / "runs/stack_planner/default")
+        "STACK_PLANNER_OUTPUT", str(WORKSPACE / "TokenHSI-coord/output/stack_planner/default")
     )).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = output_dir / "metrics.jsonl"

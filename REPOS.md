@@ -14,6 +14,10 @@ TokenHSI 기반 multi-agent HOI 연구. 아래 3개는 모두 **원본 TokenHSI�
 
 ---
 
+## 결과 저장 위치
+
+본학습 checkpoint·TensorBoard·진단은 각 프로젝트의 `output/`에 둔다. `ksh_jointpush/`는 최상위 독립 프로젝트이며 실행 안내는 [EXECUTION](ksh_jointpush/EXECUTION.md)을 따른다. 기존 `runs/` 참조는 호환 링크로 유지하고, 실행 중인 결과는 물리적으로 옮기지 않는다. 공통 큐·캐시·생성 설정·상태는 `runs/`에 남긴다. 이동 내역과 확인 방법은 [결과 경로](docs/OUTPUT_LAYOUT.md)를 따른다.
+
 ## 멀티 GPU
 
 TokenHSI 소스는 건드리지 않는다. 멀티 GPU는 전부 레포 **바깥**에 있다.
@@ -35,7 +39,7 @@ TOKENHSI_REPO=TokenHSI-ma    bash scripts/train.sh 4 tokenhsi/scripts/single_tas
 
 같은 변수를 [scripts/verify_all.sh](scripts/verify_all.sh), [scripts/verify_rerun.sh](scripts/verify_rerun.sh),
 [scripts/sweep_knobs.sh](scripts/sweep_knobs.sh), [scripts/tokenhsi_gui.sh](scripts/tokenhsi_gui.sh)도 받는다.
-생성물은 전부 `runs/` 아래로 모이고 레포 이름으로 나뉜다 (`runs/gen_cfgs/<repo>/`, `runs/verify_logs/<repo>/`, `runs/sweep_logs/<repo>/`, `runs/sweep_cfgs/<repo>/`).
+공통 실행기의 생성 설정·검증 로그는 `runs/` 아래로 모이고 레포 이름으로 나뉜다 (`runs/gen_cfgs/<repo>/`, `runs/verify_logs/<repo>/`, `runs/sweep_logs/<repo>/`, `runs/sweep_cfgs/<repo>/`).
 
 ---
 

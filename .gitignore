@@ -119,3 +119,21 @@ TokenHSI-coord/output
 
 # Generated per-run carry evaluation metrics (keep local files)
 /metrics/carry/metrics_*.json
+
+# KSH runtime links and generated artifacts (frozen sources remain tracked)
+/ksh_jointpush/output
+/ksh_jointpush/output_etc
+/ksh_jointpush/pth
+/ksh_jointpush/tokenhsi/data/dataset_amass_climb/motions
+/ksh_jointpush/tokenhsi/data/dataset_amass_climb/objects
+/ksh_jointpush/tokenhsi/data/dataset_amass_climb/smpl_params
+/ksh_jointpush/tokenhsi/data/dataset_amass_loco/motions
+/ksh_jointpush/tokenhsi/data/dataset_amass_loco/smpl_params
+/ksh_jointpush/tokenhsi/data/dataset_amass_loco_stairs/motions
+/ksh_jointpush/tokenhsi/data/dataset_amass_loco_stairs/smpl_params
+/ksh_jointpush/tokenhsi/data/dataset_carry/motions
+/ksh_jointpush/tokenhsi/data/dataset_dynamic_objects/test
+/ksh_jointpush/tokenhsi/data/dataset_dynamic_objects/train
+/ksh_jointpush/tokenhsi/data/dataset_sit/motions
+/ksh_jointpush/tokenhsi/data/dataset_sit/objects
+/ksh_jointpush/tokenhsi/data/jointpush_motions

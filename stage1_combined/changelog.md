@@ -1,5 +1,10 @@
 ## 2026-10-28
 
+### 기존 Chair 본학습 결과 output 통합
+
+runs의 Chair HOLDING_AT 본학습과 장기 bbox FT 결과를 이 프로젝트 output으로 이동했다. 소스사본·검증 기록은 유지하고 구 결과 경로는 호환 링크로 연결했다. checkpoint inode/크기·양쪽 경로 접근 검사 통과. 학습을 새로 실행하거나 중단하지 않았다. 상세 ../docs/OUTPUT_LAYOUT.md.
+
+
 ### Table residual10k TokenHSI 원본 환경·평가 방식 측정
 사용자요청. 原본HumanoidAdaptCarryBox2Objs/환경YAML/seed·sim함수/Transformer player run_eval body를고정사본에서실행하고정책만우리10k로교체. 512환경/test9/seed0/연속3repeat/20초/AT20cm+native updot≥.86615. 성공432/438/427,전체**84.44±1.08%**(연속repeat표본std),이전Chair집계처럼0회제외하면**84.47±1.52%**. 성공최소거리오차7.09/6.91/6.91cm. native→우리280D관측기존생성기bitwise exact·171tensor/RMS strict/평가전후동결,4환경3repeat smoke·metric회귀3개·정식3trace/precision/599step/첫episode재채점·원본core/ckpt해시통과. 첫시도절대에셋경로전달실수로asset None/actor-1/첫reset CUDA오류→상대경로수정·actor검증추가,실패기록보존. 성공경로에별도동기화/수명변경없음. Chair3831871유지. ../runs/table_residual_10k_tokenhsi_native_20261028/REPORT.md 및validation.json. 공개코드조건이며논문10×10m와달라논문83.6%재현과구분;30초위치-only평가와도구분.
 

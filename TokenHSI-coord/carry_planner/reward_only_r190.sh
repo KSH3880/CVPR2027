@@ -10,12 +10,12 @@ case "$TAG" in ""|*[!A-Za-z0-9_.-]*) echo "invalid tag: $TAG" >&2; exit 2;; esac
 case "$ITERS:$GPU" in *[!0-9:]*) echo 'iterations/GPU must be integers' >&2; exit 2;; esac
 [ "$ITERS" -gt 0 ] || exit 2
 case "$MODE" in run|--dry-run) ;; *) echo 'fourth argument: --dry-run or run' >&2; exit 2;; esac
-SOURCE_RUN="$ROOT/runs/carry_planner/carry_implicit_consistency_s7"
+SOURCE_RUN="$ROOT/TokenHSI-coord/output/carry_planner/carry_implicit_consistency_s7"
 INIT="$SOURCE_RUN/planner_000190.pth"
 for FILE in "$SOURCE_RUN/run.env" "$INIT"; do
     [ -f "$FILE" ] || { echo "missing: $FILE" >&2; exit 1; }
 done
-[ ! -e "$ROOT/runs/carry_planner/$TAG" ] || { echo "existing run: $TAG" >&2; exit 3; }
+[ ! -e "$ROOT/TokenHSI-coord/output/carry_planner/$TAG" ] || { echo "existing run: $TAG" >&2; exit 3; }
 set -a
 . "$SOURCE_RUN/run.env"
 set +a
@@ -26,7 +26,7 @@ export CARRY_PLANNER_SMOOTHNESS_COEF=0 CARRY_PLANNER_SPEED_SMOOTHNESS_COEF=0
 export CARRY_PLANNER_ANALYTIC_COLLISION_COEF=0 CARRY_PLANNER_ANALYTIC_CURVATURE_COEF=0
 export CARRY_PLANNER_REPLAN_CONSISTENCY_COEF=0 CARRY_PLANNER_EXCESS_LENGTH_COEF=0
 export CARRY_PLANNER_DIRECTION_COEF=0
-export CARRY_PLANNER_OUTPUT="$ROOT/runs/carry_planner/$TAG"
+export CARRY_PLANNER_OUTPUT="$ROOT/TokenHSI-coord/output/carry_planner/$TAG"
 export PYTHONDONTWRITEBYTECODE=1
 # Use the existing per-GPU MPS server; never start or stop a daemon here.
 . "$ROOT/mps/shell.sh"

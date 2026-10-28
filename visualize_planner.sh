@@ -24,8 +24,8 @@ current stack_planner schema is selected.
 
 Examples:
   ./visualize_planner.sh --list
-  ./visualize_planner.sh --check runs/stack_planner/<tag>/planner_000010.pth
-  ./visualize_planner.sh --gpu 1 runs/stack_planner/<tag>/planner_000010.pth
+  ./visualize_planner.sh --check TokenHSI-coord/output/stack_planner/<tag>/planner_000010.pth
+  ./visualize_planner.sh --gpu 1 TokenHSI-coord/output/stack_planner/<tag>/planner_000010.pth
 EOF
 }
 

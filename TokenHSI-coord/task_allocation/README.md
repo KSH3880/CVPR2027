@@ -85,7 +85,7 @@ MA_GPU=6 ALLOC_ENVS=2 ALLOC_ITERS=1 ALLOC_HORIZON=2 ALLOC_EPOCHS=1 \
   bash TokenHSI-coord/task_allocation/launch.sh allocation_smoke /absolute/path/ms18.pth
 ```
 
-산출물: `runs/task_allocation/<tag>/env.yaml`, `run.env`, `config.json`,
+산출물: `TokenHSI-coord/output/task_allocation/<tag>/env.yaml`, `run.env`, `config.json`,
 `run.log`, `metrics.jsonl`, `allocation_latest.pth`, 10 iteration 간격 numbered PTH.
 run.env에는 기본값까지 실제 적용한 설정이 기록된다. `ALLOC_INIT`으로 할당 checkpoint와
 optimizer를 재개할 수 있다. simulator episode/RNG는 새로 시작한다.
@@ -124,7 +124,7 @@ PPO smoke에서 ms18 model state 불변, allocation 갱신, checkpoint 재로드
 재할당 시 물리 root/box/goal 불변을 확인했다. 초기 거리 기반 고정 담당 대조군은
 `ALLOC_MODE=eval ALLOC_BASELINE=nearest_initial ALLOC_INIT=...`으로 실행한다.
 `ALLOC_VERIFY=1`은 위 고정/재로드 검증 및 verification.json 기록을 켠다.
-기록은 `runs/task_allocation/readiness_20261002.json` 및 각 tag의 run.log,
+기록은 `TokenHSI-coord/output/task_allocation/readiness_20261002.json` 및 각 tag의 run.log,
 metrics.jsonl, verification.json에 있다. 물리 실행/학습 연결은 준비됐지만,
 동적 할당 모델의 수렴/성능은 아직 검증하지 않았다.
 

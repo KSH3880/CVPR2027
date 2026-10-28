@@ -4,7 +4,7 @@ export TOKENHSI_GPU=6
 . "$(dirname "$0")/runtime_env.sh"
 PROJECT_ROOT=$(cd "$TOKENHSI_ROOT/../../.." && pwd)
 STAGE1_CHECKPOINT=${STAGE1_CHECKPOINT:-$PROJECT_ROOT/runs/jointpush/push_stage1_repro_20261012/checkpoints/OpenPushPush180ContactAtWarmstart_00029000.pth}
-TRAIN_OUTPUT=${OUTPUT_PATH:-$PROJECT_ROOT/runs/jointpush/training}
+TRAIN_OUTPUT=${OUTPUT_PATH:-$PROJECT_ROOT/jointpush/output/training}
 CFG_ENV=tokenhsi/data/cfg/multi_agent/joint_push_loco_rsi_ca4.yaml
 set -- --task_graph push
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then

@@ -2,6 +2,12 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-28
+
+### Table Carry 본학습 결과 output 통합
+
+기존 table_carry/finetune 결과를 output/table_carry로 이동하고 새 본학습 runtime 기본값과 train/resume 안내를 맞췄다. 검증·에셋·상태는 보존하고 구 학습 경로에 호환 링크를 유지했다. checkpoint inode/크기·경로 접근·shell 구문 확인. 상세 ../docs/OUTPUT_LAYOUT.md.
+
 ## 2026-10-19
 
 ### 직사각형 테이블 상판 아래 파지 fine-tune

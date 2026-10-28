@@ -8,7 +8,7 @@ fi
 . "$(dirname "$0")/runtime_env.sh"
 PROJECT_ROOT=$(cd "$TOKENHSI_ROOT/../../.." && pwd)
 STAGE1_CHECKPOINT=${STAGE1_CHECKPOINT:-$PROJECT_ROOT/runs/jointpush/push_stage1_repro_20261012/checkpoints/OpenPushPush180ContactAtWarmstart_00029000.pth}
-TRAIN_OUTPUT=${OUTPUT_PATH:-$PROJECT_ROOT/runs/jointpush/aligned_koo_rsi_training}
+TRAIN_OUTPUT=${OUTPUT_PATH:-$PROJECT_ROOT/jointpush/output/aligned_koo_rsi_training}
 CFG_ENV=tokenhsi/data/cfg/multi_agent/joint_push_aligned_koo_rsi_ca4.yaml
 set -- --task_graph push
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then

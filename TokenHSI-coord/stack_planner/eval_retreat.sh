@@ -14,7 +14,7 @@ case "$EVAL_SCEN" in
     free|cross|parallel|solo) ;;
     *) echo "invalid STACK_PLANNER_EVAL_SCEN: $EVAL_SCEN" >&2; exit 2;;
 esac
-SIDECAR="$ROOT/runs/stack_planner/$TRAIN_TAG/run.env"
+SIDECAR="$ROOT/TokenHSI-coord/output/stack_planner/$TRAIN_TAG/run.env"
 [ -f "$SIDECAR" ] || { echo "missing training sidecar: $SIDECAR" >&2; exit 5; }
 set -a
 . "$SIDECAR"

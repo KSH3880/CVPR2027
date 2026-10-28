@@ -8,9 +8,9 @@ MODE=${3:-run}
 case "$TAG" in ""|*[!A-Za-z0-9_.-]*) echo "invalid tag: $TAG" >&2; exit 2;; esac
 case "$GPU" in ""|*[!0-9]*) echo 'GPU must be a non-negative integer' >&2; exit 2;; esac
 case "$MODE" in run|--dry-run) ;; *) echo 'third argument: run or --dry-run' >&2; exit 2;; esac
-SOURCE_ENV="$ROOT/runs/carry_planner/carry_implicit_consistency_s7/run.env"
+SOURCE_ENV="$ROOT/TokenHSI-coord/output/carry_planner/carry_implicit_consistency_s7/run.env"
 [ -f "$SOURCE_ENV" ] || { echo "missing baseline settings: $SOURCE_ENV" >&2; exit 1; }
-[ ! -e "$ROOT/runs/carry_planner/$TAG" ] || { echo "existing run: $TAG" >&2; exit 3; }
+[ ! -e "$ROOT/TokenHSI-coord/output/carry_planner/$TAG" ] || { echo "existing run: $TAG" >&2; exit 3; }
 set -a
 . "$SOURCE_ENV"
 set +a
@@ -19,7 +19,7 @@ export CARRY_PLANNER_INIT=""
 export CARRY_PLANNER_ANALYTIC_CURVATURE_COEF=0.5
 export CARRY_PLANNER_LR=0.0003 CARRY_PLANNER_CLIP=0.2
 export CARRY_PLANNER_ITERS=3000 CARRY_PLANNER_SEED=0 CARRY_PLANNER_ENVS=2048
-export CARRY_PLANNER_OUTPUT="$ROOT/runs/carry_planner/$TAG"
+export CARRY_PLANNER_OUTPUT="$ROOT/TokenHSI-coord/output/carry_planner/$TAG"
 export PYTHONDONTWRITEBYTECODE=1
 export CUDA_CACHE_PATH="$ROOT/runs/cache/cuda"
 export TORCH_EXTENSIONS_DIR="$ROOT/runs/cache/torch_extensions"

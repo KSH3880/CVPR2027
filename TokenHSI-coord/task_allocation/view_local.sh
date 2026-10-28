@@ -10,7 +10,7 @@ case "$TAG" in ""|*[!A-Za-z0-9_.-]*) echo 'invalid tag' >&2; exit 2;; esac
 for file in "$INITIAL" "$POLICY" "$STAGE1"; do
     [ -f "$file" ] || { echo "checkpoint missing: $file" >&2; exit 2; }
 done
-ALLOC_IMPORT="$ROOT/runs/task_allocation/$TAG"
+ALLOC_IMPORT="$ROOT/TokenHSI-coord/output/task_allocation/$TAG"
 [ ! -e "$ALLOC_IMPORT" ] || { echo "use a new tag: $ALLOC_IMPORT" >&2; exit 2; }
 PYTHON_BIN="${CONDA_BASE:-/home/injesus1010/anaconda3}/envs/${TOKENHSI_CONDA_ENV:-tokenhsi118}/bin/python"
 [ -x "$PYTHON_BIN" ] || { echo "Python missing: $PYTHON_BIN" >&2; exit 2; }

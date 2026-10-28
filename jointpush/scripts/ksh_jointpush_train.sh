@@ -1,3 +1,1 @@
-#!/bin/bash
-set -eu
-exec bash "$(dirname "$0")/ksh_jointpush_launch.sh" train
+../../ksh_jointpush/scripts/ksh_jointpush_train.sh

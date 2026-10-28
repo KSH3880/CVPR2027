@@ -105,7 +105,7 @@ def import_jsonl(metrics_path: Path, writer, *, follow: bool = False,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_dir", type=Path, help="runs/carry_planner/<tag>")
+    parser.add_argument("run_dir", type=Path, help="TokenHSI-coord/output/carry_planner/<tag>")
     parser.add_argument("--follow", action="store_true", help="계속 새 iteration 읽기")
     parser.add_argument("--log-dir", type=Path, help="event 출력 위치 (기본: run_dir/tensorboard_imported)")
     args = parser.parse_args()

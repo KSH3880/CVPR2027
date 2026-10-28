@@ -528,7 +528,7 @@ def main():
         raise ValueError("path regularization warmup must be non-negative")
 
     output_dir = Path(os.environ.get(
-        "CARRY_PLANNER_OUTPUT", str(WORKSPACE / "runs/carry_planner/default"),
+        "CARRY_PLANNER_OUTPUT", str(WORKSPACE / "TokenHSI-coord/output/carry_planner/default"),
     )).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = output_dir / "metrics.jsonl"

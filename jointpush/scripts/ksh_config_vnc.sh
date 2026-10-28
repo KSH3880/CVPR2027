@@ -1,0 +1,1 @@
+../../ksh_jointpush/scripts/ksh_config_vnc.sh

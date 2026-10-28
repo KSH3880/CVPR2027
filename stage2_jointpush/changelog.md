@@ -2,6 +2,12 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-10-28
+
+### JointPush 결과 참조 및 본학습 기본 경로 통일
+
+koo_push 전용 학습 wrapper와 viewer의 결과 참조를 ../jointpush/output으로 통일하고 config/structure의 경로를 갱신했다. 원래 runs 경로는 호환 링크로 접근 가능하다. shell 구문·실제 결과 경로 검증. 실행 중인 작업과 원본 KSH 코드는 유지했다.
+
 ## 2026-10-22
 
 ### koo_1021 Stage1BasePush 기반 Partial Joint Push Stage2 실행

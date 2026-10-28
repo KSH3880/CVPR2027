@@ -1,5 +1,11 @@
 # TokenHSI-coord — 변경 기록
 
+## 2026-10-28
+
+### 본학습 결과를 프로젝트 output으로 통합
+
+Carry/Stack planner·Task allocation 기존 결과를 output 하위로 이동하고 train/resume/eval/viewer 기본 경로를 함께 수정했다. 기존 runs 경로는 호환 링크로 유지했다. 경로별 checkpoint inode·크기 보존, shell/Python 구문 및 추가 이동 0개 검증을 통과했다. 상세는 ../docs/OUTPUT_LAYOUT.md.
+
 ## 2026-10-07
 
 ### Carry view의 eval pipeline 대조 옵션

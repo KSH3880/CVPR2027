@@ -11,7 +11,7 @@ STAGE1=${MS_CKPT:-"/home/hwanhee/juan/CVPR2027/TokenHSI-masteer/output/tokenhsi/
 ENVS=${CARRY_PLANNER_ENVS:-2048}
 GPU=${MA_GPU:-7}
 SEED=${CARRY_PLANNER_SEED:-0}
-OUT="$ROOT/runs/carry_planner/$TAG"
+OUT="$ROOT/TokenHSI-coord/output/carry_planner/$TAG"
 
 case "$TAG" in ""|*[!A-Za-z0-9_.-]*) echo "invalid tag: $TAG" >&2; exit 2;; esac
 case "$ENVS:$GPU" in *[!0-9:]*) echo "ENVS/GPU must be non-negative integers" >&2; exit 2;; esac

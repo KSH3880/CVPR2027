@@ -5,14 +5,14 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 HERE="$ROOT/TokenHSI-coord/task_allocation"
 if [ "${1:-}" = --help ]; then
     echo 'usage: bash task_allocation/scp_view.sh [SSH-host] [remote-allocation.pth]'
-    echo 'defaults: Pro1 /home/hwanhee/juan/CVPR2027/runs/task_allocation/allocation_s0/allocation_000100.pth'
+    echo 'defaults: Pro1 /home/hwanhee/juan/CVPR2027/TokenHSI-coord/output/task_allocation/allocation_s0/allocation_000100.pth'
     echo 'overrides: MA_GPU=0 PORT=6109 CONDA_BASE=... TOKENHSI_CONDA_ENV=tokenhsi118'
     exit 0
 fi
 if [ "${1:-}" != --local ]; then
     HOST=${1:-Pro1}
-    REMOTE=${2:-/home/hwanhee/juan/CVPR2027/runs/task_allocation/allocation_s0/allocation_000100.pth}
-    IMPORT=$(mktemp -d "$ROOT/runs/task_allocation/import_vnc_XXXXXX")
+    REMOTE=${2:-/home/hwanhee/juan/CVPR2027/TokenHSI-coord/output/task_allocation/allocation_s0/allocation_000100.pth}
+    IMPORT=$(mktemp -d "$ROOT/TokenHSI-coord/output/task_allocation/import_vnc_XXXXXX")
     scp "$HOST:$REMOTE" "$IMPORT/allocation_original.pth"
     PYTHON_BIN="${CONDA_BASE:-/home/injesus1010/anaconda3}/envs/${TOKENHSI_CONDA_ENV:-tokenhsi118}/bin/python"
     [ -x "$PYTHON_BIN" ] || { echo "Python not found: $PYTHON_BIN" >&2; exit 2; }

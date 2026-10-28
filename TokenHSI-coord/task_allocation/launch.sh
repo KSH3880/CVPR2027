@@ -9,7 +9,7 @@ case "$MODE" in run|--dry-run) ;; *) echo "third argument: run or --dry-run" >&2
 CHECKPOINT=${2:-"$ROOT/TokenHSI-masteer/output/stack/ms18_maskteam_origscale_c06_s0_00009000.pth"}
 STAGE1=${MS_CKPT:-"$ROOT/TokenHSI-masteer/output/tokenhsi/ckpt_stage1.pth"}
 [ -f "$CHECKPOINT" ] && [ -f "$STAGE1" ] || { echo 'missing ms18/stage1 checkpoint' >&2; exit 2; }
-OUT="$ROOT/runs/task_allocation/$TAG"
+OUT="$ROOT/TokenHSI-coord/output/task_allocation/$TAG"
 [ ! -e "$OUT" ] || { echo "use a new tag: $OUT" >&2; exit 3; }
 GPU=${MA_GPU:-6}
 [ "$GPU" = 6 ] || { echo "task allocation must use GPU 6" >&2; exit 2; }

@@ -49,7 +49,7 @@ STACK_PLANNER_SEED=0 \
 
 ```bash
 MA_GPU=1 bash TokenHSI-coord/stack_planner/view_retreat_only.sh \
-  runs/stack_planner/retreat_only_v15_s0/planner_000005.pth \
+  TokenHSI-coord/output/stack_planner/retreat_only_v15_s0/planner_000005.pth \
   TokenHSI-masteer/output/sequential_stack/anti_feat_top_s2/Humanoid_00012000.pth
 ```
 
@@ -265,7 +265,7 @@ STACK_PLANNER_HORIZON=8 STACK_PLANNER_LOW_STEPS=6 \
   bash TokenHSI-coord/stack_planner/train_local_gpu1.sh local_stack_smoke
 ```
 
-metric, sidecar, planner checkpoint는 `runs/stack_planner/<tag>/`에만 저장된다.
+metric, sidecar, planner checkpoint는 `TokenHSI-coord/output/stack_planner/<tag>/`에만 저장된다.
 `metrics.jsonl`에는 reward 항 외에 planner/executor 품질을 직접 읽을 수 있는 다음 metric을
 iteration마다 기록한다.
 
@@ -305,7 +305,7 @@ branch snapshot도 보존하므로 env 수를 후보 수에 맞춰 낮춘다. �
 `STACK_PLANNER_ITERS`는 최종 iteration 번호가 아니라 추가로 실행할 iteration 수다.
 
 ```bash
-STACK_PLANNER_INIT=runs/stack_planner/stack_path_speed_v15_s0/planner_000200.pth \
+STACK_PLANNER_INIT=TokenHSI-coord/output/stack_planner/stack_path_speed_v15_s0/planner_000200.pth \
 STACK_PLANNER_ITERS=200 MA_GPU=7 \
   bash TokenHSI-coord/stack_planner/train.sh stack_path_speed_v15_s0_resume1
 ```
@@ -320,7 +320,7 @@ checkpoint도 학습 때 쓴 파일을 같이 지정해야 한다. planner는 �
 
 ```bash
 bash TokenHSI-coord/stack_planner/view.sh \
-  runs/stack_planner/<tag>/planner_000010.pth \
+  TokenHSI-coord/output/stack_planner/<tag>/planner_000010.pth \
   TokenHSI-masteer/output/sequential_stack/anti_feat_top_s2/Humanoid_00011000.pth
 ```
 

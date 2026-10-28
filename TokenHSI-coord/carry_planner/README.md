@@ -13,7 +13,7 @@ MS_CKPT="$PWD/TokenHSI-masteer/output/ckpt_stage1.pth" \
 CARRY_PLANNER_EVAL_PIPELINE=cpu CARRY_PLANNER_EVAL_PHYSICAL_CONTACT=1 \
 CARRY_PLANNER_EVAL_LABEL=physical_contacts \
 bash TokenHSI-coord/carry_planner/eval_one.sh \
-  runs/carry_planner/carry_implicit_consistency_s6/planner_000110.pth \
+  TokenHSI-coord/output/carry_planner/carry_implicit_consistency_s6/planner_000110.pth \
   TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth mixed 4 0
 ```
 
@@ -194,10 +194,10 @@ MA_GPU=0 TOKENHSI_CONDA_ENV=tokenhsi118 \
   /path/to/ms18/Humanoid.pth
 ```
 
-출력은 `runs/carry_planner/<tag>/`에 저장한다. 동일 tag는 덮어쓰지 않는다.
+출력은 `TokenHSI-coord/output/carry_planner/<tag>/`에 저장한다. 동일 tag는 덮어쓰지 않는다.
 
 TensorBoard는 기본으로 켜져 있으며, 매 iteration의 핵심 지표를
-`runs/carry_planner/<tag>/tensorboard/`에 기록한다. 전체 원시 지표는 기존
+`TokenHSI-coord/output/carry_planner/<tag>/tensorboard/`에 기록한다. 전체 원시 지표는 기존
 `metrics.jsonl`에 그대로 남는다. `Reward/`는 보상·진척,
 `Collision/`은 근접 proxy 비율·cost와 analytic loss, `Plan/`은 sampled/mean 제안의
 유효율·곡률 통과율, `Path/`는 우회 거리·replan 변화, `Loss/`는 학습 손실이다.
@@ -210,7 +210,7 @@ TensorBoard는 기본으로 켜져 있으며, 매 iteration의 핵심 지표를
 
 ```bash
 # 서버
-python -m tensorboard.main --logdir runs/carry_planner/<tag>/tensorboard --host 127.0.0.1 --port 6006
+python -m tensorboard.main --logdir TokenHSI-coord/output/carry_planner/<tag>/tensorboard --host 127.0.0.1 --port 6006
 # 로컬 PC의 새 터미널
 ssh -N -L 6006:127.0.0.1:6006 hwanhee@<server-host>
 ```
@@ -228,8 +228,8 @@ ssh -N -L 6006:127.0.0.1:6006 hwanhee@<server-host>
 
 ```bash
 PYTHONPATH=TokenHSI-coord python -m carry_planner.tensorboard_metrics \
-  runs/carry_planner/<tag> --follow
-python -m tensorboard.main --logdir runs/carry_planner/<tag>/tensorboard_imported \
+  TokenHSI-coord/output/carry_planner/<tag> --follow
+python -m tensorboard.main --logdir TokenHSI-coord/output/carry_planner/<tag>/tensorboard_imported \
   --host 127.0.0.1 --port 6006
 ```
 
@@ -237,7 +237,7 @@ Viewer:
 
 ```bash
 MA_GPU=0 bash TokenHSI-coord/carry_planner/view.sh \
-  runs/carry_planner/<tag>/planner_000200.pth \
+  TokenHSI-coord/output/carry_planner/<tag>/planner_000200.pth \
   TokenHSI-masteer/output/ms18_maskteam_origscale_c06_s0_00009000.pth
 ```
 
@@ -254,7 +254,7 @@ checkpoint를 다시 만들 때는 기존 파일을 자동으로 덮어쓰지 �
 ```bash
 PYTHONPATH=TokenHSI-coord python \
   TokenHSI-coord/carry_planner/make_sanity_checkpoint.py \
-  runs/carry_planner/sanity_sparse_v16/planner_detour_slow.pth
+  TokenHSI-coord/output/carry_planner/sanity_sparse_v16/planner_detour_slow.pth
 ```
 
 viewer에서는 집기 전 `loco_carry` 시작의 자기 상자가 캐릭터에서 3m보다
@@ -285,7 +285,7 @@ action_log_std를 우선 사용하므로 학습 exploration 분포를 그대로 
 ~~~bash
 CARRY_PLANNER_VIEW_STOCHASTIC=1 CARRY_PLANNER_VIEW_SEED=0 \
 MA_GPU=0 bash TokenHSI-coord/carry_planner/view.sh \
-  runs/carry_planner/<tag>/planner_000200.pth \
+  TokenHSI-coord/output/carry_planner/<tag>/planner_000200.pth \
   TokenHSI-masteer/output/masteer/<executor>.pth
 ~~~
 
@@ -297,7 +297,7 @@ valid, reason, max_turn_deg가 같이 출력된다.
 
 ```bash
 MA_GPU=1 bash TokenHSI-coord/carry_planner/eval_suite.sh \
-  runs/carry_planner/<tag>/planner_000200.pth \
+  TokenHSI-coord/output/carry_planner/<tag>/planner_000200.pth \
   TokenHSI-masteer/output/masteer/<executor>.pth 64 0 1 2
 ```
 
