@@ -37,22 +37,31 @@ def validate_env(env):
         if before.get('initialization') != 'stage1_rsi':
             raise ValueError('Full BEFORE RSI requires initialization=stage1_rsi')
         before['initialization'] = 'loco'  # Normalize only for the legacy base contract below.
+    pickup_carry = before.pop('follower_pickup_carry_rsi', None)
+    from utils.before_pickup_carry_rsi import SPEC as PICKUP_CARRY_SPEC
+    if pickup_carry is not None and pickup_carry != PICKUP_CARRY_SPEC:
+        raise ValueError('BEFORE pickup/carry RSI requires loco/pickUp/carryWith 40/30/30')
     carry_rsi = before.pop('follower_carry_rsi', None)
+    if pickup_carry is not None and (full is not None or carry_rsi is not None):
+        raise ValueError('BEFORE RSI initializations are mutually exclusive')
     if full is not None and carry_rsi is not None:
         raise ValueError('Full RSI and follower-only carry RSI are mutually exclusive')
     if carry_rsi is not None and carry_rsi != dict(probability=.5, skill='carryWith'):
         raise ValueError('BEFORE follower_carry_rsi requires carryWith 50/50')
     mixture = before.pop('distance_mixture', None)
+    from utils.before_relative_sampling import DISTANCE_MIXTURE as RELATIVE_MIXTURE
+    if mixture == RELATIVE_MIXTURE and pickup_carry is None:
+        raise ValueError('Relative BEFORE distances require follower pickup/carry RSI')
     progress_target = before.pop('progress_target', 'current_box')
     if progress_target not in ('current_box', 'predecessor_at_goal'):
         raise ValueError('Unknown BEFORE progress_target')
     if progress_target == 'predecessor_at_goal' and (
-            mixture != MIX226_DISTANCE_MIXTURE or env['box']['reset']['platformMode'] != 'ground_only'):
-        raise ValueError('BEFORE AT-goal progress requires the ground 20/20/60 configuration')
-    if mixture is not None and mixture not in (DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE):
-        raise ValueError('BEFORE distance mixture requires the agreed 50/50, 30/30/40 or 20/20/60 ranges')
-    if carry_rsi is not None and (progress_target != 'predecessor_at_goal' or mixture != MIX226_DISTANCE_MIXTURE):
-        raise ValueError('BEFORE carry RSI requires mix226 AT progress')
+            mixture not in (MIX226_DISTANCE_MIXTURE, RELATIVE_MIXTURE) or env['box']['reset']['platformMode'] != 'ground_only'):
+        raise ValueError('BEFORE AT-goal progress requires ground mix226 or relative-sum distances')
+    if mixture is not None and mixture not in (DISTANCE_MIXTURE, THREE_WAY_DISTANCE_MIXTURE, MIX226_DISTANCE_MIXTURE, RELATIVE_MIXTURE):
+        raise ValueError('Unknown BEFORE distance mixture')
+    if (carry_rsi is not None or pickup_carry is not None) and (progress_target != 'predecessor_at_goal' or mixture not in (MIX226_DISTANCE_MIXTURE, RELATIVE_MIXTURE)):
+        raise ValueError('BEFORE follower RSI requires AT progress with mix226 or relative-sum distances')
     if full is not None and progress_target != 'predecessor_at_goal':
         raise ValueError('Full BEFORE RSI requires mix226 AT progress')
     if before != SPEC or env['relationGraph']['sampler'] != SAMPLER:
@@ -179,7 +188,7 @@ def checkpoint_contract(env):
         contract['critic_human_bias'] = critic_mode
     if env['relationGraph'].get('actor_head_adapter') is not None:
         contract['actor_head_adapter'] = env['relationGraph']['actor_head_adapter']
-    if env['before'].get('full_rsi') is not None:
+    if env['before'].get('full_rsi') is not None or env['before'].get('follower_pickup_carry_rsi') is not None:
         contract['size_aware_rsi'] = env['sizeAwareRsi']
     return contract
 

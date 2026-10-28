@@ -35,6 +35,8 @@
 | [stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml) | [stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_adapter_bias0_1200.yaml) |
 | [stage2_before_ground_mix226_atprogress_bias0_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_bias0_1200.yaml) | [stage2_before_ground_mix226_atprogress_bias0_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_bias0_1200.yaml) |
 | [stage2_before_ground_mix226_atprogress_nonemask_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_1200.yaml) | [stage2_before_ground_mix226_atprogress_nonemask_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_nonemask_1200.yaml) |
+| [stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200.yaml) | [stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200.yaml) |
+| [stage2_before_ground_atprogress_nonemask_rsi433_near50_1200.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200.yaml) | [stage2_before_ground_atprogress_nonemask_rsi433_near50_1200.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200.yaml) |
 
 ## 학습
 
@@ -100,6 +102,12 @@ env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=
 
 # stage2_before_ground_mix226_atprogress_nonemask_1200
 env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=0 STAGE1_CHECKPOINT=../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_1200_train.sh 4 1024 8
+
+# stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=5 STAGE1_CHECKPOINT=/home/hwanhee/juan/CVPR2027/stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200_train.sh 4 1024 8
+
+# stage2_before_ground_atprogress_nonemask_rsi433_near50_1200
+env -u CHECK -u RESUME_CHECKPOINT -u MAX_ITERATIONS -u OUTPUT_PATH TOKENHSI_GPU=5 STAGE1_CHECKPOINT=/home/hwanhee/juan/CVPR2027/stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -168,6 +176,12 @@ HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground
 
 # stage2_before_ground_mix226_atprogress_nonemask_1200
 HEADLESS=0 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200
+HEADLESS=0 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_atprogress_nonemask_rsi433_near50_1200
+HEADLESS=0 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -234,6 +248,12 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atp
 
 # stage2_before_ground_mix226_atprogress_nonemask_1200
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_ground_atprogress_nonemask_rsi433_near50_1200
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션

@@ -4,6 +4,21 @@
 
 ## 2026-10-28
 
+### RSI433 원래/후행 상대 거리 합 50/50
+
+- `stage2_before_ground_atprogress_nonemask_rsi433_near50_1200` env/train YAML·전용 train/test/VNC를 추가했다. RSI433의 nonemask·AT progress·후행 ON_TOP loco/pickUp/carryWith40/30/30·1200step·2e-5·fixed78000 새 전이는 유지하고 거리20/20/60을 기존 BEFORE 제안 분포의 원래/후행 가까움50/50으로 교체했다. 기존 목표 샘플러를 사용하며 추가 단거리 상한은 두지 않는다.
+- 가까운 쌍은 XY에서 선행 사람→선행 상자 거리보다 SIT/CLIMB 후행 사람→받침 상자, ON_TOP 후행 사람→들 상자 + 후행 사람→받침 상자의 합이 작아야 한다. 위반 시 해당 쌍의 거리 후보를 재추첨하며 그래프·모드·RSI 요청을 유지한다. 원래 모드·단독 배치는 부등식을 강제하지 않는다. RSI 사람·상자는 같은 변환으로 이동하고 최종 물리 검사에서도 합 조건을 확인한다. 평가 `BEFORE_FOLLOWER_NEAR=1`은100% 상대 가까움이며2/short는 지원하지 않는다. [설계](markdowns/reference/stage2_before.md#rsi433-상대-거리-합-near50), [명령](markdowns/config.md), [옵션](markdowns/USAGE.md#stage2-before-rsi433-relative-near50).
+- CPU42개 통과:50/50·RSI 독립성·합 조건·원래 모드 범위·RSI 상대 자세·checkpoint 분리와 기존 BEFORE 회귀. [CPU](output_etc/check/before_relative50_20261028/cpu.log), [회귀](output_etc/check/before_relative50_20261028/regression.log). GPU5/MPS·4명/1024환경/8물체 CHECK epoch2/frame262144에서 source78000·encoder73 tensor/RMS 동결·head6 tensor와 양쪽 BEFORE bias 갱신·adapter 없음·모델/scalar finite를 확인했다. 초기 가까움 비율50.69%였다. [학습](output_etc/check/before_relative50_20261028/training_validation.json). 물리 배치 최종 실패0을 확인했다. 32환경 loco/mix/pickup/carry·단독5개 구성에서 최종 합 조건·원래 접근 범위·RSI 상대 자세·AT progress·AMP·부분 reset·가중치 불변을 확인했다. [물리/재로드](output_etc/check/before_relative50_20261028/eval/physics_validation.json). 전용 test로100% 가까움·BEFORE ON_TOP·mix RSI·4환경·32step headless 재로드도 통과했다. [wrapper](output_etc/check/before_relative50_20261028/eval.log). 셸/Python/YAML 문법·새 문서 경로/명령 순서·diff를 확인했다. 본학습은 시작하지 않았으며 기존 학습을 유지했다. GUI/VNC 실화면·장기 성능은 미검증이다.
+
+
+### Nonemask 후행 ON_TOP loco/pickUp/carryWith 40/30/30
+
+- `stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200` env/train YAML·전용 train/test/VNC를 추가했다. 집기와 후반 운반 학습을 함께 늘리기 위해 BEFORE ON_TOP 후행만 loco40%/pickUp30%/carryWith30%를 요청하며 선행·단독·SIT/CLIMB는 loco다. 현재 서버의 fixed78000 절대경로에서 새 전이한다. nonemask·AT progress·거리20/20/60·1200step·2e-5·encoder/RMS 동결·action head 학습은 유지한다.
+- carry50 전용 캐시에 pickUp을 추가했다. 원본 상대 자세를 유지하는 크기/몸 관통/native 물리 유효 프레임을 사용하며 carryWith는 HOLDING·바닥8cm 이상을 추가 검사한다. 유효 프레임 부재 또는8회 배치 재시도 소진 시 후행만 loco로 대체한다. 요청·적용·fallback 통계와 checkpoint 계약, 평가 전용 loco/mix/pickup/carry 옵션을 분리했다. [설계](markdowns/reference/stage2_before.md#nonemask-후행-on_top-rsi433), [명령](markdowns/config.md), [평가 옵션](markdowns/USAGE.md#stage2-before-nonemask-rsi433).
+- CPU34개 통과: 분포·대상 제한·재정규화 없는 fallback·배치 소진/부분 환경 보존·기존 config/checkpoint 분리·nonemask/full RSI/bias 회귀. [신규·관련](output_etc/check/before_nonemask_rsi433_20261028/cpu.log), [회귀](output_etc/check/before_nonemask_rsi433_20261028/regression.log). GPU5/MPS·4명/1024환경/8물체 CHECK epoch2/frame262144 저장에서 fixed78000 전이·encoder73 tensor/RMS 동결·head6 tensor 갱신·adapter 없음·양쪽 BEFORE bias 갱신·모델/scalar finite·물리 배치 최종 실패0을 확인했다. 첫 집계 실제 loco/pickUp/carryWith는45.6/29.1/25.2%였다(carryWith 요청563개 중77개 fallback). [학습](output_etc/check/before_nonemask_rsi433_20261028/training_validation.json).
+- 32환경에서 loco/mix/pickup/carry·단독5개 구성의 상대 자세·carry HOLDING/높이·AT progress 연결·AMP·부분 reset·가중치 불변을 확인했다. [물리/재로드](output_etc/check/before_nonemask_rsi433_20261028/eval/physics_validation.json). 전용 test wrapper의 BEFORE ON_TOP·mix·4환경·32step headless 재로드와 셸/Python 문법·문서 경로/순서·diff도 확인했다. [wrapper 평가](output_etc/check/before_nonemask_rsi433_20261028/eval.log). 본학습과 GUI/VNC 실화면·장기 성능은 미검증이며 기존 학습 프로세스는 유지했다.
+
+
 ### AT progress SELF bias0·NONE 마스킹
 
 - `stage2_before_ground_mix226_atprogress_nonemask_1200` env/train YAML·전용 train/test/VNC와 실행 계약을 추가했다. actor·critic 사람 SA4의 `before_only_mask_none` 모드는 SELF bias 상수0·NONE 완전 차단·BEFORE bias만 학습한다. adapter 없는 AT progress의 fixed78000 새 전이·encoder/RMS 동결·action head 학습·거리20/20/60·loco·보상/gate·1200step·학습률2e-5를 유지한다. 기존 bias0와 같은 파라미터 모양이라도 checkpoint 계약으로 혼용을 차단한다. [설계](markdowns/reference/stage2_before.md#at-progress-self-bias-0none-마스킹), [명령](markdowns/config.md).

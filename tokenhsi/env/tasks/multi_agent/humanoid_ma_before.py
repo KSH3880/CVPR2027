@@ -1,5 +1,8 @@
 from dataclasses import replace
 from utils.before_full_rsi import full_rsi
+from env.tasks.multi_agent import before_pickup_carry_rsi as pickup_carry
+from env.tasks.multi_agent import before_relative_sampling as relative_sampling
+from utils.before_relative_sampling import DISTANCE_MIXTURE as RELATIVE_DISTANCE_MIXTURE
 from env.tasks.multi_agent import before_full_rsi as full_reset
 
 from isaacgym import gymapi
@@ -21,7 +24,12 @@ class HumanoidMABefore(HumanoidMACarry):
     _place_distractors = HumanoidMASharedSupport._place_distractors
     def _ontop_scene_infeasible(self, ids):
         base = lambda rows: HumanoidMASharedSupport._ontop_scene_infeasible(self, rows)
-        return full_reset.screen(self, ids, base) if full_rsi(self.cfg['env']) else base(ids)
+        if full_rsi(self.cfg['env']):
+            return full_reset.screen(self, ids, base)
+        bad = base(ids)
+        if self.cfg['env']['before'].get('distance_mixture') == RELATIVE_DISTANCE_MIXTURE:
+            bad |= relative_sampling.invalid(self, ids)
+        return pickup_carry.screen(self, ids, bad) if self.cfg['env']['before'].get('follower_pickup_carry_rsi') else bad
 
     def _load_box_asset(self):
         n, m, p = self.num_envs, self.num_agents, self.num_physical_objects
@@ -64,6 +72,7 @@ class HumanoidMABefore(HumanoidMACarry):
         self._task_token_count = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
         self._before_carry_mask = torch.zeros(shape, device=self.device, dtype=torch.bool)
         self._before_carry_counts = torch.zeros(4, device=self.device)
+        pickup_carry.allocate(self)
 
     def _init_ontop_context_runtime(self):
         super()._init_ontop_context_runtime()
@@ -126,6 +135,8 @@ class HumanoidMABefore(HumanoidMACarry):
         self._sampling_counts[1:6] += torch.bincount(templates.flatten(), minlength=5)
         if full_rsi(self.cfg['env']):
             full_reset.new_graph(self, ids)
+        if self.cfg['env']['before'].get('follower_pickup_carry_rsi'):
+            pickup_carry.select(self, ids)
         spec = self.cfg['env']['before'].get('follower_carry_rsi')
         if spec is not None:
             mode = getattr(self.cfg['args'], 'before_carry_rsi', 'loco') if self._is_eval else 'mix'
@@ -149,9 +160,17 @@ class HumanoidMABefore(HumanoidMACarry):
             return super()._reset_ref_state_init(slot_env, slot_agent)
         if (~carry).any():
             super()._reset_ref_state_init(slot_env[~carry], slot_agent[~carry])
-        rows, owners = slot_env[carry], slot_agent[carry]
-        clips, times = self._size_rsi_cache.sample('carryWith', rows, owners, self._templates[rows, owners])
-        lib = self._motion_lib['carryWith']
+        for skill in ('pickUp', 'carryWith'):
+            self._reset_follower_rsi(slot_env, slot_agent, carry, skill)
+
+    def _reset_follower_rsi(self, slot_env, slot_agent, carry, skill):
+        selected = carry & ((self._before_rsi_skill[slot_env, slot_agent] == 1) if skill == 'pickUp'
+                            else (self._before_rsi_skill[slot_env, slot_agent] != 1))
+        if not selected.any():
+            return
+        rows, owners = slot_env[selected], slot_agent[selected]
+        clips, times = self._size_rsi_cache.sample(skill, rows, owners, self._templates[rows, owners])
+        lib = self._motion_lib[skill]
         root, rot, dofs, vel, ang, dof_vel, _ = lib.get_motion_state(clips, times)
         offset = self._agent_spawn_offsets[owners] + self._env_origins[rows]
         self._set_env_state(rows, owners, root_pos=root+offset, root_rot=rot,
@@ -160,11 +179,11 @@ class HumanoidMABefore(HumanoidMACarry):
         self._kinematic_humanoid_rigid_body_states[rows, owners] = torch.cat(
             (pos+offset[:, None], quat, linear, angular), -1)
         self._every_env_init_dof_pos[rows, owners] = dofs
-        self._reset_ref_slots['carryWith'] = (rows, owners)
-        self._reset_ref_motion_ids['carryWith'] = clips
-        self._reset_ref_motion_times['carryWith'] = times
+        self._reset_ref_slots[skill] = (rows, owners)
+        self._reset_ref_motion_ids[skill] = clips
+        self._reset_ref_motion_times[skill] = times
         if not self._is_eval:
-            self._size_rsi_requested[4, self._skill.index('carryWith')] += len(rows)
+            self._size_rsi_requested[4, self._skill.index(skill)] += len(rows)
 
     def _init_amp_obs(self, env_ids):
         super()._init_amp_obs(env_ids)
@@ -174,10 +193,10 @@ class HumanoidMABefore(HumanoidMACarry):
                     self._init_amp_obs_ref(slots, self._reset_ref_motion_ids[skill],
                                            self._reset_ref_motion_times[skill], skill)
             return
-        if 'carryWith' not in self._skill and 'carryWith' in self._reset_ref_slots:
-            self._init_amp_obs_ref(self._reset_ref_slots['carryWith'],
-                self._reset_ref_motion_ids['carryWith'],
-                self._reset_ref_motion_times['carryWith'], 'carryWith')
+        for skill in ('pickUp', 'carryWith'):
+            if skill not in self._skill and skill in self._reset_ref_slots:
+                self._init_amp_obs_ref(self._reset_ref_slots[skill],
+                    self._reset_ref_motion_ids[skill], self._reset_ref_motion_times[skill], skill)
 
     def _sample_box_assignments(self, ids):
         return
@@ -197,6 +216,8 @@ class HumanoidMABefore(HumanoidMACarry):
         super()._reset_boxes(ids)
         if slots is not None:
             self._reset_ref_slots['loco'] = slots
+        if self.cfg['env']['before'].get('distance_mixture') == RELATIVE_DISTANCE_MIXTURE:
+            return relative_sampling.apply_layout(self, ids)
         row, human = (self._before_predecessor[ids] >= 0).nonzero(as_tuple=True)
         es = ids[row]
         first = self._before_predecessor[es, human]
@@ -283,6 +304,8 @@ class HumanoidMABefore(HumanoidMACarry):
         result = super()._consume_sampling_diagnostics()
         if full_rsi(self.cfg['env']):
             result.update(full_reset.diagnostics(self))
+        if self.cfg['env']['before'].get('follower_pickup_carry_rsi'):
+            result.update(pickup_carry.diagnostics(self))
         if self.cfg['env']['before'].get('follower_carry_rsi') is not None:
             eligible, requested, executed, fallback = self._before_carry_counts
             for key, value in (('eligible', eligible), ('requested', requested),

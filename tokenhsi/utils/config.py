@@ -113,6 +113,13 @@ def load_cfg(args):
         adapter_bias0_name = 'Stage2BeforeGroundMix226ATProgressAdapterBias0_1200'
         bias0_name = 'Stage2BeforeGroundMix226ATProgressBias0_1200'
         none_mask_name = 'Stage2BeforeGroundMix226ATProgressNoneMask_1200'
+        rsi433_name = 'Stage2BeforeGroundMix226ATProgressNoneMaskRSI433_1200'
+        near50_name = 'Stage2BeforeGroundATProgressNoneMaskRSI433Near50_1200'
+        none_mask_names = (none_mask_name, rsi433_name, near50_name)
+        from utils.before_pickup_carry_rsi import SPEC as pickup_carry_spec
+        expected_pickup_carry = pickup_carry_spec if training['name'] in (rsi433_name, near50_name) else None
+        if cfg['env']['before'].get('follower_pickup_carry_rsi') != expected_pickup_carry:
+            raise ValueError('BEFORE pickup/carry RSI does not match the experiment training config')
         expected_adapter = 'tokenhsi_internal_v1' if training['name'] in (adapter_name, adapter_bias0_name) else None
         if cfg['env']['relationGraph'].get('actor_head_adapter') != expected_adapter:
             raise ValueError('BEFORE actor_head_adapter does not match the experiment training config')
@@ -122,8 +129,8 @@ def load_cfg(args):
         if cfg['env']['before'].get('follower_carry_rsi') != expected_carry:
             raise ValueError('BEFORE carry RSI does not match the experiment training config')
         actor_bias0_names = ('Stage2BeforeGroundMix226ActorBias0_1200',
-                             'Stage2BeforeGroundMix226ATProgressActorBias0_1200', adapter_bias0_name, bias0_name, none_mask_name)
-        expected_critic_bias = ('before_only_mask_none' if training['name'] == none_mask_name else
+                             'Stage2BeforeGroundMix226ATProgressActorBias0_1200', adapter_bias0_name, bias0_name, none_mask_name, rsi433_name)
+        expected_critic_bias = ('before_only_mask_none' if training['name'] in none_mask_names else
                                'before_only' if training['name'] in (adapter_bias0_name, bias0_name) else 'all')
         if cfg['env']['relationGraph'].get('critic_human_bias', 'all') != expected_critic_bias:
             raise ValueError('BEFORE critic_human_bias does not match the experiment training config')
@@ -132,14 +139,14 @@ def load_cfg(args):
         expected_full = full_rsi_spec if training['name'] == full_rsi_name else None
         if cfg['env']['before'].get('full_rsi') != expected_full:
             raise ValueError('BEFORE full RSI does not match the experiment training config')
-        at_progress_names = (none_mask_name, bias0_name, adapter_bias0_name, adapter_name, full_rsi_name, carry_rsi_name, 'Stage2BeforeGroundMix226ATProgress_1200',
+        at_progress_names = (near50_name, rsi433_name, none_mask_name, bias0_name, adapter_bias0_name, adapter_name, full_rsi_name, carry_rsi_name, 'Stage2BeforeGroundMix226ATProgress_1200',
                              'Stage2BeforeGroundMix226ATProgressActorBias0_1200')
         mix226_names = ('Stage2BeforeGroundMix226_1200', 'Stage2BeforeGroundMix226ATProgress_1200') + actor_bias0_names + (carry_rsi_name, full_rsi_name, adapter_name)
-        expected_bias = ('before_only_mask_none' if training['name'] == none_mask_name else
+        expected_bias = ('before_only_mask_none' if training['name'] in none_mask_names else
                          'before_only' if training['name'] in actor_bias0_names else 'all')
         if cfg['env']['relationGraph'].get('actor_human_bias', 'all') != expected_bias:
             raise ValueError('BEFORE actor_human_bias does not match the experiment training config')
-        if training['name'] in ('Stage2BeforeGround', 'Stage2BeforeGroundMix50', 'Stage2BeforeGroundMix334_1200') + mix226_names and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
+        if training['name'] in ('Stage2BeforeGround', 'Stage2BeforeGroundMix50', 'Stage2BeforeGroundMix334_1200') + mix226_names + (near50_name,) and cfg['env']['box']['reset']['platformMode'] != 'ground_only':
             raise ValueError('stage2_before_ground requires a ground_only environment/checkpoint')
         if training['name'] == 'Stage2BeforeGroundMix50':
             from utils.before_sampling import DISTANCE_MIXTURE
@@ -157,6 +164,12 @@ def load_cfg(args):
                 raise ValueError('stage2_before_ground_mix226_1200 requires the 20/20/60 distance mixture')
             if not is_eval and cfg['env']['episodeLength'] != 1200:
                 raise ValueError('stage2_before_ground_mix226_1200 training requires 1200 steps')
+        if training['name'] == near50_name:
+            from utils.before_relative_sampling import DISTANCE_MIXTURE as relative_mixture
+            if cfg['env']['before'].get('distance_mixture') != relative_mixture:
+                raise ValueError('BEFORE near50 requires original/relative-sum 50/50')
+            if not is_eval and cfg['env']['episodeLength'] != 1200:
+                raise ValueError('BEFORE near50 training requires 1200 steps')
         at_progress = cfg['env']['before'].get('progress_target', 'current_box')
         expected_target = ('predecessor_at_goal' if training['name'] in at_progress_names
                            else 'current_box')
@@ -198,6 +211,9 @@ def load_cfg(args):
     carry_mode = getattr(args, 'before_carry_rsi', 'loco')
     if carry_mode != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('follower_carry_rsi')):
         raise ValueError('--before_carry_rsi mix/carry requires the carry RSI evaluation config')
+    pickup_carry_mode = getattr(args, 'before_pickup_carry_rsi', 'loco')
+    if pickup_carry_mode != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('follower_pickup_carry_rsi')):
+        raise ValueError('--before_pickup_carry_rsi requires the follower pickup/carry RSI evaluation config')
     before_short = getattr(args, "before_follower_short", False)
     if getattr(args, "before_follower_near", False) or before_short:
         if not args.eval or 'before' not in cfg['env']:
@@ -437,6 +453,8 @@ def get_args(benchmark=False):
          "help": "BEFORE loco evaluation with randomized follower-near placement"},
         {"name": "--before_full_rsi", "type": str, "choices": ["loco", "mix", "both_carry"], "default": "loco",
          "help": "Full Stage1 RSI evaluation: loco, training mix, or both ON_TOP pair members carrying"},
+        {"name": "--before_pickup_carry_rsi", "type": str, "choices": ["loco", "mix", "pickup", "carry"], "default": "loco",
+         "help": "BEFORE ON_TOP follower RSI evaluation mode"},
         {"name": "--before_carry_rsi", "type": str, "choices": ["loco", "mix", "carry"], "default": "loco",
          "help": "BEFORE ON_TOP follower evaluation initialization; default loco"},
         {"name": "--before_follower_short", "action": "store_true", "default": False,

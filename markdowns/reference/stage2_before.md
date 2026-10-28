@@ -179,3 +179,13 @@ fixed78000에서 새로 시작하며 거리20/20/60·loco·AT progress·보상/g
 단독·선행 AT는 SELF만, 후행은 SELF와 BEFORE 선행만 볼 수 있다. SELF만 있는 행의 QK는 선택에 영향을 주지 않지만 V·출력 projection·FFN은 학습한다. 현재 모델은 BEFORE만 지원하며 COUPLED와 BEFORE를 함께 구분하는 확장은 포함하지 않는다.
 
 fixed78000 새 전이·encoder/RMS 동결·기존 action head 학습·거리20/20/60·loco·AT progress·1200step·학습률2e-5를 유지한다. SELF/NONE bias0 버전과는 마스킹 유무만 다르며, 가중치 모양이 같아도 checkpoint 계약에서 혼용을 거부한다.
+
+## Nonemask 후행 ON_TOP RSI433
+
+`stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200`는 nonemask의 actor·critic SELF bias0·NONE 완전 마스킹·BEFORE bias 학습, AT progress·20/20/60 거리·1200step·2e-5·encoder/RMS 동결·action head 학습을 유지한다. Stage1 fixed78000에서 새 전이하며 BEFORE ON_TOP 후행만 loco/pickUp/carryWith를40/30/30으로 요청한다. 스킬 선택은 그래프당 한 번이며 배치 재시도에서 다시 추첨하지 않는다.
+
+carry50의 전용 캐시를 두 스킬로 확장했다. pickUp은 크기·몸 관통·native 물리 검사를 통과한 집기 전/중 프레임, carryWith는 추가로 HOLDING·바닥8cm 이상을 통과한 프레임을 clip 내에서 균등 선택한다(clip은 원래 모션 가중치). 원본 모션·상대 자세를 변형하지 않으며 후행 사람과 payload에 같은 XY 이동·yaw 회전을 적용한다. 선행·단독·SIT/CLIMB 초기화는 loco를 유지한다. 캐시에서 불가능한 요청과8회 재시도 후 배치 불가능한 요청은 해당 후행만 loco로 대체한다. 캐시는 확인 실행 시 output_etc/check 아래, 본학습 시 output/rsi_cache_before_carry 아래의 내용 해시별 새 파일로 분리된다. 요청/실행/fallback 통계와 checkpoint 계약을 분리한다. 평가 RSI는 명시적 옵션으로만 적용한다.
+
+## RSI433 상대 거리 합 near50
+
+`stage2_before_ground_atprogress_nonemask_rsi433_near50_1200`는 기존 RSI433에서 거리 혼합만 교체한다. pair별 원래/가까움50/50과 후행 ON_TOP RSI40/30/30은 독립이다. 모드·그래프·RSI 요청은 재시도에서 유지한다. 두 모드 모두 기존 BEFORE의 제안 분포를 사용한다(선행 접근1~10m, 후행 SIT1~5m·CLIMB/ON_TOP1~10m, loco ON_TOP 자기 상자 접근1~10m). 목표도 기존 BEFORE 샘플러를 따른다. 가까운 모드만 XY에서 `선행 사람→선행 상자 > 후행 사람→받침 상자 + ON_TOP이면 후행 사람→들 상자`를 요구한다. 가까운 쌍의 선행 상자·후행 위치·loco payload 배치를 다시 제안하며256회 소진 시 오류로 종료한다. 원래 모드·단독 배치는 조건을 강제하지 않는다. pickUp/carryWith의 상대 자세는 그대로 두고 후행 사람·상자를 같은 XY 이동·yaw로 옮긴다. 최종 물리 배치 검사에서도 합 조건을 확인하며 조건을 풀어 fallback하지 않는다. 캐시/프레임·RSI fallback·보상·네트워크는 RSI433과 같다. checkpoint 계약은 거리 설정으로 분리한다.

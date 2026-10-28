@@ -231,3 +231,15 @@ bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50
 `stage2_before_ground_mix226_atprogress_adapter_bias0_1200`은 actor·critic 사람 SA 모두 SELF/NONE bias0인 [별도 adapter 실험](reference/stage2_before.md#adapter-actorcritic-selfnone-bias-0)이다. 기본 학습/test/VNC 명령은 [config](config.md)에 있다. Stage1 fixed78000에서 새로 시작하며 resume에는 이 실험에서 저장한 checkpoint만 사용한다.
 
 평가 환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_ADAPTER_BIAS0_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1/2`, `HEADLESS`, `TASK_GRAPH`, `EVAL_SKILLS`, `EPISODE_LENGTH`는 기반 adapter와 같다. 별도 지정이 없으면 checkpoint 옆 `relation_config.yaml`을 읽는다.
+
+## Stage2 BEFORE nonemask RSI433
+
+`stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200`는 Stage1 fixed78000에서 새 전이하며 BEFORE ON_TOP 후행만 loco 40% / pickUp 30% / carryWith 30%를 요청한다. 나머지 사람·과제는 loco다. clip은 원래 모션 가중치로, clip 내 유효 프레임은 균등 선택하며 pickUp은 집기 전·중 프레임을 허용하고 carryWith는 HOLDING·상자 바닥8cm 이상을 요구한다. 사람·상자 상대 자세와 속도를 함께 옮긴다. 크기/물리 프레임 부재 또는8회 배치 재시도 소진 시 해당 후행만 loco로 fallback하며 그래프·거리 모드는 유지한다. 요청 비율과 실제 적용 비율은 다를 수 있다. TensorBoard `relation/sampling/before_pickup_carry/`에서 스킬별 requested/executed/fallback/fraction을 확인한다.
+
+평가 기본은 `BEFORE_PICKUP_CARRY_RSI=loco`다. `mix`는40/30/30, `pickup`은 후행 ON_TOP 전원 pickUp 요청, `carry`는 전원 carryWith 요청이다. 직접 옵션은 `--before_pickup_carry_rsi loco|mix|pickup|carry`다. `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`을 유지하며 test/VNC 모두 같은 환경변수를 지원한다. 예: `BEFORE_PICKUP_CARRY_RSI=mix HEADLESS=1 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200_test.sh "$CKPT" 4 32 8 1`. 기존 nonemask/carry50/full RSI checkpoint와 혼용하지 않는다. 학습·로컬·서버 기본 명령은 [config](config.md)에 있다.
+
+## Stage2 BEFORE RSI433 relative near50
+
+`stage2_before_ground_atprogress_nonemask_rsi433_near50_1200`는 RSI433의 nonemask·AT progress·후행 ON_TOP loco/pickUp/carryWith40/30/30·fixed78000 새 전이를 유지하고 거리만 원래 BEFORE/후행 가까움50/50으로 바꾼다. 원래 모드와 가까운 모드는 같은 원래 거리 제안 분포를 사용하며20/20/60의 상한·선행 단거리 보정·목표 거리 혼합은 사용하지 않는다. 원래 목표 샘플러를 유지한다. 가까운 모드는 XY 기준 선행 사람→선행 상자 거리보다 후행 거리 비용이 작아야 한다. SIT/CLIMB는 후행 사람→선행 상자, ON_TOP은 후행 사람→자기 들 상자 + 후행 사람→받침 상자의 합이다. 위반 시 가까운 쌍의 거리 배치만 재추첨한다. 원래 모드에는 이 부등식을 강제하지 않는다. RSI 사람·상자 상대 자세와 속도는 함께 변환한다.
+
+거리 모드와 RSI 요청은 독립적으로 그래프당 한 번 선택하며 물리 재시도에서도 유지한다. `BEFORE_FOLLOWER_NEAR=0`(기본)은50/50, `1`은 모든 BEFORE 쌍에 상대적 가까움 조건을 적용한다. `2`/`--before_follower_short`는 지원하지 않는다. `BEFORE_PICKUP_CARRY_RSI=loco|mix|pickup|carry`는 RSI433과 같으며 기본 loco 평가다. 예: `BEFORE_FOLLOWER_NEAR=1 BEFORE_PICKUP_CARRY_RSI=mix HEADLESS=1 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200_test.sh "$CKPT" 4 32 8 1`. 실행 명령은 [config](config.md)에 있다.
