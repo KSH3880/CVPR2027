@@ -33,3 +33,13 @@
 KSH의 새 실행은 [EXECUTION.md](../ksh_jointpush/EXECUTION.md), 로컬 변경은 [LOCAL_CHANGELOG.md](../ksh_jointpush/LOCAL_CHANGELOG.md)를 따른다. frozen source 안의 원본 문서는 provenance 보존을 위해 수정하지 않았다.
 
 검증: 이동 안전성 CPU4tests, KSH CPU19tests, 새 경로의2환경 CPU reset/정책/부분reset(optimizer0, rc0), 원본554파일 해시,53쌍 경로 접근,46개 실행 파일 구문·diff 검사를 통과했다. 기본 `scripts/check_docs.py`는 이 checkout 대신 `/home/hwanhee/CVPR2027`을 검사하도록 기존부터 하드코딩되어 외부 steer 진입 문서2개의 링크 누락을 보고한다. 외부 문서는 수정하지 않았다.
+
+## 2026-10-28 runs 로그·과거 실험 정리
+
+현재 실행·코드·심링크 의존성을 검사해 완료 실험 폴더81개와 미사용 로그/실행 파일140개를 압축 보관한 뒤 `runs/` 원본을 제거했다. 보관 위치는 각 프로젝트 `output_etc/archive/runs/`, 공통 기록은 `runs/archive/cleanup_20261028/`다. 원본13,672,886,443바이트의 실험 폴더를10,840,947,819바이트로 압축했고 개별 로그도 별도 보관했다. `runs/` 자체 용량은 약23GB에서9.9GB로 줄었다. 이 감소에는 프로젝트별 보관 위치로 이동한 양이 포함된다.
+
+압축마다 tar 원본 대조·SHA-256 기록을 수행하고 제거 직전에 열린 파일·실행 인자·cwd를 재확인했다. 원시 결과·실패 근거를 압축본에 보존했으며 checkpoint·큐 원장·설정·설치/빌드 경로는 유지했다. 현재 학습/supervisor/TensorBoard/proxy/viewer 생존과 학습 event 갱신을 확인했다.
+
+[보관 인덱스 및 복원 방법](../runs/archive/cleanup_20261028/INDEX.md), [상세 목록·압축본 해시·유지 이유](../runs/archive/cleanup_20261028/manifest.json).
+
+미사용 상위 실험 폴더 안에 있던 이전 호환 링크도 압축되었으므로, 해당 구 경로는 보관 인덱스에서 찾는다. 현재 프로젝트 `output/` 결과와 실행 중인 경로는 유지한다. 과거 launch-time 경로가 담긴 문서는 역사 기록으로 보존했다.

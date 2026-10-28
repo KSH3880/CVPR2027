@@ -4,6 +4,11 @@
 
 ## 2026-10-28
 
+### runs의 미사용 실험·로그 압축 보관
+
+사용자 요청으로 실행 프로세스·코드·심링크 의존성이 없는 과거 실험을 output_etc/archive/runs에 보관했다. 전체81폴더·140개별파일을 tar 원본 대조·압축본 SHA 기록 후 runs에서 제거했다. 원시 결과와 실패 근거는 보존했으며 학습/supervisor/TensorBoard/viewer 생존과 학습 event 갱신을 확인했다. 보관 목록·복원은 ../runs/archive/cleanup_20261028/INDEX.md, 정책은 ../docs/OUTPUT_LAYOUT.md.
+
+
 ### Table Carry 본학습 결과 output 통합
 
 기존 table_carry/finetune 결과를 output/table_carry로 이동하고 새 본학습 runtime 기본값과 train/resume 안내를 맞췄다. 검증·에셋·상태는 보존하고 구 학습 경로에 호환 링크를 유지했다. checkpoint inode/크기·경로 접근·shell 구문 확인. 상세 ../docs/OUTPUT_LAYOUT.md.

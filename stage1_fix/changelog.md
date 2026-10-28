@@ -4,6 +4,11 @@
 
 ## 2026-10-28
 
+### runs의 미사용 실험·로그 압축 보관
+
+사용자 요청으로 실행 프로세스·코드·심링크 의존성이 없는 과거 실험을 output_etc/archive/runs에 보관했다. 이 프로젝트 실험 폴더 4개를 포함해 전체81폴더·140개별파일을 tar 원본 대조·압축본 SHA 기록 후 runs에서 제거했다. 원시 결과와 실패 근거는 보존했으며 학습/supervisor/TensorBoard/viewer 생존과 학습 event 갱신을 확인했다. 보관 목록·복원은 ../runs/archive/cleanup_20261028/INDEX.md, 정책은 ../docs/OUTPUT_LAYOUT.md.
+
+
 ### Push/Door 본학습 결과 output 통합
 
 기존 split_goal 학습 checkpoint·TensorBoard·진단을 output/push_door 아래로 이동했다. 원래 runs 경로는 호환 링크로 남기고 snapshot·상태는 유지했다. checkpoint inode/크기 및 경로 접근 검사 통과. 기존 학습은 유지했다. 상세 ../docs/OUTPUT_LAYOUT.md.

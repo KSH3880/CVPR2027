@@ -2,6 +2,11 @@
 
 ## 2026-10-28
 
+### runs의 미사용 실험·로그 압축 보관
+
+사용자 요청으로 실행 프로세스·코드·심링크 의존성이 없는 과거 실험을 output_etc/archive/runs에 보관했다. 이 프로젝트 실험 폴더 46개를 포함해 전체81폴더·140개별파일을 tar 원본 대조·압축본 SHA 기록 후 runs에서 제거했다. 원시 결과와 실패 근거는 보존했으며 학습/supervisor/TensorBoard/viewer 생존과 학습 event 갱신을 확인했다. 보관 목록·복원은 ../runs/archive/cleanup_20261028/INDEX.md, 정책은 ../docs/OUTPUT_LAYOUT.md.
+
+
 ### 프로젝트별 output 및 KSH 최상위 분리
 
 완료 JointPush 학습 결과를 output에 모으고 사용 중인 결과는 연결만 추가했다. KSH snapshot·전용 adapter/scripts/tests를 ../ksh_jointpush로 분리하고 구 경로 호환 링크를 유지했다. 원본554파일 해시·KSH CPU19tests·이동안전성4tests 통과. 기존 학습/supervisor/TensorBoard 생존과 결과 파일 접근 확인. 상세는 ../docs/OUTPUT_LAYOUT.md.

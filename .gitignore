@@ -137,3 +137,6 @@ TokenHSI-coord/output
 /ksh_jointpush/tokenhsi/data/dataset_sit/motions
 /ksh_jointpush/tokenhsi/data/dataset_sit/objects
 /ksh_jointpush/tokenhsi/data/jointpush_motions
+
+# Verified archives of retired runs
+**/output_etc/archive/
