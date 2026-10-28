@@ -21,9 +21,9 @@ def validate_env(env):
     if env['numAgents'] < 1 or env['numObjects'] < env['numAgents']:
         raise ValueError('BEFORE requires numAgents >= 1 and numObjects >= numAgents')
     before = dict(env['before'])
-    if env['relationGraph'].get('actor_human_bias', 'all') not in ('all', 'before_only'):
+    if env['relationGraph'].get('actor_human_bias', 'all') not in ('all', 'before_only', 'before_only_mask_none'):
         raise ValueError('Unknown BEFORE actor_human_bias')
-    if env['relationGraph'].get('critic_human_bias', 'all') not in ('all', 'before_only'):
+    if env['relationGraph'].get('critic_human_bias', 'all') not in ('all', 'before_only', 'before_only_mask_none'):
         raise ValueError('Unknown BEFORE critic_human_bias')
     if env['relationGraph'].get('actor_head_adapter') not in (None, 'tokenhsi_internal_v1'):
         raise ValueError('Unknown BEFORE actor_head_adapter')

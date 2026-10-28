@@ -2,6 +2,22 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-28
+
+### AT progress SELF bias0·NONE 마스킹
+
+- `stage2_before_ground_mix226_atprogress_nonemask_1200` env/train YAML·전용 train/test/VNC와 실행 계약을 추가했다. actor·critic 사람 SA4의 `before_only_mask_none` 모드는 SELF bias 상수0·NONE 완전 차단·BEFORE bias만 학습한다. adapter 없는 AT progress의 fixed78000 새 전이·encoder/RMS 동결·action head 학습·거리20/20/60·loco·보상/gate·1200step·학습률2e-5를 유지한다. 기존 bias0와 같은 파라미터 모양이라도 checkpoint 계약으로 혼용을 차단한다. [설계](markdowns/reference/stage2_before.md#at-progress-self-bias-0none-마스킹), [명령](markdowns/config.md).
+- 관련 CPU31개 통과. NONE 확률0·입력/점수 경로 차단·SELF-only QK gradient0·BEFORE/QK gradient·사람 순서 변경·actor/critic 명시적 마스크와 동등성·전이 초기 출력·head 학습/encoder 동결·재로드를 검사했다. GPU0/MPS·4명/1024환경/8물체 CHECK 학습 epoch2/frame262144에서 encoder73 tensor/RMS 동결·head6 tensor 갱신·adapter 없음·양쪽 SA/BEFORE bias 갱신·모델/scalar finite·물리 배치 최종 실패0을 확인했다. 저장본의 양쪽4레이어에서 NONE 확률 정확한0·SELF bias0도 검사했다. [CPU](output_etc/check/before_nonemask_20261028/cpu.log), [학습 검증](output_etc/check/before_nonemask_20261028/training_validation.json).
+
+- 전용 test로 BEFORE ON_TOP·더 가까움·4환경·32step headless 재로드를 확인했다. 셸/Python 문법·문서 경로/목록 순서·diff 확인. [재로드 로그](output_etc/check/before_nonemask_20261028/eval.log). 본학습은 시작하지 않았으며 기존 두 학습을 유지했다. GUI/VNC 실화면·장기 성능은 미검증이다.
+
+### Adapter 없는 AT progress actor·critic SELF/NONE bias0
+
+- `stage2_before_ground_mix226_atprogress_bias0_1200` env/train YAML·전용 train/test/VNC와 실행 계약을 추가했다. 기본 AT progress에서 actor·critic 사람 SA4의 SELF/NONE bias만 상수0으로 고정하고 BEFORE bias는 학습한다. adapter 없이 action head 학습·encoder/RMS 동결·fixed78000 새 전이·거리20/20/60·loco·AT progress·1200step·학습률2e-5를 유지한다. [설계](markdowns/reference/stage2_before.md#at-progress-actorcritic-selfnone-bias-0), [명령](markdowns/config.md).
+- 관련 CPU27개 통과: adapter 유무별 초기 출력 동등성·양쪽 고정0·BEFORE/QK gradient·head 학습/동결·Stage1 전이·재로드·checkpoint 혼용 거부 확인. GPU0/MPS·4명/1024환경/8물체 CHECK 학습 epoch2/frame262144에서 encoder73 tensor/RMS 동결·head6 tensor 갱신·adapter 없음·actor/critic 모든 layer/head SELF/NONE 정확한0·BEFORE/SA/critic head 갱신·finite·물리 배치 최종 실패0을 확인했다. [CPU](output_etc/check/before_atprogress_bias0_20261028/cpu.log), [학습 검증](output_etc/check/before_atprogress_bias0_20261028/training_validation.json).
+
+- 전용 test에서 BEFORE ON_TOP·더 가까움·4환경·32step headless 재로드를 확인했다. 셸/Python 문법·문서 경로/목록 순서·diff 확인. [재로드 로그](output_etc/check/before_atprogress_bias0_20261028/eval.log). 본학습은 시작하지 않았으며 기존 두 본학습을 유지했다. GUI/VNC 실화면·장기 성능은 미검증이다.
+
 ## 2026-10-27
 
 ### Adapter actor·critic SELF/NONE bias0

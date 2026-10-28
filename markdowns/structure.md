@@ -124,3 +124,7 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유
 `stage2_before_ground_mix226_atprogress_adapter_1200`의 env/train YAML·전용 train/test/VNC는 같은 디렉터리에 있다. `before_network.py`가 actor hidden Linear1·2의 공유 0-init adapter를 추가하며 `stage2_network_builder.py`가 Stage1 전이와 기존 head 전체 동결을 처리한다. `test_before_adapter.py`는 초기 출력 동등성·gradient·동결·전이·checkpoint 분리를 검사한다.
 
 `stage2_before_ground_mix226_atprogress_adapter_bias0_1200`은 adapter 기반 actor·critic SELF/NONE bias0 비교 설정으로 같은 위치의 env/train YAML·train/test/VNC를 사용한다. `stage2_network_builder.py`에서 `actor_human_bias`·`critic_human_bias`를 각각 전달하고 `before_spec.py`에서 checkpoint 계약을 분리한다. `test_before_adapter_bias0.py`는 양쪽 고정0·BEFORE/QK gradient·전이·동결·재로드를 검사한다.
+
+`stage2_before_ground_mix226_atprogress_bias0_1200`은 adapter 없는 AT progress의 actor·critic SELF/NONE bias0 설정으로 같은 위치의 env/train YAML·train/test/VNC를 사용한다. actor encoder/RMS는 동결하고 기존 action head는 학습한다. `test_before_adapter_bias0.py`에서 adapter 유무별 고정0·head 학습/동결·전이·재로드를 함께 검사한다.
+
+`stage2_before_ground_mix226_atprogress_nonemask_1200`의 env/train YAML·전용 train/test/VNC는 같은 위치에 있다. `human_coordination.py`의 `before_only_mask_none` 모드가 actor·critic 사람 SA의 NONE을 차단하며 SELF bias는0, BEFORE bias만 학습한다. `test_before_none_mask.py`는 연결 차단·gradient·순서 변경·전이/재로드·checkpoint 분리를 검사한다.

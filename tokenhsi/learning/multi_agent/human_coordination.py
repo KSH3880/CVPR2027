@@ -27,9 +27,9 @@ def task_relations(packet, num_agents):
 class CoordinationBlock(nn.Module):
     def __init__(self, width, heads, feedforward_dim, relations, bias_mode="all"):
         super().__init__()
-        if bias_mode not in ("all", "before_only"):
+        if bias_mode not in ("all", "before_only", "before_only_mask_none"):
             raise ValueError("Unknown human attention bias mode")
-        if bias_mode == "before_only" and relations != 3:
+        if bias_mode != "all" and relations != 3:
             raise ValueError("before_only requires NONE/SELF/BEFORE relations")
         self.bias_mode = bias_mode
         self.attention = nn.MultiheadAttention(
@@ -42,17 +42,19 @@ class CoordinationBlock(nn.Module):
             nn.ReLU(),
             nn.Linear(feedforward_dim, width),
         )
-        # before_only stores only BEFORE: fixed NONE/SELF are not parameters.
-        self.relation_bias = nn.Parameter(torch.zeros(heads, 1 if bias_mode == "before_only" else relations))
+        # Restricted modes store only BEFORE; NONE/SELF have no parameters.
+        self.relation_bias = nn.Parameter(torch.zeros(heads, relations if bias_mode == "all" else 1))
 
     def effective_relation_bias(self):
-        if self.bias_mode == "before_only":
+        if self.bias_mode != "all":
             return torch.cat((self.relation_bias.new_zeros(self.relation_bias.shape[0], 2),
                               self.relation_bias), dim=-1)
         return self.relation_bias
 
     def forward(self, humans, tokens, relations, padding):
         bias = self.effective_relation_bias()[:, relations].permute(1, 0, 2, 3)
+        if self.bias_mode == "before_only_mask_none":
+            padding = padding | (relations == 0)[:, None]
         bias = bias.masked_fill(padding, float("-inf")).flatten(0, 1)
         query = self.query_norm(humans)
         if tokens is None:
@@ -101,7 +103,7 @@ class HumanCoordination(nn.Module):
         bias_mode="all",
     ):
         super().__init__()
-        if bias_mode == "before_only" and not before:
+        if bias_mode in ("before_only", "before_only_mask_none") and not before:
             raise ValueError("before_only bias requires BEFORE coordination")
         self.shuffle_human_order = shuffle_human_order
         self.before = before

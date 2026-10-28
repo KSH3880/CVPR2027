@@ -165,3 +165,17 @@ Adapter1·2는 bias를 포함한 full-size Linear이고 weight/bias 모두0에�
 Stage1의 actor/critic 모두 SELF/NONE 관계 bias0 규칙을 Stage2 사람 SA에도 적용하는 비교다. QK 점수·attention 자체를0으로 만들지 않으며, adapter Linear의 bias와 일반 Linear bias는 이 옵션의 대상이 아니다. 기존 Stage1 encoder의 관계 bias 계산은 유지한다.
 
 기반 adapter 실험의 encoder/RMS·head3층 동결, 공유 Adapter1·2의0 초기화·학습, critic/AMP 학습, AT progress·거리20/20/60·loco·1200step·학습률2e-5는 그대로다. 같은 fixed78000에서 새로 시작한다. 기존 actor-only bias0 실험의 critic은 계속 전체 관계 bias를 학습한다. 새 설정은 actor/critic bias 모드를 checkpoint 계약에 포함하므로 기존 adapter·actor-only 체크포인트와 혼용할 수 없다.
+
+## AT progress actor·critic SELF/NONE bias 0
+
+`stage2_before_ground_mix226_atprogress_bias0_1200`은 adapter 없는 AT progress 기반이다. `relationGraph.actor_human_bias`와 `critic_human_bias`를 모두 `before_only`로 지정해 사람 SA4의 모든 layer/head에서 SELF/NONE bias를 상수0으로 유지하고 BEFORE bias·Q/K/V는 학습한다. 기존 actor encoder/RMS는 동결하고 action head는 계속 학습한다.
+
+fixed78000에서 새로 시작하며 거리20/20/60·loco·AT progress·보상/gate·1200step·학습률2e-5는 기존 AT progress와 동일하다. adapter는 생성하지 않는다. actor-only bias0·adapter 양쪽 bias0·기본 AT progress와 checkpoint 계약 및 output/전용 train/test/VNC를 분리한다.
+
+## AT progress SELF bias 0·NONE 마스킹
+
+`stage2_before_ground_mix226_atprogress_nonemask_1200`은 adapter 없는 AT progress에서 actor·critic `relationGraph.*_human_bias`를 모두 `before_only_mask_none`으로 지정한다. 사람 간 SA4의 각 layer/head는 BEFORE bias 하나만 학습하며 SELF bias는 상수0이다. NONE은 QK 계산 뒤 softmax 전에 `-inf`로 마스킹해 확률과 해당 점수를 통한 gradient가0이다. 사람-물체 encoder attention은 변경하지 않는다.
+
+단독·선행 AT는 SELF만, 후행은 SELF와 BEFORE 선행만 볼 수 있다. SELF만 있는 행의 QK는 선택에 영향을 주지 않지만 V·출력 projection·FFN은 학습한다. 현재 모델은 BEFORE만 지원하며 COUPLED와 BEFORE를 함께 구분하는 확장은 포함하지 않는다.
+
+fixed78000 새 전이·encoder/RMS 동결·기존 action head 학습·거리20/20/60·loco·AT progress·1200step·학습률2e-5를 유지한다. SELF/NONE bias0 버전과는 마스킹 유무만 다르며, 가중치 모양이 같아도 checkpoint 계약에서 혼용을 거부한다.
