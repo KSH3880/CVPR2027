@@ -33,4 +33,11 @@ class BeforeBuilder(Stage2Builder):
             return self.action_head[1](humans)
 
         def _humans(self, encoder, obs):
+            if self.relation_graph_spec.get('before_object_alias') is not None:
+                from utils.before_object_alias import encoder_packet
+                width = 5*self.num_agents
+                packet = encoder_packet(obs[:, -width:], self.num_agents, self.num_objects)
+                # Keep the caller's packet intact: Stage2 human SA derives its
+                # BEFORE relation from the original shared-object identities.
+                obs = torch.cat((obs[:, :-width], packet), -1)
             return encoder(obs)

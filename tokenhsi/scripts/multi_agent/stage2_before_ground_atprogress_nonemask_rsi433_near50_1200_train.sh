@@ -9,7 +9,7 @@ set -- --num_agents "${1:-4}" --num_envs "${2:-1024}" --num_objects "${3:-8}" --
 if [ -n "${RESUME_CHECKPOINT:-}" ]; then
   set -- "$@" --checkpoint "$RESUME_CHECKPOINT" --resume 1
 else
-  set -- "$@" --transfer_checkpoint "${STAGE1_CHECKPOINT:-/home/hwanhee/juan/CVPR2027/stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth}"
+  set -- "$@" --transfer_checkpoint "${STAGE1_CHECKPOINT:-../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth}"
 fi
 if [ -n "${MAX_ITERATIONS:-}" ]; then set -- "$@" --max_iterations "$MAX_ITERATIONS"; fi
 python tokenhsi/run.py --task HumanoidMABefore \

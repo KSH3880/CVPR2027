@@ -383,4 +383,4 @@ sim:
 experiment:
   name: stage2_before_ground_atprogress_nonemask_rsi433_near50_1200
   transfer:
-    checkpoint: /home/hwanhee/juan/CVPR2027/stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth
+    checkpoint: ../stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth

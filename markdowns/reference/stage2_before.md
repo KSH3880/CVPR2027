@@ -189,3 +189,38 @@ carry50의 전용 캐시를 두 스킬로 확장했다. pickUp은 크기·몸 �
 ## RSI433 상대 거리 합 near50
 
 `stage2_before_ground_atprogress_nonemask_rsi433_near50_1200`는 기존 RSI433에서 거리 혼합만 교체한다. pair별 원래/가까움50/50과 후행 ON_TOP RSI40/30/30은 독립이다. 모드·그래프·RSI 요청은 재시도에서 유지한다. 두 모드 모두 기존 BEFORE의 제안 분포를 사용한다(선행 접근1~10m, 후행 SIT1~5m·CLIMB/ON_TOP1~10m, loco ON_TOP 자기 상자 접근1~10m). 목표도 기존 BEFORE 샘플러를 따른다. 가까운 모드만 XY에서 `선행 사람→선행 상자 > 후행 사람→받침 상자 + ON_TOP이면 후행 사람→들 상자`를 요구한다. 가까운 쌍의 선행 상자·후행 위치·loco payload 배치를 다시 제안하며256회 소진 시 오류로 종료한다. 원래 모드·단독 배치는 조건을 강제하지 않는다. pickUp/carryWith의 상대 자세는 그대로 두고 후행 사람·상자를 같은 XY 이동·yaw로 옮긴다. 최종 물리 배치 검사에서도 합 조건을 확인하며 조건을 풀어 fallback하지 않는다. 캐시/프레임·RSI fallback·보상·네트워크는 RSI433과 같다. checkpoint 계약은 거리 설정으로 분리한다.
+
+
+## BEFORE 역할별 object 토큰
+
+`stage2_before_ground_atprogress_nonemask_rsi433_near50_objalias_1200`는 `relationGraph.before_object_alias: replace_distractor_v1`로 공유 상자의 역할을 분리한다. near50의 원래/상대 거리 합50/50, 후행 ON_TOP RSI40/30/30, AT progress, ground-only, 1200step, 2e-5, fixed78000 새 전이를 유지한다. 배우는 파라미터를 추가하지 않고 actor encoder/RMS 동결·action head 학습과 기존 critic/AMP·사람 SA 정책을 유지한다.
+
+선행이 운반하는 물리 상자 Oa에 후행용 관측 토큰 Oa′를 만든다. 정책 task bias의 방향은 다음과 같다.
+
+| 과제 | encoder task 연결 |
+| --- | --- |
+| 선행 AT | Ha→Oa, Ha→Ga, Oa→Ga |
+| 후행 SIT/CLIMB | Hb→Oa′ |
+| 후행 ON_TOP (Ob가 후행 payload) | Hb→Ob, Hb→Oa′, Ob→Oa′ |
+
+Oa와 Oa′는 같은 물리 ID를 참조하므로 매 step의 크기·local 속도·bbox·GTA pose가 같고, 동일한 object tokenizer/type embedding/RMS를 사용한다. Transformer 안에서는 task 연결이 달라 각자의 표현이 갱신된다. 사람별 task action 조건은 한 번만 적용한다. 새 token embedding·Stage1 attention mask·Oa↔Oa′ 관계는 추가하지 않는다. Stage2 사람 SA는 원래 task packet으로 SELF/BEFORE/NONE을 판정하며 기존 NONE 마스킹을 유지한다. 보상/gate·성공·RSI·물리 검사는 원래 graph와 물리 상자를 사용한다.
+
+원래 과제 물체를 압축한 prefix 뒤에 후행 actor 순서로 별도 토큰을 배치하고, 그 수만큼 distractor를 대체한다. 물리 ID→토큰의 일대일 역매핑에 의존하지 않으며, 원래 과제 인덱스는 보존한다. 대체된 distractor는 비활성 bank 위치로 옮겨 보이지 않는 장애물이 남지 않는다. obj 토큰 수는 고정이고 물리 활성 수만 `objects - BEFORE 쌍 수`가 된다. 단독에는 별도 토큰이 없고 원래 입력/출력과 같다. 모든 구성의 예산을 보장하려면 `objects >= 2 * agents`가 필요하다.
+
+환경의 graph/reward packet은 기존 공유 상자 인덱스를 유지한다. encoder로 전달할 사본의 후행 target만 별도 토큰 인덱스로 바꾸며, actor/critic에 동일하게 적용한다. 이 구분으로 토큰 번호가 달라도 기존 BEFORE 사람 관계를 보존한다. `before_contract`와 train/env 일치 검사에 토큰 모드를 포함해 기존 실험 저장본과 혼용하지 않는다. 구현은 `utils/before_object_alias.py`와 `learning/multi_agent/before_network.py`, 물리 mapping 연결은 `env/tasks/multi_agent/humanoid_ma_before.py`다(`tokenhsi/` 기준).
+
+실행 명령은 [config](../config.md), override·평가 옵션은 [USAGE](../USAGE.md#stage2-before-역할별-object-토큰)에 있다. 초기 출력 분리의 타당성과 ON_TOP 성능 향상은 구분하며, 토큰 분리만으로 실패 원인이 입증되지는 않는다.
+
+
+## AT progress mix226 역할별 object 토큰
+
+`stage2_before_ground_mix226_atprogress_objalias_1200`는 `stage2_before_ground_mix226_atprogress_1200`의 별도 전이 실험이다. env의 의미 있는 차이는 `relationGraph.before_object_alias: replace_distractor_v1`뿐이고 train은 실행 이름만 다르다. 거리20/20/60·원래 mix226 접근/운반/목표 거리 범위·loco 초기화·AT progress·현재 AT 성공 gate·ground-only·1200step·2e-5를 유지한다. actor/critic 사람 SA는 기반 실험처럼 SELF/NONE/BEFORE 전체 bias를 학습한다. NONE 마스킹·RSI433·relative near50는 적용하지 않는다.
+
+[역할별 토큰 구현](#before-역할별-object-토큰)의 물리 공유·distractor 대체·encoder용 task target 분리·원래 사람 관계/보상 packet 보존을 그대로 사용한다. 고정8obj 토큰은 쌍 수에 따라 실제8/7/6개 상자를 표현하며 `objects >= 2 * agents`를 요구한다. 새 파라미터나 Stage1 mask를 추가하지 않는다. fixed78000에서 새로 시작하고 actor encoder/RMS 동결·action head 학습과 critic/AMP 정책을 유지한다. 두 objalias 실험은 기반 거리/RSI/bias 계약이 달라 서로 resume/평가할 수 없다. [실행](../config.md), [추가 옵션](../USAGE.md#stage2-before-mix226-at-progress-object-토큰).
+
+
+## AT progress mix226 object 토큰 RSI433
+
+`stage2_before_ground_mix226_atprogress_objalias_rsi433_1200`는 mix226 objalias의 초기화 ablation이다. env에는 `before.follower_pickup_carry_rsi`만 추가하고 train은 이름만 바꾼다. BEFORE ON_TOP 후행만 loco40%/pickUp30%/carryWith30%를 요청하며 선행·단독·SIT/CLIMB는 loco를 유지한다. native 유효 프레임·동일 사람/상자 변환·8회 배치 재시도·불가 시 loco fallback은 기존 RSI433 구현을 사용한다. fallback 때문에 실제 적용 비율은 요청 비율과 다를 수 있다.
+
+거리20/20/60·AT progress·역할별 object 토큰·전체 SELF/NONE/BEFORE bias 학습·1200step·2e-5·fixed78000 새 전이와 actor encoder/RMS 동결·action head 학습은 그대로다. 새 mask/파라미터를 추가하지 않는다. 토큰은 고정8개이며 alias당 distractor 하나를 물리 장면에서도 제외한다. RSI 없는 mix226 objalias 및 near50/nonemask RSI433와 train/env/checkpoint 혼용을 거부한다. [명령](../config.md), [평가 옵션](../USAGE.md#stage2-before-mix226-object-토큰-rsi433).

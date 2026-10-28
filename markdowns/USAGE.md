@@ -242,4 +242,29 @@ bash tokenhsi/scripts/multi_agent/stage2_before_ground_mix226_atprogress_carry50
 
 `stage2_before_ground_atprogress_nonemask_rsi433_near50_1200`는 RSI433의 nonemask·AT progress·후행 ON_TOP loco/pickUp/carryWith40/30/30·fixed78000 새 전이를 유지하고 거리만 원래 BEFORE/후행 가까움50/50으로 바꾼다. 원래 모드와 가까운 모드는 같은 원래 거리 제안 분포를 사용하며20/20/60의 상한·선행 단거리 보정·목표 거리 혼합은 사용하지 않는다. 원래 목표 샘플러를 유지한다. 가까운 모드는 XY 기준 선행 사람→선행 상자 거리보다 후행 거리 비용이 작아야 한다. SIT/CLIMB는 후행 사람→선행 상자, ON_TOP은 후행 사람→자기 들 상자 + 후행 사람→받침 상자의 합이다. 위반 시 가까운 쌍의 거리 배치만 재추첨한다. 원래 모드에는 이 부등식을 강제하지 않는다. RSI 사람·상자 상대 자세와 속도는 함께 변환한다.
 
-거리 모드와 RSI 요청은 독립적으로 그래프당 한 번 선택하며 물리 재시도에서도 유지한다. `BEFORE_FOLLOWER_NEAR=0`(기본)은50/50, `1`은 모든 BEFORE 쌍에 상대적 가까움 조건을 적용한다. `2`/`--before_follower_short`는 지원하지 않는다. `BEFORE_PICKUP_CARRY_RSI=loco|mix|pickup|carry`는 RSI433과 같으며 기본 loco 평가다. 예: `BEFORE_FOLLOWER_NEAR=1 BEFORE_PICKUP_CARRY_RSI=mix HEADLESS=1 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200_test.sh "$CKPT" 4 32 8 1`. 실행 명령은 [config](config.md)에 있다.
+거리 모드와 RSI 요청은 독립적으로 그래프당 한 번 선택하며 물리 재시도에서도 유지한다. `BEFORE_FOLLOWER_NEAR=0`(기본)은50/50, `1`은 모든 BEFORE 쌍에 상대적 가까움 조건을 적용한다. `2`/`--before_follower_short`는 지원하지 않는다. `BEFORE_PICKUP_CARRY_RSI=loco|mix|pickup|carry`는 RSI433과 같으며 기본 loco 평가다. 예: `BEFORE_FOLLOWER_NEAR=1 BEFORE_PICKUP_CARRY_RSI=mix HEADLESS=1 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_1200_test.sh "$CKPT" 4 32 8 1`. 기본 source는 형제 `stage1_message`의 fixed78000이며 `STAGE1_CHECKPOINT`로 변경한다. 현재 단일 GPU 서버에서는 `TOKENHSI_GPU=0`을 사용한다. 실행 명령은 [config](config.md)에 있다.
+
+
+## Stage2 BEFORE 역할별 object 토큰
+
+`stage2_before_ground_atprogress_nonemask_rsi433_near50_objalias_1200`는 near50/RSI433에서 공유 상자의 후행용 토큰을 추가하되 distractor 슬롯을 대체한다. 마지막 실행 인자 `objects`는 정책 obj 토큰 수이며, 기본 4명·8토큰에서 실제 활성 물리 상자는 `8 - BEFORE 쌍 수`다. 모든 과제 구성을 수용하도록 `objects >= 2 * agents`를 요구하며 부족하면 거부한다. 제거된 distractor는 물리 장면에서도 제외한다.
+
+Stage1 actor/critic encoder에서만 후행 target을 별도 토큰으로 연결한다. 두 토큰은 같은 물리 관측·GTA pose를 공유하고, 기존 사람 SA의 BEFORE 판정 및 보상은 원래 task packet을 사용한다. Stage1 attention mask를 추가하지 않으며 Stage2 사람 SA의 NONE 마스킹은 유지한다. 상세 계약은 [BEFORE 참고](reference/stage2_before.md#before-역할별-object-토큰)에 있다.
+
+기본 source는 형제 `stage1_message`의 fixed78000이다. `RESUME_CHECKPOINT`와 test/VNC는 이 실험의 checkpoint만 지원하며 기존 near50 저장본과 혼용하지 않는다. 환경 override는 `BEFORE_GROUND_ATPROGRESS_NONEMASK_RSI433_NEAR50_OBJALIAS_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1`, `BEFORE_PICKUP_CARRY_RSI=loco/mix/pickup/carry`, `HEADLESS`, `EPISODE_LENGTH`는 near50와 같다. 실행 명령은 [config](config.md)에 있다.
+
+
+## Stage2 BEFORE mix226 AT progress object 토큰
+
+`stage2_before_ground_mix226_atprogress_objalias_1200`는 `stage2_before_ground_mix226_atprogress_1200`의 거리20/20/60·loco 초기화·AT progress·1200step·2e-5·actor/critic 사람 SA의 SELF/NONE/BEFORE bias 학습을 유지하고 역할별 object 토큰만 적용한다. Stage1 encoder에는 mask를 추가하지 않으며 사람 SA도 기반 실험의 전체 attention을 사용한다. near50/nonemask/RSI433 설정은 포함하지 않는다.
+
+기본4명·1024환경·8obj 토큰이다. 공유 상자의 후행 토큰이 distractor를 대체하고 실제 distractor도 제외되므로 활성 물리 상자는 `objects - BEFORE 쌍 수`다. `objects >= 2 * agents`를 요구한다. 기본 source는 형제 `stage1_message`의 fixed78000이며 새 전이로 시작한다. `RESUME_CHECKPOINT` 및 test/VNC에는 이 실험의 저장본만 사용한다. 기존 AT progress와 near50 objalias 저장본은 혼용할 수 없다.
+
+환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_OBJALIAS_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1/2`는 각각 기본20/20/60·중간 거리·가장 짧은 거리이며 `HEADLESS`, `TASK_GRAPH`, `EVAL_SKILLS`, `EPISODE_LENGTH`는 기반 AT progress와 같다. [실행 명령](config.md), [설계](reference/stage2_before.md#at-progress-mix226-역할별-object-토큰)를 따른다.
+
+
+## Stage2 BEFORE mix226 object 토큰 RSI433
+
+`stage2_before_ground_mix226_atprogress_objalias_rsi433_1200`는 mix226 objalias에 BEFORE ON_TOP 후행 loco/pickUp/carryWith40/30/30만 추가한다. 선행·단독·SIT/CLIMB는 loco다. 거리20/20/60·전체 사람 관계 bias·역할별 object 토큰·fixed78000 새 전이를 유지한다. RSI 배치 실패는 loco로 fallback하므로 요청/적용 비율을 구분한다.
+
+기본4명·1024환경·8obj 토큰이며 `objects >= 2 * agents`를 요구한다. 기본 source는 형제 `stage1_message`의 fixed78000이다. resume/test/VNC는 이 실험 저장본만 사용한다. 환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_OBJALIAS_RSI433_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1/2`는 기본20/20/60·중간·가장 짧은 거리다. `BEFORE_PICKUP_CARRY_RSI=loco|mix|pickup|carry`는 평가 초기화를 선택하며 기본 loco, 학습 분포 재현은 mix다. `HEADLESS`, `TASK_GRAPH`, `EPISODE_LENGTH`는 기반과 같다. [명령](config.md), [설계](reference/stage2_before.md#at-progress-mix226-object-토큰-rsi433).

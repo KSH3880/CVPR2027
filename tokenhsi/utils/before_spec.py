@@ -27,6 +27,12 @@ def validate_env(env):
         raise ValueError('Unknown BEFORE critic_human_bias')
     if env['relationGraph'].get('actor_head_adapter') not in (None, 'tokenhsi_internal_v1'):
         raise ValueError('Unknown BEFORE actor_head_adapter')
+    from utils.before_object_alias import MODE as OBJECT_ALIAS_MODE
+    alias = env['relationGraph'].get('before_object_alias')
+    if alias not in (None, OBJECT_ALIAS_MODE):
+        raise ValueError('Unknown BEFORE before_object_alias')
+    if alias is not None and env['numObjects'] < 2*env['numAgents']:
+        raise ValueError('BEFORE object aliases require numObjects >= 2*numAgents')
     from utils.before_full_rsi import SPEC as FULL_SPEC, TEMPLATE_RSI
     full = before.pop('full_rsi', None)
     if full is not None and (full != FULL_SPEC or env['templateRsi'] != TEMPLATE_RSI
@@ -75,6 +81,7 @@ def validate_env(env):
     base['relationGraph'].pop('actor_human_bias', None)
     base['relationGraph'].pop('critic_human_bias', None)
     base['relationGraph'].pop('actor_head_adapter', None)
+    base['relationGraph'].pop('before_object_alias', None)
     reset = base['box']['reset']
     if reset['platformMode'] == 'ground_only':
         if reset['randomHeight'] is not False or reset['randomHeightProb'] != 0.:
@@ -188,6 +195,8 @@ def checkpoint_contract(env):
         contract['critic_human_bias'] = critic_mode
     if env['relationGraph'].get('actor_head_adapter') is not None:
         contract['actor_head_adapter'] = env['relationGraph']['actor_head_adapter']
+    if env['relationGraph'].get('before_object_alias') is not None:
+        contract['before_object_alias'] = env['relationGraph']['before_object_alias']
     if env['before'].get('full_rsi') is not None or env['before'].get('follower_pickup_carry_rsi') is not None:
         contract['size_aware_rsi'] = env['sizeAwareRsi']
     return contract

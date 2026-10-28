@@ -19,6 +19,7 @@ class Stage2Builder(AMPMultiAgentBuilder):
             base.pop('actor_human_bias', None)
             base.pop('critic_human_bias', None)
             base.pop('actor_head_adapter', None)
+            base.pop('before_object_alias', None)
             base['sampler'] = 'two_agent_four_object_independent_unified'
             base['edge_capacity'] = 4
             kwargs['relation_graph_spec'] = base

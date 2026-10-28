@@ -55,7 +55,7 @@ def inspect(t):
         progress=check_at_progress(t))
 
 
-def main():
+def main(inspector=inspect, presets=None, step_inspector=None):
     torch.set_num_threads(1)
     args = get_args(); args.test = args.eval = True
     cfg, train, _ = load_cfg(args)
@@ -80,10 +80,11 @@ def main():
     before = {k: v.clone() for k, v in model.state_dict().items()}
     results = []
     with torch.no_grad():
-        for preset, mode in [('random_scenario', 'loco'), ('random_scenario', 'mix'),
-                             ('before_stack', 'pickup'), ('before_stack', 'carry'), ('all_solo', 'mix')]:
+        for preset, mode in (presets if presets is not None else [
+                ('random_scenario', 'loco'), ('random_scenario', 'mix'),
+                ('before_stack', 'pickup'), ('before_stack', 'carry'), ('all_solo', 'mix')]):
             task._task_graph_preset = preset; args.before_pickup_carry_rsi = mode
-            obs = env.reset(); layout = inspect(task)
+            obs = env.reset(); layout = inspector(task)
             if mode == 'loco' or preset == 'all_solo':
                 assert not task._before_rsi_skill.any()
             assert torch.isfinite(task.fetch_amp_obs_demo(128)).all()
@@ -91,11 +92,15 @@ def main():
                 mu, _ = net.eval_actor(rms(obs)); value = net.eval_critic(rms(obs))
                 obs, reward, done, info = env.step(mu)
                 assert all(torch.isfinite(x).all() for x in (mu, value, obs, reward))
+                if step_inspector is not None:
+                    step_inspector(task, obs)
             untouched = task._root_states.view(task.num_envs, -1, 13)[1:].clone()
             saved = task._before_rsi_skill[1:].clone()
+            saved_mapping = task._logical_box_order[1:].clone()
             task._reset_envs(torch.tensor([0], device=task.device))
             assert torch.equal(untouched, task._root_states.view(task.num_envs, -1, 13)[1:])
             assert torch.equal(saved, task._before_rsi_skill[1:])
+            assert torch.equal(saved_mapping, task._logical_box_order[1:])
             results.append(dict(preset=preset, mode=mode, finite=True, partial_reset=True, **layout))
     assert all(torch.equal(v, model.state_dict()[k]) for k, v in before.items())
     p = Path(args.output_path)/'physics_validation.json'

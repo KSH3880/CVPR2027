@@ -132,3 +132,11 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`, 공유
 `stage2_before_ground_mix226_atprogress_nonemask_rsi433_1200`의 env/train YAML·전용 train/test/VNC는 같은 디렉터리에 있다. `utils/before_pickup_carry_rsi.py`는 후행 ON_TOP의 loco/pickUp/carryWith 40/30/30 선택을, `env/tasks/multi_agent/before_pickup_carry_rsi.py`는 요청·적용·fallback과 배치 재시도를 담당한다(`tokenhsi/` 기준). `before_carry_rsi.py`의 `BeforePickupCarryRsiCache`는 두 스킬의 크기별 물리 프레임을 검사한다. `test_before_pickup_carry_rsi.py`는 분포·대상 제한·fallback·checkpoint 분리를, `check_before_pickup_carry_rsi.py`는 GPU 초기화·상대 자세·AMP·부분 reset·재로드를 검사한다.
 
 `stage2_before_ground_atprogress_nonemask_rsi433_near50_1200`의 env/train YAML·전용 train/test/VNC는 같은 위치에 있다. `utils/before_relative_sampling.py`는 원래 거리 제안 분포와 후행 거리 합 조건의 rejection sampling을, `env/tasks/multi_agent/before_relative_sampling.py`는 실제 사람·상자 변환과 최종 조건 검사를 담당한다(`tokenhsi/` 기준). `test_before_relative_sampling.py`는50/50·RSI 독립성·합 조건·원래 모드/상대 자세 보존·checkpoint 분리를 검사하며 `check_before_pickup_carry_rsi.py`는 GPU 거리 조건도 검사한다.
+
+
+`stage2_before_ground_atprogress_nonemask_rsi433_near50_objalias_1200`의 env/train YAML·전용 train/test/VNC는 같은 위치에 있다. `utils/before_object_alias.py`가 distractor 대체 슬롯과 encoder용 후행 target을 계산하고, `humanoid_ma_before.py`가 공유 물리 ID를 두 관측 슬롯에 연결한다. `before_network.py`는 actor/critic encoder에만 변경된 task packet을 전달하며 사람 SA는 원래 packet을 사용한다(`tokenhsi/` 기준). `test_before_object_alias.py`는 task 연결·물리 ID·순서 변경·동결/갱신·checkpoint 분리를, `check_before_object_alias.py`는 실제 관측/pose 공유·distractor 제외·BEFORE 유지·부분 reset을 검사한다.
+
+
+`stage2_before_ground_mix226_atprogress_objalias_1200`는 기본 AT progress mix226에 같은 object 토큰 분리를 적용한 env/train YAML·전용 train/test/VNC다. 구현은 위 `before_object_alias.py`를 공유하며 `test_before_object_alias.py`가 두 기반별 설정·전이·학습·재로드를 검사한다. `check_before_object_alias.py`는 RSI433/상대 거리와 loco/mix226 거리 검증을 config에 맞춰 선택한다.
+
+`stage2_before_ground_mix226_atprogress_objalias_rsi433_1200`의 env/train YAML·전용 train/test/VNC는 위와 같은 위치에 있다. mix226 objalias에 기존 `before_pickup_carry_rsi`의 후행 ON_TOP40/30/30 초기화를 결합한다. `test_before_object_alias.py`는 초기화만 바뀌는 계약·전이·재로드를, `check_before_object_alias.py`는 mix226 거리와 native RSI 상대 자세·역할별 토큰 공유를 함께 검사한다.

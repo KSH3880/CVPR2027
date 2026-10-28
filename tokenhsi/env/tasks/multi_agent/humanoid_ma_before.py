@@ -125,6 +125,11 @@ class HumanoidMABefore(HumanoidMACarry):
             endpoint.copy_(torch.where(objects, m+inverse.gather(1, old),
                                       torch.where(goals, endpoint+self.num_objects-2*m, endpoint)))
         graph = replace(graph, num_objects=self.num_objects)
+        if self._relation_graph_spec.get('before_object_alias') is not None:
+            from utils.before_object_alias import replace_distractors
+            from utils.task_role_spec import task_graph_packet
+            mapping, count = replace_distractors(mapping, task_graph_packet(graph, len(ids)), m)
+            self._logical_box_order[ids], self._task_token_count[ids] = mapping, count
         if self._relation_graph_spec['shuffle_edge_order']:
             graph = permute_graph(graph, torch.rand(len(ids), 2*m, device=self.device).argsort(-1))
         copy_graph_rows(self.relation_runtime.graph, ids, graph)
