@@ -228,3 +228,15 @@ rc=0 으로 끝난다. 죽은 것은 새 토큰 하나뿐이라 나머지가 그
 ## MPS 클라이언트를 SIGTERM으로 종료하면 다른 학습도 실패할 수 있음 (2026-10-25)
 
 GPU5 SIT1881817을SIGTERM한직후0.2초내기존PUSH685104가MPS fatal/sticky error및CUDA illegal memory access로종료. daemon PID가살아있어도내부GPUcontextreset이가능하므로daemon생존만으로영향없음을판단하지않는다. MPS사용작업은GPU동기화된정상종료또는설치버전에맞는공식MPS client종료절차를사용하고단순signal종료를피한다. NVIDIA근거: https://docs.nvidia.com/deploy/mps/when-to-use-mps.html . 원시근거 runs/gpu5_mps_incident_20261025_203531/REPORT.md.
+
+
+## 2026-10-28 — 고정 checkout 밖 preflight 경로로 예약이 학습 전에 종료됨
+
+Chair 예약은 `runs/<예약>/code`를 checkout으로 사용했지만 preflight 출력은 그 형제 `runs/<예약>/output_etc/check/train`으로 지정했다. 실제 `output_paths.resolve_output_path`는 이 checkout의 `code/output_etc/check` 또는 `code.parent/runs`만 허용하므로 rc2로 중단되어 본학습이 시작되지 않았다. Popen을 대체한 모의 검증만으로는 wrapper의 경로 검사를 거치지 않아 이 실패를 잡지 못했다.
+
+검증 출력을 `code/output_etc/check/chair_preflight/train`으로 지정하고, 예약 등록 전에 실제 resolver로 검증·본학습 경로를 확인한다. 회귀검증도 실제 resolver의 옛 경로 거부/새 경로 허용을 검사한다. 실패 산출물은 `runs/chair_residual_after_table_20261027/`에 보존하고 복구는 새 폴더에서 진행했다.
+
+
+## 2026-10-28 — 원본 IsaacGym 에셋 로더에 절대경로를 넘겨 actor가 누락됨
+
+원본carry환경은 `gym.load_asset(sim,"./",urdf,options)`를 사용한다. object root를 절대경로로 바꾸면 Gym이 `.///home/...`처럼붙여URDF로드에실패하고object actor가-1이될수있다. 그상태에서GPUroot indexed reset을하면CUDA illegal memory access가발생한다. 데이터는기존심링크로연결하고원본상대objectroot `dataset_dynamic_objects`를유지한다. 실제평가전actorID의int32/비음수/전체root범위를검사해누락을막는다. 이번실패및복구로그는 `runs/table_residual_10k_tokenhsi_native_20261028/output_etc/check/`에보존했다. 원인은tensor수명문제가아니었고별도수명/동기화변경은최종평가에쓰지않았다.

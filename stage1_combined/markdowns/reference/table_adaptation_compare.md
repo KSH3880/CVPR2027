@@ -33,3 +33,24 @@ config.md에개별train/test/VNC명령이있다. 현재controller와동시에수
 실행확인: residual본학습PID3634237/GPU0 유지, tokenizer취소. 10k continuation supervisor3637486. 원본구간이정상1000회저장을완료해야만resume한다. 그전장애시새로시작하지않고실패를기록한다. [TensorBoard](http://localhost:6013)는두모드로그를분리표시하며tokenizer 이벤트는새로생기지않는다. 공통회귀16개통과.
 
 추가검증: 실제2회PPO checkpoint를CPU에서동일한restore 경로로복원해모델·전체normalizer·optimizer18개상태·epoch/frame exact를확인했다. 로그 `output_etc/check/resume_cpu_final.log`. 1000회최종checkpoint와구간설정/메타정보는 `residual/phase1_1000/`에보존후이어간다.
+
+
+## 2026-10-28 Table4k–10k 연속 평가
+
+사용자 요청 범위는4000/5000/6000/7000/8000/9000/10000 번호 checkpoint다. 고정 코드 사본으로 GPU0에서 순차512환경×독립seed0/1/2·30초·AT20cm 첫episode ever를 측정하고,현재Chair4096학습은 유지한다. 기존10k `runs/table_hold_at_eval_20261028_110441/`는 trace/precision/hash/epoch검증 후 재사용한다. 새4k–9k도각seed초기root/DOF/물체/모델/목표전배열이10k와exact인지 검사한다. 모든checkpoint의동결153tensor/scene RMS는원본78k exact·finite를사전검증한다.
+
+산출물: `runs/table_residual_eval_4k_10k_20261028/{state.json,results.csv,REPORT.md}`. 상태와결과는batch진행중갱신된다. `batch.log`와 `eval_<8자리epoch>.log`는실행로그,checkpoint별원시결과는 `runs/epoch_<8자리epoch>/`다. `completed.json`이있을때만7개전체평가완료다.
+
+평가완료 결과(평균±평가seed표본std):
+
+| Iteration | Success (%) |
+|---:|---:|
+| 4000 | 80.21 ± 4.24 |
+| 5000 | 81.25 ± 1.28 |
+| 6000 | 85.94 ± 2.93 |
+| 7000 | 86.39 ± 2.46 |
+| 8000 | 88.41 ± 0.69 |
+| 9000 | 87.63 ± 1.96 |
+| 10000 | 90.89 ± 3.03 |
+
+평균최고는10k90.89%. 전체21seed(18신규+3기존10k재사용)trace/precision/hash/통계검산·초기전배열동일성검증통과. 평가종료후에도Chair학습유지확인. 그래프와CSV는위산출물루트에있다.

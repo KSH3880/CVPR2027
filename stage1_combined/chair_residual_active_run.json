@@ -1,0 +1,19 @@
+{
+  "status": "running",
+  "phase": "train",
+  "supervisor_pid": 3831386,
+  "gpu": 0,
+  "run": "/home/injesus1010/repos/CVPR2027/runs/chair_residual_after_table_20261028_recovery",
+  "predecessor_run": "/home/injesus1010/repos/CVPR2027/runs/table_adaptation_compare_20261027",
+  "predecessor_pid": 3648228,
+  "total_epochs": 10000,
+  "num_envs": 4096,
+  "source_epoch": 78000,
+  "mode": "residual",
+  "launch_attempted": true,
+  "training_pid": 3831871,
+  "wrapper_pid": 3831837,
+  "updated_at": "2026-10-28T11:08:35.602987+09:00",
+  "output_path": "/home/injesus1010/repos/CVPR2027/runs/chair_residual_after_table_20261028_recovery/train",
+  "returncode": 0
+}

@@ -14,6 +14,8 @@ def main():
     p.add_argument('--object-root', type=Path, default=ROOT / 'tokenhsi/data/dataset_dynamic_objects')
     p.add_argument('--python', default='/home/injesus1010/anaconda3/envs/tokenhsi118/bin/python')
     p.add_argument('--gpu', type=int, default=0)
+    p.add_argument('--public-table-checkpoint', type=Path, help='Use original public Table policy; --checkpoint supplies the shared scene only')
+    p.add_argument('--public-base-checkpoint', type=Path, help='Original public stage1 checkpoint required by the adaptation network')
     p.add_argument('--prepare-only', action='store_true')
     p.add_argument('--smoke', action='store_true', help='4 environments, seed0, full900step; not performance evaluation')
     a = p.parse_args()
@@ -30,6 +32,11 @@ def main():
         '--object-root', str(a.object_root.resolve()), '--num-envs', str(count)]
     if a.template_checkpoint:
         command += ['--template-checkpoint', str(a.template_checkpoint.resolve())]
+    if a.public_table_checkpoint:
+        if not a.public_base_checkpoint:
+            p.error('--public-table-checkpoint requires --public-base-checkpoint')
+        command += ['--public-table-checkpoint', str(a.public_table_checkpoint.resolve()),
+                    '--public-base-checkpoint', str(a.public_base_checkpoint.resolve())]
     subprocess.run(command, env=env, check=True)
     prep = json.loads((output / 'preparation.json').read_text())
     source = Path(prep['source'])
@@ -38,6 +45,8 @@ def main():
                     seeds=seeds, gpu=a.gpu, smoke=a.smoke, prepared_only=a.prepare_only,
                     config_source=prep['config_source'], config_only_template=prep['config_only_template'],
                     checkpoint_byte_copy_unchanged=prep['checkpoint_byte_copy_unchanged'])
+    if a.public_table_checkpoint:
+        manifest['public_policy'] = json.loads((output / 'public_policy_provenance.json').read_text())
     (output / 'run_manifest.json').write_text(json.dumps(manifest, indent=2))
     if a.prepare_only:
         print('PREPARED', output)
@@ -62,6 +71,10 @@ def main():
         records.append(record)
         (output / 'records.json').write_text(json.dumps(records, indent=2))
     summary = dict(protocol=PROTOCOL, records=records, smoke=a.smoke)
+    if a.public_table_checkpoint:
+        summary['public_policy'] = manifest['public_policy']
+        for name, key in [('public_table.pth', 'checkpoint_sha256'), ('public_stage1.pth', 'base_checkpoint_sha256')]:
+            assert sha256(output / name) == manifest['public_policy'][key]
     if not a.smoke:
         summary['statistics'] = aggregate(records)
     for name, digest in json.loads((output / 'asset_sha256.json').read_text()).items():

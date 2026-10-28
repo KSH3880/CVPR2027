@@ -92,6 +92,9 @@ def parse_task(args, cfg, cfg_train, sim_params):
     elif args.task == "HumanoidTableCarryRsiFT":
         from env.tasks.multi_agent.humanoid_table_carry_rsi_ft import HumanoidTableCarryRsiFT
         task_class = HumanoidTableCarryRsiFT
+    elif args.task == "HumanoidChairTokenHSIFT":
+        from env.tasks.multi_agent.humanoid_chair_tokenhsi_ft import HumanoidChairTokenHSIFT
+        task_class = HumanoidChairTokenHSIFT
     elif args.task == "HumanoidTableTokenHSIFT":
         from env.tasks.multi_agent.humanoid_table_tokenhsi_ft import HumanoidTableTokenHSIFT
         task_class = HumanoidTableTokenHSIFT

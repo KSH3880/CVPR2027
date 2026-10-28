@@ -6,7 +6,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 
-def prepare(checkpoint, output, object_root, count, template_checkpoint=None):
+def prepare(checkpoint, output, object_root, count, template_checkpoint=None, public_table_checkpoint=None, public_base_checkpoint=None):
     checkpoint, output, object_root = map(lambda x: Path(x).resolve(), (checkpoint, output, object_root))
     output.mkdir(parents=True, exist_ok=False)
     shutil.copy2(checkpoint, output / 'checkpoint.pth')
@@ -32,6 +32,37 @@ def prepare(checkpoint, output, object_root, count, template_checkpoint=None):
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     shutil.copytree(Path(__file__).parent, source / 'evaluation/table_hold_at',
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    if public_table_checkpoint is not None:
+        if public_base_checkpoint is None:
+            raise ValueError('Public Table policy requires --public-base-checkpoint')
+        baseline = ROOT.parent / 'TokenHSI/tokenhsi'
+        original = output / 'original'
+        original.mkdir()
+        shutil.copy2(public_table_checkpoint, output / 'public_table.pth')
+        shutil.copy2(public_base_checkpoint, output / 'public_stage1.pth')
+        files = dict(human_source='env/tasks/humanoid.py',
+                     carry_source='env/tasks/adapt_interaction_skills/humanoid_adapt_carry_box2objs.py',
+                     train_config='data/cfg/train/rlg/amp_imitation_task_transformer_multi_task_adapt_disc3.yaml')
+        policy = {key: str(original / Path(path).name) for key,path in files.items()}
+        for key,path in files.items():
+            shutil.copy2(baseline / path, policy[key])
+        from metrics import sha256
+        network_files = ['learning/amp_network_builder.py', 'learning/transformer/composer.py',
+            'learning/transformer/amp_network_builder_transformer.py',
+            'learning/transformer/amp_network_builder_transformer_adapt.py']
+        for path in network_files:
+            assert sha256(baseline/path) == sha256(source/'tokenhsi'/path), path
+        shutil.copytree(ROOT / 'evaluation/hold_at', source / 'evaluation/hold_at',
+                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+        policy.update(checkpoint=str(output / 'public_table.pth'),
+                      base_checkpoint=str(output / 'public_stage1.pth'),
+                      policy_name='public_tokenhsi_table_adapt', validate_cpu_action=True)
+        provenance = dict(original_checkpoint=str(Path(public_table_checkpoint).resolve()),
+            checkpoint_sha256=sha256(output / 'public_table.pth'),
+            base_checkpoint_sha256=sha256(output / 'public_stage1.pth'),
+            network_original_hashes={path:sha256(baseline/path) for path in network_files},
+            original_sources_sha256={key:sha256(value) for key,value in policy.items() if key in files})
+        (output / 'public_policy_provenance.json').write_text(json.dumps(provenance, indent=2))
     assets = output / 'assets/test/Table_Circle'
     shutil.copytree(object_root / 'test/Table_Circle', assets, symlinks=False)
     entries = sorted(assets.glob('*/config.json'))
@@ -51,6 +82,8 @@ def prepare(checkpoint, output, object_root, count, template_checkpoint=None):
     env.update(numAgents=1, numObjects=1, numEnvs=count, episodeLength=900)
     env['eval'].update(skill=['loco'], skillInitProb=[1.])
     env['holdAtFT'].update(asset_split='test', object_root=str(output / 'assets'))
+    if public_table_checkpoint is not None:
+        env['holdAtFT']['public_policy'] = policy
     env['debug']['reward'] = False
     assert env['enableEarlyTermination'] and env['contactBodies'] == ['right_foot', 'left_foot']
     assert env['holdAtFT']['ground_only'] and not env['holdAtFT']['face_human']
@@ -79,5 +112,7 @@ if __name__ == '__main__':
     p.add_argument('--object-root', required=True)
     p.add_argument('--num-envs', type=int, default=512)
     p.add_argument('--template-checkpoint')
+    p.add_argument('--public-table-checkpoint')
+    p.add_argument('--public-base-checkpoint')
     a = p.parse_args()
-    print(prepare(a.checkpoint, a.output, a.object_root, a.num_envs, a.template_checkpoint))
+    print(prepare(a.checkpoint, a.output, a.object_root, a.num_envs, a.template_checkpoint, a.public_table_checkpoint, a.public_base_checkpoint))

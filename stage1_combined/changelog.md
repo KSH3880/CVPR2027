@@ -1,4 +1,27 @@
+## 2026-10-28
+
+### Table residual10k TokenHSI 원본 환경·평가 방식 측정
+사용자요청. 原본HumanoidAdaptCarryBox2Objs/환경YAML/seed·sim함수/Transformer player run_eval body를고정사본에서실행하고정책만우리10k로교체. 512환경/test9/seed0/연속3repeat/20초/AT20cm+native updot≥.86615. 성공432/438/427,전체**84.44±1.08%**(연속repeat표본std),이전Chair집계처럼0회제외하면**84.47±1.52%**. 성공최소거리오차7.09/6.91/6.91cm. native→우리280D관측기존생성기bitwise exact·171tensor/RMS strict/평가전후동결,4환경3repeat smoke·metric회귀3개·정식3trace/precision/599step/첫episode재채점·원본core/ckpt해시통과. 첫시도절대에셋경로전달실수로asset None/actor-1/첫reset CUDA오류→상대경로수정·actor검증추가,실패기록보존. 성공경로에별도동기화/수명변경없음. Chair3831871유지. ../runs/table_residual_10k_tokenhsi_native_20261028/REPORT.md 및validation.json. 공개코드조건이며논문10×10m와달라논문83.6%재현과구분;30초위치-only평가와도구분.
+
+### Table residual4k–10k 연속 평가 완료
+사용자요청4000부터1000간격10000까지7개checkpoint/GPU0·test9/512×독립seed0·1·2/30초AT20cm첫episode ever. 평균±평가seed표본std:4k80.21±4.24%,5k81.25±1.28%,6k85.94±2.93%,7k86.39±2.46%,8k88.41±0.69%,9k87.63±1.96%,10k90.89±3.03%. 기존완료10k재채점재사용·4k–9k18seed신규실행. 모든checkpoint frozen153/scene RMS원본78k exact·finite,21seed trace/precision/hash·초기전배열10k및이전2200과exact·통계검산통과. Chair3831871평가후에도유지. CSV/PNG/SVG/validation.json 및../runs/table_residual_eval_4k_10k_20261028/REPORT.md.
+
+### Chair 예약 경로 오류 복구 및 본학습 시작
+상태조회로Table10k/rc0완료·Chair예약04:45 preflight경로검사rc2/PPO미진입확인. 원인은고정code checkout의형제출력경로;원본실패보존후새recovery에서code/output_etc/check/chair_preflight/train으로수정,등록전실제resolver호출추가. 옛경로거부/새경로허용포함회귀4개및모의검증통과. 실제4096환경2PPO rc0/epoch2·frozen153/sceneRMS exact·trainable18·양gradient통과후11:08:33에fresh78k/GPU0/4096/seed42/총10k본학습시작(PID3831871,supervisor3831386). 사용자Table평가미종료. ../runs/chair_residual_after_table_20261028_recovery/REPORT.md 및preflight_validation.json;현재state는chair_residual_active_run.json.
+
 ## 2026-10-27
+
+### Table 종료 후 Chair HOLDING_AT residual 예약 활성화
+사용자실행예약요청. Table3648228·기존supervisor3637486유지,독립예약supervisor3685235가Table10k정상종료marker/번호checkpoint/PID종료→GPU0여유23GiB확인→Chair4096환경2PPO·frozen153/sceneRMS/양gradient검증→fresh78k에서총10k/save100본학습을자동수행하도록등록. seed42·TokenHSI보상/PPO·encoder/action head/sigma/scene RMS동결·residual/valuehead/AMP학습18tensor유지. 코드/78k/설정사본·해시고정,PIDstarttime/lock/launch marker로중복방지,선행실패시미시작·실패시무재시도. CPU모의predecessor성공/실패/누락/PID재사용/검증→본학습/중복방지통과;실제Chair는아직대기. 상태chair_residual_active_run.json,산출물../runs/chair_residual_after_table_20261027/ 및reference/chair_adapt_residual.md.
+
+### 公開 TokenHSI Table pth 공통 AT 평가
+사용자요청GPU0·기존Table학습유지,배포ckpt_stage2_objShape_table.pth(내부epoch40000)/base40k의원본265D관측·42Dcarry·RMS·102tensor strict복원으로test9/512×seed0·1·2/30초/AT20cm첫episode ever평가. 성공476/454/475, **91.47±2.43%**(평가seed표본std). 우리residual2200의66.28±1.18%와전seed초기전배열bitwise동일. fusedSDP가RTX5090에서FATAL→사용자승인으로오류worker3674693만중단·실패기록보존,math attention재실행및각seed8개CPU/GPU action최대오차4.2e-7검증. 전seedrc0/trace재채점/32·64ever/해시·통계/metrics10개통과. 논문83.6%·10k재현과구분. Table3648228유지·Chair미실행. evaluator public-checkpoint옵션/공유원본policy/문서추가. ../runs/tokenhsi_table_common_eval_20261027/REPORT.md 및validation.json.
+
+### Chair carry residual 학습 준비 (본학습 미시작)
+Table residual과동일한78k fresh·encoder/action head/sigma/scene RMS동결·zero action residual·value head/fresh AMP학습·4096환경·원본carry보상/PPO·총10k/save100을Chair에추가. native Chair정면reset/train63/test27실제에셋사용,carry RSI/tokenizer추가없음. 전용train/test/vnc/eval및설정/구조문서추가. evaluator의adapter이름보존·GPU/환경override·구모션manifest없을때공용carry목록fallback지원. CPU설정동등/초기78k출력일치/2backward·원본동결/부분reset/정면·에셋검증,1환경native추론rc0,정식평가기4환경900step smoke rc0·trace/precision/hash재채점,metrics5개통과. Table3648228유지·Chair본학습미실행;GPU여유상4096 PPO미검증. 공통check_docs는기존/hwanhee하드코딩으로실패,새문서링크·Python/shell구문통과. reference/chair_adapt_residual.md 및../runs/chair_adapt_residual_prepare_20261027/output_etc/check/REPORT.md.
+
+### Residual1200회 공통평가
+사용자요청GPU0·학습유지,1200회고정·test9/512×독립seed0·1·2/30초/AT20cm첫episode ever. 성공267/259/266명, **51.56±0.85%**(평가seed표본std),800회44.27%대비+7.29%p. 세seed초기전배열800회와bitwise동일. 동결153tensor/sceneRMS 원본78k exact,전seedrc0/trace재채점/32·64ever/해시·통계검산통과. ../runs/table_residual_eval1200_20261027/REPORT.md 및validation.json.
 
 ### Residual800회 공통평가
 사용자요청GPU0·학습유지,800회번호checkpoint고정·test9/512×독립seed0·1·2/30초/AT20cm첫episode ever. 성공234/212/234명, **44.27±2.48%**(평가seed표본std),zero-shot26.50%대비+17.77%p. 동결153tensor/sceneRMS 원본78k exact확인. 전seedrc0/trace재채점·32/64ever/해시·통계검산통과. 초기모션/물체동일·origin제외좌표0.05mm이내일치. ../runs/table_residual_eval800_20261027/REPORT.md 및validation.json.

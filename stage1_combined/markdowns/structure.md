@@ -202,3 +202,13 @@ Table carry RSI: `rsi_native/{table_carry,check_table_carry,merge_table_carry,ch
 `humanoid_table_tokenhsi_ft.py`와 `utils/tokenhsi_table_kernels.py`는 원본Table 보상·종료함수를 우리78k 장면에 연결한다. `table_tokenhsi_ft_agent.py`는 actor 물체토크나이저 adaptation/critic·새판별자 학습과 동결을 관리한다. 전용 `table_tokenhsi_ft.yaml`/train/test/vnc 사용. [설정](reference/table_tokenhsi_ft.md).
 
 `table_adaptation_network.py`/`table_adaptation_agent.py`는 기존78k encoder·action head·scene RMS를동결하고action residual 또는복사초기화한새물체tokenizer만정책학습한다. `table_adapt_{residual,tokenizer}.yaml` 및전용train/test/vnc, CPU검증 `check_table_adaptation_cpu.py`. [설계·실행](reference/table_adaptation_compare.md).
+
+Chair residual: `humanoid_chair_tokenhsi_ft.py`는 Chair 정면 reset과 Table에서 공유하는 원본 carry 보상·종료를 연결한다. `chair_adapt_residual.yaml`과 전용 train/test/vnc/eval은 기존 adaptation network/agent를 재사용한다. CPU 검증은 `check_chair_residual_cpu.py`, 정식 평가는 adapter를 복원하는 `evaluation/hold_at/`이다. [설정](reference/chair_adapt_residual.md).
+
+공개 TokenHSI Table 평가는 `evaluation/table_hold_at/{prepare,worker}.py`에서 원본 policy/에셋 사본과 공통 장면을 연결한다. `evaluation/hold_at/public_policy.py`의 원본265D carry policy를 재사용하며 RTX5090 math attention 및 CPU/GPU action 대조를 제공한다. [명령·기준](../evaluation/table_hold_at/README.md).
+
+`tokenhsi/scripts/multi_agent/chair_after_table.py`는 지정 Table 정상종료·10k checkpoint·GPU 여유를 확인하고 Chair4096 2PPO검증→fresh78k/10k 본학습을 순차 실행하는 단발 예약 supervisor다. 예약 상태는 `chair_residual_active_run.json`, 고정 사본과 로그는 `runs/chair_residual_after_table_20261027/`. [예약·상태 확인](reference/chair_adapt_residual.md#table-종료-후-자동-실행-예약).
+
+Chair 예약 복구는 `runs/chair_residual_after_table_20261028_recovery/`에서 실행한다. scheduler는 실제 출력 resolver로 사전 경로 검사하며 검증 출력은 고정 checkout 내부 `code/output_etc/check/chair_preflight/train`이다. 회귀 검증은 `tokenhsi/tests/test_chair_after_table.py`. 현재 PID/경로는 `chair_residual_active_run.json`이 기준이다.
+
+`evaluation/tokenhsi_native_table/`은 원본 TokenHSI Table 환경·20초/직립/연속3repeat player loop에 우리10k정책을 연결한다. native→우리280D bridge/strict복원은policy.py,실행은worker.py,독립재채점은validate.py. [명세·실행](../evaluation/tokenhsi_native_table/README.md).

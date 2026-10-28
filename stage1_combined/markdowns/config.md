@@ -37,6 +37,7 @@
 | [table_tokenhsi_ft.yaml](../tokenhsi/data/cfg/multi_agent/table_tokenhsi_ft.yaml) | [table_tokenhsi_ft.yaml](../tokenhsi/data/cfg/train/rlg/table_tokenhsi_ft.yaml) |
 | [table_adapt_residual.yaml](../tokenhsi/data/cfg/multi_agent/table_adapt_residual.yaml) | [table_adapt_residual.yaml](../tokenhsi/data/cfg/train/rlg/table_adapt_residual.yaml) |
 | [table_adapt_tokenizer.yaml](../tokenhsi/data/cfg/multi_agent/table_adapt_tokenizer.yaml) | [table_adapt_tokenizer.yaml](../tokenhsi/data/cfg/train/rlg/table_adapt_tokenizer.yaml) |
+| [chair_adapt_residual.yaml](../tokenhsi/data/cfg/multi_agent/chair_adapt_residual.yaml) | [chair_adapt_residual.yaml](../tokenhsi/data/cfg/train/rlg/chair_adapt_residual.yaml) |
 
 ## 학습
 
@@ -157,6 +158,11 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_adapt_residual_train.sh
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_adapt_tokenizer_train.sh
 ```
 
+```bash
+# chair_adapt_residual
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_train.sh
+```
+
 ## 로컬 추론
 
 모니터가 연결된 로컬 viewer다. `CKPT`는 사용할 컨피그의 checkpoint로 지정한다. 아래 경로는 PUSH raw 예시다.
@@ -234,6 +240,11 @@ TOKENHSI_GPU=0 HEADLESS=0 TABLE_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/ta
 
 # table_adapt_tokenizer
 TOKENHSI_GPU=0 HEADLESS=0 TABLE_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/table_adapt_tokenizer_test.sh "$CKPT"
+```
+
+```bash
+# chair_adapt_residual
+TOKENHSI_GPU=0 HEADLESS=0 CHAIR_TEST_ENVS=1 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_test.sh "$CKPT"
 ```
 
 ## 서버 VNC 추론
@@ -322,9 +333,22 @@ TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/table_adapt_residual_
 TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/table_adapt_tokenizer_vnc.sh "$CKPT"
 ```
 
+```bash
+# chair_adapt_residual
+TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_vnc.sh "$CKPT"
+```
+
 ## 추론 옵션
 
+Chair residual 정식 평가(30초·512환경×3seed): `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_eval.sh "$CKPT"`. [설정·검증](reference/chair_adapt_residual.md).
+Chair residual Table 종료 후 예약·상태 확인은 [예약 안내](reference/chair_adapt_residual.md#table-종료-후-자동-실행-예약)를 따른다.
+
+
 Table carry 정식 평가(최신 번호 checkpoint 자동선택·512환경×3seed): `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/table_hold_at_full_ft_eval.sh`. 특정 모델은 뒤에 `"$CKPT"`를 붙인다. [조건·출력](../evaluation/table_hold_at/README.md).
+공개 TokenHSI Table 정책의 공통 기준 평가는 [public checkpoint 옵션](../evaluation/table_hold_at/README.md#공개-tokenhsi-table-모델을-공통-기준으로-평가)을 사용한다.
+우리 Table10k의 TokenHSI 원본환경·20초·직립·연속repeat 평가는 [native 평가 안내](../evaluation/tokenhsi_native_table/README.md)를 따른다.
+
+
 
 아래 옵션을 test/VNC 명령의 `bash` 앞에 붙인다. 기본 시작 동작은 `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`이다. 기본 과제는 일반 설정에서 `random_scenario`, PUSH 계열에서 `push`다.
 

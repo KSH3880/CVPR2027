@@ -9,10 +9,13 @@ def validate_stage1_platform_config(env):
         raise ValueError('stage1 and carry_payload_tokenhsi platforms must be paired')
     if reset.get('platformMode') not in (None, 'carry_payload_tokenhsi'):
         raise ValueError('Unknown platformMode')
-    native_table = (env.get('holdAtFT', {}).get('reward') == 'tokenhsi_native_table'
-                    and env.get('holdAtFT', {}).get('category') == 'Table_Circle')
-    expected_probability = 1. if native_table else (0. if env.get('holdAtFT', {}).get('ground_only') else .5)
-    expected_max_top = 1.35 if native_table else 1.2
+    native_profile = (env.get('holdAtFT', {}).get('reward'),
+                      env.get('holdAtFT', {}).get('category'))
+    native_furniture = native_profile in (
+        ('tokenhsi_native_table', 'Table_Circle'),
+        ('tokenhsi_native_chair', 'ArmChair_Normal'))
+    expected_probability = 1. if native_furniture else (0. if env.get('holdAtFT', {}).get('ground_only') else .5)
+    expected_max_top = 1.35 if native_furniture else 1.2
     if selected and (reset.get('randomHeight') is not True
                      or reset.get('randomHeightProb') != expected_probability
                      or reset.get('minPlatformHeight') != 0.

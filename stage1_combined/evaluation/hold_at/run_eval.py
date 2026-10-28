@@ -13,7 +13,7 @@ def main():
     p.add_argument('--template-checkpoint', type=Path, help='78k zero-shot: native FT checkpoint provides env/sim/train only')
     p.add_argument('--object-root', type=Path, default=ROOT / 'tokenhsi/data/dataset_dynamic_objects')
     p.add_argument('--python', default='/home/hwanhee/anaconda3/envs/tokenhsi_jhh/bin/python')
-    p.add_argument('--gpu', type=int, choices=[5], default=5)
+    p.add_argument('--gpu', type=int, default=5)
     p.add_argument('--public-chair-checkpoint', type=Path, help='Original TokenHSI Chair adaptation weights; --checkpoint constructs the scene only')
     p.add_argument('--prepare-only', action='store_true')
     p.add_argument('--smoke', action='store_true', help='4 environments, seed0, full900step; not performance evaluation')
@@ -52,7 +52,7 @@ def main():
         child = os.environ.copy()
         for key in ('CUDA_MPS_PIPE_DIRECTORY', 'CUDA_MPS_LOG_DIRECTORY', 'CUDA_VISIBLE_DEVICES'):
             child.pop(key, None)
-        child.update(TOKENHSI_GPU=str(a.gpu), PYTHONDONTWRITEBYTECODE='1')
+        child.update(TOKENHSI_GPU=str(a.gpu), PYTHONDONTWRITEBYTECODE='1', TOKENHSI_EVAL_PYTHON=a.python)
         print('START', seed, output, flush=True)
         with (output / f'seed{seed}.log').open('w') as log:
             rc = subprocess.run(['bash', str(source / 'evaluation/hold_at/seed.sh'), str(seed), str(count)],

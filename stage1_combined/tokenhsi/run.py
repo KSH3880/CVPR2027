@@ -266,7 +266,7 @@ def main():
     try:
         runner.run(vargs)
     finally:
-        if args.task in ("HumanoidChairHoldAtFT", "HumanoidTableHoldAtFT", "HumanoidTableCarryRsiFT", "HumanoidTableTokenHSIFT") and torch.cuda.is_initialized():
+        if args.task in ("HumanoidChairHoldAtFT", "HumanoidTableHoldAtFT", "HumanoidTableCarryRsiFT", "HumanoidTableTokenHSIFT", "HumanoidChairTokenHSIFT") and torch.cuda.is_initialized():
             torch.cuda.synchronize()
 
     return

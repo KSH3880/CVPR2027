@@ -32,6 +32,8 @@ def run_eval(player):
                     asset_split='test', category='Table_Circle',
                     official_sample_count=task.num_envs == 512,
                     source_sha256={str(p): sha256(p) for base in ('tokenhsi', 'evaluation/table_hold_at') for p in sorted(Path(base).rglob('*.py'))})
+    if hasattr(task, '_public_policy_metadata'):
+        manifest['public_policy'] = task._public_policy_metadata
     (out / 'manifest.json').write_text(json.dumps(manifest, indent=2))
     obs = player.env_reset()
     player.get_batch_size(obs['obs'], 1)

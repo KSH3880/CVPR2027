@@ -81,7 +81,8 @@ def prepare(checkpoint, output, object_root, count, template_checkpoint=None, pu
     assert env['holdAtFT']['ground_only'] and env['holdAtFT']['face_human']
     train = copy.deepcopy(saved['train'])
     train['params']['algo']['name'] = 'ma'  # Inference player only; never construct an FT agent.
-    train['params']['network']['name'] = 'amp_multi_agent'
+    if train['params']['network']['name'] not in ('amp_multi_agent', 'amp_table_adaptation'):
+        raise ValueError('Unsupported Chair evaluation network')
     train['params']['load_checkpoint'] = False
     train['params'].pop('load_path', None)
     (output / 'env.yaml').write_text(yaml.safe_dump(cfg, sort_keys=False))
