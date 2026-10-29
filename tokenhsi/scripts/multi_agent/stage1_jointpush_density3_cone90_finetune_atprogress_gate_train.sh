@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eu
+export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi_jhh}
 . "$(dirname "$0")/runtime_env.sh"
 . "$TOKENHSI_ROOT/tokenhsi/scripts/multi_agent/output_paths.sh"
 tokenhsi_select_output stage1_jointpush_density3_cone90_finetune_atprogress_gate train

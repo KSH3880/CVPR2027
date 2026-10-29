@@ -27,7 +27,7 @@ def test_only_requested_environment_and_transfer_changes():
     assert push['scene']['goal_angle_degrees'] == 90.
     push['scene']['goal_angle_degrees'] = 360.
     assert push['rsi'].pop('reference_mass') == 20.
-    assert variant['experiment']['transfer']['checkpoint'].endswith('_00008000.pth')
+    assert variant['experiment']['transfer']['checkpoint'] == 'pth/Stage1JointPushDensity3Cone90Finetune_00011000.pth'
     variant['experiment'] = original['experiment']
     assert variant == original
     original = config('train/rlg', BASE)

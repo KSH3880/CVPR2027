@@ -30,7 +30,7 @@ def validate_env(env):
     if (env['numAgents'], env['numObjects']) != (4, 8):
         raise ValueError('stage2_jointpush requires four people and eight object tokens')
     if (spec['coupled_probability'] != .8 or spec['physical_boxes'] != 24
-            or spec['candidate_batch'] != 32 or spec['goal_half_angle_degrees'] != 45.
+            or spec['candidate_batch'] != 32 or spec['goal_half_angle_degrees'] not in (0., 45.)
             or spec['gate_face_tolerance'] != .18 or spec['initialization'] not in ('loco','stage1_rsi')):
         raise ValueError('Unexpected Stage2 jointpush sampling contract')
     baseline = yaml.safe_load(Path('tokenhsi/data/cfg/multi_agent/stage1_jointpush.yaml').read_text())['env']

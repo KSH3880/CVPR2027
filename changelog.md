@@ -2,7 +2,52 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-29
+
+### Stage2 PUSH 7500 평가·1000/2000 비교
+
+- 7500 checkpoint를 이전과 같은 GPU6·seed42·결정적 추론·40초·넘어짐 종료로 단독/공동2·3·4인 각각32환경×1회 평가했다. 공동은2+2/3+단독1/4인 구성을 유지하고 공동 그룹의 PUSH만 집계했다. 저장된 초기 상태는 네 조건 모두1000/2000과 정확히 같다.
+- 단독/공동2/3/4인 목표 도달은 각각5/128·5/64·1/32·5/32, 종료 성공은3/128·0/64·0/32·0/32였다. 평균 목표 거리 감소는2.149·1.796·-0.915·-1.670m로2000의2.276·3.117·1.614·2.290m보다 모두 줄었다. 공동4인 도달 건수는 늘었지만 종료 성공과 최종 목표 접근량은 악화했다. 단일 seed 소표본 결과다.
+- 실제7500의269개 모델 항목·입력 정규화 일치, 성공 판정 일치·전 step 유한값 및 두 실행 정상 종료를 확인했다. 결과·재현 명령은 `output_etc/check/stage2_coupled_straight_7500_groups_32x1/`, `output_etc/check/stage2_solo_push_7500_32x1/`에 있으며 전자에 `comparison_1k_2k_7500.json`을 저장했다. 본학습3496353 PID·시작 시각을 유지했고 운영 코드/config는 변경하지 않았다.
+
 ## 2026-10-28
+
+### Stage2 단독 PUSH 1000·2000 비교
+
+- 단독 PUSH를 각 checkpoint32환경×4명×1회(128건), seed42·결정적 추론·보행 시작·목표±45°/2~10m·40초·넘어짐 종료로 평가했다. 운영 `TASK_GRAPH=push`를 사용했으며 저장된 초기 그룹·사람 root/DOF·상자·목표·할당은1000/2000에서 정확히 같다.
+- 1000→2000 목표 도달13→5/128(10.16→3.91%), 종료 성공9→3/128, 평균 목표 거리 감소3.137→2.276m였다. 접촉 경험은97→103/128, 종료 목표 거리는2.657→3.518m, 조기 종료는1→0/32환경이다. 이번 동일 장면 소표본에서는 접촉이 늘었지만 목표 도달·종료 성공·목표 접근량이 감소했다.
+- 두 checkpoint의 실제 epoch·269개 모델 항목·입력 정규화 일치, 초기 기하·환경 성공 판정 일치·전 step 유한값 및 정상 종료를 확인했다. 결과·초기 상태·재현 명령·비교 JSON은 `output_etc/check/stage2_solo_push_1k_2k_32x1/`에 저장했다. 본학습3496353 PID·시작 시각을 유지했고 운영 코드/config는 변경하지 않았다.
+
+### Stage2 공동 직선 목표 2000 평가·1000 비교
+
+- 2000 checkpoint를1000과 같은 GPU6 MPS·인원별32환경×1회·seed42·결정적 추론·40초·넘어짐 종료로 평가했다. 2+2/3+단독1/4인 구성을 유지했고, 세 조건 모두 저장된 초기 그룹·사람 root·상자·목표·할당이1000과 정확히 같았다.
+- 1000→2000 목표 도달은2인5→5/64·3인2→1/32·4인2→3/32, 종료 성공은3→1/64·0→0/32·0→1/32였다. 평균 목표 거리 감소는3.322→3.117·3.304→1.614·2.980→2.290m다. 4인 도달은 소폭 늘었지만 평균 목표 접근량은 세 조건 모두 줄었으며, 단일 seed 소표본으로 학습 추세를 확정하지 않는다.
+- 실제2000의269개 모델 항목·입력 정규화 일치, 초기 기하 검사·환경 성공 판정 일치·전 step 유한값과 정상 종료를 확인했다. 결과·초기 상태·재현 명령·`comparison_1k_2k.json`은 `output_etc/check/stage2_coupled_straight_2000_groups_32x1/`에 저장했다. 본학습3496353 PID·시작 시각을 유지했고 운영 코드/config는 변경하지 않았다.
+
+### Stage2 공동 직선 목표 1000 인원별 간단 평가
+
+- 사용자 지정1000 checkpoint를 GPU6 MPS에서 공동 인원수별32환경×1회씩 평가했다. 4명 환경에서2인은2+2, 3인은3+단독1, 4인은전원공동으로 평가 harness만 그룹 추첨을 고정했다. seed42·결정적 추론·loco100%·1200step(40초)·넘어짐 종료는 기본 설정을 유지했고, 3인 조건의 단독 과제는 기존 비율로 추첨했다.
+- 목표 도달은2인5/64그룹(7.81%)·3인2/32(6.25%)·4인2/32(6.25%), 종료 시 성공은각각3/64·0/32·0/32였다. 평균 목표 거리 감소는3.322·3.304·2.980m, 종료 목표 거리는2.594·3.063·2.866m였다. 전원 동시 접촉 경험53/64·17/32·20/32, 조기 종료 장면은1/32·4/32·2/32였다. 한 번의 소표본 평가이며 인원별 반복 통계는 아니다.
+- 실제1000의269개 모델 항목·입력 정규화 일치, 초기 공동0°·거리/간섭 검사, 기하 성공과 환경 AT 성공의 전 step 일치, 관측/행동/보상 유한값 및 정상 종료를 확인했다. 결과·그룹별 기록·초기 상태·재현 명령은 `output_etc/check/stage2_coupled_straight_1000_groups_32x1/`에 저장했다. 본학습3496353 PID·시작 시각을 유지했고 운영 코드/config는 변경하지 않았다.
+
+### Stage2 공동 PUSH 로컬 +Y 직선 목표 컨피그
+
+- 사용자 요청으로 `stage2_jointpush_goal_saturation_density3_cone90_coupled_straight` 환경/학습 YAML·train/test/VNC·별도 출력을 추가했다. 공동 목표 반각만45→0으로 설정해 공유 상자 로컬+Y 위에2~10m 거리 후보를 균등 추첨한다. 단독±45°·사람 뒤쪽 배치·간섭/경로 검사·물성·보상·PPO·11k 전이는 유지한다. 기존45° 경로는 보존하고, 각도0/45 검증과 checkpoint 계약 분리를 확인했다.
+- CPU19개 통과·미배포10500 checkpoint 의존1개 생략. GPU5 MPS·1024환경에서2/3/4인 공동 목표의 최대 횡방향 수치 오차0.112mm·단독 최대44.93°·거리2~10m·간섭 검사를 통과했다. 512환경 부분 reset과 나머지 상태 보존, 64환경 단독 샘플링의 기존45° 설정 대비 정확한 동일 결과를 확인했다.
+- 실제11k의165개 항목 전이·저장 epoch2·optimizer96회 업데이트·checkpoint 저장·모델 값/274개 지표 유한값·actor encoder/입력 정규화 동결을 확인했다. 결과와 재현 harness는 `output_etc/check/stage2_coupled_straight/`에 있다. 본학습·성공률 평가·VNC 렌더는 실행하지 않았다.
+- train_vnc dispatch와 config 목록 맨 아래의 학습/로컬/VNC 명령, structure·상세 문서를 갱신했다. shell 구문·문서 링크·diff 검사 통과, 기존 GPU5 학습3103831/3306277 PID·시작 시각 유지 확인.
+
+### Stage2 밀도3·±45° 11000 전이 실행 확인
+
+- 사용자 제공 `pth/Stage1JointPushDensity3Cone90Finetune_00011000.pth`의 실제 epoch11000·Stage1 밀도3/±45° 설정 일치를 확인했다. `stage2_jointpush_goal_saturation_density3_cone90` YAML·train/test/VNC의 기본 전이를 해당 파일로 맞추고 세 wrapper의 기본 환경을 `tokenhsi_jhh`로 변경했다. config·structure·상세 문서와 기존 경로 검사를 갱신했으며 보상·배치·PPO는 유지했다.
+- 관련 CPU2개 통과. GPU5 MPS·4명·1024환경·8 object 토큰의 `CHECK=1`이 실제165개 항목 전이 후 정상 종료했다. 저장 epoch2·optimizer96회 업데이트·checkpoint 저장, actor encoder/입력 정규화의 source 일치·action head 갱신, 모델 값과274개 지표 유한값을 확인했다. 본학습·성공률 평가·viewer는 실행하지 않았다.
+- 결과는 `output_etc/check/stage2_d3_cone90_11000_setup/`에 저장했다. 세 shell 구문·diff 검사 통과, 기존 GPU5 학습3103831/3306277의 PID·시작 시각 유지 확인.
+
+### AT progress gate 현재 서버 실행 경로 연결
+
+- 이웃 `stage1_2_jointpush`의 실행 환경을 참고해 gate 학습 wrapper의 기본 환경을 `tokenhsi_jhh`로 지정하고, `tokenhsi/data/jointpush_motions`를 해당 checkout의 같은 데이터 경로에 상대 심링크로 연결했다. 모션 참조 누락0개, 사용자 제공 `pth/Stage1V2Fixed_00078000.pth`의 epoch78000을 확인했다. 로컬 데이터 심링크도 Git 제외하고 config·structure에 실행 명령과 연결 위치를 반영했다.
+- 실제78k 전이 CPU 검사1개 통과. GPU5 MPS·2명·2048환경·4물체의 `CHECK=1` 실행은 RSI 캐시4390개 생성 후 정상 종료했다. 기존 종료 조건에 따라 저장 epoch2·optimizer96회 업데이트였으며 모델 값과 TensorBoard274개 지표 모두 유한값, 새 optimizer/78k 전이 보고서·checkpoint 저장을 확인했다. 본학습은 시작하지 않았다.
+- 검증 결과는 `output_etc/check/atprogress_gate_local_setup/`, 재사용 RSI 캐시는 `output/rsi_cache_stage1_v2/`에 저장했다. shell 구문·diff 검사 통과. 환경/학습 YAML·보상·PPO는 변경하지 않았다.
 
 ### Stage1 PUSH AT progress 1mm 전진 gate 컨피그
 

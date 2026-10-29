@@ -90,6 +90,8 @@ def sample_push(task, ids):
             cone = shared | (task.cfg['env']['jointPush']['scene']['goal_angle_degrees'] == 90.)
             heading = torch.where(cone[:, None], yaw+torch.pi/2+(draws[..., 3]-.5)*torch.pi/2,
                                   draws[..., 3]*2*torch.pi)
+            if spec['goal_half_angle_degrees'] == 0.:
+                heading = torch.where(shared[:, None], yaw+torch.pi/2, heading)
             direction = torch.stack((heading.cos(), heading.sin()), -1)
             goal = center+(2+8*draws[..., 4, None])*direction
             relative = roots[:, None]-center[:, :, None]

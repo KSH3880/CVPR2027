@@ -471,4 +471,4 @@ sim:
 experiment:
   name: stage2_jointpush_goal_saturation_density3_cone90
   transfer:
-    checkpoint: output/stage1_jointpush_density3_cone90_finetune/Stage1JointPushDensity3Cone90Finetune_27-17-59-07/nn/Stage1JointPushDensity3Cone90Finetune_00008000.pth
+    checkpoint: pth/Stage1JointPushDensity3Cone90Finetune_00011000.pth

@@ -66,4 +66,10 @@ Adapter weight/bias는0, coordination은 identity로 초기화하여 전이 직�
 
 단독 SIT10%·CLIMB20%·HOLDING_AT25%·HOLDING_ON_TOP20%·PUSH25%, coupled PUSH 전용·그룹 추첨·loco100%·40초·넘어짐 종료·목표 포화/gate·학습 파라미터·네트워크는 원본 그대로다. Stage1 fine-tune의 PUSH50%와 접촉 RSI는 가져오지 않는다. `reference_mass: 20.0`은 기존 RSI bank 출처 메타데이터이며 이 loco 설정은 접촉 RSI를 실행하지 않는다.
 
-기본 전이 파일은 `output/stage1_jointpush_density3_cone90_finetune/Stage1JointPushDensity3Cone90Finetune_27-17-59-07/nn/Stage1JointPushDensity3Cone90Finetune_00008000.pth`다. `STAGE1_CHECKPOINT`로 교체할 수 있다. 기존 Stage2 checkpoint의 물성/배치 계약과 다르므로 기존 Stage2 결과를 이 설정의 resume/test 입력으로 섞지 않는다.
+기본 전이 파일은 `pth/Stage1JointPushDensity3Cone90Finetune_00011000.pth`다. `STAGE1_CHECKPOINT`로 교체할 수 있다. 기존 Stage2 checkpoint의 물성/배치 계약과 다르므로 기존 Stage2 결과를 이 설정의 resume/test 입력으로 섞지 않는다.
+
+## 공동 PUSH 직선 목표
+
+`stage2_jointpush_goal_saturation_density3_cone90_coupled_straight`는 밀도3·단독±45° 설정에서 `stage2JointPush.goal_half_angle_degrees`만45→0으로 바꾼다. 공유 상자 중심에서 로컬+Y 방향으로 거리 후보를2~10m 균등 추첨하며, 상자의 월드 yaw는 계속 무작위다. 단독 목표±45°·사람 시작 위치·그룹 구성·물성·보상·PPO·Stage1 11000 전이는 유지한다.
+
+기존 사람 뒤쪽 배치·사람/상자 간섭·이동 경로 검사를 그대로 적용하고, 간섭 시 후보를 다시 뽑는다. 공동 목표 반각45°는 기존 샘플링을 유지한다. 전용 train/test/VNC와 출력을 분리하며, 목표 각도가 checkpoint 계약에 포함되므로 재개에는 이 직선 설정으로 학습한 Stage2 checkpoint를 사용한다.

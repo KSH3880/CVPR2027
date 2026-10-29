@@ -175,6 +175,8 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 
 `stage1_jointpush_density3_cone90_finetune_atprogress_gate` 환경/학습 YAML·전용 train/test/VNC는 PUSH AT progress에 step당 수평 목표 거리 감소 1mm 초과 gate를 적용한다. `jointpush_reward.gate_push_at_progress`와 task의 직전 상자 위치를 사용하며, `test_stage1_jointpush_atprogress_gate.py`가 임계값·혼합 과제·성공 포화·reset 경계를 검사한다.
 
+이 checkout의 `tokenhsi/data/jointpush_motions`는 이웃 `stage1_2_jointpush/tokenhsi/data/jointpush_motions`를 가리키는 로컬 심링크다. 초기 전이 파일은 `pth/Stage1V2Fixed_00078000.pth`에 둔다.
+
 ## Stage2 jointpush
 
 | 경로 | 역할 |
@@ -229,8 +231,12 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 
 | 경로 | 역할 |
 | --- | --- |
-| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush_goal_saturation_density3_cone90.yaml` | 기존 목표 포화 설정에 밀도3·단독 cone90·Stage1 8000 전이 적용 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_jointpush_goal_saturation_density3_cone90.yaml` | 기존 목표 포화 설정에 밀도3·단독 cone90·Stage1 11000 전이 적용 |
 | `tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_density3_cone90_{train,test,vnc}.sh` | 전용 학습·로컬 추론·서버 VNC 실행 |
 | `tokenhsi/tests/test_stage2_jointpush_density3_cone90.py` | 설정 차이 제한·단독/공동 질량·checkpoint 계약 검사 |
 
 상세 설정은 [Stage2 jointpush](reference/stage2_jointpush.md#밀도3단독-목표-45-설정)를 따른다.
+
+## Stage2 공동 PUSH 직선 목표
+
+`stage2_jointpush_goal_saturation_density3_cone90_coupled_straight` 환경/학습 YAML·전용 train/test/VNC는 공동 목표의 반각만0°로 설정한다. `stage2_jointpush_scene.sample_push`가 공유 상자 로컬+Y 위에 목표를 배치하며 단독±45°는 유지한다. `test_stage2_jointpush_coupled_straight.py`는 설정 차이·checkpoint 계약·허용 각도를 검사한다. 상세는 [Stage2 jointpush](reference/stage2_jointpush.md#공동-push-직선-목표)를 따른다.
