@@ -1,4 +1,70 @@
+## 2026-10-29
+
+### Table carry 공개정책·우리residual10k 우리영역40초 비교 완료
+사용자 요청으로 `climb_paired/run_table_carry.py`를 추가하고 공유carry driver/tracker의category·protocol·모델수·정책epoch를 Table/Chair별로 구분했다. 기존Chair의env/train/체크포인트/protocol 준비값은 저장된정식결과와동일함을CPU대조했다. 공개Table40k(102tensor/265D RMS)와 우리residual10k(171tensor/scene RMS)를 기존공통Table환경·test9·512환경·seed0·40초·연속3회로 평가했다. 거리1~5m·랜덤yaw·목표XY±4.5m/바닥높이를 유지하며 우리AT영역=물체중심3D20cm, 초기frame제외/첫episode종료action포함ever·직립/파지추가조건없음. 첫회제외 **TokenHSI93.07±.69%, 우리10k91.21±.55%**,차이우리−1.85546875%p. 원시성공수478/474/479 대471/465/469,3회전체93.16±.52 대91.47±.60%. std는동일seed 반복표본산포다. CPU23개(양category routing·40초후반/terminal·부분reset누수방지·기존지표/CLI 등),4환경40초×2정책×3repeat 연결검증 후 정식6회 모두rc0. 전trace독립재채점/32·64ever/test9/1199종료/strict복원·모델RMS불변/원본·사본pth·코드·에셋 SHA/CSV·평균·std재계산 통과. 두정책첫repeat root/DOF/물체/목표/크기/ID전배열exact,후속repeat초기차이는실측기록. 두checkpoint는앞서각20초native평가에쓴파일과SHA동일확인;시간뿐아니라환경/성공조건/실행경로차이도있으므로20초대비변화를시간효과로단정하지않음. 결과 `output_etc/check/hold_at_eval/table_compare_40s_20261029_145043/{REPORT.md,validation.json,audit.json,checkpoint_and_initial_identity.json}`, 상태 `../runs/table_carry_40s_active.json`. 기존평가·프로세스 보존.
+
+### 공개 TokenHSI Table 모델 원본환경20초 평가 완료
+사용자 요청으로 `tokenhsi_native_table/run_public.py`와 `public_worker.py`를 추가했다. 공개 `ckpt_stage2_objShape_table.pth`의 실제epoch40000/102tensor/265D RMS와base40k를 고정사본으로 복원했다. 읽기전용baseline의 run·env·seed/sim·관측·player/get_action/run_eval 전체를 byte동일사본으로 사용하고 관측/행동에 손대지 않는 trace wrapper 및 RTX5090용math attention만 연결했다. 원본get_action의deterministic행동선택과정/RNG소비도 유지하며 우리280D bridge를 사용하지 않는다. Table_Circle test9·512환경·seed0·20초(600설정/599action)·연속3회·3D20cm+native updot≥.86615로 **427/422/414명**, 첫회제외 **81.64±1.10%**, 전체3회 **82.23±1.28%**(동일seed 반복표본std). CPU재채점회귀3개·4환경20초×3repeat연결검증(rc0) 후 정식평가rc0. 모델/RMS/AMP RMS strict복원·평가전후불변, 모든repeat9종/첫episode·종료frame/성공precision 독립재채점, 원본config/Python전수동일·원본/사본pth·trace SHA·평균/std재계산 검증통과. 결과 `output_etc/check/hold_at_eval/tokenhsi_table_native20s_20261029_144236/{REPORT.md,summary.json,validation.json,audit.json}`, 상태 `../runs/tokenhsi_table_native20s_active.json`. 기존우리10k원본환경84.47±1.52%는별도측정이고초기장면동일성은가정하지않았다. 공개코드9×9m목표조건이므로논문83.6%조건전체재현과구분한다. baseline·기존작업보존.
+
+### Chair HOLD+AT 공개carry·residual8.5k/10k 우리기준40초 비교 완료
+사용자 요청으로 `climb_paired/run_chair_carry.py`, `launch_carry.py`, `continuous_carry.py`를 추가했다. 공개 chair carry adaptation10k(265D/102tensor)와 78k기반 encoder고정+action residual8500/10000(각171tensor)을 동적 ArmChair test27/1명1의자/512환경/seed0/40초/원본 연속3회 루프로 평가했다. 우리 AT는 의자중심–목표3D20cm·첫episode action후부터종료frame까지 ever이며 직립·파지·정지 조건을 추가하지 않았다. 대표repeat1/2 평균±동일seed 반복표본std: **TokenHSI98.24±.28%, 우리8500 95.21±1.80%, 우리10000 96.58±.41%**. 원시성공수는 각각498/504/502, 488/481/494, 496/496/493명이며 repeat0와3회전체통계도 보존했다. 우리10k는8.5k보다+1.3671875%p,공개정책보다−1.66015625%p. 초기화와물리는기존carry평가분포를 유지하고 시간·반복집계를 명시적으로 분리했다. PublicChairPolicy는 연속루프의 부분reset에서 해당행만 새kinematic body를 사용하도록 선택인자를 추가했고 기존 호출 동작은 유지했다. CPU21개(40초후반/terminal성공·reset후누수방지·원본제어순서·기존CLI/30초지표 등) 통과. 4환경40초×세정책×3repeat 연결검증 후 정식9회 모두rc0;전trace 독립재채점/32·64ever/27종/1199종료/모델·RMS strict·불변/원본·사본pth·소스·에셋 SHA/CSV·평균·std 재계산 통과. 세정책의첫repeat 초기 root/DOF/의자/목표/크기/ID 전배열 exact, 후속repeat 상태차이는 기록했다. 결과 `output_etc/check/hold_at_eval/chair_compare_40s_20261029_140943/{REPORT.md,validation.json,audit.json}`; 상태 `../runs/chair_carry_40s_active.json`. 기존평가·타프로세스 보존, 논문 원본환경 전체 재현과 구분한다.
+
+### 공개 TokenHSI SIT를 우리 영역40초 기준으로 비교 완료
+사용자 요청으로 `run_chair_sit --policy tokenhsi`를 추가했다. 같은 FullFT20k 장면 checkpoint와 Chair test26·512환경·seed0·40초·원본 연속3회 루프를 유지하고 행동은 공개 Stage1 40k의 원본354D 정책/RMS를 strict 복원해 계산했다. 영역 성공511/510/510명(99.80/99.61/99.61%), 첫회 제외 **99.61±0.00%**, 3회 전체99.67±.11%; 점 보조 첫회 제외99.51±.14%. std는 동일seed 반복 표본산포다. 우리 FullFT20k 96.09±0.00%보다 영역 +3.515625%p. 첫 반복 root/DOF/object/modelID 전배열 exact·환경config 동일, 후속 반복 초기상태는 부분reset/RNG소비로 달라지는 것을 기록했다. CPU9개·정식3회 rc0·독립 SciPy 재채점/26종/1199종료/원본·사본pth 및 코드 SHA/scene 모델·RMS 불변/통계·CSV 검증 통과. 논문 원본 평가조건 전체의 재현과 구분한다. 결과 `output_etc/check/chair_sit_eval/tokenhsi_sit_epoch40000_40s_continuous3_20261029_135516/{REPORT.md,comparison.json,validation.json}`, 상태 `../runs/tokenhsi_sit_40s_active.json`. 기존 우리 결과와 JointPush 학습은 유지했다.
+
+### 올바른SIT FullFT20k로 영역40초 재평가 완료
+사용자가sit_adaptation에다시가져온`tokenhsi_sit_full_ft/tokenhsi_sit_78k_20261024_130732/TokenHSISitFullFT_24-13-07-36/nn/TokenHSISitFullFT_00020000.pth`의내부epoch20000/source78k/all_layers/SIT100%확인. 기존검증된run_chair_sit.py로우리정책만seed0/512환경/Chair test26/40초/연속3회재평가(rc0),가중치변환없음. 영역491/492/492명=95.90/96.09/96.09%;첫회제외 **96.09±0.00%**,3회전체96.03±.11%(동일seed반복표본std). 점보조첫회제외95.31±.28%. 1·2회초기root는서로다르며영역성공수가492로같아서std0임확인. 매repeat26종/1199종료/목표점오차0·trace SHA·독립재채점/원본·사본pth SHA·모델/RMS strict·불변·CSV/통계검증통과. 결과output_etc/check/chair_sit_eval/chair_epoch20000_40s_continuous3_20261029_134827/{REPORT.md,validation.json};공통active갱신·구active및기존2k결과보존.
+
+### Chair SIT 저성능을 기존 평가 진입점으로 교차 확인
+사용자기존95%와차이질문. 로컬evaluation/finetuned기존launch_case.py/EvaluationPlayer로같은사용자지정ChairBBox35TokenizerFT_00002000pth·seed0/512/Chair26/40초1회검증(rc0). 영역95/512=18.55%,점86/512=16.80%로기존코드에서도낮음확인. 연속평가repeat0와초기root/DOF/object/modelID전배열exact·trace SHA/SciPy재채점통과;연속첫회16.99%와수치자체는동일하지않아루프동등성은주장하지않음. 기록의95.64±.23%는78k기반SIT전용fullFT20000,지정파일은73k기반SIT/CLIMB혼합chair tokenizer FT2000으로체크포인트차이확인. 예전서버FrozenChairSit snapshot/95%원본pth는현재로컬에서확인되지않아그정확한프로토콜재현은미검증. 근거output_etc/check/chair_sit_eval/legacy_single_40s_same_pth_20261029_134426/comparison_validation.json. 모델변경없음.
+
+### Chair SIT 사용자지정pth 단일seed·영역40초 평가 완료
+사용자최종지정`output/sit_adaptation/chair_bbox35_20k_20261022_142206/ChairBBox35TokenizerFT_22-14-22-17/nn/ChairBBox35TokenizerFT_00002000.pth`의실제epoch2000/35D/73k기반chair tokenizer전용학습메타확인후그파일그대로평가. 20k폴더이름과실제epoch구분,시드는요청대로0하나·우리정책만/test26/512환경/40초/원본연속3회. 영역성공87/102/86(16.99/19.92/16.80%);첫회제외 **18.36±2.21%**(반복표본std),3회전체17.90±1.75%,점보조17.48±2.07%(첫회제외). run_chair_sit.py추가,공통tracker/SciPy채점기에SIT좌판+10cm/로컬영역지원·CLIMB기본유지. CPU9개(회전좌판/점·영역분리포함)·기존35D의4환경1초×3연결smoke rc0후지정pth정식3회rc0완료. 매repeat26종/1199최대종료/목표점진단·독립재채점파일·SHA·모델/RMS strict·불변·통계/CSV검증. 결과output_etc/check/chair_sit_eval/chair_epoch2000_40s_continuous3_20261029_133731/{REPORT.md,validation.json};상태../runs/chair_sit_40s_active.json. 원본파일·기존평가·타학습유지.
+
+### Table CLIMB 원본연속3회 방식으로 재평가 시작
+사용자재측정요청. 시드별1회평가결과보존,공개TokenHSI40k/우리원본30D2k·Table test8/512환경/40초/seed0~9각한프로세스에서3회연속으로재실행. native_loop.py가읽기전용원본run_eval의reset/부분reset/첫episode수집제어흐름을추출하며시드재설정없음. continuous.py는공통점·영역·초기/종료frame·trace/부분reset/newkin관측을기록한다. 원본운영집계에맞춰repeat0보존·대표repeat1/2평균/반복std,3회전체보조값및seed간std별도저장. CPU8개(원본loop와reset·RNG·행동순서·수집동일,부분reset몸관측,반복/seed std구분등)통과. 4환경1초양정책×3repeat smoke rc0/6trace SciPy·29종료/모델RMS strict·불변검증;반복0초기전배열exact,이후반복배열상이실측·동일성가정없음. 본평가supervisor4137411/GPU0시작,기존JointPush3984199유지. 상태../runs/table_climb_30d_continuous3_active.json(공통active도갱신),산출물output_etc/check/climb_eval/table_30d_2k_continuous3_20261029_125155/. 시작시정식성능미완료.
+
+### 원본30D Table CLIMB 40초 비교 완료
+3seed checkpoint비교에서2k99.74±.30%,3k98.83±.34%로2k선택. 선택모델의Table test8/40초/512×독립seed0~9전평가rc0완료. 최종우리2k99.79±.19%(5109/5120),공개TokenHSI40k99.86±.21%(5113/5120),차이−.078125%p. 점·영역동일,동일seed승0/무6/패4(각패배1시도차이). 우리seed2·6·7은100%지만TokenHSI도100%. 선택용3seed포함·평가seed표본std이며독립학습seed결론과구분. 전체통계재계산/CSV10행/3stage rc0/초기전배열exact/저장독립재채점검증26case·고유trace23개/trace·checkpoint SHA전수확인. REPORT.md에한국어정리및validation.json저장. 경로output_etc/check/climb_eval/table_30d_2k_3k_40s_20261029_115957/. supervisor자연종료·기존JointPush3984199생존확인,신규평가/학습미시작.
+
+### 원본30D CLIMB 2k/3k Table 40초 paired 평가 시작
+사용자최종지정은35D20k가아닌원본30D2k/3k. 과거30초Mixed점·영역은2k99.80±.34%,3k99.09±.49%로확인. 새evaluation/climb_paired는Table test8/1명1고정물체/512환경/40초1200설정step/같은초기장면에서공개TokenHSI40k와원본30D를비교한다. 기존finetuned loop의900하드코딩을task.max_episode_length로대체하여기존900기본은유지. 골반영역80%XY/Z±20cm와점20cm를한trace에서채점,추가성공조건없음. strict모델/RMS·평가후불변/초기전배열exact·SciPy독립재채점·SHA/모든seed통계·승리시드진단저장. CPU4개·양checkpoint165tensor/shape원본78k동일·4환경paired40초1199종료smoke rc0검증. 첫public smoke의사후시간검증은float32 dt 오차40.000002초로실패해원시실패보존,허용오차1e-4로수정후trace재검증·paired smoke통과. 사용자요청순차실행:3k/2k를seed0·1·2로평가→영역평균이엄격히높으면3k,그외2k→선택모델seed3~9및0~9전체통계. 이기는seed만보고하지않고원시전체보존. GPU0 supervisor4127785로정식평가시작,기존JointPush3984199유지. 상태../runs/table_climb_30d_40s_active.json,산출물output_etc/check/climb_eval/table_30d_2k_3k_40s_20261029_115957/. 시작시정식성능결과는미완료.
+
 ## 2026-10-28
+
+### Chair10k 학습 완료 및 최종 동시기준 평가
+사용자완료확인·eval요청. Chair10k/rc0완료(23:00KST)·최종00010000pth확인후GPU0/test27/512×독립seed0/1/2로최종평가. 우리30초AT20cm **95.51±0.52%**(491/490/486),동일episode TokenHSI20초+upright조건 **89.91±1.11%**(462/465/454),각평가seed표본std. 후자는공통환경재채점이며원본환경/연속repeat평가와구분. frozen153/scene RMS원본78k exact·finite/전seed27종/trace·32·64ever/해시/통계/CSV1536행·최초성공step·오차/시간범위검증통과. output_etc/check/hold_at_eval/20261028_233319/{REPORT.md,validation.json,episodes.csv}. 신규학습미시작.
+
+### Chair 평가 기본 저장 경로 hold_at_eval로 변경
+사용자최종지정대로새기본출력을 `stage1_combined/output_etc/check/hold_at_eval/<YYYYMMDD_HHMMSS>/`로변경. 실행시각별하위폴더로기존결과보존,명시적--output우선순위유지. 실제출력경로표현식으로기본parent/허용경로/override검증및구문·diff확인. GPU평가미실행·기존결과/실행프로세스미변경.
+
+### output_etc/check 테스트·임시 산출물 영구 삭제
+
+사용자 명시 요청으로 smoke/단기학습/RSI·IK 검증/viewer/빈 준비 폴더82개와 테스트 로그·보조파일77개를 삭제했다(총2.756GiB). 정식·비교 평가21폴더/1,566파일은 inode·크기·mtime 불변을 확인했다. 삭제 직전마다 호스트 프로세스 실행 인자·cwd·열린 파일을 확인했고 외부 입력 심링크 의존성은 없었다. 삭제 목록·사유는 ../runs/cleanup_stage1_checks_20261028.json. 과거 변경 기록의 테스트 근거 경로 일부는 이 정리로 제거되었다.
+
+### Chair 단일 rollout 우리/TokenHSI 조건 동시 채점
+사용자episode한번실행·기록한번추출요청. 기존30초512×3seed명령유지,동일첫episode에서우리AT20cm/30초및TokenHSIAT20cm+에셋updot≥.86615/처음599action(원본20초timeout)추가채점. source는same_common_rollout으로명시,원본환경/연속repeat평가와구분. 각각mean/std·seed성공률/summaryJSON·환경별합본episodes.csv(기본1536행)/최초성공step·성공거리오차저장. 기존primary/initial필드·legacy JSON검증호환. 새기본출력S1 output_etc/check로정리하고명시적runs지원유지. CPU15개,실제4400의3seed×512trace 원본metric body대조성공·precision일치/우리점수보존,실제4환경1rollout smoke·두점수재채점/CSV/해시통과. 정식GPU3seed신규실행없음·Chair3831871유지. output_etc/check/chair_dual_metrics_20261028/validation.json 및evaluation/hold_at/README.md.
+
+### output 결과 링크를 절대경로로 변경
+
+사용자 요청으로 output 최상위 상대 심링크 5개를 실제 대상의 절대경로로 교체했다. 모든 대상 접근 및 링크 문자열 확인. 실제 결과 디렉터리와 실행 프로세스는 변경하지 않았다.
+
+### output 최상위 활성 결과 링크 복구
+
+output/runs에서 output 최상위로 배치가 바뀐 뒤 남은 ../../../runs 상대 링크 5개를 ../../runs로 수정했다. 대상 디렉터리 및 resolve 일치 전수 확인. 학습·TensorBoard의 실제 runs 경로는 변경하지 않았다.
+
+### 실험 폴더를 소속 output/runs로 추가 통합
+
+사용자 요청으로 기존 runs 실험·평가·진단을 이 프로젝트 output/runs에서 접근하도록 정리했다. 사용 중 경로는 이동하지 않고 새 위치에서 연결했으며 완료 경로는 역방향 호환 링크를 유지했다. 전체81경로(74이동·7활성연결) 및 일반파일20,632개 inode/크기/mtime 확인. 기존 프로세스 생존 확인. 이전 cleanup 보관 폴더 부재로9개 링크 미해결. 정확한 목록·현재 기준은 ../docs/OUTPUT_LAYOUT.md 및 ../runs/project_output_migration_final_20261028.json.
+
+### Chair 최신 checkpoint 자동3seed 평가·mean/std CLI
+사용자직접실행요청. chair_adapt_residual_eval.sh인자생략시활성본학습최신번호pth자동선택,명시pth/추가옵션유지. 숫자epoch선택·별칭/preflight제외·부분저장재시도·Chair/residual메타확인. 기본512×독립seed0/1/2·30초AT20cm유지,새--concise로seed별성공률및최종Mean±Std(ddof1)·결과경로출력,긴episode배열은JSON보존. 기존driver기본RESULT출력호환유지. CPU회귀5개/shell구문/실제prepare-only최신5000·512×3seed확인/기존4400summary89.58±.63formatter통과. GPU신규평가미실행·학습미변경. ../runs/chair_eval_cli_20261028/output_etc/check/ 및reference/chair_adapt_residual.md.
+
+### Chair residual 최신4400회 공통 AT 평가
+사용자eval요청,선택시최신4400번호pth고정/GPU0/test27/512×독립seed0·1·2/30초/AT20cm첫episode ever. 성공455/460/461, **89.58±0.63%**(평가seed표본std),3800회87.50%대비+2.08%p. 전seed초기전배열3800회와bitwise exact. frozen153/scene RMS원본78k exact/finite·전trace재채점·32/64ever·해시·통계·각seed27종포함통과. Chair3831871유지. ../runs/chair_residual_eval4400_20261028/REPORT.md 및validation.json.
+
+### Chair residual 최신3800회 공통 AT 평가
+사용자지금eval요청,선택시최신3800번호pth고정/GPU0/test27/512×독립seed0·1·2/30초/AT20cm첫episode ever. 성공452/450/442, **87.50±1.03%**(평가seed표본std),3100회84.31%대비+3.19%p. 전seed초기전배열3100회와bitwise exact. frozen153/scene RMS원본78k exact/finite·전trace재채점·32/64ever·해시·통계·각seed27종포함통과. Chair3831871유지. ../runs/chair_residual_eval3800_20261028/REPORT.md 및validation.json.
 
 ### runs의 미사용 실험·로그 압축 보관
 

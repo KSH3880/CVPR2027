@@ -1,5 +1,7 @@
 ## 현재 Partial 구현
 
+기존 runs 실험·평가 기록은 이 프로젝트 `output/runs/`에서 접근한다. 실행 중인 경로는 연결만 유지한다. [현재 배치·미해결 경로](../../docs/OUTPUT_LAYOUT.md).
+
 현재 RawCuboid Partial의 코드·보상·실행 명령은 `../../jointpush/partial/`, `../../jointpush/scripts/partial_*`와 [안내](../../jointpush/README.md)를 따른다. 새 partial은 여기의 KSH/기존 Koo port에 의존하지 않는다. 아래 경로는 기존 viewer·분석용이다.
 
 ## KSH Depth180 9000 Partial viewer

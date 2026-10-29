@@ -7,6 +7,8 @@ sys.dont_write_bytecode=True
 sys.path[:0]=[str(SOURCE/'tokenhsi'),str(SOURCE),str(ROOT)]
 import isaacgym
 import torch
+from ksh_jointpush.ksh_torch_compat import install as install_torch_compat
+install_torch_compat()
 import utils.output_paths as output_paths
 _resolve=output_paths.resolve_output_path
 _RUN_ROOT=SOURCE
@@ -37,6 +39,9 @@ from ksh_jointpush.ksh_distractor_clearance import install as install_distractor
 install_distractor_clearance(prepared_env)
 from ksh_jointpush.ksh_push_only import install as install_push_only
 install_push_only(prepared_env)
+# Load task classes only after reward adapters have bound the runtime class.
+from ksh_jointpush.ksh_torch_compat import install_cuda_volume_compat
+install_cuda_volume_compat()
 if os.environ.get('PUSH_RSI_MIX'):
     probability=float(os.environ['PUSH_RSI_MIX'])
     if '--test' not in sys.argv or not 0<=probability<=1:raise ValueError('PUSH_RSI_MIX is evaluation-only and must be in [0,1]')

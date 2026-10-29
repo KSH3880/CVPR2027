@@ -1,5 +1,7 @@
 # 레포 구조
 
+기존 runs 실험·평가 기록은 이 프로젝트 `output/runs/`에서 접근한다. 실행 중인 경로는 연결만 유지한다. [현재 배치·미해결 경로](../../docs/OUTPUT_LAYOUT.md).
+
 기존 Push/Door split_goal 학습 결과는 `output/push_door/split_goal_gpu0_20261015_152651/`에 모았다. 구 경로는 호환 링크로 유지한다. [공통 결과 경로](../../docs/OUTPUT_LAYOUT.md).
 
 현재 실행 실험은 PUSH/DOOR Stage 1, 원본 multi-agent carry(1), 독립 Stage 1(27·28·30·31·32·33·34·35·36·37 및 paired AT/placement·unified 독립 5과제), 협력 Stage 2(29 및 SIT plane 변형)다. 실행 명령과 checkpoint 규칙은 [config.md](config.md)에 있다.

@@ -1,5 +1,7 @@
 # Chair HOLDING+AT 단독 평가
 
+40초·동일시드 연속3회로 공개 chair carry 및 우리 residual8.5k/10k를 비교하려면 [Chair HOLD+AT 40초 비교](../climb_paired/README.md#chair-holdat-40초-비교)를 사용한다. 아래 기존 평가의 30초·독립3시드 방식과 집계 단위를 구분한다.
+
 기준은 [evaluation_single.md](../../../docs/evaluation_single.md)의 AT 성공식·시간·집계다. 프로토콜은 `native_chair_hold_at_30s_v1`이며, 일반 박스 `single_match_region_v1`과 초기 배치 분포를 구분한다.
 
 | 항목 | 설정 |
@@ -76,3 +78,27 @@ python3 stage1_combined/evaluation/hold_at/metrics.py "$RUN/source/output_etc/ch
 
 
 **논문 수치와 구분:** 위공개코드측정97.85%는논문Table3의Chair88.8±3.1%재현결과가아니다. 논문은randomorientation/10×10m목표,공개코드는front사람정렬/9×9m목표다. 이차이가수치차이원인인지는미확정이다. `runs/tokenhsi_chair_official_20261026_160009/PAPER_AUDIT.md`참조.
+
+
+## 같은 episode에서 두 기준 동시 기록
+
+현재 `chair_adapt_residual_eval.sh` 기본 실행은 seed별 한 번의30초 rollout에서 아래두점수를함께계산한다.512환경×독립seed0/1/2는유지하고TokenHSI용시뮬레이션을별도로추가하지않는다.
+
+| 출력 | 성공 조건 | 시간 범위 |
+|---|---|---|
+| Ours | 물체중심3D거리≤20cm | 첫episode,최대899action(30초설정) |
+| TokenHSI criteria (same episode) | 거리≤20cm AND native up-dot≥0.86615 | 같은첫episode의처음599action(원본600step/20초timeout과일치) |
+
+두번째는동일공통환경/독립seed의trajectory를원본carry성공조건으로재채점한값이다. 원본TokenHSI환경·reset·연속3repeat로실행한별도native평가와는구분한다. 초기geometry는채점하지않고종료action은포함하며,종료이후나시간범위이후성공은제외한다. up축은각에셋의`up_facing`을사용하고원본`quat_rotate`수식/threshold를유지한다.
+
+터미널에는seed별두성공률과각각의Mean±Std(ddof1평가seed표본std)가나온다. `summary.json`의기존`statistics`는우리기준을그대로유지하며`tokenhsi_criteria_statistics`가추가된다. seed별`results.json`에는`tokenhsi_criteria`가포함된다. `episodes.csv`는모든seed의환경별성공여부/최초성공step/TokenHSI성공중최소거리오차(cm)를합친기록이다.512×3실행시1536행이다. 원시trace와`object_metadata.npz`의up축/모델ID로둘다독립재채점한다. 기존`initial_0.npz`필드는유지한다.
+
+프로젝트루트에서기존과같이:
+
+```bash
+TOKENHSI_GPU=0 bash stage1_combined/tokenhsi/scripts/multi_agent/chair_adapt_residual_eval.sh
+```
+
+새평가의기본출력은 `stage1_combined/output_etc/check/hold_at_eval/<YYYYMMDD_HHMMSS>/`. 이전명령의명시적`--output` project runs경로도계속지원한다. 실행중학습/기존평가는수정하지않는다.
+
+검증:CPU15개(20초cutoff/직립/terminal포함/종료후누수/에셋별up축/3D거리/집계/기존CLI호환),이전실제4400의3seed×512trace를원본`_compute_metrics_evaluation`body로대조해성공수와precision일치,기존우리점수동일확인. 실제4환경1rollout smoke/두점수재채점/합본CSV/해시검사통과. 기록은 `output_etc/check/chair_dual_metrics_20261028/`.

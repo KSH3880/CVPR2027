@@ -4,6 +4,10 @@
 
 ## 2026-10-28
 
+### 실험 폴더를 소속 output/runs로 추가 통합
+
+사용자 요청으로 기존 runs 실험·평가·진단을 이 프로젝트 output/runs에서 접근하도록 정리했다. 사용 중 경로는 이동하지 않고 새 위치에서 연결했으며 완료 경로는 역방향 호환 링크를 유지했다. 전체81경로(74이동·7활성연결) 및 일반파일20,632개 inode/크기/mtime 확인. 기존 프로세스 생존 확인. 이전 cleanup 보관 폴더 부재로9개 링크 미해결. 정확한 목록·현재 기준은 ../docs/OUTPUT_LAYOUT.md 및 ../runs/project_output_migration_final_20261028.json.
+
 ### JointPush 결과 참조 및 본학습 기본 경로 통일
 
 koo_push 전용 학습 wrapper와 viewer의 결과 참조를 ../jointpush/output으로 통일하고 config/structure의 경로를 갱신했다. 원래 runs 경로는 호환 링크로 접근 가능하다. shell 구문·실제 결과 경로 검증. 실행 중인 작업과 원본 KSH 코드는 유지했다.

@@ -16,7 +16,7 @@ Table에서 검증한 `table_adapt_residual`을 ArmChair_Normal에 적용한다.
 
 실행 명령은 [config](../config.md). 학습 환경 수를 임의 축소하지 않는다. 동시4096 학습을 시작할 GPU 여유가 없으므로 현재 검증은 CPU 전이/gradient와 소규모 **추론**으로 제한하며4096 PPO 실행 검증과 본학습은 아직 수행하지 않는다.
 
-정식 평가는 `chair_adapt_residual_eval.sh CKPT`로 native_chair_hold_at_30s_v1(test27,512×독립seed0/1/2,30초,AT20cm 첫episode ever)을 쓴다. residual network 이름과 저장된 normalizer를 그대로 복원한다. `--smoke`는4환경×seed0 동작검사이고 성능 측정이 아니다. `--prepare-only`는 실행 없이 checkpoint/에셋/코드 사본만 만든다. GPU0·tokenhsi118은 새 wrapper가 지정하며 기존 driver의GPU5 기본값은 유지한다.
+정식 평가는 `chair_adapt_residual_eval.sh [CKPT]`로 native_chair_hold_at_30s_v1(test27,512×독립seed0/1/2,30초,AT20cm 첫episode ever)을 쓴다. residual network 이름과 저장된 normalizer를 그대로 복원한다. `--smoke`는4환경×seed0 동작검사이고 성능 측정이 아니다. `--prepare-only`는 실행 없이 checkpoint/에셋/코드 사본만 만든다. GPU0·tokenhsi118은 새 wrapper가 지정하며 기존 driver의GPU5 기본값은 유지한다.
 
 검증 산출물: `runs/chair_adapt_residual_prepare_20261027/output_etc/check/`. CPU script의 `untrained_chair_residual.pth`는 원본78k+zero residual로 만든 **추론 검증 전용** 파일이며 학습·resume용 checkpoint가 아니다.
 
@@ -46,3 +46,35 @@ tail -f runs/chair_residual_after_table_20261027/scheduler.log
 복구 루트는 `runs/chair_residual_after_table_20261028_recovery/`. preflight는 해당 `code/output_etc/check/chair_preflight/train`으로 이동했고 scheduler 등록 시 실제 `resolve_output_path`를 실행하여 검증/본학습 경로를 모두 검사한다. 실제 resolver를 사용하는 회귀검증으로 옛 경로 거부/새 경로 허용을 확인했다. Table최종 checkpoint/78k/환경·보상/PPO·4096환경·10k설정은 동일하다. 복구 과정에서도 다른 평가 프로세스는 종료하지 않는다. 현재 활성 경로/PID/학습 단계는 `chair_residual_active_run.json`을 따른다.
 
 복구 검증 결과: 실제4096환경2PPO rc0/동결153·scene RMS exact/학습18tensor/양gradient 통과. 2026-10-28 11:08:33KST fresh78k 본학습을 시작했다. 현재 상태·PID는 활성 JSON을 따른다. Table은10k 정상완료,Chair가밤사이학습된것은아니다.
+
+2026-10-28 최신저장2500회 공통30초AT평가:426/415/435명,**83.07±1.96%**(512×독립평가seed3개). test27모두포함,trace/precision/hash·동결153/scene RMS검증통과. 본학습유지. 산출물 `runs/chair_residual_eval2500_20261028/REPORT.md` 및validation.json.
+
+2026-10-28 최신저장3100회 공통30초AT평가:426/432/437명,**84.31±1.08%**(평가seed표본std). 2500회대비+1.24%p,전seed초기전배열2500회와bitwise exact·trace/precision/hash·동결검증통과. 본학습유지. `runs/chair_residual_eval3100_20261028/REPORT.md` 및validation.json.
+
+2026-10-28 최신저장3800회 공통30초AT평가:452/450/442명,**87.50±1.03%**(평가seed표본std). 3100회대비+3.19%p,전seed초기전배열3100회와bitwise exact·trace/precision/hash·동결검증통과. 본학습유지. `runs/chair_residual_eval3800_20261028/REPORT.md` 및validation.json.
+
+2026-10-28 최신저장4400회 공통30초AT평가:455/460/461명,**89.58±0.63%**(평가seed표본std). 3800회대비+2.08%p,전seed초기전배열3800회와bitwise exact·trace/precision/hash·동결검증통과. 본학습유지. `runs/chair_residual_eval4400_20261028/REPORT.md` 및validation.json.
+
+
+## 최신 checkpoint 자동 평가 명령
+
+프로젝트 루트(CVPR2027)에서:
+
+```bash
+TOKENHSI_GPU=0 bash stage1_combined/tokenhsi/scripts/multi_agent/chair_adapt_residual_eval.sh
+```
+
+인자 생략 시 활성 `chair_residual_active_run.json`의 본학습 경로에서 번호가 가장 큰 Chair residual pth를 선택한다. best alias/preflight는 제외하고, 저장 중인 최신 파일은 잠시 재시도한다. 평가 시작 시 번호 저장본을 고정 복사하므로 도중 새 checkpoint가 생겨도 대상이 바뀌지 않는다.
+
+특정 checkpoint를 평가하려면 명령 마지막에 `"$CKPT"`를 붙인다. 기본값은GPU0/tokenhsi118/PYTORCH_JIT0,512환경×독립seed0/1/2·30초·AT20cm다. seed별 성공수/성공률을 출력하고 마지막에 `Mean ± Std`(ddof1 평가seed표본std)와 결과 폴더를 출력한다. 전체episode 배열은 summary.json/trace 파일에 그대로 보존한다. `--smoke`는 성능 mean/std로 표시하지 않는다. `--prepare-only`는GPU실행없이설정/코드/에셋/모델사본만만든다.
+
+2026-10-28 검증:최신번호선택/별칭제외/부분저장재시도/잘못된category거부/mean·std표시/smoke구분 CPU5개 통과. 실제wrapper `--prepare-only`로최신5000선택 및512×3seed설정확인. 기존4400summary를같은formatter에넣어89.58±0.63%출력확인. 이CLI변경검증에서는새GPU평가를실행하지않았다. 로그 `runs/chair_eval_cli_20261028/output_etc/check/`.
+
+
+## 한 번의 rollout에서 우리/TokenHSI 조건 동시 채점
+
+기존자동최신평가명령그대로사용한다. seed마다동일한첫episode를최대30초만실행하고,우리AT20cm/30초와TokenHSI거리20cm+upright(updot≥.86615)/처음599action(20초설정)을함께저장한다. 각각3seed평균±표본std를출력한다. TokenHSI행은공통scene에조건만적용한점수로서원본환경/연속repeat평가와구분한다.
+
+결과폴더의`episodes.csv`에환경별두성공여부·최초성공step·성공중최소거리오차를합쳐저장하고`summary.json`에두기준통계를기록한다. 기본경로는프로젝트`output_etc/check/hold_at_eval/<YYYYMMDD_HHMMSS>/`이다. 자세한필드·검증은 [동시채점명세](../../evaluation/hold_at/README.md#같은-episode에서-두-기준-동시-기록)를확인한다.
+
+2026-10-28 Chair본학습10000회/rc0완료. 최종10k의512×독립seed0/1/2평가:우리30초AT **95.51±0.52%**,동일episode TokenHSI20초AT+upright조건 **89.91±1.11%**(평가seed표본std). 전trace/해시/통계/CSV1536행검증통과. `output_etc/check/hold_at_eval/20261028_233319/REPORT.md` 및validation.json.

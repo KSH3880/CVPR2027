@@ -1,12 +1,76 @@
 """Prepare an isolated KSH jointpush workspace; external sources stay read-only."""
-import argparse,hashlib,json,sys,shutil
+import argparse,hashlib,json,os,sys,shutil
 from pathlib import Path
 import yaml
 ROOT=Path(__file__).resolve().parents[2]
 SOURCE=ROOT/'ksh_jointpush'
 WORK=ROOT/'runs/jointpush/ksh_jointpush_rsi/workspace_push_solo45_coupled0'
 
-def prepare(rsi_mode='group', gate_mode='soft', checkpoint_path=None, init_safety='legacy', distractors='legacy'):
+def restore_inputs(manifest, data_root):
+    """Import missing immutable metadata and link payloads from the local download.
+
+    The original manifest remains a provenance record, never a destination or
+    a machine-specific runtime path. Check every input before making changes.
+    """
+    pending=[]
+    missing=[]
+    for name,digest in manifest['files'].items():
+        local=SOURCE/name
+        candidate=local
+        if not local.is_file():
+            relative=Path(name)
+            if relative.parts[:2] != ('tokenhsi','data'):
+                raise FileNotFoundError('Immutable source missing: '+str(local))
+            candidate=data_root/relative.relative_to('tokenhsi/data')
+            if not candidate.is_file():
+                missing.append(str(candidate))
+                continue
+            pending.append((candidate,local))
+        if hashlib.sha256(candidate.read_bytes()).hexdigest()!=digest:
+            raise ValueError('Snapshot hash differs: '+str(candidate))
+    links=[]
+    for name in manifest['data_links']:
+        local=SOURCE/name
+        if local.exists():
+            continue
+        target=data_root/Path(name).relative_to('tokenhsi/data')
+        if not target.is_dir():
+            missing.append(str(target))
+        else:
+            links.append((local,target))
+    if missing:
+        raise FileNotFoundError('Missing local KSH data ('+str(len(missing))+'):\n'
+            +'\n'.join(missing)+'\nDownload the original tokenhsi/data/. to '+str(data_root)
+            +' (see ksh_jointpush/EXECUTION.md).')
+    for candidate,local in pending:
+        local.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(candidate,local)
+    for local,target in links:
+        local.parent.mkdir(parents=True,exist_ok=True)
+        if local.is_symlink():
+            local.unlink()  # Replace only a broken dataset link in this checkout.
+        local.symlink_to(target,target_is_directory=True)
+
+
+def resolve_motion_path(value, data_root):
+    path=Path(value)
+    # The supplied manifest also contains paths relative to the previous
+    # checkout, e.g. ../../../../CVPR2027/TokenHSI/tokenhsi/data/....
+    marker='tokenhsi/data/'
+    if marker in str(path):
+        path=Path(str(path).rsplit(marker,1)[1])
+    elif path.is_absolute():
+        if path.is_file():
+            return str(path.resolve())
+        raise FileNotFoundError('Cannot relocate motion path: '+str(path))
+    for candidate in (SOURCE/'tokenhsi/data'/path,data_root/path):
+        if candidate.is_file():
+            return str(candidate.resolve())
+    raise FileNotFoundError('Motion payload missing: '+str(data_root/path))
+
+
+def prepare(rsi_mode='balanced', gate_mode='soft', checkpoint_path=None, init_safety='legacy', distractors='legacy', data_root=None):
+    data_root=Path(data_root or os.environ.get('KSH_DATA_ROOT',ROOT/'runs/assets/ksh_jointpush/data')).expanduser().resolve()
     if distractors not in ('legacy','clear_paths'):
         raise ValueError('distractors must be legacy or clear_paths')
     if init_safety not in ('legacy','all_pairs'):
@@ -17,7 +81,7 @@ def prepare(rsi_mode='group', gate_mode='soft', checkpoint_path=None, init_safet
         raise ValueError('rsi_mode must be group, agent or balanced')
     suffix={'group':'','agent':'_agent_rsi','balanced':'_balanced_rsi'}[rsi_mode]
     work = WORK.with_name(WORK.name + suffix + ('_hard_gate' if gate_mode == 'hard' else ''))
-    custom_checkpoint=Path(checkpoint_path).expanduser().resolve(strict=True) if checkpoint_path else None
+    custom_checkpoint=Path(checkpoint_path or SOURCE/'pth/Stage1PushFinetune_00019500.pth').expanduser().resolve(strict=True)
     if custom_checkpoint:
         digest=hashlib.sha256(custom_checkpoint.read_bytes()).hexdigest()
         work=work.with_name(work.name+'_base_'+custom_checkpoint.stem+'_'+digest[:8])
@@ -26,33 +90,14 @@ def prepare(rsi_mode='group', gate_mode='soft', checkpoint_path=None, init_safet
     if distractors == 'clear_paths':
         work=work.with_name(work.name+'_clear_paths')
     manifest=json.loads((ROOT/'ksh_jointpush/source_manifest.json').read_text())
-    for name,digest in manifest['files'].items():
-        local=SOURCE/name
-        if not local.exists():
-            original=Path(manifest['source'])/name
-            if hashlib.sha256(original.read_bytes()).hexdigest()!=digest:raise ValueError('Cannot reconstruct changed source: '+name)
-            local.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(original,local)
-        if hashlib.sha256((SOURCE/name).read_bytes()).hexdigest()!=digest:
-            raise ValueError('Snapshot changed: '+name)
-    for name,target in manifest['data_links'].items():
-        link=SOURCE/name
-        if not link.exists() and not link.is_symlink():
-            link.parent.mkdir(parents=True,exist_ok=True);link.symlink_to(target,target_is_directory=Path(target).is_dir())
+    restore_inputs(manifest,data_root)
     # Output storage is local to this project; generated configs remain under runs/.
     for name in ('output','output_etc'):
         (SOURCE/name).mkdir(parents=True,exist_ok=True)
-    checkpoint_dir=ROOT/'jointpush/checkpoints/ksh_jointpush';checkpoint_dir.mkdir(parents=True,exist_ok=True)
-    if not (SOURCE/'pth').exists():(SOURCE/'pth').symlink_to(checkpoint_dir,target_is_directory=True)
-    for name,digest in manifest['checkpoints'].items():
-        target=checkpoint_dir/name
-        if not target.exists():
-            original=Path(manifest['source'])/'pth'/name
-            if hashlib.sha256(original.read_bytes()).hexdigest()!=digest:raise ValueError('Checkpoint source changed: '+name)
-            shutil.copy2(original,target)
     broken=[name for name in manifest['data_links'] if not (SOURCE/name).exists()]
     if broken:raise ValueError('Missing dataset links: '+str(broken))
-    checkpoint=custom_checkpoint or ROOT/'jointpush/checkpoints/ksh_jointpush/Stage1PushFinetune_00014000.pth'
-    if not custom_checkpoint and hashlib.sha256(checkpoint.read_bytes()).hexdigest()!=manifest['checkpoints'][checkpoint.name]:raise ValueError('Checkpoint changed')
+    checkpoint=custom_checkpoint
+    if checkpoint.name in manifest['checkpoints'] and hashlib.sha256(checkpoint.read_bytes()).hexdigest()!=manifest['checkpoints'][checkpoint.name]:raise ValueError('Checkpoint changed')
     work.mkdir(parents=True,exist_ok=True);(work/'configs').mkdir(exist_ok=True)
     env=yaml.safe_load((SOURCE/'tokenhsi/data/cfg/multi_agent/stage2_jointpush_rsi.yaml').read_text())
     env['experiment']['transfer']['checkpoint']=str(checkpoint)
@@ -82,9 +127,7 @@ def prepare(rsi_mode='group', gate_mode='soft', checkpoint_path=None, init_safet
             if not isinstance(row,dict):continue
             for key in ('file','obj_file'):
                 if key not in row:continue
-                local=SOURCE/'tokenhsi/data'/row[key]
-                original=Path(manifest['source'])/'tokenhsi/data'/row[key]
-                row[key]=str((local if local.exists() else original).resolve(strict=True))
+                row[key]=resolve_motion_path(row[key],data_root)
     motion_path=work/'configs/motions.yaml'
     expected_motion=yaml.safe_dump(raw,sort_keys=False)
     if motion_path.exists() and motion_path.read_text()!=expected_motion:raise ValueError('Workspace motion manifest differs')
@@ -106,14 +149,15 @@ def prepare(rsi_mode='group', gate_mode='soft', checkpoint_path=None, init_safet
                 count+=1
                 if not (SOURCE/'tokenhsi/data'/row['file']).exists():missing.append(row['file'])
     if missing:raise ValueError('Motion payloads missing: '+str(missing))
-    report=dict(source=str(SOURCE),source_commit=manifest['commit'],workspace=str(work),checkpoint=str(checkpoint),source_epoch=int(checkpoint.stem.rsplit('_',1)[-1]),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),agents=4,objects=8,environments=1024,motion_entries=count,training_started=False,source_files_verified=len(manifest['files']),gpu_used=False)
+    report=dict(source=str(SOURCE),source_commit=manifest['commit'],workspace=str(work),data_root=str(data_root),checkpoint=str(checkpoint),source_epoch=int(checkpoint.stem.rsplit('_',1)[-1]),checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),agents=4,objects=8,environments=1024,motion_entries=count,training_started=False,source_files_verified=len(manifest['files']),gpu_used=False)
     (work/'preparation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('--rsi-mode',choices=['group','agent','balanced'],default='group')
+    parser.add_argument('--rsi-mode',choices=['group','agent','balanced'],default='balanced')
     parser.add_argument('--gate-mode',choices=['soft','hard'],default='soft')
     parser.add_argument('--checkpoint')
     parser.add_argument('--init-safety',choices=['legacy','all_pairs'],default='legacy')
     parser.add_argument('--distractors',choices=['legacy','clear_paths'],default='legacy')
+    parser.add_argument('--data-root',help='Local copy of the original tokenhsi/data directory (or KSH_DATA_ROOT)')
     args=parser.parse_args()
-    prepare(args.rsi_mode,args.gate_mode,args.checkpoint,args.init_safety,args.distractors)
+    prepare(args.rsi_mode,args.gate_mode,args.checkpoint,args.init_safety,args.distractors,args.data_root)

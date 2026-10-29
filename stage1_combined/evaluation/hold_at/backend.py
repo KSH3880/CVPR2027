@@ -1,10 +1,14 @@
 """Deterministic first-episode evaluator. Does not call training success metrics."""
 import json
+import csv
+import os
 from pathlib import Path
 import numpy as np
 import torch
 import yaml
 from evaluation.hold_at.metrics import PROTOCOL, classify, sha256
+from evaluation.hold_at.carry_metrics import score as carry_score, first_success_steps, PROTOCOL as CARRY_PROTOCOL
+from tokenhsi.utils.hold_at_ft import object_catalog
 
 def cpu(value):
     return value.detach().cpu().numpy().copy()
@@ -31,6 +35,7 @@ def run_eval(player):
                     checkpoint=str(checkpoint), checkpoint_sha256=sha256(checkpoint),
                     asset_split='test', category='ArmChair_Normal',
                     official_sample_count=task.num_envs == 512,
+                    secondary_protocol=CARRY_PROTOCOL,
                     source_sha256={str(p): sha256(p) for base in ('tokenhsi', 'evaluation/hold_at') for p in sorted(Path(base).rglob('*.py'))})
     if hasattr(task, '_public_policy_metadata'):
         manifest['scene_checkpoint'] = manifest['checkpoint']
@@ -49,6 +54,14 @@ def run_eval(player):
                    origins=cpu(task._env_origins), ground_z=cpu(task._object_ground_z),
                    front=cpu(task._object_front))
     np.savez_compressed(out / 'initial_0.npz', **initial)
+    if hasattr(task, '_native_up'):
+        up = cpu(task._native_up).reshape(n, 3)
+    else:
+        cfg = task.cfg['env']['holdAtFT']
+        catalog = object_catalog(os.environ.get('HOLD_AT_OBJECT_ROOT', cfg['object_root']),
+                                 cfg['asset_split'], cfg['category'])
+        up = np.asarray([catalog[int(i)]['up_facing'] for i in initial['model_ids']], dtype=np.float32)
+    np.savez_compressed(out / 'object_metadata.npz', up_facing=up, model_ids=initial['model_ids'])
     active = np.ones(n, bool)
     ever = np.zeros(n, bool)
     lengths = np.zeros(n, int)
@@ -82,13 +95,26 @@ def run_eval(player):
     if active.any():
         raise RuntimeError('First episode did not finish within horizon')
     assert float(task._sampling_failures) == 0
-    np.savez_compressed(out / 'trace_0.npz', **{k: np.stack(v) for k, v in trace.items()})
+    data = {k: np.stack(v) for k, v in trace.items()}
+    np.savez_compressed(out / 'trace_0.npz', **data)
+    tokenhsi = carry_score(data, up)
     result = dict(protocol=PROTOCOL, seed=manifest['seed'], num_envs=n,
                   point_ever_count=int(ever.sum()), region_ever_count=int(ever.sum()),
                   point_ever=float(ever.mean()), region_ever=float(ever.mean()),
-                  episode_steps=lengths.tolist(), official_sample_count=n == 512)
+                  episode_steps=lengths.tolist(), official_sample_count=n == 512,
+                  tokenhsi_criteria=tokenhsi)
+    ours_first = first_success_steps(data['point'] & data['active'])
+    with (out / 'episodes.csv').open('w', newline='') as stream:
+        writer = csv.writer(stream)
+        writer.writerow(['seed', 'env_id', 'episode_steps', 'ours_30s_success', 'ours_first_success_step',
+                         'tokenhsi_20s_success', 'tokenhsi_first_success_step', 'tokenhsi_min_success_error_cm'])
+        for i in range(n):
+            writer.writerow([manifest['seed'], i, lengths[i], int(ever[i]), ours_first[i],
+                             int(tokenhsi['success_by_env'][i]), tokenhsi['first_success_step'][i],
+                             tokenhsi['min_success_error_cm'][i]])
     (out / 'results.json').write_text(json.dumps(result, indent=2))
-    artifacts = ['manifest.json', 'input_env.yaml', 'resolved_env.yaml', 'initial_0.npz', 'trace_0.npz', 'results.json']
+    artifacts = ['manifest.json', 'input_env.yaml', 'resolved_env.yaml', 'initial_0.npz', 'trace_0.npz',
+                 'object_metadata.npz', 'episodes.csv', 'results.json']
     (out / 'completed.json').write_text(json.dumps(dict(rc=0, sha256={x: sha256(out / x) for x in artifacts}), indent=2))
     print('HOLD_AT_EVAL', json.dumps(result), flush=True)
     return result

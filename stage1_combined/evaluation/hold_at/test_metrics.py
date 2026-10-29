@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 import json
+import csv
 import numpy as np
 import pytest
 from evaluation.hold_at.metrics import PROTOCOL, aggregate, classify, first_episode, validate
@@ -49,9 +50,11 @@ def test_actual_rollout_adapter_never_resets_or_counts_initial_state(tmp_path, m
         _humanoid_root_states=torch.zeros(2,1,13), _box_states=torch.zeros(2,1,13),
         _tar_pos=torch.tensor([[[4.,0,.5]],[[4.,0,.5]]]), _dof_pos=torch.zeros(2,1,32),
         _dof_vel=torch.zeros(2,1,32), _box_size=torch.ones(2,1,3),
+        _native_up=torch.tensor([[0.,0.,1.],[0.,0.,1.]]),
         _object_model_ids=torch.tensor([0,1]), _env_origins=torch.zeros(2,3),
         _object_ground_z=torch.full((2,),.5), _object_front=torch.tensor([[0.,1,0]]).repeat(2,1))
     task._box_states[:,0,0]=1.5; task._box_states[:,0,2]=.55
+    task._box_states[:,0,6]=1
     class Player:
         def __init__(self): self.env=SimpleNamespace(task=task);self.resets=0;self.steps=0
         def env_reset(self): self.resets+=1;return {'obs':torch.ones(2,280)}
@@ -65,6 +68,10 @@ def test_actual_rollout_adapter_never_resets_or_counts_initial_state(tmp_path, m
     player=Player();result=run_eval(player)
     assert player.resets==1 and player.steps==2
     assert result['point_ever_count']==result['region_ever_count']==1
+    assert result['tokenhsi_criteria']['success_count']==1
+    rows=list(csv.DictReader((tmp_path/'episodes.csv').open()))
+    assert [r['ours_30s_success'] for r in rows]==['1','0']
+    assert [r['tokenhsi_20s_success'] for r in rows]==['1','0']
     assert validate(tmp_path)['ok']
     with (tmp_path/'results.json').open() as stream: record=json.load(stream)
     record['point_ever_count']=2

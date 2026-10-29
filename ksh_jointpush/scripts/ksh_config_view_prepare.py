@@ -26,10 +26,10 @@ def prepare(checkpoint=None):
         hashes[name]=hashlib.sha256((helpers/name).read_bytes()).hexdigest()
     env='''#!/usr/bin/env bash
 set -eu
-export TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi_juan TOKENHSI_GUI_GPU_MODE=native PYTHONDONTWRITEBYTECODE=1
+export TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi118} TOKENHSI_GUI_GPU_MODE=native PYTHONDONTWRITEBYTECODE=1
 export MPS_GPU_ROOT=/tmp/ksh-jointpush-native-no-mps
 unset CUDA_MPS_PIPE_DIRECTORY CUDA_MPS_LOG_DIRECTORY PUSH_RSI_MIX KSH_RSI_MODE_CHECK
-export WEBSOCKIFY="$HOME/anaconda3/envs/tokenhsi_juan/bin/websockify" VNC_DIR="$HOME/opt/vnc"
+export VNC_DIR="${VNC_DIR:-$HOME/opt/vnc}"
 export TORCH_EXTENSIONS_DIR='''+shlex.quote(str(ROOT/'runs/jointpush/torch_extensions'))+''' CXX=/usr/bin/g++-11
 export KSH_DOCUMENTED_VIEW_CONFIG='''+shlex.quote(str(run/'configs'))+'''
 export JOINTPUSH_ENTRYPOINT='''+shlex.quote(str(ROOT/'ksh_jointpush/scripts/ksh_config_view_entry.py'))+'''

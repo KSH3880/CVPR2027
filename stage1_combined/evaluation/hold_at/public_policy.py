@@ -56,9 +56,15 @@ class PublicChairPolicy:
         print('PUBLIC_CARRY_POLICY', json.dumps(self.metadata), flush=True)
 
     @torch.no_grad()
-    def action(self):
+    def action(self, reset_env_ids=None):
         t = self.task
-        if self.first:
+        if reset_env_ids is not None:
+            from evaluation.climb_paired.repeat_metrics import bodies_after_reset
+            pos,rot,vel,ang=bodies_after_reset(
+                [t._rigid_body_pos[:,0],t._rigid_body_rot[:,0],t._rigid_body_vel[:,0],t._rigid_body_ang_vel[:,0]],
+                t._kinematic_humanoid_rigid_body_states[:,0],reset_env_ids)
+            self.first=False
+        elif self.first:
             bodies=t._kinematic_humanoid_rigid_body_states[:,0]
             pos,rot,vel,ang=(bodies[...,:3],bodies[...,3:7],bodies[...,7:10],bodies[...,10:13])
             self.first=False

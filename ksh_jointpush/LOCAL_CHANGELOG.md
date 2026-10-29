@@ -1,6 +1,39 @@
 # 로컬 실행 변경
 
+## 2026-10-29
+
+### 사용자 요청으로 현재 학습 일시정지
+
+- 12:59KST 사용자 요청으로 현재출력/명령/MPS미연결을 확인한 학습PID3984199에 SIGSTOP을 보내 `T (stopped)` 상태를 검증했다. 프로세스·optimizer·메모리 상태와GPU메모리는 유지하며 자동재개하지 않는다. TensorBoard와보상분리writer는 유지했다. 현재metadata는 `paused`, 재개신호는SIGCONT이며현재launch의 `pause.json`에 기록했다.
+
+### 현재 학습 CONTACT/AT 보상 분리 표시
+
+- 사용자 요청으로 기존 `scripts/ksh_reward_split.py`를 CPU writer(PID4119578,tmux `ksh_jointpush_reward_split`)로 연결했다. PUSH-only의 전체 과제 항에서 AT를 빼 CONTACT를 산출하며 가중치/gate/포화 반영 state/progress/success/total8개를 추가한다. 기존4442step을 backfill하고 후속7step 갱신도 확인했다. 모든 변환에서 전체합·항별합 일치와 CONTACT음수없음을 검사한다.
+- 원본event는 유지하며 별도 `derived_summaries/` 단일writer미러에 원본197태그와분리8태그를 기록한다. TensorBoard6017만 새미러로 재연결해 HTTP응답·205태그·8개실제값을 확인했다. 학습PID3984199는 그대로 실행 중이며 상태/명령/검증은현재launch의 `reward_split*`·`tensorboard_split*`에 있다.
+
+### 현재 학습 TensorBoard6017 연결
+
+- 사용자 요청으로 `scripts/tensorboard_compat.py`와 `tokenhsi118`을 사용해 localhost6017에 현재학습 `ksh_soft_balanced_19500`만 연결했다.15초 갱신·CPU실행·tmux `ksh_jointpush_tensorboard_6017`이며 명령/로그는 현재launch폴더에 보존한다. 기존6006/6016포트와 학습은 유지했다. HTTP200·scalar197개 로딩을 확인했다.
+
+### RTX5090 GPU0 soft/balanced 본학습 시작
+
+- 사용자 요청으로 `tokenhsi118`·Stage1 19500 전이·새 optimizer/epoch0·4명×1024환경·soft gate·balanced각1/3·초기0.7m 안전 검사·잉여 상자8~12m/경로1.5m 이격 본학습을 시작했다. tmux `ksh_jointpush_soft_20261029_001531`, PID3984199, 출력 `output/train_base19500_balanced_soft_safe_clear_gpu0_20261029_001531/Stage2JointPushRsi_29-00-15-41/`다.
+- RTX5090/CUDA11.8의 NVRTC 미지원으로 초기화 중 실패한 시도 로그를 보존했다. 로컬 호환 모듈에서 상자 부피/크기격자3축곱을 동등한 명시적 곱셈으로 연결하고 JIT fusion을 비활성화했다. PyTorch2.0의 float attention bias native 경로 오류는 identity view로 일반 attention 경로를 선택해 우회한다. source·모델구조·보상·학습조건은 유지하며 soft adapter보다 task가 먼저 import되지 않도록 연결 순서를 맞췄다.
+- 실제GPU1024환경 부피/격자·TorchScript모션보간·행렬역전파, CPU호환2개(크기/질량/확률·attention출력/gradient동등성)를 검증했다. 본학습2epoch에서 coordination gradient/갱신·actor encoder/scene RMS동결·startupweight 저장을 확인했다. 초기shared RSI그룹은전원push382/혼합422/전원loco413이었다. GPU메모리약22GB이며 실행/설정사본/검증은 `../runs/jointpush/launch_ksh_jointpush_soft_20261029_001531/`, 현재메타데이터는 `../runs/jointpush/ksh_jointpush_active_training.json`이다. 다른 프로세스는 종료하지 않았다.
+
+### 수신 데이터 검증·로컬 연결과 PyTorch2.0 호환
+
+- 수신한2.1GB 데이터에서 누락 메타데이터111개를 복원하고13개 payload 경로를 로컬로 연결했다. 원본554파일 해시, 모션130개/모션·물체161개 경로, PUSH21개 모션과 캐릭터/mesh2개 해시를 검증했다. Stage1 19500·soft gate·balanced RSI·초기0.7m 안전 검사·잉여 상자8~12m/경로 여유1.5m 실행 설정을 생성했다.
+- 실제 모션 목록에 남아 있던 이전 서버 상대경로(`../../../../CVPR2027/TokenHSI/tokenhsi/data/...`)를 로컬로 변환하도록 준비 스크립트를 보완했다. `tokenhsi118`의 PyTorch2.0에서 미지원인 `any((1,2))`는 새 로컬 `ksh_torch_compat.py`로 해당5개 함수만 동등한 단일축 순차 연산에 연결한다. frozen source와 보상/안전 기준은 유지한다.
+- CPU33개 검사·IsaacGym gymtorch 확장 import·원본 해시·diff 검사 통과. 확장 빌드 캐시는 `runs/jointpush/torch_extensions/`를 사용했다. 실제 simulator reset/GPU 학습은 실행하지 않았다. 준비/검증/CPU검사 결과는 `output_etc/check/data_ready_20261029/`에 보존했다.
+
 ## 2026-10-28
+
+### 현재 서버 tokenhsi118·soft/balanced 실행 경로 이식
+
+- 사용자 요청으로 launcher 기본 환경을 `tokenhsi118`, RSI를 balanced, gate를 soft로 정하고 로컬 Stage1 19500 checkpoint를 연결했다. GPU 번호를 선택 가능하게 하고 검증된 기존 MPS 자동 연결 또는 일반 CUDA를 사용한다. 초기 배치 검사·주변 박스 이격·1024환경은 유지한다. view wrapper도 같은 conda 기본값을 사용한다.
+- 원본 데이터는 `runs/assets/ksh_jointpush/data/`로 받는다. 준비 스크립트는 원본 manifest를 보존하면서 누락 메타데이터의 해시를 검사하고 로컬 payload를 연결하며 모션 경로를 변환한다. 사용하지 않는10500/14000 복원 의존성을 제거했다. `EXECUTION.md` 상단에 현재 서버 scp·준비·학습 명령을 기록했다.
+- `tokenhsi118`에서 CPU13개 검사(데이터 이식·누락/해시 오류·모션 경로·soft/balanced 설정 생성·기존 보상/RSI), shell/Python 구문 검사를 통과했다. 실제 입력 검사는111개 메타데이터+13개 payload 경로 누락을 보고하며 데이터 전송 전이므로 simulator/GPU 학습은 실행하지 않았다. 확인 로그는 `output_etc/check/local_port_20261028/`에 둔다.
 
 ### 최종 safe-start·장애물 이격 설정 GPU5 본학습
 

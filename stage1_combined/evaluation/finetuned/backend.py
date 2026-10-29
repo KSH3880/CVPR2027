@@ -57,7 +57,8 @@ class EvaluationPlayer(ChairFTPlayer):
     @torch.no_grad()
     def run_eval(self):
         task=self.env.task;out=Path(task.cfg['args'].output_path);out.mkdir(parents=True,exist_ok=True)
-        action=task._action;N=task.num_envs;steps=900
+        action=task._action;N=task.num_envs;steps=int(task.max_episode_length)
+        assert steps>0
         from utils.edge_ontop_spec import batched
         obs=self.env_reset();self.get_batch_size(obs['obs'],1)
         graph=task.relation_runtime.graph
@@ -101,5 +102,5 @@ class EvaluationPlayer(ChairFTPlayer):
             expected_end=int(ending[0]) if len(ending) else len(saved['done'])-1
             assert int(end[index])==expected_end
             np.testing.assert_array_equal(saved['alive'][:,index],np.arange(len(saved['alive']))<=expected_end)
-        result=dict(terminal_frame_validated=True,trace_sha256=hashlib.sha256((out/'trace.npz').read_bytes()).hexdigest(),category=task._category,action=action,num_envs=N,seed=task.cfg['args'].seed,point_ever=float(everp.mean()),region_ever=float(everr.mean()),ended=int((~alive).sum()),max_end_frame=int(end.max()),trace_rescore_exact=True,model_counts=np.bincount(ids,minlength=len(catalog)).tolist())
+        result=dict(terminal_frame_validated=True,trace_sha256=hashlib.sha256((out/'trace.npz').read_bytes()).hexdigest(),category=task._category,action=action,num_envs=N,seed=task.cfg['args'].seed,point_ever=float(everp.mean()),region_ever=float(everr.mean()),ended=int((~alive).sum()),max_end_frame=int(end.max()),trace_rescore_exact=True,model_counts=np.bincount(ids,minlength=len(catalog)).tolist(),max_steps=steps,control_dt=float(task.dt),time_limit_seconds=steps*float(task.dt))
         (out/'results.json').write_text(json.dumps(result,indent=2));print('FINETUNED_EVAL',json.dumps(result),flush=True)

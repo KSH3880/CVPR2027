@@ -1,5 +1,7 @@
 # Table carry HOLDING+AT 체크포인트 평가
 
+공개TokenHSI Table과우리residual10k를 우리영역식·40초·동일seed연속3회로 비교하려면 [Table carry 40초 명령](../climb_paired/README.md#table-carry-40초-비교)을 사용한다. 아래기존30초·독립3seed평가와 집계를구분한다.
+
 Chair의 [전용 평가](../hold_at/README.md)와 같은 AT 성공식/시간/집계를 사용한다. Table 전용 프로토콜 `native_table_hold_at_30s_v1`로 결과를 구분한다.
 
 | 항목 | 조건 |

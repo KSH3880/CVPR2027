@@ -1,6 +1,6 @@
 {
-  "status": "running",
-  "phase": "train",
+  "status": "complete",
+  "phase": "complete",
   "supervisor_pid": 3831386,
   "gpu": 0,
   "run": "/home/injesus1010/repos/CVPR2027/runs/chair_residual_after_table_20261028_recovery",
@@ -11,9 +11,10 @@
   "source_epoch": 78000,
   "mode": "residual",
   "launch_attempted": true,
-  "training_pid": 3831871,
-  "wrapper_pid": 3831837,
-  "updated_at": "2026-10-28T11:08:35.602987+09:00",
+  "training_pid": null,
+  "wrapper_pid": null,
+  "updated_at": "2026-10-28T23:00:45.895055+09:00",
   "output_path": "/home/injesus1010/repos/CVPR2027/runs/chair_residual_after_table_20261028_recovery/train",
-  "returncode": 0
+  "returncode": 0,
+  "final_checkpoint": "/home/injesus1010/repos/CVPR2027/runs/chair_residual_after_table_20261028_recovery/train/ChairAdaptResidual_28-11-08-36/nn/ChairAdaptResidual_00010000.pth"
 }

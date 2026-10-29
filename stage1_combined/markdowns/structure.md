@@ -1,5 +1,7 @@
 # 현재 의자 FT 진입점
 
+기존 runs 실험·평가 기록은 이 프로젝트 `output/runs/`에서 접근한다. 실행 중인 경로는 연결만 유지한다. [현재 배치·미해결 경로](../../docs/OUTPUT_LAYOUT.md).
+
 기존 Chair 본학습 결과는 `output/chair_hold_at_78k_20261026_135444/`와 `output/chair_bbox35_20k_20261022_142206/`에 모았다. 구 경로는 호환 링크로 유지한다. [공통 결과 경로](../../docs/OUTPUT_LAYOUT.md).
 
 `../chair_assets/`: 로컬 의자/테이블 에셋과 catalog. `../checkpoints/Stage1V2Fixed_00073000.pth`: 초기 weight. `../tokenhsi/env/tasks/multi_agent/humanoid_chair_ft.py`: 환경. `../tokenhsi/learning/multi_agent/chair_ft_network.py`: 35D MLP. `../tokenhsi/learning/multi_agent/chair_ft_agent.py`: 동결/검증. 아래는 상속한 전체 코드 구조 참고.
@@ -214,3 +216,21 @@ Chair residual: `humanoid_chair_tokenhsi_ft.py`는 Chair 정면 reset과 Table�
 Chair 예약 복구는 `runs/chair_residual_after_table_20261028_recovery/`에서 실행한다. scheduler는 실제 출력 resolver로 사전 경로 검사하며 검증 출력은 고정 checkout 내부 `code/output_etc/check/chair_preflight/train`이다. 회귀 검증은 `tokenhsi/tests/test_chair_after_table.py`. 현재 PID/경로는 `chair_residual_active_run.json`이 기준이다.
 
 `evaluation/tokenhsi_native_table/`은 원본 TokenHSI Table 환경·20초/직립/연속3repeat player loop에 우리10k정책을 연결한다. native→우리280D bridge/strict복원은policy.py,실행은worker.py,독립재채점은validate.py. [명세·실행](../evaluation/tokenhsi_native_table/README.md).
+
+`evaluation/hold_at/cli_helpers.py`는 활성 Chair residual 최신 번호 checkpoint의 완전성·category를 검사하고 seed 평가 mean/std를 간결하게 표시한다. `chair_adapt_residual_eval.sh`는checkpoint생략시자동선택하며기본3seed를실행한다. 회귀검증은 `evaluation/hold_at/test_cli_helpers.py`.
+
+`evaluation/hold_at/carry_metrics.py`는 같은30초trace를TokenHSI20초+직립조건으로추가채점한다. backend는별도시뮬레이션없이metadata/두점수/환경별CSV를저장하고driver는3seed통계와합본CSV를만든다. 회귀검증은 `test_carry_metrics.py`;원본환경별도실행용 `evaluation/tokenhsi_native_table/`과구분한다.
+
+`evaluation/climb_paired/`는원본30D CLIMB checkpoint와공개TokenHSI40k를Table test8/40초/같은초기장면으로비교한다. `compare_checkpoints.py`는사용자요청2k/3k의3seed비교후선택된모델의seed0~9전체통계·승리시드진단을저장한다. `metrics.py`는SciPy기반독립trace재채점,`launch.py`는평가프로세스에서만정책을선택한다. [명령·기준](../evaluation/climb_paired/README.md).
+
+시드별연속3회Table CLIMB는`climb_paired/run_continuous.py`를사용한다. `native_loop.py`는원본run_eval의연속reset·수집제어흐름을추출하고`continuous.py`는공통성공/trace/progress를기록한다. `repeat_metrics.py`는0회차보존·1/2회차대표값·반복std/시드std구분및부분reset관측을담당한다. `test_continuous.py`는원본과reset·RNG·행동순서동일성을검사한다.
+
+`climb_paired/run_chair_sit.py`는우리Chair SIT지정checkpoint 또는`--policy tokenhsi`공개354D정책을seed0/40초/512환경/연속3회로평가하고실제policy/장면epoch를기록한다. 장면생성checkpoint와공통영역판정은유지한다. 공통tracker/독립재채점기는SIT의좌판+10cm와좌판영역을지원하며CLIMB기본은유지한다. 결과는`output_etc/check/chair_sit_eval/`에저장한다. [실행명령](../evaluation/climb_paired/README.md#chair-sit-단일-시드-평가).
+
+`climb_paired/run_chair_carry.py`는公開chair carry adaptation과우리residual8500/10000을Chair HOLD+AT/40초/seed0/연속3회로비교한다. `launch_carry.py`가모델/RMS strict복원·불변검사를하고`continuous_carry.py`가동적의자AT20cm·첫episode·종료frame·독립재채점을원본반복루프에연결한다. 기존30초독립seed평가는유지한다. 결과는`output_etc/check/hold_at_eval/`, 상태는저장소루트`runs/chair_carry_40s_active.json`이다. [명령](../evaluation/climb_paired/README.md#chair-holdat-40초-비교).
+
+`climb_paired/run_table_carry.py`는上記공유carry driver를Table전용기본값으로호출해공개Table40k와우리residual10k의40초/seed0/연속3회/AT20cm를비교한다. Table_Circle test9/랜덤yaw를유지하고`continuous_carry.py`는실제category에따라Chair/Table프로토콜을구분한다. 결과는`output_etc/check/hold_at_eval/table_compare_40s_*`,상태는저장소루트`runs/table_carry_40s_active.json`이다. [명령](../evaluation/climb_paired/README.md#table-carry-40초-비교).
+
+`tokenhsi_native_table/run_public.py`는공개Table carry(40k)의원본환경20초·512환경·seed0연속3회평가를준비·실행한다. baseline코드사본의원본run/get_action/run_eval을유지하고`public_worker.py`는순수기록과모델/RMS/AMP RMS검증만연결한다. `validate.py`가위치+직립·first episode·terminal·precision을독립재채점한다. 기존우리10k용worker/policy와구분한다. [명령](../evaluation/tokenhsi_native_table/README.md#공개-tokenhsi-table-모델의-원본-평가).
+
+Chair 평가의 새 기본 결과 경로는 `output_etc/check/hold_at_eval/<YYYYMMDD_HHMMSS>/`다. 실행별 summary/CSV/seed로그를 이 아래에 모은다.

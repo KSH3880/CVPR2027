@@ -4,7 +4,7 @@ ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 SOURCE="$ROOT/ksh_jointpush"
 WORK="$ROOT/runs/jointpush/ksh_jointpush_rsi/workspace_push_solo45_coupled0"
 MODE=${1:-train}
-export KSH_RSI_MODE=${KSH_RSI_MODE:-group}
+export KSH_RSI_MODE=${KSH_RSI_MODE:-balanced}
 case "$KSH_RSI_MODE" in
  group) ;;
  agent) WORK="${WORK}_agent_rsi" ;;
@@ -17,9 +17,10 @@ case "$KSH_GATE_MODE" in
  hard) WORK="${WORK}_hard_gate" ;;
  *) echo 'KSH_GATE_MODE must be soft or hard'; exit 2 ;;
 esac
-export TOKENHSI_GPU=${TOKENHSI_GPU:-6}
+export TOKENHSI_GPU=${TOKENHSI_GPU:-0}
 gpu_index=$(nvidia-smi -i "$TOKENHSI_GPU" --query-gpu=index --format=csv,noheader,nounits)
-case "$gpu_index" in 5|6) ;; *) echo 'This prepared launcher supports GPU5 or GPU6'; exit 2 ;; esac
+case "$gpu_index" in ''|*[!0-9]*) echo 'Select exactly one GPU with TOKENHSI_GPU'; exit 2 ;; esac
+export STAGE1_CHECKPOINT=${STAGE1_CHECKPOINT:-$SOURCE/pth/Stage1PushFinetune_00019500.pth}
 prepare_checkpoint_args=()
 if [ -n "${STAGE1_CHECKPOINT:-}" ]; then
  STAGE1_CHECKPOINT=$(readlink -f "$STAGE1_CHECKPOINT")
@@ -44,10 +45,9 @@ case "$KSH_DISTRACTORS" in
  clear_paths) WORK="${WORK}_clear_paths" ;;
  *) echo 'KSH_DISTRACTORS must be legacy or clear_paths'; exit 2 ;;
 esac
-export TOKENHSI_CONDA_ENV=tokenhsi_juan PYTHONDONTWRITEBYTECODE=1
-PYTHON="$HOME/anaconda3/envs/tokenhsi_juan/bin/python"
-export LD_LIBRARY_PATH="$HOME/anaconda3/envs/tokenhsi_juan/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-CUDA_VISIBLE_DEVICES='' "$PYTHON" "$ROOT/ksh_jointpush/scripts/ksh_jointpush_prepare.py" --rsi-mode "$KSH_RSI_MODE" --gate-mode "$KSH_GATE_MODE" --init-safety "$KSH_INIT_SAFETY" --distractors "$KSH_DISTRACTORS" "${prepare_checkpoint_args[@]}"
+export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi118} PYTHONDONTWRITEBYTECODE=1
+# This environment's conda activation hook expands LD_LIBRARY_PATH under set -u.
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
 export HEADLESS=${HEADLESS:-1}
 if [ "$MODE" = train ]; then export HEADLESS=1; fi
 if [ "$MODE" = check ]; then
@@ -58,12 +58,15 @@ elif [ "$HEADLESS" = 0 ]; then
  unset CUDA_MPS_PIPE_DIRECTORY CUDA_MPS_LOG_DIRECTORY
 fi
 . "$SOURCE/tokenhsi/scripts/multi_agent/runtime_env.sh"
+PYTHON="$CONDA_PREFIX/bin/python"
+CUDA_VISIBLE_DEVICES='' "$PYTHON" "$ROOT/ksh_jointpush/scripts/ksh_jointpush_prepare.py" --rsi-mode "$KSH_RSI_MODE" --gate-mode "$KSH_GATE_MODE" --init-safety "$KSH_INIT_SAFETY" --distractors "$KSH_DISTRACTORS" "${prepare_checkpoint_args[@]}"
 export TORCH_EXTENSIONS_DIR="$ROOT/runs/jointpush/torch_extensions" CXX=/usr/bin/g++-11
 export PYTHONPATH="$SOURCE/tokenhsi:$SOURCE${PYTHONPATH:+:$PYTHONPATH}"
-CHECKPOINT="${STAGE1_CHECKPOINT:-$ROOT/jointpush/checkpoints/ksh_jointpush/Stage1PushFinetune_00014000.pth}"
+CHECKPOINT="$STAGE1_CHECKPOINT"
 args=(--task HumanoidMAStage2JointPushRsi --cfg_env "$WORK/configs/env.yaml" --cfg_train "$WORK/configs/train.yaml" --motion_file "$WORK/configs/motions.yaml" --num_agents 4 --num_objects 8 --seed "${SEED:-42}" --no_video)
 if [ "$MODE" = train ]; then
- [ -n "${CUDA_MPS_PIPE_DIRECTORY:-}" ] || { echo 'Verified per-GPU MPS attachment required'; exit 1; }
+ # runtime_env validates an existing per-GPU MPS connection; native CUDA is
+ # also supported on this server when no MPS daemon is configured.
  args+=(--headless --sim_device cuda:0 --rl_device cuda:0 --num_envs 1024 --task_graph random_scenario)
  if [ -n "${RESUME_CHECKPOINT:-}" ]; then args+=(--checkpoint "$RESUME_CHECKPOINT" --resume 1); else args+=(--transfer_checkpoint "$CHECKPOINT"); fi
  OUTPUT_PATH=${OUTPUT_PATH:-$ROOT/ksh_jointpush/output/train_${KSH_RSI_MODE}_${KSH_GATE_MODE}gate_$(date +%Y%m%d_%H%M%S)}

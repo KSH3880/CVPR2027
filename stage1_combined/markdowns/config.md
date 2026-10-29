@@ -340,7 +340,13 @@ TOKENHSI_GPU=0 PORT=6083 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_
 
 ## 추론 옵션
 
-Chair residual 정식 평가(30초·512환경×3seed): `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_eval.sh "$CKPT"`. [설정·검증](reference/chair_adapt_residual.md).
+- 원본30D Table CLIMB의40초평가·2k/3k비교·시드별연속3회TokenHSI비교는 [climb_paired 명령](../evaluation/climb_paired/README.md)을따른다. 연속3회는`evaluation.climb_paired.run_continuous`이며35D의기존20k·이전시드별1회와구분한다.
+- Chair SIT지정checkpoint의영역40초/seed0단일평가는 [Chair SIT 명령](../evaluation/climb_paired/README.md#chair-sit-단일-시드-평가)의`evaluation.climb_paired.run_chair_sit --checkpoint "$CKPT"`를사용한다. `--policy tokenhsi`는동일장면에서공개SIT정책을평가한다. 실제policy/장면epoch·연속3회·반복평균/std를기록한다.
+- Chair HOLD+AT의공개chair carry/우리residual8.5k·10k 비교는 [40초 비교 명령](../evaluation/climb_paired/README.md#chair-holdat-40초-비교)의`evaluation.climb_paired.run_chair_carry --seed 0 --gpu 0`을사용한다. 우리AT20cm·512환경·시드0연속3회·첫회제외평균/반복std다.
+- 공개TokenHSI Table carry의원본환경20초·거리+직립평가는 [원본 평가 명령](../evaluation/tokenhsi_native_table/README.md#공개-tokenhsi-table-모델의-원본-평가)의`evaluation.tokenhsi_native_table.run_public --gpu 0`을사용한다. 512환경·seed0연속3회·첫회제외평균/반복std다.
+- 공개TokenHSI Table carry와우리residual10k의우리AT영역40초비교는 [Table 40초 명령](../evaluation/climb_paired/README.md#table-carry-40초-비교)의`evaluation.climb_paired.run_table_carry --seed 0 --gpu 0`을사용한다. test9·512환경·시드0연속3회·첫회제외평균/반복std다.
+
+Chair residual 최신 저장본 정식 평가(512환경×3seed·우리30초/TokenHSI20초+직립 동시 mean/std): `TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/chair_adapt_residual_eval.sh`. 특정 모델은 뒤에 `"$CKPT"`를 붙인다. [설정·검증](reference/chair_adapt_residual.md). 결과: `output_etc/check/hold_at_eval/<YYYYMMDD_HHMMSS>/`.
 Chair residual Table 종료 후 예약·상태 확인은 [예약 안내](reference/chair_adapt_residual.md#table-종료-후-자동-실행-예약)를 따른다.
 
 

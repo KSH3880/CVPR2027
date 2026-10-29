@@ -40,11 +40,14 @@ class PublicPolicy:
         self.metadata=dict(epoch=weights['epoch'],checkpoint_sha256=hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest(),observation_size=354,model_keys_strict=True,original_observation_functions=True)
         print('PUBLIC_POLICY',json.dumps(self.metadata),flush=True)
 
-    def action(self):
+    def action(self,reset_env_ids=None):
         t=self.task;root=t._humanoid_root_states[:,0];obj=t._box_states[:,0]
         if self.first:
             body=t._kinematic_humanoid_rigid_body_states[:,0];pos,rot,vel,ang=(body[...,:3],body[...,3:7],body[...,7:10],body[...,10:13]);self.first=False
         else:pos,rot,vel,ang=(t._rigid_body_pos[:,0],t._rigid_body_rot[:,0],t._rigid_body_vel[:,0],t._rigid_body_ang_vel[:,0])
+        if reset_env_ids is not None and len(reset_env_ids):
+            from evaluation.climb_paired.repeat_metrics import bodies_after_reset
+            pos,rot,vel,ang=bodies_after_reset((pos,rot,vel,ang),t._kinematic_humanoid_rigid_body_states[:,0],reset_env_ids)
         human=self.human(pos,rot,vel,ang,False,False)
         target=obj[:,:3]+quat_rotate(obj[:,3:7],self.entry_surface);target[:,2]+=.1 if t._action=='SIT' else .94
         traj=root[:,None,:3].expand(-1,10,-1)

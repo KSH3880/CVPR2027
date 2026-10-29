@@ -2,6 +2,8 @@
 
 import json
 import hashlib
+import math
+import os
 import torch
 from utils.edge_context_spec import AT
 from utils.edge_ontop_spec import ON_TOP, expand_graph, select_graph, copy_graph_rows
@@ -770,6 +772,15 @@ class SampledOnTopTaskMixin:
         center = (low + high) / 2
         center[2] = max(float(center[2]), 0.8)
         radius = max(float((high - low)[:2].norm()) * 0.8, 3.0)
+        height = 2.8 + radius * (0.8 if camera == "overview" else 0.2)
+        elevation = os.environ.get("TASK_CAMERA_ELEVATION")
+        if elevation is not None:
+            elevation = float(elevation)
+            if not math.isfinite(elevation) or not 0 < elevation < 89:
+                raise ValueError("TASK_CAMERA_ELEVATION must be between 0 and 89 degrees")
+            height = float(center[2]) + math.hypot(radius * 0.65, radius) * math.tan(
+                math.radians(elevation)
+            )
         if self._camera_follow_flag:
             self.gym.viewer_camera_look_at(
                 self.viewer,
@@ -777,7 +788,7 @@ class SampledOnTopTaskMixin:
                 gymapi.Vec3(
                     float(center[0]) + radius * 0.65,
                     float(center[1]) - radius,
-                    2.8 + radius * (0.8 if camera == "overview" else 0.2),
+                    height,
                 ),
                 gymapi.Vec3(*center.tolist()),
             )

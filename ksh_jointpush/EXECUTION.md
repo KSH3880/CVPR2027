@@ -1,5 +1,89 @@
 # KSH stage1_2_jointpush 실행 준비
 
+## 현재 서버 실행 — 2026-10-28 경로 이식
+
+현재 저장소는 `/home/injesus1010/repos/CVPR2027`이며 conda 기본값은 `tokenhsi118`이다.
+새 실행 기본값은 **soft gate + balanced RSI**(전원PUSH/혼합/전원LOCO 각1/3),
+Stage1 `ksh_jointpush/pth/Stage1PushFinetune_00019500.pth` 전이, 4명·1024환경이다.
+초기 agent 안전 검사와 주변 박스 경로 이격은 유지한다. GPU 기본값은0이며 `TOKENHSI_GPU`로
+선택한다. 기존 per-GPU MPS가 있으면 공통 runtime이 검증 후 연결하고, 없으면 일반 CUDA로
+실행한다. MPS 서버를 자동으로 시작하거나 종료하지 않는다.
+
+현재 서버에서 아래 명령으로 원본 데이터 폴더를 받는다. `Pro1`은 이 계정의 SSH config에
+등록된 `hwanhee@163.152.162.122`다. 직접 접속할 수 없는 네트워크에서는 `Pro1_jump`로 바꾼다.
+`scp -r`은 원본 데이터 폴더 안의 심볼릭 링크도 따라가 실제 내용을 복사한다.
+이 명령은 전체 `tokenhsi/data/`를 복사하므로 원본 모션·물체·메타데이터가 함께 전송된다.
+기존 코드/YAML 위에 덮어쓰지 않고 별도 데이터 보관 폴더로 받는다.
+
+```bash
+cd /home/injesus1010/repos/CVPR2027
+mkdir -p runs/assets/ksh_jointpush/data
+scp -r Pro1:/home/hwanhee/ksh/stage1_2_jointpush/tokenhsi/data/. \
+  /home/injesus1010/repos/CVPR2027/runs/assets/ksh_jointpush/data/
+```
+
+별도의10500/14000 checkpoint는 필요 없다. 로컬19500 파일의 SHA-256은 `4eb295a8…`이다.
+받은 뒤 아래 CPU 준비 명령으로 누락111개 메타데이터 파일을 원본554파일 manifest 해시와
+검증하고,13개 payload 경로를 로컬 데이터로 연결하며 실행 YAML을 생성한다.
+메타데이터/폴더가 덜 왔으면 복사를 시작하기 전에 누락 목록을 출력하고 실패한다.
+`KSH_DATA_ROOT` 또는 `--data-root`로 다른 데이터 보관 위치를 지정할 수 있다.
+
+```bash
+conda activate tokenhsi118
+python ksh_jointpush/scripts/ksh_jointpush_prepare.py \
+  --rsi-mode balanced --gate-mode soft --init-safety all_pairs --distractors clear_paths
+
+# 데이터 준비 후 사용할 본학습 명령. 이번 경로 이식 작업에서는 실행하지 않았다.
+TOKENHSI_GPU=0 KSH_GATE_MODE=soft KSH_RSI_MODE=balanced \
+  bash ksh_jointpush/scripts/ksh_jointpush_train.sh
+```
+
+모션 절대경로도 새 데이터 위치로 변환한다. 생성 설정은 `runs/jointpush/`에,
+학습 결과는 `ksh_jointpush/output/`에 둔다. 원본 `source_manifest.json`은 출처 기록으로 보존한다.
+2026-10-29 데이터 수신/연결을 완료했다. 원본554파일·모션130개 경로·PUSH21개 모션/캐릭터
+해시를 검증했고 CPU33개 검사를 통과했다. 이전 서버 상대 모션 경로를 변환하며,
+PyTorch2.0의 다중축 `any` 호환은 로컬 bootstrap의 `ksh_torch_compat.py`로 처리한다.
+데이터 준비 검증은 `output_etc/check/data_ready_20261029/`에 있다.
+
+2026-10-29 00:15 GPU0(RTX5090)에서 사용자 요청한 본학습을 시작했다.
+tmux는 `ksh_jointpush_soft_20261029_001531`, PID는3984199, 출력은
+`output/train_base19500_balanced_soft_safe_clear_gpu0_20261029_001531/Stage2JointPushRsi_29-00-15-41/`다.
+2epoch의 실제PPO업데이트·actor/RMS동결·coordination갱신과 startup checkpoint 저장을 검증했다.
+현재 실행 metadata는 `../runs/jointpush/ksh_jointpush_active_training.json`, 설정/실행사본/검증은
+`../runs/jointpush/launch_ksh_jointpush_soft_20261029_001531/`를 따른다.
+**2026-10-29 12:59KST 사용자 요청으로 PID3984199를 SIGSTOP 일시정지했다.**
+현재프로세스는 `T (stopped)`이며학습/optimizer/GPU메모리상태를유지한다.
+자동재개하지 않으며 사용자재개요청 시동일PID를다시확인한뒤SIGCONT로이어간다.
+RTX5090/CUDA11.8용3축곱·JIT fusion·PyTorch2.0 attention호환은 로컬bootstrap으로 적용하며
+원본source/모델구조/보상은 유지한다. 초기화중종료한시도들의 로그도 보존했다.
+
+```bash
+# 현재 학습 로그
+tail -f ksh_jointpush/output/train_base19500_balanced_soft_safe_clear_gpu0_20261029_001531/train.log
+
+# 현재 학습 세션 접속
+tmux -L codex-ksh attach -t ksh_jointpush_soft_20261029_001531
+```
+
+현재 학습 TensorBoard는 **http://localhost:6017** 이다. `ksh_soft_balanced_19500` run만
+표시하며15초마다 갱신한다. 원격 접속이면6017포트를 포워딩한다.
+tmux `ksh_jointpush_tensorboard_6017`에서 실행하며 명령/로그는 현재launch폴더의
+`tensorboard_split.sh`·`tensorboard_split.log`에 있다. HTTP200과scalar205개 로딩을 확인했다.
+
+사용자 요청으로 같은TensorBoard의 `reward_terms/at_{state,progress,success,total}`과
+`reward_terms/contact_{state,progress,success,total}`을 분리했다. 현재PUSH-only의 agent별
+CONTACT+AT각1개 구성에서 원래 가중치·gate·목표포화가 반영된 agent-step 평균이다.
+AMP/penalty는 포함하지 않는다. 기존 로그 전체를 backfill하고CPU writer가30초 대기 후
+새 로그를 계속 반영한다. 원본 `summaries/`는 읽기만 하고 단일writer의
+`derived_summaries/`를 TensorBoard에 연결했다. 학습을 재시작하지 않았다.
+writer는tmux `ksh_jointpush_reward_split`,PID4119578이며 학습PID가 끝나면 종료한다.
+검증/프로세스/진행상태는현재launch의 `reward_split_{verification,process,state}.json`이다.
+
+## 이전 서버 실행 기록
+
+이하 `/home/hwanhee/...` 경로·PID·GPU·학습 실행 상태는 이전 서버 기록이다.
+현재 서버 명령과 기본값은 위 항목을 따른다.
+
 2026-10-27 사용자 승인으로 기존 Partial 학습만 종료하고 이 RSI+soft gate 본학습을 GPU6에서 시작했다.
 원본 `/home/hwanhee/ksh/stage1_2_jointpush`는 읽기만 한다.
 
