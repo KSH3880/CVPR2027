@@ -45,6 +45,17 @@ case "$KSH_DISTRACTORS" in
  clear_paths) WORK="${WORK}_clear_paths" ;;
  *) echo 'KSH_DISTRACTORS must be legacy or clear_paths'; exit 2 ;;
 esac
+export KSH_CONTACT_MODE=${KSH_CONTACT_MODE:-native}
+case "$KSH_CONTACT_MODE" in
+ native) contact_output_suffix= ;;
+ legacy_jhh) WORK="${WORK}_coupled_jhh_solo_ksh_contact"; contact_output_suffix=_coupled_jhh_solo_ksh_contact ;;
+ *) echo 'Unknown KSH_CONTACT_MODE'; exit 2 ;;
+esac
+prepare_contact_args=()
+if [ "$KSH_CONTACT_MODE" = legacy_jhh ]; then
+ : "${KSH_CONTACT_REFERENCE_CONFIGS:?Set KSH_CONTACT_REFERENCE_CONFIGS to comparison launch configs}"
+ prepare_contact_args=(--reference-configs "$KSH_CONTACT_REFERENCE_CONFIGS")
+fi
 export TOKENHSI_CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi118} PYTHONDONTWRITEBYTECODE=1
 # This environment's conda activation hook expands LD_LIBRARY_PATH under set -u.
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
@@ -59,7 +70,7 @@ elif [ "$HEADLESS" = 0 ]; then
 fi
 . "$SOURCE/tokenhsi/scripts/multi_agent/runtime_env.sh"
 PYTHON="$CONDA_PREFIX/bin/python"
-CUDA_VISIBLE_DEVICES='' "$PYTHON" "$ROOT/ksh_jointpush/scripts/ksh_jointpush_prepare.py" --rsi-mode "$KSH_RSI_MODE" --gate-mode "$KSH_GATE_MODE" --init-safety "$KSH_INIT_SAFETY" --distractors "$KSH_DISTRACTORS" "${prepare_checkpoint_args[@]}"
+CUDA_VISIBLE_DEVICES='' "$PYTHON" "$ROOT/ksh_jointpush/scripts/ksh_jointpush_prepare.py" --rsi-mode "$KSH_RSI_MODE" --gate-mode "$KSH_GATE_MODE" --init-safety "$KSH_INIT_SAFETY" --distractors "$KSH_DISTRACTORS" --contact-mode "$KSH_CONTACT_MODE" "${prepare_checkpoint_args[@]}" "${prepare_contact_args[@]}"
 export TORCH_EXTENSIONS_DIR="$ROOT/runs/jointpush/torch_extensions" CXX=/usr/bin/g++-11
 export PYTHONPATH="$SOURCE/tokenhsi:$SOURCE${PYTHONPATH:+:$PYTHONPATH}"
 CHECKPOINT="$STAGE1_CHECKPOINT"
@@ -69,7 +80,7 @@ if [ "$MODE" = train ]; then
  # also supported on this server when no MPS daemon is configured.
  args+=(--headless --sim_device cuda:0 --rl_device cuda:0 --num_envs 1024 --task_graph random_scenario)
  if [ -n "${RESUME_CHECKPOINT:-}" ]; then args+=(--checkpoint "$RESUME_CHECKPOINT" --resume 1); else args+=(--transfer_checkpoint "$CHECKPOINT"); fi
- OUTPUT_PATH=${OUTPUT_PATH:-$ROOT/ksh_jointpush/output/train_${KSH_RSI_MODE}_${KSH_GATE_MODE}gate_$(date +%Y%m%d_%H%M%S)}
+ OUTPUT_PATH=${OUTPUT_PATH:-$ROOT/ksh_jointpush/output/train_${KSH_RSI_MODE}_${KSH_GATE_MODE}gate${contact_output_suffix}_$(date +%Y%m%d_%H%M%S)}
 else
  args+=(--test --eval --checkpoint "${CHECKPOINT_OVERRIDE:-$CHECKPOINT}" --num_envs "${NUM_ENVS:-1}" --task_graph "${TASK_GRAPH:-random_scenario}" --eval_repeats "${REPEATS:-100000}")
  case "${PUSH_RSI:-0}" in

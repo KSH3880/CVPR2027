@@ -1,5 +1,11 @@
 ## 2026-10-29
 
+### PUSH viewer 에이전트 뒤쪽·30도 카메라
+사용자 요청으로 로컬 viewer overlay에 rear_camera.py를 추가했다. agent0 담당상자→목표 방향의 뒤에서 수평거리4.8m/하향30도(높이약3.82m)로 agent0를 추적하며 위치·방향을 완만히 보간하고 reset시 재정렬한다. F키 수동시점 전환 유지. 후속 사용자 요청으로 GPU6/noVNC6240 재실행, 새 저장폴더 `viewer_gpu6_rear30_20261029_173204`로 기존PNG/MP4보존·stop.sh 대상갱신. GPU5 초기화 프로세스만 MPS 미연결 확인 후 SIGINT→finally CUDA동기화 종료를 확인했고 기존MPS/학습PID는 유지했다. 정책·원본코드·MPS 변경없음. 실제 pose함수의 네방향 뒤쪽위치/30도계산 및 Python/shell구문검증 통과; GPU6 실제PNG 화면·camera.json의 뒤쪽위치/높이3.821m/30도 구도 확인.
+
+### 외부 PUSH22000 GPU5 viewer·저장 경로 분리
+사용자 지정 koo_cvpr Stage1PushAtMotion16k_00022000.pth를 읽기 전용 입력으로 사용하고 `output_etc/check/push_22000_gpu5_20261029_160244/`에 코드·설정·workspace·RSI 사본을 만들어 실행했다. 원본 prepare.py는 실행하지 않으며 JIT/진단/PNG/MP4도 로컬 경로를 사용한다. GPU5/noVNC6240/2명·4물체·1환경/PUSH_AT/seed42/1200step, 원본 GUI 방식대로 MPS 미연결·기존 daemon/학습 보존. 첫900frame 자동PNG 및 MP4변환, 이후 L키 추가PNG. stop.sh는 STOP 파일을 통해 다음render에서 CUDA synchronize 후 종료하며 프로세스에 signal을 보내지 않는다. 코드166파일 byte일치·checkpoint SHA·CUDA/Vulkan GPU5·추론/실제PNG화면 확인, shell/Python구문검증 통과. 정상종료 동작은 사용자 viewer를 유지하기 위해 실제 실행하지 않았다. 근거 해당폴더의 validation.json/provenance.json/view.log/README.txt, 재실행·종료는 USAGE 참고.
+
 ### Table carry 공개정책·우리residual10k 우리영역40초 비교 완료
 사용자 요청으로 `climb_paired/run_table_carry.py`를 추가하고 공유carry driver/tracker의category·protocol·모델수·정책epoch를 Table/Chair별로 구분했다. 기존Chair의env/train/체크포인트/protocol 준비값은 저장된정식결과와동일함을CPU대조했다. 공개Table40k(102tensor/265D RMS)와 우리residual10k(171tensor/scene RMS)를 기존공통Table환경·test9·512환경·seed0·40초·연속3회로 평가했다. 거리1~5m·랜덤yaw·목표XY±4.5m/바닥높이를 유지하며 우리AT영역=물체중심3D20cm, 초기frame제외/첫episode종료action포함ever·직립/파지추가조건없음. 첫회제외 **TokenHSI93.07±.69%, 우리10k91.21±.55%**,차이우리−1.85546875%p. 원시성공수478/474/479 대471/465/469,3회전체93.16±.52 대91.47±.60%. std는동일seed 반복표본산포다. CPU23개(양category routing·40초후반/terminal·부분reset누수방지·기존지표/CLI 등),4환경40초×2정책×3repeat 연결검증 후 정식6회 모두rc0. 전trace독립재채점/32·64ever/test9/1199종료/strict복원·모델RMS불변/원본·사본pth·코드·에셋 SHA/CSV·평균·std재계산 통과. 두정책첫repeat root/DOF/물체/목표/크기/ID전배열exact,후속repeat초기차이는실측기록. 두checkpoint는앞서각20초native평가에쓴파일과SHA동일확인;시간뿐아니라환경/성공조건/실행경로차이도있으므로20초대비변화를시간효과로단정하지않음. 결과 `output_etc/check/hold_at_eval/table_compare_40s_20261029_145043/{REPORT.md,validation.json,audit.json,checkpoint_and_initial_identity.json}`, 상태 `../runs/table_carry_40s_active.json`. 기존평가·프로세스 보존.
 

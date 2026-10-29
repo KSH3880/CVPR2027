@@ -234,3 +234,5 @@ Chair 예약 복구는 `runs/chair_residual_after_table_20261028_recovery/`에�
 `tokenhsi_native_table/run_public.py`는공개Table carry(40k)의원본환경20초·512환경·seed0연속3회평가를준비·실행한다. baseline코드사본의원본run/get_action/run_eval을유지하고`public_worker.py`는순수기록과모델/RMS/AMP RMS검증만연결한다. `validate.py`가위치+직립·first episode·terminal·precision을독립재채점한다. 기존우리10k용worker/policy와구분한다. [명령](../evaluation/tokenhsi_native_table/README.md#공개-tokenhsi-table-모델의-원본-평가).
 
 Chair 평가의 새 기본 결과 경로는 `output_etc/check/hold_at_eval/<YYYYMMDD_HHMMSS>/`다. 실행별 summary/CSV/seed로그를 이 아래에 모은다.
+
+- `output_etc/check/push_22000_gpu5_20261029_160244/{start,view,stop}.sh`: 외부 PUSH22000의 로컬 실행 사본·GPU5/noVNC6240·영상 저장·동기화 정상 종료. 입력 원본은 수정하지 않는다.

@@ -39,6 +39,8 @@ from ksh_jointpush.ksh_distractor_clearance import install as install_distractor
 install_distractor_clearance(prepared_env)
 from ksh_jointpush.ksh_push_only import install as install_push_only
 install_push_only(prepared_env)
+from ksh_jointpush.ksh_legacy_contact import install as install_legacy_contact
+install_legacy_contact(prepared_env)
 # Load task classes only after reward adapters have bound the runtime class.
 from ksh_jointpush.ksh_torch_compat import install_cuda_volume_compat
 install_cuda_volume_compat()

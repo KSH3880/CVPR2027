@@ -306,3 +306,8 @@ CPU64장면에서반경·접근선·sweep이격·초기agent안전성assert와�
 
 
 2026-10-28 21:40최종설정본학습: GPU5,tmux`jointpush_hardgate_safe19500`,checkpoint`output/train_base19500_hard_safe_clear_gpu5_20261028_214039/Stage2JointPushRsi_28-21-40-42/nn/`,TensorBoard`current_ksh_jointpush_base19500_hard_safe`. 이전1500epoch재개가아니며Stage1 19500부터새optimizer로시작했다.
+
+
+## stage1_2_base coupled 제공 체크포인트 viewer
+
+사용자 제공 Stage2 coupled PTH로 관찰하기 위한 별도 사본은 [coupled_base/LOCAL_VIEWER.md](coupled_base/LOCAL_VIEWER.md)를 따른다. 현재 체크포인트 대기 상태이며 학습·제로샷·뷰어를 자동 시작하지 않는다. 기존 JointPush 실행은 유지한다.

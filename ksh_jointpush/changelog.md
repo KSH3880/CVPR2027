@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-29
+
+### CONTACT 적용 범위 정정: 단독 KSH · 공동 jhh
+
+- 사용자 최종 지시에 따라 `members == 1`은 KSH CONTACT state·progress·성공 판정을 그대로 보존하고, `members > 1` CONTACT에만 jhh의 중점XY/1.04m·우회 접근거리·접촉 성공 조건을 적용했다. AT·gate·RSI 등은 유지한다. 기존 전체 jhh 준비 경로와 분리한 `coupled_jhh_solo_ksh_contact` workspace/output 및 새 checkpoint 계약을 사용하며 전용 래퍼는 이 설정을 가리킨다.
+- CPU 테스트7개 통과: 혼합 scene에서 단독/공동 state·progress·진단·physics hit 분기, substep hit 누적, AT/gate 보존, 원본 수식·설정·checkpoint 격리. CPU4환경×3preset 각8step·부분 reset도 통과했다. 로그: `output_etc/check/coupled_jhh_solo_ksh_contact_20261029/`. 본학습 시작·재시작 및 GPU/MPS 조작 없음.
+
+### KSH19500 CONTACT-only jhh Partial 비교 설정
+
+- 현재 hard/balanced/safe/clear 실행의 저장 설정을 복제하고 CONTACT state(중점XY·1.04m 높이), 장애물 우회 progress, 양손 접촉 성공 조건만 이전 jhh 방식으로 선택 적용했다. AT·gate·RSI·물성·AMP·LR는 유지하고 구현 SHA를 checkpoint 계약에 포함했다. 기존 native 기본값은 유지하며 전용 train/test/VNC 래퍼와 실행 가이드를 추가했다. 현재 RSI 손 높이0.8m와 reward 목표1.04m 차이는 reference 문서에 명시했다.
+- CPU 수식/격리/계약 테스트6개, CPU4환경×3preset 각8step 정책 실행·부분 reset·유한 보상 검증 통과. GPU 미사용·optimizer0회. 기존 GPU5 학습 PID3851733을 유지했고 본학습 시작·재시작은 하지 않았다. 로그는 `output_etc/check/legacy_contact_20261029/`, 상세는 `markdowns/reference/ksh_legacy_contact.md`.
+
+### stage1_2_base coupled 사본 점검·제공 체크포인트 viewer 준비
+`2979913`을ports에고정하고coupled_base에독립실행사본·원본읽기전용자료링크/로컬78k·21k검사사본을준비했다. CPU313/PreLN·4종bias gradient/PUSH bank해시통과. 사용자범위정정전확인학습2epoch·32환경8preset물리검사를수행했고추가평가중단·검증프로세스종료. 추가학습/제로샷생성금지·사용자제공Stage2체크포인트대기,viewer미실행. 기존GPU5학습/MPS보존. 상세와검증한계는coupled_base/LOCAL_VIEWER.md.
+
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
 ## 2026-10-27

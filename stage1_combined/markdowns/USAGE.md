@@ -211,3 +211,11 @@ bash tokenhsi/scripts/multi_agent/stage1_v2_fixed_push_360_vnc.sh \
 전용 `evaluation/hold_at/run_eval.py`에 원본78k `--checkpoint`와 ChairFT의 `--template-checkpoint`를 함께 전달한다. template는env/sim/train설정만제공하며모델tensor/normalizer는원본78k파일의byte-identical사본에서직접복원한다. tokenizer30D유지·가중치변환/업데이트없음. 실행·trace·통계는 [평가README](../evaluation/hold_at/README.md).
 
 `chair_hold_at_full_ft`의 다음 실행용 AT 높이 허용 오차는 5cm(`success.at_z_tolerance: 0.05`)다. 이전 실행 사본에는 소급 적용되지 않는다. 상세는 [Chair HOLDING+AT](reference/chair_hold_at_ft.md)를 따른다.
+
+## 외부 PUSH 22000 체크포인트 로컬 viewer
+
+`output_etc/check/push_22000_gpu5_20261029_160244/`의 `start.sh`는 GPU5/noVNC6240에서 실행하고 `viewer/`에 영상·PNG·로그를 저장한다. `koo_cvpr`의 checkpoint·데이터는 입력으로만 읽고 로컬 코드/설정/RSI 사본을 사용한다. 첫30초는 `viewer/push_22000.mp4`로 자동 저장하며 L키 추가 녹화는 PNG다. 종료는 같은 폴더의 `stop.sh`로 요청하고 `viewer/normal_exit`를 기다린다. 기존 MPS 데몬은 유지하며 그래픽 프로세스는 MPS에 연결하지 않는다.
+
+현재 PUSH viewer는 agent0 뒤쪽·하향30도 추적 카메라다. 현재 저장 폴더명은 실행폴더의 `active_viewer.txt`를 확인한다. 기존 `viewer/` 결과는 보존하며 `stop.sh`가 현재 폴더의 STOP에 정상 종료를 요청한다.
+
+사용자 후속지정으로 현재 GPU는 **6**이며 noVNC 포트는6240을 유지한다. 기존 GPU5 viewer는 종료했다.

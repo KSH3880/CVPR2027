@@ -25,6 +25,7 @@
 | [stage2_jointpush_goal_saturation.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_goal_saturation.yaml) | [stage2_jointpush_goal_saturation.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_goal_saturation.yaml) |
 | [stage2_jointpush_rsi_goal_saturation.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_rsi_goal_saturation.yaml) | [stage2_jointpush_rsi_goal_saturation.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_rsi_goal_saturation.yaml) |
 | [stage2_jointpush_goal_saturation_adapter.yaml](../tokenhsi/data/cfg/multi_agent/stage2_jointpush_goal_saturation_adapter.yaml) | [stage2_jointpush_goal_saturation_adapter.yaml](../tokenhsi/data/cfg/train/rlg/stage2_jointpush_goal_saturation_adapter.yaml) |
+| [stage2 coupled_jhh_solo_ksh_contact env](../../runs/jointpush/ksh_jointpush_rsi/workspace_push_solo45_coupled0_balanced_rsi_hard_gate_base_Stage1PushFinetune_00019500_4eb295a8_safe_start_clear_paths_coupled_jhh_solo_ksh_contact/configs/env.yaml) | [stage2 coupled_jhh_solo_ksh_contact train](../../runs/jointpush/ksh_jointpush_rsi/workspace_push_solo45_coupled0_balanced_rsi_hard_gate_base_Stage1PushFinetune_00019500_4eb295a8_safe_start_clear_paths_coupled_jhh_solo_ksh_contact/configs/train.yaml) |
 
 ## 학습
 
@@ -65,6 +66,9 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=1 STAGE1_CHECKPOINT=pth/
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=1 STAGE1_CHECKPOINT=pth/Stage1PushFinetune_00014000.pth bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_train.sh 4 1024 8
+
+# stage2_coupled_jhh_solo_ksh_contact
+TOKENHSI_GPU=5 bash ksh_jointpush/scripts/ksh_legacy_contact_train.sh
 ```
 
 백그라운드 학습 상태·로그. `rsi_uniform`은 fixed78000에서 KL0·새 optimizer/epoch으로 시작한 GPU0 MPS 사용자 서비스이며 로그아웃 후에도 유지된다. raw·20~25kg variant·기존 cuboid는 중단 상태다.
@@ -179,6 +183,9 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_test.sh pth/Stage1PushFinetune_00014000.pth 4 1 8 10
+
+# stage2_coupled_jhh_solo_ksh_contact
+TOKENHSI_GPU=5 HEADLESS=0 CHECKPOINT_OVERRIDE="$CKPT_LEGACY_CONTACT" bash ksh_jointpush/scripts/ksh_legacy_contact_test.sh
 ```
 
 화면 없는 평가는 `HEADLESS=1`을 사용한다.
@@ -220,6 +227,9 @@ TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6099 bash tokenhsi/scripts/m
 
 # stage2_jointpush_goal_saturation_adapter
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6101 bash tokenhsi/scripts/multi_agent/stage2_jointpush_goal_saturation_adapter_vnc.sh pth/Stage1PushFinetune_00014000.pth 4 1 8 10
+
+# stage2_coupled_jhh_solo_ksh_contact
+TOKENHSI_GPU=5 PORT=6086 CHECKPOINT_OVERRIDE="$CKPT_LEGACY_CONTACT" bash ksh_jointpush/scripts/ksh_legacy_contact_vnc.sh
 ```
 
 `http://localhost:6081/vnc.html?autoconnect=1&resize=remote`
@@ -258,3 +268,5 @@ PUSH RSI 진단 시각화 예시. `TASK_GRAPH=all_coupled`는4명 공동, `push`
 # stage2_jointpush_rsi
 TOKENHSI_CONDA_ENV=tokenhsi_jhh TOKENHSI_GPU=5 PORT=6095 PUSH_RSI=1 TASK_GRAPH=all_coupled bash tokenhsi/scripts/multi_agent/stage2_jointpush_rsi_vnc.sh "$CKPT_STAGE2" 4 1 8 10
 ```
+
+제공된 stage1_2_base coupled 체크포인트 viewer 준비 상태와 실행은 [별도 사본](../coupled_base/LOCAL_VIEWER.md)을 따른다. 추가학습/제로샷은 실행하지 않는다.

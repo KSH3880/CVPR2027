@@ -6,6 +6,9 @@ Multi-agent 실험은 `stage1`, `stage1_v2`, `stage1_v2_fixed`, `stage2`와 공�
 
 | 경로 | 역할 |
 | --- | --- |
+| `ksh_legacy_contact.py` | 공동 jhh Partial / 단독 KSH CONTACT state·progress·성공 조건 분기 |
+| `scripts/ksh_legacy_contact_{train,test,vnc}.sh` | 저장된 KSH19500 hard/balanced/safe/clear 설정을 복제하는 CONTACT 비교 실행기 |
+| `markdowns/reference/ksh_legacy_contact.md` | CONTACT 비교 범위·참조 설정·초기 높이 차이 |
 | `tokenhsi/run.py` | 학습·평가 등록과 실행 |
 | `tokenhsi/data/cfg/multi_agent/stage1*.yaml` | 세 실험의 환경 설정 |
 | `tokenhsi/data/cfg/train/rlg/stage1*.yaml` | 세 실험의 PPO/AMP/모델 설정 |
@@ -217,3 +220,6 @@ RSI 균등 거리 실험은 `stage1_v2_fixed_push_360_raw_cuboid_rsi_uniform` �
 | `tokenhsi/tests/test_stage2_jointpush_adapter.py` | 설정 동등성·14k 전이 초기 출력·동결/gradient·모델 복원 검사 |
 
 상세 구조는 [Stage2 jointpush](reference/stage2_jointpush.md#내부-action-adapter-비교-설정)를 따른다.
+
+- `../coupled_base/`: stage1_2_base 2979913의 독립실행사본. 제공 체크포인트 viewer 준비·현재상태는 LOCAL_VIEWER.md, 검증은 output_etc/check/branch_audit/.
+- `../scripts/coupled_base_{prepare.py,train.sh,test.sh,vnc.sh,eval.sh}`: 별도사본 준비/실행 진입점. 현재는 사용자제공체크포인트를받은뒤viewer만사용한다.

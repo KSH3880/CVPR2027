@@ -69,7 +69,7 @@ def resolve_motion_path(value, data_root):
     raise FileNotFoundError('Motion payload missing: '+str(data_root/path))
 
 
-def prepare(rsi_mode='balanced', gate_mode='soft', checkpoint_path=None, init_safety='legacy', distractors='legacy', data_root=None):
+def prepare(rsi_mode='balanced', gate_mode='soft', checkpoint_path=None, init_safety='legacy', distractors='legacy', data_root=None, contact_mode='native', reference_configs=None):
     data_root=Path(data_root or os.environ.get('KSH_DATA_ROOT',ROOT/'runs/assets/ksh_jointpush/data')).expanduser().resolve()
     if distractors not in ('legacy','clear_paths'):
         raise ValueError('distractors must be legacy or clear_paths')
@@ -89,6 +89,44 @@ def prepare(rsi_mode='balanced', gate_mode='soft', checkpoint_path=None, init_sa
         work=work.with_name(work.name+'_safe_start')
     if distractors == 'clear_paths':
         work=work.with_name(work.name+'_clear_paths')
+    if contact_mode not in ('native', 'legacy_jhh'):
+        raise ValueError('Unknown CONTACT mode')
+    if contact_mode == 'legacy_jhh':
+        work=work.with_name(work.name+'_coupled_jhh_solo_ksh_contact')
+    if contact_mode == 'legacy_jhh':
+        if reference_configs is None:
+            raise ValueError('Legacy CONTACT requires --reference-configs from the comparison run')
+        reference=Path(reference_configs).resolve(strict=True)
+        env=yaml.safe_load((reference/'env.yaml').read_text())
+        actual=Path(env['experiment']['transfer']['checkpoint']).resolve(strict=True)
+        if hashlib.sha256(actual.read_bytes()).hexdigest()!=digest:
+            raise ValueError('Reference Stage1 checkpoint differs')
+        stage2=env['env']['stage2JointPush']
+        if 'contact_reward' in stage2:
+            raise ValueError('Reference already overrides CONTACT')
+        if (stage2['reward_gate']['mode']!='all_hands_face_tolerance_v1'
+                or rsi_mode!='balanced' or gate_mode!='hard'
+                or init_safety!='all_pairs' or distractors!='clear_paths'):
+            raise ValueError('Legacy comparison requires current hard/balanced/safe/clear reference')
+        stage2['contact_reward']=dict(mode='coupled_jhh_solo_ksh_contact_v1',scope='coupled_only',contact_height=1.04,
+            midpoint_only=True,approach_stand_off=1.,clearance=.45,
+            implementation_sha256=hashlib.sha256((SOURCE/'ksh_legacy_contact.py').read_bytes()).hexdigest())
+        configs=work/'configs';configs.mkdir(parents=True,exist_ok=True)
+        # Keep the reference motion_file path, preserving every other config value.
+        contents={'env.yaml':yaml.safe_dump(env,sort_keys=False),
+                  'train.yaml':(reference/'train.yaml').read_text(),
+                  'motions.yaml':(reference/'motions.yaml').read_text()}
+        for name,content in contents.items():
+            target=configs/name
+            if target.exists() and target.read_text()!=content:
+                raise ValueError('Workspace config differs: '+str(target))
+            target.write_text(content)
+        report=dict(workspace=str(work),reference_configs=str(reference),
+                    changed_fields=['env.stage2JointPush.contact_reward'],
+                    training_started=False,gpu_used=False)
+        (work/'preparation.json').write_text(json.dumps(report,indent=2))
+        print(json.dumps(report,indent=2))
+        return
     manifest=json.loads((ROOT/'ksh_jointpush/source_manifest.json').read_text())
     restore_inputs(manifest,data_root)
     # Output storage is local to this project; generated configs remain under runs/.
@@ -159,5 +197,7 @@ if __name__=='__main__':
     parser.add_argument('--init-safety',choices=['legacy','all_pairs'],default='legacy')
     parser.add_argument('--distractors',choices=['legacy','clear_paths'],default='legacy')
     parser.add_argument('--data-root',help='Local copy of the original tokenhsi/data directory (or KSH_DATA_ROOT)')
+    parser.add_argument('--reference-configs')
+    parser.add_argument('--contact-mode',choices=['native','legacy_jhh'],default='native')
     args=parser.parse_args()
-    prepare(args.rsi_mode,args.gate_mode,args.checkpoint,args.init_safety,args.distractors,args.data_root)
+    prepare(args.rsi_mode,args.gate_mode,args.checkpoint,args.init_safety,args.distractors,args.data_root,args.contact_mode,args.reference_configs)
