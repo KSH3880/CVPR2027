@@ -1,0 +1,447 @@
+# Copyright (c) 2018-2022, NVIDIA Corporation
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+import os
+import yaml
+from isaacgym import gymapi
+from isaacgym import gymutil
+import numpy as np
+import random
+import torch
+
+SIM_TIMESTEP = 1.0 / 60.0
+
+
+def set_np_formatting():
+    np.set_printoptions(
+        edgeitems=30,
+        infstr="inf",
+        linewidth=4000,
+        nanstr="nan",
+        precision=2,
+        suppress=False,
+        threshold=10000,
+        formatter=None,
+    )
+
+
+def set_seed(seed, torch_deterministic=False):
+    if seed == -1 and torch_deterministic:
+        seed = 42
+    elif seed == -1:
+        seed = np.random.randint(0, 10000)
+    print("Setting seed: {}".format(seed))
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    if torch_deterministic:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+        torch.set_deterministic(True)
+    else:
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+    return seed
+
+
+def load_cfg(args):
+    from pathlib import Path
+    from utils.experiments import load_environment, validate_experiment, NAMES
+    name = Path(args.cfg_train).stem
+    if name not in NAMES:
+        raise ValueError('Unsupported experiment: ' + name)
+    with open(args.cfg_train) as stream:
+        cfg_train = yaml.safe_load(stream)
+    is_eval = args.test or args.eval or getattr(args, 'play', False)
+    cfg, source_path = load_environment(name, args.cfg_env, args.checkpoint,
+                                         saved=is_eval or args.resume > 0)
+    from utils.experiments import experiment_horizon
+    cfg["env"]["episodeLength"] = experiment_horizon(name)
+    from utils.evaluation_protocol import configure
+    configure(args, cfg, name)
+    args.resolved_env_config = str(source_path)
+    from utils.unified_training import validate_stage1_network
+
+    validate_stage1_network(cfg["env"], cfg_train)
+    if args.task in ("HumanoidMACarry", "HumanoidMABefore", "HumanoidMAPush", "HumanoidMABeforePush", "HumanoidMACoupledPush"):
+        from utils.output_paths import resolve_output_path
+
+        is_eval = args.test or args.eval or getattr(args, "play", False)
+        check = getattr(args, "check", False) or os.environ.get("CHECK") == "1"
+        if check and not is_eval and args.max_iterations <= 0:
+            args.max_iterations = 1
+        args.output_path = resolve_output_path(
+            os.path.splitext(os.path.basename(args.cfg_train))[0],
+            "eval" if is_eval else "train", args.output_path,
+            check=check, max_iterations=args.max_iterations,
+        )
+    if args.num_envs > 0:
+        cfg["env"]["numEnvs"] = args.num_envs
+    if args.episode_length > 0:
+        cfg["env"]["episodeLength"] = args.episode_length
+    if getattr(args, "num_agents", 0) > 0:
+        cfg["env"]["numAgents"] = args.num_agents
+    if getattr(args, "num_objects", 0) > 0:
+        cfg["env"]["numObjects"] = args.num_objects
+    validate_experiment(name, cfg['env'], cfg_train, evaluation=is_eval)
+    eval_skills_arg = getattr(args, "eval_skills", "")
+    eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
+    if bool(eval_skills_arg) != bool(eval_skill_probs_arg):
+        raise ValueError(
+            "--eval_skills and --eval_skill_probs must be specified together"
+        )
+    if eval_skills_arg:
+        eval_skills = [
+            value.strip() for value in eval_skills_arg.split(",") if value.strip()
+        ]
+        eval_skill_probs = [
+            float(value.strip()) for value in eval_skill_probs_arg.split(",")
+        ]
+        if len(eval_skills) != len(eval_skill_probs):
+            raise ValueError("eval skill and probability counts must match")
+        if (
+            not eval_skills
+            or not np.isfinite(eval_skill_probs).all()
+            or any((prob < 0.0 for prob in eval_skill_probs))
+            or (sum(eval_skill_probs) <= 0.0)
+        ):
+            raise ValueError(
+                "eval skill probabilities must be finite, non-negative, and have a positive sum"
+            )
+        cfg["env"]["eval"]["skill"] = eval_skills
+        cfg["env"]["eval"]["skillInitProb"] = eval_skill_probs
+    if getattr(args, "no_video", False) and "video" in cfg["env"]:
+        cfg["env"]["video"]["enable"] = False
+    if getattr(args, "transfer_checkpoint", ""):
+        cfg.setdefault("experiment", {}).setdefault("transfer", {})["checkpoint"] = args.transfer_checkpoint
+    pickup_carry_mode = getattr(args, 'before_pickup_carry_rsi', 'loco')
+    if pickup_carry_mode != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('follower_pickup_carry_rsi')):
+        raise ValueError('--before_pickup_carry_rsi requires the follower pickup/carry RSI evaluation config')
+    before_short = getattr(args, "before_follower_short", False)
+    if getattr(args, "before_follower_near", False) or before_short:
+        if not args.eval or 'before' not in cfg['env']:
+            raise ValueError('BEFORE distance overrides require BEFORE evaluation')
+        if cfg['env']['eval']['skill'] != ['loco']:
+            raise ValueError('BEFORE distance overrides require EVAL_SKILLS=loco')
+    if before_short:
+        from utils.before_sampling import MIX226_DISTANCE_MIXTURE
+        if (getattr(args, 'before_follower_near', False)
+                or cfg['env']['before'].get('distance_mixture') != MIX226_DISTANCE_MIXTURE):
+            raise ValueError('--before_follower_short requires the 20/20/60 mixture without --before_follower_near')
+
+    cfg["name"] = args.task
+    cfg["headless"] = args.headless
+    if "task" in cfg:
+        if "randomize" not in cfg["task"]:
+            cfg["task"]["randomize"] = args.randomize
+        else:
+            cfg["task"]["randomize"] = args.randomize or cfg["task"]["randomize"]
+    else:
+        cfg["task"] = {"randomize": False}
+    logdir = args.logdir
+    if args.torch_deterministic:
+        cfg_train["params"]["torch_deterministic"] = True
+    exp_name = cfg_train["params"]["config"]["name"]
+    if args.experiment != "Base":
+        exp_name = args.experiment
+    cfg_train["params"]["config"]["name"] = exp_name
+    if args.resume > 0:
+        cfg_train["params"]["load_checkpoint"] = True
+    if args.checkpoint != "Base":
+        cfg_train["params"]["load_path"] = args.checkpoint
+        cfg["env"]["checkpoint"] = args.checkpoint
+    if args.eval and args.test:
+        cfg_train["params"]["config"]["eval"] = True
+        cfg_train["params"]["config"]["eval_task"] = args.eval_task
+    else:
+        cfg_train["params"]["config"]["eval"] = False
+        cfg_train["params"]["config"]["eval_task"] = args.eval_task
+    if args.max_iterations > 0:
+        cfg_train["params"]["config"]["max_epochs"] = args.max_iterations
+    cfg_train["params"]["config"]["num_actors"] = cfg["env"]["numEnvs"]
+    cfg_train["params"]["config"]["device"] = args.rl_device
+    seed = cfg_train["params"].get("seed", -1)
+    if args.seed is not None:
+        seed = args.seed
+    cfg["seed"] = seed
+    cfg_train["params"]["seed"] = seed
+    cfg["args"] = args
+    from utils.unified_training import validate_unified_env
+    validate_unified_env(cfg['env'])
+    if is_eval and args.checkpoint == 'Base':
+        raise ValueError('Evaluation requires --checkpoint')
+    expected_task = ('HumanoidMACoupledPush' if cfg['env'].get('stage2JointPush') is not None
+        else 'HumanoidMABeforePush' if cfg['env'].get('jointPush') is not None and cfg['env'].get('before')
+        else 'HumanoidMAPush' if cfg['env'].get('jointPush') is not None
+        else 'HumanoidMABefore' if cfg['env'].get('before') else 'HumanoidMACarry')
+    if args.task != expected_task:
+        raise ValueError('Task does not match selected experiment: ' + expected_task)
+    if getattr(args, 'eval_protocol', ''):
+        folder = Path(args.output_path)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / 'resolved_env.yaml').write_text(yaml.safe_dump(
+            {key: value for key, value in cfg.items() if key != 'args'}, sort_keys=False))
+    print(f"[run] experiment={name} env={source_path} python={__import__('sys').executable}")
+    print(f"[run] gpu={os.environ.get('TOKENHSI_GPU', os.environ.get('CUDA_VISIBLE_DEVICES', 'default'))} "
+          f"agents={cfg['env']['numAgents']} envs={cfg['env']['numEnvs']} objects={cfg['env']['numObjects']} "
+          f"headless={args.headless} checkpoint={args.checkpoint}")
+    print(f"[run] follower_rsi={args.before_pickup_carry_rsi if is_eval else 'training config'} output={args.output_path}")
+    return (cfg, cfg_train, logdir)
+
+
+def parse_sim_params(args, cfg, cfg_train):
+    sim_params = gymapi.SimParams()
+    sim_params.dt = SIM_TIMESTEP
+    sim_params.num_client_threads = args.slices
+    if args.physics_engine == gymapi.SIM_FLEX:
+        if args.device != "cpu":
+            print("WARNING: Using Flex with GPU instead of PHYSX!")
+        sim_params.flex.shape_collision_margin = 0.01
+        sim_params.flex.num_outer_iterations = 4
+        sim_params.flex.num_inner_iterations = 10
+    elif args.physics_engine == gymapi.SIM_PHYSX:
+        sim_params.physx.solver_type = 1
+        sim_params.physx.num_position_iterations = 4
+        sim_params.physx.num_velocity_iterations = 0
+        sim_params.physx.num_threads = 4
+        sim_params.physx.use_gpu = args.use_gpu
+        sim_params.physx.num_subscenes = args.subscenes
+        sim_params.physx.max_gpu_contact_pairs = 8 * 1024 * 1024
+    sim_params.use_gpu_pipeline = args.use_gpu_pipeline
+    sim_params.physx.use_gpu = args.use_gpu
+    if "sim" in cfg:
+        gymutil.parse_sim_config(cfg["sim"], sim_params)
+    if args.physics_engine == gymapi.SIM_PHYSX and args.num_threads > 0:
+        sim_params.physx.num_threads = args.num_threads
+    return sim_params
+
+
+def get_args():
+    custom_parameters = [
+        {"name": "--transfer_checkpoint", "type": str, "default": "",
+         "help": "Initialize Stage2 from a Stage1 checkpoint"},
+        {"name": "--check", "action": "store_true", "default": False,
+         "help": "Short Stage1 training check; write under output_etc/check"},
+        {
+            "name": "--task_camera",
+            "type": str,
+            "default": "stack",
+            "help": "OnTop viewer camera: stack or agent",
+        },
+        {
+            "name": "--task_graph",
+            "type": str,
+            "default": "",
+            "help": "Edge viewer preset (OnTop or SIT/CLIMB); random re-samples each episode",
+        },
+        {
+            "name": "--task_role_swap",
+            "action": "store_true",
+            "default": False,
+            "help": "Swap A/B roles in fixed OnTop viewer presets",
+        },
+        {
+            "name": "--test",
+            "action": "store_true",
+            "default": False,
+            "help": "Run trained policy, no training",
+        },
+        {
+            "name": "--play",
+            "action": "store_true",
+            "default": False,
+            "help": "Run trained policy, the same as test, can be used only by rl_games RL library",
+        },
+        {
+            "name": "--resume",
+            "type": int,
+            "default": 0,
+            "help": "Resume training or start testing from a checkpoint",
+        },
+        {
+            "name": "--checkpoint",
+            "type": str,
+            "default": "Base",
+            "help": "Path to the saved weights, only for rl_games RL library",
+        },
+        {
+            "name": "--headless",
+            "action": "store_true",
+            "default": False,
+            "help": "Force display off at all times",
+        },
+        {
+            "name": "--task",
+            "type": str,
+            "default": "HumanoidMACarry",
+            "help": "HumanoidMACarry or HumanoidMABefore",
+        },
+        {
+            "name": "--rl_device",
+            "type": str,
+            "default": "cuda:0",
+            "help": "Choose CPU or GPU device for inferencing policy network",
+        },
+        {"name": "--logdir", "type": str, "default": "logs/"},
+        {
+            "name": "--experiment",
+            "type": str,
+            "default": "Base",
+            "help": "Optional run name",
+        },
+        {
+            "name": "--cfg_env",
+            "type": str,
+            "default": "",
+            "help": "Explicit environment YAML; default native for train, saved for eval/resume",
+        },
+        {
+            "name": "--cfg_train",
+            "type": str,
+            "default": "Base",
+            "help": "Training configuration file (.yaml)",
+        },
+        {
+            "name": "--motion_file",
+            "type": str,
+            "default": "",
+            "help": "Specify reference motion file",
+        },
+        {
+            "name": "--num_envs",
+            "type": int,
+            "default": 0,
+            "help": "Number of environments to create - override config file",
+        },
+        {
+            "name": "--num_agents",
+            "type": int,
+            "default": 0,
+            "help": "Number of agents per environment (multi-agent tasks) - override config file",
+        },
+        {
+            "name": "--num_objects",
+            "type": int,
+            "default": 0,
+            "help": "Object tokens per environment (0 keeps config)",
+        },
+        {"name": "--before_follower_near", "action": "store_true", "default": False,
+         "help": "BEFORE loco evaluation with randomized follower-near placement"},
+        {"name": "--before_pickup_carry_rsi", "type": str, "choices": ["loco", "mix", "pickup", "carry"], "default": "loco",
+         "help": "BEFORE ON_TOP follower RSI evaluation mode"},
+        {"name": "--before_follower_short", "action": "store_true", "default": False,
+         "help": "Three-mode BEFORE evaluation: force the saved config's shortest distance mode"},
+        {"name": "--eval_protocol", "type": str, "choices": ["", "general", "stage1_single"], "default": ""},
+        {"name": "--eval_single_task", "type": str, "default": ""},
+        {
+            "name": "--eval_repeats",
+            "type": int,
+            "default": 3,
+            "help": "Number of evaluation repeats",
+        },
+        {
+            "name": "--eval_skills",
+            "type": str,
+            "default": "",
+            "help": "Comma-separated evaluation skills",
+        },
+        {
+            "name": "--eval_skill_probs",
+            "type": str,
+            "default": "",
+            "help": "Comma-separated evaluation skill probabilities",
+        },
+        {
+            "name": "--no_video",
+            "action": "store_true",
+            "default": False,
+            "help": "Disable periodic video recording (multi-agent tasks)",
+        },
+        {
+            "name": "--episode_length",
+            "type": int,
+            "default": 0,
+            "help": "Episode length, by default is read from yaml config",
+        },
+        {"name": "--seed", "type": int, "help": "Random seed"},
+        {
+            "name": "--max_iterations",
+            "type": int,
+            "default": 0,
+            "help": "Set a maximum number of training iterations",
+        },
+        {
+            "name": "--horizon_length",
+            "type": int,
+            "default": -1,
+            "help": "Set number of simulation steps per 1 PPO iteration. Supported only by rl_games. If not -1 overrides the config settings.",
+        },
+        {
+            "name": "--minibatch_size",
+            "type": int,
+            "default": -1,
+            "help": "Set batch size for PPO optimization step. Supported only by rl_games. If not -1 overrides the config settings.",
+        },
+        {
+            "name": "--randomize",
+            "action": "store_true",
+            "default": False,
+            "help": "Apply physics domain randomization",
+        },
+        {
+            "name": "--torch_deterministic",
+            "action": "store_true",
+            "default": False,
+            "help": "Apply additional PyTorch settings for more deterministic behaviour",
+        },
+        {
+            "name": "--output_path",
+            "type": str,
+            "default": "output/",
+            "help": "Specify output directory",
+        },
+        {"name": "--eval", "action": "store_true", "default": False, "help": ""},
+        {"name": "--eval_task", "type": str, "default": "", "help": ""},
+    ]
+    args = gymutil.parse_arguments(
+        description="RL Policy", custom_parameters=custom_parameters
+    )
+    args.device_id = args.compute_device_id
+    args.device = args.sim_device_type if args.use_gpu_pipeline else "cpu"
+    if args.test:
+        args.play = args.test
+        args.train = False
+    elif args.play:
+        args.train = False
+    else:
+        args.train = True
+    return args
