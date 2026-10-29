@@ -118,14 +118,16 @@ def load_cfg(args):
         objalias_name = 'Stage2BeforeGroundATProgressNoneMaskRSI433Near50ObjAlias_1200'
         mix226_objalias_name = 'Stage2BeforeGroundMix226ATProgressObjAlias_1200'
         mix226_objalias_rsi_name = 'Stage2BeforeGroundMix226ATProgressObjAliasRSI433_1200'
+        near50_bias0_alias_name = 'Stage2BeforeGroundATProgressBias0Near50ObjAlias_1200'
         from utils.before_object_alias import MODE as object_alias_mode
-        expected_alias = object_alias_mode if training['name'] in (objalias_name, mix226_objalias_name, mix226_objalias_rsi_name) else None
+        expected_alias = object_alias_mode if training['name'] in (objalias_name, mix226_objalias_name, mix226_objalias_rsi_name, near50_bias0_alias_name) else None
         if cfg['env']['relationGraph'].get('before_object_alias') != expected_alias:
             raise ValueError('BEFORE object alias does not match the experiment training config')
-        near50_names = (near50_name, objalias_name)
-        none_mask_names = (none_mask_name, rsi433_name) + near50_names
+        near50_rsi_names = (near50_name, objalias_name)
+        near50_names = near50_rsi_names + (near50_bias0_alias_name,)
+        none_mask_names = (none_mask_name, rsi433_name) + near50_rsi_names
         from utils.before_pickup_carry_rsi import SPEC as pickup_carry_spec
-        expected_pickup_carry = pickup_carry_spec if training['name'] in (rsi433_name, mix226_objalias_rsi_name) + near50_names else None
+        expected_pickup_carry = pickup_carry_spec if training['name'] in (rsi433_name, mix226_objalias_rsi_name) + near50_rsi_names else None
         if cfg['env']['before'].get('follower_pickup_carry_rsi') != expected_pickup_carry:
             raise ValueError('BEFORE pickup/carry RSI does not match the experiment training config')
         expected_adapter = 'tokenhsi_internal_v1' if training['name'] in (adapter_name, adapter_bias0_name) else None
@@ -139,7 +141,7 @@ def load_cfg(args):
         actor_bias0_names = ('Stage2BeforeGroundMix226ActorBias0_1200',
                              'Stage2BeforeGroundMix226ATProgressActorBias0_1200', adapter_bias0_name, bias0_name, none_mask_name, rsi433_name)
         expected_critic_bias = ('before_only_mask_none' if training['name'] in none_mask_names else
-                               'before_only' if training['name'] in (adapter_bias0_name, bias0_name) else 'all')
+                               'before_only' if training['name'] in (adapter_bias0_name, bias0_name, near50_bias0_alias_name) else 'all')
         if cfg['env']['relationGraph'].get('critic_human_bias', 'all') != expected_critic_bias:
             raise ValueError('BEFORE critic_human_bias does not match the experiment training config')
         full_rsi_name = 'Stage2BeforeGroundMix226ATProgressFullRSI_1200'
@@ -147,11 +149,11 @@ def load_cfg(args):
         expected_full = full_rsi_spec if training['name'] == full_rsi_name else None
         if cfg['env']['before'].get('full_rsi') != expected_full:
             raise ValueError('BEFORE full RSI does not match the experiment training config')
-        at_progress_names = (mix226_objalias_rsi_name, mix226_objalias_name, objalias_name, near50_name, rsi433_name, none_mask_name, bias0_name, adapter_bias0_name, adapter_name, full_rsi_name, carry_rsi_name, 'Stage2BeforeGroundMix226ATProgress_1200',
+        at_progress_names = (near50_bias0_alias_name, mix226_objalias_rsi_name, mix226_objalias_name, objalias_name, near50_name, rsi433_name, none_mask_name, bias0_name, adapter_bias0_name, adapter_name, full_rsi_name, carry_rsi_name, 'Stage2BeforeGroundMix226ATProgress_1200',
                              'Stage2BeforeGroundMix226ATProgressActorBias0_1200')
         mix226_names = ('Stage2BeforeGroundMix226_1200', 'Stage2BeforeGroundMix226ATProgress_1200', mix226_objalias_name, mix226_objalias_rsi_name) + actor_bias0_names + (carry_rsi_name, full_rsi_name, adapter_name)
         expected_bias = ('before_only_mask_none' if training['name'] in none_mask_names else
-                         'before_only' if training['name'] in actor_bias0_names else 'all')
+                         'before_only' if training['name'] in actor_bias0_names + (near50_bias0_alias_name,) else 'all')
         if cfg['env']['relationGraph'].get('actor_human_bias', 'all') != expected_bias:
             raise ValueError('BEFORE actor_human_bias does not match the experiment training config')
         if training['name'] in ('Stage2BeforeGround', 'Stage2BeforeGroundMix50', 'Stage2BeforeGroundMix334_1200') + mix226_names + near50_names and cfg['env']['box']['reset']['platformMode'] != 'ground_only':

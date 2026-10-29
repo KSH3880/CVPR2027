@@ -254,6 +254,16 @@ Stage1 actor/critic encoder에서만 후행 target을 별도 토큰으로 연결
 기본 source는 형제 `stage1_message`의 fixed78000이다. `RESUME_CHECKPOINT`와 test/VNC는 이 실험의 checkpoint만 지원하며 기존 near50 저장본과 혼용하지 않는다. 환경 override는 `BEFORE_GROUND_ATPROGRESS_NONEMASK_RSI433_NEAR50_OBJALIAS_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1`, `BEFORE_PICKUP_CARRY_RSI=loco/mix/pickup/carry`, `HEADLESS`, `EPISODE_LENGTH`는 near50와 같다. 실행 명령은 [config](config.md)에 있다.
 
 
+8명 랜덤 viewer 예시(7000 저장본, 1환경·16obj 슬롯·loco·near50 기본 혼합):
+
+```bash
+CKPT=output/stage2_before_ground_atprogress_nonemask_rsi433_near50_objalias_1200/Stage2BeforeGroundATProgressNoneMaskRSI433Near50ObjAlias_1200_28-22-36-55/nn/Stage2BeforeGroundATProgressNoneMaskRSI433Near50ObjAlias_1200_00007000.pth
+HEADLESS=0 TOKENHSI_GPU=0 TASK_GRAPH=random_scenario BEFORE_PICKUP_CARRY_RSI=loco BEFORE_FOLLOWER_NEAR=0 EPISODE_LENGTH=1200 OUTPUT_PATH=output_etc/check/near50_objalias_8agents_viewer bash tokenhsi/scripts/multi_agent/stage2_before_ground_atprogress_nonemask_rsi433_near50_objalias_1200_test.sh "$CKPT" 8 1 16 10
+```
+
+서버 VNC에서는 같은 명령의 `_test.sh`를 `_vnc.sh`로 바꾼다. 6명은 마지막 인자를 `6 1 12 10`으로 바꾼다. 랜덤 preset은 기존 순차80% pairing/단독 샘플러를 인원 수에 맞춰 사용하며, 쌍은 AT→SIT/CLIMB/ON_TOP이다. 인원이 늘어도 3명 이상 연쇄 관계를 만들지 않는다.
+
+
 ## Stage2 BEFORE mix226 AT progress object 토큰
 
 `stage2_before_ground_mix226_atprogress_objalias_1200`는 `stage2_before_ground_mix226_atprogress_1200`의 거리20/20/60·loco 초기화·AT progress·1200step·2e-5·actor/critic 사람 SA의 SELF/NONE/BEFORE bias 학습을 유지하고 역할별 object 토큰만 적용한다. Stage1 encoder에는 mask를 추가하지 않으며 사람 SA도 기반 실험의 전체 attention을 사용한다. near50/nonemask/RSI433 설정은 포함하지 않는다.
@@ -268,3 +278,9 @@ Stage1 actor/critic encoder에서만 후행 target을 별도 토큰으로 연결
 `stage2_before_ground_mix226_atprogress_objalias_rsi433_1200`는 mix226 objalias에 BEFORE ON_TOP 후행 loco/pickUp/carryWith40/30/30만 추가한다. 선행·단독·SIT/CLIMB는 loco다. 거리20/20/60·전체 사람 관계 bias·역할별 object 토큰·fixed78000 새 전이를 유지한다. RSI 배치 실패는 loco로 fallback하므로 요청/적용 비율을 구분한다.
 
 기본4명·1024환경·8obj 토큰이며 `objects >= 2 * agents`를 요구한다. 기본 source는 형제 `stage1_message`의 fixed78000이다. resume/test/VNC는 이 실험 저장본만 사용한다. 환경 override는 `BEFORE_GROUND_MIX226_ATPROGRESS_OBJALIAS_RSI433_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1/2`는 기본20/20/60·중간·가장 짧은 거리다. `BEFORE_PICKUP_CARRY_RSI=loco|mix|pickup|carry`는 평가 초기화를 선택하며 기본 loco, 학습 분포 재현은 mix다. `HEADLESS`, `TASK_GRAPH`, `EPISODE_LENGTH`는 기반과 같다. [명령](config.md), [설계](reference/stage2_before.md#at-progress-mix226-object-토큰-rsi433).
+
+## Stage2 BEFORE near50 objalias bias0
+
+`stage2_before_ground_atprogress_bias0_near50_objalias_1200`는 loco-only·near50·역할별 object 토큰·actor/critic SELF/NONE bias0·NONE attention 유지 설정이다. 기본 source는 형제 `stage1_message`의 fixed78000이며 이 실험의 저장본으로만 resume/test/VNC를 실행한다. [설계와 동결 정책](reference/stage2_before.md#near50-역할별-object-토큰과-selfnone-bias0), [실행 명령](config.md).
+
+환경 override는 `BEFORE_GROUND_ATPROGRESS_BIAS0_NEAR50_OBJALIAS_1200_ENV_CONFIG`다. `BEFORE_FOLLOWER_NEAR=0/1`은 각각50/50 혼합/relative-sum100%이며 short 모드와 pickup/carry RSI는 사용하지 않는다. `HEADLESS=0/1`, `EPISODE_LENGTH`, `TASK_GRAPH`, `OUTPUT_PATH`는 공통 옵션을 따른다. obj 슬롯은 최소 인원의2배다.

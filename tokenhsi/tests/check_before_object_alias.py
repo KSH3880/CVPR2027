@@ -39,6 +39,9 @@ def check_observations(task, obs):
 def inspect_alias(task):
     assert task._relation_graph_spec['before_object_alias'] == MODE
     result = inspect(task)
+    if not task.cfg['env']['before'].get('follower_pickup_carry_rsi'):
+        assert not task._before_rsi_skill.any()
+        assert not task._before_carry_mask.any()
     pairs, count = check_observations(task, task._compute_clean_scene_obs())
     ids = torch.arange(task.num_envs, device=task.device)
     active = task._active_physical(ids)

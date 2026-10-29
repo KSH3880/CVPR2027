@@ -224,3 +224,11 @@ Oa와 Oa′는 같은 물리 ID를 참조하므로 매 step의 크기·local 속
 `stage2_before_ground_mix226_atprogress_objalias_rsi433_1200`는 mix226 objalias의 초기화 ablation이다. env에는 `before.follower_pickup_carry_rsi`만 추가하고 train은 이름만 바꾼다. BEFORE ON_TOP 후행만 loco40%/pickUp30%/carryWith30%를 요청하며 선행·단독·SIT/CLIMB는 loco를 유지한다. native 유효 프레임·동일 사람/상자 변환·8회 배치 재시도·불가 시 loco fallback은 기존 RSI433 구현을 사용한다. fallback 때문에 실제 적용 비율은 요청 비율과 다를 수 있다.
 
 거리20/20/60·AT progress·역할별 object 토큰·전체 SELF/NONE/BEFORE bias 학습·1200step·2e-5·fixed78000 새 전이와 actor encoder/RMS 동결·action head 학습은 그대로다. 새 mask/파라미터를 추가하지 않는다. 토큰은 고정8개이며 alias당 distractor 하나를 물리 장면에서도 제외한다. RSI 없는 mix226 objalias 및 near50/nonemask RSI433와 train/env/checkpoint 혼용을 거부한다. [명령](../config.md), [평가 옵션](../USAGE.md#stage2-before-mix226-object-토큰-rsi433).
+
+## Near50 역할별 object 토큰과 SELF/NONE bias0
+
+`stage2_before_ground_atprogress_bias0_near50_objalias_1200`는 `stage2_before_ground_mix226_atprogress_objalias_1200`에서 거리 혼합과 actor/critic 사람 SA의 bias 모드만 바꾼다. BEFORE 쌍별로 원래 거리50%·relative-sum 조건50%를 사용하며, 모든 사람의 초기화는 loco다. 후행 pickUp/carryWith RSI는 사용하지 않는다. `before_spec.validate_env`는 relative-sum 거리와 RSI 사용 여부를 독립적으로 검증한다.
+
+양쪽 `relationGraph.actor_human_bias`·`critic_human_bias`는 `before_only`다. NONE/SELF bias는 파라미터 없이 정확히0이며 BEFORE bias만 학습한다. NONE attention은 마스킹하지 않아 QK에 따른 확률은 남는다. 사람 SA의 Q/K/V·FFN 등 기존 학습 파라미터는 계속 갱신하며 actor encoder/RMS 동결·action head 학습·adapter 없음은 기반과 같다.
+
+고정 obj 슬롯의 distractor 대체·같은 물체 관측/pose 공유·encoder의 후행 target 분리·원래 물리/BEFORE 관계·AT progress·ground-only·1200step·학습률2e-5를 유지한다. Stage1 fixed78000에서 새 전이하며 기존 mix226 및 masked RSI433 near50와 train/env·체크포인트 혼용을 거부한다. 전용 test/VNC의 `BEFORE_FOLLOWER_NEAR=0`은50/50, `1`은 relative-sum100%이며 short 모드는 지원하지 않는다. [실행 명령](../config.md).

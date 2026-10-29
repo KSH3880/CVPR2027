@@ -2,7 +2,54 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 과거 변경·검증 전체는 [보관 changelog](markdowns/legacy/changelog_before_cleanup.md)에 있다.
 
+## 2026-10-29
+
+### near50 objalias loco-only·SELF/NONE bias0
+
+- `stage2_before_ground_atprogress_bias0_near50_objalias_1200` env/train YAML·전용 train/test/VNC를 추가했다. mix226 objalias 기반에서 거리만 original/relative-sum50/50으로 바꾸고 actor/critic은 `before_only`로 설정했다. SELF/NONE bias는 파라미터 없이0, BEFORE bias만 학습하며 NONE attention은 열어둔다. 전원 loco·역할별 물체 토큰·AT progress·1200step·2e-5·fixed78000 새 전이·encoder/RMS 동결·action head 학습을 유지한다. relative 거리의 RSI 필수 조건을 해제하고 기존 masked RSI433 near50와 새 loco 설정의 train/env·checkpoint 계약을 분리했다. [설계](markdowns/reference/stage2_before.md#near50-역할별-object-토큰과-selfnone-bias0), [명령](markdowns/config.md).
+- CPU 기존42개와 신규3개 통과: 거리/초기화 독립성·양쪽 고정0/BEFORE 및 QKV gradient·NONE 연결 유지·alias·전이/동결/재로드·checkpoint 분리. 신규 검사의 첫 step gradient 가정은 기존 coordination의 zero-init output projection에 맞춰 수정 후 통과했다. [회귀](output_etc/check/before_bias0_near50_objalias_20261029/cpu.log), [신규 최종](output_etc/check/before_bias0_near50_objalias_20261029/cpu_new.log), [train/env13조합](output_etc/check/before_bias0_near50_objalias_20261029/config_contract.json).
+- GPU0/MPS·4명/1024환경/8토큰 CHECK epoch2/frame262144 정상 종료. source78000·actor encoder73 tensor/RMS 불변·head6 및 BEFORE bias8 tensor(2×1) 갱신·모델/scalar542개 finite·기록된 물리 최종 실패0을 확인했다. [학습 검증](output_etc/check/before_bias0_near50_objalias_20261029/training_validation.json).
+- 32환경 random/ON_TOP 두 쌍/한 쌍/단독 및 별도 SIT/CLIMB에서 near50 조건·전원 loco·관측/pose 공유·활성 물리 수·BEFORE/AT progress·AMP·부분 reset·가중치 불변을 확인했다. SIT/CLIMB 최초 검사는 결과 폴더 누락으로 저장 단계에서 실패해 폴더 생성 후 재검사했다. [기본4구성](output_etc/check/before_bias0_near50_objalias_20261029/eval/physics_validation.json), [SIT](output_etc/check/before_bias0_near50_objalias_20261029/sit/physics_validation.json), [CLIMB](output_etc/check/before_bias0_near50_objalias_20261029/climb/physics_validation.json). 전용 test의4환경·32step·near100% headless 재로드, 셸/Python/YAML·문서 경로/순서·diff 확인. [wrapper](output_etc/check/before_bias0_near50_objalias_20261029/wrapper.log). 새 본학습·GUI/VNC 실화면·장기 성능은 미검증이며 기존 학습은 유지했다.
+
+### near50 objalias9000 원래 배치4명 평가
+
+- 최신 고정 저장본9000(epoch9000/frame1179648000)을 원래 near50 배치·4명/8obj 슬롯·행동별32환경·seed42·loco·1200step·결정적 action으로 BEFORE3종/단독4종 평가했다. 세트 분리 hook 없이 기본64회 reset 예산을 사용했다. checkpoint finite·7개 exit0·유한 action·loco/분모·7000 평가와 초기 사람/상자 상태1e-4 이내 일치·셸/Python/diff를 확인했다. 운영 코드/config와 기존 학습은 유지했다.
+- 한 번 이상 성공률은 BEFORE SIT21/64(32.81%), CLIMB17/64(26.56%), ON_TOP4/64(6.25%); 단독 SIT118/128(92.19%), CLIMB122/128(95.31%), AT89/128(69.53%), ON_TOP95/128(74.22%)였다. BEFORE ON_TOP 후행 집기60/64(93.75%)·선행 AT41/64(64.06%)·gate 제외 쌓기5/64(7.81%)다. 같은7000 표본보다 단독 AT는 상승, 단독 ON_TOP은 하락, BEFORE ON_TOP 완수는 동일했으며 단일 seed/32장면 결과다. [조건·7000 비교·상세 결과](output_etc/check/near50_objalias9000_n4_eval32_20261029/summary.json), 재현은 같은 폴더의 case `.sh`/`run_all.py`다.
+
+### 세트 간 거리 분리 평가: 충돌 원인 분리의 한계
+
+- 같은 near50 objalias7000·4/6/8명·행동별32환경·loco·1200step·seed42로 BEFORE3종/단독4종 총21구성을 다시 평가했다. 초기 샘플을 그대로 만든 뒤 단독 또는 BEFORE 연결 성분의 사람·과제 물체·목표를 함께 평행이동해 세트별 초기 bounding box 사이에 최소10m 여유를 두었다. distractor는 원래 가장 가까운 사람의 세트에 배정했다. 평가용 hook만 사용하며 물리 검사·초기 재시도 예산은 앞 평가와 동일하다.
+- 원래 초기 사람/상자 상태가 앞 평가와1e-4 이내로 일치하고, 세트 내부 위치·회전·속도 및 native 과제 거리/progress/높이/영역 판정의 보존·물리 유효성을 검사했다. 모든 실행에서 서로 다른 세트 사람의 root 거리0.7m 미만 관측은0이었다. 이는 근접 지표이며 실제 contact pair 측정은 아니다. [조건·대응 비교·검증](output_etc/check/near50_objalias7000_separated_eval32_20261029/comparison.json), 재현은 같은 폴더의 case `.sh`/`run_all.py`다.
+- 분리 후 성공률(4/6/8명 순): BEFORE SIT20.31/9.38/3.12%, CLIMB6.25/1.04/0%, ON_TOP3.12/0/0%; 단독 SIT81.25/28.12/3.12%, CLIMB86.72/6.77/0%, AT35.94/0/0%, ON_TOP66.41/1.04/0%였다. 전반적으로 조기 종료가 증가했고8명 단독은 모든32장면이 조기 종료했다. 거리를 벌리면 관측상의 세트 간 기하도 바뀌므로 이 결과는 충돌만 차단한 대조군이 아니며, 원래 인원 증가 성능 저하의 원인을 Stage1/Stage2/충돌 중 하나로 확정하지 않는다. 배치를 유지한 세트 간 접촉 차단 대조는 미실시다.
+- 21개 exit0·유한 action·초기 샘플 대응·기하/물리 검사·문서 diff 확인. 초기8명 SIT 예비 실행은 `pilot_before_sit_n8/`에 보존하고 최종21구성과 구분했다. 운영 코드/config와 기존 학습은 변경하지 않았다.
+
+### 4/6/8명 BEFORE·단독 행동별 일반화 평가
+
+- near50 objalias7000을 동일 저장본·seed42·loco·1200step·행동별32환경으로4/6/8명 각각 평가했다. BEFORE SIT/CLIMB/ON_TOP과 단독 SIT/CLIMB/AT/ON_TOP 총21구성을 완료했다. obj 슬롯은2N이며 BEFORE는 N/2쌍, 단독은 N개 과제다. 초기 배치는 인원마다 달라지며 조기 장면 종료도 성공률 분모에 포함했다. [조건·지표·scene bootstrap 구간](output_etc/check/near50_objalias7000_scaling_eval32_20261029/summary.json), 같은 폴더의 각 case `.sh` 및 `run_all.py`로 재현/완료 결과 재사용이 가능하다.
+- 한 번 이상 성공률(4/6/8명 순): BEFORE SIT29.69/34.38/11.72%, CLIMB25.00/6.25/7.03%, ON_TOP6.25/6.25/2.34%; 단독 SIT89.06/90.62/81.25%, CLIMB95.31/95.31/92.97%, AT62.50/54.17/46.09%, ON_TOP82.03/66.67/55.08%다. BEFORE는 선행 AT와 후행 목표 동시 성립이며, raw·집기·종료 시 성공·장면 조기 종료는 상세 JSON에 분리했다. 단일 seed/32장면 결과이며, 인원 증가에 따른 모델 입력·장면 배치·조기 종료 영향을 분리한 실험은 아니다.
+- 8명 단독 AT는 초기32환경 중5개가 기본64회 물리 배치 한도를 소진해 첫 실행이 중단됐다. 해당 실패 로그를 보존하고 평가 프로세스에서만 원래 graph·후보분포·물리 검사 조건을 유지한 채 재시도 상한을1024로 확장했다. 8명 단독 AT 재실행 및 남은4/6/8명 단독 ON_TOP에만 적용했다. 최종21개 모두 exit0·loco 확인·finite action·인원별 분모·명령/결과 경로·셸/Python 문법·diff를 확인했다. 원본 학습 코드/config와 기존 학습 프로세스는 변경하지 않았다.
+
+### near50 objalias 가변 인원 viewer 명령
+
+- USAGE에7000 저장본·8명/1환경/16obj 슬롯·random_scenario·loco·near50 기본 혼합의 로컬 viewer와 VNC 전환 예시를 추가하고 config 추론 옵션에 연결했다. checkpoint/스크립트 경로·셸 문법·문서 diff를 확인했다. 명령 안내만 수행했으며8명 GUI 실행은 하지 않았다.
+
+### Stage2 사람 attention relation별 QK/bias 진단
+
+- near50 objalias7000을 SIT/CLIMB/ON_TOP 각각32환경·loco·1200step·seed42로 평가하며10step마다 actor/critic 사람 SA4×2head를 수집했다. 실제 layer 입력과 projection으로 `QKᵀ/√d`, bias 추가, NONE mask 전후 softmax를 각각 계산했다. relation별 softmax 확률을 먼저 구한 뒤 합산/평균했으며 후행·선행 query와 head/layer/행동을 분리했다. 임시 hook은 check 폴더에만 두었다.
+- 후행 actor의 SELF/NONE/BEFORE 확률 질량은 QK만27.38/50.46/22.16%, bias 추가27.22/50.10/22.69%, mask만56.85/0/43.15%, 실제 bias+mask56.27/0/43.73%였다. NONE은 두 key의 합이다. critic 실제 확률은48.80/0/51.20%다. 선행은 BEFORE key가 없어 실제 SELF100%다. 동일 입력에서 bias 효과를 계산한 진단이며 mask/bias 제거 정책을 별도로 rollout한 결과는 아니다.
+- PyTorch 실제 attention 가중치와 재구성 최대 오차1.73e-6·모델 가중치 불변·NONE 확률0을 확인했다. [상세 지표·layer/head bias](output_etc/check/stage2_attention7000_20261029/summary.json), 재현은 같은 폴더의 `sit.sh`·`climb.sh`·`ontop.sh`다. 기존 학습과 운영 코드/config는 유지했다.
+
+### near50 objalias6500 행동별 loco 평가
+
+- 최신 고정 저장본6500(epoch6500/frame851968000)을 GPU0·4명/8토큰·행동별32환경/64 BEFORE쌍·seed42·1200step·결정적 action으로 평가했다. SIT/CLIMB/ON_TOP을 각각 크기 조건에 맞는 별도 환경으로 생성하고 전원 loco·RSI 비활성을 확인했다. 저장된 near50 거리 혼합을 유지했으며 기존 학습/운영 코드는 변경하지 않았다.
+- 한 번 이상 성공한 수는 SIT: 선행 집기58/64·AT38/64·후행 raw28/64·BEFORE20/64, CLIMB:56/64·32/64·22/64·16/64, ON_TOP:60/64·41/64·6/64·4/64(후행 집기59/64)였다. 종료 시 BEFORE 성공은 각각15/64·15/64·3/64다. HOLDING은 기존 손 거리 판정, raw는 선행 AT gate 제외, BEFORE는 선행 AT와 동시 성립이다. 단일 seed 소표본이며 조기 종료도 분모에 포함한다. [조건·결과](output_etc/check/near50_objalias_actions_loco_eval32_20261029/summary.json), 재현 명령은 같은 폴더의 `sit.sh`·`climb.sh`·`ontop.sh`에 있다.
+
 ## 2026-10-28
+
+### 500epoch 후행 집기·목표 평가 비교
+
+- 사용자 지정 기존 `stage1_stage2_before` mix226 AT-progress500과 현재 near50/nonemask/RSI433/objalias500을 GPU0·32환경·4명·BEFORE ON_TOP64쌍·seed42·loco·1200step·결정적 action으로 평가했다. 두 저장본 모두 epoch500/frame65536000·Stage1 source78000이다. 기존 학습·viewer와 원본 checkpoint는 유지했다.
+- 에피소드 중 한 번 이상 성공 기준, 현재/기존 순서로 선행 HOLDING52/64·53/64, 후행 HOLDING54/64·2/64, 선행 AT34/64·40/64, 선행 AT gate를 포함한 후행 ON_TOP2/64·0/64였다. gate 제외 ON_TOP 기하 성공은15/64·0/64, 종료 시 gated ON_TOP은1/64·0/64다. HOLDING은 기존 손 거리 판정이며 추가 들기 높이/유지시간 기준은 없다. 거리 분포·사람 attention·학습 RSI도 달라 토큰 분리 단독 효과로 해석하지 않는다. [조건·지표·결과](output_etc/check/near50_alias_epoch500_eval32_20261028/comparison.json), [재현 명령](output_etc/check/near50_alias_epoch500_eval32_20261028/rerun.sh). 임시 평가 코드는 check 폴더에만 두며 운영 코드·config는 변경하지 않았다.
 
 ### mix226 역할별 object 토큰 후행 RSI433 ablation
 

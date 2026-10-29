@@ -56,8 +56,6 @@ def validate_env(env):
         raise ValueError('BEFORE follower_carry_rsi requires carryWith 50/50')
     mixture = before.pop('distance_mixture', None)
     from utils.before_relative_sampling import DISTANCE_MIXTURE as RELATIVE_MIXTURE
-    if mixture == RELATIVE_MIXTURE and pickup_carry is None:
-        raise ValueError('Relative BEFORE distances require follower pickup/carry RSI')
     progress_target = before.pop('progress_target', 'current_box')
     if progress_target not in ('current_box', 'predecessor_at_goal'):
         raise ValueError('Unknown BEFORE progress_target')
