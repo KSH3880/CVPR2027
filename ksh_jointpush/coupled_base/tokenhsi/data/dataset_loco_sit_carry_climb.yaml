@@ -80,7 +80,7 @@ motions:
       obj_file: dataset_sit/motions/sit/SAMP+__+Subject+__+chair_mo019_stageII/phys_humanoid_v3/object_state.npy
       weight: 1.0
       rsi_skipped_range: [271, 10000]
-    
+
     - file: dataset_sit/motions/sit/SAMP+__+Subject+__+armchair001_stageII/phys_humanoid_v3/ref_motion.npy
       obj_file: dataset_sit/motions/sit/SAMP+__+Subject+__+armchair001_stageII/phys_humanoid_v3/object_state.npy
       weight: 1.0
@@ -161,7 +161,7 @@ motions:
       weight: 1.0
     - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
       weight: 1.0
-  
+
   loco_sit:
     - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
       weight: 1.0
@@ -213,7 +213,7 @@ motions:
       weight: 1.0
     - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B9_-_walk_turn_left_(90)_stageii/phys_humanoid_v3/ref_motion.npy
       weight: 1.0
-  
+
   loco_climb:
     - file: dataset_amass_loco/motions/ACCAD/ACCAD+__+Female1Walking_c3d+__+B10_-_walk_turn_left_(45)_stageii/phys_humanoid_v3/ref_motion.npy
       weight: 1.0
@@ -275,7 +275,7 @@ motions:
       weight: 1.0
     - file: dataset_carry/motions/omomo/OMOMO+__+sub7_smallbox_051/phys_humanoid_v3/ref_motion.npy
       weight: 1.0
-  
+
   climb:
     - file: dataset_amass_climb/motions/CMU/CMU+__+36+__+36_04_stageii/phys_humanoid_v3/ref_motion.npy
       obj_file: dataset_amass_climb/motions/CMU/CMU+__+36+__+36_04_stageii/phys_humanoid_v3/object_state.npy
@@ -305,7 +305,7 @@ motions:
       weight: 1.0
       rsi_skipped_range: [10, 10000]
       obj_file: dataset_amass_climb/motions/Eyes_Japan_Dataset/Eyes_Japan_Dataset+__+ichige+__+jump-13-matrix-ichige_stageii/phys_humanoid_v3/object_state.npy
-  
+
   climbNoRSI:
     - file: dataset_amass_climb/motions/CMU/CMU+__+83+__+83_27_stageii/phys_humanoid_v3/ref_motion.npy
       weight: 1.0
