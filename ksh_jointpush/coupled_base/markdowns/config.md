@@ -4,7 +4,7 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 여덟 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 유지하는 실험은 아래 아홉 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
 - 학습 인자: `[agents] [envs] [objects]`. Stage1·Stage1 PUSH는 **2명·2048환경·4물체**, BEFORE·coupled는 **4명·1024환경·8토큰**이다. BEFORE의 인원 N≥1, 토큰 M≥2N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
@@ -25,6 +25,7 @@
 | [stage2_before_push.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push.yaml) | [stage2_before_push.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push.yaml) |
 | [stage2_coupled_push.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push.yaml) | [stage2_coupled_push.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push.yaml) |
 | [stage2_before_push_near50.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50.yaml) | [stage2_before_push_near50.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50.yaml) |
+| [stage2_coupled_push_region_goals.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push_region_goals.yaml) | [stage2_coupled_push_region_goals.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push_region_goals.yaml) |
 
 ## 학습
 
@@ -52,6 +53,9 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_train.sh 4 
 
 # stage2_before_push_near50
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_train.sh 4 1024 8
+
+# stage2_coupled_push_region_goals
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -82,6 +86,9 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_
 
 # stage2_before_push_near50
 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_test.sh "$CKPT" 4 1 8 10
+
+# stage2_coupled_push_region_goals
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -112,6 +119,9 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_vnc.sh "$CK
 
 # stage2_before_push_near50
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_coupled_push_region_goals
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -168,4 +178,9 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_eval.sh "$C
 ```bash
 # stage2_before_push_near50
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_eval.sh "$CKPT" --output output_etc/check/stage2_before_push_near50_general
+```
+
+```bash
+# stage2_coupled_push_region_goals
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_eval.sh "$CKPT" --output output_etc/check/stage2_coupled_push_region_goals_general
 ```

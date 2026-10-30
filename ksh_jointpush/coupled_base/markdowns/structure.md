@@ -1,16 +1,16 @@
 # 레포 구조
 
-유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
+유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_region_goals`다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
 
 ## 실행과 설정
 
 | 경로 | 역할 |
 | --- | --- |
 | `tokenhsi/run.py`, `utils/parse_task.py` | MA 학습/평가·Stage1/BEFORE 모델 등록과 환경 생성 |
-| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 여덟 실험 계약, 학습/추론/resume env/sim 로딩 |
-| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 여덟 개 |
-| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 24개 |
-| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가8개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
+| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 아홉 실험 계약, 학습/추론/resume env/sim 로딩 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 아홉 개 |
+| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 27개 |
+| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가9개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
 | `tokenhsi/evaluate.py`, `rescore.py` | 독립 seed 실행·통계, 저장 trace CPU 재채점 |
 | `tokenhsi/utils/evaluation_protocol.py`, `learning/multi_agent/formal_eval.py` | 학습 인원/단독 구분·점/영역/BEFORE 지표·개인 낙상 제어 |
 | `tokenhsi/scripts/multi_agent/launch.sh`, `runtime_env.sh` | 공통 인자·출력 경로·conda·GPU |
@@ -59,3 +59,5 @@
 `tokenhsi/tests/`는 보상·배치·GTA·mask·RSI·전이·재로드·출력 경로를 검사한다. `before_test_utils.py`, `stage1_test_utils.py`는 CPU fixture다. `check_before_object_alias.py`·`check_before_push.py`·`check_coupled_push.py`는 실제 물리·부분 reset·추론 검사 진입점이다.
 
 [PUSH](reference/stage1_push.md), [BEFORE PUSH](reference/stage2_before_push.md), [공통 Stage2/coupled](reference/stage2_coupled_push.md), [평가 규약](reference/evaluation.md), [Stage1 단독](../evaluation_single.md), [공통 정책](reference/ma_clean_scene_gta.md), [BEFORE](reference/stage2_before.md), [지표](reference/relation_diagnostics.md), [이관](reference/PORTING_GUIDE.md)을 참고한다. 이전 실험은 [legacy](legacy/README.md)에 보존한다.
+
+`stage2_coupled_push_region_goals`는 공동 PUSH의 구역별 고정 목표 변형이다. 같은 환경 클래스와 모델을 사용하며, `coupled_push_spec.region_goal_offsets`·`HumanoidMACoupledPush._task_goal_positions`가 관측/AT보상/marker/평가의 구역 목표를 연결한다. 기하·계약 검사는 `test_coupled_region_goals.py`, 실제 CPU 추론 검사는 `check_coupled_region_goals.py`다.

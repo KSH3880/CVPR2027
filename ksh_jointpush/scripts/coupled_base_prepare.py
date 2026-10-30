@@ -14,7 +14,7 @@ DEFAULT_DATA = Path('/home/hwanhee/koo_cvpr/stage1_2_jointpush_st/tokenhsi/data'
 DEFAULT_CHECKPOINT = Path('/home/hwanhee/koo_cvpr/stage1_2_jointpush_st/pth/Stage1JointPushDensity3Cone90Finetune_00021000.pth')
 
 
-def prepare(checkpoint=DEFAULT_CHECKPOINT, data=DEFAULT_DATA):
+def prepare(checkpoint=DEFAULT_CHECKPOINT, data=DEFAULT_DATA, body_models=None, stage1_checkpoint=None):
     checkpoint = Path(checkpoint).resolve(strict=True)
     data = Path(data).resolve(strict=True)
     if not PROJECT.exists():
@@ -31,9 +31,19 @@ def prepare(checkpoint=DEFAULT_CHECKPOINT, data=DEFAULT_DATA):
             path.symlink_to(target, target_is_directory=target.is_dir())
     for name in ('dataset_amass_loco','dataset_amass_climb','dataset_sit','dataset_carry','jointpush_motions'):
         link(PROJECT/'tokenhsi/data'/name, data/name)
-    link(PROJECT/'body_models', ROOT/'stage1_combined/body_models')
-    for name, source in (('Stage1PushFinetune_00021000.pth', checkpoint),
-                         ('Stage1_00078000.pth', ROOT/'stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth')):
+    body_models = Path(body_models) if body_models is not None else ROOT/'stage1_combined/body_models'
+    if body_models.exists():
+        link(PROJECT/'body_models', body_models)
+    elif body_models != ROOT/'stage1_combined/body_models':
+        raise FileNotFoundError(str(body_models))
+    sources = [('Stage1PushFinetune_00021000.pth', checkpoint)]
+    # Coupled PUSH starts from 21k. The old 78k file is optional for other tasks.
+    original = Path(stage1_checkpoint) if stage1_checkpoint is not None else ROOT/'stage1_combined/checkpoints/Stage1V2Fixed_00078000.pth'
+    if original.exists():
+        sources.append(('Stage1_00078000.pth', original))
+    elif stage1_checkpoint is not None:
+        raise FileNotFoundError(str(original))
+    for name, source in sources:
         dest = PROJECT/'checkpoints'/name
         dest.parent.mkdir(exist_ok=True)
         digest = hashlib.sha256(source.read_bytes()).hexdigest()
@@ -76,5 +86,7 @@ if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checkpoint',type=Path,default=DEFAULT_CHECKPOINT)
     parser.add_argument('--data-root',type=Path,default=DEFAULT_DATA)
+    parser.add_argument('--body-models',type=Path,help='Optional body_models directory for other tasks')
+    parser.add_argument('--stage1-checkpoint',type=Path,help='Optional original 78k checkpoint; not needed for coupled PUSH')
     args=parser.parse_args()
-    print(json.dumps(prepare(args.checkpoint,args.data_root),indent=2))
+    print(json.dumps(prepare(args.checkpoint,args.data_root,args.body_models,args.stage1_checkpoint),indent=2))

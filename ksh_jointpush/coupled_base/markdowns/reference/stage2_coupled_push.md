@@ -52,3 +52,13 @@ CONTACT+AT 기본 보상과 가중치는 Stage1 PUSH를 따른다. 공동 CONTAC
 일반 평가는 학습 장면과 인원을 유지하는1200step·512환경×3seed다. PUSH 성공은 **구역 중심이 아니라 실제 전체 상자 중심**과 공유 목표의3D 거리≤0.20m를 사용한다. 점/영역 리포트에서 PUSH 값은 같다. 개인 낙상 후 나머지는 계속 수행한다. 학습에서는 기존처럼 한 명 낙상 시 환경 전체를 reset한다. [평가 규약](evaluation.md).
 
 원본 이식 대상은 GitHub `stage1_2_jointpush_st`의 `stage2_jointpush_goal_saturation_density3_cone90_coupled_straight`다.1200step·직선 목표·그룹 gate·goal saturation은 유지하고, 독립 행동 비율·AMP 비율을 현재 Stage1 PUSH 설정에 연결했다. 원격의 별도 Stage2 모델/추가 adapter/RSI 스택은 가져오지 않았다.
+
+## 구역별 고정 목표 변형
+
+`stage2_coupled_push_region_goals`는 Stage1 PUSH21k·4명/1024환경·1200step·물성·과제/AMP/PPO·초기 배치·밀기 거리2~10m를 기존 coupled와 같게 유지한다. `stage2JointPush.goal_representation: initial_region_offset_v1`만 추가하며 전용 train/test/VNC/eval·출력·checkpoint 계약으로 분리한다. 원래 coupled checkpoint를 직접 resume하지 않는다.
+
+reset에서 물리 상자 초기 중심을 c₀, 사람 i의 구역 초기 중심을 cᵢ₀, 기존 공통 중심 목표를 g라 할 때 목표 gᵢ = g + (cᵢ₀ − c₀)를 고정한다. 따라서 gᵢ − cᵢ₀ = g − c₀이며, 모든 구역의 밀기 방향과 거리는 원래와 같다. 목표 offset은 초기 yaw와 구역 순서로 계산하고 현재 상자의 회전에는 따라가지 않는다. 물리 상자는 하나를 유지한다.
+
+PUSH task packet은 각자 goal token을 가리키고 사람 간 COUPLED 관계는 그룹으로 유지한다. GTA goal pose·AT state/progress/성공·goal saturation·marker는 각자의 고정 목표와 현재 구역 중심을 사용한다. 전원 양손18cm 접촉 gate와 CONTACT 계산은 기존과 같다. 경로/충돌 검사는 전체 물리 상자와 원래 중심 목표를 사용해 기존 sampler의 난수 소비와 밀기 경로를 유지한다. 단독 PUSH와 다른 독립 과제는 그대로다.
+
+이 변형의 정식 PUSH 평가는 각 구역 중심과 대응 목표의 거리20cm를 채점한다. 기존 전체 상자 중심 평가와 구분하며, 목표가 고정되어 상자가 목표 중심에서 회전하면 구역 목표 오차도 증가한다. 학습의 높이 허용오차1mm와 정식 평가의 기존 점 거리 기준은 각각 유지한다.

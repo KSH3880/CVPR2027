@@ -17,3 +17,12 @@ TOKENHSI_GPU=6 PORT=6240 TASK_GRAPH=all_coupled bash ksh_jointpush/scripts/coupl
 `TASK_GRAPH=random_scenario`는저장분포, `all_coupled`는4명공동PUSH 관찰이다. Stage1PTH를Stage2저장본으로대신사용하지않는다. checkpoint와저장env/sim·model/RMS·coupled계약호환을확인한후실행한다. 기존19500기반JointPush의직접resume은하지않는다. 새로운뷰어는MPS에연결하지않는다.
 
 근거: `output_etc/check/branch_audit/{preparation,bias_validation,checkpoint_validation,status}.json`, `pytest.log`, `physics/physics_validation.json`. 출력은이프로젝트 `output_etc/check/` 아래다.
+
+## 2026-10-30 구역별 고정 목표 준비
+
+사용자 요청으로 아까 받은 coupled/Stage1 PUSH21k를 기준으로 `stage2_coupled_push_region_goals`를 추가했다. 밀기 거리2~10m를 유지하면서 구역과 목표를1:1대응한다. 본학습은 시작하지 않았으며 CPU추론 검증은 optimizer0회·새 checkpoint생성 없이 수행한다. 루트 실행기는 `ksh_jointpush/scripts/coupled_region_goals_{train,test,vnc,eval}.sh`, 상세는 [구역 목표](markdowns/reference/stage2_coupled_push.md)를 따른다.
+
+```bash
+# 프로젝트 루트에서 새 Stage2 본학습을 시작할 때 사용; 아직 실행하지 않음
+TOKENHSI_GPU=4 bash ksh_jointpush/scripts/coupled_region_goals_train.sh 4 1024 8
+```

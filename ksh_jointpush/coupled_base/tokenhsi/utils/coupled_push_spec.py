@@ -28,7 +28,10 @@ def validate_env(env):
     from utils.before_push_spec import validate_env as validate_before
     if (env['numAgents'],env['numObjects'])!=(4,8):
         raise ValueError('Coupled PUSH requires four people and eight object tokens')
-    if env['stage2JointPush']!=native_config('stage2_coupled_push')['env']['stage2JointPush']:
+    expected = deepcopy(native_config('stage2_coupled_push')['env']['stage2JointPush'])
+    if 'goal_representation' in env['stage2JointPush']:
+        expected['goal_representation'] = 'initial_region_offset_v1'
+    if env['stage2JointPush'] != expected:
         raise ValueError('Unsupported coupled PUSH sampling/physics contract')
     from utils.stage1_platforms import validate_stage1_platform_config
     validate_stage1_platform_config(env)
@@ -130,14 +133,23 @@ def assign_regions(groups):
     return (same & earlier).sum(-1)
 
 
-def compose_graph(templates, groups, shuffle=True):
+def compose_graph(templates, groups, shuffle=True, region_goals=False):
     people = groups.shape[1]
     graph = compose_canonical_graph(torch.where(templates == 5, 3, templates), shuffle, 2*people)
     push = (templates == 5).gather(1, graph.edge_owner)
     leader = groups.gather(1, graph.edge_owner)
+    goal_owner = graph.edge_owner if region_goals else leader
     return replace(graph,
         edge_relation=torch.where(push & (graph.edge_relation == 6), PUSH, graph.edge_relation),
-        edge_dst=torch.where(push & (graph.edge_relation == 7), 3*people+leader, graph.edge_dst))
+        edge_dst=torch.where(push & (graph.edge_relation == 7), 3*people+goal_owner, graph.edge_dst))
+
+
+def region_goal_offsets(physical_states, physical_sizes, members, region):
+    """Fixed world offsets from the initial box pose; no RNG or distance change."""
+    offset = torch.zeros_like(physical_sizes)
+    width = physical_sizes[..., 0] / members
+    offset[..., 0] = width * (region + .5) - physical_sizes[..., 0] / 2
+    return rotate(physical_states[..., 3:7], offset)
 
 
 def region_states(physical_states, physical_sizes, members, region):

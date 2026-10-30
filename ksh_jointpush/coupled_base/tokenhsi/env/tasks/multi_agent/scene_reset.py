@@ -331,13 +331,14 @@ class SceneResetMixin:
             self._precision_buf[flat] = float("Inf")
         ids = [self._box_actor_ids[env_ids].contiguous().view(-1)]
         if self._enable_markers:
-            self._marker_pos[env_ids] = self._tar_pos[env_ids]
+            goals = self._task_goal_positions(env_ids)
+            self._marker_pos[env_ids] = goals
             from utils.edge_ontop_spec import select_graph
 
             graph = select_graph(self.relation_runtime.graph, env_ids)
             at_edges, goal_slots, active = at_goal_marker_slots(graph)
             self._marker_pos[env_ids, :, 2] = torch.where(
-                active, self._tar_pos[env_ids, :, 2], 20.0
+                active, goals[:, :, 2], 20.0
             )
             shown = (
                 torch.ones_like(env_ids, dtype=torch.bool)

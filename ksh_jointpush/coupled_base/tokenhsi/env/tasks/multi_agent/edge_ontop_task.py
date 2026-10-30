@@ -80,7 +80,7 @@ class SampledOnTopTaskMixin:
             if env_ids is None
             else self._kinematic_humanoid_rigid_body_states[env_ids, ..., :3]
         )
-        goals = self._tar_pos if env_ids is None else self._tar_pos[env_ids]
+        goals = self._task_goal_positions(env_ids)
         objects = self._logical_box_values(self._box_states, env_ids)
         sizes = self._logical_box_values(self._box_size, env_ids)
         graph = (

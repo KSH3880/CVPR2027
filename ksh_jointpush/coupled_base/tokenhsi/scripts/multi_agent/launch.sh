@@ -6,7 +6,7 @@ EXPERIMENT=$1
 MODE=$2
 shift 2
 case "$EXPERIMENT" in
-  stage2_coupled_push) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
+  stage2_coupled_push|stage2_coupled_push_region_goals) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage2_before_push|stage2_before_push_near50) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage1_push) TASK=HumanoidMAPush; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage1) TASK=HumanoidMACarry; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
@@ -62,7 +62,7 @@ else
   exit 1
 fi
 MOTION=tokenhsi/data/dataset_loco_sit_carry_climb.yaml
-if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_coupled_push ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
+if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$TASK" = HumanoidMACoupledPush ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
 python tokenhsi/run.py --task "$TASK" \
   --cfg_train "tokenhsi/data/cfg/train/rlg/$EXPERIMENT.yaml" \
   --cfg_env "${ENV_CONFIG:-}" \

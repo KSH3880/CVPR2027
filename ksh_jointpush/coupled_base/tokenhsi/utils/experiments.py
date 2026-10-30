@@ -13,7 +13,8 @@ PUSH = "stage1_push"
 BEFORE_PUSH = "stage2_before_push"
 COUPLED = "stage2_coupled_push"
 BEFORE_PUSH_NEAR50="stage2_before_push_near50"
-NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50)
+COUPLED_REGION_GOALS = "stage2_coupled_push_region_goals"
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_REGION_GOALS)
 
 
 def experiment_horizon(name):
@@ -89,7 +90,7 @@ def validate_experiment(name, env, train, evaluation=False):
             raise ValueError('PUSH policy requires its own saved environment')
         from utils.stage1_jointpush import validate_env
         validate_env(env)
-    elif name == COUPLED:
+    elif name in (COUPLED, COUPLED_REGION_GOALS):
         from utils.coupled_push_spec import checkpoint_contract,validate_env
         validate_env(env)
         if checkpoint_contract(env)!=checkpoint_contract(native['env']):

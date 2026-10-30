@@ -5,6 +5,9 @@ from isaacgym.torch_utils import quat_rotate
 from utils import torch_utils
 
 class SceneObservationMixin:
+    def _task_goal_positions(self, env_ids=None):
+        return self._tar_pos if env_ids is None else self._tar_pos[env_ids]
+
     def get_relation_suffix_size(self):
         return self._context_suffix_width
 
@@ -86,7 +89,7 @@ class SceneObservationMixin:
             body_ang_vel = self._rigid_body_ang_vel
             box_states = self._logical_box_values(self._box_states)
             box_bps = self._logical_box_values(self._box_bps)
-            tar_pos = self._tar_pos
+            tar_pos = self._task_goal_positions()
             origins = self._env_origins
         else:
             kin = self._kinematic_humanoid_rigid_body_states[env_ids]
@@ -96,7 +99,7 @@ class SceneObservationMixin:
             body_ang_vel = kin[..., 10:13]
             box_states = self._logical_box_values(self._box_states, env_ids)
             box_bps = self._logical_box_values(self._box_bps, env_ids)
-            tar_pos = self._tar_pos[env_ids]
+            tar_pos = self._task_goal_positions(env_ids)
             origins = self._env_origins[env_ids]
         B, M, O = (body_pos.shape[0], self.num_agents, self.num_objects)
         human_nodes = self._compute_clean_humanoid_nodes(

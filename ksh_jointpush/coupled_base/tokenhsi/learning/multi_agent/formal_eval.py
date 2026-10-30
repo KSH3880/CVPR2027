@@ -40,7 +40,7 @@ def run_formal_eval(player):
     simultaneous = torch.zeros_like(ever)
     fall_step = torch.full((n, m), -1, device=task.device, dtype=torch.long)
     sizes = box_values(task._box_size).clone()
-    goals = task._tar_pos.clone()
+    goals = task._task_goal_positions().clone()
     groups=(obs["obs"][:,-m:].long().clone() if getattr(task,"_stage2_push",False)
             else torch.arange(m,device=task.device)[None].expand(n,-1))
     initial = dict(groups=groups.cpu(),packet=packet.cpu(), predecessor=parent.cpu(), sizes=sizes.cpu(), goals=goals.cpu(),

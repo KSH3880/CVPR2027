@@ -138,5 +138,11 @@ TokenHSI-coord/output
 /ksh_jointpush/tokenhsi/data/dataset_sit/objects
 /ksh_jointpush/tokenhsi/data/jointpush_motions
 
+# Coupled code ships motion manifests; machine-specific payload links stay local.
+!/ksh_jointpush/coupled_base/tokenhsi/data/dataset_*.yaml
+/ksh_jointpush/coupled_base/tokenhsi/data/jointpush_motions
+/ksh_jointpush/coupled_base/body_models
+/local_assets/
+
 # Verified archives of retired runs
 **/output_etc/archive/

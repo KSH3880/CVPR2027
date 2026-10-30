@@ -2,6 +2,19 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-10-30
+
+### Git 배포와 로컬 데이터 준비 경로 보완
+
+- 사용자 로컬 다운로드 실행을 위해 모션목록YAML2개를Git제외에서해제하고서버절대경로body_models/PUSH자료링크는추적에서제외했다. 실제서버자료·링크는보존한다. 준비명령은명시적data/21k경로를받으며coupled에불필요한78k/body_models를요구하지않는다.
+- 별도/tmp checkout에서실제235개모션항목·21개PUSH모션/캐릭터해시·21k복사·준비기록을검증했다. [로컬실행안내](LOCAL_RUN.md)에다운로드·별도자료수신·준비·학습·viewer명령을추가했다. 대용량자료/PTH/결과는Git에포함하지않으며검증은 `output_etc/check/region_goals/portable_prepare.json`에있다.
+
+### 공동 PUSH 구역별 고정 goal 추가
+
+- 사용자 요청으로 앞서 받은coupled/Stage1 PUSH21k를 기준으로 `stage2_coupled_push_region_goals`를 추가했다. 초기구역중심−초기전체중심 offset을 기존공통goal에 더해 사람별고정goal을 만들고, 각자의task목표·GTA관측·AT보상/성공·goal saturation·marker·정식평가를 현재구역중심과대응시켰다. 목표는상자회전을따라가지않으며각구역의초기밀기방향/거리2~10m는원래와같다.
+- 기존coupled설정·물리상자·배치/충돌경로·CONTACT·18cm접촉gate·PPO·모델·베이스는유지했다. 전용YAML·train/test/VNC/eval·루트wrapper와별도checkpoint계약으로구실험resume를거부한다. 외부ksh/고정ports·기존프로세스는변경하지않았다.
+- CPU전체324개·shell9개구문·변경문서링크검사통과. 실제CPU4환경에서21k165tensor전이후공동/혼합/단독PUSH/독립AT각8step관측·행동·보상finite,구역별관측목표·거리·목표고정·부분reset보존·목표도착AT/gate·회전시오차증가를확인했다. optimizer0회·가중치불변·새checkpoint생성없음·본학습미실행. 검증은 `output_etc/check/region_goals/{summary.json,pytest.log,live/verification.json}`, 상세는[구역별목표](markdowns/reference/stage2_coupled_push.md).
+
 ## 2026-10-29
 
 ### PUSH viewer 목표구 확대
