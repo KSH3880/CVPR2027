@@ -43,14 +43,14 @@ def eligible_families(sizes, ranges):
     return torch.stack((*masks, torch.ones_like(masks[0])), -1)
 
 
-def sample_roles(sizes, ranges, preset, solo_probabilities=None):
+def sample_roles(sizes, ranges, preset, solo_probabilities=None, pairing_probability=.8):
     if preset not in PRESETS:
         raise ValueError('Unknown BEFORE preset: '+preset)
     n, m = sizes.shape[:2]
     device = sizes.device
     grouping = 'two_pairs_at' if preset.startswith('before_') else (
         'one_pair_at' if preset.startswith('one_pair_') else preset)
-    groups = sample_groups(n, device, grouping, num_agents=m)
+    groups = sample_groups(n, device, grouping, num_agents=m, pairing_probability=pairing_probability)
     paired = (groups[:, :, None] == groups[:, None]).sum(-1) == 2
     templates = torch.multinomial(sizes.new_tensor([.1, .25, .325, .325] if solo_probabilities is None else solo_probabilities),
         n*m, replacement=True).reshape(n, m)+1
@@ -158,7 +158,7 @@ def pack_objects(parents, valid, num_objects=None, num_physical=None, excluded_d
     return all_parents.gather(1, order[:, :o]), order.argsort(-1)[:, :parents.shape[1]], valid.sum(-1)
 
 
-def sample_groups(n, device, preset='random_scenario', num_agents=4):
+def sample_groups(n, device, preset='random_scenario', num_agents=4, pairing_probability=.8):
     order = torch.rand(n, num_agents, device=device).argsort(-1)
     remaining = torch.ones(n, num_agents, dtype=torch.bool, device=device)
     groups = torch.full((n, num_agents), -1, device=device, dtype=torch.long)
@@ -168,7 +168,7 @@ def sample_groups(n, device, preset='random_scenario', num_agents=4):
         active = remaining.any(-1)
         first = order.gather(1, remaining.gather(1, order).long().argmax(-1)[:, None]).flatten()
         remaining[rows, first] = False
-        paired = active & remaining.any(-1) & (torch.rand(n, device=device) < .8)
+        paired = active & remaining.any(-1) & (torch.rand(n, device=device) < pairing_probability)
         if preset.startswith('two_pairs'):
             paired = active & remaining.any(-1)
         elif preset.startswith('one_pair'):

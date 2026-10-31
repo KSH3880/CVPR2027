@@ -41,7 +41,11 @@ BEFORE 의존 관계는 후행→선행 방향이고, COUPLED는 같은 공동 P
 
 24개 물리 후보(일반 AT/SIT/CLIMB/받침16개, 독립 PUSH4개,2인용2개·3인용1개·4인용1개)를 만들고8개 논리 토큰에 배정한다. 공동 상자의 논리 토큰은 사람별 구역이지만 물리 actor는 하나다. 사용하지 않는 후보는1000m 이상 멀리 둔다.
 
-PUSH 출발 상자는 각 참여자에서2–10m, 목표는 상자에서2–10m다. 공동 참여자는 상자 뒤쪽에 두고, 공동 목표는 local +Y 정면 직선으로 고정한다. 독립 PUSH는 local +Y ±45도다. 사람·다른 상자·이동 경로와 충돌하지 않도록 후보를 거부한다. 나머지 독립 행동 크기·배치는 Stage1의 기존 규칙을 따른다. 시작은 전부 loco이며 PUSH는 `push_loco` 모션을 쓴다. 접촉 RSI bank는 사용하지 않는다.
+기본 `stage2_coupled_push`의 PUSH 출발 상자는 모든 참여자에서2–10m, 목표는 실제 상자 중심에서2–10m다. 두 거리는 수평 XY 기준이다. 거리 설정이 없는 과거 coupled 저장본도 기존2–10m로 복원한다.
+
+거리 변형 `stage2_coupled_push_goal5`는 공동 PUSH의 사람→상자2–10m를 유지하고 상자→목표만2–5m로 줄인다. `stage2JointPush.source_distance`·`goal_distance`로 기록하며 독립 PUSH는 두 거리 모두2–10m다. 기본 전이는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`이고, 나머지 환경·학습 설정은 기본 coupled와 같다. 전용 YAML·train/test/VNC/eval과 별도 출력 `output/stage2_coupled_push_goal5/`를 사용하며 기본 coupled 저장본과 resume/추론을 혼용하지 않는다.
+
+공동 참여자는 상자 뒤쪽에 두고, 공동 목표는 local +Y 정면 직선으로 고정한다. 독립 PUSH는 local +Y ±45도다. 사람·다른 상자·이동 경로와 충돌하지 않도록 후보를 거부한다. 나머지 독립 행동 크기·배치는 Stage1의 기존 규칙을 따른다. 시작은 전부 loco이며 PUSH는 `push_loco` 모션을 쓴다. 접촉 RSI bank는 사용하지 않는다.
 
 ## 보상과 평가
 
@@ -52,3 +56,28 @@ CONTACT+AT 기본 보상과 가중치는 Stage1 PUSH를 따른다. 공동 CONTAC
 일반 평가는 학습 장면과 인원을 유지하는1200step·512환경×3seed다. PUSH 성공은 **구역 중심이 아니라 실제 전체 상자 중심**과 공유 목표의3D 거리≤0.20m를 사용한다. 점/영역 리포트에서 PUSH 값은 같다. 개인 낙상 후 나머지는 계속 수행한다. 학습에서는 기존처럼 한 명 낙상 시 환경 전체를 reset한다. [평가 규약](evaluation.md).
 
 원본 이식 대상은 GitHub `stage1_2_jointpush_st`의 `stage2_jointpush_goal_saturation_density3_cone90_coupled_straight`다.1200step·직선 목표·그룹 gate·goal saturation은 유지하고, 독립 행동 비율·AMP 비율을 현재 Stage1 PUSH 설정에 연결했다. 원격의 별도 Stage2 모델/추가 adapter/RSI 스택은 가져오지 않았다.
+
+
+## 개인 목표·공통 4면 실험
+
+`stage2_coupled_push_individual_goal`은 goal5의 공동 거리·26k 전이·4명/1024환경/8토큰을 유지한다. `stage2JointPush`의 `goal_mode: individual`, `contact_face: group_four`, `gate_alignment: false`를 함께 사용하는 별도 계약이다. 기존 coupled/goal5의 동작은 유지한다.
+
+이 실험의 `coupled_probability`는0.5다. 그룹 생성 시 공동/단독 선택 확률을50/50으로 설정하며,4명 기준 기대 인원 비율은 공동63.54%·단독36.46%다. AMP expert 혼합도 같은 확률을 따른다. 기존0.8 저장본과 새 학습 설정의 resume 계약은 다르다.
+
+원본 개인 목표 컨피그의 단독 사람→상자는 SIT1–5m·CLIMB/CARRY1–10m·PUSH2–10m이며 단독 PUSH 목표 거리는2–10m다. 단독 거리 축소는 아래 별도 solo5 컨피그에서만 적용한다.
+
+- 그룹당 2–5m를 한 번 뽑고 초기 상자 로컬 +Y 이동 벡터를 각 분할 토큰의 초기 중심에 더한다. 목표는 고정되며 AT 연결·관측·보상은 각 토큰과 개인 목표를 사용한다. 공유 중심 목표는 별도 보관하여 물리 경로·충돌 검사에 사용한다.
+- 접촉 면은 실제 공유 중심→공유 중심 목표 방향과 안쪽 밀기 방향이60° 이내인 실제 외곽 네 면에서 선택한다. 각 후보 면을 기존 구역 번호 순서로 균등 분할하고, 담당 구역까지 양손 중 최대 거리의 그룹 최댓값이 가장 작은 면을 공통 선택한다. ±Y 면은 로컬 +X 순서, ±X 면은 로컬 +Y 순서로 나눈다. 가상의 내부 경계면은 후보가 아니다.
+- CONTACT는 선택 면의 개인 담당 구역까지 XY 거리·접촉력을 사용한다. 전원 gate는 같은 선택 면 전체에 양손이0.18m 이내이고 상자 중심 기준 바깥쪽 반공간에 있는지 검사한다. 기존처럼 gate 자체는 구역별 배정·접촉력을 요구하지 않는다. 별도의 `aligned` 검사는 없다. 네 면 선택은 단독과 같은 yaw 기준이며 gate는 면의 가로 범위와 상자 높이도 검사한다.
+- 개인 토큰→개인 목표의3D 거리≤0.2m·Z 오차≤0.001m면 그 사람의 gate를 해제하고 기존 AT→CONTACT 포화 로직을 적용한다. 이탈하면 현재 조건으로 재판정한다. 목표 관측 토큰/분할 축은 접촉 면이 바뀌어도 바꾸지 않는다.
+- 정식 평가는 개인 토큰→목표 거리≤0.2m를 사용한다. `coupled_scores`는2/3/4명별 개인 ever/final과 전원 동시 성공의 ever/final을 기록한다. 서로 다른 시점의 개인 성공을 합쳐 공동 성공으로 세지 않는다. 이는 접촉 gate와 독립적인 공간 평가다.
+- 단독 행동의 보상·접촉 규칙은 유지한다. 개인 목표 변환은 공동 구성원에게만 적용하여 단독 CARRY AT 목표 높이와 받침을 보존한다. 출력은 `output/stage2_coupled_push_individual_goal/`이며 학습·viewer·VNC·eval 전용 wrapper와 저장본을 사용한다.
+
+
+## 개인 목표 solo5 거리 변형
+
+`stage2_coupled_push_individual_goal_solo5`는 개인 목표 원본의 공동 확률0.5·공동 접근2–10m/이동2–5m·26k 전이를 유지한다.
+
+단독 거리는 `stage2JointPush.solo_source_max_distance: 5.0`·`solo_goal_max_distance: 5.0`으로 제한한다. 이 값은 공통 Stage1 기준값보다 우선하며 다른 실험에는 적용하지 않는다. 단독 SIT/CLIMB/CARRY AT/ON_TOP의 사람→대상 상자는1–5m, 단독 PUSH는 사람→상자와 상자→목표 모두2–5m다. CARRY AT 목표·ON_TOP 받침의 XY 샘플링은 환경 원점 기준±4.5m 정사각형과 기존 제외 조건을 유지한다. 공동은 사람→실제 상자 중심2–10m·각 분할 토큰→개인 목표2–5m다. 거리는 XY 기준이다.
+
+전용 환경/학습 YAML과 train/test/VNC/eval wrapper를 사용한다. 출력은 `output/stage2_coupled_push_individual_goal_solo5/`이며 원본 개인 목표 저장본과 계약을 혼용하지 않는다. AT 목표 높이 보존 버그 수정은 두 컨피그에 공통 적용한다.

@@ -6,8 +6,8 @@ EXPERIMENT=$1
 MODE=$2
 shift 2
 case "$EXPERIMENT" in
-  stage2_coupled_push) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
-  stage2_before_push|stage2_before_push_near50) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
+  stage2_coupled_push|stage2_coupled_push_goal5|stage2_coupled_push_individual_goal|stage2_coupled_push_individual_goal_solo5) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
+  stage2_before_push|stage2_before_push_near50|stage2_before_push_near50_pair50_source5) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage1_push) TASK=HumanoidMAPush; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage1) TASK=HumanoidMACarry; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage2_before_nonemask_rsi433_near50|stage2_before|stage2_before_rsi433)
@@ -62,7 +62,7 @@ else
   exit 1
 fi
 MOTION=tokenhsi/data/dataset_loco_sit_carry_climb.yaml
-if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_coupled_push ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
+if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
 python tokenhsi/run.py --task "$TASK" \
   --cfg_train "tokenhsi/data/cfg/train/rlg/$EXPERIMENT.yaml" \
   --cfg_env "${ENV_CONFIG:-}" \

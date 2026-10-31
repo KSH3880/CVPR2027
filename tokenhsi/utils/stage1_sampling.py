@@ -6,9 +6,10 @@ def uses_tokenhsi_sampling(env):
     return env['box']['reset'].get('samplingMode') == 'tokenhsi'
 
 
-def sample_source_xy(human_xy, templates):
+def sample_source_xy(human_xy, templates, max_distance=10.):
     # Template 1 is SIT; CLIMB and both carry tasks use the native 10 m limit.
     maximum = torch.where(templates == 1, 5., 10.)
+    maximum = maximum.clamp(max=max_distance)
     direction = torch.randn_like(human_xy)
     direction /= direction.norm(dim=-1, keepdim=True)
     radius = 1. + torch.rand_like(maximum) * (maximum - 1.)

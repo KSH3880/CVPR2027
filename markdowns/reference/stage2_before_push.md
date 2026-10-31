@@ -52,3 +52,14 @@ PUSH는 Stage1 PUSH의 CONTACT+AT 보상이다. CONTACT의 state/progress/succes
 나머지50%는 기존 original 범위에서 뽑고 위 부등식을 강제하지 않는다. 따라서 전체에서 우연히 가까운 경우까지 합친 비율은50%보다 높을 수 있다. mix226의20/20/60 거리 구간이나 절대거리 단축과 다르다. 독립 PUSH에는 near 조건을 적용하지 않는다.
 
 mix226·near50의 학습/추론 checkpoint 계약은 구분한다. 실행 명령은 [config](../config.md)에 있으며 새 학습은 기본 Stage1 PUSH21k에서 시작한다.
+
+
+## 쌍 선택50·접근 최대5m 변형
+
+`stage2_before_push_near50_pair50_source5`은 `stage2_before_push_near50`에서 쌍 생성 확률을0.8→0.5로 바꾸고 `before.source_max_distance: 5.0`을 추가한 별도 실험이다. 일반 단독/BEFORE의 사람→대상 상자, BEFORE 후행 ON_TOP의 사람→공유 상자와 사람→payload는1–5m다. SIT의 기존1–5m는 유지하며 단독 PUSH 접근은2–5m다. 4명 기준 이론적 쌍 수 확률은0쌍12.5%·1쌍62.5%·2쌍25%, 사람 수 기대 비율은BEFORE56.25%·단독43.75%다.
+
+near50의 상대 거리 부등식과50% 선택은 유지한다. AT 목표와 단독 ON_TOP 받침은 기존 환경 원점±4.5m 정사각형 샘플링을 유지한다. BEFORE 후행 ON_TOP의 payload→공유 상자 거리에는 별도 상한을 추가하지 않는다. 사람→상자 제한과 near 조건으로 운반 거리가 간접적으로 달라질 수 있다. 단독 PUSH 이동도 기존2–10m를 유지한다.
+
+새 거리 설정에서 PUSH 경로 후보가 소진되면 성공한 환경의 배치를 보존하고 실패 환경만 기존 장면 재샘플링 루프에서 다시 배치한다. 거리·경로·충돌 조건은 완화하지 않으며 기존 실험의 후보 횟수와 실패 동작은 유지한다.
+
+독립 행동 비율·보상·모델·loco·4명/1024환경/8토큰/1200step·기본21k 전이는 유지한다. 기존21k 파일이 없는 checkout에서는 `STAGE1_CHECKPOINT`로 존재하는 Stage1 PUSH 파일을 지정한다. 전용 train/test/VNC/eval·출력과 별도 checkpoint 계약을 사용하며 기존 near50/mix226 저장본과 resume/추론을 혼용하지 않는다. [실행 명령](../config.md).

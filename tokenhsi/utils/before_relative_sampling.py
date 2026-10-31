@@ -12,21 +12,21 @@ def pair_distances(leader, support, follower, payload, templates):
     return first, second
 
 
-def sample_layout(leader, support, follower, payload, templates, near, advanced):
+def sample_layout(leader, support, follower, payload, templates, near, advanced, max_distance=10.):
     support = support.clone()
     offset = payload-follower
-    follower = sample_source_xy(support, templates)
+    follower = sample_source_xy(support, templates, max_distance)
     payload = torch.where(advanced[:, None], follower+offset,
-                          sample_source_xy(follower, torch.full_like(templates, 4)))
+                          sample_source_xy(follower, torch.full_like(templates, 4), max_distance))
     pending = near.nonzero(as_tuple=True)[0]
     for _ in range(256):
         if not len(pending):
             return support, follower, payload
         r = pending
-        support[r] = sample_source_xy(leader[r], torch.full_like(templates[r], 3))
-        follower[r] = sample_source_xy(support[r], templates[r])
+        support[r] = sample_source_xy(leader[r], torch.full_like(templates[r], 3), max_distance)
+        follower[r] = sample_source_xy(support[r], templates[r], max_distance)
         payload[r] = torch.where(advanced[r, None], follower[r]+offset[r],
-            sample_source_xy(follower[r], torch.full_like(templates[r], 4)))
+            sample_source_xy(follower[r], torch.full_like(templates[r], 4), max_distance))
         first, second = pair_distances(leader[r], support[r], follower[r], payload[r], templates[r])
         pending = r[second >= first]
     raise RuntimeError('BEFORE relative-distance rejection sampler exhausted')

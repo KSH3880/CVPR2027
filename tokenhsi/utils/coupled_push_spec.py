@@ -28,7 +28,25 @@ def validate_env(env):
     from utils.before_push_spec import validate_env as validate_before
     if (env['numAgents'],env['numObjects'])!=(4,8):
         raise ValueError('Coupled PUSH requires four people and eight object tokens')
-    if env['stage2JointPush']!=native_config('stage2_coupled_push')['env']['stage2JointPush']:
+    coupled = deepcopy(env['stage2JointPush'])
+    native = native_config('stage2_coupled_push')['env']['stage2JointPush']
+    mode = (coupled.pop('goal_mode', 'shared'), coupled.pop('contact_face', 'rear'),
+            coupled.pop('gate_alignment', True))
+    if mode not in (('shared', 'rear', True), ('individual', 'group_four', False)):
+        raise ValueError('Unsupported coupled goal/contact/gate combination')
+    probability = coupled.pop('coupled_probability')
+    native.pop('coupled_probability')
+    if not 0 <= probability <= 1:
+        raise ValueError('Invalid coupled PUSH probability')
+    for key in ('solo_source_max_distance', 'solo_goal_max_distance'):
+        if not 2 <= coupled.pop(key, 10.) <= 10:
+            raise ValueError('Invalid solo PUSH distance maximum')
+    for key in ('source_distance', 'goal_distance'):
+        bounds = coupled.pop(key, [2., 10.])
+        native.pop(key, None)
+        if len(bounds) != 2 or not 0 < bounds[0] <= bounds[1]:
+            raise ValueError('Invalid coupled PUSH distance range: ' + key)
+    if coupled!=native:
         raise ValueError('Unsupported coupled PUSH sampling/physics contract')
     from utils.stage1_platforms import validate_stage1_platform_config
     validate_stage1_platform_config(env)
@@ -130,11 +148,11 @@ def assign_regions(groups):
     return (same & earlier).sum(-1)
 
 
-def compose_graph(templates, groups, shuffle=True):
+def compose_graph(templates, groups, shuffle=True, individual_goals=False):
     people = groups.shape[1]
     graph = compose_canonical_graph(torch.where(templates == 5, 3, templates), shuffle, 2*people)
     push = (templates == 5).gather(1, graph.edge_owner)
-    leader = groups.gather(1, graph.edge_owner)
+    leader = graph.edge_owner if individual_goals else groups.gather(1, graph.edge_owner)
     return replace(graph,
         edge_relation=torch.where(push & (graph.edge_relation == 6), PUSH, graph.edge_relation),
         edge_dst=torch.where(push & (graph.edge_relation == 7), 3*people+leader, graph.edge_dst))

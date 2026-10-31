@@ -806,3 +806,6 @@ class SampledOnTopTaskMixin:
                 np.asarray(vertices, dtype=np.float32),
                 colors,
             )
+        if hasattr(self, '_joint'):
+            from env.tasks.multi_agent.push_goal_markers import draw_push_goal_markers
+            draw_push_goal_markers(self)

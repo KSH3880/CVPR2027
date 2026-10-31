@@ -1,6 +1,6 @@
 # Stage1와 BEFORE Multi-Agent TokenHSI
 
-SIT/CLIMB/AT/ON_TOP 및 PUSH를 학습한다. Stage1·Stage1 PUSH와 역할별 object 토큰을 쓰는 BEFORE 세 설정과 solo PUSH를 추가한 `stage2_before_push`·공동 PUSH `stage2_coupled_push`, BEFORE PUSH의 거리 변형 `stage2_before_push_near50`를 유지한다. 전체 이름과 학습·추론·VNC 명령은 [config](markdowns/config.md)에 있다.
+SIT/CLIMB/AT/ON_TOP 및 PUSH를 학습한다. Stage1·Stage1 PUSH와 역할별 object 토큰을 쓰는 BEFORE 세 설정과 solo PUSH를 추가한 `stage2_before_push`·공동 PUSH `stage2_coupled_push`, 거리 변형 `stage2_before_push_near50`·`stage2_coupled_push_goal5`, 개인 목표·공통 4면 접촉 `stage2_coupled_push_individual_goal`와 단독 거리 변형 `stage2_coupled_push_individual_goal_solo5`, BEFORE 쌍 선택50·접근5m `stage2_before_push_near50_pair50_source5`를 유지한다. 전체 이름과 학습·추론·VNC 명령은 [config](markdowns/config.md)에 있다.
 
 - [추가 옵션](markdowns/USAGE.md): conda·데이터·Stage1 78000·resume·추론 초기화.
 - [코드 구조](markdowns/structure.md), [변경 기록](changelog.md), [작업 규칙](AGENTS.md), [과거 기록](markdowns/legacy/README.md).

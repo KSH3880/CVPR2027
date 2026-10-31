@@ -27,13 +27,16 @@ def validate_env(env):
         raise ValueError('BEFORE PUSH always starts from loco')
     if env['eval']['skill']!=['loco'] or env['eval']['skillInitProb']!=[1.]:
         raise ValueError('BEFORE PUSH evaluation is loco-only')
-    expected={k:v for k,v in source['jointPush'].items() if k!='rsi'}
+    expected=deepcopy({k:v for k,v in source['jointPush'].items() if k!='rsi'})
+    if env['before'].get('source_max_distance') == 5.:
+        expected['scene']['source_distance']=[2.,5.]
     if env['jointPush']!=expected or env['ampExpertMapping']!=source['ampExpertMapping']:
         raise ValueError('BEFORE solo PUSH requires the Stage1 PUSH physics/contact/expert mapping')
     from utils.before_relative_sampling import DISTANCE_MIXTURE
     original=native_config('stage2_before')['env']['before']
     near=deepcopy(original);near['distance_mixture']=deepcopy(DISTANCE_MIXTURE)
-    if env['before'] not in (original,near):
+    limited=deepcopy(near);limited.update(pairing_probability=.5,source_max_distance=5.)
+    if env['before'] not in (original,near,limited):
         raise ValueError('BEFORE PUSH requires the mix226 or near50 distance contract with loco-only initialization')
     old=deepcopy(env)
     old.pop('jointPush')
@@ -44,11 +47,11 @@ def validate_env(env):
     validate_common_env(old)
 
 
-def sample_graph(sizes,ranges,probabilities,preset='random_scenario',num_objects=None):
+def sample_graph(sizes,ranges,probabilities,preset='random_scenario',num_objects=None,pairing_probability=.8):
     n,m=sizes.shape[:2]
     probs=[probabilities[k] for k in ('SIT','CLIMB','HOLDING_AT','HOLDING_ON_TOP','PUSH_AT')]
     base='all_solo' if preset=='push' else preset
-    predecessor,templates=sample_roles(sizes,ranges,base,solo_probabilities=probs)
+    predecessor,templates=sample_roles(sizes,ranges,base,solo_probabilities=probs,pairing_probability=pairing_probability)
     if preset=='push':templates.fill_(5)
     graph=compose_graph(templates,num_objects=2*m)
     rows,follower=(predecessor>=0).nonzero(as_tuple=True)

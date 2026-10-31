@@ -4,6 +4,12 @@ import torch
 from utils.jointpush_scene import radial_xy, corridors, segment_distance, goal_angles_valid
 
 
+class PushLayoutError(RuntimeError):
+    def __init__(self, boxes, goals, pending):
+        super().__init__('BEFORE solo PUSH corridor sampler exhausted')
+        self.boxes, self.goals, self.pending = boxes, goals, pending
+
+
 def paths_valid(boxes,sizes,goals,roots,push,primary,active,spec):
     n,m=push.shape
     row=torch.arange(n,device=boxes.device)[:,None]
@@ -29,13 +35,13 @@ def paths_valid(boxes,sizes,goals,roots,push,primary,active,spec):
     return valid
 
 
-def sample_layout(boxes,sizes,roots,push,primary,active,spec):
+def sample_layout(boxes,sizes,roots,push,primary,active,spec,max_attempts=4096):
     n,m=push.shape
     rows=torch.arange(n,device=boxes.device)[:,None]
     result=boxes.clone()
     goals=boxes[rows,primary,:3].clone()
     pending=push.any(-1).nonzero().flatten()
-    for _ in range(4096):
+    for _ in range(max_attempts):
         if not len(pending):return result,goals
         local=push[pending]
         xy=radial_xy(roots[pending,:,:2],spec['source_distance'])
@@ -62,4 +68,5 @@ def sample_layout(boxes,sizes,roots,push,primary,active,spec):
         accepted=pending[valid]
         result[accepted]=candidate[valid];goals[accepted]=goal[valid]
         pending=pending[~valid]
-    raise RuntimeError('BEFORE solo PUSH corridor sampler exhausted')
+    if not len(pending):return result,goals
+    raise PushLayoutError(result,goals,pending)

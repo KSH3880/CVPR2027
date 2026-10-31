@@ -34,15 +34,25 @@ def inspect(task):
     assert paths_valid(boxes,sizes,goals,task._humanoid_root_states[...,:3],push,primary,active,spec).all()
     source=boxes[ids[:,None],primary]
     assert goal_angles_valid(source,goals,push,spec).all()
-    for distance in ((source[...,:2]-task._humanoid_root_states[...,:2]).norm(dim=-1),(source[...,:2]-goals[...,:2]).norm(dim=-1)):
-        assert ((distance[push]>=2-3e-5)&(distance[push]<=10+3e-5)).all()
+    for distance,key in (((source[...,:2]-task._humanoid_root_states[...,:2]).norm(dim=-1),'source_distance'),
+                         ((source[...,:2]-goals[...,:2]).norm(dim=-1),'goal_distance')):
+        lo,hi=spec[key]
+        assert ((distance[push]>=lo-3e-5)&(distance[push]<=hi+3e-5)).all()
+    maximum=task.cfg['env']['before'].get('source_max_distance',10.)
+    owned=task._reward_box_values(boxes)
+    distance=(owned[...,:2]-task._humanoid_root_states[...,:2]).norm(dim=-1)
+    assert ((distance[~push]>=1.-3e-5)&(distance[~push]<=maximum+3e-5)).all()
+    es,followers=(task._before_predecessor>=0).nonzero(as_tuple=True)
+    leaders=task._before_predecessor[es,followers]
+    distance=(task._humanoid_root_states[es,followers,:2]-boxes[es,leaders,:2]).norm(dim=-1)
+    assert ((distance>=1.-3e-5)&(distance<=maximum+3e-5)).all()
     family=task._amp_family().reshape(task.num_envs,task.num_agents)
     assert (family[push]==3).all() and not (family[~push]==3).any()
     assert not task._before_rsi_skill.any()
     for e,a in zip(*[v.cpu().tolist() for v in (task._reset_ref_slots['loco'])]):
         assert task._templates[e,a]>=1
     result.update(push_people=int(push.sum()),push_pairs=0,physical_banks=task.num_physical_objects,
-        push_mass_friction=True,push_paths=True,amp_families=4,loco_only=True)
+        push_mass_friction=True,push_paths=True,source_max_distance=maximum,amp_families=4,loco_only=True)
     return result
 
 

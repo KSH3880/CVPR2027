@@ -252,7 +252,9 @@ class SceneResetMixin:
                 self.relation_runtime.graph, curr_env, curr_agent, True
             )
             root_pos_xy = sample_source_xy(
-                self._humanoid_root_states[curr_env, curr_agent, :2], templates
+                self._humanoid_root_states[curr_env, curr_agent, :2], templates,
+                max_distance=self.cfg['env'].get('before', {}).get('source_max_distance',
+                    self.cfg['env'].get('stage2JointPush', {}).get('solo_source_max_distance', 10.))
             )
             root_pos_z = self._box_size[curr_env, curr_box, 2] / 2
             axis = (

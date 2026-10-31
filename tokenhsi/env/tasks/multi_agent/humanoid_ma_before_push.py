@@ -6,7 +6,7 @@ from env.tasks.multi_agent.humanoid_ma_push import HumanoidMAPush
 from env.tasks.multi_agent.before_push_reward import BeforePushRuntime
 from env.tasks.multi_agent.jointpush_reward import contact_state
 from utils.before_push_spec import sample_graph
-from utils.before_push_layout import sample_layout, paths_valid
+from utils.before_push_layout import sample_layout, paths_valid, PushLayoutError
 from utils.jointpush_scene import goal_angles_valid
 from utils.jointpush_geometry import push_rear_xy
 
@@ -69,11 +69,13 @@ class HumanoidMABeforePush(HumanoidMABefore):
         super()._build_assignment_tensors()
         self._push_goals=torch.zeros(self.num_envs,self.num_agents,3,device=self.device)
         self._push_hits=torch.zeros(self.num_envs,self.num_agents,dtype=torch.bool,device=self.device)
+        self._push_layout_failed=torch.zeros(self.num_envs,device=self.device,dtype=torch.bool)
         self._solo_counts=torch.zeros(6,device=self.device)
 
     def _draw_episode_graph(self,ids):
         graph,pre,templates=sample_graph(self._box_size[ids,:self.num_agents],
-            self.cfg['env']['box']['build']['taskSizeRanges'],self._relation_graph_spec['template_probabilities'],self._task_graph_preset,self.num_objects)
+            self.cfg['env']['box']['build']['taskSizeRanges'],self._relation_graph_spec['template_probabilities'],self._task_graph_preset,self.num_objects,
+            pairing_probability=self.cfg['env']['before']['pairing_probability'])
         paired=pre>=0
         rows,followers=paired.nonzero(as_tuple=True)
         paired[rows,pre[rows,followers]]=True
@@ -114,10 +116,18 @@ class HumanoidMABeforePush(HumanoidMABefore):
 
     def _reset_boxes(self,ids):
         self._push_hits[ids]=False
+        self._push_layout_failed[ids]=False
         super()._reset_boxes(ids)
         primary=self._primary_objects(self._templates[ids])
-        boxes,goals=sample_layout(self._box_states[ids],self._box_size[ids],self._humanoid_root_states[ids,:,:3],
-            self._templates[ids]==5,primary,self._active_physical(ids),self._joint['scene'])
+        retry_scene='source_max_distance' in self.cfg['env']['before']
+        try:
+            boxes,goals=sample_layout(self._box_states[ids],self._box_size[ids],self._humanoid_root_states[ids,:,:3],
+                self._templates[ids]==5,primary,self._active_physical(ids),self._joint['scene'],
+                max_attempts=128 if retry_scene else 4096)
+        except PushLayoutError as error:
+            if not retry_scene:raise
+            boxes,goals=error.boxes,error.goals
+            self._push_layout_failed[ids[error.pending]]=True
         self._box_states[ids]=boxes;self._push_goals[ids]=goals
 
     def _reset_task(self,ids):
@@ -126,7 +136,7 @@ class HumanoidMABeforePush(HumanoidMABefore):
         self._tar_pos[ids[rows],owner]=self._push_goals[ids[rows],owner]
 
     def _ontop_scene_infeasible(self,ids):
-        invalid=super()._ontop_scene_infeasible(ids)
+        invalid=super()._ontop_scene_infeasible(ids)|self._push_layout_failed[ids]
         primary=self._primary_objects(self._templates[ids]);push=self._templates[ids]==5
         row=torch.arange(len(ids),device=self.device)[:,None]
         boxes=self._box_states[ids];sizes=self._box_size[ids];goals=self._tar_pos[ids]

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import numpy as np
 import torch
-from utils.evaluation_protocol import HORIZON, TASK_NAMES, spatial_success, predecessors
+from utils.evaluation_protocol import HORIZON, TASK_NAMES, spatial_success, predecessors, coupled_current_success, coupled_scores
 from utils.task_role_spec import task_graph_packet
 
 
@@ -43,6 +43,8 @@ def run_formal_eval(player):
     goals = task._tar_pos.clone()
     groups=(obs["obs"][:,-m:].long().clone() if getattr(task,"_stage2_push",False)
             else torch.arange(m,device=task.device)[None].expand(n,-1))
+    individual_goals = getattr(task, '_individual_push_goals', False)
+    coupled_ever = torch.zeros_like(ever)
     initial = dict(groups=groups.cpu(),packet=packet.cpu(), predecessor=parent.cpu(), sizes=sizes.cpu(), goals=goals.cpu(),
                    roots=task._humanoid_root_states.cpu().clone(), boxes=box_values(task._box_states).cpu().clone(),
                    dof_pos=task._dof_pos.cpu().clone(), dof_vel=task._dof_vel.cpu().clone(),
@@ -59,6 +61,9 @@ def run_formal_eval(player):
         boxes = box_values(task._box_states)[..., :7]
         current = spatial_success(packet, roots, boxes, sizes, goals) & alive[..., None]
         ever |= current
+        if individual_goals:
+            coupled_current = coupled_current_success(current, groups)
+            coupled_ever |= coupled_current
         simultaneous |= current & current[batch, parent.clamp_min(0)] & dependent[..., None]
         roots_trace.append(roots.cpu().numpy().copy())
         boxes_trace.append(boxes.cpu().numpy().copy())
@@ -92,6 +97,9 @@ def run_formal_eval(player):
                 horizon=horizon, simulated_steps=step, deterministic=True, control_dt=task.dt, scores=scores,
                 falls=int((fall_step >= 0).sum()), fall_rate=float((fall_step >= 0).double().mean()),
                 source_config=args.resolved_env_config)
+    if individual_goals:
+        data['push_goal_mode'] = 'individual'
+        data['coupled_scores'] = coupled_scores(groups, ever, current, coupled_ever, coupled_current)
     (path/'result.json').write_text(json.dumps(data, indent=2))
     np.savez_compressed(path/'trace.pending.npz', roots=np.stack(roots_trace), boxes=np.stack(boxes_trace),
                         valid=np.stack(valid_trace), packet=packet.cpu().numpy(), sizes=sizes.cpu().numpy(),

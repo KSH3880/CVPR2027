@@ -39,7 +39,7 @@ def test_both_tasks_have_the_same_model_and_stage1_transfer():
     rms.load_state_dict(ckpt['running_mean_std'],strict=True)
 
 
-@pytest.mark.parametrize('name',NAMES)
+@pytest.mark.parametrize('name',NAMES+('stage2_coupled_push_goal5',))
 def test_current_contracts_and_time(name):
     env=native_config(name)['env'];validate_unified_env(env);validate_experiment(name,env,native_config(name,True))
     assert env['episodeLength']==experiment_horizon(name)==1200
@@ -47,6 +47,51 @@ def test_current_contracts_and_time(name):
     assert native_config(name,True)['params']['network']==native_config(NAMES[0],True)['params']['network']
     cfg=deepcopy(env);cfg['stage2Policy']['relations'].pop()
     with pytest.raises(ValueError):validate_unified_env(cfg)
+
+
+def test_coupled_short_distances_preserve_solo_and_legacy_contracts():
+    from utils.coupled_push_spec import checkpoint_contract,check_checkpoint
+    env=native_config('stage2_coupled_push_goal5')['env']
+    assert env['stage2JointPush']['source_distance']==[2.,10.]
+    assert env['stage2JointPush']['goal_distance']==[2.,5.]
+    for key in ('source_distance','goal_distance'):
+        assert env['jointPush']['scene'][key]==[2.,10.]
+    legacy=native_config('stage2_coupled_push')['env']
+    assert 'source_distance' not in legacy['stage2JointPush']
+    assert 'goal_distance' not in legacy['stage2JointPush']
+    validate_unified_env(legacy)
+    checkpoint={'coupled_push_contract':checkpoint_contract(legacy)}
+    check_checkpoint(checkpoint,legacy)
+    with pytest.raises(ValueError):check_checkpoint(checkpoint,env)
+
+
+def test_goal5_only_changes_coupled_distances_and_transfer():
+    original=native_config('stage2_coupled_push')
+    short=native_config('stage2_coupled_push_goal5')
+    env=deepcopy(short['env'])
+    for key in ('source_distance','goal_distance'):
+        env['stage2JointPush'].pop(key)
+    assert env==original['env'] and short['sim']==original['sim']
+    for name,other in (('stage2_coupled_push',short),('stage2_coupled_push_goal5',original)):
+        with pytest.raises(ValueError,match='selected experiment'):
+            validate_experiment(name,other['env'],native_config(name,True))
+
+
+def test_goal5_transfers_its_configured_stage1_26000():
+    path=native_config('stage2_coupled_push_goal5')['experiment']['transfer']['checkpoint']
+    checkpoint=torch.load(path,map_location='cpu',weights_only=False)
+    model=torch.nn.Module();model.a2c_network=build('stage2_coupled_push_goal5')
+    report=transfer_stage1(model,checkpoint)
+    assert report['source_epoch']==26000 and len(report['copied'])==165
+    for key,value in checkpoint['model'].items():
+        torch.testing.assert_close(model.state_dict()[key],value,rtol=0,atol=0)
+
+
+@pytest.mark.parametrize('bounds',[[5.,2.],[0.,5.],[2.]])
+def test_coupled_rejects_invalid_distance_ranges(bounds):
+    env=native_config('stage2_coupled_push')['env']
+    env['stage2JointPush']['source_distance']=bounds
+    with pytest.raises(ValueError,match='distance range'):validate_unified_env(env)
 
 
 def test_before_and_coupled_relations_are_distinct_in_the_same_packet_format():

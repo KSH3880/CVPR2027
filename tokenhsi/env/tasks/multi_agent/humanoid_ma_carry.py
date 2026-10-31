@@ -537,10 +537,7 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
         self.gym.set_rigid_body_color(
             env_ptr, marker_handle, 0, gymapi.MESH_VISUAL, self._agent_color(agent_id)
         )
-        # The marker asset has a 10 cm visual radius. PUSH scenes span tens of
-        # metres, so show a 20 cm target rather than the ordinary 3 cm dot.
-        marker_scale = 2.0 if self.cfg["env"].get("jointPush") is not None else 0.3
-        self.gym.set_actor_scale(env_ptr, marker_handle, marker_scale)
+        self.gym.set_actor_scale(env_ptr, marker_handle, 2.0)
         self._marker_handles.append(marker_handle)
         return
 

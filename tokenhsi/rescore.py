@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import numpy as np
 import torch
-from utils.evaluation_protocol import spatial_success
+from utils.evaluation_protocol import spatial_success, coupled_current_success, coupled_scores
 
 
 def rescore(path):
@@ -23,6 +23,11 @@ def rescore(path):
         ever32=torch.zeros_like(ever)
         simultaneous32=torch.zeros_like(ever)
         previous=torch.ones(n,m,dtype=torch.bool)
+        recorded=json.loads((path/'result.json').read_text())
+        individual_goals=recorded.get('push_goal_mode')=='individual'
+        if individual_goals:
+            groups=torch.from_numpy(data['groups'])
+            group_ever=torch.zeros_like(ever)
         for frame in range(len(data['roots'])):
             valid=torch.from_numpy(data['valid'][frame])
             assert not (valid & ~previous).any(), 'A fallen person was reactivated'
@@ -33,6 +38,9 @@ def rescore(path):
             ever32 |= current32
             simultaneous32 |= current32 & current32[rows,parent.clamp_min(0)] & dependent[...,None]
             ever |= current
+            if individual_goals:
+                group_current=coupled_current_success(current,groups)
+                group_ever |= group_current
             simultaneous |= current & current[rows,parent.clamp_min(0)] & dependent[...,None]
             previous=valid
         both=ever & ever[rows,parent.clamp_min(0)] & dependent[...,None]
@@ -49,6 +57,8 @@ def rescore(path):
             assert not valid[step:,env,agent].any()
         assert steps==recorded_horizon or not valid[-1].any() or np.all((falls>=0)&(falls<=steps))
         recorded=json.loads((path/'result.json').read_text())
+        if individual_goals:
+            assert recorded['coupled_scores']==coupled_scores(groups,ever,current,group_ever,group_current)
         for label,idx in [('point',0),('region',1)]:
             for kind,name in enumerate(('SIT','CLIMB','AT','ON_TOP','PUSH')):
                 if name not in recorded['scores'][label]:

@@ -9,6 +9,7 @@ from utils import coupled_push_spec as spec
 from utils import coupled_push_scene as scene
 from utils.edge_ontop_spec import copy_graph_rows
 from utils.jointpush_geometry import push_rear_xy, push_face_geometry, rotate
+from utils.coupled_push_contact import group_face_geometry, individual_goal_gate
 
 
 class HumanoidMACoupledPush(HumanoidMACarry):
@@ -20,6 +21,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def __init__(self, cfg, *args, **kwargs):
         self._amp_num_families = 4
         self._joint = cfg['env']['jointPush']
+        self._individual_push_goals = cfg['env']['stage2JointPush'].get('goal_mode') == 'individual'
         super().__init__(cfg, *args, **kwargs)
 
     def get_relation_suffix_size(self):
@@ -62,6 +64,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self._groups = self._agent_box_assignment.clone()
         self._members = torch.ones_like(self._groups)
         self._regions = torch.zeros_like(self._groups)
+        if self._individual_push_goals:
+            self._center_tar_pos = self._tar_pos.clone()
         self._templates_by_owner = torch.full_like(self._groups,3)
         self._logical_box_order[:,4:] = torch.arange(12,16,device=self.device)
 
@@ -100,7 +104,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         assignment = spec.physical_assignment(templates,groups)
         self._agent_box_assignment[ids] = assignment
         self._logical_box_order[ids,:4] = assignment
-        graph = spec.compose_graph(templates,groups,self._relation_graph_spec['shuffle_edge_order'])
+        graph = spec.compose_graph(templates,groups,self._relation_graph_spec['shuffle_edge_order'],
+                                   individual_goals=self._individual_push_goals)
         copy_graph_rows(self.relation_runtime.graph,ids,graph)
         self._edge_goal_owners[ids] = True
         self._ontop_maintain_steps[ids] = 0
@@ -153,6 +158,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
             self._reset_boxes(pending)
             self._reset_task(pending)
             self._configure_ontop_targets(pending)
+            if self._individual_push_goals:
+                self._center_tar_pos[pending] = self._tar_pos[pending]
             rejected = scene.sample_push(self,pending)
             scene.place_distractors(self,pending)
             from utils.stage1_platforms import reset_stage1_platforms
@@ -164,6 +171,13 @@ class HumanoidMACoupledPush(HumanoidMACarry):
                 break
         if len(pending):
             raise RuntimeError('Stage2 jointpush layout exhausted; people/group retained: '+str(pending[:16].tolist()))
+        if self._individual_push_goals:
+            boxes = self._assigned_box_values(self._box_states, ids)
+            sizes = self._assigned_box_values(self._box_size, ids)
+            tokens, _ = spec.region_states(boxes, sizes, self._members[ids], self._regions[ids])
+            offset = tokens[..., :3]-boxes[..., :3]
+            self._tar_pos[ids] = torch.where((self._members[ids] > 1)[..., None],
+                self._center_tar_pos[ids]+offset, self._tar_pos[ids])
         self._reset_ref_slots,self._reset_ref_motion_ids,self._reset_ref_motion_times = saved
         if not self._is_eval:
             templates = self._templates_by_owner[ids].flatten()
@@ -191,17 +205,32 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         shared = self._members[ids] > 1
         distance = torch.where(shared,distance,push_rear_xy(hands,boxes,self._tar_pos[ids],sizes).amax(-1))
         normal = torch.where(shared[...,None],normal,push_face_geometry(hands,boxes,self._tar_pos[ids],sizes)[1])
-        return distance,normal,hands,boxes,sizes
+        face = None
+        if self._individual_push_goals:
+            face = group_face_geometry(hands, boxes, sizes, self._center_tar_pos[ids],
+                self._groups[ids], self._members[ids], self._regions[ids],
+                self.cfg['env']['stage2JointPush']['gate_face_tolerance'])
+            distance = torch.where(shared, face['distance'], distance)
+            normal = torch.where(shared[..., None], face['normal'], normal)
+        return distance,normal,hands,boxes,sizes,face
 
     def _evaluate_ontop_context(self, env_ids=None):
         phi,diag = super()._evaluate_ontop_context(env_ids)
         ids = torch.arange(self.num_envs,device=self.device) if env_ids is None else env_ids
         bodies = self._rigid_body_pos[ids] if env_ids is None else self._kinematic_humanoid_rigid_body_states[ids,...,:3]
-        distance,_,hands,boxes,sizes = self._contact_geometry(ids,bodies)
-        self.relation_runtime.gate[ids] = spec.group_contact_gate(
-            hands, boxes, sizes, self._tar_pos[ids], self._groups[ids],
-            tolerance=self.cfg['env']['stage2JointPush']['gate_face_tolerance'],
-            goal_saturation=self.cfg['env']['stage2JointPush']['goal_saturation'])
+        distance,_,hands,boxes,sizes,face = self._contact_geometry(ids,bodies)
+        if self._individual_push_goals:
+            boxes = self._logical_box_values(self._box_states, ids)[:, :self.num_agents]
+            self.relation_runtime.gate[ids] = individual_goal_gate(
+                face['on_face'], boxes, self._tar_pos[ids], self._groups[ids],
+                goal_saturation=self.cfg['env']['stage2JointPush']['goal_saturation'],
+                success_distance=self._relation_cfg['at']['success_distance'],
+                z_tolerance=self._relation_cfg['success']['at_z_tolerance'])
+        else:
+            self.relation_runtime.gate[ids] = spec.group_contact_gate(
+                hands, boxes, sizes, self._tar_pos[ids], self._groups[ids],
+                tolerance=self.cfg['env']['stage2JointPush']['gate_face_tolerance'],
+                goal_saturation=self.cfg['env']['stage2JointPush']['goal_saturation'])
         owner = self.relation_runtime.graph.edge_owner[ids]
         relation = self.relation_runtime.graph.edge_relation[ids]
         root_distance = (bodies[:,:,0,:2]-self._logical_box_values(self._box_states,ids)[:,:4,:2]).norm(dim=-1)
@@ -229,7 +258,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
             self.gym.simulate(self.sim)
             self.gym.fetch_results(self.sim,True)
             self._refresh_sim_tensors()
-            distance,normal,_,_,_ = self._contact_geometry(ids,self._rigid_body_pos)
+            distance,normal,_,_,_,_ = self._contact_geometry(ids,self._rigid_body_pos)
             reaction = -(self._contact_forces[:,:,self._key_body_ids[:2],:2]*normal[:,:,None]).sum(-1)
             force = (self._assigned_box_values(self._ontop_box_contact)[...,:2]*normal).sum(-1)
             cfg = self._joint['contact']
@@ -289,6 +318,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
 
     def _evaluation_box_values(self,values):
         result=self._logical_box_values(values).clone()
+        if self._individual_push_goals:
+            return result
         # PUSH AT is measured on the actual shared box, not each virtual cell.
         actual=self._assigned_box_values(values)
         push=self._templates_by_owner==5

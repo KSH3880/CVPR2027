@@ -71,6 +71,29 @@ def spatial_success(packet, roots, boxes, sizes, goals, dtype=torch.float64):
     return torch.stack((point_ok & valid.bool(), region_ok & valid.bool()), -1)
 
 
+def coupled_current_success(current, groups):
+    same = groups[:, :, None] == groups[:, None, :]
+    return (current[:, None] | ~same[..., None]).all(2)
+
+
+def coupled_scores(groups, individual_ever, individual_final, group_ever, group_final):
+    members = (groups[:, :, None] == groups[:, None, :]).sum(-1)
+    leader = groups == torch.arange(groups.shape[1], device=groups.device)[None]
+    result = {}
+    for label, index in (('point', 0), ('region', 1)):
+        result[label] = {}
+        for size in (2, 3, 4):
+            people = members == size
+            selected = people & leader
+            result[label][str(size)] = dict(
+                groups=int(selected.sum()), people=int(people.sum()),
+                individual_ever=int(individual_ever[..., index][people].sum()),
+                individual_final=int(individual_final[..., index][people].sum()),
+                simultaneous_ever=int(group_ever[..., index][selected].sum()),
+                simultaneous_final=int(group_final[..., index][selected].sum()))
+    return result
+
+
 def predecessors(graph, n, device):
     """Owner of the prerequisite AT edge for each follower; -1 for independent tasks."""
     from utils.edge_ontop_spec import batched

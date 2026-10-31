@@ -43,6 +43,18 @@ def summarize(directory):
                 item=dict(mean=statistics.mean(seed_macro),std=statistics.stdev(seed_macro) if len(seed_macro)>1 else None,seeds=seed_macro)
                 summary['scores'][criterion]['macro'+str(count)]=item
                 summary['scores'][criterion]['macro']=item
+    coupled = [r['coupled_scores'] for r in runs if 'coupled_scores' in r]
+    if coupled:
+        summary['coupled_scores'] = {}
+        for criterion in ('point', 'region'):
+            summary['coupled_scores'][criterion] = {}
+            for size in ('2', '3', '4'):
+                rows = [r[criterion][size] for r in coupled]
+                item = {key: sum(row[key] for row in rows) for key in rows[0]}
+                for metric in ('individual_ever', 'individual_final', 'simultaneous_ever', 'simultaneous_final'):
+                    denominator = item['people' if metric.startswith('individual') else 'groups']
+                    item[metric+'_rate'] = item[metric]/denominator if denominator else None
+                summary['coupled_scores'][criterion][size] = item
     (directory/'summary.json').write_text(json.dumps(summary,indent=2))
     return summary
 
@@ -58,8 +70,8 @@ def main():
     parser.add_argument('--tasks', nargs='+', choices=['AT','ON_TOP','SIT','CLIMB','PUSH'], default=None)
     args=parser.parse_args()
     if args.tasks is None:
-        args.tasks=['AT','ON_TOP','SIT','CLIMB']+(['PUSH'] if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50') else [])
-    if 'PUSH' in args.tasks and args.experiment not in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50'):
+        args.tasks=['AT','ON_TOP','SIT','CLIMB']+(['PUSH'] if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5') else [])
+    if 'PUSH' in args.tasks and args.experiment not in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5'):
         parser.error('PUSH requires a PUSH experiment')
     if args.envs <= 0 or len(set(args.seeds)) != len(args.seeds) or not set(args.seeds).issubset({0,1,2}):
         parser.error('Use positive environment count and distinct seeds from 0,1,2')
@@ -71,7 +83,7 @@ def main():
     manifest=vars(args).copy()
     manifest["horizon"] = experiment_horizon(args.experiment)
     manifest.update(checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(), resolved_checkpoint=str(checkpoint),
-                    formal_report=(args.envs==512 and args.seeds==[0,1,2] and (args.profile=='general' or set(args.tasks)==({'AT','ON_TOP','SIT','CLIMB','PUSH'} if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50') else {'AT','ON_TOP','SIT','CLIMB'}))))
+                    formal_report=(args.envs==512 and args.seeds==[0,1,2] and (args.profile=='general' or set(args.tasks)==({'AT','ON_TOP','SIT','CLIMB','PUSH'} if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5') else {'AT','ON_TOP','SIT','CLIMB'}))))
     old_path=directory/'manifest.json'
     if old_path.exists():
         old=json.loads(old_path.read_text())
@@ -86,9 +98,9 @@ def main():
             if (out/'result.json').exists() and (out/'trace.npz').exists():
                 continue
             out.mkdir(parents=True,exist_ok=True)
-            cmd=[sys.executable,str(ROOT/'tokenhsi/run.py'),'--task','HumanoidMACoupledPush' if args.experiment=='stage2_coupled_push' else 'HumanoidMABeforePush' if args.experiment in ('stage2_before_push','stage2_before_push_near50') else 'HumanoidMAPush' if args.experiment=='stage1_push' else 'HumanoidMACarry' if args.experiment=='stage1' else 'HumanoidMABefore',
+            cmd=[sys.executable,str(ROOT/'tokenhsi/run.py'),'--task','HumanoidMACoupledPush' if args.experiment in ('stage2_coupled_push','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5') else 'HumanoidMABeforePush' if args.experiment in ('stage2_before_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5') else 'HumanoidMAPush' if args.experiment=='stage1_push' else 'HumanoidMACarry' if args.experiment=='stage1' else 'HumanoidMABefore',
                  '--cfg_train',f'tokenhsi/data/cfg/train/rlg/{args.experiment}.yaml', '--cfg_env','',
-                 '--motion_file',('tokenhsi/data/dataset_stage1_jointpush.yaml' if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50') else 'tokenhsi/data/dataset_loco_sit_carry_climb.yaml'), '--checkpoint',str(checkpoint),
+                 '--motion_file',('tokenhsi/data/dataset_stage1_jointpush.yaml' if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5') else 'tokenhsi/data/dataset_loco_sit_carry_climb.yaml'), '--checkpoint',str(checkpoint),
                  '--test','--eval','--headless','--no_video','--eval_protocol',args.profile,
                  '--eval_repeats','1','--num_envs',str(args.envs),'--seed',str(seed),'--output_path',str(out),
                  '--task_graph','random_scenario']

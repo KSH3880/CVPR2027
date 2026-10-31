@@ -53,6 +53,10 @@ def solo_path_clear(center, goal, size, boxes, sizes, goals, roots, other_people
     return valid
 
 
+def path_goals(task, ids):
+    return task._center_tar_pos[ids] if getattr(task, '_individual_push_goals', False) else task._tar_pos[ids]
+
+
 def paths(task, ids):
     boxes = task._logical_box_values(task._box_states, ids).clone()
     # Paths use whole physical boxes; region centres are only policy/contact tokens.
@@ -61,15 +65,21 @@ def paths(task, ids):
     start = boxes[..., :2].clone()
     end = start.clone()
     push = task._templates_by_owner[ids] == 5
-    delta = task._tar_pos[ids, ..., :2]-start[:, :4]
+    goals = path_goals(task, ids)
+    delta = goals[..., :2]-start[:, :4]
     unit = delta/delta.norm(dim=-1, keepdim=True).clamp_min(1e-8)
     start[:, :4] -= torch.where(push[..., None], 1.5*unit, 0.)
-    end[:, :4] = torch.where(push[..., None], task._tar_pos[ids, ..., :2], end[:, :4])
+    end[:, :4] = torch.where(push[..., None], goals[..., :2], end[:, :4])
     return start, end, box_yaw(boxes), sizes[..., :2]/2
 
 
 def sample_push(task, ids):
     spec = task.cfg['env']['stage2JointPush']
+    solo = task.cfg['env']['jointPush']['scene']
+    source_bounds = torch.tensor([[solo['source_distance'][0], spec.get('solo_source_max_distance', solo['source_distance'][1])],
+                                 spec.get('source_distance', [2., 10.])], device=task.device)
+    goal_bounds = torch.tensor([[solo['goal_distance'][0], spec.get('solo_goal_max_distance', solo['goal_distance'][1])],
+                               spec.get('goal_distance', [2., 10.])], device=task.device)
     failed = torch.zeros(len(ids), dtype=torch.bool, device=task.device)
     people = torch.arange(4, device=task.device)
     placed = task._templates_by_owner[ids] != 5
@@ -84,21 +94,26 @@ def sample_push(task, ids):
             physical = task._agent_box_assignment[es, leader]
             size = task._box_size[es, physical]
             draws = torch.rand(n, c, 5, device=task.device)
-            angle, radius, yaw = draws[..., 0]*2*torch.pi, 2+8*draws[..., 1], draws[..., 2]*2*torch.pi
-            center = roots[:, leader, None]+radius[..., None]*torch.stack((angle.cos(),angle.sin()), -1)
             shared = task._members[es, leader] > 1
+            source_min, source_max = source_bounds[shared.long()].unbind(-1)
+            goal_min, goal_max = goal_bounds[shared.long()].unbind(-1)
+            radius = source_min[:, None]+(source_max-source_min)[:, None]*draws[..., 1]
+            angle, yaw = draws[..., 0]*2*torch.pi, draws[..., 2]*2*torch.pi
+            center = roots[:, leader, None]+radius[..., None]*torch.stack((angle.cos(),angle.sin()), -1)
             cone = shared | (task.cfg['env']['jointPush']['scene']['goal_angle_degrees'] == 90.)
             heading = torch.where(cone[:, None], yaw+torch.pi/2+(draws[..., 3]-.5)*torch.pi/2,
                                   draws[..., 3]*2*torch.pi)
             if spec['goal_half_angle_degrees'] == 0.:
                 heading = torch.where(shared[:, None], yaw+torch.pi/2, heading)
             direction = torch.stack((heading.cos(), heading.sin()), -1)
-            goal = center+(2+8*draws[..., 4, None])*direction
+            goal_distance = goal_min[:, None]+(goal_max-goal_min)[:, None]*draws[..., 4]
+            goal = center+goal_distance[..., None]*direction
             relative = roots[:, None]-center[:, :, None]
             distances = relative.norm(dim=-1)
             member = task._groups[es] == leader
             rear = (relative*axes(yaw)[:, :, None, 1]).sum(-1) < 0
-            valid = (((distances >= 2)&(distances <= 10)&(rear | ~shared[:,None,None])) | ~member[:,None]).all(-1)
+            valid = (((distances >= source_min[:,None,None])&(distances <= source_max[:,None,None])
+                &(rear | ~shared[:,None,None])) | ~member[:,None]).all(-1)
             local = (relative.unsqueeze(-2)*axes(yaw)[:, :, None]).sum(-1)
             clearance = (local.abs()-size[:, None, None, :2]/2).clamp_min(0).norm(dim=-1)
             valid &= (clearance >= spec['human_clearance']).all(-1)
@@ -114,7 +129,7 @@ def sample_push(task, ids):
             valid &= ~(human_hit & ~member[:,None]).any(-1)
             boxes = task._gather_entity_slots(task._box_states[es],task._logical_box_order[es])
             sizes = task._gather_entity_slots(task._box_size[es],task._logical_box_order[es])
-            goals = torch.cat((task._tar_pos[es],boxes[:,4:,:3]),1)
+            goals = torch.cat((path_goals(task, es),boxes[:,4:,:3]),1)
             other_push = torch.cat((task._templates_by_owner[es] == 5,torch.zeros(n,4,device=task.device,dtype=torch.bool)),-1)
             solo_valid = solo_path_clear(center,goal,size[:,None],boxes[:,None],sizes[:,None],goals[:,None],roots[:,None],
                 ~member[:,None],relevant[:,None],other_push[:,None])
@@ -130,6 +145,8 @@ def sample_push(task, ids):
             task._box_states[es_ok,parent,7:] = 0.
             target3 = torch.cat((target,size[accepted,2,None]/2),-1)
             task._tar_pos[es_ok] = torch.where(member[accepted,:,None],target3[:,None],task._tar_pos[es_ok])
+            if getattr(task, '_individual_push_goals', False):
+                task._center_tar_pos[es_ok] = task._tar_pos[es_ok]
             placed[pending[accepted]] |= member[accepted]
             pending = pending[~accepted]
         failed[pending] = True
@@ -185,7 +202,7 @@ def scene_infeasible(task, ids):
     legacy_at = task._templates_by_owner[ids] == 3
     goal_other = mapping[:,:4,None] != mapping[:,None]
     bad |= ((goal_gap < radius[:,:4,None]+radius[:,None]+.25) & goal_other & legacy_at[...,None]).any((1,2))
-    goals = torch.cat((task._tar_pos[ids],states[:,4:,:3]),1)
+    goals = torch.cat((path_goals(task, ids),states[:,4:,:3]),1)
     for owner in range(4):
         solo = (task._templates_by_owner[ids,owner] == 5)&(task._members[ids,owner] == 1)
         other_people = torch.arange(4,device=task.device)[None] != owner
