@@ -1,0 +1,143 @@
+import torch
+from push_reference.utils.edge_context_spec import HOLDING, AT
+from push_reference.utils.edge_ontop_spec import ON_TOP, batched
+
+
+def vertical_extent(quaternion, half_size):
+    q = quaternion / quaternion.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    x, y, z, w = q.unbind(-1)
+    row = torch.stack(
+        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)], -1
+    )
+    return (row.abs() * half_size).sum(-1)
+
+
+def inner_xy_region_error(point_xy, support, support_size, margin_fraction):
+    q = support[..., 3:7]
+    q = q / q.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    x, y, z, w = q.unbind(-1)
+    yaw = torch.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+    dx, dy = (point_xy - support[..., :2]).unbind(-1)
+    local = torch.stack(
+        (
+            torch.cos(yaw) * dx + torch.sin(yaw) * dy,
+            -torch.sin(yaw) * dx + torch.cos(yaw) * dy,
+        ),
+        -1,
+    )
+    half_width = support_size[..., :2] * (0.5 - margin_fraction)
+    return (local.abs() - half_width).clamp_min(0).norm(dim=-1)
+
+
+def ontop_geometry(source, support, source_size, support_size):
+    hs = vertical_extent(source[..., 3:7], source_size / 2)
+    ht = vertical_extent(support[..., 3:7], support_size / 2)
+    bottom = source[..., 2] - hs
+    top = support[..., 2] + ht
+    gap = bottom - top
+    target = support[..., :3].clone()
+    target[..., 2] += hs + ht
+    delta = source[..., :3] - target
+    dxy = delta[..., :2].norm(dim=-1)
+    return (
+        delta,
+        dict(
+            signed_gap=gap,
+            source_bottom_z=bottom,
+            support_top_z=top,
+            source_extent=hs,
+            support_extent=ht,
+            target=target,
+            distance_xy=dxy,
+        ),
+    )
+
+
+def evaluate_ontop_edges(hands, roots, objects, sizes, goals, graph, config):
+    n = roots.shape[0]
+    m = graph.num_agents
+    o = graph.num_objects
+    src = batched(graph.edge_src, n)
+    dst = batched(graph.edge_dst, n)
+    rel = batched(graph.edge_relation, n)
+    valid = batched(graph.edge_valid, n)
+    batch = torch.arange(n, device=roots.device)[:, None]
+    src_box = objects[batch, (src - m).clamp(0, o - 1)]
+    dst_box = objects[batch, (dst - m).clamp(0, o - 1)]
+    src_size = sizes[batch, (src - m).clamp(0, o - 1)]
+    dst_size = sizes[batch, (dst - m).clamp(0, o - 1)]
+    top_delta, diag = ontop_geometry(src_box, dst_box, src_size, dst_size)
+    hold = rel == HOLDING
+    at = rel == AT
+    top = rel == ON_TOP
+    h = hands.mean(-2)[batch, src.clamp(0, m - 1)]
+    goal = goals[batch, (dst - m - o).clamp(0, m - 1)]
+    delta = torch.where(
+        hold[..., None],
+        h - dst_box[..., :3],
+        torch.where(at[..., None], src_box[..., :3] - goal, top_delta),
+    )
+    progress_delta = torch.where(
+        hold[..., None], roots[batch, src.clamp(0, m - 1)] - dst_box[..., :3], delta
+    )
+    xy = progress_delta[..., :2].norm(dim=-1)
+    phi = torch.exp(-10 * delta.square().sum(-1)) * valid
+    p = config["progress"]
+    radius = torch.full_like(xy, float(p.get("delta", 0.0)))
+    if "bbox_buffers" in p:
+        buffers = p["bbox_buffers"]
+        bbox_radius = dst_size[..., :2].norm(dim=-1) / 2
+        radius = torch.where(
+            hold,
+            bbox_radius + buffers["HOLDING"],
+            torch.where(
+                top, bbox_radius + buffers["ON_TOP"], torch.full_like(xy, buffers["AT"])
+            ),
+        )
+    progress = 1 / (1 + (xy - radius).clamp_min(0) / p["sigma"])
+    diag["target"] = torch.where(
+        hold[..., None],
+        dst_box[..., :3],
+        torch.where(at[..., None], goal, diag["target"]),
+    )
+    for key in (
+        "signed_gap",
+        "source_bottom_z",
+        "support_top_z",
+        "source_extent",
+        "support_extent",
+    ):
+        diag[key] = diag[key] * top * valid
+    diag.update(
+        progress=progress * valid,
+        z_error=delta[..., 2],
+        distance=delta.norm(dim=-1),
+        distance_xy=xy,
+    )
+    diag["support_speed"] = dst_box[..., 7:10].norm(dim=-1) * top
+    diag["relative_speed"] = (src_box[..., 7:10] - dst_box[..., 7:10]).norm(
+        dim=-1
+    ) * top
+    diag["source_tilt"] = (
+        torch.acos(
+            (1 - 2 * (src_box[..., 3].square() + src_box[..., 4].square())).clamp(-1, 1)
+        )
+        * top
+    )
+    diag["support_tilt"] = (
+        torch.acos(
+            (1 - 2 * (dst_box[..., 3].square() + dst_box[..., 4].square())).clamp(-1, 1)
+        )
+        * top
+    )
+    if "success_inner_margin_fraction" in config.get("ontop", {}):
+        diag["region_error"] = (
+            inner_xy_region_error(
+                src_box[..., :2],
+                dst_box,
+                dst_size,
+                config["ontop"]["success_inner_margin_fraction"],
+            )
+            * top
+        )
+    return (phi, diag)

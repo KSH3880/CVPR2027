@@ -1,0 +1,129 @@
+# Copyright (c) 2018-2022, NVIDIA Corporation
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+from push_reference.env.tasks.humanoid import Humanoid
+from push_reference.env.tasks.humanoid_amp import HumanoidAMP
+
+######### basic interaction skills
+from push_reference.env.tasks.basic_interaction_skills.humanoid_traj import HumanoidTraj
+from push_reference.env.tasks.basic_interaction_skills.humanoid_sit import HumanoidSit
+from push_reference.env.tasks.basic_interaction_skills.humanoid_carry import HumanoidCarry
+from push_reference.env.tasks.basic_interaction_skills.humanoid_climb import HumanoidClimb
+#########
+
+######### multi task
+from push_reference.env.tasks.multi_task.humanoid_traj_sit_carry_climb import HumanoidTrajSitCarryClimb
+#########
+
+######### policy adaptation
+
+# skill composition
+from push_reference.env.tasks.comp_interaction_skills.humanoid_comp_sit_carry import HumanoidCompSitCarry
+from push_reference.env.tasks.comp_interaction_skills.humanoid_comp_climb_carry import HumanoidCompClimbCarry
+from push_reference.env.tasks.comp_interaction_skills.humanoid_comp_traj_carry import HumanoidCompTrajCarry
+
+# object shape variation
+from push_reference.env.tasks.adapt_interaction_skills.humanoid_adapt_carry_box2objs import HumanoidAdaptCarryBox2Objs
+
+# terrain shape variation
+from push_reference.env.tasks.adapt_interaction_skills.humanoid_adapt_traj_ground2terrain import HumanoidAdaptTrajGround2Terrain
+from push_reference.env.tasks.adapt_interaction_skills.humanoid_adapt_carry_ground2terrain import HumanoidAdaptCarryGround2Terrain
+
+# The long-horizon task imports optional PyTorch3D rendering dependencies. Import it
+# lazily in parse_task so unrelated tasks such as HumanoidMACarry do not require them.
+
+#########
+
+######### multi agent
+from push_reference.env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
+#########
+
+from push_reference.env.tasks.vec_task_wrappers import VecTaskPythonWrapper
+from push_reference.env.tasks.multi_agent.vec_task_wrapper_ma import VecTaskPythonWrapperMA
+
+from isaacgym import rlgpu
+
+import json
+import numpy as np
+
+
+def warn_task_name():
+    raise Exception(
+        "Unrecognized task!\nTask should be one of: [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]")
+
+def parse_task(args, cfg, cfg_train, sim_params):
+
+    # create native task and pass custom config
+    device_id = args.device_id
+    rl_device = args.rl_device
+
+    cfg["seed"] = cfg_train.get("seed", -1)
+    cfg_task = cfg["env"]
+    cfg_task["seed"] = cfg["seed"]
+
+    if args.task == 'HumanoidMAStage2JointPushRsi':
+        from push_reference.env.tasks.multi_agent.humanoid_ma_stage2_jointpush_rsi import HumanoidMAStage2JointPushRsi
+        task_class = HumanoidMAStage2JointPushRsi
+    elif args.task == 'HumanoidMAStage2JointPush':
+        from push_reference.env.tasks.multi_agent.humanoid_ma_stage2_jointpush import HumanoidMAStage2JointPush
+        task_class = HumanoidMAStage2JointPush
+    elif args.task == 'HumanoidMAStage1JointPush':
+        from push_reference.env.tasks.multi_agent.humanoid_ma_stage1_jointpush import HumanoidMAStage1JointPush
+        task_class = HumanoidMAStage1JointPush
+    elif args.task == "HumanoidMAStage1Push":
+        from push_reference.env.tasks.multi_agent.humanoid_ma_stage1_push import HumanoidMAStage1Push
+        task_class = HumanoidMAStage1Push
+    elif args.task == "HumanoidMASharedSupport":
+        from push_reference.env.tasks.multi_agent.humanoid_ma_shared_support import HumanoidMASharedSupport
+        task_class = HumanoidMASharedSupport
+    elif args.task == "HumanoidMAStage2":
+        from push_reference.env.tasks.multi_agent.humanoid_ma_stage2 import HumanoidMAStage2
+        task_class = HumanoidMAStage2
+    elif args.task == "HumanoidLongTerm4BasicSkills":
+        from push_reference.env.tasks.longterm_task_completion.humanoid_longterm_4basicskills \
+            import HumanoidLongTerm4BasicSkills
+        task_class = HumanoidLongTerm4BasicSkills
+    else:
+        task_class = globals().get(args.task)
+
+    if task_class is None:
+        warn_task_name()
+    task = task_class(
+        cfg=cfg,
+        sim_params=sim_params,
+        physics_engine=args.physics_engine,
+        device_type=args.device,
+        device_id=device_id,
+        headless=args.headless)
+    if hasattr(task, "num_agents"):
+        # multi-agent tasks emit one obs/reward row per (env, agent)
+        env = VecTaskPythonWrapperMA(task, rl_device, cfg_train.get("clip_observations", np.inf), cfg_train.get("clip_actions", 1.0))
+    else:
+        env = VecTaskPythonWrapper(task, rl_device, cfg_train.get("clip_observations", np.inf), cfg_train.get("clip_actions", 1.0))
+
+    return task, env
