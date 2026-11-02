@@ -1,6 +1,6 @@
 # 레포 구조
 
-유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_before_push_near50_pair50_source5_virtual`, `stage2_before_push_near50_pair50_source5_virtual_asym`, `stage2_before_push_near50_pair50_source5_goal5`, `stage2_before_push_near50_pair50_source5_virtual_goal5`, `stage2_before_push_near50_pair50_source5_virtual_asym_goal5`, `stage2_before_push_near50_pair50_source5_goal5_goalroute`, `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute`, `stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute`다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
+유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_before_push_near50_pair50_source5_virtual`, `stage2_before_push_near50_pair50_source5_virtual_asym`, `stage2_before_push_near50_pair50_source5_goal5`, `stage2_before_push_near50_pair50_source5_virtual_goal5`, `stage2_before_push_near50_pair50_source5_virtual_asym_goal5`, `stage2_before_push_near50_pair50_source5_goal5_goalroute`, `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute`, `stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute`, `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear`다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
 
 ## 실행과 설정
 
@@ -8,9 +8,9 @@
 | --- | --- |
 | `tokenhsi/run.py`, `utils/parse_task.py` | MA 학습/평가·Stage1/BEFORE 모델 등록과 환경 생성 |
 | `tokenhsi/utils/config.py`, `experiments.py` | CLI, 20개 실험 계약, 학습/추론/resume env/sim 로딩 |
-| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 20개 |
-| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 60개 |
-| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가20개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 21개 |
+| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 63개 |
+| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가21개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
 | `tokenhsi/evaluate.py`, `rescore.py` | 독립 seed 실행·통계, 저장 trace CPU 재채점 |
 | `tokenhsi/utils/evaluation_protocol.py`, `learning/multi_agent/formal_eval.py` | 학습 인원/단독 구분·점/영역/BEFORE 지표·개인 낙상 제어 |
 | `tokenhsi/scripts/multi_agent/launch.sh`, `runtime_env.sh` | 공통 인자·출력 경로·conda·GPU |
@@ -63,3 +63,7 @@
 `test_before_goal_sampling.py`는 목표 중심 거리·조건부 분포·near50·기존 goal5와의 계약 분리를 검사한다. `tokenhsi/tests/`는 보상·배치·GTA·mask·RSI·전이·재로드·출력 경로를 검사한다. `before_test_utils.py`, `stage1_test_utils.py`는 CPU fixture다. `check_before_asymmetric_progress.py`는 현재 AT 성공 전환·비대칭 progress·기존 항 보존을 검사한다. `check_before_virtual_object.py`는 가상 Alias XYZ·실제 회전·원본 상태 보존을 검사한다. `check_before_object_alias.py`·`check_before_push.py`·`check_coupled_push.py`는 실제 물리·부분 reset·추론 검사 진입점이다.
 
 [PUSH](reference/stage1_push.md), [BEFORE PUSH](reference/stage2_before_push.md), [공통 Stage2/coupled](reference/stage2_coupled_push.md), [평가 규약](reference/evaluation.md), [Stage1 단독](../evaluation_single.md), [공통 정책](reference/ma_clean_scene_gta.md), [BEFORE](reference/stage2_before.md), [지표](reference/relation_diagnostics.md), [이관](reference/PORTING_GUIDE.md)을 참고한다. 이전 실험은 [legacy](legacy/README.md)에 보존한다.
+
+- `tokenhsi/env/tasks/multi_agent/before_wait_reward.py`: 선행 사람/상자→goal 통로와 안전 대기 구역의 선택적 보상. `test_before_wait_clear.py`는 CPU 기하/계약 검사, `check_before_wait_clear.py`는 실제 환경 보상 합산·부분 reset 검사다. [설계](reference/before_wait_clear.md).
+
+- `tokenhsi/learning/multi_agent/attention_viewer.py`, `attention_dashboard.html`: viewer 전용 actor GTA/coordination attention 추출과 localhost 대시보드. `test_attention_viewer.py`는 행동·RNG·가중치 보존, MHA 확률 일치와 셔플 복원을 검사한다.

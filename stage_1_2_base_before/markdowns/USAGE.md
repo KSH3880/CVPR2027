@@ -142,3 +142,20 @@ PUSH AT의 viewer/VNC에는 바닥 링(반지름35cm)·세로선·와이어 구(
 ### goal5 기반 BEFORE 목표 중심 후행 배치
 
 세 `stage2_before_push_near50_pair50_source5*_goal5_goalroute`는 각각 기존 goal5의 단독 거리·모델·보상·Virtual/비대칭 설정을 유지하고 BEFORE 후행 배치와 near50 거리 정의만 바꾼다. 기본 Stage1 26k 전이로 새 학습하며, 기존 goal5 저장본과 resume/추론을 혼용하지 않는다. 실행 명령은 [config](config.md), 상세 거리·샘플링 순서는 [BEFORE PUSH](reference/stage2_before_push.md#goal5-기반-목표-중심-후행-배치)를 따른다.
+
+## 가상 상자 기반 통로 확보·정지 대기
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear`는 일반 virtual goalroute에 두 페널티만 추가한 별도 실험이다. 기본 전이는 동일 Stage1 PUSH26k다. 기존 virtual/asym Stage2 저장본은 보상 계약이 달라 이 설정의 resume/viewer용으로 혼용하지 않는다. 기존 모델 파일 자체는 변하지 않으며, 새 보상에 따른 행동 변화에는 새 학습이 필요하다. 학습·추론·VNC·평가는 [config](config.md), 수식·범위·초기 계수·제한은 [설계](reference/before_wait_clear.md)를 따른다.
+
+## Viewer attention 지도
+
+`ATTENTION_MAP=1 ATTENTION_PORT=6089 ATTENTION_INTERVAL=10`을 기존 VNC wrapper 앞에 추가한다. `PORT=6088`은 영상 포트다. VS Code에서 두 포트를 포워딩하고 `http://localhost:6089`를 열면 영상과 actor GTA/사람 coordination attention을 함께 볼 수 있다. 레이어0–3, head0/1 또는 평균, 화면 고정·JSON 저장을 지원한다.
+
+```bash
+# stage2_before_push_near50_pair50_source5_goal5_goalroute: attention viewer
+TOKENHSI_GPU=5 PORT=6088 ATTENTION_MAP=1 ATTENTION_PORT=6089 TASK_GRAPH=before_sit bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_vnc.sh "$CKPT" 4 1 8 1000
+```
+
+결과는 해당 `output_etc/check/` 실행 폴더의 `attention/` 아래에 저장한다. `latest.json`은10 policy step마다 원자적으로 갱신하고 `episode_*.json`은 각 반복의 첫 샘플을 보존한다. env0·행query/열key·GTA와 task bias를 포함한 softmax 확률이다. 셔플된 사람/상자/goal 순서는 canonical 순서로 복원한다. 상자 토큰→실제 물체 매핑과 같은 관측 시점의 위치도 기록한다. 지도는 action 직전 관측 기준이며 VNC 영상과 네트워크 지연 차이가 있을 수 있다. raw attention은 행동의 기여도나 인과 효과를 의미하지 않는다.
+
+계측은 actor에만 hook을 붙여 Q/K에서 확률을 재계산하며 원래 attention 출력·학습 가중치·난수를 변경하지 않는다. human attention은 원래 `need_weights=False` 경로를 유지한다. viewer 종료 시 지도 서버도 종료된다. 기본값은 계측 꺼짐이며 formal eval/학습에는 적용하지 않는다.

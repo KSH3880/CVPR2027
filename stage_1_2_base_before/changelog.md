@@ -4,6 +4,26 @@
 
 ## 2026-11-02
 
+### 비가상8000 viewer에 actor attention 지도 추가
+
+- viewer 전용 `ATTENTION_MAP=1`로 actor GTA4층×2head와 사람 coordination4층×2head의 env0 softmax 확률을 재계산·추출한다. 원래 forward/need_weights=False 경로를 유지하고 셔플 순서를 양축 모두 canonical로 복원한다. parameter/buffer는 추가하지 않았다.
+- localhost6089 대시보드에서6088 영상·XY 위치·역할/실제 상자 매핑·layer/head 선택·지도 고정·JSON 저장을 제공한다. 결과는 모두 이 checkout의 `output_etc/check/view_nonvirtual8000_attention_gpu5/attention/` 아래이며10step 간격 latest와 반복별 첫 샘플을 저장한다. raw attention을 행동 기여도/인과 효과로 해석하지 않으며 영상과 지도의 네트워크 지연 차이를 명시했다.
+- CPU9개 통과: 출력/RNG/가중치 보존, 순서 복원, PyTorch MHA 확률 일치 및 기존 GTA/마스크 회귀. 비가상 goalroute8000을 GPU5 기존 MPS로4명·1환경·before_sit 실행하고8개 지도·확률합1·HTTP 응답·실제 rollout을 확인했다. 기존 학습31255/31512와 MPS서버4104165 유지. [PNG](output_etc/check/view_nonvirtual8000_attention_gpu5/attention/attention_snapshot.png), [같은 시점 raw](output_etc/check/view_nonvirtual8000_attention_gpu5/attention/attention_snapshot.json), [실행](output_etc/check/view_nonvirtual8000_attention_gpu5/launch.json).
+
+### virtual goalroute에 통로 확보·정지 대기 실험 추가
+
+- `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear`를 추가했다. 기존20개 환경 YAML은 원본과 바이트 동일하다. 관측·기본 progress/state/success·PPO/AMP를 유지하고 자기 선행 사람/상자→goal 캡슐 침범 페널티와 통로 밖 안전한 goal 주변에서의 수평 이동 페널티를 추가했다. ON_TOP은 후행 상자도 검사한다. 현재 선행 AT 성공 시 두 항을 해제하고 실패로 돌아오면 재적용한다.
+- 대기점 없이 goal·물체 크기로 반경을 계산한다. 큰 상자에서도 대기 공간이 남도록 캡슐 끝점 반경을 반영한다. 통로 안에서는 정지 페널티를 끈다. 두 보상은 별도 로그와 total에 포함하며 새 설정은 기존 Stage2 저장본과 계약을 분리했다. 기본 전이는 동일 Stage1 PUSH26k이고 학습은 시작하지 않았다.
+- CPU 기하/설정/기존 asym 회귀89개(실제78k 전이3개 제외), 관측·goal 배치·공통 정책·평가/출력 회귀102개, wrapper/runtime43개로 총234개 통과. GPU5 기존 MPS로4명·4환경·BEFORE ON_TOP·zero action4step의 유한성/보상합/부분reset 검사를 통과하고 synchronize→destroy_sim으로 정상 종료했다. [물리 검사](output_etc/check/wait_clear_physics/physics_validation.json).
+- 검사 도구의 초기 checkpoint 인자 누락과 SIT 자산으로 CLIMB preset을 바꾸던 오류를 수정했다. 고정 preset마다 별도 초기화하며 정책 평가/학습 결과로 해석하지 않는다. 기존 MPS control4102559/server4104165 및 학습31255/31512 유지 확인.
+- 초기 계수는 미튜닝이며 실제 정지·선행 비방해 성능은 미검증이다. 다른 BEFORE 쌍까지 아우르는 전역 통로 회피는 구현 범위 밖이다. [설계/제한](markdowns/reference/before_wait_clear.md), 실행은 [config](markdowns/config.md).
+
+### GPU5에서 원본 asym7500 viewer 실행
+
+- `/home/hwanhee/ksh/stage_1_2_base_1031`과 현재 tokenhsi 코드·YAML·자산 등 286개 파일의 바이트 일치를 확인했다. 해당 원본의 virtual_asym_goal5_goalroute epoch7500 저장본을 현재 코드로 로드해 실제 rollout을 확인했다.
+- GPU5 기존 MPS(control4102559/server4104165)에 연결하고 기존 학습 PID31255/31512를 유지했다. BEFORE SIT 고정·4명·1환경·8토큰·1200step, noVNC6088로 실행했다. 대기/통로 신규 보상은 미구현이다.
+- 실행 인자와 PID는 [launch.json](output_etc/check/view_asym7500_gpu5/launch.json), 로그는 [viewer.log](output_etc/check/view_asym7500_gpu5/viewer.log)에 있다.
+
 ### 이 checkout 학습 데이터·전이 가중치 연결
 
 - 누락된 loco/climb/sit/carry motions 4개와 Stage1 78k·PUSH 21k·26k 가중치 3개를 기존 공유 파일로 심링크 연결했다. 기존 PUSH 모션 링크를 유지하고 원본 파일은 수정하지 않았다.

@@ -96,6 +96,8 @@ class HumanCoordination(nn.Module):
             order = torch.randperm(humans.shape[1], device=humans.device)
             context = context[:, order]
             relations = relations[:, order][:, :, order]
+        if getattr(self, "_capture_attention_order", False):
+            self._attention_order = order if self.shuffle_human_order else None
         padding = torch.zeros((), device=humans.device, dtype=torch.bool)
         for block in self.blocks:
             context = block(context, None, relations, padding)

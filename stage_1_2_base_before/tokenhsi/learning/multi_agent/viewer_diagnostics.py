@@ -13,6 +13,10 @@ def run_viewer_diagnostics(player):
     task = player.env.task
     N, M = (task.num_envs, task.num_agents)
     graph = task.relation_runtime.graph
+    attention = None
+    if os.environ.get("ATTENTION_MAP") == "1":
+        from learning.multi_agent.attention_viewer import AttentionViewer
+        attention = AttentionViewer(player)
     results = {}
     for repeat in range(task.cfg["args"].eval_repeats):
         obs = player.env_reset()
@@ -34,9 +38,13 @@ def run_viewer_diagnostics(player):
         edge_relation = batched(graph.edge_relation, N).clone()
         terminated = torch.zeros_like(alive)
         resets = []
-        for _ in range(task.max_episode_length + 1):
+        for step in range(task.max_episode_length + 1):
             obs = player.env_reset(resets)
+            if attention is not None:
+                attention.begin()
             action = player.get_action(obs, player.is_determenistic)
+            if attention is not None:
+                attention.publish(repeat, step)
             obs, _, done, info = player.env_step(player.env, action)
             current = task.relation_runtime.done
             scene = scene_success(task.relation_runtime.own_success, graph)
@@ -99,4 +107,6 @@ def run_viewer_diagnostics(player):
     with open(path, "w") as f:
         json.dump(dict(protocol="viewer_diagnostics", formal_report=False, repeats=results), f, indent=2)
     print("Saved viewer diagnostics:", path)
+    if attention is not None:
+        attention.close()
     return results

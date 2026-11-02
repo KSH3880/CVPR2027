@@ -48,6 +48,11 @@ def validate_env(env, evaluation=False):
     before=deepcopy(env['before'])
     goal_distance=before.pop('goal_distance',None)
     asymmetric=before.pop('asymmetric_progress',None)
+    if 'wait_clear' in before:
+        from env.tasks.multi_agent.before_wait_reward import validate_wait_clear
+        validate_wait_clear(before.pop('wait_clear'))
+        if virtual != VIRTUAL_MODE or asymmetric is not None or before.get('distance_mixture') != GOAL_DISTANCE_MIXTURE:
+            raise ValueError('wait_clear requires goalroute virtual without asymmetric progress')
     if before.get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
         if goal_distance != [1.,5.] or before.get('source_max_distance') != 5.:
             raise ValueError('Goal-centered BEFORE requires source5 and goal5')

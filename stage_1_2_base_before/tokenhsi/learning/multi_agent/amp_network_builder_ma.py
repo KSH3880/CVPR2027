@@ -428,6 +428,8 @@ class RelationEncoder(nn.Module):
             if gta_g is not None:
                 gta_g = gta_g.index_select(1, token_order)
                 gta_ginv = gta_ginv.index_select(1, token_order)
+        if getattr(self, "_capture_attention_order", False):
+            self._attention_order = token_order
         for i, layer in enumerate(self.layers):
             rel_bias = None if relation_bias is None else relation_bias[i]
             diagnostics_label = None
