@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-30
+
+### TensorBoard6016에 KSH density3 공동 직선 모델 추가
+
+- 사용자 요청으로 기존6016의4개run을 유지하고 `ksh_density3_cone90_coupled_straight`를 추가했다. 외부 `/home/hwanhee/ksh/stage1_2_push_stopgate/output/stage2_jointpush_goal_saturation_density3_cone90_coupled_straight/Stage2JointPushGoalSaturationDensity3Cone90CoupledStraight_28-18-41-11/summaries`를 읽기 전용으로 연결하고 TensorBoard만 재시작했다. 학습·평가·watcher와외부ksh파일은 변경하지 않았다.
+- HTTP API의5개run 등록·기존4개보존과 원본event의274개scalar를 확인했다. 실행명령·이전설정·새PID·검증은 `../runs/jointpush/tensorboard_add_density3_20261030_170559/`에 보존하고 로컬학습metadata의TensorBoard연결정보를갱신했다.
+
 ## 2026-10-29
 
 ### CONTACT 적용 범위 정정: 단독 KSH · 공동 jhh
