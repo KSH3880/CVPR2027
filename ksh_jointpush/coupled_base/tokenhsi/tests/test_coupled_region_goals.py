@@ -64,12 +64,16 @@ def test_unique_targets_keep_coupled_attention_and_other_tasks_unchanged():
         assert torch.equal(getattr(old, key), getattr(new, key))
 
 
-def test_only_goal_contract_changes_and_old_checkpoints_cannot_resume():
+def test_goal_and_joint_distance_contract_changes_and_old_checkpoints_cannot_resume():
     old = native_config(BASE)
     new = native_config(REGION)
     assert new['experiment']['transfer'] == old['experiment']['transfer']
     candidate = deepcopy(new)
+    assert 'placement_order' not in candidate['env']['stage2JointPush']
     assert candidate['env']['stage2JointPush'].pop('goal_representation') == 'initial_region_offset_v1'
+    for key in ('source_distance', 'goal_distance'):
+        assert candidate['env']['stage2JointPush'].pop(key) == [2., 10. if key == 'source_distance' else 5.]
+        assert candidate['env']['jointPush']['scene'][key] == [2., 10.]
     candidate['experiment']['name'] = BASE
     assert candidate == old
     a, b = [native_config(name, True) for name in (BASE, REGION)]

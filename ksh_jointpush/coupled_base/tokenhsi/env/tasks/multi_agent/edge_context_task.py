@@ -9,6 +9,7 @@ from env.tasks.multi_agent.relation_reward import box_speed_penalty
 from utils.edge_ontop_spec import batched, select_graph, ON_TOP
 from utils.edge_interaction_spec import SIT, CLIMB
 from utils.edge_scenario_spec import agent_object_indices
+from utils.stage1_jointpush import PUSH
 
 
 class EdgeContextTaskMixin:
@@ -115,6 +116,8 @@ class EdgeContextTaskMixin:
                 self._box_vel_pen_thre,
             )
         reward = result["agent_task_reward"] + power + collision + speed
+        if hasattr(self, '_premature_motion_penalty'):
+            reward = reward + self._premature_motion_penalty
         components = [
             owner_sum(result[k], graph)
             for k in ("state_component", "progress_component", "success_component")
@@ -176,7 +179,7 @@ class EdgeContextTaskMixin:
             z_error=diag["z_error"],
         )
         packed = torch.stack([values[k].float() for k in fields], -1)
-        relations = [(HOLDING, "holding"), (AT, "at")]
+        relations = [(HOLDING, "holding"), (AT, "at"), (PUSH, "contact")]
         relations.append((ON_TOP, "ontop"))
         relations.extend([(SIT, "sit"), (CLIMB, "climb")])
         for rel, name in relations:

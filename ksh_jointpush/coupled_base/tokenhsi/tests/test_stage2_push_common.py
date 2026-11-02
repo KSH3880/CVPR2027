@@ -104,6 +104,51 @@ def test_group_gate_requires_every_member_then_saturates_at_goal():
     goals.zero_()
     assert group_contact_gate(hands,box,size,goals,groups,goal_saturation=True).all()
     assert not group_contact_gate(hands,box,size,goals,groups,goal_saturation=False).any()
+    goals[...,1]=.3
+    assert not group_contact_gate(hands,box,size,goals,groups,goal_saturation=True).any()
+    goals.zero_(); goals[...,2]=.002
+    assert not group_contact_gate(hands,box,size,goals,groups,goal_saturation=True).any()
+
+
+@pytest.mark.parametrize('layout', [[0, 1, 1, 1], [0, 0, 2, 2], [0, 0, 0, 0]])
+@pytest.mark.parametrize('yaw', [0., torch.pi / 2])
+def test_group_gate_uses_contact_even_with_sideways_or_overshot_goal(layout, yaw):
+    from utils.jointpush_geometry import rotate
+    # Same rear-face contact with goals ahead, sideways and behind the box.
+    box = torch.zeros(3, 4, 13)
+    angle = torch.tensor(yaw / 2)
+    box[..., 5], box[..., 6] = angle.sin(), angle.cos()
+    size = torch.ones(3, 4, 3) * 2
+    groups = torch.tensor(layout).expand(3, -1)
+    local_hands = torch.zeros(3, 4, 2, 3)
+    local_hands[..., 1] = -1
+    local_hands[..., 0, 0], local_hands[..., 1, 0] = -.25, .25
+    q = box[..., None, 3:7].expand(3, 4, 2, 4)
+    hands = rotate(q, local_hands)
+    delta = torch.tensor([[0., 5., 0.], [5., 0., 0.], [0., -5., 0.]])[:, None].expand(-1, 4, -1)
+    goals = rotate(box[..., 3:7], delta)
+    assert group_contact_gate(hands, box, size, goals, groups).all()
+    # One detached hand closes only that member's shared group; solo stays free.
+    for member in range(4):
+        detached = local_hands.clone()
+        detached[:, member, 0, 2] = 1.5
+        result = group_contact_gate(rotate(q, detached), box, size, goals, groups)
+        affected = (groups == layout[member]) & (group_sizes(groups) > 1)
+        assert torch.equal(result, ~affected)
+
+
+def test_group_gate_still_requires_the_rear_halfspace():
+    box = torch.zeros(1, 4, 13); box[..., 6] = 1
+    size = torch.ones(1, 4, 3) * 2
+    size[..., 1] = .1
+    hands = torch.zeros(1, 4, 2, 3)
+    hands[..., 1] = -.05
+    goals = torch.zeros(1, 4, 3); goals[..., 1] = -5
+    groups = torch.zeros(1, 4, dtype=torch.long)
+    assert group_contact_gate(hands, box, size, goals, groups).all()
+    # Both faces of a thin box are within 18cm; the front side must be rejected.
+    hands[..., 1] = .05
+    assert not group_contact_gate(hands, box, size, goals, groups).any()
 
 
 def _common_observation(case):

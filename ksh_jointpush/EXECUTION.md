@@ -1,5 +1,49 @@
 # KSH stage1_2_jointpush 실행 준비
 
+## 현재 본학습 — 2026-10-30 Stage1 PUSH26k·구역별 고정 goal
+
+현재 `coupled_base`의 `stage2_coupled_push_region_goals`를 Stage1 PUSH26000에서 새 optimizer로 처음부터 학습 중이다. GPU0·`tokenhsi118`·4명1024환경·8토큰·LOCO 시작이며 실제2epoch 업데이트를 검증했다. 공동 상자 각 구역은 초기 offset으로 정한 고정goal을 사용한다.
+
+사람을 먼저 배치하고 그 위치를 유지한 채 상자·goal을 찾는다. 공동 사람–전체 상자 중심2~10m·상자–goal2~5m, 단독PUSH두거리2~10m다. 직전21k실행은사용자요청으로중지하고그출력을삭제했다.
+
+- 전이원본: `coupled_base/checkpoints/Stage1JointPushDensity3Cone90Finetune_00026000.pth`.
+- 출력: `/home/injesus1010/repos/CVPR2027/ksh_jointpush/coupled_base/output/stage2_coupled_26k_people_first_source2_10_goal2_5_20261030_235619/Stage2CoupledPushRegionGoals_30-23-56-23`.
+- 실행/검증: `/home/injesus1010/repos/CVPR2027/runs/jointpush/fresh_stage1_26k_people_first_20261030_235619`.
+- 현재상태: `../runs/jointpush/ksh_jointpush_active_training.json`; PID617217.
+- TensorBoard [http://localhost:6017](http://localhost:6017): `coupled_region_goals_26000`.
+- AT/CONTACT 분리 기록과 이전 run 기록을 유지한다.
+- 실행 안내: [coupled_base/LOCAL_RUN.md](coupled_base/LOCAL_RUN.md).
+- 현재viewer: 5000iter·1명단독+3명공동고정·기본초록agent단독카메라, PID768757. 1/2/3=단독/공동/전체, N=다음장면. 실행/검증은 `/home/injesus1010/repos/CVPR2027/ksh_jointpush/coupled_base/output_etc/check/view_1plus3_5000_20261031_124256`다.
+- 이전 zero-shot viewer는종료됐으며공동두거리2~5m·상자우선배치의과거관찰기록이다.
+
+```bash
+tail -f /home/injesus1010/repos/CVPR2027/ksh_jointpush/coupled_base/output/stage2_coupled_26k_people_first_source2_10_goal2_5_20261030_235619/train.log
+tmux -L codex-ksh attach -t coupled_26k_20261030_235619
+```
+
+## 현재 본학습 — 2026-10-29 hard gate · 새 공동 CONTACT
+
+2026-10-30 16:51KST 사용자 요청으로 학습을 종료했다. 마지막 정기 저장본은7000epoch이며,
+뷰어와 TensorBoard는 유지한다. 종료 기록은 현재 launch의 `stop.json`이다.
+이 학습은 GPU0·`tokenhsi118`에서 Stage1 19500을 전이해 새 optimizer로 시작했다.
+4명·1024환경·8 object token, hard gate·balanced RSI·안전 초기화·잉여 상자 경로 이격을 사용한다.
+공동 CONTACT에만 pull의 jhh 중점XY/높이1.04m·우회 접근거리·양손 거리/힘 성공 조건을 적용하고,
+단독 CONTACT는 기존 KSH 기준이다. 상세 보상은 [CONTACT 참고](markdowns/reference/ksh_legacy_contact.md)를 따른다.
+이전 soft 5500 모델을 resume하지 않았다.
+
+- 출력: `output/train_base19500_balanced_hard_jhh_contact_gpu0_20261029_222331/Stage2JointPushRsi_29-22-24-29/`.
+- 설정·실행 명령·검증: `../runs/jointpush/launch_ksh_hard_contact_20261029_222331/`.
+- 현재 상태: `../runs/jointpush/ksh_jointpush_active_training.json`. 시작 PID140502.
+- CPU57개 및 실제2epoch PPO 업데이트·새 checkpoint 계약·수치 유한값 검증 통과.
+- TensorBoard [http://localhost:6017](http://localhost:6017)은 이전 `ksh_soft_balanced_19500`과 현재 `ksh_hard_balanced_jhh_contact_19500`을 함께 표시한다. 두 run 모두 `reward_terms/at_*`·`reward_terms/contact_*`를 제공하며 현재 학습은30초 간격으로 분리 로그를 갱신한다. 비교 서버 설정은 현재 launch의 `tensorboard_compare.json`이다.
+
+```bash
+tail -f ksh_jointpush/output/train_base19500_balanced_hard_jhh_contact_gpu0_20261029_222331/train.log
+tmux -L codex-ksh attach -t ksh_hard_contact_20261029_222331
+```
+
+이하 현재 서버 경로 이식과 이전 soft 실행은 이력이며, 현재 실행 상태는 위 metadata를 따른다.
+
 ## 현재 서버 실행 — 2026-10-28 경로 이식
 
 현재 저장소는 `/home/injesus1010/repos/CVPR2027`이며 conda 기본값은 `tokenhsi118`이다.

@@ -23,8 +23,14 @@ def inspect(task):
     torch.testing.assert_close(goals - cells[..., :3], delta, atol=5e-5, rtol=1e-5)
     push = task._templates_by_owner == 5
     distance = delta[..., :2].norm(dim=-1)
-    assert ((distance[push] >= 2-5e-5) & (distance[push] <= 10+5e-5)).all()
     shared = task._members > 1
+    solo = task.cfg['env']['jointPush']['scene']
+    joint = task.cfg['env']['stage2JointPush']
+    source_distance = (whole[..., :2]-task._humanoid_root_states[..., :2]).norm(dim=-1)
+    for measured, key in ((source_distance, 'source_distance'), (distance, 'goal_distance')):
+        low, high = [torch.where(shared, a, b)
+            for a, b in zip(joint.get(key, solo[key]), solo[key])]
+        assert ((measured[push] >= low[push]-5e-5) & (measured[push] <= high[push]+5e-5)).all()
     if shared.any():
         assert (task._region_goal_offsets[shared].abs().sum(-1) > 0).any()
         assert not task._region_goal_offsets[~shared].any()
@@ -35,7 +41,9 @@ def inspect(task):
     poses = obs[:, offset:offset+16*7].reshape(-1, 16, 7)
     torch.testing.assert_close(poses[:, -4:, :3], goals-task._env_origins[:, None], atol=5e-5, rtol=1e-5)
     assert torch.equal(task._evaluation_box_values(task._box_states), task._logical_box_values(task._box_states))
-    return dict(shared_people=int(shared.sum()), min_push_distance=float(distance[push].min()) if push.any() else None,
+    return dict(shared_people=int(shared.sum()), min_push_source_distance=float(source_distance[push].min()) if push.any() else None,
+                max_push_source_distance=float(source_distance[push].max()) if push.any() else None,
+                min_push_distance=float(distance[push].min()) if push.any() else None,
                 max_push_distance=float(distance[push].max()) if push.any() else None)
 
 

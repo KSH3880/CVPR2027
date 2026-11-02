@@ -68,8 +68,39 @@ def paths(task, ids):
     return start, end, box_yaw(boxes), sizes[..., :2]/2
 
 
+def box_first_people(center, yaw, size, regions, members, low, high, clearance, draws):
+    """Place roots behind assigned regions after the physical box is chosen.
+
+    Distances are measured to the whole box centre, not the region or surface.
+    Return candidates and feasibility without mutating simulator state.
+    """
+    x = ((regions.to(size.dtype)+.5)/members[:, None]-.5)*size[:, None, 0]
+    rear_min = torch.maximum((low[:, None].square()-x.square()).clamp_min(0).sqrt(),
+                             size[:, None, 1]/2+clearance+.35)
+    radius_min = (x.square()+rear_min.square()).sqrt()
+    radius = radius_min[:, None]+(high[:, None, None]-radius_min[:, None])*draws
+    y = -(radius.square()-x[:, None].square()).clamp_min(0).sqrt()
+    basis = axes(yaw)
+    positions = (center[:, :, None]+x[:, None, :, None]*basis[:, :, None, 0]
+                 +y[..., None]*basis[:, :, None, 1])
+    return positions, radius_min <= high[:, None]
+
+
+def translate_people(task, envs, mask, positions):
+    """Translate root and reference-body positions together; preserve the pose."""
+    row, owner = mask.nonzero(as_tuple=True)
+    env = envs[row]
+    delta = positions[row, owner]-task._humanoid_root_states[env, owner, :2]
+    task._humanoid_root_states[env, owner, :2] = positions[row, owner]
+    task._kinematic_humanoid_rigid_body_states[env, owner, :, :2] += delta[:, None]
+
+
 def sample_push(task, ids):
     spec = task.cfg['env']['stage2JointPush']
+    scene = task.cfg['env']['jointPush']['scene']
+    joint_source = spec.get('source_distance', scene['source_distance'])
+    joint_goal = spec.get('goal_distance', scene['goal_distance'])
+    box_first = spec.get('placement_order') == 'box_goal_people_v1'
     failed = torch.zeros(len(ids), dtype=torch.bool, device=task.device)
     people = torch.arange(4, device=task.device)
     placed = task._templates_by_owner[ids] != 5
@@ -83,26 +114,45 @@ def sample_push(task, ids):
             roots = task._humanoid_root_states[es, ..., :2]
             physical = task._agent_box_assignment[es, leader]
             size = task._box_size[es, physical]
-            draws = torch.rand(n, c, 5, device=task.device)
-            angle, radius, yaw = draws[..., 0]*2*torch.pi, 2+8*draws[..., 1], draws[..., 2]*2*torch.pi
-            center = roots[:, leader, None]+radius[..., None]*torch.stack((angle.cos(),angle.sin()), -1)
             shared = task._members[es, leader] > 1
+            source_low, source_high = [torch.where(shared, joint, solo)[:, None]
+                for joint, solo in zip(joint_source, scene['source_distance'])]
+            goal_low, goal_high = [torch.where(shared, joint, solo)[:, None]
+                for joint, solo in zip(joint_goal, scene['goal_distance'])]
+            draws = torch.rand(n, c, 5, device=task.device)
+            angle = draws[..., 0]*2*torch.pi
+            radius = source_low+(source_high-source_low)*draws[..., 1]
+            yaw = draws[..., 2]*2*torch.pi
+            center = roots[:, leader, None]+radius[..., None]*torch.stack((angle.cos(),angle.sin()), -1)
+            if box_first:
+                spawn_radius = task.cfg['env'].get('agentSpawnRadius', 2.5)+joint_source[1]
+                independent_center = task._env_origins[es, None, :2]+(draws[..., :2]*2-1)*spawn_radius
+                center = torch.where(shared[:, None, None], independent_center, center)
             cone = shared | (task.cfg['env']['jointPush']['scene']['goal_angle_degrees'] == 90.)
             heading = torch.where(cone[:, None], yaw+torch.pi/2+(draws[..., 3]-.5)*torch.pi/2,
                                   draws[..., 3]*2*torch.pi)
             if spec['goal_half_angle_degrees'] == 0.:
                 heading = torch.where(shared[:, None], yaw+torch.pi/2, heading)
             direction = torch.stack((heading.cos(), heading.sin()), -1)
-            goal = center+(2+8*draws[..., 4, None])*direction
-            relative = roots[:, None]-center[:, :, None]
-            distances = relative.norm(dim=-1)
+            goal = center+(goal_low+(goal_high-goal_low)*draws[..., 4])[..., None]*direction
             member = task._groups[es] == leader
+            candidate_roots = roots[:, None].expand(n, c, 4, 2)
+            people_feasible = torch.ones(n, 4, dtype=torch.bool, device=task.device)
+            if box_first and shared.any():
+                proposed, people_feasible = box_first_people(center, yaw, size, task._regions[es],
+                    task._members[es, leader], source_low[:, 0], source_high[:, 0],
+                    spec['human_clearance'], torch.rand(n, c, 4, device=task.device))
+                move = shared[:, None, None, None] & member[:, None, :, None]
+                candidate_roots = torch.where(move, proposed, candidate_roots)
+            relative = candidate_roots-center[:, :, None]
+            distances = relative.norm(dim=-1)
             rear = (relative*axes(yaw)[:, :, None, 1]).sum(-1) < 0
-            valid = (((distances >= 2)&(distances <= 10)&(rear | ~shared[:,None,None])) | ~member[:,None]).all(-1)
+            valid = (((distances >= source_low[..., None])&(distances <= source_high[..., None])&(rear | ~shared[:,None,None])) | ~member[:,None]).all(-1)
+            valid &= ((people_feasible | ~member).all(-1) | ~shared)[:, None]
             local = (relative.unsqueeze(-2)*axes(yaw)[:, :, None]).sum(-1)
             clearance = (local.abs()-size[:, None, None, :2]/2).clamp_min(0).norm(dim=-1)
             valid &= (clearance >= spec['human_clearance']).all(-1)
-            valid &= (((goal[:,:,None]-roots[:,None]).norm(dim=-1) >= 1.) | ~member[:,None]).all(-1)
+            valid &= (((goal[:,:,None]-candidate_roots).norm(dim=-1) >= 1.) | ~member[:,None]).all(-1)
             starts, ends, oyaw, half = paths(task, es)
             relevant = torch.cat((placed[pending], task._templates_by_owner[es] == 4), -1)
             hit = swept_overlap((center-1.5*direction)[:,:,None], goal[:,:,None], yaw[:,:,None], size[:,None,None,:2]/2,
@@ -110,8 +160,19 @@ def sample_push(task, ids):
             valid &= ~(hit & relevant[:,None]).any(-1)
             # Other groups must also have a clear approach/path, as in Stage1 PUSH.
             human_hit = swept_overlap((center-1.5*direction)[:,:,None],goal[:,:,None],yaw[:,:,None],size[:,None,None,:2]/2,
-                roots[:,None],roots[:,None],torch.zeros(n,1,4,device=task.device),torch.full((n,1,4,2),.5,device=task.device))
+                candidate_roots,candidate_roots,torch.zeros(n,c,4,device=task.device),torch.full((n,c,4,2),.5,device=task.device))
             valid &= ~(human_hit & ~member[:,None]).any(-1)
+            if box_first and shared.any():
+                # New people must not occupy another box's swept path or overlap
+                # either another member or an independent person's fixed root.
+                human_path_hit = swept_overlap(candidate_roots[..., None, :], candidate_roots[..., None, :],
+                    torch.zeros(n,c,4,1,device=task.device), torch.full((n,c,4,1,2),.5,device=task.device),
+                    starts[:,None,None], ends[:,None,None], oyaw[:,None,None], half[:,None,None], .05)
+                blocked = (human_path_hit & member[:,None,:,None] & relevant[:,None,None]).any(-1).any(-1)
+                gap = (candidate_roots[:,:,:,None]-candidate_roots[:,:,None,:]).norm(dim=-1)
+                pair = (member[:,:,None] | member[:,None,:]) & ~torch.eye(4,device=task.device,dtype=torch.bool)[None]
+                crowded = ((gap < task.cfg['env']['box']['reset']['minAgentDistance']) & pair[:,None]).any(-1).any(-1)
+                valid &= ~(shared[:,None] & (blocked | crowded))
             boxes = task._gather_entity_slots(task._box_states[es],task._logical_box_order[es])
             sizes = task._gather_entity_slots(task._box_size[es],task._logical_box_order[es])
             goals = torch.cat((task._tar_pos[es],boxes[:,4:,:3]),1)
@@ -130,6 +191,9 @@ def sample_push(task, ids):
             task._box_states[es_ok,parent,7:] = 0.
             target3 = torch.cat((target,size[accepted,2,None]/2),-1)
             task._tar_pos[es_ok] = torch.where(member[accepted,:,None],target3[:,None],task._tar_pos[es_ok])
+            if box_first and shared.any():
+                translate_people(task, es_ok, member[accepted] & shared[accepted,None],
+                                 candidate_roots[rows, choice][accepted])
             placed[pending[accepted]] |= member[accepted]
             pending = pending[~accepted]
         failed[pending] = True

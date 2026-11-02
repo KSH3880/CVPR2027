@@ -325,9 +325,9 @@ class HumanoidMACarry(SampledOnTopTaskMixin, EdgeContextTaskMixin, HumanoidMA):
                 dtype=torch.float,
             )
         from utils.task_role_spec import task_size_probabilities as task_probabilities
-
         self._size_template_probabilities = task_probabilities(
             getattr(self, "_rsi_asset_sizes", self._box_size)[:, :M], cfg["env"]["box"]["build"]["taskSizeRanges"]
+
         )
         self._init_relation_runtime()
         if not self._is_eval:

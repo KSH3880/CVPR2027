@@ -47,7 +47,7 @@ PUSH 출발 상자는 각 참여자에서2–10m, 목표는 상자에서2–10m�
 
 CONTACT+AT 기본 보상과 가중치는 Stage1 PUSH를 따른다. 공동 CONTACT는 각자 담당 구역의 뒤쪽 면을 기준으로 계산한다. 개인 접촉 성공은 양손/상자 힘 조건도 사용한다.
 
-공동 AT gate는 전원이 상자 뒤쪽 면0.18m 이내에 양손을 둔 현재 상태에서 열린다. `goal_saturation: true`는 실제 상자 중심이 목표에 도달했을 때 이 gate를 열어 접촉이 풀려도 AT 성공/포화 보상을 유지한다. 성공 이력으로 gate를 영구 고정하는 방식은 아니다.
+공동 AT gate는 전원이 상자 뒤쪽 면0.18m 이내에 양손을 두고 양손 모두 상자 local Y≤0인 현재 상태에서 열린다. 목표 방향과 상자 local +Y의 정렬(`aligned`)은 검사하지 않는다. 따라서 목표를 지나쳐도 전원 접촉을 유지하면 접촉 gate는 열릴 수 있다. `goal_saturation: true`는 현재 목표 거리≤0.20m·높이 오차≤0.001m인 동안 접촉과 관계없이 gate를 연다. 범위를 벗어나면 접촉 조건으로 다시 판정하며 성공 이력으로 gate를 영구 고정하지 않는다. 구역별 고정 목표 변형은 아래의 구역 기준을 사용한다.
 
 일반 평가는 학습 장면과 인원을 유지하는1200step·512환경×3seed다. PUSH 성공은 **구역 중심이 아니라 실제 전체 상자 중심**과 공유 목표의3D 거리≤0.20m를 사용한다. 점/영역 리포트에서 PUSH 값은 같다. 개인 낙상 후 나머지는 계속 수행한다. 학습에서는 기존처럼 한 명 낙상 시 환경 전체를 reset한다. [평가 규약](evaluation.md).
 
@@ -55,10 +55,14 @@ CONTACT+AT 기본 보상과 가중치는 Stage1 PUSH를 따른다. 공동 CONTAC
 
 ## 구역별 고정 목표 변형
 
-`stage2_coupled_push_region_goals`는 Stage1 PUSH21k·4명/1024환경·1200step·물성·과제/AMP/PPO·초기 배치·밀기 거리2~10m를 기존 coupled와 같게 유지한다. `stage2JointPush.goal_representation: initial_region_offset_v1`만 추가하며 전용 train/test/VNC/eval·출력·checkpoint 계약으로 분리한다. 원래 coupled checkpoint를 직접 resume하지 않는다.
+`stage2_coupled_push_region_goals`는 Stage1 PUSH21k·4명/1024환경·1200step·물성·과제/AMP/PPO를 기존 coupled와 같게 유지한다. `stage2JointPush.goal_representation: initial_region_offset_v1`로 구역별 목표를 선택하며 전용 train/test/VNC/eval·출력·checkpoint 계약으로 분리한다. 원래 coupled checkpoint를 직접 resume하지 않는다.
+
+현재 native 설정은 공동 PUSH(2명 이상)만 `stage2JointPush.source_distance: [2.0, 10.0]`과 `goal_distance: [2.0, 5.0]`을 사용한다. agent–box는 참여자 각각의 root XY와 전체 물리 상자 중심 XY 사이 거리이며 모든 참여자에 대해 범위를 검사한다. box–goal은 전체 상자 중심과 공통 중심 목표 사이 XY 거리다. 초기 구역 offset을 더해도 각 구역–개인 목표 거리는 이 값과 같다. 단독 PUSH는 `jointPush.scene`의 기존2~10m, 다른 과제는 원래 배치를 유지한다. 추가 필드가 없는 저장된 구 설정은 기존2~10m로 재현하며 새/구 거리 계약의 checkpoint 혼용은 거부한다.
 
 reset에서 물리 상자 초기 중심을 c₀, 사람 i의 구역 초기 중심을 cᵢ₀, 기존 공통 중심 목표를 g라 할 때 목표 gᵢ = g + (cᵢ₀ − c₀)를 고정한다. 따라서 gᵢ − cᵢ₀ = g − c₀이며, 모든 구역의 밀기 방향과 거리는 원래와 같다. 목표 offset은 초기 yaw와 구역 순서로 계산하고 현재 상자의 회전에는 따라가지 않는다. 물리 상자는 하나를 유지한다.
 
-PUSH task packet은 각자 goal token을 가리키고 사람 간 COUPLED 관계는 그룹으로 유지한다. GTA goal pose·AT state/progress/성공·goal saturation·marker는 각자의 고정 목표와 현재 구역 중심을 사용한다. 전원 양손18cm 접촉 gate와 CONTACT 계산은 기존과 같다. 경로/충돌 검사는 전체 물리 상자와 원래 중심 목표를 사용해 기존 sampler의 난수 소비와 밀기 경로를 유지한다. 단독 PUSH와 다른 독립 과제는 그대로다.
+PUSH task packet은 각자 goal token을 가리키고 사람 간 COUPLED 관계는 그룹으로 유지한다. GTA goal pose·AT state/progress/성공·goal saturation·marker는 각자의 고정 목표와 현재 구역 중심을 사용한다. 전원 양손18cm 접촉 gate와 CONTACT 계산은 기존과 같다. 경로/충돌 검사는 전체 물리 상자와 중심 목표를 사용한다. 거리 범위 변경으로 공동 후보의 수락 결과는 달라지며 단독 PUSH와 다른 독립 과제의 배치 규칙은 그대로다.
 
 이 변형의 정식 PUSH 평가는 각 구역 중심과 대응 목표의 거리20cm를 채점한다. 기존 전체 상자 중심 평가와 구분하며, 목표가 고정되어 상자가 목표 중심에서 회전하면 구역 목표 오차도 증가한다. 학습의 높이 허용오차1mm와 정식 평가의 기존 점 거리 기준은 각각 유지한다.
+
+현재 공동 PUSH는 사람의 초기 배치·참조 자세를 먼저 정한 뒤, 그 위치를 고정한 채 조건에 맞는 상자와 goal을 찾는 기존 순서를 사용한다. native YAML에서 `placement_order: box_goal_people_v1`을 제거했다. 이 필드가 있는 과거 저장 설정에는 상자 우선 구현을 남겨 두며, 새 학습과 해당 checkpoint 계약은 구분한다.

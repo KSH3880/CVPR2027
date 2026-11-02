@@ -93,7 +93,11 @@ def validate_experiment(name, env, train, evaluation=False):
     elif name in (COUPLED, COUPLED_REGION_GOALS):
         from utils.coupled_push_spec import checkpoint_contract,validate_env
         validate_env(env)
-        if checkpoint_contract(env)!=checkpoint_contract(native['env']):
+        comparison_env = deepcopy(env)
+        # Only this validated reward option may differ from the native preset.
+        # Saved checkpoint contracts still include it and remain exact.
+        comparison_env['stage2JointPush'].pop('premature_motion_penalty', None)
+        if checkpoint_contract(comparison_env)!=checkpoint_contract(native['env']):
             raise ValueError('Coupled PUSH environment differs from selected experiment')
         if not evaluation and env['episodeLength']!=1200:
             raise ValueError('Stage2 training requires 1200 steps')

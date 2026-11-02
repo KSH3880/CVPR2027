@@ -66,11 +66,12 @@ def main():
     if args.profile=='stage1_single' and args.experiment not in ('stage1','stage1_push'):
         parser.error('Single-task evaluation is Stage1-only')
     checkpoint=args.checkpoint.resolve(strict=True)
+    run_entry=Path(os.environ.get('TOKENHSI_RUN_ENTRY', str(ROOT/'tokenhsi/run.py'))).resolve(strict=True)
     directory=Path(resolve_output_path(args.experiment,'eval',str(args.output)))
     directory.mkdir(parents=True,exist_ok=True)
     manifest=vars(args).copy()
     manifest["horizon"] = experiment_horizon(args.experiment)
-    manifest.update(checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(), resolved_checkpoint=str(checkpoint),
+    manifest.update(run_entry=str(run_entry), checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(), resolved_checkpoint=str(checkpoint),
                     formal_report=(args.envs==512 and args.seeds==[0,1,2] and (args.profile=='general' or set(args.tasks)==({'AT','ON_TOP','SIT','CLIMB','PUSH'} if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_coupled_push_region_goals') else {'AT','ON_TOP','SIT','CLIMB'}))))
     old_path=directory/'manifest.json'
     if old_path.exists():
@@ -86,7 +87,7 @@ def main():
             if (out/'result.json').exists() and (out/'trace.npz').exists():
                 continue
             out.mkdir(parents=True,exist_ok=True)
-            cmd=[sys.executable,str(ROOT/'tokenhsi/run.py'),'--task','HumanoidMACoupledPush' if args.experiment in ('stage2_coupled_push','stage2_coupled_push_region_goals') else 'HumanoidMABeforePush' if args.experiment in ('stage2_before_push','stage2_before_push_near50') else 'HumanoidMAPush' if args.experiment=='stage1_push' else 'HumanoidMACarry' if args.experiment=='stage1' else 'HumanoidMABefore',
+            cmd=[sys.executable,str(run_entry),'--task','HumanoidMACoupledPush' if args.experiment in ('stage2_coupled_push','stage2_coupled_push_region_goals') else 'HumanoidMABeforePush' if args.experiment in ('stage2_before_push','stage2_before_push_near50') else 'HumanoidMAPush' if args.experiment=='stage1_push' else 'HumanoidMACarry' if args.experiment=='stage1' else 'HumanoidMABefore',
                  '--cfg_train',f'tokenhsi/data/cfg/train/rlg/{args.experiment}.yaml', '--cfg_env','',
                  '--motion_file',('tokenhsi/data/dataset_stage1_jointpush.yaml' if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_coupled_push_region_goals') else 'tokenhsi/data/dataset_loco_sit_carry_climb.yaml'), '--checkpoint',str(checkpoint),
                  '--test','--eval','--headless','--no_video','--eval_protocol',args.profile,

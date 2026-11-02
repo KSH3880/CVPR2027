@@ -31,6 +31,15 @@ def validate_env(env):
     expected = deepcopy(native_config('stage2_coupled_push')['env']['stage2JointPush'])
     if 'goal_representation' in env['stage2JointPush']:
         expected['goal_representation'] = 'initial_region_offset_v1'
+    if 'source_distance' in env['stage2JointPush'] or 'goal_distance' in env['stage2JointPush']:
+        expected.update(source_distance=[2., 10.], goal_distance=[2., 5.])
+    if 'placement_order' in env['stage2JointPush']:
+        expected['placement_order'] = 'box_goal_people_v1'
+    if 'premature_motion_penalty' in env['stage2JointPush']:
+        from utils.premature_push import validate_config
+        option = env['stage2JointPush']['premature_motion_penalty']
+        validate_config(option)
+        expected['premature_motion_penalty'] = deepcopy(option)
     if env['stage2JointPush'] != expected:
         raise ValueError('Unsupported coupled PUSH sampling/physics contract')
     from utils.stage1_platforms import validate_stage1_platform_config
@@ -176,16 +185,13 @@ def group_contact_gate(hands, boxes, sizes, goals, groups, tolerance=.18, succes
     excess_x = (local[..., 0].abs()-sizes[..., None, 0]/2).clamp_min(0)
     excess_z = (local[..., 2].abs()-sizes[..., None, 2]/2).clamp_min(0)
     distance = (excess_x.square()+excess_z.square()+(local[..., 1]+sizes[..., None, 1]/2).square()).sqrt()
-    normal = torch.zeros_like(sizes)
-    normal[..., 1] = 1.
-    normal = rotate(boxes[..., 3:7], normal)
-    delta = goals-boxes[..., :3]
-    at_position = (delta.norm(dim=-1) <= success_distance) & (delta[..., 2].abs() <= z_tolerance)
-    aligned = (normal[..., :2]*delta[..., :2]).sum(-1) > 0
-    on_face = (distance <= tolerance).all(-1) & (local[..., 1] <= 0).all(-1) & (aligned | at_position)
+    # The contact gate depends on the rear face, independent of goal direction.
+    on_face = (distance <= tolerance).all(-1) & (local[..., 1] <= 0).all(-1)
     same = groups[:, :, None] == groups[:, None, :]
     gate = (on_face[:, None, :] | ~same).all(-1)
     if goal_saturation:
+        delta = goals-boxes[..., :3]
+        at_position = (delta.norm(dim=-1) <= success_distance) & (delta[..., 2].abs() <= z_tolerance)
         gate = gate | at_position
     return torch.where(group_sizes(groups) > 1, gate, True)
 

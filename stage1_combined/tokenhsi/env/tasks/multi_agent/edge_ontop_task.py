@@ -792,6 +792,11 @@ class SampledOnTopTaskMixin:
                 ),
                 gymapi.Vec3(*center.tolist()),
             )
+            if os.environ.get("TASK_CAMERA_FIXED") == "1" and not getattr(
+                self, "_fixed_task_camera_applied", False
+            ):
+                self._camera_follow_flag = False
+                self._fixed_task_camera_applied = True
         self._cam_prev_char_pos[:] = self._humanoid_root_states[0, 0, :3].cpu().numpy()
 
     def _draw_ontop_context(self):

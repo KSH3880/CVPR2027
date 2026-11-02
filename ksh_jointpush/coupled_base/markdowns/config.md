@@ -4,7 +4,7 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 아홉 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 기본 실험과 별도 보상 변형은 아래 표를 따른다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
 - 학습 인자: `[agents] [envs] [objects]`. Stage1·Stage1 PUSH는 **2명·2048환경·4물체**, BEFORE·coupled는 **4명·1024환경·8토큰**이다. BEFORE의 인원 N≥1, 토큰 M≥2N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
@@ -26,6 +26,7 @@
 | [stage2_coupled_push.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push.yaml) | [stage2_coupled_push.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push.yaml) |
 | [stage2_before_push_near50.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50.yaml) | [stage2_before_push_near50.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50.yaml) |
 | [stage2_coupled_push_region_goals.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push_region_goals.yaml) | [stage2_coupled_push_region_goals.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push_region_goals.yaml) |
+| [stage2_coupled_push_premature_motion.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push_premature_motion.yaml) | [stage2_coupled_push_region_goals.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push_region_goals.yaml) |
 
 ## 학습
 
@@ -56,6 +57,9 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_train
 
 # stage2_coupled_push_region_goals
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_train.sh 4 1024 8
+
+# stage2_coupled_push_premature_motion
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_premature_motion_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -89,6 +93,9 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_n
 
 # stage2_coupled_push_region_goals
 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_test.sh "$CKPT" 4 1 8 10
+
+# stage2_coupled_push_premature_motion
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_premature_motion_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -122,9 +129,16 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_vnc.s
 
 # stage2_coupled_push_region_goals
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_coupled_push_premature_motion
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_premature_motion_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
+
+로컬 tokenhsi118 정식 평가와 PUSH 종료 거리 기록은 [추가 실행법](USAGE.md#로컬-정식-평가와-push-종료-거리)을 따른다.
+
+Stage2 actor의agent간attention지도와1+3·2+2·4명공동의bias/QK/softmax비교는 [관찰 도구](USAGE.md#stage2-actor-attention-지도)를따른다.
 
 - `TASK_GRAPH=random_scenario`가 기본이다. Stage1: `sit`, `climb`, `holding_at`, `holding_ontop`, `sit_climb`. BEFORE: `before_sit`, `before_climb`, `before_stack`, `one_pair_sit`, `one_pair_climb`, `one_pair_stack`, `all_solo`, `sit`, `climb`, `holding_at`, `holding_ontop`.
 - `EVAL_SKILLS`와 `EVAL_SKILL_PROBS`는 함께 지정한다. 예: `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`. BEFORE의 기본 초기화는 loco이며 후행 RSI는 별도 옵션으로 선택한다.
@@ -184,3 +198,5 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_eval.
 # stage2_coupled_push_region_goals
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_region_goals_eval.sh "$CKPT" --output output_etc/check/stage2_coupled_push_region_goals_general
 ```
+
+- 최초 출발 대기 진단은 별도 관찰 entry `ksh_jointpush/scripts/coupled_departure_capture.py`를 사용한다. native eval wrapper 실행법과 지표 정의는 [USAGE](USAGE.md#최초-출발-대기-평가)를 따른다.

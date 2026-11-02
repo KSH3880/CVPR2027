@@ -63,7 +63,7 @@ else
 fi
 MOTION=tokenhsi/data/dataset_loco_sit_carry_climb.yaml
 if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$TASK" = HumanoidMACoupledPush ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
-python tokenhsi/run.py --task "$TASK" \
+python "${TOKENHSI_RUN_ENTRY:-tokenhsi/run.py}" --task "$TASK" \
   --cfg_train "tokenhsi/data/cfg/train/rlg/$EXPERIMENT.yaml" \
   --cfg_env "${ENV_CONFIG:-}" \
   --motion_file "$MOTION" \

@@ -20,6 +20,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def __init__(self, cfg, *args, **kwargs):
         self._amp_num_families = 4
         self._joint = cfg['env']['jointPush']
+        self._premature_cfg = cfg['env']['stage2JointPush'].get('premature_motion_penalty')
         self._region_goals = cfg['env']['stage2JointPush'].get('goal_representation') == 'initial_region_offset_v1'
         super().__init__(cfg, *args, **kwargs)
 
@@ -101,6 +102,9 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self.relation_runtime = CoupledPushRuntime(self.num_envs,self.relation_runtime.graph,
             self._relation_cfg,self.device,contact_weights=self._joint['contact_weights'])
         self._push_hits = torch.zeros(self.num_envs,4,device=self.device,dtype=torch.bool)
+        if self._premature_cfg is not None:
+            self._premature_motion_penalty = torch.zeros(self.num_envs, 4, device=self.device)
+            self._premature_stats = torch.zeros(4, device=self.device)
 
     def _sample_episode_graph(self, ids):
         preset = self._task_graph_preset
@@ -125,6 +129,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self._sampling_counts[0] += len(ids)
         self._sampling_counts[1:7] += torch.bincount(templates.flatten(),minlength=6)
         self._push_hits[ids] = False
+        if self._premature_cfg is not None:
+            self._premature_motion_penalty[ids] = 0.
         self._update_box_assignment_colors(ids)
 
     def _reset_ref_state_init(self, env, owner):
@@ -246,6 +252,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def pre_physics_step(self, actions):
         super().pre_physics_step(actions)
         self._push_hits.zero_()
+        if self._premature_cfg is not None:
+            self._premature_motion_penalty.zero_()
 
     def _physics_step(self):
         ids = torch.arange(self.num_envs,device=self.device)
@@ -260,6 +268,23 @@ class HumanoidMACoupledPush(HumanoidMACarry):
             cfg = self._joint['contact']
             hit = (torch.exp(-cfg['near_distance_scale']*distance.square()) > cfg['satisfaction_threshold'])
             self._push_hits |= hit & (reaction >= cfg['min_hand_force']).all(-1) & (force >= cfg['min_box_force'])
+            if self._premature_cfg is not None:
+                from utils.premature_push import motion_penalty
+                values = motion_penalty(
+                    self._rigid_body_pos[:, :, self._key_body_ids[:2]],
+                    self._contact_forces[:, :, self._key_body_ids[:2]],
+                    self._assigned_box_values(self._box_states),
+                    self._assigned_box_values(self._box_size),
+                    self._groups, self._templates_by_owner,
+                    self.cfg['env']['stage2JointPush']['gate_face_tolerance'],
+                    **self._premature_cfg)
+                self._premature_motion_penalty += values['penalty'] / self.control_freq_inv
+                active = values['eligible']
+                moving_unready = (active & ~values['ready'] &
+                    (values['speed'] > self._premature_cfg['speed_threshold']))
+                self._premature_stats += torch.stack((values['penalty'].sum(),
+                    moving_unready.float().sum(), values['force'].sum(), active.float().sum()))
+
 
     def _compute_reward(self, actions):
         self.relation_runtime.contact.copy_(self._push_hits)
@@ -310,6 +335,14 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         result=super()._consume_sampling_diagnostics()
         result['sampling/template_push']=counts[6]/(counts[0]*self.num_agents).clamp_min(1)
         result['sampling/shared_primary_object']=counts.new_zeros(())
+        if self._premature_cfg is not None:
+            sums = self._premature_stats.clone()
+            denominator = sums[3].clamp_min(1)
+            for key, value in zip(('penalty', 'moving_unready_agent_fraction',
+                                   'positive_hand_force_n'), sums[:3] / denominator):
+                result['premature_push/' + key] = value
+            self._premature_stats.zero_()
+
         return result
 
     def _evaluation_box_values(self,values):

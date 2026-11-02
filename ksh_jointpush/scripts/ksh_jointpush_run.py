@@ -77,6 +77,18 @@ if os.environ.get('KSH_POSE_ONLY')=='1':
     if '--test' not in sys.argv:raise ValueError('Pose inspection is evaluation-only')
     from ksh_jointpush.ksh_pose_viewer import install as install_pose_viewer
     install_pose_viewer()
+if os.environ.get('KSH_SUCCESS_MODE')=='hand_collect':
+    if '--test' not in sys.argv:raise ValueError('Hand-quality search is evaluation-only')
+    from ksh_jointpush.ksh_hand_success import install as install_hand_search
+    install_hand_search()
+if os.environ.get('KSH_SUCCESS_MODE') in ('group_collect', 'live'):
+    if '--test' not in sys.argv:raise ValueError('Success cases are evaluation-only')
+    from ksh_jointpush.ksh_group_success import install_collect, install_live
+    (install_collect if os.environ['KSH_SUCCESS_MODE']=='group_collect' else install_live)()
+if os.environ.get('KSH_SUCCESS_MODE')=='collect':
+    if '--test' not in sys.argv:raise ValueError('Success collection is evaluation-only')
+    from ksh_jointpush.ksh_success_cases import install as install_success_cases
+    install_success_cases()
 if os.environ.get('KSH_RSI_MODE_CHECK')=='1':
     from ksh_jointpush.tests.check_ksh_rsi_modes import install as install_rsi_check
     install_rsi_check()

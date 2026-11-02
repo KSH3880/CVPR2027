@@ -16,7 +16,9 @@ from env.tasks.multi_agent.collision_reward import (
     agent_collision_config,
     check_agent_collision_checkpoint,
 )
-from env.tasks.multi_agent.relation_diagnostics import relation_tensorboard_tag
+from env.tasks.multi_agent.relation_diagnostics import (
+    relation_tensorboard_tag, split_reward_tensorboard_tag,
+)
 
 
 class MAAgent(amp_agent.AMPAgent):
@@ -586,6 +588,9 @@ class MAAgent(amp_agent.AMPAgent):
         self.writer.add_scalar("reward_terms/amp", disc_reward_mean.item(), frame)
         for key, value in train_info.get("relation_diagnostics", {}).items():
             self.writer.add_scalar(relation_tensorboard_tag(key), value.item(), frame)
+            split_tag = split_reward_tensorboard_tag(key)
+            if split_tag is not None:
+                self.writer.add_scalar(split_tag, value.item(), frame)
         network = self.model.a2c_network
         for name in ("actor", "critic"):
             encoder = getattr(network, name + "_encoder")
