@@ -7,6 +7,7 @@ import torch
 
 
 MODE = 'replace_distractor_v1'
+VIRTUAL_MODE = 'at_goal_xyz_v1'
 
 
 def alias_layout(packet, num_agents, num_objects):
@@ -53,3 +54,21 @@ def encoder_packet(packet, num_agents, num_objects):
     result = packet.reshape(len(packet), -1, 5).clone()
     result[..., 4] = torch.where(dependent, alias, target).to(result.dtype)
     return result.reshape_as(packet)
+
+
+def goal_aligned_scene(scene, num_agents, num_objects):
+    packet = scene[:, -5*num_agents:]
+    dependent, target, alias, _ = alias_layout(packet, num_agents, num_objects)
+    valid, task, actor, payload, goal = packet.reshape(len(scene), -1, 5).long().unbind(-1)
+    leading = (valid.bool()[:, :, None] & (task[:, :, None] == 2)
+        & dependent[:, None, :] & (payload[:, :, None] == target[:, None, :])
+        & (actor[:, :, None] != actor[:, None, :]))
+    predecessor = leading.long().argmax(1)
+    goal = goal.gather(1, predecessor)
+    result = scene.clone()
+    end = scene.shape[1] - 5*num_agents
+    count = 2*num_agents + num_objects
+    poses = result[:, end-7*count:end].reshape(len(scene), count, 7)
+    row, follower = dependent.nonzero(as_tuple=True)
+    poses[row, alias[row, follower], :3] = poses[row, goal[row, follower], :3]
+    return result

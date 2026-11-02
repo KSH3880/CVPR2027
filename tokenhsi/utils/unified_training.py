@@ -72,13 +72,13 @@ def preserve_amp_labels(raw, normalized, steps, families=3):
     return torch.cat((normalized[..., :-families], raw[..., -families:]), -1).reshape(shape)
 
 
-def validate_unified_env(env):
+def validate_unified_env(env, evaluation=False):
     if env.get("stage2JointPush") is not None:
         from utils.coupled_push_spec import validate_env
         return validate_env(env)
     if env.get("jointPush") is not None and env.get("before") is not None:
         from utils.before_push_spec import validate_env
-        return validate_env(env)
+        return validate_env(env, evaluation=evaluation)
     if env.get("jointPush") is not None:
         from utils.stage1_jointpush import validate_env
         return validate_env(env)

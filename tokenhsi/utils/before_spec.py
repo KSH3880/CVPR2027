@@ -128,6 +128,8 @@ def checkpoint_contract(env):
             contract[key] = mode
     if env['relationGraph'].get('before_object_alias') is not None:
         contract['before_object_alias'] = env['relationGraph']['before_object_alias']
+    if env['relationGraph'].get('before_virtual_object') is not None:
+        contract['before_virtual_object'] = env['relationGraph']['before_virtual_object']
     if env['before'].get('follower_pickup_carry_rsi') is not None:
         contract['size_aware_rsi'] = env['sizeAwareRsi']
     if env.get("jointPush") is not None:

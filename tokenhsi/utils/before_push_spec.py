@@ -1,6 +1,7 @@
 """BEFORE pairs retain their roles; only independent people can select PUSH."""
 from copy import deepcopy
 import hashlib
+import math
 from pathlib import Path
 import torch
 from utils.before_spec import sample_roles
@@ -10,12 +11,17 @@ from utils.edge_ontop_spec import select_graph
 SAMPLER='stage2_before_push_groups'
 
 
-def validate_env(env):
+def validate_env(env, evaluation=False):
     from utils.unified_training import validate_common_env, SKILLS
     from utils.experiments import native_config
     from utils.task_role_spec import TASK_PROBS
-    if env['numAgents']<1 or env['numObjects']<2*env['numAgents']:
-        raise ValueError('BEFORE PUSH requires at least two object tokens per person')
+    from utils.before_object_alias import MODE, VIRTUAL_MODE
+    virtual = env['relationGraph'].get('before_virtual_object')
+    if virtual is not None and (virtual != VIRTUAL_MODE or env['relationGraph'].get('before_object_alias') != MODE):
+        raise ValueError('BEFORE virtual objects require at_goal_xyz_v1 and object aliases')
+    minimum = env['numAgents'] if evaluation else 2*env['numAgents']
+    if env['numAgents']<1 or env['numObjects']<minimum:
+        raise ValueError('BEFORE PUSH requires one object token per person for inference, two for training')
     if env.get('stage2Policy')!={'version':1,'observation':'task_packet_groups_v1','relations':['NONE','SELF','BEFORE','COUPLED']}:
         raise ValueError('Stage2 PUSH requires the common task/group observation and four human relations')
     source=native_config('stage1_push')['env']
@@ -30,13 +36,33 @@ def validate_env(env):
     expected=deepcopy({k:v for k,v in source['jointPush'].items() if k!='rsi'})
     if env['before'].get('source_max_distance') == 5.:
         expected['scene']['source_distance']=[2.,5.]
+    if 'goal_distance' in env['before']:
+        expected['scene']['goal_distance']=[2.,5.]
     if env['jointPush']!=expected or env['ampExpertMapping']!=source['ampExpertMapping']:
         raise ValueError('BEFORE solo PUSH requires the Stage1 PUSH physics/contact/expert mapping')
     from utils.before_relative_sampling import DISTANCE_MIXTURE
+    from utils.before_goal_sampling import DISTANCE_MIXTURE as GOAL_DISTANCE_MIXTURE
     original=native_config('stage2_before')['env']['before']
     near=deepcopy(original);near['distance_mixture']=deepcopy(DISTANCE_MIXTURE)
     limited=deepcopy(near);limited.update(pairing_probability=.5,source_max_distance=5.)
-    if env['before'] not in (original,near,limited):
+    before=deepcopy(env['before'])
+    goal_distance=before.pop('goal_distance',None)
+    asymmetric=before.pop('asymmetric_progress',None)
+    if before.get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
+        if goal_distance != [1.,5.] or before.get('source_max_distance') != 5.:
+            raise ValueError('Goal-centered BEFORE requires source5 and goal5')
+        before['distance_mixture']=deepcopy(DISTANCE_MIXTURE)
+    if 'asymmetric_progress' in env['before']:
+        if (not isinstance(asymmetric,dict) or set(asymmetric)!={'lambda_inner'}
+                or type(asymmetric['lambda_inner']) not in (int,float)
+                or not math.isfinite(asymmetric['lambda_inner']) or asymmetric['lambda_inner']<0
+                or before!=limited or virtual!=VIRTUAL_MODE):
+            raise ValueError('Asymmetric progress requires source5 virtual and a finite nonnegative lambda_inner')
+    if 'goal_distance' in env['before']:
+        if (type(goal_distance) is not list or goal_distance!=[1.,5.]
+                or any(type(value) not in (int,float) for value in goal_distance) or before!=limited):
+            raise ValueError('BEFORE goal distances require source5 and [1.0, 5.0]')
+    if before not in (original,near,limited):
         raise ValueError('BEFORE PUSH requires the mix226 or near50 distance contract with loco-only initialization')
     old=deepcopy(env)
     old.pop('jointPush')
@@ -49,10 +75,26 @@ def validate_env(env):
 
 def sample_graph(sizes,ranges,probabilities,preset='random_scenario',num_objects=None,pairing_probability=.8):
     n,m=sizes.shape[:2]
+    o=2*m if num_objects is None else num_objects
+    if m<1 or o<m:
+        raise ValueError('BEFORE PUSH requires at least one object token per person')
+    required = {'holding_ontop': 2*m, 'before_stack': m+m//2, 'one_pair_stack': m+1}
+    if o<required.get(preset,m):
+        raise ValueError('BEFORE PUSH preset exceeds the object token budget: '+preset)
     probs=[probabilities[k] for k in ('SIT','CLIMB','HOLDING_AT','HOLDING_ON_TOP','PUSH_AT')]
     base='all_solo' if preset=='push' else preset
     predecessor,templates=sample_roles(sizes,ranges,base,solo_probabilities=probs,pairing_probability=pairing_probability)
     if preset=='push':templates.fill_(5)
+    if o<2*m:
+        pending=(m+(templates==4).sum(-1)>o).nonzero(as_tuple=True)[0]
+        for _ in range(1024):
+            if not len(pending):break
+            pre,sampled=sample_roles(sizes[pending],ranges,base,solo_probabilities=probs,pairing_probability=pairing_probability)
+            fits=m+(sampled==4).sum(-1)<=o
+            predecessor[pending[fits]],templates[pending[fits]]=pre[fits],sampled[fits]
+            pending=pending[~fits]
+        if len(pending):
+            raise RuntimeError('BEFORE PUSH task graph exceeds object token budget after 1024 retries; increase numObjects')
     graph=compose_graph(templates,num_objects=2*m)
     rows,follower=(predecessor>=0).nonzero(as_tuple=True)
     edge=((graph.edge_owner[rows]==follower[:,None])&graph.required_goal[rows]).long().argmax(-1)

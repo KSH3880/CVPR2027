@@ -16,6 +16,8 @@ PyTorch는 서버 GPU/CUDA 호환 설치본을 사용하며 Isaac Gym은 torch�
 
 현재 네 모션 링크는 `/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/` 아래 각 데이터셋을 가리킨다. `tokenhsi/data/jointpush_motions`는 `/home/hwanhee/ksh/stage1_2_jointpush/tokenhsi/data/jointpush_motions`에 연결되어 있다.
 
+PUSH 기반 Stage2의 대체 전이 파일 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`는 `/home/hwanhee/ksh/stage1_2_base_jointpush/pth/`의 동명 파일에 연결되어 있다. `STAGE1_CHECKPOINT=pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`로 지정한다.
+
 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`다. 현재 링크 대상은 `/home/cvlab/Desktop/CVPR2027/stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth`다. 다른 머신은 링크를 연결하거나 `STAGE1_CHECKPOINT=<절대경로>`로 BEFORE 새 학습의 source를 지정한다.
 
 BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는 기존 run의 `relation_config.yaml`도 필요하다. 확인 학습 저장본은 장기 성능 검증을 의미하지 않는다.
@@ -70,6 +72,8 @@ PUSH 모션21개는 `tokenhsi/data/jointpush_motions/` 아래 읽기 전용 원�
 
 `TASK_GRAPH=push`는 4명 모두 독립 PUSH, `all_solo`는 다섯 행동 독립 샘플링이다. `before_sit`·`before_climb`·`before_stack`은 기존처럼 BEFORE 쌍을 고정한다. 일반 정식 평가는 저장된 학습 설정의 `random_scenario`를 사용하며, Stage2용 1명 단독 평가 wrapper는 제공하지 않는다.
 
+BEFORE PUSH 계열 viewer/test/VNC는 `[사람 수 N] [환경 수] [Object 토큰 수 M] [반복 수]`에서 N≥1·M≥N을 지원한다. 예를 들어 기존 명령 뒤를 `8 1 12 10`으로 지정할 수 있다. Alias까지 포함한 필요 토큰은 `N+ON_TOP 수`이며 예산을 초과한 과제 조합만 다시 뽑는다. M=N이면 ON_TOP이 제외되고 M<2N이면 행동·BEFORE 쌍 분포가 예산에 조건화된다. 전원 ON_TOP은 M≥2N, 전원 BEFORE ON_TOP 쌍은 M≥N+⌊N/2⌋가 필요하며 불가능한 고정 preset은 즉시 거절한다. 학습/resume은 M≥2N을 유지하고 일반 정식 평가는 인원·토큰 변경을 허용하지 않는다.
+
 ## 공통 Stage2 PUSH와 coupled
 
 `stage2_before_push`와 `stage2_coupled_push`는 동일한 5과제·4family·4종 사람 relation 모델을 사용한다. 관측은1272차원(4명·8토큰), AMP1330차원이며 두 Stage2의 제한 시간은1200step이다. 기존 BEFORE PUSH의5N suffix 저장본은 새 모델과 호환되지 않는다. Stage1 PUSH21k에서 각각 새 전이를 시작한다. 전이 원본은 `STAGE1_CHECKPOINT`, 같은 실험 resume은 `RESUME_CHECKPOINT`로 지정한다. 두 Stage2의 학습/추론/평가 명령은 [config](config.md)에 있다.
@@ -99,6 +103,12 @@ TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=all_coupled bash tokenhsi/scripts/multi_age
 
 `stage2_before_push_near50_pair50_source5`은 near50의 쌍 생성 확률0.5·사람→상자 최대5m 변형이다. 단독 PUSH 접근은2–5m이며 이동은2–10m를 유지한다. AT/ON_TOP 목표 배치와 near50 조건은 유지한다. 기본21k 전이 경로가 없으면 `STAGE1_CHECKPOINT`를 지정한다. 현재 config의 학습 명령은 존재하는26k 파일을 명시하며, resume/viewer/평가는 이 실험의 저장본을 사용한다. [거리 상세](reference/stage2_before_push.md#쌍-선택50접근-최대5m-변형), [명령](config.md).
 
+`stage2_before_push_near50_pair50_source5_virtual`은 source5의 배치·보상을 유지하고 후행 Alias의 GTA XYZ만 선행 AT Goal XYZ로 바꾼다. 기본 전이는 연결된26k이며, 비교 원본도 같은26k를 지정한다. 학습·resume·viewer·평가는 전용 wrapper와 해당 실험 저장본을 사용한다. [가상 상자 상세](reference/stage2_before_push.md#goal-aligned-virtual-object), [명령](config.md).
+
+`stage2_before_push_near50_pair50_source5_virtual_asym`은 virtual의 관측·물리·보상을 유지하고 후행 수행 Edge의 progress에만 안쪽 감쇠를 적용한다. `before.asymmetric_progress.lambda_inner: 10.0`이며 같은 스텝의 현재 AT 성공 시 기존 progress로 복원한다. 기존 virtual과 저장본 계약을 구분하고 별도 wrapper를 사용한다. [비대칭 progress 상세](reference/stage2_before_push.md#asymmetric-progress), [명령](config.md).
+
+source5·virtual·virtual_asym은 재실행부터 초기 PUSH 후보를16개씩 검사하는 공통 최적화를 사용한다. 기존 명령·checkpoint 계약·거리/충돌 조건·후보128개·순차 fallback은 유지하며 난수 소비 순서가 달라져 동일 seed의 배치는 바뀔 수 있다. 실행 중인 Python에는 자동 반영되지 않는다. [상세](reference/stage2_before_push.md#쌍-선택50접근-최대5m-변형).
+
 ### 26k PUSH 평가와 Stage2 제로샷 관찰
 
 사용자가 제공한 가중치는 `pth/Stage1V2Fixed_00078000.pth`(기존4과제), `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`(PUSH 포함)다.26k의 일반 Stage1 평가는 저장된 PUSH50% 분포를 복원하고900step을 사용한다. 현재 YAML의 새 학습 PUSH30%와 구분한다.
@@ -122,3 +132,11 @@ TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=all_coupled bash tokenhsi/scripts/multi_age
 모든 설정의 PUSH·CARRY AT 목표구는 viewer/VNC/영상에서 반지름20cm(지름40cm)로 표시한다. 크기는 actor 생성 시 지정한다. 목표 좌표와 성공 거리 판정은 그대로이며 기존 실행 명령을 다시 실행하면 적용된다.
 
 PUSH AT의 viewer/VNC에는 바닥 링(반지름35cm)·세로선·와이어 구(반지름20cm)를 선으로 덧그린다. 공동 PUSH 선은 노란색, 독립 PUSH 선은 담당자 색이다. 선 표시 함수는 actor scale·물리 상태·reset을 수정하지 않는다.
+
+### BEFORE source5 계열 goal5
+
+`stage2_before_push_near50_pair50_source5_goal5`·`stage2_before_push_near50_pair50_source5_virtual_goal5`·`stage2_before_push_near50_pair50_source5_virtual_asym_goal5`는 각 원본 실험에서 AT/독립 ON_TOP의 상자→목표를1–5m, 독립 PUSH 이동을2–5m로 바꾼다. 기본26k 전이로 새 학습하며 전용 wrapper와 출력·checkpoint 계약을 사용한다. 기존 세 실험의 저장본은 기존 wrapper에서 계속 사용하고 새 실험과 resume/viewer를 혼용하지 않는다. BEFORE 후행의 최종 수행 거리는 별도로 제한하지 않는다. [거리·수치 여유 상세](reference/stage2_before_push.md#상자목표-최대5m-변형), [명령](config.md).
+
+### goal5 기반 BEFORE 목표 중심 후행 배치
+
+세 `stage2_before_push_near50_pair50_source5*_goal5_goalroute`는 각각 기존 goal5의 단독 거리·모델·보상·Virtual/비대칭 설정을 유지하고 BEFORE 후행 배치와 near50 거리 정의만 바꾼다. 기본 Stage1 26k 전이로 새 학습하며, 기존 goal5 저장본과 resume/추론을 혼용하지 않는다. 실행 명령은 [config](config.md), 상세 거리·샘플링 순서는 [BEFORE PUSH](reference/stage2_before_push.md#goal5-기반-목표-중심-후행-배치)를 따른다.

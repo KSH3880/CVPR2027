@@ -8,7 +8,8 @@ from utils.edge_interaction_spec import SIT, CLIMB
 from utils.edge_scenario_spec import paired_placement_success
 
 
-def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, config):
+def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, config,
+                            raw_success=None, lambda_inner=0.):
     """Retarget only dependent SIT/CLIMB/ON_TOP proximity, in either gate state.
 
     Keep the actual support's size/buffer and every non-dependent edge intact.
@@ -37,8 +38,12 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
         radius = sizes[rows, dst[rows, edges]-m, :2].norm(dim=-1)/2
         radius += torch.where(top, float(buffers['ON_TOP']),
             torch.where(relation[rows, edges] == SIT, float(buffers['SIT']), float(buffers['CLIMB'])))
+    error = (distance-radius).clamp_min(0)
+    if lambda_inner:
+        predecessor_success = raw_success[rows, predecessor_edge]
+        error = error + lambda_inner*(~predecessor_success).to(error.dtype)*(radius-distance).clamp_min(0)
     result = progress.clone()
-    result[rows, edges] = 1 / (1 + (distance-radius).clamp_min(0)/p['sigma'])
+    result[rows, edges] = 1 / (1 + error/p['sigma'])
     return result
 
 

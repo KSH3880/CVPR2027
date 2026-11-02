@@ -319,7 +319,8 @@ class SceneResetMixin:
             from utils.stage1_sampling import sample_goal_xy
             new_xy = sample_goal_xy(
                 self._humanoid_root_states[curr_env, curr_agent, :2],
-                self._box_states[curr_env, curr_box, :2], self._env_origins[curr_env, :2])
+                self._box_states[curr_env, curr_box, :2], self._env_origins[curr_env, :2],
+                goal_distance=self.cfg['env'].get('before', {}).get('goal_distance'))
             new_z = self._box_size[curr_env, curr_box, 2] / 2
             new_target_pos = torch.cat([new_xy, new_z.unsqueeze(-1)], dim=-1)
             self._tar_pos[curr_env, goal_index] = new_target_pos

@@ -196,7 +196,7 @@ def load_cfg(args):
     cfg_train["params"]["seed"] = seed
     cfg["args"] = args
     from utils.unified_training import validate_unified_env
-    validate_unified_env(cfg['env'])
+    validate_unified_env(cfg['env'], evaluation=is_eval)
     if is_eval and args.checkpoint == 'Base':
         raise ValueError('Evaluation requires --checkpoint')
     expected_task = ('HumanoidMACoupledPush' if cfg['env'].get('stage2JointPush') is not None

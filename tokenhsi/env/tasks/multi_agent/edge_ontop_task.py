@@ -173,6 +173,9 @@ class SampledOnTopTaskMixin:
 
             reset_stage1_platforms(self, pending)
             rejected = self._ontop_scene_infeasible(pending)
+            if self.cfg['env'].get('before', {}).get('goal_distance') is not None:
+                from env.tasks.multi_agent.scene_validation import scene_infeasible
+                rejected |= scene_infeasible(self, pending, margin=.001)
             accepted = pending[~rejected]
             if len(accepted):
                 putdown_supports = self._putdown_ontop_supports()

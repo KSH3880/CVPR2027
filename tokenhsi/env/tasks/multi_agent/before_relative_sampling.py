@@ -15,7 +15,8 @@ def apply_layout(t, ids):
     support, desired, payload = sample_layout(first, t._box_states[es, leader, :2],
         root, t._box_states[es, follower, :2], t._templates[es, follower],
         t._before_near_pairs[es, follower], advanced,
-        max_distance=t.cfg['env']['before'].get('source_max_distance', 10.))
+        max_distance=t.cfg['env']['before'].get('source_max_distance', 10.),
+        distance_margin=.001 if 'source_max_distance' in t.cfg['env']['before'] else 0.)
     delta = desired-root
     t._box_states[es, leader, :2] = support
     t._humanoid_root_states[es, follower, :2] += delta

@@ -1,5 +1,6 @@
 """Stage1 opt-in TokenHSI distances; legacy saved configs retain their sampler."""
 import torch
+from utils.jointpush_scene import radial_xy
 
 
 def uses_tokenhsi_sampling(env):
@@ -16,16 +17,16 @@ def sample_source_xy(human_xy, templates, max_distance=10.):
     return human_xy + direction * radius[:, None]
 
 
-def sample_goal_xy(human_xy, payload_xy, center_xy):
-    """Native square U([-4.5,4.5]^2), outside both 1 m exclusion circles."""
-    target = center_xy + (torch.rand_like(human_xy) * 2. - 1.) * 4.5
+def sample_goal_xy(human_xy, payload_xy, center_xy, goal_distance=None):
+    target = (center_xy + (torch.rand_like(human_xy) * 2. - 1.) * 4.5
+              if goal_distance is None else radial_xy(payload_xy, goal_distance))
     for _ in range(256):
         invalid = ((target - human_xy).square().sum(-1) < 1.) | (
             (target - payload_xy).square().sum(-1) < 1.)
         if not invalid.any():
             return target
-        target[invalid] = center_xy[invalid] + (
-            torch.rand_like(target[invalid]) * 2. - 1.) * 4.5
+        target[invalid] = (center_xy[invalid] + (torch.rand_like(target[invalid]) * 2. - 1.) * 4.5
+                           if goal_distance is None else radial_xy(payload_xy[invalid], goal_distance))
     raise RuntimeError('TokenHSI goal sampler exhausted rejection attempts')
 
 

@@ -1,7 +1,9 @@
 from dataclasses import replace
 from env.tasks.multi_agent import before_pickup_carry_rsi as pickup_carry
 from env.tasks.multi_agent import before_relative_sampling as relative_sampling
+from env.tasks.multi_agent import before_goal_sampling as goal_sampling
 from utils.before_relative_sampling import DISTANCE_MIXTURE as RELATIVE_DISTANCE_MIXTURE
+from utils.before_goal_sampling import DISTANCE_MIXTURE as GOAL_DISTANCE_MIXTURE
 
 from isaacgym import gymapi
 import torch
@@ -23,6 +25,8 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
         bad = scene_infeasible(self, ids)
         if self.cfg['env']['before'].get('distance_mixture') == RELATIVE_DISTANCE_MIXTURE:
             bad |= relative_sampling.invalid(self, ids)
+        elif self.cfg['env']['before'].get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
+            bad |= goal_sampling.invalid(self, ids, margin=.0005)
         return pickup_carry.screen(self, ids, bad) if self.cfg['env']['before'].get('follower_pickup_carry_rsi') else bad
 
     def _load_box_asset(self):
@@ -80,9 +84,16 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
             graph = (self.relation_runtime.graph if env_ids is None
                      else select_graph(self.relation_runtime.graph, env_ids))
             goals = self._tar_pos if env_ids is None else self._tar_pos[env_ids]
+            lambda_inner = self.cfg['env']['before'].get('asymmetric_progress', {}).get('lambda_inner', 0.)
+            raw_success = None
+            if lambda_inner:
+                from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
+                raw_success = interaction_own_success(phi, diag['z_error'], diag['feet_height_error'],
+                    graph, self._relation_cfg, diag['region_error'])
             diag['progress'] = predecessor_at_progress(diag['progress'], bodies[..., 0, :],
                 self._logical_box_values(self._box_states, env_ids),
-                self._logical_box_values(self._box_size, env_ids), goals, graph, self._relation_cfg)
+                self._logical_box_values(self._box_size, env_ids), goals, graph, self._relation_cfg,
+                raw_success=raw_success, lambda_inner=lambda_inner)
         return phi, diag
 
     def _draw_episode_graph(self, ids):
@@ -195,6 +206,8 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
         super()._reset_boxes(ids)
         if slots is not None:
             self._reset_ref_slots['loco'] = slots
+        if self.cfg['env']['before'].get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
+            return
         if self.cfg['env']['before'].get('distance_mixture') == RELATIVE_DISTANCE_MIXTURE:
             return relative_sampling.apply_layout(self, ids)
         row, human = (self._before_predecessor[ids] >= 0).nonzero(as_tuple=True)
@@ -235,6 +248,8 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
     def _reset_task(self, ids):
         super()._reset_task(ids)
         mixture = self.cfg['env']['before'].get('distance_mixture')
+        if mixture == GOAL_DISTANCE_MIXTURE:
+            return goal_sampling.apply_layout(self, ids)
         if mixture is None or 'leader_goal_distance' not in mixture:
             return
         row, follower = (self._before_predecessor[ids] >= 0).nonzero(as_tuple=True)
@@ -252,7 +267,8 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
         row, human = ((self._templates[ids] == 4) & (self._before_predecessor[ids] < 0)).nonzero(as_tuple=True)
         es = ids[row]
         self._box_states[es, 3*self.num_agents+human, :2] = sample_goal_xy(
-            self._humanoid_root_states[es, human, :2], self._box_states[es, human, :2], self._env_origins[es, :2])
+            self._humanoid_root_states[es, human, :2], self._box_states[es, human, :2], self._env_origins[es, :2],
+            goal_distance=self.cfg['env']['before'].get('goal_distance'))
         self._place_distractors(ids)
 
     def _record_ontop_diagnostics(self, result, diag):

@@ -51,7 +51,7 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
         validate_relation_config(self._relation_cfg)
         from utils.unified_training import validate_unified_env
 
-        validate_unified_env(cfg["env"])
+        validate_unified_env(cfg["env"], evaluation=cfg["args"].test or cfg["args"].eval)
         default_preset = (
             "holding_at" if cfg["args"].test or cfg["args"].eval else "random_scenario"
         )

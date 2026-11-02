@@ -2,7 +2,145 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-02
+
+### BEFORE 세 모델 8명·16토큰·64환경·1회 평가
+
+- 추가 GPU/시뮬레이션 없이 기존4명(6000/5500/6000·512환경×3seed 평균)과8명(7000/6500/7000·64환경×seed2)의 Plane Ever 차이를 집계했다. checkpoint·평가 규모가 달라 순수 인원 수 효과로 해석할 수 없음을 명시했다. [4명→8명 행동별 차이](output_etc/check/before8_eval64_20261102/comparison_4_to_8.md), [집계 JSON](output_etc/check/before8_eval64_20261102/comparison_4_to_8.json).
+- 사용자 지정대로 GPU5·6만 사용해 source5 7000·virtual6500·asym7000 저장본을8명·16토큰·64환경·seed2·첫 episode1회·1200step·deterministic으로 평가했다. 저장된 random_scenario/near50 설정을 유지하고 기존 Plane Ever 기하 판정·개인 낙상 freeze를 재사용했다. 학습4명에서 인원을 바꾼 진단 평가이며, 정식 general의 인원 변경 금지 규칙은 운영 코드에서 유지하고 확인용 driver만 별도 경로에 뒀다.
+- 후행 동시 Plane Ever는 SIT21.05/15.79/13.16%(각38쌍), CLIMB30.77/2.56/2.56%(각39쌍), ON_TOP10.11/13.48/8.99%(각89쌍), 전체17.47/11.45/8.43%(각166쌍)였다. 선행 AT81.33/77.71/79.52%이며 단독 행동은 양쪽 BEFORE 역할을 제외해 집계했다. 1seed이므로 표준편차를 계산하지 않았다. [행동별·단독·선행 AT 표](output_etc/check/before8_eval64_20261102/report_plane.md).
+- 세 rollout 모두1200step·CPU float64/GPU/JSON 판정 일치·trace finite·float32/64 누적 차이0·모델 간 초기 상태 정확 일치·checkpoint 및 운영 파일281개 해시 보존을 확인했다. 기존 학습 프로세스도 유지됐다. 8명 초기화에서 기존 PUSH sequential 경로 배치가 오래 걸렸으며 이번 예산 수정에서 해당 물리 sampler를 최적화하거나 검사를 완화하지 않았다. [입력 조건](output_etc/check/before8_eval64_20261102/plan.json), [전체 수치](output_etc/check/before8_eval64_20261102/comparison.json), [검증](output_etc/check/before8_eval64_20261102/verification.json).
+
+### BEFORE PUSH viewer의 가변 인원·물체 예산 지원
+
+- 추론 validation을 CLI와 task 생성까지 전달해 BEFORE PUSH viewer/test/VNC에서 N≥1·M≥N을 허용했다. Alias 포함 `N+ON_TOP 수`가 예산을 초과한 과제 조합만 최대1024회 재샘플링하며 불가능한 고정 ON_TOP preset은 즉시 거절한다. 학습/resume의 M≥2N·기존 충분한 예산의 샘플링/RNG·모델/보상/Gate/계약과 정식 general 규약은 유지했다. config/USAGE/structure를 갱신했다.
+- CPU132개 통과(기존 checkpoint 전이1개 제외), 수정 전후 CPU5개·CUDA4개 사례의 그래프/역할/template/RNG 정확 일치, GPU5의 작은 토큰 예산2560개 장면 검사를 통과했다. GPU6에서 기존 asym6000을8명·1환경·12토큰·seed2·32step으로 실제 VNC 실행/종료하고 CUDA/Vulkan GPU 일치를 확인했다. 같은 GPU에서 실제 test wrapper의1명·1토큰/source5 7000과8명·8토큰/virtual6500을 각각1환경·seed2·16step으로 완료했다. 보조8환경 다중preset 검사는 random_scenario16step·부분reset 이후 all_solo의 기존 PUSH 배치 지연으로 해당 보조 프로세스만 중단했으며 전체 preset 통과로 간주하지 않는다. 기존 학습·참고 jointpush 레포는 보존했다. [검증/제한](output_etc/check/before_viewer_budget_20261102/report.md), [이번 구현 diff](output_etc/check/before_viewer_budget_20261102/implementation_diff.patch).
+
+### 최신 goalroute 세 BEFORE 실험 Plane Ever 평가
+
+- 실제 초기 후행 수행거리가 선행 접근+운반거리보다 짧은1322/1689쌍(78.27%)을 CPU로 분리 집계했다. 후행 SIT45.36/22.51/10.51%, CLIMB24.15/2.60/1.00%, ON_TOP19.66/19.57/17.55%였다. 강제 near 표시는 저장되지 않아 실제 거리로 분리했으며, 모델별 분류 동일·near/far 합의 기존 행동/seed별 건수 정확 재현을 확인했다. [가까운 쌍/나머지 표](output_etc/check/goalroute_eval_latest_20261102/report_near_plane.md).
+- 평가 시작 시 최신 고정 저장본인 source5 6000/frame786432000, virtual 5500/frame720896000, virtual_asym 6000/frame786432000을 각각512환경×4명×seed0·1·2×1200step deterministic 첫 episode로 평가했다. 직전 허용 GPU0·3 중 GPU0은 여유 메모리 약2GB라 GPU3만 사용했고 기존 프로세스·학습 설정은 유지했다. near50을 포함한 checkpoint의 학습 샘플링을 사용하며 모델별 epoch가 다르다.
+- BEFORE 후행 동시 Plane Ever는 SIT44.68/21.81/11.46%, CLIMB25.96/6.17/6.09%, ON_TOP21.31/20.69/18.27%였다. 단독 SIT96.55/92.31/85.80%, 선행 AT82.84/83.00/84.72%였다(source5/virtual/asym 순서). [행동별 표·선행 AT](output_etc/check/goalroute_eval_latest_20261102/report_plane.md), [1500→최신 비교](output_etc/check/goalroute_eval_latest_20261102/comparison_1500_to_latest.md).
+- 9개 rollout 모두1200step·CPU float64/GPU/JSON 판정 일치·trace finite·float32/64 누적 판정 차이0·입력 checkpoint 해시 보존을 통과했다. 세 모델과1500↔최신의 같은seed 초기 상태가 정확히 같았고 운영 코드/설정281개 해시도 같았다. 현재 세 학습 PID 생존·누적 학습 지표 finite를 확인했다. [입력 조건](output_etc/check/goalroute_eval_latest_20261102/plan.json), [전체 수치](output_etc/check/goalroute_eval_latest_20261102/comparison.json), [전체 검증](output_etc/check/goalroute_eval_latest_20261102/verification.json).
+
+## 2026-11-01
+
+### 최신 goalroute 세 실험 1500 checkpoint Plane Ever 평가
+
+- 추가 CPU 분리 집계에서 초기 후행 수행거리가 선행 접근+운반거리보다 짧은 쌍은1322/1689개(78.27%)였다. near50은 약50%에 짧은 거리를 강제하며 나머지 무제약 표본도 가까울 수 있다. 저장되지 않은 강제 near 선택 표시 대신 실제 초기 거리로 분리했고 세 모델/seed별 분류 동일·near/far 건수 합의 기존 결과 정확 재현을 확인했다. [가까운 쌍/나머지 Plane 표](output_etc/check/goalroute_eval1500_20261101/report_near_plane.md).
+- 사용자 지정 GPU0·3에서 세 goalroute 실험의 epoch1500/frame196608000 저장본을 각각512환경×4명×seed0·1·2×1200step deterministic 첫 episode로 평가했다. BEFORE는 선행AT·후행 동시 Plane Ever, 단독은 혼합 장면에서 BEFORE 양쪽 역할을 제외한 개인 Ever다. 기존 프로세스·학습 설정은 유지했다.
+- BEFORE 동시 전체 평균±표본std는 source5 `21.42±0.77%`, virtual `12.27±1.03%`, asym `12.22±1.57%`였다. 후행 SIT38.07/13.79/11.27%, CLIMB19.91/5.13/6.64%, ON_TOP15.86/14.64/14.86%였다. 단독 SIT94.64/82.35/84.62%로1000 대비 각각+3.48/+2.72/-3.82%p였다. [행동별 Plane 표](output_etc/check/goalroute_eval1500_20261101/report_plane.md), [1000→1500 비교](output_etc/check/goalroute_eval1500_20261101/comparison_1000_to_1500.md).
+- 9개 rollout 모두1200step·CPU float64/GPU/JSON 판정 일치·trace finite·float32/64 누적 차이0·checkpoint 해시 보존을 통과했다. 세 모델과1000↔1500의 같은seed 초기 상태가 정확히 같았고 운영 코드/설정281개 해시도 보존됐다. 모든seed GPU0/3 실행과 현재 세 학습 PID·지표 finite를 확인했다. [입력 조건](output_etc/check/goalroute_eval1500_20261101/plan.json), [전체 검증](output_etc/check/goalroute_eval1500_20261101/verification.json).
+
+### 최신 goalroute 세 실험 1000 checkpoint Plane Ever 평가
+
+- 동일 세 goalroute 실험의 epoch1000/frame131072000 저장본을 GPU5·6만 사용해 각512환경×4명×seed0·1·2×1200step의 deterministic 첫 episode로 정식 평가했다. BEFORE는 선행AT·후행 동시 Plane Ever, 단독은 혼합 장면에서 BEFORE 양쪽 역할을 제외한 개인 Plane Ever다. 기존 학습·checkpoint·운영 코드는 유지했다.
+- BEFORE 동시 전체 평균±표본std는 source5 `18.93±0.91%`, virtual `13.39±0.44%`, asym `12.29±1.66%`였다. 후행 SIT25.65/15.07/9.99%, CLIMB22.50/6.75/5.91%, ON_TOP14.90/15.54/15.72%였다. 단독 SIT는91.16/79.63/88.44%로500 대비 각각-5.34/+1.99/+0.03%p였다. [행동별 Plane 표](output_etc/check/goalroute_eval1000_20261101/report_plane.md), [500→1000 비교](output_etc/check/goalroute_eval1000_20261101/comparison_500_to_1000.md).
+- 9개 rollout 모두1200step·CPU float64/GPU/JSON 판정 일치·trace finite·float32/64 누적 차이0·입력 checkpoint 해시 보존을 통과했다. 세 모델 및500↔1000의 같은seed 초기 상태가 정확히 같았고 두 평가의 운영 코드/설정281개 해시도 같았다. 모든seed GPU5/6 실행과 현재 세 학습 PID·지표 finite를 확인했다. [입력 조건](output_etc/check/goalroute_eval1000_20261101/plan.json), [전체 검증](output_etc/check/goalroute_eval1000_20261101/verification.json), [seed별 변화](output_etc/check/goalroute_eval1000_20261101/delta_from_500.json).
+
+### 최신 goalroute 세 실험 500 checkpoint Plane Ever 평가
+
+- source5_goal5_goalroute·virtual_goal5_goalroute·virtual_asym_goal5_goalroute의 epoch500/frame65536000 저장본을 GPU5·6만 사용해 각512환경×4명×seed0·1·2×1200step의 deterministic 첫 episode로 정식 평가했다. 시작 시 virtual은466epoch여서 해당500 저장본이 생성된 뒤 평가했으며, 각 checkpoint의 goal_route_sum·목표 거리·Virtual/비대칭 설정을 유지했다.
+- BEFORE 동시 Plane Ever 전체 평균±표본std는 source5 `14.26±1.15%`, virtual `11.60±0.90%`, asym `10.71±1.23%`였다. 후행 SIT22.22/13.83/9.99%, CLIMB19.76/8.45/9.24%, ON_TOP9.14/12.09/11.57%이며 단독은 BEFORE 양쪽 역할을 제외해 따로 집계했다. [행동별 Plane 표](output_etc/check/goalroute_eval500_20261101/report_plane.md), [seed별 건수·통계](output_etc/check/goalroute_eval500_20261101/plane_tables.json).
+- 9개 rollout 모두1200step을 완료하고 CPU float64 재채점·GPU 누적·JSON 건수가 일치했다. trace finite·float32/64 누적 판정 차이0·같은seed 초기 상태 정확 일치·입력 checkpoint 해시 보존과 모든seed GPU5/6 실행 기록을 확인했다. 운영 코드/설정281개 해시와 기존 세 학습 PID·지표 finite도 유지됐다. [입력/실행 조건](output_etc/check/goalroute_eval500_20261101/plan.json), [전체 검증](output_etc/check/goalroute_eval500_20261101/verification.json).
+
+### 이전 source5·virtual·virtual_asym 5000 checkpoint Plane Ever 평가
+
+- 이전 세 run의 epoch5000/frame655360000 저장본을 GPU5·6에서 각512환경×4명×seed0·1·2×1200step의 deterministic 첫 episode로 정식 평가했다. checkpoint에 저장된 기존 relative_sum 배치를 사용했고 현재 goalroute 학습은 유지했다. BEFORE는 선행AT·후행 같은 frame의 동시 Plane Ever, 단독은 BEFORE 선행·후행을 모두 제외한 개인 Plane Ever다.
+- BEFORE 동시 전체 평균±표본std는 source5 `15.12±1.78%`, virtual `8.12±0.68%`, asym `9.10±1.16%`였다. 행동별 SIT33.85/7.59/9.72%, CLIMB13.82/2.07/2.25%, ON_TOP8.85/10.85/11.66%로 source5의 SIT/CLIMB 우위가 유지됐다. [Plane 행동별 표](output_etc/check/eval5000_20261101/report_plane.md), [세부 수치](output_etc/check/eval5000_20261101/plane_tables.json).
+- 9개 rollout의 CPU float64 재채점·GPU 누적·JSON 건수가 일치했고 trace finite·float32/64 누적 판정 차이0·동일seed 초기 상태 정확 일치·입력 checkpoint 해시 보존을 확인했다. 비교 코드 삭제 후 운영 코드/설정281개 해시도 유지됐고 현재 세 goalroute 학습 PID·지표 finite를 확인했다. [입력 조건](output_etc/check/eval5000_20261101/plan.json), [전체 검증](output_etc/check/eval5000_20261101/verification.json).
+
+### 사용하지 않는 최적화 비교·계측 코드 정리
+
+- 사용자 요청으로 `output_etc/check/push_opt123_20261101`·`reset_share_20261101` 아래 일회성 Python17개와 bytecode9개만 삭제했다. 운영 경로의 참조·실행 프로세스가 없음을 확인했고 코드/설정281개 해시를 전후 비교해 전부 보존했다. 현재 학습·원본·모든 checkpoint·보고서·JSON·로그는 유지했다. 보고서의 삭제 코드 링크를 정리하고 삭제 표시를 추가했다. [삭제 목록·검증](output_etc/check/eval5000_20261101/cleanup_result.json).
+
+### source5 goalroute 실제 학습의 reset 시간 비중 계측
+
+- GPU5·원본 source5_goal5_goalroute·4명/1024환경/8토큰·seed42·Stage1 26k에서 CHECK40epoch(1280step)를 실행했다. 계측은 별도 프로세스에서 reset 앞뒤 동기화와 후보 sampler CUDA event로 추가했고 운영 코드·모델/보상/샘플링 설정·기존 프로세스는 유지했다. 시작 전체 초기화와 첫2epoch는 집계에서 제외했다.
+- 측정38epoch275.584초 중 reset39.994초(14.51%), 나머지 rollout80.372초(29.16%), PPO/AMP 업데이트·배치 준비 등155.217초(56.32%)였다. reset 내부 PUSH 후보 sampler는7.369초로 전체2.67%·reset18.42%였다. reset465회 중464회는1–5환경,1회는550환경이었고 호출당 환경 수 중앙값1이었다. 큰 전체 초기화의63–66% 단축을 학습 중 작은 부분 reset에 그대로 대입할 수 없으며, 이번 후보 sampler 최적화가 줄일 수 있는 전체 시간 비중은 제한적이다.
+- 40epoch/frame5242880 완료·학습 지표/모델/optimizer/정규화 finite·encoder73 tensor/입력 RMS 동결·운영 sampler 해시 보존을 확인했다. 단일seed 초기 학습과 동기화 계측의 근사 비중이며 성숙한 정책·세 모델 동시 학습이나 최적화 적용 후 처리량을 보장하지 않는다. [보고서](output_etc/check/reset_share_20261101/report.md), [전체 집계](output_etc/check/reset_share_20261101/verification.json), [checkpoint 검사](output_etc/check/reset_share_20261101/checkpoint_validation.json).
+
+### source5 goalroute PUSH sampler 최적화1·2·3 분리 비교
+
+- 사용자 요청으로 GPU5만 사용해 source5_goal5_goalroute 하나에서 원본/실제 PUSH 경로 벡터화/반경 재사용/후보 메타데이터 공유를 누적 비교했다. 구현은 `output_etc/check/push_opt123_20261101/variants.py`의 프로세스별 교체로 격리했고 운영 코드·세 설정·기존 프로세스는 보존했다. 최종 전체 장면 validator는 원본을 유지한다.
+- CPU/GPU 각각 경로147,456건·경계30건·sampler54건의 판정/후보/미해결 index/입력/RNG 동일성을 통과했다. 교차32,768회 reset의 상태·관측이 정확히 같았고, 4명/1024환경/8토큰 스트레스65,596회에서 거리/near/충돌/경로/각도/성공 환경 보존·부분 reset을 통과했다. 최종 실패0·최대10라운드·버전별 fallback2,216건 전부 해결·집계 동일이었다. 네 버전의32환경5preset×16step Actor/Critic·alias·보상/관측 finite·부분 reset·모델 보존과 각5epoch CHECK 학습의26k165 tensor 전이·encoder73 tensor/입력 RMS 동결·head6 tensor 갱신·모델/optimizer/지표 finite를 확인했다.
+- 같은 GPU에서 순서를 교차한6개 측정 seed의 전체 reset 중앙값은 원본1.749초, 1번0.645초, 1+2번0.629초, 1+2+3번0.589초였다. 순서를 뒤집은 최종 단일seed 학습에서 첫 epoch 제외 중앙값은 각각6.890/7.003/7.239/7.130초로 전체 PPO 속도 개선은 확인되지 않았다. 후보 중간 메모리는108.0→179.5/162.8/146.5MiB로 늘었고 전체 PyTorch 학습 peak는 약13.17GiB였다. 장기 처리량·정책 성능은 미검증이므로 정식 반영은 보류한다. 기존 mix226 전용 물리 검사 도구가 goalroute 설정을 거절한 것은 비교용 검사만 현재 거리 검증으로 교체해 재검증했다. [보고서](output_etc/check/push_opt123_20261101/report.md), [전체 결과](output_etc/check/push_opt123_20261101/verification.json).
+
+### goal5 기반 목표 중심 BEFORE 배치·수행 거리 near50 실험3개
+
+- 세 goal5 설정에 `_goalroute`를 붙인 환경/학습 YAML과 train/test/VNC/eval을 추가했다. 선행 A→O·O→G 각각1–5m, SIT/CLIMB 후행 G→B 1–10m, ON_TOP G→P·P→B 각각1–5m와 B→G≥1m를 적용한다. near50은 생성된 쌍 절반에 후행 수행 거리 합 < 선행 접근+운반 거리 합을 강제한다. 기존 goal5 여섯 YAML 해시·단독 거리·모델/보상/Gate/Virtual/비대칭 설정을 보존하고 새로운 before 계약·출력·20개 실험의 문서/명령 목록을 분리했다. 기본은 동일 Stage1 26k 전이이며 기존 goal5 저장본과 resume/추론을 혼용하지 않는다.
+- near 거리 합의 조건부 CDF와 조건부 각도로 반복 rejection을 피한다. 새 설정에서만 AT 목표·후행 배치를 PUSH 후보 검사보다 먼저 확정하고, PUSH/distractor/단독 ON_TOP 받침처럼 나중에 배치할 물체를 제외한 고정 장면을 선검사한다. 최종 전체 충돌·경로·각도·strict near 판정과64회 외부 재시도는 유지한다. 이 선검사는 중간 검사에서 발견한 불가능한 장면의 긴 PUSH 순차 fallback을 줄이기 위한 것이다.
+- GPU5/6에서 최종 코드의 각4명·1024환경·8토큰을16,399회씩, 총49,197회 reset했다. 혼합·전원PUSH·BEFORE 두쌍/한쌍·독립과 부분 reset, 모든 거리·near50·충돌·경로·각도·graph/성공 환경 보존을 통과했고 최종 실패0·최대10라운드·순차 fallback 미해결0이었다. 설정별 후행 SIT2645·CLIMB2461·ON_TOP11594건을 포함했고 강제 near5739/11571쌍(49.60%)이었다. 세 설정의 기하 검사 집계도 동일했다.
+- CPU213개 통과(없는 기존 checkpoint4개 skip·기존21k 전이1개 제외), 세 새 wrapper CHECK 학습 epoch2/frame262144·26k165 tensor 전이·actor encoder73 tensor/입력 RMS 동결·head6 tensor 갱신·finite를 확인했다. 최종 선검사 포함 asym CHECK 재확인과32환경5preset×16step의 actor/critic·Virtual XYZ/실제 회전·같은 스텝 AT 성공 전환·State/Success/HOLDING/원본 상태 보존, 세 wrapper의4환경32step headless 재로딩을 통과했다.12개 wrapper 구문·20개 config 표/세 명령 목록·문서 링크·diff 검사도 통과했다.
+- 같은 GPU6에서 순서를 교차한8쌍 중 warmup2쌍을 제외한 혼합1024환경 reset 중앙값은 기존 goal5 5.246초→goalroute 3.827초(27.1% 감소)였다. 기존 본학습과 함께 실행된 reset 측정이며 장기 PPO 전체 처리량 개선을 보장하지 않는다. 기존 사용자 프로세스를 유지했으며 본학습·새 정책 성능 평가·GUI/VNC 실화면은 실행하지 않았다. [검증 보고서](output_etc/check/before_goalroute/report.md), [전체 수치/실행 조건](output_etc/check/before_goalroute/verification.json).
+
+### 세 모델4k BEFORE·단독 Plane Ever 재집계
+
+- 사용자 요청으로 기존 source5/virtual/virtual_asym epoch4000·512환경×4명×3seed·1200step 결과에서 `region`을 Plane Ever 주 지표로 정리했다. BEFORE는 선행 AT와 후행의 같은 프레임 동시 Ever, 단독은 선행·후행 모두 제외한 개인 Ever다. 기존 Point 표는 보존하고 [Plane 표](output_etc/check/latest3_eval_20261101_132836/report_plane.md)·[seed별 건수/통계](output_etc/check/latest3_eval_20261101_132836/plane_tables.json)를 추가했다.
+- 기존9개 CPU/GPU 재채점 결과와 finite를 확인하고 저장 trace의 Plane 성공 건수/JSON 일치·기존 Point 단독 표 재현을 통과했다. 새 시뮬레이션·GPU 작업 없이 재집계했다. 후행 SIT 동시 Ever29.07/5.82/14.12%, 단독 SIT95.37/79.60/93.07%이며 값은 source5/virtual/asym 순서의 seed 평균이다.
+
+### 원본 Stage1 26k 단독 SIT·CLIMB 거리별 평가
+
+- 사용자 지정 주 지표는 **Plane Ever**(기존 코드 `region`)다. 저장·CPU 검증한 결과를 다시 정리했으며 추가 시뮬레이션은 하지 않았다. Stage1 26k는 SIT1–5m83.75%·6–10m90.31%, CLIMB100.00%·99.69%다. [Stage1 Plane 표](output_etc/check/stage1_26k_distance_eval_20261101/report_plane.md), [source5 Plane 표](output_etc/check/source5_distance_eval_20261101/report_plane.md). 아래 Point 수치는 별도 지표로 보존한다.
+- `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`의 저장 env/sim을 복원하고 Stage1 단독 기준1명·1상자·loco·deterministic·900step·seed0으로 평가했다. 사람 root→자기 상자 중심 초기 XY 거리1·2·…·10m마다64환경, 행동별640시도이며 GPU5(SIT)·6(CLIMB)만 사용했다. 기존 학습 프로세스·코드·설정·원본 checkpoint는 보존했다.
+- Point Ever는 SIT1–5m70.00%·6–10m71.88%, CLIMB98.75%·98.12%였다. 앞선 source5는4명·8토큰·1200step이므로 모델만 바꾼 통제 비교와 구분한다. 두 rollout900step·총1280시도의 CPU float64 재채점/GPU 누적/JSON 집계 일치, float32/64 누적 판정 차이0·trace finite·초기 거리 오차 최대0.067mm·checkpoint SHA256 보존을 확인했다. [거리별 결과](output_etc/check/stage1_26k_distance_eval_20261101/report.md), [실행 조건/검증](output_etc/check/stage1_26k_distance_eval_20261101/comparison.json).
+
+### source5 5k 독립 SIT·CLIMB 거리별 평가
+
+- 요청 시점 최신 source5 epoch5000 저장본을 사람 root→자기 상자 중심 초기 XY 거리1·2·…·10m에서 평가했다. 행동·거리별64환경×4명=256시도, seed0·loco·deterministic·1200step이며 전원 독립 SIT 또는 CLIMB로 배치했다. 별도 평가 프로세스에서 거리만 고정하고 기존 학습·설정·보상·충돌 검사를 유지했다. 단일 seed 거리 진단이며 일반 혼합 과제 평가와 구분한다.
+- Point Ever는 SIT1–5m 평균83.05%·6–10m82.89%, CLIMB95.00%·95.63%였다. 거리별 결과는 [결과표](output_etc/check/source5_distance_eval_20261101/report.md)에 있다. 두 rollout의1200step·전체5120시도 CPU float64 재채점과 GPU 누적/JSON 집계 일치, float32/64 누적 판정 차이0·trace finite·최대 초기 거리 오차0.168mm·checkpoint SHA256 보존을 확인했다.
+- 평가는 GPU0/1에서 완료됐고 해당 프로세스는 종료됐다. 완료 직후 사용자 지시에 따라 이후 GPU 작업은5/6만 사용한다. [실행 조건/검증](output_etc/check/source5_distance_eval_20261101/comparison.json).
+
+### source5 계열 goal5 실험3개 추가
+
+- `stage2_before_push_near50_pair50_source5_goal5`·`stage2_before_push_near50_pair50_source5_virtual_goal5`·`stage2_before_push_near50_pair50_source5_virtual_asym_goal5` 환경/학습 YAML과 train/test/VNC/eval을 추가했다. `before.goal_distance: [1.0, 5.0]`으로 단독 AT·BEFORE 선행 AT의 현재 상자→목표와 단독 ON_TOP의 들 상자→받침을 반경 샘플링하고, PUSH 상자→목표는2–5m로 바꾼다. 사람과 목표 최소1m·기존 Z 계산은 유지하고 새 목표에는 원점±4.5m 제한을 적용하지 않는다. 기존 세 실험의 환경/학습 YAML6개 해시를 보존했다.
+- 새 설정에서만 후보 상자 간격·AT 목표와 다른 상자 간격에1mm 여유, PUSH 후보 cone89.98°를 적용한다. 최종 충돌·90° cone 기준은 유지한다. 사용자 선택대로 BEFORE 후행 최종 수행 거리에는 상한을 추가하지 않았고 현재 공유 상자/들 상자 배치·near50·보상·Gate·Virtual 관측·lambda10·모델·AMP/PPO는 유지한다. 새 계약/출력을 분리하고 기본 전이는 모두 기존 실험 실행과 같은 Stage1 26k다. config/structure/USAGE/README·거리 상세를 갱신했다.
+- CPU191개 통과(없는 기존 가중치4개 skip·21k 전이1개 제외), 기존 정사각형 sampler 출력/RNG 회귀를 통과했다. GPU0/3/1·각4명/1024환경/8토큰에서 혼합·전원PUSH·BEFORE 두쌍/한쌍·독립과 부분 reset을 각각16,399회, 총49,197회 검사해 최종 실패0·장면 검사 최대9라운드·거리/near/충돌/경로/각도/성공 환경 보존을 확인했다. 각 순차 fallback2건은 기존 장면 재시도로 해결했다.
+- 새 wrapper 세 개의 CHECK 학습을 각각 epoch2/frame262144까지 저장했다.26k165 tensor 전이·actor encoder73 tensor/입력 RMS 동결·head6 tensor 갱신·모델/optimizer/지표 finite와 각4환경32step headless 재로딩을 통과했다. 새 asym 저장본의32환경5preset×16step·부분 reset에서 Virtual XYZ/실제 회전·같은 스텝 AT 성공 전환·State/Success/HOLDING/원본 상태 보존을 확인했다.17개 컨피그 표·세 명령 목록·12개 새 wrapper·문서 링크/구문 검사를 통과했다. 본학습·정규 성능 평가·GUI/VNC 실화면은 실행하지 않았고 기존 학습을 유지했다. [전체 검증](output_etc/check/before_goal5/verification.json).
+
+### PUSH 목표 거리2–5m 검증과 reset 수치 경계 확인
+
+- 기존 source5/virtual/asym 설정·코드와 학습 프로세스는 보존하고, 별도 검증 프로세스의 메모리에서 PUSH 상자→목표만2–5m로 바꿨다. 기존2–10m는 변경 범위를 접근 거리로 한정하면서 유지한 값이며,5m 축소 검증 실패로 되돌렸다는 기록은 확인되지 않았다. 현재 validator는 기존 Stage1 PUSH의2–10m 계약을 요구하므로 새 범위는 별도 계약 지원이 필요하다.
+- 막힌4명 PUSH fixture는 기존/축소 각각20seed에서 통과했다. GPU0/3·4명·1024환경·8토큰에서 기존2–10m는16,399회, 무여유2–5m는 혼합/전원PUSH/BEFORE 두쌍·한쌍/독립의 다섯 preset24,591회 reset을 완료했다.64회 한도 소진0·최대 장면 검사12/10라운드였지만, 축소 검사에서는 PhysX 반영 뒤 상자 간격 경계가 약0.007–0.008mm 뒤집힌 두 장면을 발견했다. 탐색 검사의 추가 강제SIT preset은 random asset bank와 호환되지 않아 제외하고 기존 범위는 다섯 preset으로 재검증했다.
+- 후보 간격1mm 여유만 준 중간 검사에서는 PUSH 방향44.99903°가 반영 뒤45.00025°로 바뀌는 각도 경계도 발견했다. 검증용 프로세스에서 후보 간격1mm·후보 cone89.98°를 함께 적용하자16,399회 reset과 부분 reset·그래프/성공 환경 보존·거리/near/경로/충돌/각도 최종 검사를 통과했다. 최종 간격50mm·cone90° 및 나머지 판정은 유지했고 최대 장면 검사11라운드였다. 보완안은 실제 코드·config에 적용하지 않았다. [검증 요약](output_etc/check/push_goal5_reset/report.md), [전체 결과/제한](output_etc/check/push_goal5_reset/verification.json).
+
+### source5·virtual·virtual_asym 최신4k 정식 평가
+
+- 재시작한 세 run의 요청 시점 최신 저장본은 모두 epoch4000/frame524288000이었다. 전용 eval wrapper로 각512환경×seed0·1·2·4명·1200step·deterministic 첫 episode를 GPU0/2/3에서 평가했다. 기존 GPU5/6 학습과 checkpoint를 보존했다.
+- 점 기준 개인 macro5는 source5 `74.54±0.75%`, virtual `56.00±2.13%`, virtual_asym `61.26±2.28%`였다. BEFORE 동시 성공은 각각 `15.82±0.92%`, `8.41±3.26%`, `11.70±1.92%`, 후행 개인 성공은 `46.15±1.70%`, `9.24±3.73%`, `12.11±1.99%`였다. 실험당1689쌍이며 값은 seed 평균±표본std다. 비대칭은 virtual보다 개선됐지만 현재 시점에서는 원본이 우세하며, 후행 SIT/CLIMB 동시 성공에서 차이가 컸다. 선행 AT는 `67.62/67.00/75.35%`였다.
+- 모든 seed에서 세 실험의 저장 초기 상태가 정확히 동일했다.9개 rollout이1200step을 완료하고 CPU float64 재채점·GPU 누적 성공·JSON 집계가 정확히 일치했다. float32/64 판정 차이0·trace finite·입력 checkpoint SHA256 보존을 확인했다. [결과표](output_etc/check/latest3_eval_20261101_132836/report.md), [전체 수치/검증](output_etc/check/latest3_eval_20261101_132836/comparison.json), [입력/실행 조건](output_etc/check/latest3_eval_20261101_132836/plan.json).
+
+### source5 계열 PUSH 초기 후보 검사 배치화
+
+- source5·virtual·virtual_asym의 초기 PUSH 후보128개를16개씩 최대8묶음으로 검사하도록 변경했다. 기존 `sample_layout(..., max_attempts=1)`의 유효성 검사를 재사용하며 환경별 첫 유효 후보·성공 환경 보존·후보 예산·순차 fallback·장면 재시도를 유지한다. 보상·Virtual 관측·lambda10·모델·checkpoint 계약·실행 명령과 다른 설정은 유지한다. 난수 소비 순서가 바뀌므로 같은 seed의 배치는 달라질 수 있다. 상세/structure/USAGE를 갱신했다.
+- 관련 CPU173개 통과(없는 기본 가중치4개 skip·21k 전이1개 제외). GPU6·1024환경 reset16,399회에서 최종 실패0, 순차 fallback2,658건 해결·성공 환경/graph/near/거리/경로 조건 보존을 확인했다. GPU5·1024환경 CHECK 학습 epoch4/frame524288와 재확인 학습에서 actor encoder73 tensor·입력 RMS 동결, head6 tensor 갱신, 모델/optimizer/지표 finite를 확인했다.32환경5preset의 물리·Virtual XYZ/실제 회전·현재 AT 성공 전환·기존 State/Success/HOLDING 보존과4환경32step headless 재로딩을 통과했다.
+- 후보 검사만 비교하면 어려운1환경은 중앙값1.290→0.084초(15.28배), 일반1024환경은0.0259→0.0109초(2.37배)였다. GPU5에 다른 학습이 없는 상태에서 같은 설정·seed42·4epoch의 평균 rollout+update는8.735→7.416초로15.1% 감소했다. 난수 순서가 다른 짧은 단일 seed 측정이며 장기/동시 학습 속도 보장은 아니다. 기존 프로세스를 종료하지 않았고 본학습은 시작하지 않았다. [전체 검증](output_etc/check/push_batched_sampling/verification.json).
+
+### Virtual BEFORE 비대칭 progress 실험 추가
+
+- `stage2_before_push_near50_pair50_source5_virtual_asym` 환경·학습 YAML과 train/test/VNC/eval을 추가했다. 기존 virtual에서 `before.asymmetric_progress.lambda_inner: 10.0`만 추가하고 출력·checkpoint 계약을 분리했다. 기본26k 전이·Virtual GTA·물리 배치·모델·PPO/AMP·가중치·State/Success Gate·성공 saturation·HOLDING/독립/PUSH 보상은 유지한다. config/structure/USAGE·상세 설계를 갱신했다.
+- `predecessor_at_progress()`에 현재 AT raw 성공과 lambda를 전달해 미완료 시 반경 안쪽 거리만10배 감쇠한다. 거리/root·payload/반경·바깥 감쇠는 유지하고 성공 시 기존 식으로 즉시 복원한다. 호출부는 Runtime과 같은 `interaction_own_success()`로 현재 phi/오차를 판정하며 이전 own_success/achieved를 읽지 않는다. 기존 설정은 lambda0 경로로 동일 계산을 유지하고 새 옵션은 source5 virtual에 한정해 검증한다.
+- CPU165개 통과(없는 기본 가중치4개 skip·21k 전이1개 제외). GPU5·1024환경 CHECK epoch2/frame262144 저장, actor encoder73 tensor/입력 RMS 동결·head6 tensor 갱신·모델/optimizer/지표 finite를 확인했다.32환경7preset의 각16step·부분 reset과 성공/실패3회 전환을 검사해 같은 스텝 반영·성공 이력 무시·State/Success/HOLDING/독립 항 보존·Virtual XYZ/실제 회전 유지를 확인했다.4환경32step headless 재로딩과 eval wrapper help·구문·문서 링크를 통과했다. 기존 본학습은 유지했고 새 본학습·정규 성능 평가·실제 GUI/VNC는 실행하지 않았다. [전체 검증](output_etc/check/before_asymmetric_progress/verification.json).
+
 ## 2026-10-31
+
+### source5 Goal-Aligned Virtual Object 실험 추가
+
+- `stage2_before_push_near50_pair50_source5_virtual` 환경·학습 YAML과 train/test/VNC/eval을 추가했다. 환경 차이는 `relationGraph.before_virtual_object: at_goal_xyz_v1` 하나이며 source5 배치 보완·보상·Gate를 유지한다. 기본 전이는 연결된26k이고 비교 원본도 같은26k를 지정한다. 출력과 checkpoint 계약을 분리하고 기존 계약은 보존했다.
+- `before_object_alias.py`에서 packet의 actor/payload/target으로 선행 AT Goal을 찾아 복사한 scene의 후행 Alias GTA XYZ만 변경한다. `stage2_push_network.py`의 Actor/Critic Encoder 직전에 함께 적용하고 Quaternion·intrinsic·원본 관측/물리 상태/graph·coordination packet은 유지한다. 기존 목표 XY progress가 곧 가상 상자 접근 progress이며 추가 보상이나 구조 변경은 없다. config/structure/USAGE·BEFORE 상세를 갱신했다.
+- 관련 CPU140개 통과(없는 기본 가중치4개 skip·21k 전이1개 제외). GPU5·1024환경 CHECK epoch2/frame262144 저장,26k165 tensor 전이·actor encoder73 tensor/입력 RMS 동결·head6 tensor 갱신·모델/optimizer/지표 finite를 확인했다.32환경7preset에서 각16step과 부분 reset, SIT/CLIMB/ON_TOP Alias XYZ·실제 회전·원본 상태/graph 보존·정책/critic/AMP finite를 통과했다.4환경32step headless 재로드와 전용 eval의4환경·seed0·1200step을 완료했고 CPU 재채점/JSON 집계 일치·float32/64 차이0·finite·입력 저장본 해시 보존을 확인했다. 소표본 실행 검사이며 실제 GUI/VNC·장기 성능은 검증하지 않았다. 기존 본학습은 유지했다. [전체 검증](output_etc/check/before_virtual_object/verification.json).
+
+### source5 PUSH 후보 소진·reset 좌표 반올림 보완
+
+- 4명 독립 PUSH에서128개 동시 후보가64회 모두 소진되는 종료를 재현했다. `stage2_before_push_near50_pair50_source5`에서 기존 후보가 소진된 환경에만 순차 경로 배치를 적용하고, 유효한 경로를 보존하며 막히면 순서를 다시 뽑는다. 그래프·near 선택·성공 환경은 보존하고 소진된 환경만 기존 장면 재시도로 넘긴다.
+- 상태 반영 뒤 좌표가 최대0.061mm 달라져 PUSH 경로·near 경계가 뒤집히는 사례를 확인했다. 해당 설정의 후보 생성에만 경로 여유와 near 거리 차이1mm를 추가했다. 거리 범위·최종 부등식/충돌 조건·기존 near50/mix226 기본 샘플링은 유지하며, 보완된 장면의 공간적 배치 분포는 달라진다.
+- 관련 CPU92개 통과(없는 기본21k 전이 검사1개 skip·1개 제외). GPU5·1024환경에서 일반51,200·4명 PUSH5,120·BEFORE 두 쌍/한 쌍 각5,120·독립5,120과 부분 reset15개, 총71,695회를 통과했다. 순차 보완7,951건 중7,949건을 해결하고2건은 기존 장면 재시도로 통과했다. 최종 reset 실패0·그래프/near/성공 환경 보존·기존 거리/경로/충돌 조건을 확인했다. 거리 경계 측정에는 float32 허용0.2mm를 사용했으며 최대 이탈은0.038mm였다.
+- CHECK 학습 epoch11/frame1441792 저장·actor encoder73 tensor/입력 RMS 동결·head6 tensor 갱신·모델/optimizer/지표 finite를 확인했다. 저장본의4환경32step headless 재로딩과32환경5preset의 물리·alias·AMP·부분 reset 검사를 통과했다. [전체 검증](output_etc/check/reset_1031/verification.json). 본학습은 재시작하지 않았으며 장기 수렴 성능은 검증하지 않았다.
+
+### 1031 checkout 모션·26k 전이 연결 복구
+
+- tmux `1031`의 SIT 모션 `FileNotFoundError`를 확인했다. `stage1_2_base_jointpush`를 참고해 누락된 SIT/CARRY/LOCO/CLIMB 네 모션 링크를 공유 원본에 연결하고, `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`를 참고 레포의 파일에 연결했다. 기존 PUSH 링크와 외부 원본은 유지했다.
+- PUSH 모션 YAML161개·기존 모션 YAML136개 파일 참조가 모두 존재하며, 오류가 난 SIT 배열과26k checkpoint(epoch26000·model165 tensor)의 CPU 로딩을 확인했다. [검증](output_etc/check/data_links_1031/verification.json). 학습은 실행·재시작하지 않았다.
 
 ### BEFORE near50 쌍 선택50·접근 최대5m 설정 추가
 

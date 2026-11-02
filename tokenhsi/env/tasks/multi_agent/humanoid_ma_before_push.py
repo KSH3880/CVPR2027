@@ -6,7 +6,9 @@ from env.tasks.multi_agent.humanoid_ma_push import HumanoidMAPush
 from env.tasks.multi_agent.before_push_reward import BeforePushRuntime
 from env.tasks.multi_agent.jointpush_reward import contact_state
 from utils.before_push_spec import sample_graph
-from utils.before_push_layout import sample_layout, paths_valid, PushLayoutError
+from utils.before_goal_sampling import DISTANCE_MIXTURE as GOAL_DISTANCE_MIXTURE
+from env.tasks.multi_agent.before_goal_sampling import static_infeasible
+from utils.before_push_layout import sample_layout, sample_batched_layout, sample_sequential_layout, paths_valid, PushLayoutError
 from utils.jointpush_scene import goal_angles_valid
 from utils.jointpush_geometry import push_rear_xy
 
@@ -118,20 +120,43 @@ class HumanoidMABeforePush(HumanoidMABefore):
         self._push_hits[ids]=False
         self._push_layout_failed[ids]=False
         super()._reset_boxes(ids)
+        if self.cfg['env']['before'].get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
+            super()._reset_task(ids)
+            rejected=static_infeasible(self, ids)
+            self._push_layout_failed[ids[rejected]]=True
+            ids=ids[~rejected]
+            if not len(ids):return
         primary=self._primary_objects(self._templates[ids])
         retry_scene='source_max_distance' in self.cfg['env']['before']
+        scene=self._joint['scene']
+        if retry_scene:
+            scene=dict(scene)
+            for key in ('path_separation','agent_clearance','obstacle_clearance'):
+                scene[key]+=0.001
+            if self.cfg['env']['before'].get('goal_distance') is not None:
+                scene['goal_angle_degrees']-=.02
+        sampler=sample_batched_layout if retry_scene else sample_layout
         try:
-            boxes,goals=sample_layout(self._box_states[ids],self._box_size[ids],self._humanoid_root_states[ids,:,:3],
-                self._templates[ids]==5,primary,self._active_physical(ids),self._joint['scene'],
+            boxes,goals=sampler(self._box_states[ids],self._box_size[ids],self._humanoid_root_states[ids,:,:3],
+                self._templates[ids]==5,primary,self._active_physical(ids),scene,
                 max_attempts=128 if retry_scene else 4096)
         except PushLayoutError as error:
             if not retry_scene:raise
             boxes,goals=error.boxes,error.goals
-            self._push_layout_failed[ids[error.pending]]=True
+            pending=error.pending
+            try:
+                extra_boxes,extra_goals=sample_sequential_layout(boxes[pending],self._box_size[ids[pending]],
+                    self._humanoid_root_states[ids[pending],:,:3],self._templates[ids[pending]]==5,
+                    primary[pending],self._active_physical(ids[pending]),scene)
+            except PushLayoutError as unresolved:
+                extra_boxes,extra_goals=unresolved.boxes,unresolved.goals
+                self._push_layout_failed[ids[pending[unresolved.pending]]]=True
+            boxes[pending]=extra_boxes;goals[pending]=extra_goals
         self._box_states[ids]=boxes;self._push_goals[ids]=goals
 
     def _reset_task(self,ids):
-        super()._reset_task(ids)
+        if self.cfg['env']['before'].get('distance_mixture') != GOAL_DISTANCE_MIXTURE:
+            super()._reset_task(ids)
         rows,owner=(self._templates[ids]==5).nonzero(as_tuple=True)
         self._tar_pos[ids[rows],owner]=self._push_goals[ids[rows],owner]
 

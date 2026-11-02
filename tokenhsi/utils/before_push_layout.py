@@ -70,3 +70,99 @@ def sample_layout(boxes,sizes,roots,push,primary,active,spec,max_attempts=4096):
         pending=pending[~valid]
     if not len(pending):return result,goals
     raise PushLayoutError(result,goals,pending)
+
+
+def sample_batched_layout(boxes, sizes, roots, push, primary, active, spec,
+                          max_attempts=128, candidate_batch=16):
+    n, m = push.shape
+    result = boxes.clone()
+    rows = torch.arange(n, device=boxes.device)[:, None]
+    goals = boxes[rows, primary, :3].clone()
+    pending = push.any(-1).nonzero().flatten()
+    for offset in range(0, max_attempts, candidate_batch):
+        if not len(pending):
+            return result, goals
+        count = min(candidate_batch, max_attempts-offset)
+        args = [value[pending].repeat_interleave(count, 0)
+                for value in (boxes, sizes, roots, push, primary, active)]
+        valid = torch.ones(len(pending)*count, device=boxes.device, dtype=torch.bool)
+        try:
+            candidate, drawn = sample_layout(*args, spec, max_attempts=1)
+        except PushLayoutError as error:
+            candidate, drawn = error.boxes, error.goals
+            valid[error.pending] = False
+        valid = valid.reshape(len(pending), count)
+        good = valid.any(-1)
+        choice = torch.arange(len(pending), device=boxes.device)*count + valid.long().argmax(-1)
+        accepted = pending[good]
+        result[accepted] = candidate[choice[good]]
+        goals[accepted] = drawn[choice[good]]
+        pending = pending[~good]
+    if len(pending):
+        raise PushLayoutError(result, goals, pending)
+    return result, goals
+
+
+def sample_sequential_layout(boxes, sizes, roots, push, primary, active, spec,
+                             max_restarts=32, candidate_batch=128, max_attempts=16):
+    n, m = push.shape
+    device = boxes.device
+    row = torch.arange(n, device=device)[:, None]
+    result = boxes.clone()
+    goals = boxes[row, primary, :3].clone()
+    push_objects = torch.zeros_like(active)
+    push_objects.scatter_(1, primary, push)
+    obstacles = active & ~push_objects
+    pending = push.any(-1).nonzero().flatten()
+    for _ in range(max_restarts):
+        if not len(pending):
+            return result, goals
+        current = boxes[pending].clone()
+        targets = goals[pending].clone()
+        settled = torch.zeros_like(push[pending])
+        blocked = torch.zeros(len(pending), dtype=torch.bool, device=device)
+        order = torch.rand(len(pending), m, device=device).masked_fill(~push[pending], 2.).argsort(-1)
+        for stage in range(m):
+            actor = order[:, stage]
+            selected = (torch.arange(m, device=device)[None] == actor[:, None]) & push[pending]
+            retry = (selected.any(-1) & ~blocked).nonzero().flatten()
+            for _ in range(max_attempts):
+                if not len(retry):
+                    break
+                ids = pending[retry]
+                local = selected[retry].repeat_interleave(candidate_batch, 0)
+                actors = actor[retry].repeat_interleave(candidate_batch)
+                batch = torch.arange(len(actors), device=device)
+                batch_sizes = sizes[ids].repeat_interleave(candidate_batch, 0)
+                batch_roots = roots[ids].repeat_interleave(candidate_batch, 0)
+                batch_primary = primary[ids].repeat_interleave(candidate_batch, 0)
+                batch_active = obstacles[ids].repeat_interleave(candidate_batch, 0)
+                accepted = torch.ones(len(actors), dtype=torch.bool, device=device)
+                try:
+                    candidate, drawn = sample_layout(current[retry].repeat_interleave(candidate_batch, 0),
+                        batch_sizes, batch_roots, local, batch_primary, batch_active, spec, max_attempts=1)
+                except PushLayoutError as error:
+                    candidate, drawn = error.boxes, error.goals
+                    accepted[error.pending] = False
+                target = targets[retry].repeat_interleave(candidate_batch, 0)
+                target[batch, actors] = drawn[batch, actors]
+                checking = (settled[retry] | selected[retry]).repeat_interleave(candidate_batch, 0)
+                valid = accepted & paths_valid(candidate, batch_sizes, target, batch_roots,
+                    checking, batch_primary, batch_active, spec)
+                valid = valid.reshape(len(retry), candidate_batch)
+                good = valid.any(-1)
+                choice = torch.arange(len(retry), device=device) * candidate_batch + valid.long().argmax(-1)
+                current[retry[good]] = candidate[choice[good]]
+                targets[retry[good]] = target[choice[good]]
+                settled[retry[good]] |= selected[retry[good]]
+                retry = retry[~good]
+            blocked[retry] = True
+        valid = (settled == push[pending]).all(-1)
+        valid &= paths_valid(current, sizes[pending], targets, roots[pending],
+            push[pending], primary[pending], active[pending], spec)
+        accepted = pending[valid]
+        result[accepted], goals[accepted] = current[valid], targets[valid]
+        pending = pending[~valid]
+    if len(pending):
+        raise PushLayoutError(result, goals, pending)
+    return result, goals
