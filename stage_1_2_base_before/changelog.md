@@ -2,7 +2,89 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-03
+
+### asym state 정규화6500 viewer 실행
+
+- 사용자 요청으로 최신 저장6500 checkpoint를 GPU2 기존 MPS·4명·1환경·8객체·BEFORE SIT로 실행했다. noVNC6088/display100에서 실제 rollout 및 HTTP200 확인. [실행 기록](output_etc/check/view_asym_state_rescale6500_gpu2/launch.json). 종료는 WM_DELETE_WINDOW 또는 검증된 MPS client 종료 절차를 따른다.
+
+### 일반 virtual(no-asym) state 정규화와 원본 5000 iter 평가
+
+- 요청 당시 최신 저장본 epoch5000/frame655360000과 ksh 원본 일반 virtual의 같은 epoch/frame을 비교했다. state_rescale 외 env/sim 동일 확인. GPU1/2 기존 MPS에서512환경·4명·8객체·seed0/1/2·1200step deterministic 첫 episode 평가 완료.
+- Plane 선행/후행 동시 성공률: SIT22.68→16.01%, CLIMB7.26→12.95%, ON_TOP19.24→22.19%, 전체17.12→18.80%. 낙상률3.04→3.09%. 행동별 손익이 갈리며 학습 각1회 비교이므로 일반적 개선으로 단정하지 않는다.
+- 6개 CPU 재채점과 GPU/JSON 일치, 초기 tensor 동일, checkpoint SHA256 불변 검증 통과. 기존 학습/MPS 종료 없이 평가 완료. [결과](output_etc/check/virtual_state_rescale5000_vs_base_20261103/report.md), [검증](output_etc/check/virtual_state_rescale5000_vs_base_20261103/verification.json).
+
+### virtual_asym state 정규화와 원본 6000 iter 평가
+
+- 평가 시작 시 최신 저장본인 state_rescale epoch6000/frame786432000을 ksh 원본 virtual_asym의 같은 epoch/frame과 비교했다. GPU1/2 기존 MPS에서 각각512환경·4명·8객체·평가 seed0/1/2·1200step deterministic 첫 episode 평가를 완료했다.
+- Plane 기준 선행/후행 동시 성공률 평균: SIT12.31→15.29%, CLIMB5.58→5.62%, ON_TOP18.48→19.08%, 전체14.25→15.18%. 낙상률4.28→3.32%. 각 설정 학습1회이므로 정규화의 일반적 개선 효과로 확정하지 않는다.
+- 6개 rollout CPU 재채점/GPU 집계/JSON 일치, float32/64 성공 판정 차이0, seed별 초기 상태 모든 tensor 동일, checkpoint SHA256 불변을 확인했다. 중단된 CPU 집계만 재실행했으며 GPU 평가는 중복 실행하지 않았다. [비교 결과](output_etc/check/asym_state_rescale6000_vs_base_20261103/report.md), [검증](output_etc/check/asym_state_rescale6000_vs_base_20261103/verification.json).
+
 ## 2026-11-02
+
+### 일반 virtual 원본 TensorBoard 비교 추가
+
+- 사용자 요청으로 ksh 일반 virtual_goal5_goalroute 원본을6020의 `base_virtual_no_asym`으로 추가했다. 같은 설정의11/02 22:39 run도 `base_virtual_no_asym_1102_2239`로 분리했다. 두 sidecar에 state_rescale/asymmetric_progress가 없음을 확인했다. 기존4개 run 유지,6개 run 목록 및 원본283개 scalar 로드 확인. 대용량 로그 초기 로딩은 순차 진행된다.
+
+### GPU1 일반 virtual 학습 TensorBoard 추가
+
+-6020 비교 화면에 `virtual_no_asym_state_rescale_gpu1` run을 추가했다. 기존 원본 asym·현재 asym·중단 run도 유지한다. 새 run의 scalar 로드와4개 run 목록 확인. 학습·MPS 변경 없이 TensorBoard만 재시작했다.
+
+### GPU1 일반 virtual state 정규화 본학습 시작
+
+- 사용자 선택에 따라 가상박스는 유지하고 asym은 없는 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale`을 GPU1에서 시작했다. 기존 준비/검증된 설정 그대로4명·1024환경·8토큰·seed42·Stage1 PUSH26k 전이, learner41338/launcher41301. GPU1 기존 MPS 연결과 첫 iteration 완료를 확인했다.
+- GPU2 asym 정규화 learner3683972는 유지했다. [실행 기록](output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale/launch.json), [로그](output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale/train.log).
+
+### 현재 asym state 정규화500 viewer
+
+- 사용자 요청으로19:20 재시작 run의 epoch500을 GPU2 MPS·4명·1환경·8토큰·BEFORE SIT로 실행했다. noVNC6088/display103/viewer3969162, 실제 rollout/HTTP200 확인. 본학습 유지. [실행 기록](output_etc/check/view_asym_state_rescale500_gpu2/launch.json).
+
+### 원본 asym9000 viewer 실행
+
+- 현재 정규화 학습은 아직 저장본이 없어 사용자 선택에 따라 ksh 원본 virtual_asym9000을 GPU2 MPS로 실행했다. 4명·1환경·8토큰·BEFORE SIT·1000회 반복, noVNC6088/display103/viewer3745142. 실제 rollout 및 HTTP200 확인. 정규화 학습이나 다른 프로세스는 종료하지 않았다. [실행 기록](output_etc/check/view_asym9000_gpu2/launch.json).
+
+### TensorBoard에 원본 asym 비교 추가
+
+- 사용자 요청으로6020에 ksh 원본 `virtual_asym_goal5_goalroute` summaries를 `base_virtual_asym`으로 추가했다. 현재 정규화 학습은 `state_rescale_current`, 중단된 첫 실행은 `state_rescale_interrupted`로 구분한다. 세 run/scalar API 로드 확인. 로그 원본·학습·MPS는 유지하고 TensorBoard만 재시작했다.
+
+### GPU2 MPS 준비 후 asym 정규화 재시작 대기
+
+- 19:20:40 GPU2 MPS server3343262 검증 후 launcher3683928/learner3683972로 실제 재시작됐다. MPS auto-connect와 초기 iteration 완료를 확인했다. 새 로그는 `output/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale/train_restart_20261102_192040.log`.
+- 사용자 재개 요청 후 기존 학습의 CUDA illegal memory access 종료와 저장된 .pth 부재를 확인했다. 추가 지시에 따라 MPS를 직접 시작하지 않고 GPU2 daemon 소유권·GPU UUID·pipe·응답·server PID를 두 번 확인한 뒤에만 동일4명·1024환경·8토큰·seed42·Stage1 PUSH26k에서 새 학습을 시작하는 일회성 waiter3683285를 등록했다.
+- 기존 로그/결과는 보존하고 새 timestamp 학습 로그를 쓴다. 중복 학습은 거부하며 재시작 루프는 없다. 실제 시작/종료는 [상태](output_etc/check/asym_restart_wait_mps/status.json), [대기 로그](output_etc/check/asym_restart_wait_mps/waiter.log)를 따른다. TensorBoard는 동일 output 아래 새 run을 읽는다.
+
+### TensorBoard runs 화면 오류 수정
+
+- tokenhsi 환경 TensorBoard2.14의 HParams API에서 protobuf MessageToJson 인자 불일치로500이 발생했다. 학습 환경 패키지는 수정하지 않고 기존 base 환경 TensorBoard2.20으로6020 서버만 교체(PID3631183)했다. runs/scalars/HParams experiment API 모두 HTTP200 확인. 학습·MPS는 유지했다.
+
+### asym state 정규화 TensorBoard 시작
+
+- 사용자 요청으로 현재 asym 정규화 output만 읽는 TensorBoard를 localhost6020(PID3624954)에서 시작했다. 10초 갱신, scalar API의 run/tag 로드를 확인했다. 기존 TensorBoard·학습·MPS는 유지한다. [실행 기록](output_etc/check/tensorboard_asym_state_rescale/launch.json).
+
+### GPU2 virtual_asym state 정규화 시작 및 비가상 학습 종료
+
+- 사용자 요청으로 `stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale` 설정·train/test/VNC/eval을 추가하고 GPU2·4명·1024환경·8토큰·seed42·Stage1 PUSH26k 전이로 시작했다. 원본 virtual_asym 대비 state 정규화 옵션만 추가하며 가상박스, lambda_inner10 progress, success와 모델을 유지한다. CPU162개 통과. launcher3490705/learner3490754, 초기 iteration 진행 확인.
+- 후속 사용자 종료 지시에 따라 비가상 learner3464338만 설치 manpage/NVIDIA 공식 절차의 `terminate_client 3343262 3464338`로 정리했다. 반환0·MPS Client termination succeeded·프로세스 소멸 확인. 직접 SIGTERM/SIGKILL은 사용하지 않았으며 MPS control3343237/server3343262를 유지했다. 비가상 로그의 client-terminated 오류는 이 요청된 종료에 따른 것이다.
+- [새 학습 로그](output/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale/train.log), [실행 기록](output/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale/launch.json), [CPU 검증](output_etc/check/asym_state_rescale/pytest.log).
+
+### GPU2 비가상 state 정규화 본학습 시작
+
+- 사용자 요청으로 `stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale`을 GPU2·4명·1024환경·8토큰·seed42로 시작했다. CHECK/MAX_ITERATIONS/resume override를 제거하고 기본 Stage1 PUSH26k 전이·max_epochs1000000을 사용한다.
+- GPU2 기존 MPS `/tmp/mps-test-1003/gpu2/pipe` 연결, learner3464338(launcher3463360), 초기4회 iteration 완료 로그와 GPU2 UUID를 확인했다. 기존 프로세스를 종료하거나 MPS를 재시작하지 않았다.
+- [실행 기록](output/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale/launch.json), [학습 로그](output/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale/train.log). 시작 확인이며 수렴/성능 검증은 아니다.
+
+### 비가상 goalroute 기반 state 정규화 설정 추가
+
+- 사용자 선택에 따라 `stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale`을 추가했다. 비가상 원본 env 대비 `before.state_rescale: first_open_affine_v1`만 추가하며 모델·전이(Stage1 PUSH26k)·샘플링·progress/success를 유지한다. 가상박스/asym/wait_clear는 포함하지 않는다. 앞서 만든 virtual 정규화 설정은 비교용으로 보존한다.
+- 전용 환경/학습 config, train/test/VNC/eval wrapper, 실행·평가 등록 및 문서를 추가했다. CPU149개 통과: 두 기반의 원본 설정 보존·계약 분리·보상 동작·실행/평가/출력 회귀. [검증](output_etc/check/nonvirtual_state_rescale/pytest.log).
+- GPU5 기존 MPS로4환경·4step·BEFORE ON_TOP zero-action 환경 검사에서 유한성·보상합·부분reset을 확인하고 CUDA 동기화 후 정상 종료했다. 기존 학습31255/31512 및 MPS4102559/4104165 유지. [환경 검사](output_etc/check/nonvirtual_state_rescale/physics/physics_validation.json). 학습은 시작하지 않았고 정책 성능은 미검증이다.
+
+### virtual goalroute의 후행 state 개방 구간 정규화
+
+- 별도 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale` 환경/학습 config와 train/test/VNC/eval 진입점을 추가했다. 일반 virtual만 기반으로 하며 wait_clear/asym은 합치지 않았다. 기존 설정은 보존하고 checkpoint 계약에 `first_open_affine_v1`을 저장한다.
+- 기존 state 기하 함수와 성공 포화를 유지한 채 첫 유효 gate 개방의 s0를 저장하고 `clip((s-s0)/(1-s0),0,1)`로 출력 구간을 조정한다. 기울기는 재스케일되며 progress/success/선행/단독은 유지한다. 기준값은 재잠금에도 유지하고 부분 reset 대상만 지운다. 처음부터 s0=1인 퇴화구간은 기존 state를 사용한다. [공식·예외](markdowns/reference/before_state_rescale.md).
+- CPU 보상/계약56개 및 실행/평가/출력 회귀135개, 총191개 통과. GPU5 기존 MPS에 연결한4환경·4step·BEFORE ON_TOP zero-action 검사에서 유한성·7항 보상합·부분reset을 확인하고 CUDA synchronize 후 정상 종료했다. 정책 성능 검사가 아니며 학습은 시작하지 않았다. [CPU](output_etc/check/state_rescale/pytest.log), [실행 회귀](output_etc/check/state_rescale/runtime_pytest.log), [환경 검사](output_etc/check/state_rescale/physics/physics_validation.json).
+- 초기 테스트 수집에서 이름 등록 치환이 BEFORE_NAMES까지 덮던 오류를 발견해 수정한 뒤 전체 관련 검증을 통과했다. 기존 GPU5 학습31255/31512 및 MPS control4102559/server4104165 생존을 확인했다.
 
 ### 비가상8000 viewer에 actor attention 지도 추가
 

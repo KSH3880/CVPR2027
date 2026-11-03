@@ -159,3 +159,11 @@ TOKENHSI_GPU=5 PORT=6088 ATTENTION_MAP=1 ATTENTION_PORT=6089 TASK_GRAPH=before_s
 결과는 해당 `output_etc/check/` 실행 폴더의 `attention/` 아래에 저장한다. `latest.json`은10 policy step마다 원자적으로 갱신하고 `episode_*.json`은 각 반복의 첫 샘플을 보존한다. env0·행query/열key·GTA와 task bias를 포함한 softmax 확률이다. 셔플된 사람/상자/goal 순서는 canonical 순서로 복원한다. 상자 토큰→실제 물체 매핑과 같은 관측 시점의 위치도 기록한다. 지도는 action 직전 관측 기준이며 VNC 영상과 네트워크 지연 차이가 있을 수 있다. raw attention은 행동의 기여도나 인과 효과를 의미하지 않는다.
 
 계측은 actor에만 hook을 붙여 Q/K에서 확률을 재계산하며 원래 attention 출력·학습 가중치·난수를 변경하지 않는다. human attention은 원래 `need_weights=False` 경로를 유지한다. viewer 종료 시 지도 서버도 종료된다. 기본값은 계측 꺼짐이며 formal eval/학습에는 적용하지 않는다.
+
+### BEFORE state 구간 정규화
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale`는 일반 virtual에 state 구간 정규화만 추가한다. 기존 Stage2 저장본과 계약이 다르며 Stage1 PUSH26k에서 새로 학습한다. 기존 state 곡선의 출력 구간을 조정하고 progress/success는 유지한다. [공식·기준값 수명·이미 최대인 경우](reference/before_state_rescale.md), 명령은 [config](config.md)를 따른다.
+
+현재 선택한 비가상 버전은 `stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale`다. 비가상 원본 대비 state 정규화만 추가하며 전이·모델·샘플링·progress/success는 동일하다. 가상 버전과 실행 이름·출력·checkpoint 계약을 분리한다.
+
+추가 학습용 `stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale`은 virtual_asym 원본의 가상박스 및 lambda_inner=10 progress를 유지하고 state만 정규화한다. GPU2 실행 명령은 config를 따른다.

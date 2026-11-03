@@ -91,7 +91,8 @@ class HumanoidMABeforePush(HumanoidMABefore):
 
     def _init_ontop_context_runtime(self):
         super()._init_ontop_context_runtime()
-        self.relation_runtime=BeforePushRuntime(self.num_envs,self.relation_runtime.graph,self._relation_cfg,self.device,contact_weights=self._joint["contact_weights"])
+        self.relation_runtime=BeforePushRuntime(self.num_envs,self.relation_runtime.graph,self._relation_cfg,self.device,contact_weights=self._joint["contact_weights"],
+            state_rescale=self.cfg["env"]["before"].get("state_rescale") == "first_open_affine_v1")
 
     def _reset_ref_state_init(self,env,owner):
         push=self._templates[env,owner]==5

@@ -48,6 +48,9 @@ def validate_env(env, evaluation=False):
     before=deepcopy(env['before'])
     goal_distance=before.pop('goal_distance',None)
     asymmetric=before.pop('asymmetric_progress',None)
+    if 'state_rescale' in before:
+        if before.pop('state_rescale') != 'first_open_affine_v1':
+            raise ValueError('state_rescale requires first_open_affine_v1')
     if 'wait_clear' in before:
         from env.tasks.multi_agent.before_wait_reward import validate_wait_clear
         validate_wait_clear(before.pop('wait_clear'))

@@ -67,3 +67,5 @@
 - `tokenhsi/env/tasks/multi_agent/before_wait_reward.py`: 선행 사람/상자→goal 통로와 안전 대기 구역의 선택적 보상. `test_before_wait_clear.py`는 CPU 기하/계약 검사, `check_before_wait_clear.py`는 실제 환경 보상 합산·부분 reset 검사다. [설계](reference/before_wait_clear.md).
 
 - `tokenhsi/learning/multi_agent/attention_viewer.py`, `attention_dashboard.html`: viewer 전용 actor GTA/coordination attention 추출과 localhost 대시보드. `test_attention_viewer.py`는 행동·RNG·가중치 보존, MHA 확률 일치와 셔플 복원을 검사한다.
+
+- `before_reward.py`의 선택적 state 구간 정규화: [설계와 예외](reference/before_state_rescale.md). `test_before_state_rescale.py`는 CPU 보상/계약 검사, `check_before_state_rescale.py`는 실제 환경 연결·보상합·부분 reset 검사다.

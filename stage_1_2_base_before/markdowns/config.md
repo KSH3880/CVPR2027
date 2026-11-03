@@ -4,7 +4,7 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 21개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 유지하는 실험은 아래 24개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
 - 학습 인자: `[agents] [envs] [objects]`. Stage1·Stage1 PUSH는 **2명·2048환경·4물체**, BEFORE·coupled는 **4명·1024환경·8토큰**이다. BEFORE 학습은 인원 N≥1·토큰 M≥2N이며, BEFORE PUSH viewer/test/VNC는 M≥N을 지원한다. 부족한 예산의 과제 재샘플링은 [USAGE](USAGE.md#before-push)를 따른다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
@@ -38,6 +38,9 @@
 | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml) |
 | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml) | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml) |
 | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear.yaml) |
+| [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale.yaml) |
+| [stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale.yaml) | [stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale.yaml) |
+| [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale.yaml) | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale.yaml) |
 
 
 ## 학습
@@ -105,6 +108,15 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear_train.sh 4 1024 8
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale_train.sh 4 1024 8
+
+# stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale_train.sh 4 1024 8
+
+# stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale
+TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -174,6 +186,15 @@ TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_n
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear
 TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale
+TOKENHSI_GPU=2 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -243,6 +264,15 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale
+TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -334,4 +364,13 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 ```bash
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_clear_eval.sh "$CKPT" --output output_etc/check/wait_clear_general
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_state_rescale_eval.sh "$CKPT" --output output_etc/check/state_rescale_general
+
+# stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale_eval.sh "$CKPT" --output output_etc/check/nonvirtual_state_rescale_general
+
+# stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale
+TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale_eval.sh "$CKPT" --output output_etc/check/asym_state_rescale_general
 ```

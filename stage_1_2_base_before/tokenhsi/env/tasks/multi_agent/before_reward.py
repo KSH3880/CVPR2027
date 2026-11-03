@@ -48,6 +48,35 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
 
 
 class BeforeRuntime(Stage1ContextRuntime):
+    def __init__(self, *args, state_rescale=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.state_rescale = state_rescale
+        if state_rescale:
+            self.state_open_value = torch.zeros_like(self.phi)
+            self.state_open_seen = torch.zeros_like(self.phi, dtype=torch.bool)
+
+    def _rescale_state(self, result):
+        # Only step() commits anchors. components() and reset diagnostics are pure.
+        dependent = self.graph.prereq_mask.any(-1) & self.graph.edge_valid
+        gate = result['prerequisite_gate'] & dependent
+        value = torch.where(result['reward_saturated'], 1., result['phi_raw'])
+        opening = gate & ~self.state_open_seen
+        self.state_open_value.copy_(torch.where(opening, value, self.state_open_value))
+        self.state_open_seen |= opening
+        span = 1. - self.state_open_value
+        # Exact-ceiling starts have no remaining interval: retain the original state.
+        # Do not epsilon-clamp positive spans: that would lower the attainable maximum.
+        safe_span = torch.where(span > 0, span, torch.ones_like(span))
+        scaled = ((value-self.state_open_value)/safe_span).clamp(0., 1.)
+        scaled = torch.where(span > 0, scaled, value)
+        result['state_component'] = torch.where(dependent,
+            scaled * gate * self.config['state_reward_weight'], result['state_component'])
+        result['state_open_value'] = self.state_open_value.clone()
+        result['state_open_seen'] = self.state_open_seen.clone()
+        result['total'] = result['state_component']+result['progress_component']+result['success_component']
+        local = owner_sum(result['total'], self.graph)
+        result['local_task_reward'] = result['agent_task_reward'] = local
+
     def _raw_success(self, phi, z_error, feet_error, region_error, graph):
         return interaction_own_success(phi, z_error, feet_error, graph, self.config, region_error)
 
@@ -70,6 +99,9 @@ class BeforeRuntime(Stage1ContextRuntime):
             teammate_task_reward=torch.zeros_like(local))
 
     def reset(self, ids, phi, z_error, feet_error=None, region_error=None):
+        if self.state_rescale:
+            self.state_open_value[ids] = 0
+            self.state_open_seen[ids] = False
         graph = select_graph(self.graph, ids)
         result = self.components(phi, torch.zeros_like(phi), z_error, feet_error, region_error, graph)
         self.phi[ids] = phi
@@ -79,6 +111,8 @@ class BeforeRuntime(Stage1ContextRuntime):
 
     def step(self, phi, progress, z_error, feet_error=None, region_error=None):
         result = self.components(phi, progress, z_error, feet_error, region_error, self.graph)
+        if self.state_rescale:
+            self._rescale_state(result)
         self.phi.copy_(phi)
         self.own_success.copy_(result['own_success'])
         self.achieved |= result['own_success']
