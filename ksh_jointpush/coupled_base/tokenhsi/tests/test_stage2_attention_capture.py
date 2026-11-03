@@ -15,9 +15,9 @@ def test_canonical_maps_preserve_shuffled_outputs_and_agent_labels():
     branch = HumanCoordination(shuffle_human_order=True, relations=4).eval()
     for layer in branch.blocks:
         layer.relation_bias.data.copy_(torch.tensor([[0., .2, .3, .6], [-.1, .4, .2, .7]]))
-    humans = torch.randn(3, 4, 64)
-    groups = torch.tensor([[0, 1, 1, 1], [0, 0, 2, 2], [0, 0, 0, 0]])
-    packet = torch.tensor([[1., 4., i, i, 12+i] for i in range(4)]).flatten().expand(3, -1)
+    humans = torch.randn(4, 4, 64)
+    groups = torch.tensor([[0, 1, 1, 1], [0, 0, 2, 2], [0, 0, 0, 0], [0, 1, 2, 3]])
+    packet = torch.tensor([[1., 4., i, i, 12+i] for i in range(4)]).flatten().expand(4, -1)
     with torch.no_grad():
         original = branch(humans, None, packet, None, groups=groups)
     before = {key: value.clone() for key, value in branch.state_dict().items()}
@@ -27,8 +27,8 @@ def test_canonical_maps_preserve_shuffled_outputs_and_agent_labels():
     assert torch.equal(rng, torch.get_rng_state())
     assert all(torch.equal(value, branch.state_dict()[key]) for key, value in before.items())
     assert branch.shuffle_human_order
-    assert result['attention'].shape == (3, 4, 2, 4, 4)
-    torch.testing.assert_close(result['attention'].sum(-1), torch.ones(3, 4, 2, 4))
+    assert result['attention'].shape == (4, 4, 2, 4, 4)
+    torch.testing.assert_close(result['attention'].sum(-1), torch.ones(4, 4, 2, 4))
     expected = torch.tensor([[.2, 0., 0., 0.], [0., .2, .6, .6],
                              [0., .6, .2, .6], [0., .6, .6, .2]])
     torch.testing.assert_close(result['relation_bias'][0, 0, 0], expected)

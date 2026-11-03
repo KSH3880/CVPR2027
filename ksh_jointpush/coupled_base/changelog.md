@@ -4,7 +4,25 @@
 
 ## 2026-11-02
 
+### Stage2 attention에4명 단독 PUSH 구성 추가
+
+- 사용자 요청으로 capture의 `4solo=[0,1,2,3]` 고정 구성을 추가하고 각reset에서4명 모두PUSH template임을 검증한다. renderer/HTML은 선택적4solo와 가변 배치 수를 지원하며 기존 세 배치 출력도 유지한다.
+- 기존11.5k 1+3·2+2·4명 기록은 읽기 전용 링크로 재사용하고4solo만3episode×600step 새로 수집한다. 실행/출력: `output_etc/check/stage2_attention_four_layouts_11500_20261102_213606/`. 완료 후 새 비교 HTML을 브라우저로 연다.
+- CPU2테스트 통과:4solo를 포함한 원래 shuffled actor와canonical attention출력·relation bias·softmax 일치, 모델/RNG 보존. Python/JS 구문 검사 통과. 실제 수집·renderer 검증 결과는 해당폴더 state/로그에 기록한다.
+
+### 11.5k Stage2 attention 세 배치 비교 실행
+
+- 사용자 요청으로 기존 관찰 entry/비교 renderer를 사용해11.5k의1+3·2+2·4명 PUSH에서 각각3episode×600step,10step간격 actor attention을 수집한다. GPU여유6000MiB 이상일 때 시작하며 학습/진행 중 평가를 종료하지 않는다.
+- bias·raw QK·최종softmax 비교 HTML을 생성하고 모델/RMS 불변·원래 actor출력과의 수치 대조를 renderer에서 검증한다. 완료 시 브라우저 열기를 시도한다. 실행 상태는 `runs/jointpush/ksh_jointpush_stage2_attention.json`, 실행/로그는 `output_etc/check/stage2_attention_comparison_11500_20261102_211202/`이다.
+
+### 11k checkpoint 저장 후 일회 평가 예약
+
+- 사용자 요청으로 현재 premature_motion 학습의11000 checkpoint를30초마다 확인하는 일회 watcher를 등록했다. 파일 크기/mtime 안정화·epoch11000·모델 유한값·예약 당시 source hash를 검증하고512환경×seed0/1/2 평가 및 성공/종료/미접촉10·20·50cm 집계를 실행한다. 기존 평가가 있거나GPU여유가6500MiB 미만이면 기다리며 다른 프로세스는 종료하지 않는다.
+- 실행: `runs/jointpush/eval_11000_when_ready_20261102_191303/`(CVPR2027 루트 기준), 상태: `runs/jointpush/scheduled_eval_11000.json`. 중복 실행 방지 claim을 사용하며11k 한 번 완료 후 종료한다. shell/Python 구문 검증 및 waiting_checkpoint 로그를 확인했다.
+
 ### 최초 출발 대기 지표와 이전15k·현재7.5k 비교 평가
+
+- 사용자 요청으로 같은 capture의 출발 기준 민감도를 추가했다. 속도0.1/0.2m/s·지속0.2/0.5초와 초기 XY변위10/20cm를 비교하며 접촉조건은 유지한다. 별도 `sensitivity.py`가 완료된seed 수를 명시하고 SENSITIVITY.md/JSON에 저장한다. 진행 중인 평가/기존 지표는 변경하지 않았다.
 
 - 사용자 요청으로 `scripts/coupled_departure_capture.py`에 정식 평가 전용 관찰 entry를 추가했다. 기존 학습/보상 코드는 수정하지 않고 초기 reset과 매 control step에서 양손 뒷면 근접·물리 상자 XY/속도를 저장한다. 실제 contact gate(goal 예외 해제)와 준비 판정 일치를 매 sample 확인한다.
 - `ksh_departure_eval.py`는 물리 상자당 최초 출발(0.05m/s 초과6sample≈0.2초), 최초 전원 접촉 전 선출발·출발 순간 미준비·무출발/미준비·준비 인원·접촉 전 경로/변위·준비 후 출발 지연을2/3/4명별 집계한다. 첫 팀원 낙상에서 관측을 중단하고 censor 비율을 별도 기록한다. 접촉은 힘 조건이 아닌 기존 gate의18cm 양손 위치 조건이다.

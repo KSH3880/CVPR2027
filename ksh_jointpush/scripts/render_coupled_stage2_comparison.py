@@ -19,7 +19,8 @@ import matplotlib.pyplot as plt
 
 PATTERNS = [('1plus3', '1 solo + 3 coupled', [0, 1, 1, 1]),
             ('2plus2', '2 coupled + 2 coupled', [0, 0, 2, 2]),
-            ('4', '4 coupled', [0, 0, 0, 0])]
+            ('4', '4 coupled', [0, 0, 0, 0]),
+            ('4solo', '4 independent solo PUSH', [0, 1, 2, 3])]
 COLORS = ['#6ebf24', '#3984d3', '#d48b22', '#ad42bc']
 COMPONENTS = ['relation_bias', 'raw_qk_scores', 'attention']
 
@@ -29,6 +30,8 @@ def load_cases(out):
     checkpoint = None
     for key, title, groups in PATTERNS:
         source = out/key
+        if key == '4solo' and not (source/'capture.json').exists():
+            continue
         meta = json.loads((source/'capture.json').read_text())
         assert meta['groups'] == groups and meta['optimizer_steps'] == 0
         assert meta['model_and_rms_unchanged'] and meta['unchanged_action_max_error'] == 0
@@ -88,7 +91,7 @@ def load_cases(out):
                    array_layout='frame, layer, head, canonical query agent, canonical key agent',
                    raw_qk_scores='Unscaled projected Q K^T', qk_scores='Q K^T / sqrt(head_dim)',
                    mean_note='Each component is averaged over sampled frames separately; mean(softmax(logits)) is not softmax(mean(logits)).',
-                   sampling_note='Three rollouts per layout, sampled before actions every 10 steps, horizon 600 or environment termination; no success filtering. 1plus3 reuses the earlier verified capture. Other layouts share one player process and continue its seeded RNG; scenes are not paired.',
+                   sampling_note='Three rollouts per layout, sampled before actions every 10 steps, horizon 600 or environment termination; no success filtering. Captures may reuse prior verified rollouts or come from separate player processes; scenes are not paired. See per-layout capture metadata.',
                    cases={key: c['info'] for key, c in cases.items()})
     return cases, summary
 
@@ -129,11 +132,11 @@ def make_pngs(out, cases, summary, bounds):
                         ax.set_title(f'L{layer+1} H{head+1} | {titles[col]}\n'
                                      + ('color 0..1' if name == 'attention' else f'color +/- {bounds[name]:.3f}'), fontsize=11)
             fig.suptitle(f"{summary['checkpoint_epoch']} iter | {case['info']['title']} | {case['info']['frames']} sampled frames\n"
-                         'Each column has one common color scale across all three layouts; rows = query, columns = key\n'
+                         'Each column has one common color scale across all available layouts; rows = query, columns = key\n'
                          f"Final weights = softmax(raw QK / sqrt({summary['head_dim']}) + bias); displayed means are averaged separately", fontsize=13)
             fig.savefig(out/f'{key}_mean{suffix}.png', dpi=150)
             plt.close(fig)
-        fig, axes = plt.subplots(3, 3, figsize=(14, 13.5), constrained_layout=True)
+        fig, axes = plt.subplots(len(cases), 3, figsize=(14, 4.5*len(cases)), constrained_layout=True)
         for row, (key, case) in enumerate(cases.items()):
             for col, name in enumerate(names):
                 ax = axes[row, col]
@@ -159,8 +162,8 @@ def main():
                    mean={k: a.round(7).tolist() for k, a in c['mean'].items()}) for key, c in cases.items()})
     template = Path(__file__).with_name('stage2_attention_comparison.html').read_text()
     (out/'index.html').write_text(template.replace('__PAYLOAD__', json.dumps(payload, separators=(',', ':'), allow_nan=False)))
-    (out/'README.md').write_text('Stage2 attention comparison: 1+3, 2+2, 4 coupled\n\n'
-        'Open index.html. Default view: all three layouts, layer 4/head 1, sampled-frame means. '
+    (out/'README.md').write_text('Stage2 attention comparison: 1+3, 2+2, 4 coupled, optional 4 solo\n\n'
+        'Open index.html. Default view: all available layouts, layer 4/head 1, sampled-frame means. '
         'Choose any/all layers and heads or inspect the same episode/step across layouts. '
         'Each row shows relation bias, unscaled raw QK, and final softmax side by side. '
         'The scale checkbox switches raw QK to the actual content logits QK/sqrt(d). '

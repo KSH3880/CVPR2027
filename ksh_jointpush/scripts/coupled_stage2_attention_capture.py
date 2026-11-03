@@ -16,10 +16,10 @@ from learning.multi_agent.ma_players import MAPlayerContinuous
 from utils import coupled_push_spec as spec
 
 
-PATTERNS = {'1plus3': [0, 1, 1, 1], '2plus2': [0, 0, 2, 2], '4': [0, 0, 0, 0]}
+PATTERNS = {'1plus3': [0, 1, 1, 1], '2plus2': [0, 0, 2, 2], '4': [0, 0, 0, 0], '4solo': [0, 1, 2, 3]}
 SELECTED = os.environ.get('STAGE2_ATTN_PATTERNS', '1plus3').split(',')
 if not SELECTED or len(set(SELECTED)) != len(SELECTED) or any(key not in PATTERNS for key in SELECTED):
-    raise ValueError('STAGE2_ATTN_PATTERNS accepts unique comma-separated 1plus3,2plus2,4')
+    raise ValueError('STAGE2_ATTN_PATTERNS accepts unique comma-separated 1plus3,2plus2,4,4solo')
 CURRENT_GROUPS = PATTERNS[SELECTED[0]]
 
 
@@ -81,6 +81,7 @@ def capture_case(self, out, pattern):
             obs = self.env_reset()
             self.get_batch_size(obs['obs'], 1)
             assert task._groups[0].tolist() == PATTERNS[pattern]
+            assert task._templates_by_owner[0].tolist() == [5, 5, 5, 5]
             for step in range(horizon):
                 wanted = step % interval == 0
                 if wanted:

@@ -252,3 +252,8 @@ TOKENHSI_CONDA_ENV=tokenhsi118 TOKENHSI_GPU=0 CHECK=1 MAX_ITERATIONS=2 \
 최초 출발은 수평속도0.05m/s 초과6control sample(약0.2초)의 시작이다. 전원 준비는 양손이 물리 상자 뒤 면18cm 이내인 기존 gate의 위치 조건이며 aligned/goal 예외/접촉력을 포함하지 않는다. 초기 reset을 포함하고 첫 팀원 낙상에서 그룹 관측을 중단한다. `ksh_departure_eval.py <eval-output>`이2/3/4명 물리 그룹별 선출발·출발 시 미준비·무출발·미준비·낙상 censor·준비 인원·준비 전 경로/변위·준비 후 출발 지연을 계산한다. 무준비 그룹의 거리는 관측 종료까지 누적한다.
 
 이번 이전15k/현재7.5k 쌍 비교 실행은 `output_etc/check/departure_compare_15000_7500_20261102_112157/run.sh`, 상태는 CVPR2027 루트의 `runs/jointpush/departure_comparison.json`이다. 같은 실행을 중복 시작하지 않는다. 비교보고서는 완료 후 같은 폴더 REPORT.md에 저장된다.
+
+
+### 4명 모두 단독 PUSH attention
+
+`STAGE2_ATTN_PATTERNS=4solo`는 `[0,1,2,3]` 그룹으로 각자 별도 상자를 미는4명 PUSH를 수집한다. 여러 구성을 함께 수집하려면 `1plus3,2plus2,4,4solo`를 지정한다. 단일 구성 수집은 `STAGE2_ATTN_OUTPUT` 직하위에 저장하므로 비교 renderer를 쓸 때는 `<comparison-output>/4solo`로 지정한다. 기존 세 구성과 같은checkpoint의4solo가 있으면 renderer가 네 번째 행과선택항목을 추가한다.
