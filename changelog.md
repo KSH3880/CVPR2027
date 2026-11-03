@@ -2,7 +2,31 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-03
+
+### 2m 본학습을 Stage2 scratch로 전환
+
+- 사용자 정정에 따라3500 재개 PID1958075를 종료하고, GPU1·`koo_train:4`(`before_2m_scratch`)·PID1959048에서 Stage2 epoch/frame0부터 새 실행을 시작했다. Stage1 PUSH26k만 전이하고 Stage2 coordination·optimizer는 새로 초기화한다. `load_checkpoint: false`, CLI의 resume/checkpoint 부재, RESUME_CHECKPOINT/CHECK/MAX_ITERATIONS 해제, transfer report의 source_epoch26000·새 coordination 항을 확인했다. 4명/1024환경/8토큰·차단 반경2m를 유지한다. 앞선 재개 실행의 출력은 기록용으로 보존했다. [명령](output_etc/check/before_hardgate_2m_20261103/scratch_launch.sh), [로그](output_etc/check/before_hardgate_2m_20261103/scratch_train.log), [실행 상태](output_etc/check/before_hardgate_2m_20261103/scratch_status.json).
+
+### BEFORE 후행 progress 차단 반경 2m
+
+- 사용자 요청으로 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m` 실험을 분리했다. SIT·CLIMB·ON_TOP의 현재 선행 AT 미완료 시 차단 반경을 물체 크기와 관계없이2m로 고정한다. 경계 밖/현재 AT 성공 시 기존 크기별 progress를 사용한다. 기존 hardgate 및 단독 행동은 유지하고 config/train/test/VNC/eval·계약·문서를 갱신했다.
+- 관련 CPU61개·shell 구문·diff 검사를 통과했다. GPU0·4명/1024환경/8토큰의 재개 CHECK가 epoch3502/frame459014144까지 완료돼2m 설정 저장과 모델 finite를 확인했다. 원본 epoch3500/frame458752000의 모델·optimizer·normalizer·epoch/frame을 그대로 유지한 별도 전환 checkpoint를 만들고 출처/SHA256을 기록했다. 기존 checkpoint 계약 검사는 유지했다. [검증](output_etc/check/before_hardgate_2m_20261103/train_validation.json), [전환 출처](output_etc/check/before_hardgate_2m_20261103/resume_seed/transition.json).
+- 검증 후 기존 GPU1 PID1733538만 종료하고 원본 결과/저장본을 보존했다. GPU1·`koo_train:3`(`before_2m_run`)·PID1958075에서3500 상태로2m 본학습을 재개했다. CHECK/MAX_ITERATIONS를 해제하고 max_epochs1000000·4명/1024환경/8토큰·고정2m 저장 설정을 확인했다. [명령](output_etc/check/before_hardgate_2m_20261103/main_launch.sh), [로그](output_etc/check/before_hardgate_2m_20261103/main_train.log).
+
 ## 2026-11-02
+
+### Virtual goalroute 경계 progress 하드 게이트와 로컬 attention 호환
+
+- 기본 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute`에서 `hardgate` 실험을 분리했다. 선행 현재 AT가 미완료이고 후행이 기존 progress 반경 경계/내부에 있으면 progress만0, 선행 성공 또는 경계 밖이면 기존 progress를 사용한다. config/train/test/VNC/eval·출력·계약을 분리하고 config/structure/BEFORE PUSH 상세를 갱신했다.
+- 로컬 PyTorch2.0 eval의 per-batch/head float mask 오류를 `human_coordination.py`의 값/gradient가 같은 key/value view로 일반 attention 경로를 사용해 해결했다. CPU47개(1024환경 mask·eval/train·gradient·하드 게이트/기존 asym 포함), shell 구문·diff 검사를 통과했다. GPU1·4명/1024환경/8토큰 CHECK가 epoch2/frame262144까지 완료돼 checkpoint 저장·모델 finite를 확인했다. 실제 물리 상태를 강제하는 별도 `check_before_hardgate_progress.py` 검사는 미실행이다. [검증 로그](output_etc/check/before_hardgate_20261102/train_maskfix.log).
+- GPU1·`koo_train:2`(`before_hardgate_run`)에서 같은1024환경 본학습을 시작했다. Stage1 PUSH26k 전이이며 CHECK/MAX_ITERATIONS/resume override를 해제했다. 기존 창·프로세스·외부 원본은 보존했다. [실행 명령](output_etc/check/before_hardgate_20261102/main_launch.txt), [학습 로그](output_etc/check/before_hardgate_20261102/main_train.log).
+
+### BEFORE 브랜치 로컬 독립 준비
+
+- 사용자 요청으로 GitHub `stage_1_2_base_before`의 `064e215`를 같은 이름의 CVPR_stage2 하위 폴더에 독립 복제했다. 기존 checkout/결과/프로세스는 보존했다. 로컬 데이터 링크·Stage1 78k/21k/26k 복사·기본 conda `tokenhsi_koo`와 config/structure/로컬 준비 문서를 추가했다.
+- 모션/물체297개 경로 누락0·필수4패키지 위치·전체 multi_agent shell 구문·diff 검사를 통과했다. GPU 학습/시뮬레이션·checkpoint 전이 호환성은 미검증이다. 78k/21k는 로컬 가중치의 경로 alias이며 원본과의 동일성을 주장하지 않는다. 상세는 `markdowns/reference/local_before_setup.md`를 따른다.
+
 
 ### BEFORE 세 모델 8명·16토큰·64환경·1회 평가
 

@@ -4,12 +4,12 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 20개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
-- 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
+- 유지하는 실험은 아래 22개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 모든 실행은 기본 conda `tokenhsi_koo`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다. 로컬 GPU는 0/1이며 아래 예제의 GPU5/6은 사용 가능한 번호로 바꾼다. [로컬 준비](reference/local_before_setup.md)를 따른다.
 - 학습 인자: `[agents] [envs] [objects]`. Stage1·Stage1 PUSH는 **2명·2048환경·4물체**, BEFORE·coupled는 **4명·1024환경·8토큰**이다. BEFORE 학습은 인원 N≥1·토큰 M≥2N이며, BEFORE PUSH viewer/test/VNC는 M≥N을 지원한다. 부족한 예산의 과제 재샘플링은 [USAGE](USAGE.md#before-push)를 따른다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
-- 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_before_push_near50_pair50_source5_virtual`·`stage2_before_push_near50_pair50_source5_virtual_asym`·`stage2_before_push_near50_pair50_source5_goal5`·`stage2_before_push_near50_pair50_source5_virtual_goal5`·`stage2_before_push_near50_pair50_source5_virtual_asym_goal5`는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
+- 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_before_push_near50_pair50_source5_virtual`·`stage2_before_push_near50_pair50_source5_virtual_asym`·`stage2_before_push_near50_pair50_source5_goal5`·`stage2_before_push_near50_pair50_source5_virtual_goal5`·`stage2_before_push_near50_pair50_source5_virtual_asym_goal5`·`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m`는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
 - 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이다.
 - 모든 test의 기본값은 viewer다. 로컬 추론은 `HEADLESS=0`, 화면 없는 진단은 `HEADLESS=1`이다. **정식 평가는 `*_eval.sh`**, 1명 단독 평가는 **Stage1 계열 전용 `stage1_single_eval.sh`·`stage1_push_single_eval.sh`**로 구분한다. 일반 평가는 저장된 학습 인원·물체 수를 유지한다.
 
@@ -37,6 +37,8 @@
 | [stage2_before_push_near50_pair50_source5_goal5_goalroute.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute.yaml) | [stage2_before_push_near50_pair50_source5_goal5_goalroute.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_goal5_goalroute.yaml) |
 | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml) |
 | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml) | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml) |
+| [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate.yaml) |
+| [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m.yaml) |
 
 ## 학습
 
@@ -100,6 +102,12 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_train.sh 4 1024 8
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_train.sh 4 1024 8
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -166,6 +174,12 @@ TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_n
 
 # stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute
 TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate
+TOKENHSI_GPU=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m
+TOKENHSI_GPU=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -232,6 +246,12 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션

@@ -85,15 +85,17 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
                      else select_graph(self.relation_runtime.graph, env_ids))
             goals = self._tar_pos if env_ids is None else self._tar_pos[env_ids]
             lambda_inner = self.cfg['env']['before'].get('asymmetric_progress', {}).get('lambda_inner', 0.)
+            hard_gate = self.cfg['env']['before'].get('hard_gate_progress', False)
             raw_success = None
-            if lambda_inner:
+            if lambda_inner or hard_gate:
                 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
                 raw_success = interaction_own_success(phi, diag['z_error'], diag['feet_height_error'],
                     graph, self._relation_cfg, diag['region_error'])
             diag['progress'] = predecessor_at_progress(diag['progress'], bodies[..., 0, :],
                 self._logical_box_values(self._box_states, env_ids),
                 self._logical_box_values(self._box_size, env_ids), goals, graph, self._relation_cfg,
-                raw_success=raw_success, lambda_inner=lambda_inner)
+                raw_success=raw_success, lambda_inner=lambda_inner, hard_gate=hard_gate,
+                hard_gate_radius=self.cfg['env']['before'].get('hard_gate_radius'))
         return phi, diag
 
     def _draw_episode_graph(self, ids):

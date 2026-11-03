@@ -123,3 +123,17 @@ near50은 생성된 쌍의 절반에 `D_B < D_A`를 강제한다. `D_A=|A−O|+|
 기존 설정의 배치 함수/RNG 경로는 그대로 두며 새 설정의 난수 소비 순서는 다르다. 새 before 계약과 출력·실행 스크립트를 분리했으므로 기존 goal5 checkpoint로 새 실험을 resume하지 않는다. 기본 전이는 동일한 Stage1 26k다.
 
 신규 goalroute의 reset에서는 AT 목표·후행 배치를 PUSH 후보 검사보다 먼저 확정한다. 이후 고정된 과제 물체와 사람의 충돌을 선검사해 이미 불가능한 장면은 기존 외부 재시도로 넘긴다. 이 선검사는 앞으로 배치할 PUSH 상자·distractor·단독 ON_TOP 받침을 제외하며, 최종 전체 장면 검사는 그대로 수행한다. 따라서 물리 판정을 완화하지 않고 불가능한 장면의 PUSH 순차 fallback 반복을 줄인다.
+
+
+## Virtual goalroute 경계 하드 게이트
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate`는 기본 virtual goal5 goalroute에서 `before.hard_gate_progress: true`만 추가한 비교 실험이다. 기본 Stage1 PUSH 26k 전이·배치·관측·보상 가중치는 유지하고 별도 config/train/test/VNC/eval·출력·checkpoint 계약을 사용한다.
+
+후행 SIT/CLIMB는 사람 XY, ON_TOP은 payload XY와 선행 AT 목표 XY의 거리 `d`를 쓴다. 경계 `r`은 기존 progress와 같은 공유 받침 XY 대각선의 절반에 SIT/CLIMB 0.3m 또는 ON_TOP 0.1m를 더한 값이다. 현재 프레임의 선행 AT 성공이 false이고 `d <= r`이면 후행 progress를 0으로 만든다. 경계 밖 또는 선행 성공 시 기존 `1 / (1 + max(d-r, 0) / sigma)`를 사용한다. 성공 이력을 latch하지 않아 선행이 다시 실패하면 경계 안 progress는 다시 차단된다. State/success/HOLDING·단독 PUSH에는 이 하드 게이트를 추가하지 않는다.
+
+
+## Hard gate 고정 반경 2m
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_hardgate_2m`는 기존 hardgate와 설정/출력을 분리한다. `before.hard_gate_radius: 2.0`으로 BEFORE 후행 SIT·CLIMB·ON_TOP의 차단 반경만 고정한다. 선행 현재 AT 미완료이고 선행 AT goal 중심의 XY 거리 d≤2m이면 progress=0이다. SIT/CLIMB는 pelvis/root, ON_TOP은 옮기는 물체의 중심을 사용한다. d>2m 또는 현재 선행 AT 성공이면 기존 물체 크기별 progress 계산을 그대로 사용한다. 단독 행동과 state/success/성공 판정은 기존 설정을 따른다. 반경을 지정하지 않은 기존 hardgate는 원래 물체 크기별 반경을 유지한다.
+
+현재 본학습은 사용자 지정 Stage2 scratch다. `RESUME_CHECKPOINT`를 해제하고 Stage1 PUSH26k(`pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`)만 전이한다. Stage2 coordination과 optimizer·epoch/frame은 처음부터 시작한다. 실행 명령은 `output_etc/check/before_hardgate_2m_20261103/scratch_launch.sh`, 로그는 같은 폴더의 `scratch_train.log`다. 직전3500 재개 실행은 종료했고, 이전 전환 checkpoint·검증·원본 저장본은 기록용으로 보존한다.

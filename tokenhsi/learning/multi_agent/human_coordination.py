@@ -36,7 +36,9 @@ class CoordinationBlock(nn.Module):
         bias = bias.masked_fill(padding, float("-inf")).flatten(0, 1)
         query = self.query_norm(humans)
         if tokens is None:
-            tokens = query
+            # Torch 2.0's eval fast path mishandles per-batch/head float masks.
+            # A view keeps identical values/gradients and uses the regular path.
+            tokens = query.view_as(query)
         context, _ = self.attention(
             query, tokens, tokens, attn_mask=bias, need_weights=False
         )

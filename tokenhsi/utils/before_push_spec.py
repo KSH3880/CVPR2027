@@ -48,10 +48,20 @@ def validate_env(env, evaluation=False):
     before=deepcopy(env['before'])
     goal_distance=before.pop('goal_distance',None)
     asymmetric=before.pop('asymmetric_progress',None)
+    hard_gate=before.pop('hard_gate_progress',None)
+    hard_radius=before.pop('hard_gate_radius',None)
+    if 'hard_gate_radius' in env['before']:
+        if (hard_gate is not True or type(hard_radius) not in (int,float)
+                or not math.isfinite(hard_radius) or hard_radius<=0):
+            raise ValueError('Hard gate radius requires hard gate progress and a finite positive radius')
     if before.get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
         if goal_distance != [1.,5.] or before.get('source_max_distance') != 5.:
             raise ValueError('Goal-centered BEFORE requires source5 and goal5')
         before['distance_mixture']=deepcopy(DISTANCE_MIXTURE)
+    if 'hard_gate_progress' in env['before']:
+        if (hard_gate is not True or before!=limited or virtual!=VIRTUAL_MODE
+                or 'asymmetric_progress' in env['before']):
+            raise ValueError('Hard gate progress requires source5 virtual, true, and no asymmetric progress')
     if 'asymmetric_progress' in env['before']:
         if (not isinstance(asymmetric,dict) or set(asymmetric)!={'lambda_inner'}
                 or type(asymmetric['lambda_inner']) not in (int,float)
