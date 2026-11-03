@@ -82,8 +82,20 @@ def load_cfg(args):
     with open(args.cfg_train) as stream:
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
+    from utils.coupled_push_assignment import validate_mode
+    validate_mode(getattr(args, 'coupled_assignment', 'random'), args.task, is_eval,
+                  getattr(args, 'eval_protocol', ''), args.resume)
+    from utils.coupled_push_peer_selection import validate_mode as validate_peers
+    validate_peers(getattr(args, 'coupled_peers', 'all'), args.task, is_eval,
+                   getattr(args, 'eval_protocol', ''), args.resume)
     cfg, source_path = load_environment(name, args.cfg_env, args.checkpoint,
                                          saved=is_eval or args.resume > 0)
+    if (getattr(args, 'coupled_peers', 'all') != 'all'
+            and cfg['env']['stage2JointPush'].get('goal_mode') != 'individual'):
+        raise ValueError('--coupled_peers requires individual coupled PUSH goals')
+    if (cfg['env']['relationGraph'].get('coupled_peer_selection', 'all') != 'all'
+            and getattr(args, 'coupled_peers', 'all') != 'all'):
+        raise ValueError('Saved single-peer selection cannot be combined with --coupled_peers')
     from utils.experiments import experiment_horizon
     cfg["env"]["episodeLength"] = experiment_horizon(name)
     from utils.evaluation_protocol import configure
@@ -112,6 +124,9 @@ def load_cfg(args):
         cfg["env"]["numAgents"] = args.num_agents
     if getattr(args, "num_objects", 0) > 0:
         cfg["env"]["numObjects"] = args.num_objects
+    if cfg['env'].get('stage2JointPush'):
+        from utils.coupled_push_spec import physical_box_count
+        cfg['env']['stage2JointPush']['physical_boxes'] = physical_box_count(cfg['env']['numAgents'], cfg['env']['numObjects'])
     validate_experiment(name, cfg['env'], cfg_train, evaluation=is_eval)
     eval_skills_arg = getattr(args, "eval_skills", "")
     eval_skill_probs_arg = getattr(args, "eval_skill_probs", "")
@@ -354,6 +369,10 @@ def get_args():
             "default": 0,
             "help": "Object tokens per environment (0 keeps config)",
         },
+        {"name": "--coupled_assignment", "type": str, "choices": ["random", "ordered", "distance", "optimal"], "default": "random",
+         "help": "Coupled viewer-only person-to-region assignment"},
+        {"name": "--coupled_peers", "type": str, "choices": ["all", "keep3", "shrink3"], "default": "all",
+         "help": "Viewer-only contact-aware coupled peer attention selection"},
         {"name": "--before_follower_near", "action": "store_true", "default": False,
          "help": "BEFORE loco evaluation with randomized follower-near placement"},
         {"name": "--before_pickup_carry_rsi", "type": str, "choices": ["loco", "mix", "pickup", "carry"], "default": "loco",

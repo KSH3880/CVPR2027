@@ -66,3 +66,7 @@ BEFORE는 점·영역 각각 다음 세 지표를 저장한다.
 현재 전 실험의 학습·정식 평가·viewer 기본은Stage1 900step/Stage2 1200step이다. 이전1200step 결과는 당시 조건의 과거 결과로 보존한다. 기본 Stage1 단독은4행동, `stage1_push` 단독은5행동으로 각각512환경×3seed를 실행한다. PUSH 검사점은 payload 중심, 목표점은 reset 때 지정한 AT 목표이며 점/영역 모두3D거리20cm로 동일하다. 평가에 CONTACT·손 힘·유지시간을 추가하지 않는다. PUSH 크기는 학습167종이며 AT9종 override와 섞지 않는다.
 
 Stage1 PUSH 일반 평가는 checkpoint 저장 분포·2명·4물체·배치를 복원한다. 새 scratch는 AT25/ON_TOP20/SIT10/CLIMB15/PUSH30%, 제공21k finetune은 PUSH50%다. 결과의 `macro4`는 기존네행동, `macro5`는 PUSH포함5행동이고 `macro`는 해당 모델의 전체 과제 평균이다. 점/영역 각각 seed별 macro를 먼저 만든 뒤 평균/표본std를 계산한다.
+
+개인 목표 coupled 설정(`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`)은 기존 개인/전원 동시 `coupled_scores`와 별도로 `shared_center_scores`를 저장한다. 실제 공유 상자 중심과 고정 공유 중심 목표의3D 거리≤0.20m를2/3/4명 그룹별 `ever_success`·`final_success`·성공률로 보고하며, 구성원 최소1명이 유효한 frame만 인정한다. `result.json`은 seed별, `summary.json`은 그룹 수/성공 수 합산 결과다. 새 trace에는 실제 중심·공유 목표·ever/final mask를 추가한다. 과거 개인 목표 trace의 재채점은 균등 분할 토큰/목표 평균을 사용하며 계산 방식은 `rescore.json`의 `shared_center_source`에 기록한다. 기존 과제·개인 전원 동시 지표와 학습 보상은 유지한다.
+
+2026-11-01 사용자 지정 이후 공동 PUSH 평가의 배정은 `ordered`다. 현재는 전용 비교 실행기로 수행하고 `formal_report=false`를 기록하며, 기존 random 배정 정식 결과와 구분한다. ever/final을 분리하고 SIT/CLIMB/ON_TOP은 점/영역을 슬래시로 병기하며 AT/PUSH는 점만 표시한다. [실행법](../USAGE.md#공통-stage2-push와-coupled).

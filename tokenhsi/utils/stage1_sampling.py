@@ -16,8 +16,10 @@ def sample_source_xy(human_xy, templates, max_distance=10.):
     return human_xy + direction * radius[:, None]
 
 
-def sample_goal_xy(human_xy, payload_xy, center_xy):
+def sample_goal_xy(human_xy, payload_xy, center_xy, distance_range=None):
     """Native square U([-4.5,4.5]^2), outside both 1 m exclusion circles."""
+    if distance_range is not None:
+        return sample_carry_goal_xy(human_xy, payload_xy, distance_range)
     target = center_xy + (torch.rand_like(human_xy) * 2. - 1.) * 4.5
     for _ in range(256):
         invalid = ((target - human_xy).square().sum(-1) < 1.) | (
@@ -27,6 +29,23 @@ def sample_goal_xy(human_xy, payload_xy, center_xy):
         target[invalid] = center_xy[invalid] + (
             torch.rand_like(target[invalid]) * 2. - 1.) * 4.5
     raise RuntimeError('TokenHSI goal sampler exhausted rejection attempts')
+
+
+def sample_carry_goal_xy(human_xy, payload_xy, distance_range):
+    target = torch.empty_like(payload_xy)
+    pending = torch.arange(len(payload_xy), device=payload_xy.device)
+    low, high = distance_range
+    for _ in range(256):
+        draws = torch.rand(len(pending), 2, device=payload_xy.device)
+        radius = low+(high-low)*draws[:,0]
+        angle = draws[:,1]*2*torch.pi
+        candidate = payload_xy[pending]+radius[:,None]*torch.stack((angle.cos(),angle.sin()),-1)
+        valid = (candidate-human_xy[pending]).square().sum(-1) >= 1.
+        target[pending[valid]] = candidate[valid]
+        pending = pending[~valid]
+        if not len(pending):
+            return target
+    raise RuntimeError('Radial carry goal sampler exhausted rejection attempts')
 
 
 def reset_ontop_support_xy(task):
@@ -48,7 +67,8 @@ def reset_ontop_support_xy(task):
     support = task._logical_box_order[env, packet[env, owner, 4] - task.num_agents]
     task._box_states[env, support, :2] = sample_goal_xy(
         task._humanoid_root_states[env, owner, :2],
-        task._box_states[env, payload, :2], task._env_origins[env, :2])
+        task._box_states[env, payload, :2], task._env_origins[env, :2],
+        distance_range=task.cfg['env'].get('stage2JointPush', {}).get('solo_carry_goal_distance'))
 
 
 def check_sampling_resume(weights, env):

@@ -3,13 +3,18 @@ import torch.nn as nn
 
 
 class CoordinationBlock(nn.Module):
-    def __init__(self, width, heads, feedforward_dim, relations, bias_mode="all"):
+    def __init__(self, width, heads, feedforward_dim, relations, bias_mode="all", count_normalization="none"):
         super().__init__()
         if bias_mode not in ("all", "before_only_mask_none"):
             raise ValueError("Unknown human attention bias mode")
         if bias_mode != "all" and relations != 3:
             raise ValueError("Masked attention requires NONE/SELF/BEFORE relations")
+        if count_normalization not in ("none", "coupled", "coupled_none"):
+            raise ValueError("Unknown human attention count normalization")
+        if count_normalization != "none" and (relations != 4 or bias_mode != "all"):
+            raise ValueError("Count normalization requires four-relation human attention")
         self.bias_mode = bias_mode
+        self.count_normalization = count_normalization
         self.attention = nn.MultiheadAttention(
             width, heads, dropout=0.0, batch_first=True
         )
@@ -33,6 +38,12 @@ class CoordinationBlock(nn.Module):
         bias = self.effective_relation_bias()[:, relations].permute(1, 0, 2, 3)
         if self.bias_mode == "before_only_mask_none":
             padding = padding | (relations == 0)[:, None]
+        if self.count_normalization != "none":
+            kinds = (3, 0) if self.count_normalization == "coupled_none" else (3,)
+            for kind in kinds:
+                selected = (relations[:, None] == kind) & ~padding
+                count = selected.sum(-1, keepdim=True).clamp_min(1).to(bias.dtype)
+                bias = bias - selected.to(bias.dtype)*count.log()
         bias = bias.masked_fill(padding, float("-inf")).flatten(0, 1)
         query = self.query_norm(humans)
         if tokens is None:
@@ -70,12 +81,15 @@ class HumanCoordination(nn.Module):
         shuffle_human_order=False,
         bias_mode="all",
         relations=3,
+        count_normalization="none",
     ):
         super().__init__()
         self.shuffle_human_order = shuffle_human_order
+        self.coupled_peer_mask = None
         self.blocks = nn.ModuleList(
             [
-                CoordinationBlock(width, heads, feedforward_dim, relations, bias_mode=bias_mode)
+                CoordinationBlock(width, heads, feedforward_dim, relations, bias_mode=bias_mode,
+                                  count_normalization=count_normalization)
                 for _ in range(num_layers)
             ]
         )
@@ -88,9 +102,13 @@ class HumanCoordination(nn.Module):
             nn.init.zeros_(block.ffn[-1].bias)
 
     def forward(
-        self, humans, nodes, packet, edge_encoder, entity_types=None, entity_poses=None, groups=None
+        self, humans, nodes, packet, edge_encoder, entity_types=None, entity_poses=None, groups=None,
+        selected_peers=None
     ):
         relations = human_relations(packet, humans.shape[1]) if groups is None else stage2_human_relations(packet, groups)
+        selected = self.coupled_peer_mask if selected_peers is None else selected_peers
+        if selected is not None:
+            relations = torch.where((relations == 3) & ~selected, 0, relations)
         context = humans
         if self.shuffle_human_order:
             order = torch.randperm(humans.shape[1], device=humans.device)

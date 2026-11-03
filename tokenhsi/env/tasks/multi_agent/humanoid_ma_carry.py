@@ -158,7 +158,7 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
             box_cfg["obs"]["enableBboxObs"] is True
         ), "the multi-agent object token always carries the bbox points"
         self._reset_random_rot = box_cfg["reset"]["randomRot"]
-        self._ground_only = self._before and box_cfg['reset']['platformMode'] == 'ground_only'
+        self._ground_only = (self._before or self._coupled) and box_cfg['reset']['platformMode'] == 'ground_only'
         self._reset_random_height = not self._ground_only
         from utils.stage1_config import uses_fixed_platforms
 

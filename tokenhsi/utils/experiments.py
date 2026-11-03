@@ -17,7 +17,13 @@ COUPLED_GOAL5="stage2_coupled_push_goal5"
 COUPLED_INDIVIDUAL="stage2_coupled_push_individual_goal"
 BEFORE_PUSH_SOURCE5="stage2_before_push_near50_pair50_source5"
 COUPLED_INDIVIDUAL_SOLO5="stage2_coupled_push_individual_goal_solo5"
-NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5)
+COUPLED_INDIVIDUAL_CARRY5="stage2_coupled_push_individual_goal_solo5_carry5"
+COUPLED_COUNTNORM="stage2_coupled_push_individual_goal_solo5_countnorm_coupled"
+COUPLED_COUNTNORM_NONE="stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none"
+COUPLED_KEEP1="stage2_coupled_push_individual_goal_solo5_keep1"
+COUPLED_SHRINK1="stage2_coupled_push_individual_goal_solo5_shrink1"
+COUPLED_CARRY5_GROUND="stage2_coupled_push_individual_goal_solo5_carry5_ground"
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND)
 
 
 def experiment_horizon(name):
@@ -93,10 +99,10 @@ def validate_experiment(name, env, train, evaluation=False):
             raise ValueError('PUSH policy requires its own saved environment')
         from utils.stage1_jointpush import validate_env
         validate_env(env)
-    elif name in (COUPLED, COUPLED_GOAL5, COUPLED_INDIVIDUAL, COUPLED_INDIVIDUAL_SOLO5):
+    elif name in (COUPLED, COUPLED_GOAL5, COUPLED_INDIVIDUAL, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND):
         from utils.coupled_push_spec import checkpoint_contract,validate_env
         validate_env(env)
-        if checkpoint_contract(env)!=checkpoint_contract(native['env']):
+        if checkpoint_contract(env, inference=True)!=checkpoint_contract(native['env']):
             raise ValueError('Coupled PUSH environment differs from selected experiment')
         if not evaluation and env['episodeLength']!=1200:
             raise ValueError('Stage2 training requires 1200 steps')

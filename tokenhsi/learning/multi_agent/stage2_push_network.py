@@ -13,8 +13,11 @@ class Stage2PushBuilder(BeforeBuilder):
             for encoder in (self.actor_encoder,self.critic_encoder):
                 encoder.edge_encoder.category_embed=nn.Embedding(5,64)
                 nn.init.trunc_normal_(encoder.edge_encoder.category_embed.weight,std=.02)
-            self.coordination=HumanCoordination(shuffle_human_order=True,relations=4)
-            self.critic_coordination=HumanCoordination(shuffle_human_order=True,relations=4)
+            count_normalization=self.relation_graph_spec.get('human_attention_count_normalization','none')
+            self.coordination=HumanCoordination(shuffle_human_order=True,relations=4,
+                                               count_normalization=count_normalization)
+            self.critic_coordination=HumanCoordination(shuffle_human_order=True,relations=4,
+                                                      count_normalization=count_normalization)
             for branch in (self.coordination,self.critic_coordination):
                 # Match the reference Stage2 initialization, including FFN input bias.
                 for layer in branch.modules():
@@ -32,9 +35,13 @@ class Stage2PushBuilder(BeforeBuilder):
         def _encode(self,encoder,coordination,obs):
             m=self.num_agents
             scene,groups=obs[:,:-m],obs[:,-m:]
+            selected = None
+            if self.relation_graph_spec.get('coupled_peer_selection', 'all') != 'all':
+                scene, peers = scene[:, :-m], scene[:, -m:].long()
+                selected = peers[..., None] == torch.arange(m, device=obs.device)
             packet=scene[:,-5*m:]
             humans=self._humans(encoder,scene)
-            return coordination(humans,None,packet,None,groups=groups)
+            return coordination(humans,None,packet,None,groups=groups,selected_peers=selected)
 
         def eval_actor(self,obs):
             humans=self._encode(self.actor_encoder,self.coordination,obs)

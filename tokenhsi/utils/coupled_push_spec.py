@@ -9,16 +9,25 @@ SAMPLER = 'stage2_jointpush'
 PRESETS = ('random_scenario', 'all_solo', 'all_coupled', 'sit', 'climb', 'holding_at', 'holding_ontop', 'push')
 
 
-def checkpoint_contract(env):
+def checkpoint_contract(env, inference=False):
     from copy import deepcopy
     from utils.before_push_spec import push_contract
-    return dict(policy=deepcopy(env['stage2Policy']),push=push_contract(env),
+    result = dict(policy=deepcopy(env['stage2Policy']),push=push_contract(env),
         coupled=deepcopy(env['stage2JointPush']),graph=deepcopy(env['relationGraph']),
         box=deepcopy(env['box']),people=env['numAgents'],objects=env['numObjects'])
+    if inference and env['numAgents'] >= 1 and env['numObjects'] >= env['numAgents']:
+        result.update(people=4, objects=8)
+        result['coupled']['physical_boxes'] = physical_box_count(4)
+    return result
 
 
-def check_checkpoint(checkpoint,env):
-    if checkpoint.get('coupled_push_contract')!=checkpoint_contract(env):
+def check_checkpoint(checkpoint,env,inference=False):
+    from copy import deepcopy
+    saved = deepcopy(checkpoint.get('coupled_push_contract'))
+    if inference and saved is not None:
+        saved.update(people=4, objects=8)
+        saved['coupled']['physical_boxes'] = physical_box_count(4)
+    if saved!=checkpoint_contract(env, inference=inference):
         raise ValueError('Coupled PUSH checkpoint settings differ from the environment')
 
 
@@ -26,10 +35,21 @@ def validate_env(env):
     from copy import deepcopy
     from utils.experiments import native_config
     from utils.before_push_spec import validate_env as validate_before
-    if (env['numAgents'],env['numObjects'])!=(4,8):
-        raise ValueError('Coupled PUSH requires four people and eight object tokens')
+    people = env['numAgents']
+    if people < 1 or env['numObjects'] < people:
+        raise ValueError('Coupled PUSH requires at least one person and one object token per person')
+    if env['relationGraph'].get('human_attention_count_normalization', 'none') not in ('none', 'coupled', 'coupled_none'):
+        raise ValueError('Invalid human attention count normalization')
+    peers = env['relationGraph'].get('coupled_peer_selection', 'all')
+    if peers not in ('all', 'keep1', 'shrink1'):
+        raise ValueError('Invalid coupled peer selection')
+    if peers != 'all' and env['stage2JointPush'].get('goal_mode') != 'individual':
+        raise ValueError('Single-peer selection requires individual coupled PUSH goals')
     coupled = deepcopy(env['stage2JointPush'])
     native = native_config('stage2_coupled_push')['env']['stage2JointPush']
+    if coupled.pop('physical_boxes') != physical_box_count(people, env['numObjects']):
+        raise ValueError('Coupled PUSH physical bank does not match the people count')
+    native.pop('physical_boxes')
     mode = (coupled.pop('goal_mode', 'shared'), coupled.pop('contact_face', 'rear'),
             coupled.pop('gate_alignment', True))
     if mode not in (('shared', 'rear', True), ('individual', 'group_four', False)):
@@ -46,11 +66,15 @@ def validate_env(env):
         native.pop(key, None)
         if len(bounds) != 2 or not 0 < bounds[0] <= bounds[1]:
             raise ValueError('Invalid coupled PUSH distance range: ' + key)
+    carry = coupled.pop('solo_carry_goal_distance', None)
+    if carry is not None and (len(carry) != 2 or not 1 <= carry[0] <= carry[1]):
+        raise ValueError('Invalid solo CARRY goal distance range')
     if coupled!=native:
         raise ValueError('Unsupported coupled PUSH sampling/physics contract')
     from utils.stage1_platforms import validate_stage1_platform_config
     validate_stage1_platform_config(env)
     base=deepcopy(env)
+    base['numObjects'] = max(base['numObjects'], 2*people)
     base.pop('stage2JointPush')
     original=native_config('stage2_before_push')['env']
     base['before']=deepcopy(original['before'])
@@ -71,41 +95,58 @@ def expected_solo_fraction(people,probability):
 def compile_graph(spec, people, objects, device=None):
     from utils.edge_ontop_spec import select_graph
     groups = torch.arange(people, device=device)[None]
-    return select_graph(compose_graph(torch.full_like(groups, 3), groups, False), 0)
+    return select_graph(compose_graph(torch.full_like(groups, 3), groups, False, num_objects=objects), 0)
+
+
+def physical_box_count(people, objects=None):
+    extra = max(0, objects-2*people) if objects is not None else 0
+    return 4*people+sum(people//size for size in range(1, people+1))+extra
 
 
 def asset_bank(count, env, device):
     from utils.stage1_jointpush import box_profiles
-    sizes = torch.empty(count, 24, 3, device=device)
+    people = env['numAgents']
+    push_end = physical_box_count(people)
+    sizes = torch.empty(count, physical_box_count(people, env['numObjects']), 3, device=device)
     ranges = env['box']['build']['taskSizeRanges']
     for bank, name in enumerate(('HOLDING_AT','SIT','CLIMB','SUPPORT')):
         for axis, (low, high) in enumerate(ranges[name]):
-            sizes[:,bank*4:bank*4+4,axis] = torch.randint(round(low*20),round(high*20)+1,(count,4),device=device)/20
+            sizes[:,bank*people:(bank+1)*people,axis] = torch.randint(round(low*20),round(high*20)+1,(count,people),device=device)/20
     profiles = torch.tensor(box_profiles(), device=device)
-    base = profiles[torch.randint(len(profiles),(count,4),device=device)]
-    sizes[:,16:20] = base
-    sizes[:,20:22] = base[:,:2]
-    sizes[:,22:24] = base[:,:1]
-    members = sizes.new_tensor([1,1,1,1,2,2,3,4])
-    sizes[:,16:,0] *= members
+    base = profiles[torch.randint(len(profiles),(count,people),device=device)]
+    members = torch.cat([torch.full((people//size,), size, device=device) for size in range(1, people+1)])
+    offset = 4*people
+    for size in range(1, people+1):
+        slots = people//size
+        sizes[:,offset:offset+slots] = base[:,:slots]
+        offset += slots
+    sizes[:,4*people:push_end,0] *= members
+    extra = sizes.shape[1]-push_end
+    if extra:
+        for axis, (low, high) in enumerate(ranges['SUPPORT']):
+            sizes[:,push_end:,axis] = torch.randint(round(low*20),round(high*20)+1,(count,extra),device=device)/20
     masses = sizes.prod(-1)*100.
     physical = env['jointPush']['box']
     if 'density' in physical:
-        masses[:,16:] = sizes[:,16:].prod(-1)*physical['density']
+        masses[:,4*people:push_end] = sizes[:,4*people:push_end].prod(-1)*physical['density']
     else:
-        masses[:,16:] = physical['mass']*members
+        masses[:,4*people:push_end] = physical['mass']*members
     return sizes, masses
 
 
 def physical_assignment(templates, groups):
-    people = torch.arange(4, device=groups.device)[None].expand_as(groups)
+    n = groups.shape[1]
+    people = torch.arange(n, device=groups.device)[None].expand_as(groups)
     counts = group_sizes(groups)
-    pair_leader = (counts == 2) & (groups == people)
-    pair_slot = (pair_leader.long().cumsum(-1)-1).gather(1, groups)
-    push_slot = torch.where(counts == 1, 16+people,
-        torch.where(counts == 2, 20+pair_slot, torch.where(counts == 3, 22, 23)))
+    push_slot = 4*n+people
+    offset = 5*n
+    for size in range(2, n+1):
+        leader = (counts == size) & (groups == people)
+        slot = (leader.long().cumsum(-1)-1).gather(1, groups)
+        push_slot = torch.where(counts == size, offset+slot, push_slot)
+        offset += n//size
     return torch.where(templates == 5, push_slot,
-        torch.where(templates == 1, 4+people, torch.where(templates == 2, 8+people, people)))
+        torch.where(templates == 1, n+people, torch.where(templates == 2, 2*n+people, people)))
 
 
 def sample_groups(count, people, probability, device, preset='random_scenario'):
@@ -140,6 +181,41 @@ def sample_templates(groups, probabilities):
     return torch.where(group_sizes(groups) > 1, 5, solo)
 
 
+def sample_episode(count, people, objects, probability, probabilities, device, preset):
+    forced = dict(sit=1,climb=2,holding_at=3,holding_ontop=4,push=5)
+    if preset == 'holding_ontop' and objects < 2*people:
+        raise ValueError('All-person ON_TOP requires a distinct spare support per person')
+    groups = torch.empty(count, people, dtype=torch.long, device=device)
+    templates = torch.empty_like(groups)
+    pending = torch.arange(count, device=device)
+    while len(pending):
+        sampled = sample_groups(len(pending), people, probability, device,
+            preset if preset in ('random_scenario','all_coupled','all_solo') else 'all_solo')
+        tasks = sample_templates(sampled, probabilities)
+        if preset == 'all_coupled':
+            tasks.fill_(5)
+        if preset in forced:
+            tasks.fill_(forced[preset])
+        valid = (tasks == 4).sum(-1) <= objects-people
+        groups[pending[valid]] = sampled[valid]
+        templates[pending[valid]] = tasks[valid]
+        pending = pending[~valid]
+    return groups, templates
+
+
+def spare_assignment(templates, objects):
+    count, people = templates.shape
+    spare = objects-people
+    order = torch.arange(people, device=templates.device)[None].expand(count,-1)
+    if spare < people:
+        order = (templates == 4).long().argsort(dim=-1, descending=True, stable=True)
+    assignment = 3*people+order[:,:min(spare,people)]
+    if spare > people:
+        extra = torch.arange(physical_box_count(people), physical_box_count(people, objects), device=templates.device)
+        assignment = torch.cat((assignment, extra[None].expand(count,-1)), -1)
+    return assignment
+
+
 def assign_regions(groups):
     people = groups.shape[1]
     order = torch.rand_like(groups, dtype=torch.float).argsort(-1)
@@ -148,14 +224,15 @@ def assign_regions(groups):
     return (same & earlier).sum(-1)
 
 
-def compose_graph(templates, groups, shuffle=True, individual_goals=False):
+def compose_graph(templates, groups, shuffle=True, individual_goals=False, num_objects=None):
     people = groups.shape[1]
-    graph = compose_canonical_graph(torch.where(templates == 5, 3, templates), shuffle, 2*people)
+    objects = 2*people if num_objects is None else num_objects
+    graph = compose_canonical_graph(torch.where(templates == 5, 3, templates), shuffle, objects)
     push = (templates == 5).gather(1, graph.edge_owner)
     leader = graph.edge_owner if individual_goals else groups.gather(1, graph.edge_owner)
     return replace(graph,
         edge_relation=torch.where(push & (graph.edge_relation == 6), PUSH, graph.edge_relation),
-        edge_dst=torch.where(push & (graph.edge_relation == 7), 3*people+leader, graph.edge_dst))
+        edge_dst=torch.where(push & (graph.edge_relation == 7), people+objects+leader, graph.edge_dst))
 
 
 def region_states(physical_states, physical_sizes, members, region):

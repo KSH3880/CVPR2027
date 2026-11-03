@@ -6,7 +6,7 @@ EXPERIMENT=$1
 MODE=$2
 shift 2
 case "$EXPERIMENT" in
-  stage2_coupled_push|stage2_coupled_push_goal5|stage2_coupled_push_individual_goal|stage2_coupled_push_individual_goal_solo5) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
+  stage2_coupled_push|stage2_coupled_push_goal5|stage2_coupled_push_individual_goal|stage2_coupled_push_individual_goal_solo5|stage2_coupled_push_individual_goal_solo5_carry5|stage2_coupled_push_individual_goal_solo5_carry5_ground|stage2_coupled_push_individual_goal_solo5_countnorm_coupled|stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none|stage2_coupled_push_individual_goal_solo5_keep1|stage2_coupled_push_individual_goal_solo5_shrink1) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage2_before_push|stage2_before_push_near50|stage2_before_push_near50_pair50_source5) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage1_push) TASK=HumanoidMAPush; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage1) TASK=HumanoidMACarry; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
@@ -14,6 +14,18 @@ case "$EXPERIMENT" in
     TASK=HumanoidMABefore; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   *) echo "Unsupported experiment: $EXPERIMENT" >&2; exit 1 ;;
 esac
+if [ "${COUPLED_ASSIGNMENT:-random}" != random ] && { [ "$MODE" = train ] || [ "$TASK" != HumanoidMACoupledPush ]; }; then
+  echo 'COUPLED_ASSIGNMENT requires a coupled test/VNC wrapper.' >&2
+  exit 1
+fi
+case "${COUPLED_PEERS:-all}" in
+  all|keep3|shrink3) ;;
+  *) echo 'COUPLED_PEERS must be all, keep3 or shrink3.' >&2; exit 1 ;;
+esac
+if [ "${COUPLED_PEERS:-all}" != all ] && { [ "$MODE" = train ] || [ "$TASK" != HumanoidMACoupledPush ]; }; then
+  echo 'COUPLED_PEERS requires a coupled test/VNC wrapper.' >&2
+  exit 1
+fi
 HORIZON=900
 case "$EXPERIMENT" in stage2_*) HORIZON=1200 ;; esac
 . "$SCRIPT_DIR/runtime_env.sh"
@@ -47,6 +59,10 @@ elif [ "$MODE" = eval ]; then
     --eval_skills "${EVAL_SKILLS:-loco}" --eval_skill_probs "${EVAL_SKILL_PROBS:-1.0}" --test --eval
   if [ "${HEADLESS:-0}" != 0 ]; then set -- "$@" --headless; fi
   if [ "${TASK_ROLE_SWAP:-0}" = 1 ]; then set -- "$@" --task_role_swap; fi
+  if [ "$TASK" = HumanoidMACoupledPush ]; then
+    set -- "$@" --coupled_assignment "${COUPLED_ASSIGNMENT:-random}"
+    set -- "$@" --coupled_peers "${COUPLED_PEERS:-all}"
+  fi
   set -- "$@" --episode_length "${EPISODE_LENGTH:-$HORIZON}"
   if { [ "$TASK" = HumanoidMABefore ] || [ "$TASK" = HumanoidMABeforePush ]; }; then
     set -- "$@" --before_pickup_carry_rsi "${BEFORE_PICKUP_CARRY_RSI:-loco}"
@@ -62,7 +78,7 @@ else
   exit 1
 fi
 MOTION=tokenhsi/data/dataset_loco_sit_carry_climb.yaml
-if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
+if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_countnorm_coupled ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_keep1 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_shrink1 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
 python tokenhsi/run.py --task "$TASK" \
   --cfg_train "tokenhsi/data/cfg/train/rlg/$EXPERIMENT.yaml" \
   --cfg_env "${ENV_CONFIG:-}" \

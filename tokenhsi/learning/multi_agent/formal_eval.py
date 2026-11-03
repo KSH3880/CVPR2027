@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from utils.evaluation_protocol import HORIZON, TASK_NAMES, spatial_success, predecessors, coupled_current_success, coupled_scores
 from utils.task_role_spec import task_graph_packet
+from utils.evaluation_protocol import shared_center_success, shared_center_scores
 
 
 def freeze_fallen(task, newly_fallen):
@@ -45,12 +46,22 @@ def run_formal_eval(player):
             else torch.arange(m,device=task.device)[None].expand(n,-1))
     individual_goals = getattr(task, '_individual_push_goals', False)
     coupled_ever = torch.zeros_like(ever)
+    if individual_goals:
+        center_goals = task._center_tar_pos.clone()
+        center_ever = torch.zeros_like(alive)
     initial = dict(groups=groups.cpu(),packet=packet.cpu(), predecessor=parent.cpu(), sizes=sizes.cpu(), goals=goals.cpu(),
                    roots=task._humanoid_root_states.cpu().clone(), boxes=box_values(task._box_states).cpu().clone(),
                    dof_pos=task._dof_pos.cpu().clone(), dof_vel=task._dof_vel.cpu().clone(),
                    logical_box_order=task._logical_box_order.cpu().clone())
+    if individual_goals:
+        initial['shared_center_goals'] = center_goals.cpu()
+        initial['shared_centers'] = task._assigned_box_values(task._box_states)[..., :3].cpu().clone()
+    peer_mode = task.cfg['env']['relationGraph'].get('coupled_peer_selection', 'all')
+    if peer_mode != 'all':
+        initial['selected_peers'] = obs['obs'][:, -2*m:-m].long().cpu()
     torch.save(initial, path/'initial.pt')
     roots_trace, boxes_trace, valid_trace = [], [], []
+    centers_trace = []
     for step in range(1, horizon+1):
         action = player.get_action(obs, True)
         action = action.reshape(n, m, -1) * alive[..., None]
@@ -64,6 +75,10 @@ def run_formal_eval(player):
         if individual_goals:
             coupled_current = coupled_current_success(current, groups)
             coupled_ever |= coupled_current
+            centers = task._assigned_box_values(task._box_states)[..., :3]
+            center_current = shared_center_success(centers, center_goals, groups, alive)
+            center_ever |= center_current
+            centers_trace.append(centers.cpu().numpy().copy())
         simultaneous |= current & current[batch, parent.clamp_min(0)] & dependent[..., None]
         roots_trace.append(roots.cpu().numpy().copy())
         boxes_trace.append(boxes.cpu().numpy().copy())
@@ -100,12 +115,18 @@ def run_formal_eval(player):
     if individual_goals:
         data['push_goal_mode'] = 'individual'
         data['coupled_scores'] = coupled_scores(groups, ever, current, coupled_ever, coupled_current)
+        data['shared_center_scores'] = shared_center_scores(groups, center_ever, center_current)
+    if peer_mode != 'all':
+        data['coupled_peer_selection'] = peer_mode
+        data['unselected_coupled'] = 'NONE'
     (path/'result.json').write_text(json.dumps(data, indent=2))
+    center_trace = dict(shared_centers=np.stack(centers_trace), shared_center_goals=center_goals.cpu().numpy(),
+                        shared_center_ever=center_ever.cpu().numpy(), shared_center_final=center_current.cpu().numpy()) if individual_goals else {}
     np.savez_compressed(path/'trace.pending.npz', roots=np.stack(roots_trace), boxes=np.stack(boxes_trace),
                         valid=np.stack(valid_trace), packet=packet.cpu().numpy(), sizes=sizes.cpu().numpy(),
                         goals=goals.cpu().numpy(), predecessor=parent.cpu().numpy(),groups=groups.cpu().numpy(),
                         fall_step=fall_step.cpu().numpy(), ever=ever.cpu().numpy(),
-                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy())
+                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(), **center_trace)
     (path/'trace.pending.npz').replace(path/'trace.npz')
     print('[formal eval result]', json.dumps(data), flush=True)
     return data

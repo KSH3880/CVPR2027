@@ -19,6 +19,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         return normalized
 
     def __init__(self, config):
+        self._coupled_peer_selector = None
         super().__init__(config)
         debug_cfg = self.env.task.cfg["env"].get("debug", {})
         self._reward_debug = debug_cfg.get("reward", False)
@@ -26,7 +27,34 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         self._reward_debug_step = 0
         self._task_reward_w = config["task_reward_w"]
         self._disc_reward_w = config["disc_reward_w"]
+        task = self.env.task
+        mode = getattr(task.cfg['args'], 'coupled_peers', 'all')
+        if mode != 'all':
+            from utils.coupled_push_peer_selection import CoupledPeerSelection
+            self._coupled_peer_selector = CoupledPeerSelection(mode, task.device, task.cfg['seed'])
+            print(f'[coupled peers] mode={mode} limit=3 contact=on_face unselected=NONE actor_only=True', flush=True)
         return
+
+    def env_reset(self, env_ids=None):
+        obs = super().env_reset(env_ids)
+        selector = getattr(self, '_coupled_peer_selector', None)
+        if selector is not None:
+            if env_ids is None:
+                selector.reset()
+                self.model.a2c_network.coordination.coupled_peer_mask = None
+            elif len(env_ids):
+                ids = torch.as_tensor(env_ids, device=self.env.task.device, dtype=torch.long)
+                selector.reset((ids//self.env.task.num_agents).unique())
+        return obs
+
+    def get_action(self, obs_dict, is_determenistic=False):
+        if self._coupled_peer_selector is not None:
+            task = self.env.task
+            ids = torch.arange(task.num_envs, device=task.device)
+            face = task._contact_geometry(ids, task._rigid_body_pos)[-1]
+            selected = self._coupled_peer_selector.update(task._groups, face['on_face'])
+            self.model.a2c_network.coordination.coupled_peer_mask = selected
+        return super().get_action(obs_dict, is_determenistic)
 
     def run(self):
         task = self.env.task
@@ -44,7 +72,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
             check_agent_collision_checkpoint(checkpoint, self.env.task.cfg["env"])
             if getattr(self.env.task,"_coupled",False):
                 from utils.coupled_push_spec import check_checkpoint
-                check_checkpoint(checkpoint,self.env.task.cfg["env"])
+                check_checkpoint(checkpoint,self.env.task.cfg["env"],inference=True)
             if getattr(self.env.task, "_before", False):
                 from utils.before_spec import check_checkpoint
                 check_checkpoint(checkpoint, self.env.task.cfg["env"])

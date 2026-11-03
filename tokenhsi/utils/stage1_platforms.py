@@ -4,7 +4,8 @@ import torch
 
 def validate_stage1_platform_config(env):
     reset = env['box']['reset']
-    ground = env.get('before') is not None
+    ground = (env.get('before') is not None or
+              (env.get('stage2JointPush') is not None and reset.get('platformMode') == 'ground_only'))
     if (reset.get('platformMode') != ('ground_only' if ground else 'carry_payload_tokenhsi')
             or reset.get('randomHeight') is not (not ground)
             or reset.get('randomHeightProb') != (0. if ground else .5)

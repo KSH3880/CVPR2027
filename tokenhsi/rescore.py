@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from utils.evaluation_protocol import spatial_success, coupled_current_success, coupled_scores
+from utils.evaluation_protocol import shared_center_success, shared_center_scores, shared_centers_from_tokens
 
 
 def rescore(path):
@@ -28,6 +29,10 @@ def rescore(path):
         if individual_goals:
             groups=torch.from_numpy(data['groups'])
             group_ever=torch.zeros_like(ever)
+            center_ever=torch.zeros(n,m,dtype=torch.bool)
+            center_ever32=torch.zeros_like(center_ever)
+            center_precision_differences=0
+            physical_centers='shared_centers' in data
         for frame in range(len(data['roots'])):
             valid=torch.from_numpy(data['valid'][frame])
             assert not (valid & ~previous).any(), 'A fallen person was reactivated'
@@ -41,6 +46,17 @@ def rescore(path):
             if individual_goals:
                 group_current=coupled_current_success(current,groups)
                 group_ever |= group_current
+                if physical_centers:
+                    centers=torch.from_numpy(data['shared_centers'][frame])
+                    center_goals=torch.from_numpy(data['shared_center_goals'])
+                else:
+                    centers,center_goals=shared_centers_from_tokens(packet,
+                        torch.from_numpy(data['boxes'][frame]),goals,groups)
+                center_current=shared_center_success(centers,center_goals,groups,valid)
+                center_current32=shared_center_success(centers,center_goals,groups,valid,dtype=torch.float32)
+                center_ever |= center_current
+                center_ever32 |= center_current32
+                center_precision_differences += int((center_current32 != center_current).sum())
             simultaneous |= current & current[rows,parent.clamp_min(0)] & dependent[...,None]
             previous=valid
         both=ever & ever[rows,parent.clamp_min(0)] & dependent[...,None]
@@ -59,6 +75,12 @@ def rescore(path):
         recorded=json.loads((path/'result.json').read_text())
         if individual_goals:
             assert recorded['coupled_scores']==coupled_scores(groups,ever,current,group_ever,group_current)
+            center_scores=shared_center_scores(groups,center_ever,center_current)
+            if 'shared_center_scores' in recorded:
+                assert recorded['shared_center_scores']==center_scores
+            if physical_centers:
+                assert np.array_equal(center_ever.numpy(),data['shared_center_ever'])
+                assert np.array_equal(center_current.numpy(),data['shared_center_final'])
         for label,idx in [('point',0),('region',1)]:
             for kind,name in enumerate(('SIT','CLIMB','AT','ON_TOP','PUSH')):
                 if name not in recorded['scores'][label]:
@@ -79,7 +101,15 @@ def rescore(path):
                     float32_float64_ever_differences=int((ever32 != ever).sum()),
                     float32_float64_simultaneous_differences=int((simultaneous32 != simultaneous).sum()),
                     finite=bool(np.isfinite(data['roots']).all() and np.isfinite(data['boxes']).all()))
+        if individual_goals and physical_centers:
+            result['finite'] &= bool(np.isfinite(data['shared_centers']).all() and np.isfinite(data['shared_center_goals']).all())
         assert result['finite']
+        if individual_goals:
+            result.update(shared_center_scores=center_scores,
+                shared_center_source='physical_trace' if physical_centers else 'legacy_tokens_mean',
+                shared_center_cpu_gpu_exact=True if physical_centers else None,
+                shared_center_float32_float64_frame_differences=center_precision_differences,
+                shared_center_float32_float64_ever_differences=int((center_ever32 != center_ever).sum()))
     (path/'rescore.json').write_text(json.dumps(result,indent=2))
     print(json.dumps(result),flush=True)
     return result

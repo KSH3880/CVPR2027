@@ -79,6 +79,7 @@ def test_ontop_only_target_xy_partial_reset_and_permuted_binding(skill):
     env, owner = (ids.repeat_interleave(2), torch.arange(2).repeat(len(ids)))
     origins = torch.randn(16, 3) * 50
     task = SimpleNamespace(
+        cfg={'env': {}},
         num_envs=16,
         num_agents=2,
         _logical_box_order=order,

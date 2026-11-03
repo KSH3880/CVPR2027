@@ -57,19 +57,26 @@ def path_goals(task, ids):
     return task._center_tar_pos[ids] if getattr(task, '_individual_push_goals', False) else task._tar_pos[ids]
 
 
+def required_supports(task, ids):
+    graph = task.relation_runtime.graph
+    slots = torch.arange(task.num_agents, task.num_objects, device=task.device)
+    used = (graph.edge_relation[ids] == 8) & graph.edge_valid[ids]
+    return ((graph.edge_dst[ids,:,None]-task.num_agents == slots) & used[...,None]).any(1)
+
+
 def paths(task, ids):
-    boxes = task._logical_box_values(task._box_states, ids).clone()
     # Paths use whole physical boxes; region centres are only policy/contact tokens.
-    boxes[:, :4] = task._assigned_box_values(task._box_states, ids)
-    sizes = task._gather_entity_slots(task._box_size[ids], task._logical_box_order[ids])
+    mapping = task._logical_box_order[ids]
+    boxes = task._gather_entity_slots(task._box_states[ids], mapping)
+    sizes = task._gather_entity_slots(task._box_size[ids], mapping)
     start = boxes[..., :2].clone()
     end = start.clone()
     push = task._templates_by_owner[ids] == 5
     goals = path_goals(task, ids)
-    delta = goals[..., :2]-start[:, :4]
+    delta = goals[..., :2]-start[:, :task.num_agents]
     unit = delta/delta.norm(dim=-1, keepdim=True).clamp_min(1e-8)
-    start[:, :4] -= torch.where(push[..., None], 1.5*unit, 0.)
-    end[:, :4] = torch.where(push[..., None], goals[..., :2], end[:, :4])
+    start[:, :task.num_agents] -= torch.where(push[..., None], 1.5*unit, 0.)
+    end[:, :task.num_agents] = torch.where(push[..., None], goals[..., :2], end[:, :task.num_agents])
     return start, end, box_yaw(boxes), sizes[..., :2]/2
 
 
@@ -81,9 +88,8 @@ def sample_push(task, ids):
     goal_bounds = torch.tensor([[solo['goal_distance'][0], spec.get('solo_goal_max_distance', solo['goal_distance'][1])],
                                spec.get('goal_distance', [2., 10.])], device=task.device)
     failed = torch.zeros(len(ids), dtype=torch.bool, device=task.device)
-    people = torch.arange(4, device=task.device)
     placed = task._templates_by_owner[ids] != 5
-    for leader in range(4):
+    for leader in range(task.num_agents):
         pending = ((task._groups[ids, leader] == leader) & (task._templates_by_owner[ids, leader] == 5)).nonzero().flatten()
         for _ in range(spec['candidate_rounds']):
             if not len(pending):
@@ -119,21 +125,26 @@ def sample_push(task, ids):
             valid &= (clearance >= spec['human_clearance']).all(-1)
             valid &= (((goal[:,:,None]-roots[:,None]).norm(dim=-1) >= 1.) | ~member[:,None]).all(-1)
             starts, ends, oyaw, half = paths(task, es)
-            relevant = torch.cat((placed[pending], task._templates_by_owner[es] == 4), -1)
+            relevant = torch.cat((placed[pending], required_supports(task, es)), -1)
             hit = swept_overlap((center-1.5*direction)[:,:,None], goal[:,:,None], yaw[:,:,None], size[:,None,None,:2]/2,
                 starts[:,None], ends[:,None], oyaw[:,None], half[:,None], .5)
             valid &= ~(hit & relevant[:,None]).any(-1)
             # Other groups must also have a clear approach/path, as in Stage1 PUSH.
             human_hit = swept_overlap((center-1.5*direction)[:,:,None],goal[:,:,None],yaw[:,:,None],size[:,None,None,:2]/2,
-                roots[:,None],roots[:,None],torch.zeros(n,1,4,device=task.device),torch.full((n,1,4,2),.5,device=task.device))
+                roots[:,None],roots[:,None],torch.zeros(n,1,task.num_agents,device=task.device),torch.full((n,1,task.num_agents,2),.5,device=task.device))
             valid &= ~(human_hit & ~member[:,None]).any(-1)
-            boxes = task._gather_entity_slots(task._box_states[es],task._logical_box_order[es])
-            sizes = task._gather_entity_slots(task._box_size[es],task._logical_box_order[es])
-            goals = torch.cat((path_goals(task, es),boxes[:,4:,:3]),1)
-            other_push = torch.cat((task._templates_by_owner[es] == 5,torch.zeros(n,4,device=task.device,dtype=torch.bool)),-1)
-            solo_valid = solo_path_clear(center,goal,size[:,None],boxes[:,None],sizes[:,None],goals[:,None],roots[:,None],
-                ~member[:,None],relevant[:,None],other_push[:,None])
-            valid &= solo_valid | shared[:,None]
+            single = (~shared).nonzero().flatten()
+            if len(single):
+                single = slice(None) if len(single) == n else single
+                solo_ids = es[single]
+                boxes = task._gather_entity_slots(task._box_states[solo_ids],task._logical_box_order[solo_ids])
+                sizes = task._gather_entity_slots(task._box_size[solo_ids],task._logical_box_order[solo_ids])
+                goals = torch.cat((path_goals(task, solo_ids),boxes[:,task.num_agents:,:3]),1)
+                other_push = torch.cat((task._templates_by_owner[solo_ids] == 5,
+                    torch.zeros(len(solo_ids),task.num_objects-task.num_agents,device=task.device,dtype=torch.bool)),-1)
+                valid[single] &= solo_path_clear(center[single],goal[single],size[single,None],
+                    boxes[:,None],sizes[:,None],goals[:,None],roots[single,None],
+                    ~member[single,None],relevant[single,None],other_push[:,None])
             accepted = valid.any(-1)
             choice = valid.long().argmax(-1)
             rows = torch.arange(n, device=task.device)
@@ -154,26 +165,32 @@ def sample_push(task, ids):
 
 
 def place_distractors(task, ids):
-    for owner in range(4):
-        pending = ids[task._templates_by_owner[ids, owner] != 4]
+    supports = required_supports(task, ids)
+    for slot in range(task.num_agents, task.num_objects):
+        pending = ids[~supports[:,slot-task.num_agents]]
+        if not len(pending):
+            continue
+        starts, ends, yaw, half = paths(task, pending)
+        roots = task._humanoid_root_states[pending,...,:2]
         for _ in range(128):
             if not len(pending):
                 break
-            starts, ends, yaw, half = paths(task, pending)
-            slot = owner+4
-            point = task._box_states[pending,12+owner,:2]
+            physical = task._logical_box_order[pending,slot]
+            point = task._box_states[pending,physical,:2]
             hit = swept_overlap(point[:,None],point[:,None],yaw[:,slot,None],half[:,slot,None],starts,ends,yaw,half,.5)
             hit[:,slot] = False
-            roots = task._humanoid_root_states[pending,...,:2]
             near_human = ((point[:,None]-roots).norm(dim=-1) < (half[:,slot].norm(dim=-1)+.35).clamp_min(1.)[:,None]).any(-1)
-            pending = pending[hit.any(-1)|near_human]
-            task._box_states[pending,12+owner,:2] = task._sample_arena_xy(task._env_origins[pending,:2])
+            rejected = hit.any(-1)|near_human
+            pending = pending[rejected]
+            starts, ends, yaw, half, roots = (value[rejected] for value in (starts, ends, yaw, half, roots))
+            physical = task._logical_box_order[pending,slot]
+            task._box_states[pending,physical,:2] = task._sample_arena_xy(task._env_origins[pending,:2])
 
 
 def scene_infeasible(task, ids):
     starts, ends, yaw, half = paths(task, ids)
     mapping = task._logical_box_order[ids]
-    push = torch.cat((task._templates_by_owner[ids] == 5, torch.zeros(len(ids),4,device=task.device,dtype=torch.bool)),-1)
+    push = torch.cat((task._templates_by_owner[ids] == 5, torch.zeros(len(ids),task.num_objects-task.num_agents,device=task.device,dtype=torch.bool)),-1)
     # Sweeps for PUSH, static footprints for the remaining objects.
     hits = swept_overlap(starts[:,:,None],ends[:,:,None],yaw[:,:,None],half[:,:,None],
                          starts[:,None],ends[:,None],yaw[:,None],half[:,None],.05)
@@ -196,18 +213,22 @@ def scene_infeasible(task, ids):
     relative = bodies[:,:,None]-states[:,None,:,None,:3]
     local_body = inverse_rotate(states[:,None,:,None,3:7].expand(*relative.shape[:-1],4),relative)
     inside = (local_body.abs() < sizes[:,None,:,None]/2-.06).all(-1).any(-1)
-    exempt = torch.arange(4,device=task.device)[None,:,None] == torch.arange(8,device=task.device)[None,None]
+    exempt = torch.arange(task.num_agents,device=task.device)[None,:,None] == torch.arange(task.num_objects,device=task.device)[None,None]
     bad |= (inside & (~exempt | push[:,None])).any((1,2))
     goal_gap = (task._tar_pos[ids,:,None,:2]-states[:,None,:,:2]).norm(dim=-1)
     legacy_at = task._templates_by_owner[ids] == 3
-    goal_other = mapping[:,:4,None] != mapping[:,None]
-    bad |= ((goal_gap < radius[:,:4,None]+radius[:,None]+.25) & goal_other & legacy_at[...,None]).any((1,2))
-    goals = torch.cat((path_goals(task, ids),states[:,4:,:3]),1)
-    for owner in range(4):
-        solo = (task._templates_by_owner[ids,owner] == 5)&(task._members[ids,owner] == 1)
-        other_people = torch.arange(4,device=task.device)[None] != owner
-        other_boxes = mapping != mapping[:,owner,None]
-        clear = solo_path_clear(states[:,owner,:2],goals[:,owner,:2],sizes[:,owner],states,sizes,goals,roots,other_people,other_boxes,push)
-        bad |= solo & ~clear
+    goal_other = mapping[:,:task.num_agents,None] != mapping[:,None]
+    bad |= ((goal_gap < radius[:,:task.num_agents,None]+radius[:,None]+.25) & goal_other & legacy_at[...,None]).any((1,2))
+    goals = torch.cat((path_goals(task, ids),states[:,task.num_agents:,:3]),1)
+    for owner in range(task.num_agents):
+        solo = ((task._templates_by_owner[ids,owner] == 5)&(task._members[ids,owner] == 1)).nonzero().flatten()
+        if not len(solo):
+            continue
+        solo = slice(None) if len(solo) == len(ids) else solo
+        other_people = torch.arange(task.num_agents,device=task.device)[None] != owner
+        other_boxes = mapping[solo] != mapping[solo,owner,None]
+        clear = solo_path_clear(states[solo,owner,:2],goals[solo,owner,:2],sizes[solo,owner],
+            states[solo],sizes[solo],goals[solo],roots[solo],other_people,other_boxes,push[solo])
+        bad[solo] |= ~clear
     return bad
 

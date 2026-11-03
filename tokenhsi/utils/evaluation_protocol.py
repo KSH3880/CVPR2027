@@ -82,7 +82,7 @@ def coupled_scores(groups, individual_ever, individual_final, group_ever, group_
     result = {}
     for label, index in (('point', 0), ('region', 1)):
         result[label] = {}
-        for size in (2, 3, 4):
+        for size in range(2, max(4, groups.shape[1])+1):
             people = members == size
             selected = people & leader
             result[label][str(size)] = dict(
@@ -91,6 +91,40 @@ def coupled_scores(groups, individual_ever, individual_final, group_ever, group_
                 individual_final=int(individual_final[..., index][people].sum()),
                 simultaneous_ever=int(group_ever[..., index][selected].sum()),
                 simultaneous_final=int(group_final[..., index][selected].sum()))
+    return result
+
+
+def shared_center_success(centers, goals, groups, valid, dtype=torch.float64):
+    same = groups[:, :, None] == groups[:, None, :]
+    active = (same & valid[:, None, :]).any(-1)
+    distance = (centers.to(dtype)-goals.to(dtype)).norm(dim=-1)
+    return (distance <= .20) & active & (same.sum(-1) > 1)
+
+
+def shared_centers_from_tokens(packet, boxes, goals, groups):
+    n, m = groups.shape
+    rows = torch.arange(n, device=boxes.device)[:, None]
+    payload = (packet[..., 3]-m).long().clamp(0, boxes.shape[1]-1)
+    target = (packet[..., 4]-m-boxes.shape[1]).long().clamp(0, m-1)
+    same = (groups[:, :, None] == groups[:, None, :]).to(torch.float64)
+    count = same.sum(-1, keepdim=True)
+    centers = same @ boxes[rows, payload, :3].double()/count
+    center_goals = same @ goals[rows, target].double()/count
+    return centers, center_goals
+
+
+def shared_center_scores(groups, ever, final):
+    members = (groups[:, :, None] == groups[:, None, :]).sum(-1)
+    leader = groups == torch.arange(groups.shape[1], device=groups.device)[None]
+    result = {}
+    for size in range(2, max(4, groups.shape[1])+1):
+        selected = (members == size) & leader
+        count = int(selected.sum())
+        row = dict(groups=count, ever_success=int(ever[selected].sum()),
+                   final_success=int(final[selected].sum()))
+        for metric in ('ever', 'final'):
+            row[metric+'_rate'] = row[metric+'_success']/count if count else None
+        result[str(size)] = row
     return result
 
 

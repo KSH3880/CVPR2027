@@ -22,10 +22,12 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self._amp_num_families = 4
         self._joint = cfg['env']['jointPush']
         self._individual_push_goals = cfg['env']['stage2JointPush'].get('goal_mode') == 'individual'
+        self._coupled_assignment = getattr(cfg.get('args'), 'coupled_assignment', 'random')
+        self._coupled_peer_mode = cfg['env']['relationGraph'].get('coupled_peer_selection', 'all')
         super().__init__(cfg, *args, **kwargs)
 
     def get_relation_suffix_size(self):
-        return 6*self.num_agents
+        return (6 + (self._coupled_peer_mode != 'all'))*self.num_agents
 
     def _load_box_asset(self):
         self._box_spawn_radius = 4.5
@@ -48,7 +50,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def _build_box(self, env_id, object_id, env_ptr):
         super()._build_box(env_id, object_id, env_ptr)
         handle = self._box_handles[-1]
-        if object_id >= 16:
+        if 4*self.num_agents <= object_id < spec.physical_box_count(self.num_agents):
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, handle)
             for prop in props:
                 prop.friction = self._joint['box']['friction']
@@ -62,21 +64,25 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def _build_assignment_tensors(self):
         super()._build_assignment_tensors()
         self._groups = self._agent_box_assignment.clone()
+        if self._coupled_peer_mode != 'all':
+            from utils.coupled_push_peer_selection import SingleCoupledPeerSelection
+            self._single_peer_selector = SingleCoupledPeerSelection(
+                self._coupled_peer_mode, self._groups, self.cfg['seed'])
         self._members = torch.ones_like(self._groups)
         self._regions = torch.zeros_like(self._groups)
         if self._individual_push_goals:
             self._center_tar_pos = self._tar_pos.clone()
         self._templates_by_owner = torch.full_like(self._groups,3)
-        self._logical_box_order[:,4:] = torch.arange(12,16,device=self.device)
+        self._logical_box_order[:,self.num_agents:] = spec.spare_assignment(self._templates_by_owner, self.num_objects)
 
     def _logical_box_values(self, values, env_ids=None):
         ids = torch.arange(self.num_envs,device=self.device) if env_ids is None else env_ids
         result = super()._logical_box_values(values, ids).clone()
         if values is self._box_states:
             sizes = self._assigned_box_values(self._box_size,ids)
-            result[:,:4] = spec.region_states(result[:,:4],sizes,self._members[ids],self._regions[ids])[0]
+            result[:,:self.num_agents] = spec.region_states(result[:,:self.num_agents],sizes,self._members[ids],self._regions[ids])[0]
         elif values is self._box_size:
-            result[:,:4,0] /= self._members[ids]
+            result[:,:self.num_agents,0] /= self._members[ids]
         elif values is self._box_bps:
             signs = result.new_tensor([[1,1,-1],[-1,1,-1],[-1,-1,-1],[1,-1,-1],
                                       [1,1,1],[-1,1,1],[-1,-1,1],[1,-1,1]])
@@ -87,25 +93,22 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         super()._init_relation_runtime()
         self.relation_runtime = CoupledPushRuntime(self.num_envs,self.relation_runtime.graph,
             self._relation_cfg,self.device,contact_weights=self._joint['contact_weights'])
-        self._push_hits = torch.zeros(self.num_envs,4,device=self.device,dtype=torch.bool)
+        self._push_hits = torch.zeros(self.num_envs,self.num_agents,device=self.device,dtype=torch.bool)
 
     def _sample_episode_graph(self, ids):
         preset = self._task_graph_preset
-        groups = spec.sample_groups(len(ids),4,self.cfg['env']['stage2JointPush']['coupled_probability'],self.device,
-            preset if preset in ('random_scenario','all_coupled','all_solo') else 'all_solo')
         weights = torch.tensor(list(self._relation_graph_spec['template_probabilities'].values()),device=self.device)
-        templates = spec.sample_templates(groups,weights)
-        forced = dict(sit=1,climb=2,holding_at=3,holding_ontop=4,push=5)
-        if preset in forced:
-            templates.fill_(forced[preset])
+        groups, templates = spec.sample_episode(len(ids), self.num_agents, self.num_objects,
+            self.cfg['env']['stage2JointPush']['coupled_probability'], weights, self.device, preset)
         self._groups[ids],self._members[ids] = groups,spec.group_sizes(groups)
         self._regions[ids] = spec.assign_regions(groups)
         self._templates_by_owner[ids] = templates
         assignment = spec.physical_assignment(templates,groups)
         self._agent_box_assignment[ids] = assignment
-        self._logical_box_order[ids,:4] = assignment
+        self._logical_box_order[ids,:self.num_agents] = assignment
+        self._logical_box_order[ids,self.num_agents:] = spec.spare_assignment(templates, self.num_objects)
         graph = spec.compose_graph(templates,groups,self._relation_graph_spec['shuffle_edge_order'],
-                                   individual_goals=self._individual_push_goals)
+                                   individual_goals=self._individual_push_goals, num_objects=self.num_objects)
         copy_graph_rows(self.relation_runtime.graph,ids,graph)
         self._edge_goal_owners[ids] = True
         self._ontop_maintain_steps[ids] = 0
@@ -136,8 +139,9 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self._box_states[ids,:,6] = 1.
         self._box_states[ids,:,2] = self._box_size[ids,:,2]/2
         self._box_states[ids,:,:2] = self._env_origins[ids,None,:2]+1000.
-        self._box_states[ids,:,0] += torch.arange(24,device=self.device)*12
-        for slot in range(12,16):
+        self._box_states[ids,:,0] += torch.arange(self.num_physical_objects,device=self.device)*12
+        for logical in range(self.num_agents,self.num_objects):
+            slot = self._logical_box_order[ids,logical]
             self._box_states[ids,slot,:2] = self._sample_arena_xy(self._env_origins[ids,:2])
             yaw = torch.rand(len(ids),device=self.device)*2*torch.pi
             self._box_states[ids,slot,5] = (yaw/2).sin()
@@ -171,6 +175,13 @@ class HumanoidMACoupledPush(HumanoidMACarry):
                 break
         if len(pending):
             raise RuntimeError('Stage2 jointpush layout exhausted; people/group retained: '+str(pending[:16].tolist()))
+        if self._coupled_assignment != 'random':
+            from utils.coupled_push_assignment import assign_regions
+            self._regions[ids] = assign_regions(
+                self._groups[ids], self._humanoid_root_states[ids],
+                self._assigned_box_values(self._box_states, ids),
+                self._assigned_box_values(self._box_size, ids), self._regions[ids],
+                self._coupled_assignment, self.cfg['env']['stage2JointPush']['human_clearance'])
         if self._individual_push_goals:
             boxes = self._assigned_box_values(self._box_states, ids)
             sizes = self._assigned_box_values(self._box_size, ids)
@@ -185,6 +196,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self._reset_env_tensors(ids)
         self._refresh_sim_tensors()
         self._reset_relation_history(ids)
+        if self._coupled_peer_mode != 'all':
+            self._single_peer_selector.reset(ids)
         self._compute_observations(ids)
         self._init_amp_obs(ids)
 
@@ -233,7 +246,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
                 goal_saturation=self.cfg['env']['stage2JointPush']['goal_saturation'])
         owner = self.relation_runtime.graph.edge_owner[ids]
         relation = self.relation_runtime.graph.edge_relation[ids]
-        root_distance = (bodies[:,:,0,:2]-self._logical_box_values(self._box_states,ids)[:,:4,:2]).norm(dim=-1)
+        root_distance = (bodies[:,:,0,:2]-self._logical_box_values(self._box_states,ids)[:,:self.num_agents,:2]).norm(dim=-1)
         contact = self._joint['contact']
         push_at = (relation == 7) & (self._templates_by_owner[ids] == 5).gather(1,owner)
         delta = self._tar_pos[ids]-boxes[...,:3]
@@ -272,6 +285,11 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def _compute_clean_scene_obs(self, env_ids=None):
         raw = super()._compute_clean_scene_obs(env_ids)
         groups = self._groups if env_ids is None else self._groups[env_ids]
+        if self._coupled_peer_mode != 'all':
+            ids = torch.arange(self.num_envs, device=self.device) if env_ids is None else env_ids
+            face = self._contact_geometry(ids, self._rigid_body_pos[ids])[-1]['on_face']
+            peers = self._single_peer_selector.update(groups, face, env_ids)
+            raw = torch.cat((raw, peers.float()), -1)
         return torch.cat((raw,groups.float()),-1)
 
     def _init_amp_obs_ref(self, slots, motion_ids, motion_times, skill_name):

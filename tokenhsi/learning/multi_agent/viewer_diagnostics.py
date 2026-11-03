@@ -57,6 +57,7 @@ def run_viewer_diagnostics(player):
         if alive.any():
             raise RuntimeError("Evaluation exceeded horizon")
         metrics = dict(
+            coupled_peers=getattr(task.cfg['args'], 'coupled_peers', 'all'),
             num_scene_trials=N,
             num_edges=len(graph.ids),
             final_agent_goal_success=(
@@ -88,6 +89,11 @@ def run_viewer_diagnostics(player):
             metrics["stage1_sampling_mode"] = task.cfg["env"]["box"]["reset"].get(
                 "samplingMode", "legacy_near"
             )
+        peer_mode = task.cfg['env']['relationGraph'].get('coupled_peer_selection', 'all')
+        if peer_mode != 'all':
+            metrics['coupled_peer_selection'] = peer_mode
+        if peer_mode != 'all' or metrics['coupled_peers'] != 'all':
+            metrics['unselected_coupled'] = 'NONE'
         results["repeat_" + str(repeat)] = metrics
         print("[viewer diagnostics; not formal evaluation]", metrics, flush=True)
     directory = os.path.join(task.cfg["args"].output_path, "metrics")

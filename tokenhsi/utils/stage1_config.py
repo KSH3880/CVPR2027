@@ -12,7 +12,8 @@ def uses_fixed_platforms(env):
     mode = reset.get('platformPhysics')
     if mode is None:
         return False
-    ground = (env.get('before') is not None and reset.get('platformMode') == 'ground_only'
+    ground = ((env.get('before') is not None or env.get('stage2JointPush') is not None)
+              and reset.get('platformMode') == 'ground_only'
               and reset.get('randomHeight') is False and reset.get('randomHeightProb') == 0.)
     if (mode != MODE or env.get('relationReward', {}).get('stage1_variant') != 'stage1'
             or (not ground and (reset.get('platformMode') != 'carry_payload_tokenhsi'
