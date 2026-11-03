@@ -57,12 +57,14 @@ if [ "${CONDA_DEFAULT_ENV:-}" != "$TOKENHSI_CONDA_ENV" ]; then
     fi
 fi
 export TOKENHSI_CONDA_ENV
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 cd "$TOKENHSI_ROOT" || exit 1
 
 # --- GPU selection ---------------------------------------------------------
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
-export TOKENHSI_GPU=${TOKENHSI_GPU:-0}
+export TOKENHSI_GPU=${TOKENHSI_GPU:-6}
 export CUDA_VISIBLE_DEVICES=$TOKENHSI_GPU
 
 # A verified MPS daemon on the selected GPU is discovered even in a fresh

@@ -22,7 +22,7 @@ set -e
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
 WEB_PORT=${PORT:-6080}
 RESOLUTION=${RESOLUTION:-1600x900x24}
-VNC_DIR=${VNC_DIR:-}
+VNC_DIR=${VNC_DIR:-$HOME/opt/vnc}
 CONDA_ENV=${TOKENHSI_CONDA_ENV:-tokenhsi}
 
 if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
