@@ -130,6 +130,9 @@ def checkpoint_contract(env):
         contract['before_object_alias'] = env['relationGraph']['before_object_alias']
     if env['relationGraph'].get('before_virtual_object') is not None:
         contract['before_virtual_object'] = env['relationGraph']['before_virtual_object']
+    fusion = env['relationGraph'].get('human_relation_fusion', 'none')
+    if fusion != 'none':
+        contract['human_relation_fusion'] = fusion
     if env['before'].get('follower_pickup_carry_rsi') is not None:
         contract['size_aware_rsi'] = env['sizeAwareRsi']
     if env['relationReward']['success']['at_z_tolerance'] != .001:

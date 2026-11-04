@@ -4,6 +4,12 @@
 
 ## 2026-11-04
 
+### relfusion_zerobg base 설정 로컬 복사
+
+- 사용자 요청한 ksh `wait_penalty_v2_relfusion_zerobg` 실행 설정을 `tokenhsi/data/cfg/imported/relfusion_zerobg/`로 복사했다. env.yaml, train.yaml, saved_run.yaml, transfer_report.json의 원본·복사본 SHA256 일치 확인, manifest에 출처 보존. 저장 env/sim은 런타임 파생값 외 동일하다.
+- 현재 소스 train seed=-1과 실제 저장 seed=42만 달라, 실제 실행 설정을 별도train_used.yaml로 추출했다. 나머지 train 설정 동일 검증.
+- human_relation_fusion=before_zerobg, hard-entry 대기벌점+3m/계수1, AT z허용0.2. 설정 복사만 수행했으며 로컬 fusion 구현·실행 등록 미이식. checkpoint 미복사, 현재 GPU2 soft-entry 학습과 ksh 파일/프로세스는 변경하지 않았다.
+
 ### Soft-entry1m GPU2 본학습 시작
 
 - 사용자 요청 및 정정에 따라 기존 학습을 건드리지 않고 GPU2 원본7k viewer1542627만 WM_DELETE_WINDOW로 정상 종료(PID/6088 종료 확인). 우리 이전 학습들은 이미 종료 상태였다.

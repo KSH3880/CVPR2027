@@ -48,6 +48,7 @@
 | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_radius3m_continuous.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_radius3m_continuous.yaml) | [stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_radius3m_continuous.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_radius3m_continuous.yaml) |
 | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2.yaml) |
 | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m.yaml) |
+| [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml) | [stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml) |
 
 ## 학습
 
@@ -141,6 +142,9 @@ TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m
 TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m_train.sh 4 1024 8
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -237,6 +241,9 @@ TOKENHSI_GPU=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_n
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m
 TOKENHSI_GPU=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m_test.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -333,6 +340,9 @@ TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m
 TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -451,4 +461,7 @@ TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair5
 
 # stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m
 TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m_eval.sh "$CKPT" --output output_etc/check/wait_penalty_v2_soft_entry1m_general
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=1 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_eval.sh "$CKPT" --output output_etc/check/relfusion_zerobg_general
 ```

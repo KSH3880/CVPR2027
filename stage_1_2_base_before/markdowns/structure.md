@@ -82,3 +82,7 @@
 - 새 base wait_penalty_v2: `before_wait.py`는 ksh 원본의 읽기 전용 복사본이며 `HumanoidMABefore` reset과 `edge_context_task`의 속도 벌점으로 연결한다. [명세](reference/before_wait_penalty_v2.md).
 
 - 대기 속도벌점 soft entry: `before_wait.py`의 `entry_weight`/`soft_entry_width`, CPU/물리 검사 `test_before_soft_wait_entry.py` / `check_before_soft_wait_entry.py`. [명세](reference/before_soft_wait_entry.md).
+
+- 가져온 relfusion_zerobg 설정: `tokenhsi/data/cfg/imported/relfusion_zerobg/`의 env/train YAML·실제train_used·saved_run·transfer_report·manifest. 설정 원본 보관본. 실행용 fusion 구현과 wrapper는 [relfusion 명세](reference/before_relfusion_zerobg.md)를 따른다.
+
+- BEFORE relation fusion: `learning/multi_agent/before_relation_fusion.py`, `human_coordination.py`, `stage2_push_network.py`. 원본 동작 이식 및 기존 attention-order 진단 유지.

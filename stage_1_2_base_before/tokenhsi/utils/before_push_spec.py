@@ -16,6 +16,8 @@ def validate_env(env, evaluation=False):
     from utils.experiments import native_config
     from utils.task_role_spec import TASK_PROBS
     from utils.before_object_alias import MODE, VIRTUAL_MODE
+    if env['relationGraph'].get('human_relation_fusion', 'none') not in ('none', 'before_zerobg'):
+        raise ValueError('Unknown BEFORE human relation fusion')
     virtual = env['relationGraph'].get('before_virtual_object')
     if virtual is not None and (virtual != VIRTUAL_MODE or env['relationGraph'].get('before_object_alias') != MODE):
         raise ValueError('BEFORE virtual objects require at_goal_xyz_v1 and object aliases')

@@ -1,0 +1,38 @@
+{
+  "experiment": "stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg",
+  "source_run": "/home/hwanhee/ksh/stage_1_2_base_1031/output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg/Stage2BeforePushNear50Pair50Source5VirtualGoal5GoalRouteWaitPenaltyV2RelFusionZeroBg_04-11-57-34",
+  "copied": "2026-11-04T20:47:51.476932",
+  "files": [
+    {
+      "source": "/home/hwanhee/ksh/stage_1_2_base_1031/tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml",
+      "file": "env.yaml",
+      "sha256": "f14c95c934833be5186f7bc4baee3abe5136dcf587aa30b6e08655e5f81cf48b"
+    },
+    {
+      "source": "/home/hwanhee/ksh/stage_1_2_base_1031/tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml",
+      "file": "train.yaml",
+      "sha256": "55624559d4f6dd0969a1391fe43485180213a888473fdb8fbfc83b5682b90acc"
+    },
+    {
+      "source": "/home/hwanhee/ksh/stage_1_2_base_1031/output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg/Stage2BeforePushNear50Pair50Source5VirtualGoal5GoalRouteWaitPenaltyV2RelFusionZeroBg_04-11-57-34/relation_config.yaml",
+      "file": "saved_run.yaml",
+      "sha256": "63863e81cbd48e778d3898eaa20baff3e2d6584da010b9c9e9e8d03c20cb14eb"
+    },
+    {
+      "source": "/home/hwanhee/ksh/stage_1_2_base_1031/output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg/Stage2BeforePushNear50Pair50Source5VirtualGoal5GoalRouteWaitPenaltyV2RelFusionZeroBg_04-11-57-34/before_transfer_report.json",
+      "file": "transfer_report.json",
+      "sha256": "02c3ffedb3303c7fc3caef5af002b6a6af2c3c593b133f03a67bc50a0744e695"
+    }
+  ],
+  "saved_env_matches_native": true,
+  "train_difference": {
+    "params.seed": {
+      "current_source_yaml": -1,
+      "saved_run": 42
+    }
+  },
+  "train_used_file": "train_used.yaml",
+  "registered_for_execution": false,
+  "reason": "Local human_relation_fusion before_zerobg implementation not ported; settings copy only",
+  "checkpoint_copied": false
+}

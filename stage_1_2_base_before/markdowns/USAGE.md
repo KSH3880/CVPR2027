@@ -179,3 +179,5 @@ TOKENHSI_GPU=5 PORT=6088 ATTENTION_MAP=1 ATTENTION_PORT=6089 TASK_GRAPH=before_s
 - 현재 교체 base: `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2`. ksh 원본을 로컬 복사했으며 [대기 페널티와 AT 높이 기준](reference/before_wait_penalty_v2.md)을 따른다.
 
 - `_wait_penalty_v2_soft_entry1m`: 기존 경계 바깥1m에서부터 속도 벌점을 부드럽게 켠다. [수식·latch·변경 범위](reference/before_soft_wait_entry.md).
+
+- `_wait_penalty_v2_relfusion_zerobg`: 로컬 fusion 구현·전용 train/test/vnc/eval 사용 가능. [모델·보상·checkpoint 안내](reference/before_relfusion_zerobg.md). 기존 soft-entry 모델과 별도이며 soft entry를 포함하지 않는다.
