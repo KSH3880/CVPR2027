@@ -111,6 +111,8 @@ def validate_stage1_context_config(config):
     expected = dict(_REWARD_CONTRACT)
     expected["stage1_variant"] = variant
     expected["diagnostics"] = config.get("diagnostics")
+    if config.get("success", {}).get("at_z_tolerance") == 0.2:
+        expected["success"] = dict(expected["success"], at_z_tolerance=0.2)
     expected["at"] = dict(state_definition="box_near", near_distance_scale=10.0)
     expected["at"]["success_distance"] = 0.2
     expected["climb"] = dict(

@@ -167,3 +167,15 @@ TOKENHSI_GPU=5 PORT=6088 ATTENTION_MAP=1 ATTENTION_PORT=6089 TASK_GRAPH=before_s
 현재 선택한 비가상 버전은 `stage2_before_push_near50_pair50_source5_goal5_goalroute_state_rescale`다. 비가상 원본 대비 state 정규화만 추가하며 전이·모델·샘플링·progress/success는 동일하다. 가상 버전과 실행 이름·출력·checkpoint 계약을 분리한다.
 
 추가 학습용 `stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_state_rescale`은 virtual_asym 원본의 가상박스 및 lambda_inner=10 progress를 유지하고 state만 정규화한다. GPU2 실행 명령은 config를 따른다.
+
+### BEFORE 선행 배치 후 접근 정체 종료
+
+`stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_approach_timeout2s`는 원본 virtual_asym에 2초 이내 최초 접근 확인만 추가한다. state 정규화는 없다. 학습·일반 viewer에 적용하고 정식 평가는 고정 horizon을 유지한다. 별도 checkpoint 계약으로 Stage1 PUSH26k 전이에서 시작한다. [판정과 예외](reference/before_approach_timeout.md), 실행 명령은 [config](config.md)를 따른다.
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_approach_timeout2s`는 같은 최초 접근 조건을 일반 virtual(no-asym)에 적용한다. 가상박스 유지, state 정규화 없음. 별도 출력과 checkpoint 계약을 사용한다.
+
+- `_goalroute_radius3m_continuous`: BEFORE 대기0.1→접근0.2 연속 progress. 추가 접근 timeout/state 정규화 없음. [정확한 전환·재개방·예외 처리](reference/before_continuous_progress.md).
+
+- 현재 교체 base: `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2`. ksh 원본을 로컬 복사했으며 [대기 페널티와 AT 높이 기준](reference/before_wait_penalty_v2.md)을 따른다.
+
+- `_wait_penalty_v2_soft_entry1m`: 기존 경계 바깥1m에서부터 속도 벌점을 부드럽게 켠다. [수식·latch·변경 범위](reference/before_soft_wait_entry.md).

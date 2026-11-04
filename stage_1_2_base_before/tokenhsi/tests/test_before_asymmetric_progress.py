@@ -186,3 +186,44 @@ def test_independent_and_coupled_progress_are_unchanged(preset):
         torch.ones(3, 8, 3), torch.randn(3, 4, 3), g, CONFIG,
         raw_success=torch.zeros_like(original, dtype=torch.bool), lambda_inner=10.)
     assert torch.equal(actual, original)
+
+
+@pytest.mark.parametrize('family', ['sit', 'climb', 'stack'])
+def test_three_meter_wait_radius_only_before_gate_opens(family):
+    args, rows, edges, _ = geometry(family, [0., 0., 0., 0.])
+    roots, boxes, sizes, goals, graph, config = args
+    source = graph.edge_src[rows, edges]
+    positions = torch.tensor([[4., 0.], [3., 0.], [2.9, 0.], [2., 0.]])
+    if family == 'stack':
+        boxes[rows, source-4, :2] = positions
+    else:
+        roots[rows, source, :2] = positions
+    old = torch.full((4, len(graph.ids)), .4)
+    closed = torch.zeros_like(old, dtype=torch.bool)
+    actual = predecessor_at_progress(old, *args, raw_success=closed, lambda_inner=10., wait_radius_m=3.)
+    torch.testing.assert_close(actual[rows, edges], torch.tensor([.5, 1., .5, 1/11.]))
+    opened = predecessor_at_progress(old, *args, raw_success=~closed, lambda_inner=10., wait_radius_m=3.)
+    assert torch.equal(opened, predecessor_at_progress(old, *args))
+    mask = ~graph.prereq_mask.any(-1)
+    assert torch.equal(actual[mask], old[mask])
+
+
+@pytest.mark.parametrize('radius', [0, -1, True, '3', None, float('nan'), float('inf')])
+def test_invalid_wait_radius_rejected(radius):
+    env = deepcopy(ENV)
+    env['before']['asymmetric_progress']['wait_radius_m'] = radius
+    with pytest.raises(ValueError, match='Asymmetric progress'):
+        validate_unified_env(env)
+
+
+def test_radius3m_experiment_contract():
+    name = 'stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute'
+    original, modified = native_config(name), native_config(name+'_radius3m')
+    validate_unified_env(modified['env'])
+    validate_experiment(name+'_radius3m', modified['env'], native_config(name+'_radius3m', True))
+    assert 'approach_timeout' not in modified['env']['before']
+    restored = deepcopy(modified['env'])
+    assert restored['before']['asymmetric_progress'].pop('wait_radius_m') == 3.
+    assert restored == original['env']
+    with pytest.raises(ValueError, match='checkpoint contract'):
+        check_checkpoint({'before_contract': checkpoint_contract(original['env'])}, modified['env'])

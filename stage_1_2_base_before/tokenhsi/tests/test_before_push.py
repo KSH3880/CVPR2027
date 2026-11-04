@@ -152,3 +152,14 @@ def test_original_before_and_push_checkpoints_cannot_be_mixed(other):
         with pytest.raises(ValueError):check_before_checkpoint({'before_contract':checkpoint_contract(source)},target)
     with pytest.raises(ValueError):validate_experiment(other,ENV,native_config(other,True))
     with pytest.raises(ValueError):validate_experiment('stage2_before_push',old,native_config('stage2_before_push',True))
+
+
+def test_before_mixed_has_only_pairs_and_all_follower_skills():
+    torch.manual_seed(65)
+    g, pre, t = draw(4096, preset='before_mixed')
+    assert ((pre >= 0).sum(-1) == 2).all()
+    rows, followers = (pre >= 0).nonzero(as_tuple=True)
+    assert (t[rows, pre[rows, followers]] == 3).all()
+    counts = torch.bincount(t[rows, followers], minlength=6)[[1, 2, 4]]
+    torch.testing.assert_close(counts.float()/len(rows), torch.full((3,), 1/3), atol=.03, rtol=0)
+    assert (g.prereq_mask.sum((1, 2)) == 2).all()

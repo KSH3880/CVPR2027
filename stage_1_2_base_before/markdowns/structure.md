@@ -29,6 +29,7 @@
 | `scene_observation.py`, `scene_reset.py`, `reference_motion.py` | 관측, reset/배치, 모션·RSI·AMP |
 | `edge_ontop_task.py`, `edge_context_task.py` | 과제 그래프·물리 재시도·보상·진단 |
 | `humanoid_ma_push.py`, `jointpush_reward.py` | 1/2명 PUSH 자산·배치·접촉 RSI·CONTACT+AT 보상 |
+| `before_approach_timeout.py` | 선행 최초 성공 이후 후행 root→goal 최초 접근 마감 타이머와 환경 전체 terminal 처리 |
 | `humanoid_ma_before_push.py`, `before_push_reward.py` | BEFORE solo PUSH 자산·배치·접촉 보상, 기존 BEFORE gate 유지 |
 | `humanoid_ma_coupled_push.py`, `coupled_push_reward.py` | 공동 상자·가상 구역·그룹 gate·goal saturation |
 | `push_goal_markers.py` | PUSH 목표의 viewer/VNC 선 표시만 추가; actor·reset·scale 수정 없음 |
@@ -69,3 +70,15 @@
 - `tokenhsi/learning/multi_agent/attention_viewer.py`, `attention_dashboard.html`: viewer 전용 actor GTA/coordination attention 추출과 localhost 대시보드. `test_attention_viewer.py`는 행동·RNG·가중치 보존, MHA 확률 일치와 셔플 복원을 검사한다.
 
 - `before_reward.py`의 선택적 state 구간 정규화: [설계와 예외](reference/before_state_rescale.md). `test_before_state_rescale.py`는 CPU 보상/계약 검사, `check_before_state_rescale.py`는 실제 환경 연결·보상합·부분 reset 검사다.
+
+- `stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_approach_timeout2s`: [2초 이내 최초 접근 확인](reference/before_approach_timeout.md). CPU 테스트 `tests/test_before_approach_timeout.py`, 환경 연결 검사 `tests/check_before_approach_timeout.py`.
+
+- `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_approach_timeout2s`: 일반 virtual의 최초 접근2초 비교 실험. 같은 timeout 구현을 사용한다.
+
+- BEFORE asym 3m: `before_reward.py::predecessor_at_progress`의 `wait_radius_m`는 gate 닫힘 때만 고정 경계를 사용한다. 전용 `_radius3m` 설정과 wrapper를 사용한다.
+
+- BEFORE 연속 progress: `before_continuous_progress.py`의 최초 개방 anchor와 `BeforeRuntime.step` 연결. [명세](reference/before_continuous_progress.md), CPU/물리 검사 `test_before_continuous_progress.py` / `check_before_continuous_progress.py`.
+
+- 새 base wait_penalty_v2: `before_wait.py`는 ksh 원본의 읽기 전용 복사본이며 `HumanoidMABefore` reset과 `edge_context_task`의 속도 벌점으로 연결한다. [명세](reference/before_wait_penalty_v2.md).
+
+- 대기 속도벌점 soft entry: `before_wait.py`의 `entry_weight`/`soft_entry_width`, CPU/물리 검사 `test_before_soft_wait_entry.py` / `check_before_soft_wait_entry.py`. [명세](reference/before_soft_wait_entry.md).

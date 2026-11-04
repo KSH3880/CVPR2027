@@ -48,6 +48,15 @@ def validate_env(env, evaluation=False):
     before=deepcopy(env['before'])
     goal_distance=before.pop('goal_distance',None)
     asymmetric=before.pop('asymmetric_progress',None)
+    penalty=before.pop('waiting_penalty',None)
+    if 'continuous_progress' in before:
+        from env.tasks.multi_agent.before_continuous_progress import validate_continuous_progress
+        validate_continuous_progress(before.pop('continuous_progress'))
+        if not isinstance(asymmetric, dict) or asymmetric.get('wait_radius_m') != 3.0 or asymmetric.get('lambda_inner') != 10.0:
+            raise ValueError('continuous_progress requires radius3m asym with lambda_inner=10')
+    if 'approach_timeout' in before:
+        from env.tasks.multi_agent.before_approach_timeout import validate_approach_timeout
+        validate_approach_timeout(before.pop('approach_timeout'))
     if 'state_rescale' in before:
         if before.pop('state_rescale') != 'first_open_affine_v1':
             raise ValueError('state_rescale requires first_open_affine_v1')
@@ -61,7 +70,11 @@ def validate_env(env, evaluation=False):
             raise ValueError('Goal-centered BEFORE requires source5 and goal5')
         before['distance_mixture']=deepcopy(DISTANCE_MIXTURE)
     if 'asymmetric_progress' in env['before']:
-        if (not isinstance(asymmetric,dict) or set(asymmetric)!={'lambda_inner'}
+        if isinstance(asymmetric, dict) and 'wait_radius_m' in asymmetric:
+            radius = asymmetric['wait_radius_m']
+            if type(radius) not in (int, float) or not math.isfinite(radius) or radius <= 0 or asymmetric.get('lambda_inner', 0) <= 0:
+                raise ValueError('Asymmetric progress wait_radius_m requires a positive finite radius and lambda_inner')
+        if (not isinstance(asymmetric,dict) or set(asymmetric) not in ({'lambda_inner'}, {'lambda_inner', 'wait_radius_m'})
                 or type(asymmetric['lambda_inner']) not in (int,float)
                 or not math.isfinite(asymmetric['lambda_inner']) or asymmetric['lambda_inner']<0
                 or before!=limited or virtual!=VIRTUAL_MODE):
@@ -70,6 +83,12 @@ def validate_env(env, evaluation=False):
         if (type(goal_distance) is not list or goal_distance!=[1.,5.]
                 or any(type(value) not in (int,float) for value in goal_distance) or before!=limited):
             raise ValueError('BEFORE goal distances require source5 and [1.0, 5.0]')
+    if 'waiting_penalty' in env['before']:
+        if (not isinstance(penalty,dict) or set(penalty) not in ({'radius_buffer','coefficient'}, {'radius_buffer','coefficient','soft_entry_width'})
+                or any(type(v) not in (int,float) or not math.isfinite(v) or v<=0 for v in penalty.values())
+                or any(k in env['before'] for k in ('waiting_termination','approach_timeout','continuous_progress','wait_clear'))
+                or asymmetric is not None or before!=limited or virtual!=VIRTUAL_MODE):
+            raise ValueError('BEFORE waiting penalty requires source5 virtual, positive radius/coefficient and no waiting termination')
     if before not in (original,near,limited):
         raise ValueError('BEFORE PUSH requires the mix226 or near50 distance contract with loco-only initialization')
     old=deepcopy(env)

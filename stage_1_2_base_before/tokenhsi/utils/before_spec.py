@@ -5,7 +5,7 @@ from utils.edge_scenario_spec import compose_canonical_graph
 from utils.edge_ontop_spec import select_graph
 
 SAMPLER = 'stage2_before_groups'
-PRESETS = ('random_scenario', 'before_sit', 'before_climb', 'before_stack',
+PRESETS = ('random_scenario', 'before_mixed', 'before_sit', 'before_climb', 'before_stack',
            'one_pair_sit', 'one_pair_climb', 'one_pair_stack', 'all_solo',
            'sit', 'climb', 'holding_at', 'holding_ontop')
 
@@ -67,7 +67,7 @@ def sample_roles(sizes, ranges, preset, solo_probabilities=None, pairing_probabi
         candidates = torch.stack((torch.full_like(partner, leader), partner), -1)
         available = allowed[rows[:, None], candidates]
         weights = available.any(1).float()
-        if preset != 'random_scenario':
+        if preset not in ('random_scenario', 'before_mixed'):
             family = ('sit', 'climb', 'stack').index(preset.rsplit('_', 1)[-1])
             weights *= torch.nn.functional.one_hot(torch.tensor(family, device=device), 3)
         if (weights.sum(-1) == 0).any():
@@ -132,6 +132,8 @@ def checkpoint_contract(env):
         contract['before_virtual_object'] = env['relationGraph']['before_virtual_object']
     if env['before'].get('follower_pickup_carry_rsi') is not None:
         contract['size_aware_rsi'] = env['sizeAwareRsi']
+    if env['relationReward']['success']['at_z_tolerance'] != .001:
+        contract['at_z_tolerance'] = env['relationReward']['success']['at_z_tolerance']
     if env.get("jointPush") is not None:
         from utils.before_push_spec import push_contract
         contract["solo_push"] = push_contract(env)
@@ -175,7 +177,7 @@ def sample_groups(n, device, preset='random_scenario', num_agents=4, pairing_pro
             paired = active & remaining.any(-1)
         elif preset.startswith('one_pair'):
             paired = active & remaining.any(-1) & (count == 0)
-        elif preset != 'random_scenario':
+        elif preset not in ('random_scenario', 'before_mixed'):
             paired[:] = False
         partner = torch.rand(n, num_agents, device=device).masked_fill(~remaining, -1).argmax(-1)
         leader = torch.where(paired, torch.minimum(first, partner), first)

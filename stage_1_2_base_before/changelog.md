@@ -2,7 +2,167 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-04
+
+### Soft-entry1m GPU2 본학습 시작
+
+- 사용자 요청 및 정정에 따라 기존 학습을 건드리지 않고 GPU2 원본7k viewer1542627만 WM_DELETE_WINDOW로 정상 종료(PID/6088 종료 확인). 우리 이전 학습들은 이미 종료 상태였다.
+- `_wait_penalty_v2_soft_entry1m`을 GPU2 기존 MPS·4명·1024환경·8객체·seed42·Stage1 PUSH26k에서 새로 시작했다. learner1582212, server3343262 연결과 최소5epoch·wait_penalty scalar 확인. saved config의 radius_buffer3/coefficient1/soft_entry_width1 및 접근timeout 부재 확인. 다른 MPS client1561529 유지.
+- TensorBoard6020 기존 비교에soft-entry를 추가. [학습 기록](output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_soft_entry1m/launch.json), [TensorBoard](output_etc/check/tensorboard_wait_soft_entry1m/launch.json). ksh 변경 없음, viewer 없음.
+
+### wait_penalty_v2 soft entry 1m 옵션
+
+- 사용자 관찰(바깥에서 진입할 때 정지 실패)에 따라 별도 `_soft_entry1m` env/train/test/vnc/eval 설정을 추가했다. 기존 R=지지 박스XY반대각선+3m 바깥1m부터 smoothstep으로 속도벌점 강도를0→1로 증가. 처음부터R안이면 기존과 같이100%. 시간 증가 없이 과거 최대 강도를 latch하며 선행 최초성공 해제는 기존 유지한다.
+- 원본 옵션 없는 hard-entry 경로, state/progress/success·AT높이0.2·기본낙상 종료는 유지, 추가 early term 없음. ksh 변경 없음. [명세](markdowns/reference/before_soft_wait_entry.md).
+- CPU25개 통과(세 행동 진입곡선/경계 연속/내부시작/정지/후퇴 latch/해제/부분reset/원본 회귀/설정검증). GPU5 MPS4환경4스텝 headless 검사: 실제 벌점=강도×XYZ속력·reward 합산·부분reset·finite 통과, CUDA 동기화 후 정상종료. [검증](output_etc/check/soft_wait_entry1m_physics/physics_validation.json). 본학습 미시작, 실행 중 GPU2 원본7k viewer는 유지했다.
+
+### 원본 wait_penalty_v2 7000 BEFORE 혼합 viewer
+
+- 사용자 요청으로 원본7k 정식 평가 snapshot을 로컬pth에 복사·SHA256 일치 확인 후 GPU2 MPS·4명·1환경·8객체·6088·before_mixed(SIT/CLIMB/ON_TOP 후행만)로 실행. 실제 rollout·HTTP200 확인, ksh 원본/프로세스 변경 없음. [실행 기록](output_etc/check/view_wait_penalty_v2_7000_before_mixed_gpu2/launch.json).
+
+### 로컬 wait_penalty_v2 학습 종료
+
+- 사용자 요청으로 우리 GPU2 learner1416705만 MPS server3343262의 terminate_client로 종료(응답0·PID 소멸·client 목록 제거 확인). 다른 client3272800 및 MPS 유지. ksh 파일/학습은 조작하지 않았으며 TensorBoard와 기존 체크포인트·로그는 보존했다. [종료 기록](output_etc/check/stop_wait_penalty_v2/terminate.json).
+
+### 새 base virtual wait_penalty_v2로 교체 학습
+
+- 사용자가 지정한 ksh wait_penalty_v2를 읽기만 하여 config/train YAML·BeforeWait 모듈·6500 checkpoint와 TensorBoard 로그를 로컬 복사했다. 코드/config/checkpoint 원본·복사본 SHA256 일치 확인. ksh 파일이나 학습3113420은 수정/종료하지 않았다. [출처](output_etc/check/import_wait_penalty_v2/provenance.json).
+- 사용자 선택은 새 base 설정·보상으로 교체. 이전 asym/3m연속progress/접근timeout/state정규화 없이 원본 waiting_penalty(radius_buffer3, coefficient1)와 AT z허용0.2를 이식했다. 반경은 박스XY반대각선+3m, 진입 후 사람XYZ속도 벌점, 선행 최초 성공 시해제. 저장 env/sim 및6500 checkpoint 계약 동일 확인. 기존strict-height 계약도 보존.
+- CPU73개 통과. GPU5 headless에서 로컬6500 strict 모델 로딩·네 가지 호환 프리셋16step씩·reward 합산·부분reset·가중치 불변 검증 통과. 처음 고정SIT 검사의 크기 불일치는 크기 호환 혼합 프리셋으로 수정하고 재검증(실패 로그 보존). [물리 검증](output_etc/check/wait_penalty_v2_physics/physics_validation.json).
+- 기존 우리 GPU2 learner1092552만 MPS terminate_client3343262로 종료(응답0). 다른 GPU2 client3272800 유지. 로컬 wait_penalty_v2를4명·1024환경·8객체·seed42·Stage1 PUSH26k에서 새 학습 시작, learner1416705·최소6epoch와wait_penalty scalar 확인, timeout태그 없음. [학습 기록](output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2/launch.json).
+- TensorBoard6020은 새base의 로컬 로그 snapshot·현재학습·이전연속progress 세 비교로 갱신. [기록](output_etc/check/tensorboard_wait_penalty_v2/launch.json). viewer 없음.
+
+### Asym3m 연속 progress 본학습으로 교체
+
+- 사용자 요청으로 기존 GPU2 접근2초 learner2262536을 MPS server3343262의 terminate_client로 종료(응답0·PID 소멸). 다른 client3272800과 MPS 서버 유지. [종료 기록](output_etc/check/stop_approach_timeout_for_continuous/terminate.json).
+- `_goalroute_radius3m_continuous`를 GPU2 기존 MPS·4명·1024환경·8객체·seed42·Stage1 PUSH26k 전이로 새로 시작했다. learner1092552, 최초7epoch 이상 TensorBoard 이벤트로 확인. saved relation_config의 radius3m/continuous_progress/접근timeout 부재 확인. [실행 기록](output/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_radius3m_continuous/launch.json).
+- CPU TensorBoard6020을 원본·이전접근2초·현재연속progress 세 로그로 갱신. 세 run 목록 확인, 대용량 원본 scalar 초기 로딩 진행. [실행 기록](output_etc/check/tensorboard_asym_3m_continuous/launch.json). viewer 없음.
+
+### Asym3m 최초 gate 개방 연속 progress
+
+- 사용자 동의에 따라 `_goalroute_radius3m_continuous` 실험/env/train/test/vnc/eval을 추가. 대기 progress 최대0.1, 첫 gate 개방 순간 동일 위치의 대기 보상과 역거리 q를 anchor로 저장하고 이후 실제 접근에 따라0.2까지 증가한다. 정지/재개방으로 보상이 오르지 않으며 후퇴 시 감소한다. 접근 timeout과 state 정규화 없음.
+- 새 모드만 후행 progress의 success saturation을 제거해 추가 점프를 방지한다. 접근 곡선은 기존 역거리 형태에서 bbox 평탄부를 없애 goal에서 최대가 된다. state/success는 유지하며 전체 reward 연속을 보장하지 않는다. 최초 개방 이후 progress mapping은 latch, 재닫힘에도 대기 페널티를 다시 켜지 않음. 정확히 goal에서 개방한 퇴화 사례는 연속성 우선으로 anchor 유지. [명세](markdowns/reference/before_continuous_progress.md).
+- CPU63개 통과: gate 전환, 안/밖에서 개방, 접근/후퇴/정지/재개방, 부분 reset, 상태·성공 및 독립 edge 보존, 신규 config. GPU5 기존 MPS에서 학습/view 없이4환경4스텝과 제어된 gate 개방/부분 reset 물리 검사 통과. 검사 도구 첫 실행의 checkpoint 요구 오류는 설정 로딩 순서를 수정해 해결했으며 로그 보존. [물리 검증](output_etc/check/continuous_progress_radius3m_physics/physics_validation.json). CUDA 동기화 후 정상 정리. 기존 학습은 변경하지 않았다.
+
+### Asym3m에서 추가 접근 조기 종료 제거
+
+- 사용자 요청으로 직전 준비한(미실행)3m 설정에서 before.approach_timeout을 제거하고 `_goalroute_radius3m`으로 env/train 및 네 wrapper·등록·평가 경로·문서를 정리했다. 원본 virtual_asym 대비 wait_radius_m=3.0만 추가하며 state 정규화 없음. 기본 낙상·시간제한 종료는 유지한다.
+- 옵션이 없으면 환경의 _approach_timeout=None이고 추가 reset 경로를 건너뜀을 확인. CPU51개·shell syntax·diff 검사 통과, 새 config 계약 테스트에서 timeout 부재 및 원본과 반경만 다름을 확인했다. 현재 실행 중인 기존 접근2초 학습은 변경/종료/재시작하지 않았다.
+
+### Asym 선행 미완료 대기 경계3m 옵션
+
+- 사용자 요청으로 wait_radius_m 선택 옵션과 별도 `_approach_timeout2s_radius3m` 실험/env/train/test/vnc/eval을 추가. 기존 원본과 현재 학습 설정은 보존하며 새 설정은 현재 접근2초 구성에 반경3m만 추가한다.
+- 선행 current AT success=false 동안 goal 수평거리3m에서 progress 최대, 안쪽은 기존 lambda10 페널티. 완료되면 기존 물체 크기+buffer 접근 보상으로 복귀. SIT/CLIMB는 사람 root, ON_TOP은 payload XY 기준 유지. state/success/timeout 불변.
+- CPU51개 통과(세 후행 skill의4m/3m/2.9m/2m·gate 개방 복귀·독립 edge 불변·잘못된 radius 거부·신규 config 및 checkpoint 계약 포함), launch shell syntax 통과. 새 학습/GPU rollout/view는 실행하지 않았고 현재 학습에는 미반영.
+
+### BEFORE 전용 혼합 스킬 viewer
+
+- 사용자 정정에 따라 독립 스킬이 포함된 random_scenario viewer를 WM_DELETE_WINDOW로 정상 종료하고 GPU5 MPS·6500·4명·1환경·6088을 before_mixed로 재실행했다.
+- before_spec에 before_mixed 추가: 전원 두 BEFORE 쌍(4명 기준), 선행 AT 유지, 후행 SIT/CLIMB/ON_TOP을 크기 호환 후보에서 균등 추출한다. 기존 학습/random_scenario 분포는 그대로다. config 추론 옵션에 기록.
+- CPU17개 통과(전원 pairing·세 후행 스킬 분포·prerequisite 검사 포함), 실제 before_mixed rollout·HTTP200 확인. [실행 기록](output_etc/check/view_asym_approach_timeout6500_before_mixed_gpu5/launch.json).
+
+### BEFORE asym6500 혼합 스킬 viewer
+
+- 사용자 요청으로 CLIMB 고정을 해제하고 random_scenario viewer를 GPU5 MPS·4명·1환경·8객체·6088에 실행. SIT/CLIMB/AT/ON_TOP/PUSH가 학습 분포에 따라 리셋마다 섞인다(균등 비율 강제 아님). 실제 rollout과HTTP200 확인. [실행 기록](output_etc/check/view_asym_approach_timeout6500_mixed_gpu5/launch.json).
+
+### BEFORE asym6500 CLIMB viewer
+
+- 사용자 요청으로 방금 평가한 접근2초 모델6500을 GPU5 기존 MPS·4명·1환경·8객체·BEFORE CLIMB·6088 포트로 실행. 실제 rollout과HTTP200 확인. 일반 viewer에는 학습 설정의 접근 timeout이 적용된다. [실행 기록](output_etc/check/view_asym_approach_timeout6500_climb_gpu5/launch.json).
+
+### BEFORE asym 최신6500 최초 접근2초 vs 원본 평가
+
+- 사용자 지정 GPU5의 기존 MPS에서 요청 시점 최신6500과 원본6500을 각각512환경×3seed·4명·1200step으로 평가. 둘 다851968000 학습 frame, 저장 설정 차이는 이름과 접근 timeout뿐이며 state 정규화 없음. 평가에서는 timeout 비활성화.
+- 원본→현재 동시 Ever: SIT12.65→16.92%, CLIMB8.44→6.87%, ON_TOP18.29→18.87%, 전체14.84→15.71%. 전체 Final11.66→10.49%, 낙상3.91→3.32%. 2000에서의 전반적 개선이6500에서는 유지되지 않았으며 학습1회 비교이므로 재현성 미확인.
+- 모든 seed 초기 tensor 동일, 양쪽 CPU 재채점/GPU·JSON 집계 일치와 checkpoint hash 불변 확인. 평가 정상 완료, 기존 학습/MPS 유지. [결과](output_etc/check/before_asym6500_timeout_vs_base_20261104/report.md).
+
 ## 2026-11-03
+
+### BEFORE asym 2000 최초 접근2초 vs 원본 비교
+
+- 원본 virtual_asym도 GPU2 MPS·512환경×3seed·4명·1200step으로 평가. 두 모델 모두2000 iter, seed별 초기 tensor 완전 동일·CPU 재채점/GPU·JSON 집계 일치·checkpoint hash 불변 확인. 평가에서는 접근 timeout을 비활성화했다.
+- 원본→현재 동시 Ever: SIT7.76→19.73%, CLIMB6.89→11.48%, ON_TOP13.23→18.86%, 전체10.63→17.36%. 전체 Final7.91→12.75%, 낙상4.28→4.20%. 각 설정 학습1회 결과로 재현성은 미확인.
+- [비교 보고서](output_etc/check/before_asym2000_timeout_vs_base_20261103/report.md). 평가 정상 완료, 기존 학습 유지.
+
+### BEFORE asym 최초 접근2초2000 정식 평가
+
+- 사용자 요청으로 직전 viewer의2000 저장본을 GPU2 MPS·512환경·4명·3seed·1200step으로 평가했다. formal eval에서 접근 timeout은 비활성화. 새 timeout 실험들의 evaluate.py 환경/모션 선택 whitelist 누락을 추가해 실제 HumanoidMABeforePush 실행으로 검증했다.
+- Plane 선행/후행 동시 Ever/Final: SIT19.73/14.05%, CLIMB11.48/9.71%, ON_TOP18.86/13.50%, 전체17.36/12.75%. 단독 CLIMB96.84/94.34%, 낙상4.20%.3개 CPU 재채점/GPU·JSON 일치, checkpoint hash 불변 검증 통과.
+- [결과](output_etc/check/eval_before_asym_approach_timeout2000_gpu2_20261103/report.md). 평가 완료, 기존 학습 유지.
+
+### 현재 BEFORE asym2000 CLIMB viewer로 전환
+
+- 사용자 정정에 따라 Stage1 21k 단독 viewer3132984를 WM_DELETE_WINDOW로 정상 종료하고 현재 학습 `_approach_timeout2s` 최신 저장2000을 BEFORE CLIMB·4명·1환경·8객체·GPU2 MPS·6088로 실행했다. 실제 rollout/HTTP200 확인. [실행 기록](output_etc/check/view_asym_approach_timeout2000_climb_gpu2/launch.json).
+
+### Stage1 PUSH21k 단독 CLIMB viewer
+
+- 사용자 요청으로 직전 평가21k 저장본의 CLIMB를 GPU2 MPS·1명·1환경·2객체·6088로 실행했다. 실제 rollout/HTTP200 확인, 기존 학습 유지. [실행 기록](output_etc/check/view_stage1_push21000_climb_gpu2/launch.json).
+
+### Stage1 PUSH21k 단독 평가 추가
+
+- 요청한 기존21k checkpoint를 GPU2 MPS·PUSH 단독1명·512환경×3seed·900step으로 평가했다. saved env/모델 shape/seed별 초기 tensor가26k와 동일, CPU 재채점 및 hash 불변 검증 통과.
+-21k Ever81.97%(1259/1536), Final81.90%(1258/1536), 낙상0.39%. 같은 조건11k/26k와 [비교 보고서](output_etc/check/push11k21k26k_20261103/report.md)에 기록했다. 평가 정상 완료, 새 학습·viewer 없음.
+
+### Stage1 PUSH 추가학습11k/26k의 PUSH 단독 성능 비교
+
+- 사용자 요청으로 기존11k와26k 저장본의 PUSH 동작만 GPU2 MPS·1명·512환경×3seed·900step·loco 시작으로 평가했다. 새 학습은 시작하지 않았다. 양쪽 saved env/모델 shape 및 seed별 초기 tensor 동일 확인.
+- 성공률11k66.86%(1027/1536) →26k88.87%(1365/1536), +22.01%p. 낙상률1.63%→0.59%. 기준은 박스 중심→goal 3D 거리20cm 이내 Ever.6개 rollout CPU 재채점/GPU·JSON 일치 및 hash 불변 검증 통과.
+- 평가 전 오해로 실행한 PUSH viewer3010277은 WM_DELETE_WINDOW로 정상 종료했다. 평가들도 정상 완료. [비교 보고서](output_etc/check/push11k_vs26k_20261103/report.md), [검증](output_etc/check/push11k_vs26k_20261103/verification.json).
+
+### Stage1 PUSH26k의 PUSH 동작 viewer
+
+- 사용자 요청한 PUSH inference를 GPU2 기존 MPS·1명·1환경·2객체·task_graph=push·6088로 실행하고 실제 rollout/HTTP200을 확인했다. 오해로 먼저 실행했던 CLIMB3003834는 WM_DELETE_WINDOW로 정상 종료했다. [PUSH 실행 기록](output_etc/check/view_stage1_push26000_push_gpu2/launch.json). 기존 학습 유지.
+
+### GPU1 no-asym 최초 접근2초 학습 종료
+
+- 사용자 요청으로 learner2435225만 MPS server22113의 terminate_client로 종료. 성공 응답0·프로세스 소멸 확인. GPU1 다른 client86358와 GPU2 asym2262536 유지 확인. checkpoint/로그 보존. [종료 기록](output_etc/check/stop_noasym_approach_timeout/terminate.json).
+
+### asym 최초 접근2초 1000 iter CLIMB viewer
+
+- 사용자 요청으로 동일 최초 접근2초 실험의1000 checkpoint를 GPU2 기존 MPS·4명·1환경·8객체·BEFORE CLIMB·6088로 실행했다. 실제 rollout과HTTP200 확인. 본학습 유지. [실행 기록](output_etc/check/view_asym_approach_timeout1000_climb_gpu2/launch.json).
+
+### asym 최초 접근2초 500 iter CLIMB viewer
+
+- 요청한 `_approach_timeout2s`의 epoch500 checkpoint로 GPU2 MPS·4명·1환경·8객체·BEFORE CLIMB viewer를6088에 실행했다. state 정규화 없음, 실제 rollout·MPS 연결·HTTP200 확인. 학습 유지. [실행 기록](output_etc/check/view_asym_approach_timeout500_climb_gpu2/launch.json). 일반 viewer이므로 최초 접근2초 종료 조건도 적용된다.
+
+### GPU1 no-asym 최초 접근2초 비교 학습 시작
+
+- 사용자 요청으로 일반 virtual(no-asym) `_approach_timeout2s`를 추가하고 GPU1 기존 MPS에서 본학습 시작. 가상박스/최초 접근2초·1cm/state 정규화 없음/4명·1024환경·8객체·seed42·Stage1 PUSH26k 전이 유지. GPU2 asym 설정과 env/sim 차이는 asymmetric_progress 하나임을 확인했다.
+- 전용 YAML·train/test/vnc/eval·등록·문서 추가, CPU17개 및 shell syntax/diff 검증 통과. launcher2435055/learner2435225, server22113 연결·초기 iteration·종료 원인별 TensorBoard 태그 확인. GPU1 기존86358와 GPU2 asym 학습은 유지했다.
+- [실행 기록](output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_approach_timeout2s/launch.json), [로그](output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_approach_timeout2s/train.log). 새 실행에는 원인별 계측이 적용되며 기존 GPU2 실행에는 소급 적용되지 않는다.
+
+### 현재 접근 timeout 비율 확인 및 다음 실행용 종료 사유 계측
+
+- 17:15:43 로그 snapshot의 최근100개 구간: 종료4297환경 중 접근 timeout861건(20.04%). 누적16867환경 중3308건(19.61%). 동일 구간 completed_scenes를 분모로 사용했고 timeout에는 낙상 동시발생이 포함된다. [원시/요약](output_etc/check/approach_timeout_termination_stats/summary.json).
+- 기존 실행은 낙상·시간제한·동시발생 미기록으로 추가 분리가 불가능하다. 다음 실행용으로 fall_only/approach_timeout_only/fall_and_approach_timeout/horizon_only count/fraction을 추가했다. 분류 CPU 회귀 포함16개 통과. 현재 학습 재시작·GPU 검증 없이 계측 코드만 준비했다.
+
+### 최초 접근2초 실험과 원본 asym TensorBoard 비교
+
+- 요청에 따라 localhost6020에 `base_virtual_asym`(원본11/01 run), `asym_first_approach_2s`(현재11/03 run)를 비교 표시했다. CPU TensorBoard2280349, runs HTTP200·양쪽 scalar283/285개 로드 확인. 대용량 원본 초기 로딩 약3분 소요. 학습/MPS는 변경하지 않았다. [실행 기록](output_etc/check/tensorboard_asym_approach_timeout2s/launch.json).
+
+### 최초 접근 2초 종료 단독 실험 본학습 시작
+
+- 사용자 요청으로 원본 virtual_asym에 `first_approach_v1`만 추가한 `_approach_timeout2s`를 GPU2 기존 MPS에서 시작했다. state 정규화 없음,4명·1024환경·8객체·seed42·Stage1 PUSH26k 전이. launcher2262388/learner2262536, MPS server3343262 연결과 초기 iteration 완료 확인. 다른 클라이언트2225521 유지.
+- [실행 기록](output/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_approach_timeout2s/launch.json), [학습 로그](output/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_approach_timeout2s/train.log). TensorBoard/viewer는 새로 시작하지 않았다.
+
+### 접근 종료를 최초 반응 1회 확인으로 수정
+
+- 사용자 수정에 따라 `_approach_timeout2s`는 선행 최초 성공 시점부터2초 내1cm 접근하면 감시를 해제한다. 이후 멈추거나 후퇴해도 재무장하지 않는다. 지속 최단거리 갱신 방식은 사용하지 않는다. 후행 성공 해제·부분 reset·scene terminal 처리는 유지한다.
+- `before.approach_timeout.mode: first_approach_v1`을 저장 계약에 명시하고 문서를 갱신했다. CPU36개 통과: 접근 후 장시간 정지/후퇴/gate 재개폐, 임계값 미만 흔들림, 마감 프레임 접근, 부분 reset과 기존 보상 회귀 포함. 이번 수정에서는 GPU 재실행/본학습을 하지 않았다.
+
+### 원본 virtual_asym에 2초 접근 정체 종료 추가
+
+- 별도 `_approach_timeout2s` 실험을 추가했다. state 정규화 없이 원본 asym 보상/관측/모델을 유지한다. 최초 선행 AT 성공 후 후행 root→선행 goal XY 최단거리 기록을1cm 이상 갱신하지 못한 채2초가 지나면 환경 전체를 terminal/reset 처리한다. 후행 성공 시 해제, gate 재개폐로 재시작하지 않으며 부분 reset 시 해당 환경만 초기화한다.
+- 학습·일반 viewer 적용, formal eval은 기존 full horizon 유지. 전용 YAML·train/test/vnc/eval wrapper·checkpoint 계약·진단 통계·문서 추가. 본학습은 시작하지 않았다.
+- CPU34개 통과(새 timeout·state 정규화·기존 progress 회귀). GPU1 기존 MPS에서4환경×4명 짧은 zero-action rollout 뒤 실제 reset 메서드에 제어된 gate 입력을 넣어60 control-step timeout, 전 agent terminal, 부분 reset, formal eval 우회 검증. CUDA 동기화 후 정상 종료(exit0). [물리 검증](output_etc/check/approach_timeout2s_physics/physics_validation.json), [정의/한계](markdowns/reference/before_approach_timeout.md).
+
+### state 정규화 작업 전체 종료 요청 처리
+
+- 사용자 요청으로 남아 있던 GPU1 일반 virtual state_rescale 학습41338을 MPS server22113의 terminate_client로 종료했다. 응답0 확인, 정규화 run.py 잔존0 확인. 같은 MPS의 다른 client86358 유지 확인. [종료 기록](output_etc/check/stop_state_rescale_20261103/terminate.json).
+- GPU2 asym 학습3683972와 CLIMB viewer1908116은 이번 종료 명령 전에 이미 종료돼 있었고 양쪽 로그에 CUDA illegal memory access가 남아 있었다. 학습 waiter는13:21:23 returncode1로 기록돼 있다. 오류 원인은 미확인. checkpoint와 로그는 보존했다.
+
+### asym6500 viewer를 CLIMB로 전환
+
+- 사용자 요청으로 SIT 창을 WM_DELETE_WINDOW로 정상 종료하고 동일6500 모델을 GPU2 MPS·BEFORE CLIMB·6088로 실행했다. 실제 rollout 확인. [실행 기록](output_etc/check/view_asym_state_rescale6500_climb_gpu2/launch.json).
 
 ### asym state 정규화6500 viewer 실행
 

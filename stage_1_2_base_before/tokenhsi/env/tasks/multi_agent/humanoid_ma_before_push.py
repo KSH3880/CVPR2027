@@ -92,7 +92,42 @@ class HumanoidMABeforePush(HumanoidMABefore):
     def _init_ontop_context_runtime(self):
         super()._init_ontop_context_runtime()
         self.relation_runtime=BeforePushRuntime(self.num_envs,self.relation_runtime.graph,self._relation_cfg,self.device,contact_weights=self._joint["contact_weights"],
-            state_rescale=self.cfg["env"]["before"].get("state_rescale") == "first_open_affine_v1")
+            state_rescale=self.cfg["env"]["before"].get("state_rescale") == "first_open_affine_v1",
+            continuous_progress="continuous_progress" in self.cfg["env"]["before"])
+        config = self.cfg['env']['before'].get('approach_timeout')
+        self._approach_timeout = None
+        if config is not None:
+            from env.tasks.multi_agent.before_approach_timeout import ApproachTimeout
+            self._approach_timeout = ApproachTimeout(self.relation_runtime.phi.shape, self.device, self.dt, config)
+            self._approach_timeout_counts = torch.zeros(2, device=self.device)
+            self._termination_reason_counts = torch.zeros(5, device=self.device)
+
+
+    def _reset_actors(self, env_ids):
+        if getattr(self, '_approach_timeout', None) is not None:
+            self._approach_timeout.reset(env_ids)
+        return super()._reset_actors(env_ids)
+
+    def _compute_reset(self):
+        super()._compute_reset()
+        if self._approach_timeout is None:
+            return
+        # Formal evaluation keeps the common full-horizon protocol for comparison.
+        if getattr(self.cfg['args'], 'eval_protocol', ''):
+            return
+        from env.tasks.multi_agent.before_approach_timeout import follower_goal_distances, apply_timeout_reset, termination_reason_counts
+        graph = self.relation_runtime.graph
+        result = self.relation_runtime.last_result
+        distance = follower_goal_distances(self._rigid_body_pos[:, :, 0], self._tar_pos, graph)
+        dependent = graph.prereq_mask.any(-1) & graph.edge_valid
+        expired = self._approach_timeout.step(distance, result['prerequisite_gate'],
+                                              result['own_success'], dependent)
+        fall = self._terminate_buf.view(self.num_envs, self.num_agents).bool().any(-1)
+        scene = apply_timeout_reset(expired, self.reset_buf, self._terminate_buf)
+        self._termination_reason_counts += termination_reason_counts(fall, scene, self.reset_buf)
+        self._approach_timeout_counts[0] += scene.sum()
+        self._approach_timeout_counts[1] += self.num_envs
+        self.extras['before_approach_timeout'] = scene.repeat_interleave(self.num_agents)
 
     def _reset_ref_state_init(self,env,owner):
         push=self._templates[env,owner]==5
@@ -208,5 +243,17 @@ class HumanoidMABeforePush(HumanoidMABefore):
             result['sampling/solo_'+name+'_fraction']=counts[i]/counts.sum().clamp_min(1)
         result['sampling/template_push']=push/(result['sampling/resets']*self.num_agents).clamp_min(1)
         result['sampling/shared_primary_object']=result['sampling/before_pairs']/result['sampling/resets'].clamp_min(1)
+        if self._approach_timeout is not None:
+            counts = self._approach_timeout_counts
+            result['termination/approach_timeout_count'] = counts[0].clone()
+            result['termination/approach_timeout_per_scene_step'] = counts[0] / counts[1].clamp_min(1)
+            counts.zero_()
+            from env.tasks.multi_agent.before_approach_timeout import TERMINATION_REASONS
+            reasons = self._termination_reason_counts
+            for i, name in enumerate(TERMINATION_REASONS):
+                result['termination/' + name + '_count'] = reasons[i].clone()
+                if name != 'all':
+                    result['termination/' + name + '_fraction'] = reasons[i] / reasons[-1].clamp_min(1)
+            reasons.zero_()
         self._solo_counts.zero_()
         return result

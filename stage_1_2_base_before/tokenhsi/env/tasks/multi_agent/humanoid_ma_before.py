@@ -75,6 +75,19 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
         self.relation_runtime = BeforeRuntime(self.num_envs, self.relation_runtime.graph,
                                               self._relation_cfg, self.device)
 
+        self._before_wait = None
+        option = self.cfg['env']['before'].get('waiting_penalty')
+        if option is not None:
+            from env.tasks.multi_agent.before_wait import BeforeWait
+            self._before_wait = BeforeWait(self.relation_runtime.graph, self.num_envs,
+                                          self.dt, option, self.device)
+
+    def _reset_relation_history(self, env_ids):
+        super()._reset_relation_history(env_ids)
+        if self._before_wait is not None:
+            self._before_wait.reset(env_ids, self.relation_runtime.graph,
+                                    self.relation_runtime.own_success)
+
     def _evaluate_ontop_context(self, env_ids=None):
         phi, diag = super()._evaluate_ontop_context(env_ids)
         if self.cfg['env']['before'].get('progress_target') == 'predecessor_at_goal':
@@ -93,7 +106,23 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
             diag['progress'] = predecessor_at_progress(diag['progress'], bodies[..., 0, :],
                 self._logical_box_values(self._box_states, env_ids),
                 self._logical_box_values(self._box_size, env_ids), goals, graph, self._relation_cfg,
-                raw_success=raw_success, lambda_inner=lambda_inner)
+                raw_success=raw_success, lambda_inner=lambda_inner,
+                wait_radius_m=self.cfg['env']['before'].get('asymmetric_progress', {}).get('wait_radius_m'))
+            if self.cfg['env']['before'].get('continuous_progress') is not None and env_ids is None:
+                # Same inverse-distance shape, without the old flat bbox band:
+                # q(d)=1/(1+d/sigma), reaching one only at the goal.
+                approach_cfg = dict(self._relation_cfg)
+                approach_cfg['progress'] = dict(self._relation_cfg['progress'])
+                approach_cfg['progress'].pop('bbox_buffers', None)
+                approach_cfg['progress']['delta'] = 0.
+                args = (diag['progress'], bodies[..., 0, :],
+                    self._logical_box_values(self._box_states, env_ids),
+                    self._logical_box_values(self._box_size, env_ids), goals, graph)
+                approach = predecessor_at_progress(*args, approach_cfg)
+                waiting = predecessor_at_progress(*args, self._relation_cfg,
+                    raw_success=torch.zeros_like(raw_success), lambda_inner=lambda_inner,
+                    wait_radius_m=self.cfg['env']['before']['asymmetric_progress']['wait_radius_m'])
+                self.relation_runtime.progress_inputs = (approach, waiting)
         return phi, diag
 
     def _draw_episode_graph(self, ids):

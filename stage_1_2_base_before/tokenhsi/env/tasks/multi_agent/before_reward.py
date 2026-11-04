@@ -9,10 +9,11 @@ from utils.edge_scenario_spec import paired_placement_success
 
 
 def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, config,
-                            raw_success=None, lambda_inner=0.):
+                            raw_success=None, lambda_inner=0., wait_radius_m=None):
     """Retarget only dependent SIT/CLIMB/ON_TOP proximity, in either gate state.
 
-    Keep the actual support's size/buffer and every non-dependent edge intact.
+    Use an optional fixed waiting radius only while the predecessor is unfinished.
+    Otherwise keep the support's size/buffer and every non-dependent edge intact.
     Geometry for state/success remains object-relative in the ordinary evaluator.
     """
     n, m, o = len(roots), graph.num_agents, graph.num_objects
@@ -38,6 +39,9 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
         radius = sizes[rows, dst[rows, edges]-m, :2].norm(dim=-1)/2
         radius += torch.where(top, float(buffers['ON_TOP']),
             torch.where(relation[rows, edges] == SIT, float(buffers['SIT']), float(buffers['CLIMB'])))
+    if lambda_inner and wait_radius_m is not None:
+        predecessor_success = raw_success[rows, predecessor_edge]
+        radius = torch.where(predecessor_success, radius, float(wait_radius_m))
     error = (distance-radius).clamp_min(0)
     if lambda_inner:
         predecessor_success = raw_success[rows, predecessor_edge]
@@ -48,9 +52,14 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
 
 
 class BeforeRuntime(Stage1ContextRuntime):
-    def __init__(self, *args, state_rescale=False, **kwargs):
+    def __init__(self, *args, state_rescale=False, continuous_progress=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.state_rescale = state_rescale
+        self.continuous_progress = None
+        self.progress_inputs = None
+        if continuous_progress:
+            from env.tasks.multi_agent.before_continuous_progress import ContinuousProgress
+            self.continuous_progress = ContinuousProgress(self.phi.shape, self.phi.device)
         if state_rescale:
             self.state_open_value = torch.zeros_like(self.phi)
             self.state_open_seen = torch.zeros_like(self.phi, dtype=torch.bool)
@@ -99,6 +108,9 @@ class BeforeRuntime(Stage1ContextRuntime):
             teammate_task_reward=torch.zeros_like(local))
 
     def reset(self, ids, phi, z_error, feet_error=None, region_error=None):
+        if self.continuous_progress is not None:
+            self.continuous_progress.reset(ids)
+            self.progress_inputs = None
         if self.state_rescale:
             self.state_open_value[ids] = 0
             self.state_open_seen[ids] = False
@@ -111,6 +123,20 @@ class BeforeRuntime(Stage1ContextRuntime):
 
     def step(self, phi, progress, z_error, feet_error=None, region_error=None):
         result = self.components(phi, progress, z_error, feet_error, region_error, self.graph)
+        if self.continuous_progress is not None:
+            if self.progress_inputs is None:
+                raise RuntimeError('continuous progress requires current geometry inputs')
+            approach, waiting = self.progress_inputs
+            dependent = self.graph.prereq_mask.any(-1) & self.graph.edge_valid
+            value = self.continuous_progress.step(approach, waiting, result['prerequisite_gate'], dependent)
+            result['progress_raw'] = torch.where(dependent, value, result['progress_raw'])
+            # Do not reintroduce a jump via progress success-saturation.
+            result['progress_component'] = torch.where(dependent,
+                value*self.config['progress_reward_weight'], result['progress_component'])
+            result['total'] = result['state_component']+result['progress_component']+result['success_component']
+            local = owner_sum(result['total'], self.graph)
+            result['local_task_reward'] = result['agent_task_reward'] = local
+            self.progress_inputs = None
         if self.state_rescale:
             self._rescale_state(result)
         self.phi.copy_(phi)
