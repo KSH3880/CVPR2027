@@ -82,10 +82,24 @@ class HumanCoordination(nn.Module):
         bias_mode="all",
         relations=3,
         count_normalization="none",
+        relation_fusion="none",
     ):
         super().__init__()
         self.shuffle_human_order = shuffle_human_order
         self.coupled_peer_mask = None
+        if relation_fusion not in ('none', 'learnedbg', 'zerobg'):
+            raise ValueError('Unknown coupled relation fusion mode')
+        self.relation_fusion = None
+        if relation_fusion != 'none':
+            if relations != 4 or bias_mode != 'all' or count_normalization != 'none':
+                raise ValueError('Coupled relation fusion requires four relations and no count normalization')
+            from learning.multi_agent.coupled_relation_fusion import CoupledRelationFusion, FusionCoordinationBlock
+            self.blocks = nn.ModuleList([
+                FusionCoordinationBlock(width, heads, feedforward_dim, relations, relation_fusion)
+                for _ in range(num_layers)
+            ])
+            self.relation_fusion = CoupledRelationFusion(width)
+            return
         self.blocks = nn.ModuleList(
             [
                 CoordinationBlock(width, heads, feedforward_dim, relations, bias_mode=bias_mode,
@@ -95,6 +109,8 @@ class HumanCoordination(nn.Module):
         )
 
     def init_identity(self):
+        if self.relation_fusion is not None:
+            self.relation_fusion.reset_output()
         for block in self.blocks:
             nn.init.zeros_(block.attention.out_proj.weight)
             nn.init.zeros_(block.attention.out_proj.bias)
@@ -116,7 +132,10 @@ class HumanCoordination(nn.Module):
             relations = relations[:, order][:, :, order]
         padding = torch.zeros((), device=humans.device, dtype=torch.bool)
         for block in self.blocks:
-            context = block(context, None, relations, padding)
+            if self.relation_fusion is None:
+                context = block(context, None, relations, padding)
+            else:
+                context = block(context, None, relations, padding, self.relation_fusion)
         if self.shuffle_human_order:
             context = context[:, order.argsort()]
         has_task = packet.reshape(packet.shape[0], -1, 5)[..., 0].bool().any(-1)

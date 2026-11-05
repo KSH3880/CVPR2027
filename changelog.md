@@ -2,7 +2,230 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-05
+
+### zerobg16k–20k ·1k 간격 정밀 평가 완료 ·17k 최종 추천
+
+- 사용자 요청으로16k/17k/18k/19k/20k PTH/YAML을 복사 고정해 각4명·8물체 혼합512환경×seed0/1/2, 총15회를 GPU3/4/5에서 평가했다. 기존 스폰/distractor·ordered·loco·평균 액션·거리/물성·1200step을 유지하고10k–15k·19.5k의21회는 재사용했다. [전체 비교·최종 추천](output_etc/check/zerobg16k20k_eval512_gpu345_20261105/report.md), [선정 PTH](output_etc/check/zerobg16k20k_eval512_gpu345_20261105/selection.json), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 16k/17k/18k/19k/20k의 Ever 그룹 합산 Coupled SR은89.43±0.75/92.31±0.56/88.79±0.75/91.63±0.56/90.76±2.19%다. 17k의 단독 PUSH92.18±1.53%, 나머지4행동 평균94.40±1.18%, I/C/Mixed=93.08±0.72/92.31±0.56/92.70±0.62%다. 공동2/3/4명93.97±0.80/89.55±1.02/91.88±1.54%이며 공동 전체·공동4명·단독 PUSH·Mixed의 최고 평균을 근거로17k를 주 후보로 추천했다. 공동3명만의 최고는19.5k다. 학습/추론 기본 PTH나 학습 프로세스는 변경하지 않았다.
+- 새15회 모두 CPU/GPU 재채점·finite·개인/그룹 건수·native gate·actor/critic zerobg/SELF·NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가 기존7개 모델과 exact일치했다. GPU당 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg16k20k_eval512_gpu345_20261105/verification.json).
+
+### 요청 시점 최신 zerobg19.5k · 정밀 평가 및15k 비교
+
+- 사용자 요청 시점의 최신 정기 PTH와 일반 이름 PTH가 모두 epoch19500임을 확인했다. 정기19.5k(epoch19500/frame2555904000) PTH/YAML을 복사 고정해 GPU5에서 기존4명·8물체 혼합512환경×seed0/1/2를 평가했다. 스폰/distractor·ordered·loco·평균 액션·거리/물성·1200step을 유지하고10k–15k의18회를 재사용했다. [비교표](output_etc/check/zerobg19500_trend512_gpu5_20261105/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역19.5k의 그룹 합산 Coupled SR91.40±0.80%, 단독 PUSH90.42±0.42%, 나머지4행동 동일 가중 평균94.04±1.53%다. 15k 대비 공동은2.99pp 높고 단독 PUSH/나머지는0.30/0.01pp 낮아 비슷한 수준이다. 공동2/3/4명91.76±0.66/92.70±1.89/88.28±2.29%로 개선은 주로2·3명에서 나왔다. 유형별 I/C/Mixed=91.96±1.34/91.40±0.80/91.68±0.88%이며 현재 비교에서 공동 전체와Mixed 평균이 가장 높다.
+- 새3회 CPU/GPU 재채점·finite·개인/그룹 건수·native gate·actor/critic zerobg/SELF·NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가10k–15k와 exact일치했다. GPU5 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg19500_trend512_gpu5_20261105/verification.json).
+
+### zerobg15k · 정밀 평가 및10k–15k 비교
+
+- 사용자 요청으로15k(epoch15000/frame1966080000) PTH/YAML을 복사 고정해 GPU5에서 기존4명·8물체 혼합512환경×seed0/1/2를 평가했다. 기존 스폰/distractor·ordered·loco·평균 액션·거리/물성·1200step을 유지하고10k–14k의15회를 재사용했다. [비교표](output_etc/check/zerobg15000_trend512_gpu5_20261105/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역15k의 그룹 합산 Coupled SR88.41±1.32%, 단독 PUSH90.72±1.23%, 나머지4행동 동일 가중 평균94.05±1.25%로14k보다 세 항목 모두 높다. 공동2/3/4명88.79±3.22/88.00±3.66/88.45±3.32%다. 유형별 I/C/Mixed=92.26±0.51/88.41±1.32/90.34±0.43%이며 현재10k–15k 비교에서 공동 전체와Mixed 평균이 가장 높다.
+- 새3회 CPU/GPU 재채점·finite·개인/그룹 건수·native gate·actor/critic zerobg/SELF·NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가10k–14k와 exact일치했다. GPU5 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg15000_trend512_gpu5_20261105/verification.json).
+
+## 2026-11-04
+
+### zerobg14k · 정밀 평가 및10k–14k 비교
+
+- 사용자 요청으로14k(epoch14000/frame1835008000) PTH/YAML을 복사 고정해 GPU5에서 기존4명·8물체 혼합512환경×seed0/1/2를 평가했다. 기존 스폰/distractor·ordered·loco·평균 액션·거리/물성·1200step을 유지하고10k–13k의12회를 재사용했다. [비교표](output_etc/check/zerobg14000_trend512_gpu5_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역14k의 그룹 합산 Coupled SR87.87±1.89%, 단독 PUSH88.75±2.10%, 나머지4행동 동일 가중 평균93.18±1.41%다. 공동2/3/4명88.68±1.54/87.63±2.34/85.83±8.11%이며13k보다2명은 높고3/4명은 낮다. 유형별 I/C/Mixed=90.90±0.57/87.87±1.89/89.38±0.99%다. 13k 대비 공동 전체는 소폭 높고 단독은 소폭 낮으며4명 공동의 seed 편차가 크다.
+- 새3회 CPU/GPU 재채점·finite·개인/그룹 건수·native gate·actor/critic zerobg/SELF·NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가10k–13k와 exact일치했다. GPU5 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg14000_trend512_gpu5_20261104/verification.json).
+
+### zerobg13k · 6/8명 all/keep3 공유 중심40cm 재집계
+
+- 기존 네64환경 궤적의 공유 상자 중심→공유 목표3D 거리를 CPU float64로20/40cm 재채점했다. Ever20→40cm는6명 all21.88→26.56%, keep3 15.62→21.88%,8명 all25.00→32.81%, keep3 25.00→39.06%다. Final은 참고 파일에 보존했다. 추가 GPU 시뮬레이션·학습/환경/종료 조건 변경은 없다. [반경 비교](output_etc/check/zerobg13000_n68_all_keep3_env64_gpu35_20261104/radius_report.md).
+- 기존20cm 성공 플래그/그룹 건수 exact일치·반경 포함 관계·Final→Ever·finite를 네 실행 모두 확인했다. 기존 그룹 유효성 규칙을 유지했다. [검증](output_etc/check/zerobg13000_n68_all_keep3_env64_gpu35_20261104/radius_verification.json), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+
+### zerobg13k · 6/8명 전원 공동 all/keep3 ·64환경
+
+- 사용자 요청으로 같은13k(epoch13000/frame1703936000)를 GPU3(6명)·5(8명)에서 각 all/keep3·64환경×seed0·ordered·loco·평균 액션·1200step으로 총4회 평가했다. 인원별 원래 상자 크기/질량·스폰/distractor를 유지한 전원 공동이며, 그룹 최대4명 혼합 확장과 별개다. keep3는 미접촉 우선3명을 유지하고 선택 밖 COUPLED를NONE으로 바꾸며 critic와 전체 그룹 gate는 유지한다. [결과](output_etc/check/zerobg13000_n68_all_keep3_env64_gpu35_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 공유 중심20cm Ever의 all→keep3는6명21.88%(14/64)→15.62%(10/64),8명25.00%(16/64)→25.00%(16/64)다. Final은 각각20.31→10.94%,21.88→14.06%로 참고 보존했다. 이번64환경1seed에서는 keep3의 Ever 개선이 없다.
+- 네 실행 모두 CPU/GPU 재채점·finite·그룹/개인 건수·가중치/PTH/YAML/epoch/frame·native gate·actor/critic zerobg 설정 검증을 통과했다. all/keep3 초기12필드 exact일치, 매step 선택수/미접촉 우선 및 actor4레이어4800회의 COUPLED→NONE·padding없음을 확인했다. GPU당 평가 최대2개·최종0개이며 기존 학습/MPS·GPU0/1/2는 변경하지 않았다. [검증](output_etc/check/zerobg13000_n68_all_keep3_env64_gpu35_20261104/verification.json).
+
+### zerobg13k · 정밀 평가 및10k–13k 비교
+
+- 사용자 요청으로13k(epoch13000/frame1703936000) PTH/YAML을 복사 고정해 GPU5에서 기존4명·8물체 혼합512환경×seed0/1/2를 평가했다. 기존 스폰/distractor·ordered·loco·평균 액션·거리/물성·1200step을 유지하고10k·11k·12k의9회를 재사용했다. [비교표](output_etc/check/zerobg13000_trend512_gpu5_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역13k의 그룹 합산 Coupled SR87.25±2.13%, 단독 PUSH88.93±1.83%, 나머지4행동 동일 가중 평균93.56±0.93%다. 공동2/3/4명86.29±1.68/89.52±0.89/86.51±5.35%이며10k보다 공동 평균은 높고 단독 PUSH·나머지 평균은 낮다. 유형별 I/C/Mixed=91.36±1.18/87.25±2.13/89.30±1.07%로10k Mixed89.15±0.81%와 비슷하다. 공동 우선 후보로13k를 추가하되4명 공동의 seed 편차를 함께 기록했다.
+- 새3회 CPU/GPU 재채점·finite·개인/그룹 건수·native gate·actor/critic zerobg/SELF·NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가10k·11k·12k와 exact일치했다. GPU5 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg13000_trend512_gpu5_20261104/verification.json).
+
+### ground18k·19k·20k · 정밀 평가 및 zerobg10k 비교
+
+- 사용자 요청으로 고정18k/19k/20k를 GPU3/4/5에서 각각512환경×seed0/1/2, 총9회 평가했다. 기존4명·8물체 혼합·ordered·loco·평균 액션·스폰/distractor·거리/물성·1200step 첫 episode를 유지하고 ground9.5k·16k·17k 및 zerobg10k 기존12회를 재사용했다. [비교표·판단](output_etc/check/ground18k19k20k_eval512_gpu345_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역18k/19k/20k의 그룹 합산 Coupled SR은84.88±2.15/85.59±1.18/86.20±1.76%, 단독 PUSH81.62±1.93/77.50±4.26/79.94±0.87%, 나머지4행동 동일 가중 평균92.72±1.42/92.21±1.88/92.06±1.57%다. zerobg10k는 각각86.00±1.08/90.18±1.55/94.60±1.18%다. 공동4명은19k87.25±2.83%로 zerobg83.32±2.92%보다 높은 평균이지만, 공동 전체의 지속 개선과 단독 회복이 없어 현 시점 추가 ground 학습 중단을 추천했다. 비교용 PTH·학습 프로세스는 보존했다.
+- 새9회 CPU/GPU 재채점·finite·개인/그룹 건수·native gate·ground 높이/거리·actor/critic 설정·가중치/PTH/YAML/epoch/frame 검증을 통과했다. 각 새 모델과 재사용4개 모델은 같은 seed의 초기12필드가 exact일치했다. GPU당 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/ground18k19k20k_eval512_gpu345_20261104/verification.json).
+
+### zerobg10k · 6/8/12/16명 혼합 확장 완료 · Stage1 유형별 SR 비교
+
+- 고정 zerobg10k를 GPU3/4/5/6에서 인원6/8/12/16별512환경×seed0/1/2, 총12회 평가했다. 승인된5m 그룹 중심 배치·불필요한 distractor 물리/관측 제외·공동 최대4·ordered·loco·평균 액션·기존 거리/물성·1200step을 적용했다. 4명은 기존 스폰/distractor 결과를 재사용했다. Stage2 actor/critic coordination은 매1200step 정상 실행했다. [두 집계·모델 비교](output_etc/check/zerobg10k_group_gap5_mixed512_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 유형별 SR은 단독 개인 I와 공동 그룹 C의 성공 건수를 각각 합산하고 Mixed=(I+C)/2로 계산했다. zerobg10k의6/8/12/16명 I=89.04±0.82/87.25±0.28/78.59±1.49/69.25±0.29%, C=84.19±1.86/82.83±0.55/78.31±0.86/75.14±0.46%, Mixed=86.61±0.89/85.04±0.22/78.45±0.90/72.20±0.37%다. 기존 행동별·공동 인원별 동일 가중 평균도 별도 보존했다. Stage1 26k는 완료된4/6/8/12/16명 결과만 CPU 재집계했다. 16명 Stage1 I/C/Mixed는71.93±0.27/58.75±0.58/65.34±0.34%다.
+- 새12회 모두 CPU 재채점/finite/건수·같은 인원/seed의 Stage1 초기12필드 exact일치·그룹 평행이동/거리·제거 토큰 영향 차단·가중치/PTH/YAML/epoch/frame 검증을 통과했다. 두 모델30개 seed 결과의 원본 개인/그룹 성공 건수를 별도로 대조했다. GPU당 평가 최대1개·최종0개·실패0회이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg10k_group_gap5_mixed512_20261104/verification.json), [건수 대조](output_etc/check/zerobg10k_group_gap5_mixed512_20261104/count_audit.json), [프로세스 감사](output_etc/check/zerobg10k_group_gap5_mixed512_20261104/process_audit.json).
+
+### zerobg10k·11k·12k · 유형별 Interaction-Group SR 재집계
+
+- 사용자 제안 정의로기존4명512환경×3seed의Ever영역결과를CPU재집계했다. I는단독전체개인건수, C는인원2·3·4명구분없이공동그룹건수로합산하고 E가없어 Mixed=(I+C)/2다. C성공은기존공유상자중심20cm를유지했다. 각seed에서비율을구한뒤3seed평균±표본표준편차를계산했다. 추가GPU실행과기존지표/결과변경은없다.
+- 10k/11k/12k의I=92.29±0.76/91.14±1.25/91.53±1.14%, C=86.00±1.08/83.73±0.63/82.84±0.70%, Mixed=89.15±0.81/87.44±0.56/87.19±0.46%다. 기존CPU재채점통과와개인수2048/seed를확인했다. [정의·결과](output_etc/check/zerobg10k12k_interaction_group_macro_20261104/report.md).
+
+### zerobg12k · 10k/11k/12k 정밀 비교
+
+- 사용자 요청으로12k(epoch12000/frame1572864000) PTH/YAML을복사고정하여GPU5에서4명·8물체혼합512환경×seed0/1/2를완료했다. 기존스폰/distractor·ordered·loco·평균액션·물성·1200step을유지하고10k/11k의검증된6회를재사용했다. [비교표](output_etc/check/zerobg12000_trend512_gpu5_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever영역10k/11k/12k 공동2·3·4명동일가중평균85.70±0.94/82.93±1.58/82.39±1.42%, 단독5행동평균93.71±0.64/92.34±0.71/92.45±0.97%, 혼합50:50평균89.71±0.68/87.63±0.72/87.42±0.61%다. 12k단독PUSH91.46±0.87%는10k90.18±1.55%보다높고공동평균은낮았다.
+- 새3회와재사용6회CPU재채점/finite/건수·초기12필드bitwise일치·actor/critic zerobg/SELF·NONE0·가중치불변·PTH/YAML해시/epoch/frame 검증을통과했다. GPU5평가peak3개·최종0개이며GPU0/1/2·기존학습/MPS는변경하지않았다. [검증](output_etc/check/zerobg12000_trend512_gpu5_20261104/verification.json).
+
+### 4명 초과 그룹 스폰 명세 · Stage1 26k 확장 평가 완료
+
+- 사용자 요청으로[4명 초과 그룹 스폰](markdowns/reference/group_spawn_over4.md)을작성했다. 4명이하기존유지/초과에만5m그룹중심배치·기존loco/그룹내상대위치보존·공동최대4·상자/목표거리유지·distractor물리/관측제외·ON_TOP필수받침유지와현재진단경로/검증범위를명시했다. structure에참조링크를추가했다.
+- 같은조건으로Stage1 26k의6/8/12/16명각512환경×seed0/1/2, 총12회를GPU3/4/5/6에서완료했다. 원래Stage1 encoder/head/RMS·merge_shared=False를사용하고Stage2 coordination을실행하면오류를내도록차단했다. 배치재시도한도만512로늘리고사람/그룹/거리/충돌조건은유지했다. 인원별최대4/5/9/52회로모든환경이통과했다. [비교표](output_etc/check/stage1_26k_group_gap5_mixed512_20261104/report.md), [설정](output_etc/check/stage1_26k_group_gap5_mixed512_20261104/manifest.json).
+- Ever영역 단독5행동평균85.14±1.04/85.00±0.56/80.19±0.18/73.76±0.67%,공동2/3/4명동일가중평균69.50±2.18/68.20±1.62/63.12±2.28/58.12±0.83%,혼합50:50평균77.32±1.35/76.60±1.09/71.66±1.20/65.94±0.71%다. 기존4명은원래스폰/distractor결과를재사용했다.
+- 12회모두원래Stage1 actor출력exact일치·coordination우회·가중치/해시/epoch26000/frame3407872000·그룹내상대위치/자세/속도·제거토큰영향차단·거리범위·CPU재채점/finite/건수검증을통과했다. 초기설정검사거부와0.1mm좌표검사거부로그를보존하고reset직전한도적용/0.5mm검증으로수정했다. 실패환경제외나0%치환은없다. [검증](output_etc/check/stage1_26k_group_gap5_mixed512_20261104/verification.json). GPU0/1/2·기존학습/MPS는종료하지않았다.
+
+### zerobg11k · 일반512환경×3회 완료
+
+- 사용자 요청으로11k(epoch11000/frame1441792000)를복사고정하여GPU4에서512환경×seed0/1/2를완료했다. 기존4명·8물체혼합·ordered·loco·평균액션·원래스폰/distractor·1200step을유지했다. [비교표](output_etc/check/zerobg11000_trend512_gpu4_20261104/report.md), [검증](output_etc/check/zerobg11000_trend512_gpu4_20261104/verification.json).
+- Ever영역10k→11k 단독5행동평균93.71±0.64→92.34±0.71%, 공동2/3/4명동일가중평균85.70±0.94→82.93±1.58%, 혼합50:50평균89.71±0.68→87.63±0.72%다. 11k 공동2/3/4명84.95/83.60/80.23%, 단독PUSH89.03%다. 새3회CPU재채점/finite/건수·초기12필드일치·actor/critic zerobg·가중치/해시/epoch/frame 검증을통과했다. GPU0/1·기존학습/뷰어는변경하지않았다.
+
+### 5m 그룹 배치 · zerobg10k 혼합 viewer
+
+- 사용자 요청으로진단폴더에 `view.sh`/`viewer.py`를추가했다. 4명이하는기존스폰/distractor를유지하고초과는기존초기위치에서그룹전체XY이동·그룹중심최소5m·공동최대4·불필요한distractor물리/관측제외를적용한다. ON_TOP받침과작업물체·ordered·loco·평균액션을유지하고기본10씬을연속재생한다. 카메라는사람/필수상자/목표만포함해parked distractor에의한과도한줌아웃을피한다. 표준코드는수정하지않았다. [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- GPU3/4에서4·8·16명각2씬×12step headless viewer경로를통과했다. 각24회finite action·가중치불변, 4명그대로/8·16명매씬그룹이동, 각씬제거토큰교란에대한encoder출력exact불변을확인했다. GUI실제렌더링/정식성공률은이번검증대상이아니다. [검증](output_etc/check/group_spawn_gap5_layout64_20261104/viewer_checks.json).
+
+### 5m 그룹 원형 이동 · 8/16명 배치만 검증
+
+- 사용자 요청으로GPU3/4에서각8/16명·64환경·seed0의배치를검증했다. 기존N명 사람원반경2.5m+loco XY와그룹내상대위치·자세·속도를유지하며그룹전원과kinematic body에같은XY이동을적용했다. 그룹중심간최소거리5m를유지하도록그룹수에따른원반경을계산하고자리를무작위배정했다. 기존혼합샘플링·공동최대4·작업거리/충돌조건을유지하고불필요한distractor만멀리옮겼다. 표준코드는변경하지않았다. [결과](output_etc/check/group_spawn_gap5_layout64_20261104/report.md).
+- 8/16명모두64/64환경배치통과, 첫시도58/40환경·평균시도1.13/2.06회·최대4/26회이며생성/검증은11.1/15.4초였다. GPU검사와CPU재검증에서그룹내상대위치/자세/속도·body동시이동·5m간격·그룹상한·필수물체보존을확인했다. 정책rollout0step이며관측토큰제외/정책성공률은측정하지않았다. [검증](output_etc/check/group_spawn_gap5_layout64_20261104/verification.json), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+
+### zerobg10k · 4명 distractor 제거512환경×3회
+
+- 사용자 요청으로 GPU3(seed0/1)·4(seed2)에서 zerobg10k를4명·8물체 슬롯·512환경×3회·ordered·loco·평균 액션·1200step으로 평가했다. 기존 초기 장면을 생성한 뒤 불필요한 distractor를 물리 장면에서 멀리 옮기고 관측에서 제외했다. ON_TOP 받침과 실제 작업 상자는 유지했으며 사람 스폰·표준 코드는 변경하지 않았다. [비교표](output_etc/check/zerobg10k_nodistractors512_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역 단독5행동 평균93.71±0.64→92.91±1.51%, 공동2·3·4명 동일 가중 평균85.70±0.94→82.77±0.89%, 혼합50:50 평균89.71±0.68→87.84±0.52%다. 공동2/3/4명85.73/83.88/78.68%, 단독PUSH90.93%다. 물리 장애물과 관측 토큰을 동시에 제거한 비교이며, 제거 후 새로 샘플링한 장면의 성능과 구분한다.
+- 세seed의 초기12필드(상자는 제거 전 전체·제거 후 필수 물체) 일치·필수 물체와 관측 보존·제거 토큰 교란에 대한 encoder 출력 불변·CPU재채점/finite/건수·가중치 불변·PTH/YAML해시와epoch10000/frame1310720000 검증을 통과했다. GPU0/1/6·기존 학습·MPS는 종료하지 않았다. [검증](output_etc/check/zerobg10k_nodistractors512_20261104/verification.json).
+
+### zerobg10k · 12명 확대·인접 스폰512×3 완료 /16명3seed 배치 실패
+
+- 사용자 승인으로12/16명 사람 반경을2.5×sqrt(N/4)=4.33/5m로 넓히고 같은 공동 그룹을 원 위 연속 슬롯에 배치했다. 실제rootXY를슬롯에고정하고kinematic body를같이옮기며 RSI자세/높이/속도·그룹/행동/RNG를유지한다. 공동은2~min(4,남은 인원), 물체2N개·ordered·loco·평균 액션·1200step·원래 작업거리/충돌/물성·distractor반경4.5m를 유지했다. 표준학습/샘플러 코드는 변경하지 않았다. [최종 비교표](output_etc/check/zerobg10k_mixed_cap4_anchored_grouped512_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- GPU4에서12명512환경×seed0/1/2가각112/117/31회배치후전부통과하여평가를완료했다. Ever영역 단독5행동평균85.96±0.82%,공동2/3/4명평균81.69±0.61%,혼합50:50평균83.82±0.72%다. 공동2/3/4명82.79±0.67/80.51±0.77/81.77±2.73%,단독SIT/CLIMB/AT/ON_TOP/PUSH96.83/97.43/81.88/67.83/85.83%다. 기존4/6/8명9회결과를재사용하지만해당인원은기존반경2.5m·기존스폰이므로인원수만바꾼비교로해석하지않는다.
+- 16명seed0/1/2는GPU3/2/5에서각512회한도까지설정변경없이시도했으나2/3/1환경배치미통과로모두중단됐다. 세seed모두rollout성공률은없다. 총6환경중5환경은단독PUSH후보배치가남았고1환경은최종장면검사가남았다. 배치실패를정책성공률0%로넣거나미통과환경을제외하지않았다. [실패 좌표·미배치그룹](output_etc/check/zerobg10k_mixed_cap4_anchored_grouped512_20261104/layout_failures.json).
+- 완료3회의CPU재채점/건수/finite·actor/critic zerobg/SELF·NONE0·countnorm없음·가중치불변·PTH해시/epoch10000/frame1310720000·AT/ON_TOP거리1~5m·그룹최대4 검증을통과했다. 스폰슬롯순열/연속·root/body동시XY이동·자세/속도/높이/RNG불변을검증했다. PhysX반영후rootXY는1e-4m허용오차로검증하며나머지root성분은exact다. 실패3회는스폰/실패건수만검증하며정책재채점은없다. 최종신규평가프로세스0개이며GPU0/1/6·본학습·MPS를종료하지않았다. [검증](output_etc/check/zerobg10k_mixed_cap4_anchored_grouped512_20261104/verification.json).
+- 중간시도는보존했다. [반경만확대한시험](output_etc/check/zerobg10k_mixed_cap4_spawnscale512_20261104/report.md)은147/93회후145/462환경정체로중단했다. [nominal슬롯시험](output_etc/check/zerobg10k_mixed_cap4_groupedspawn512_20261104/stop_reason.json)은RSI의기존XY변위가남아실제인접스폰과달라져최종방식으로수정했다. 두중간시도의정책성능수치는없다.
+
+### Stage1 PUSH26k · 현재4명 혼합512환경×3회 비교
+
+- 사용자 요청으로 원본26k(epoch26000/frame3407872000)를 복사 고정해 GPU2에서512환경×seed0/1/2를 평가했다. zerobg10k의4명/8물체·기존 단독/공동 혼합·ordered·loco·지면/현재 거리·물성/distractor·1200step 첫 episode를 사용했다. Stage1 encoder/action head/정규화·merge_shared=False를 복원하고 Stage2 coordination은 실행하지 않았다. [비교표](output_etc/check/stage1_26k_current_mixed4_512_gpu2_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역 단독5행동 평균/공동2·3·4명 동일 가중 평균/혼합50:50 평균은 Stage1 88.52±1.81/71.64±0.59/80.08±0.62%, zerobg10k 93.71±0.64/85.70±0.94/89.71±0.68%다. 단독PUSH는95.86±0.57→90.18±1.55%, AT74.28±6.55→89.31±3.48%, ON_TOP영역80.81±3.87→90.76±2.96%다. 원래Stage1 환경/900step 평가와 구분한다.
+- 세seed 모두 기존zerobg 초기12필드 bitwise일치, 첫 실제 관측에서 원래Stage1 actor와 평균/표준편차 출력 exact일치, 원본가중치 복사 exact일치·rollout가중치 불변·CPU재채점/건수/finite·PTH와환경해시 검증을 통과했다. 표준 모델·학습 코드는 변경하지 않았다. [검증](output_etc/check/stage1_26k_current_mixed4_512_gpu2_20261104/verification.json).
+
+### zerobg10k · 혼합 인원 확장 · 6/8명 완료,12/16명 배치 실패
+
+- 전체 환경 인원6/8/12/16명·물체2N개·각512환경×seed0/1/2를 GPU2/5/4/3에서 시작했다. 기존 혼합 샘플링을 유지하고 공동 그룹 크기만2~min(4,남은 인원)으로 제한했다. CPU검사에서4명이하 원본 그룹/RNG 일치와 확장 그룹 최대4명을 확인했다. 8/12/16명은 기본배치64회 소진으로 첫seed가 실패하여, 원래 사람/그룹·거리/충돌조건을 유지한 채 진단 harness의재시도한도만512회로 늘렸다. 실패로그와 검증 단계 설정거부로그를 보존했다. [진행/비교표](output_etc/check/zerobg10k_mixed_cap4_scaling512_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 6/8명 각3회는 CPU재채점/건수/finite·가중치불변·그룹상한 검증을 통과했다. Ever영역 단독/공동동일가중/혼합50:50은6명90.63±0.33/80.00±1.80/85.31±0.75%,8명89.85±0.44/77.03±1.90/83.44±0.77%다. 12명은512회에서도9환경 배치 실패로 중단됐고16명도512회 배치 소진으로 중단되어 두 인원의 성능수치는 없다. 실패환경을0% 처리하거나 제외하지 않았다. 실행 중인 본학습·표준 샘플러는 변경하지 않았다. [현재 상태](output_etc/check/zerobg10k_mixed_cap4_scaling512_20261104/status.json).
+- 실패 원인 분해용 `diagnose_layout.py`를 추가하고 GPU4/3에서12/16명·512환경·seed0·8회 배치만 진단한다. 각회 충돌 판정은 원래 함수와 exact일치 검사를 수행한다. 첫회 실패는12명359/512,16명497/512이며 상자-사람 근접은각220/452환경이었다(실패항목 중복). 스폰 반경 확대는 아직 적용하지 않았다. [12명 진단](output_etc/check/zerobg10k_mixed_cap4_scaling512_20261104/layout_diagnostic_n12/layout_diagnostic.json), [16명 진단](output_etc/check/zerobg10k_mixed_cap4_scaling512_20261104/layout_diagnostic_n16/layout_diagnostic.json).
+
+### ground/zerobg10k · 최초 전원 접촉 전후 이동 CPU 재집계
+
+- 사용자 승인 기준으로 기존 두 모델의512환경×seed0/1/2 trace/gate_trace/initial을 CPU로 재집계했다. 추가 GPU 시뮬레이션은 없다. 최초 전원 on_face·유효 접촉 이전 초기 공유 상자 중심 대비XY변위≥50cm를 조기밀기로 정의했다. 전원 접촉 미달성은 전체1200step을 검사하고, 최초접촉이후 접촉이탈은 조기밀기로 세지 않는다. native gate의목표도착예외와분리했다. [비교표·정의](output_etc/check/ground_zerobg10k_gate_timing_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 모델별1456그룹(2명778·3명421·4명257) 합산 조기50cm 비율 ground43.61%(635)/zero46.02%(670), 전원접촉달성94.16/95.12%, 접촉달성그룹중추가50cm이동98.69/99.21%다. 2/3/4명 조기밀기는 ground31.62/51.07/67.70%,zero33.68/53.68/70.82%다. 접촉 전 최대변위 중앙값0.430/0.465m,90백분위1.511/1.354m다. 조기50cm없이접촉후추가이동까지달성55.84/53.64%다.
+- 접촉 후 추가50cm이동에는 이미 움직이던 장면이 포함되며, 소요시간은 반응/출발 지연이 아니다. 조기50cm 없음도 완전정지율로 해석하지 않는다. 초기12필드일치·공동그룹분모·물리공유중심일치·전원접촉→nativegate·낙상재활성없음·원본재채점검증과입력해시를 확인했다. 표준 코드·학습·원본 결과는 변경하지 않았다. [검증](output_etc/check/ground_zerobg10k_gate_timing_20261104/verification.json).
+
+### zerobg10k · 일반512환경×3회 · 공동/단독 동반 개선
+
+- 사용자 요청으로 zerobg10000epoch/frame1310720000 PTH/YAML을 복사 고정해 GPU4에서각512환경×seed0/1/2 총3회를 평가했다. 4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode이며 zerobg8k/9k 및 ground10k 기존9회를 재사용했다. [비교표](output_etc/check/zerobg10000_trend512_gpu4_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- zerobg9k→10k 공유 중심20cm 공동 전체 Ever81.14→86.00%, 단독 PUSH87.19→90.18%, 나머지4행동 영역 평균91.88→94.60%로 세 항목이 함께 개선됐다. 공동2/3/4명86.06/87.72/83.32%이며 동일10k ground82.86/81.31/81.02%보다 높다. Final은공동84.07%,PUSH88.00%,나머지영역87.60%다.
+- 새3회와재사용9회 CPU재채점·JSON건수·finite·native gate·actor/critic zerobg/SELF·NONE0·가중치 불변·PTH/YAML해시·epoch/frame·지면 높이/거리 검증을 통과했다. seed별초기12필드가모든비교PTH와bitwise일치했다. GPU4peak3개·최종0개이며GPU0·1·본학습·표준 코드는 건드리지 않았다. [검증](output_etc/check/zerobg10000_trend512_gpu4_20261104/verification.json).
+
+### zerobg9k · 6/8명 all/keep3 · 20/40cm
+
+- 사용자 요청으로 zerobg9k를 복사 고정하고 GPU4(all)·5(keep3)에서6명/12물체·8명/16물체 각64환경×seed0, 총4회를 평가했다. ordered·loco·평균 액션·원래 인원별 상자 크기/무게·distractor·1200step 첫 episode를 유지했다. 같은 궤적을 공유 상자 중심→공유 목표3D20/40cm로 재집계했다. [반경 비교표](output_etc/check/zerobg9000_n68_all_keep3_radius_env64_gpu45_20261104/radius_report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever20→40cm는6명 all12.50→18.75%,keep3 21.88→26.56%;8명 all34.38→37.50%,keep3 31.25→37.50%다. Final은6명 all12.50→17.19%,keep3 12.50→20.31%;8명 all26.56→34.38%,keep3 21.88→35.94%다.64환경1seed에서keep3의Ever개선은6명에만 나타났다.
+- CPU재채점·finite·가중치 불변·PTH/YAML해시·epoch/frame·초기12필드 일치·native gate·매행동keep3선택/actor4층NONE전환/critic무개입 검증을 통과했다.20cm저장 성공플래그/건수 정확 일치·20cm⊆40cm·Final⊆Ever도 확인했다. GPU별평가peak1개·최종0개이며GPU0·1·본학습·표준 성공조건은 변경하지 않았다. [일반 검증](output_etc/check/zerobg9000_n68_all_keep3_radius_env64_gpu45_20261104/verification.json), [반경 검증](output_etc/check/zerobg9000_n68_all_keep3_radius_env64_gpu45_20261104/radius_verification.json).
+
+### ground17k · 일반512환경×3회 · 후반 추세
+
+- 요청 시점 새 정수 epoch ground17k를 GPU3에서각512환경×seed0/1/2로 평가했다. zerobg는9.5k까지 저장되어 사용자1k간격에 따라 이번 신규 대상에서 제외했다. 4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode를 유지하고 ground14k/16k·zerobg8k/9k 기존12회 결과를 재사용했다. [비교표](output_etc/check/ground17000_trend512_gpu3_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- ground16k→17k 공유 중심20cm 공동 전체 Ever85.85→86.68%, 단독 PUSH80.74→81.11%, 나머지4행동 영역 평균92.99→90.28%다.17k 공동2/3/4명86.89/85.55/88.02%이며 AT80.98%,ON_TOP영역87.12%로16k의86.83/90.85%보다낮다. Final은공동84.14%,PUSH78.56%,나머지영역83.85%다. 공동/PUSH 소폭 개선과 나머지 단독 하락이 함께 나타났다.
+- 새3회 및 재사용12회 CPU재채점·finite·native gate·가중치 보존·원본/고정PTH 및 YAML 해시·epoch/frame·지면 높이/거리 검증을 통과했다. seed별 초기12필드가모든비교모델과bitwise일치했다. GPU3peak3개·최종0개이며GPU0·1·GPU6 본학습 및 표준 코드는 건드리지 않았다. [검증](output_etc/check/ground17000_trend512_gpu3_20261104/verification.json).
+
+### zerobg8k·9k · 일반512환경×3회 · ground 동일 epoch 비교
+
+- 사용자 확인으로8k·9k 두 PTH만 각512환경×seed0/1/2, 총6회를 새로 평가했다. GPU4의worker0/1/2는8k, GPU3의worker3/4/5는9k이며 GPU당peak3개·최종0개다. 4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode를 유지했다. 기존ground8k/9k의6회는 재사용했다. [비교표](output_etc/check/zerobg_trend512_gpu34_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- zerobg8k→9k 공유 중심20cm 공동 전체 Ever84.20→81.14%, 단독 PUSH82.44→87.19%, 나머지4행동 영역 평균92.02→91.88%다. 동일 epoch ground는 공동82.67/85.31%, PUSH76.48/79.26%, 나머지영역91.65/91.61%다. 공동Final은zero82.08/78.38%, ground78.98/83.39%다. 앞선64환경 진단과 달리512×3에서는 zero의 나머지 영역 평균 우위가 작고 단독 PUSH가 높다.
+- CPU 재채점·JSON건수·finite·native gate·actor/critic zerobg/SELF·NONE0·가중치 불변·원본/고정PTH 및 YAML 해시·epoch/frame·지면 높이/거리 검증을 통과했다. 각seed 초기12필드가두zero PTH 및기존ground8k/9k와bitwise일치했다. [검증](output_etc/check/zerobg_trend512_gpu34_20261104/verification.json). GPU0·1·GPU6 본학습과 표준 코드는 변경하지 않았다.
+
+### learnedbg5k·zerobg8k · 6/8명 all/keep3
+
+- 사용자 요청으로 각 PTH를 복사 고정하고 6명/12물체·8명/16물체 × all/keep3, 각64환경×seed0 총8회를 GPU3·5에서 평가했다. ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode를 유지했고 GPU0·1과 본학습은 건드리지 않았다. [통합 비교표](output_etc/check/zerobg8000_n68_all_keep3_env64_gpu35_20261104/comparison.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 공유 중심20cm Ever의 all→keep3는 learnedbg5k에서 6명9.38→23.44%, 8명17.19→17.19%; zerobg8k에서 6명23.44→23.44%, 8명28.12→28.12%다. Final은 각각 6명9.38→20.31/18.75→15.62%, 8명12.50→14.06/20.31→23.44%다. 이번 표본에서 keep3의 Ever 이득은 learnedbg6명에만 나타났다. epoch가 다른 모델·64환경1seed 비교다.
+- 8회 CPU 재채점·finite·가중치 보존·PTH/YAML 해시·epoch/frame·초기12필드 일치·native gate 검증을 통과했다. 매 행동의 keep3 선택수/미접촉 우선/SELF 제외 및 actor4층 COUPLED→NONE(마스킹 없음)·critic 무개입 검사를 통과했다. 두 평가 묶음 모두 종료했다. [learnedbg 검증](output_etc/check/learnedbg5000_n68_all_keep3_env64_gpu35_20261104/verification.json), [zerobg 검증](output_etc/check/zerobg8000_n68_all_keep3_env64_gpu35_20261104/verification.json).
+
+### 선택 PTH 6/8명 · all/keep3 NONE 전환 비교
+
+- 일반 평가 후 공동 최고 ground9.5k·회복/단독 균형 ground16k·fusion 공동 최고 zerobg3k를 선택해 각각6명/12물체·8명/16물체64환경×seed0·ordered·loco·평균 액션·원래 인원별 상자 크기/무게·distractor·1200step 첫 episode로 all/keep3 총12회를 평가했다. GPU3/2/5에서각모델을실행했고GPU0·1은사용하지않았다. ground5k의기존2회는재사용했다. [Ever/Final·접촉·이동·분모](output_etc/check/ground_relfusion_selected_n68_all_keep3_env64_gpu35_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 공유 중심20cm Ever의all→keep3는 ground9.5k에서6명7.81→25.00%,8명15.62→14.06%;ground16k에서6명10.94→17.19%,8명29.69→28.12%;zerobg3k에서6명14.06→12.50%,8명17.19→10.94%다. Final은각각6명6.25→23.44/10.94→15.62/12.50→10.94%,8명15.62→10.94/21.88→21.88/9.38→7.81%다. ground6명에서는개선됐지만8명은세후보모두Ever개선이없다.64환경1seed진단이다.
+- keep3는미접촉상대를우선해3명을유지하며선택밖COUPLED를actor4층에서NONE으로전환한다. 매행동의선택수·미접촉우선·SELF제외·실제4층COUPLED/NONE수·attention padding 없음·critic개입없음4800회검사와저장선택trace검증을통과했다. 실제그룹·보상gate·물성은유지했다.
+- 새12회와재사용2회CPU/GPU재채점·JSON건수·finite·native gate·가중치불변·설정·PTH/YAML해시·epoch/frame을확인했다. 같은인원의초기12필드가모든후보/all/keep3에서bitwise일치했다. GPU별peak2개·최종0개다. [검증](output_etc/check/ground_relfusion_selected_n68_all_keep3_env64_gpu35_20261104/verification.json). 폴더명의gpu35와달리실제GPU는2·3·5이며manifest/검증에기록했다. 본학습·표준코드는변경하지않았다.
+
+### ground12k·14k·16k / zerobg8k·learnedbg5k까지 일반 추세
+
+- 사용자 요청으로 GPU0·1을 제외하고 ground12k/14k/16k를 GPU2·3에서각512환경×seed0/1/2, zerobg4k/5k/6k/8k와 learnedbg3k/4k/5k를 GPU5에서각64환경×seed0로 평가했다.10개 정기PTH/YAML을 복사 고정했고4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode를 유지했다. 기존ground27회·fusion12회를 재사용했다. [ground 추세](output_etc/check/ground_12k14k16k_eval512_gpu23_20261104/report.md), [fusion 추세](output_etc/check/relfusion_ab_3k8k_eval64_gpu5_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- ground12k/14k/16k 공유 중심20cm 전체 Ever84.08/82.08/85.85%,단독 점 평균86.62/86.23/87.66%,PUSH76.47/76.44/80.74%다.16k는9.5k의공동86.96%에는못미치지만단독점평균85.07%보다높아균형후보로추가했다. 공동전체 Final82.64/80.36/83.45%다.
+- zerobg4k/5k/6k/8k 공동전체 Ever78.125/68.75/79.6875/81.25%,learnedbg3k/4k/5k79.6875/62.5/62.5%다. zerobg3k의기존57/64(89.0625%)가fusion내공동최고다.64환경1seed로구조 우열이나512×3 ground와직접우열은판단하지않는다.
+- 새16회의CPU/GPU재채점·JSON건수·finite·native gate·actor/critic모드·가중치불변·PTH/YAML해시·epoch/frame·ground높이/거리검증을통과했다. 평가규모별초기12필드가모든비교저장본에서bitwise일치했다.일반평가GPU2/3각peak3개·GPU5peak2개,모두종료했다. [ground 검증](output_etc/check/ground_12k14k16k_eval512_gpu23_20261104/verification.json), [fusion 검증](output_etc/check/relfusion_ab_3k8k_eval64_gpu5_20261104/verification.json). 본학습·표준코드는변경하지않았다.
+
+### ground11k·11.5k / fusion A/B 최신 추세 · GPU0·1 제외
+
+- 사용자 요청으로 GPU0·1을 제외하고 GPU2에서ground11k/frame1441792000·11.5k/frame1507328000을각512환경×seed0/1/2, GPU5에서zerobg2.5k/3k/3.5k·learnedbg2k/2.5k를각64환경×seed0로 새로 평가했다.7개 정기PTH/YAML을 복사 고정했고4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode를 유지했다. 기존ground21회·fusion7회를 재사용했다. [ground 전체 추세](output_etc/check/ground_11k11500_eval512_gpu2_20261104/report.md), [fusion 전체 추세](output_etc/check/relfusion_ab_2k3500_eval64_gpu5_20261104/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- ground11k/11.5k 공유 중심20cm 전체 Ever82.16/83.54%,4명81.79/83.58%,단독 점 평균85.29/83.88%,PUSH67.66/73.09%,AT84.89/85.58%다. 공동 전체 Final80.30/82.38%다.9.5k의공동86.96%·PUSH81.04%보다낮으며 AT는회복했다.
+- zerobg2.5k/3k/3.5k 공동 전체 Ever78.1/89.1/75.0%,단독 점 평균88.4/83.8/84.7%,PUSH82.1/71.4/75.0%다. learnedbg2k/2.5k 공동전체65.6/65.6%,단독점평균82.4/83.8%,PUSH57.1/71.4%다.같은2.5k에서zerobg가공동·단독평균·PUSH에앞섰다. zerobg3k공동은57/64이며소표본1seed로512×3 ground와직접우열을판단하지않는다. 공동전체 Final은zero78.1/84.4/73.4%,learn60.9/65.6%다.
+- 새11회의CPU/GPU재채점·JSON건수·finite·native gate·실제actor/critic모드·가중치불변·PTH/YAML해시·epoch/frame·ground높이/거리검증을통과했다. 기존결과검증·해시와평가규모별초기12필드bitwise일치도확인했다. GPU2peak3개·GPU5peak2개,최종평가0개다. [ground 검증](output_etc/check/ground_11k11500_eval512_gpu2_20261104/verification.json), [fusion 검증](output_etc/check/relfusion_ab_2k3500_eval64_gpu5_20261104/verification.json). GPU0·1·본학습·표준코드는변경하지않았다.
+
 ## 2026-11-03
+
+### ground8k·10k · 512환경×3seed · 5k–10k 비교
+
+- 사용자 요청으로 ground8000epoch/frame1048576000·10000epoch/frame1310720000 PTH/YAML을 복사 고정해 GPU3에서각512환경×seed0/1/2를 평가했다.4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode이며 worker3개가 각8k→10k를 순차 실행했다. 기존5k/6k/7k/9k/9.5k의15회는 재사용했다. [Ever/Final·편차·분모](output_etc/check/ground_8k10k_eval512_gpu3_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 공동 공유 중심20cm 전체 Ever는5k→6k→7k→8k→9k→9.5k→10k에서77.99→81.78→83.42→82.67→85.31→86.96→82.03%다.8k의2/3/4명85.16/80.40/79.05%,10k82.86/81.31/81.02%다.10k는9.5k보다 세seed 모두 공동 전체가 낮고,현재 평가 저장본 중9.5k가 공동 전체·각 인원과 단독 PUSH에서 가장 높다.
+- 8k/10k 단독 점 평균86.04/84.46%,AT80.49/77.98%,ON_TOP85.86/88.11 및80.50/86.92%,PUSH76.48/79.82%다. 공동 전체 Final78.98/80.37%다.10k는9.5k보다AT·ON_TOP 점·PUSH·단독 점 평균도 낮지만SIT 점은 회복했다.
+- 새6회의 CPU/GPU 재채점·JSON 건수·finite·native gate·기본attention/fusion 없음·가중치 불변·PTH/YAML 해시·epoch/frame·ground 높이/거리 검증을 통과했다. 기존15회 검증 기록과해시를 확인하고 각seed 초기12필드가 모든epoch에서bitwise 일치함을 확인했다. 평가peak3개·최종0개다. [검증](output_etc/check/ground_8k10k_eval512_gpu3_20261103/verification.json). 본학습·표준 코드·GPU0은 변경하지 않았다.
+
+### learnedbg1.5k · zerobg 동일 epoch 추세 비교
+
+- learnedbg1500epoch/frame196608000 PTH/YAML을 복사 고정해 GPU3에서4명·8물체 혼합64환경×seed0·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode1회를 평가했다. 이전 learnedbg0.5k/1k와 zerobg0.5k/1k/1.5k/2k 여섯 결과는 재사용했다. [Ever/Final·분모·추세](output_etc/check/relfusion_learnedbg1500_ab_eval64_gpu3_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- learnedbg1k→1.5k 공유 중심20cm 전체 Ever73.4→64.1%(41/64),2/3/4명83.3/46.2/66.7→71.4/61.5/33.3%,단독 점 평균79.9→79.2%,PUSH53.6→67.9%,AT82.8→79.3%,ON_TOP83.3/83.3→88.9/94.4%다. 같은1.5k zerobg는 공동 전체76.6%,단독 점 평균85.0%,PUSH64.3%,ON_TOP77.8/77.8%다. learnedbg1.5k 공동 전체 Final62.5%,ON_TOP77.8/88.9%다. 이번 소표본에서는 zerobg가 공동 전체와 단독 평균에서 앞서며 learnedbg는ON_TOP이 강하지만 구조 우열을 확정하지 않는다.
+- CPU/GPU 재채점·JSON 건수·finite·native gate·actor/critic learnedbg 구성·가중치 불변·PTH/YAML 해시·epoch/frame·ground 높이/거리와 일곱 저장본 초기12필드bitwise 일치를 확인했다. [검증](output_etc/check/relfusion_learnedbg1500_ab_eval64_gpu3_20261103/verification.json). 본학습·표준 코드·GPU0은 변경하지 않았다.
+
+### zerobg2k · 일반64환경 추세 추가
+
+- zerobg2000epoch/frame262144000 PTH/YAML을 복사 고정해 GPU3에서4명·8물체 혼합64환경×seed0·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode1회를 평가했다. 이전0.5k/1k/1.5k 결과는 재사용했다. [Ever/Final·분모](output_etc/check/relfusion_zerobg2000_eval64_gpu3_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 1.5k→2k 공유 중심20cm 전체 Ever76.6→76.6%(49/64),2명81.0→85.7%,3명76.9→61.5%,4명55.6→55.6%다. 단독 AT93.1→96.6%,ON_TOP77.8/77.8→83.3/94.4%,PUSH64.3→67.9%,점 평균85.0→85.9%다.2k 공동 전체 Final76.6%,ON_TOP50.0/66.7%,PUSH64.3%다. 공동3명13그룹·4명9그룹 소표본이다.
+- CPU/GPU 재채점·JSON 건수·finite·native gate·actor/critic zerobg 및 SELF/NONE0·가중치 불변·PTH/YAML 해시·epoch/frame·ground 높이/거리와 이전 세 저장본 대비 초기12필드bitwise 일치를 확인했다. [검증](output_etc/check/relfusion_zerobg2000_eval64_gpu3_20261103/verification.json). 본학습·표준 코드·GPU0은 변경하지 않았다.
+
+### 최신 ground9.5k · zerobg1.5k · learnedbg1k 평가
+
+- 요청 시점의 최신 정기 PTH/YAML을 복사 고정해 ground9500은 GPU3에서512환경×seed0/1/2, zerobg1500·learnedbg1000은 GPU2에서각64환경×seed0로 평가했다. 모두4명·8물체 혼합·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode다. 이전 ground12회와 fusion3회는 재사용했다. [ground 추세](output_etc/check/ground_latest9500_eval512_gpu3_20261103/report.md), [fusion 추세](output_etc/check/relfusion_ab_trend64_1000_1500_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- ground9k→9.5k 공유 중심20cm 전체 Ever85.31→86.96%,4명84.45→88.02%,단독 PUSH79.26→81.04%,단독 점 평균85.90→85.07%다. AT83.07→80.98%,ON_TOP84.63/86.71→82.62/85.32%로 내려갔다. 공동 전체 Final83.39→84.82%다.
+- zerobg1k→1.5k 공동 전체 Ever59.4→76.6%,2/3/4명81.0/76.9/55.6%,단독 점 평균78.9→85.0%,PUSH71.4→64.3%다. learnedbg0.5k→1k 공동 전체64.1→73.4%,2/3/4명83.3/46.2/66.7%,단독 점 평균75.4→79.9%,PUSH64.3→53.6%다. 최신 공동 전체 Final75.0/73.4%다. fusion4명은9그룹 소표본이며512×3 ground와 직접 구조 우열을 판단하지 않는다.
+- 새5회 CPU/GPU 재채점·JSON 건수·finite·native gate·actor/critic 모드·가중치 불변·PTH/YAML 해시·epoch/frame 및 ground 높이/거리 검증을 통과했다. 각 평가 규모 안에서 이전 결과와 초기12필드가bitwise 일치했다. [ground 검증](output_etc/check/ground_latest9500_eval512_gpu3_20261103/verification.json), [fusion 검증](output_etc/check/relfusion_ab_trend64_1000_1500_20261103/verification.json). 본학습·표준 코드·GPU0은 변경하지 않았다.
+
+### ground 최신9k · 512환경×3seed · 5k/6k/7k 추세 확장
+
+- 사용자 요청 시점 최신 정기 ground9000epoch/frame1179648000 PTH/YAML을 복사 고정하고 GPU3에서4명·8물체 혼합512환경×seed0/1/2·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode3회를 새로 평가했다. 기존5k·6k·7k각3회는 재사용했다. [Ever/Final·편차·분모](output_etc/check/ground_latest9k_eval512_gpu3_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 5k→6k→7k→9k 공유 중심20cm 전체 Ever77.99→81.78→83.42→85.31%,4명74.48→81.82→83.03→84.45%,단독 PUSH72.27→75.57→73.35→79.26%,단독 점 평균86.34→86.55→84.06→85.90%다.9k 공동2/3명85.64/85.31%,AT83.07%,ON_TOP84.63/86.71%,SIT85.81/98.27%이며 공동 Final전체83.39%,전원 개인 목표 동시 Ever전체81.75%다. 공동은 개선 추세,단독 PUSH/SIT는7k대비 회복했지만AT는5k이후 하락했다.
+- 새3회 CPU/GPU 재채점·JSON 건수·finite·native gate·기본attention/fusion 없음·가중치 불변·원본/고정PTH와 YAML 해시·epoch/frame을 검증했다. 기존9회 검증 기록과PTH/YAML 해시를 확인했고 각seed 초기12필드는5k/6k/7k/9k 모두bitwise 일치했다. ground 운반 높이/거리도 통과했고 평가peak3개·최종0개다. [검증](output_etc/check/ground_latest9k_eval512_gpu3_20261103/verification.json). GPU0·본학습·표준 코드는 변경하지 않았다.
+
+### 관계 fusion · zerobg1k / learnedbg0.5k · 일반64환경
+
+- 사용자 요청으로 zerobg1000epoch/frame131072000·learnedbg500epoch/frame65536000 PTH/YAML을 복사 고정하고 GPU3에서4명·8물체 혼합64환경×seed0·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode2회를 평가했다. 기존 zerobg500 결과를 재사용했다. 세 모델 모두ground이고 초기12필드가bitwise 일치했다. [Ever/Final·분모](output_etc/check/relfusion_ab_trend64_500_1000_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- zerobg0.5k→1k 공유 중심20cm 전체 Ever59.4→59.4%,2/3/4명66.7/53.8/33.3→64.3/53.8/44.4%,단독 점 평균74.0→78.9%,PUSH75.0→71.4%다. learnedbg0.5k는 공동2/3/4명73.8/69.2/11.1%,전체64.1%,단독 점 평균75.4%,PUSH64.3%다. 공동4명은9그룹 소표본이며 구조 우열을 확정하지 않는다.
+- 새2회 CPU/GPU 재채점·JSON 건수·finite·native gate·실제actor/critic fusion 및 A/B 배경 bias 구성·가중치 불변·원본/고정PTH와 YAML 해시·epoch/frame을 확인했다. ground 운반 높이/거리와 재사용500 결과/고정PTH 해시도 검증했다. [검증](output_etc/check/relfusion_ab_trend64_500_1000_20261103/verification.json). 본학습·표준 코드·GPU0은 변경하지 않았다.
+
+### zerobg500 · 일반64환경 · 기존500 비교
+
+- 사용자 요청으로 ground 관계 fusion B의500epoch/frame65536000 PTH와 YAML을 복사 고정하고 GPU2에서4명·8물체 혼합64환경×seed0·ordered·loco·평균 액션·원래 물성/distractor·1200step 첫 episode1회를 평가했다. 비교용 기존 solo5·CO norm·CO+NONE norm500의 같은 규모 결과3개는 재측정 없이 재사용했다. [Ever/Final·분모·비교](output_etc/check/relfusion_zerobg500_eval64_gpu2_20261103/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- zerobg 공유 중심20cm Ever2/3/4명은28/42·7/13·3/9(66.7/53.8/33.3%),전체38/64(59.4%)이고 Final도 같다. 단독 Ever SIT40/80·CLIMB100/100·AT82.8·ON_TOP72.2/77.8·PUSH75.0%,점 평균74.0%다. 기존 solo5/CO/CO+NONE의 공동 전체 Ever64.1/60.9/70.3%,단독 점 평균75.4/78.6/78.4%다.64환경1seed 진단이며 zerobg만ground 운반 높이/거리 설정이므로 구조만의 비교가 아니다.
+- 신규 CPU/GPU 재채점·JSON 건수·finite·native gate·양쪽zerobg/SELF·NONE0·가중치 불변·원본/고정PTH와 YAML 해시·500epoch/frame을 확인했다. 기존3개의 재채점 검증 및 고정PTH 해시를 확인했고 ground AT/ON_TOP 출발 지면·목표 높이·거리1–5m도 통과했다. [검증](output_etc/check/relfusion_zerobg500_eval64_gpu2_20261103/verification.json). 본학습·표준 코드는 변경하지 않았다.
+
+### ground 관계 fusion A/B 별도 컨피그
+
+- 사용자 승인 설계로 ground 기반 `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`(A)·`_relfusion_zerobg`(B)의 env/train YAML 및 train/test/VNC/eval wrapper를 추가했다. 두 모델은 COUPLED64차원 임베딩을 레이어/헤드 bias 투영과 공유128→64→64 residual fusion에 함께 쓴다. A만 SELF/NONE lookup을 학습하고 B는0 고정한다. fusion은 attention 집계 후 output projection 전에 사람·레이어당1회 적용하며 단독 추가분은0이다. Pre-LN·환경·보상·물성·Stage1 PUSH26k 전이·actor encoder 동결은 유지한다. BEFORE는 이번 추가 범위에서 제외했다. [명령](markdowns/config.md), [설계](markdowns/reference/stage2_coupled_push.md#ground-관계-fusion-ab).
+- 기존 coordination 경로·state_dict를 보존하고 새 경로를 별도 모듈에 추가했다. 실험 등록·평가·checkpoint 계약·문서를 연결했다. CPU73개와 설정/저장 환경40개를 통과했다. 첫 CPU 실행의 기존21k 전이 테스트1개는 해당 파일 부재로 실패했으며 관련 없는 이1개를 제외해 재실행했다. 새 A/B의 실제26k 전이·초기 액션 보존·공통 초기 가중치 일치·계산/gradient 동치·인원/셔플·단독0·gradient 발생·strict reload는 통과했다.
+- GPU2에서 각각4명·1024환경·8물체로 MAX_ITERATIONS=2 확인 학습을 완료했다(epoch3/frame393216). 저장본의 actor encoder 원본 보존·action head 및 양쪽 fusion/bias 투영 갱신·모델/각263개 scalar tag finite를 확인했다. 각32환경×8preset×16step 재로드의 actor/critic/AMP/보상 finite·부분 reset·가중치 불변을 통과했고 실제 test wrapper도8환경×16step으로 완료했다. GPU0 및 기존 학습 프로세스는 변경하지 않았고 본학습·정규 성능 평가·GUI/VNC는 실행하지 않았다. [검증](output_etc/check/relfusion_ab_20261103/verification.json), [검증 재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
 
 ### ground5k · 6k · 7k · 512환경×3seed 추세
 

@@ -118,3 +118,16 @@ solo5의 `keep1`·`shrink1` 설정은 `relationGraph.coupled_peer_selection`으�
 관측 배치는 `[scene | task packet 5N | selected peer IDs N | group IDs N]`이다. 선택 ID는0부터N−1, 상대 없음은−1이며 정규화를 통과시킨다. 모델은 ID를 추가 특징으로 임베딩하지 않고 관계 분류에만 사용한다. PPO rollout/미니배치/가치 bootstrap은 저장된 ID를 사용하며 모델 forward에서 재선택하지 않는다. 기존6N suffix는 기본 설정에서 유지하고 두 설정만7N이다.4명/8토큰 관측은1272→1276차원이며 모델 파라미터 이름/형상과 Stage1 PUSH26k 전이는 유지한다. 모드는 저장 checkpoint 계약에 포함해 기존 solo5 및 다른 선택 모드와의 혼용을 거부한다.
 
 기존 `COUPLED_PEERS=keep3|shrink3`는 viewer의 actor 전용 선택이며 5명 이상 그룹에 적용한다. 현재는 이 경우도 미선택 상대를 NONE으로 바꾼다. 과거 마스킹 평가는 changelog의 당시 기록으로 구분한다. 두 학습 설정에는 이 viewer override를 중첩하지 않는다.
+
+## ground 관계 fusion A/B
+
+`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`(A)와 `_relfusion_zerobg`(B)는 ground의 환경·보상·거리·물성·4명/1024환경/8물체를 유지하고 Stage1 PUSH26k에서 새로 전이한다. actor encoder는 동결하고 coordination·action head 및 critic은 학습한다. actor/critic의 새 파라미터는 독립이다.
+
+- `relationGraph.human_relation_fusion`은 A=`learnedbg`, B=`zerobg`다. 기존 기본값 `none`은 기존 계산·state_dict를 유지한다. countnorm 및 peer selection과의 조합은 지원하지 않는다.
+- 각 coordination은 4층·2헤드·Pre-LN·일반 FFN64→128→64다. COUPLED 임베딩 하나(64차원)와 fusion MLP128→64→64를 네 층이 공유한다. 각 층/헤드의 투영과 임베딩 내적으로 COUPLED bias를 만든다.
+- LayerNorm→QKV→softmax(QK/√32+bias)→V집계→헤드 결합→COUPLED residual fusion→output projection→residual→Pre-LN FFN 순서다. 단독은 fusion 추가분만 0이고 나머지 coordination을 통과한다. 인원별 임베딩은 없고 전원 접촉 후에도 같은 관계를 유지한다.
+- A/B의 유일한 구조 차이는 SELF/NONE 배경 bias다. A는 레이어·헤드별 lookup, B는 상수0이다. 어느 쪽도 SELF/NONE을 마스킹하지 않는다. BEFORE는 이번 학습에 없고 새 경로에서 bias/fusion을 추가하지 않는다. 이후 BEFORE 지원은 별도 확장이다.
+- bias 투영·배경 lookup·fusion 마지막 층·attention output projection·FFN 마지막 층은0 초기화한다. 초기 coordination은 identity이며 output projection 학습 후 fusion gradient가 열린다.
+- 구조 선택은 저장된 relationGraph 및 coupled checkpoint 계약에 포함된다. 기존 ground 또는 A/B 사이 resume은 거부하며 새 구조의 저장/복원만 지원한다.
+
+임베딩은 공동 소속을 전달하지만 contact 준비 상태는 attention 피처에서 배워야 한다. 단독 성능 보존과 인원 확장을 보장하지 않는다. GPU 검증 및 결과는 changelog와 `output_etc/check/relfusion_ab_20261103/`를 따른다.

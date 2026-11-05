@@ -14,10 +14,11 @@ class Stage2PushBuilder(BeforeBuilder):
                 encoder.edge_encoder.category_embed=nn.Embedding(5,64)
                 nn.init.trunc_normal_(encoder.edge_encoder.category_embed.weight,std=.02)
             count_normalization=self.relation_graph_spec.get('human_attention_count_normalization','none')
+            relation_fusion=self.relation_graph_spec.get('human_relation_fusion','none')
             self.coordination=HumanCoordination(shuffle_human_order=True,relations=4,
-                                               count_normalization=count_normalization)
+                                               count_normalization=count_normalization,relation_fusion=relation_fusion)
             self.critic_coordination=HumanCoordination(shuffle_human_order=True,relations=4,
-                                                      count_normalization=count_normalization)
+                                                      count_normalization=count_normalization,relation_fusion=relation_fusion)
             for branch in (self.coordination,self.critic_coordination):
                 # Match the reference Stage2 initialization, including FFN input bias.
                 for layer in branch.modules():

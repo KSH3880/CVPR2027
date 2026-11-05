@@ -23,7 +23,9 @@ COUPLED_COUNTNORM_NONE="stage2_coupled_push_individual_goal_solo5_countnorm_coup
 COUPLED_KEEP1="stage2_coupled_push_individual_goal_solo5_keep1"
 COUPLED_SHRINK1="stage2_coupled_push_individual_goal_solo5_shrink1"
 COUPLED_CARRY5_GROUND="stage2_coupled_push_individual_goal_solo5_carry5_ground"
-NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND)
+COUPLED_RELFUSION_A="stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg"
+COUPLED_RELFUSION_B="stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg"
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B)
 
 
 def experiment_horizon(name):
@@ -99,7 +101,7 @@ def validate_experiment(name, env, train, evaluation=False):
             raise ValueError('PUSH policy requires its own saved environment')
         from utils.stage1_jointpush import validate_env
         validate_env(env)
-    elif name in (COUPLED, COUPLED_GOAL5, COUPLED_INDIVIDUAL, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND):
+    elif name in (COUPLED, COUPLED_GOAL5, COUPLED_INDIVIDUAL, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B):
         from utils.coupled_push_spec import checkpoint_contract,validate_env
         validate_env(env)
         if checkpoint_contract(env, inference=True)!=checkpoint_contract(native['env']):

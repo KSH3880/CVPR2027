@@ -41,6 +41,11 @@ def validate_env(env):
     if env['relationGraph'].get('human_attention_count_normalization', 'none') not in ('none', 'coupled', 'coupled_none'):
         raise ValueError('Invalid human attention count normalization')
     peers = env['relationGraph'].get('coupled_peer_selection', 'all')
+    fusion = env['relationGraph'].get('human_relation_fusion', 'none')
+    if fusion not in ('none', 'learnedbg', 'zerobg'):
+        raise ValueError('Invalid coupled relation fusion mode')
+    if fusion != 'none' and (peers != 'all' or env['relationGraph'].get('human_attention_count_normalization', 'none') != 'none'):
+        raise ValueError('Coupled relation fusion requires all peers and no count normalization')
     if peers not in ('all', 'keep1', 'shrink1'):
         raise ValueError('Invalid coupled peer selection')
     if peers != 'all' and env['stage2JointPush'].get('goal_mode') != 'individual':
