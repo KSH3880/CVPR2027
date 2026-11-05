@@ -86,6 +86,16 @@ def validate_env(env, evaluation=False):
                 or any(type(value) not in (int,float) for value in goal_distance) or before!=limited):
             raise ValueError('BEFORE goal distances require source5 and [1.0, 5.0]')
     if 'waiting_penalty' in env['before']:
+        if isinstance(penalty, dict) and 'target_velocity' in penalty:
+            from env.tasks.multi_agent.before_target_velocity import validate_target_velocity
+            target = penalty.pop('target_velocity')
+            validate_target_velocity(target)
+            if 'ontop' in target and target['ontop']['goal_buffer'] != env['relationReward']['progress']['bbox_buffers']['ON_TOP']:
+                raise ValueError('waiting penalty ON_TOP goal buffer must match progress')
+            if 'soft_entry_width' in penalty or env['relationGraph'].get('human_relation_fusion') != 'before_zerobg':
+                raise ValueError('waiting penalty target_velocity requires hard relfusion base')
+            if any(env['relationReward']['progress']['bbox_buffers'][k] != target['goal_buffer'] for k in ('SIT', 'CLIMB')):
+                raise ValueError('waiting penalty target_velocity goal buffer must match SIT/CLIMB progress')
         if (not isinstance(penalty,dict) or set(penalty) not in ({'radius_buffer','coefficient'}, {'radius_buffer','coefficient','soft_entry_width'})
                 or any(type(v) not in (int,float) or not math.isfinite(v) or v<=0 for v in penalty.values())
                 or any(k in env['before'] for k in ('waiting_termination','approach_timeout','continuous_progress','wait_clear'))

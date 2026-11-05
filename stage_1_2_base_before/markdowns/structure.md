@@ -86,3 +86,13 @@
 - 가져온 relfusion_zerobg 설정: `tokenhsi/data/cfg/imported/relfusion_zerobg/`의 env/train YAML·실제train_used·saved_run·transfer_report·manifest. 설정 원본 보관본. 실행용 fusion 구현과 wrapper는 [relfusion 명세](reference/before_relfusion_zerobg.md)를 따른다.
 
 - BEFORE relation fusion: `learning/multi_agent/before_relation_fusion.py`, `human_coordination.py`, `stage2_push_network.py`. 원본 동작 이식 및 기존 attention-order 진단 유지.
+
+- relfusion 목표 속도 L2 대기벌점: `before_target_velocity.py`의 순수 계산 + `before_wait.py`의 SIT/CLIMB 분기. [명세](reference/before_target_velocity.md).
+
+- 속도 상한 실험 `_relfusion_zerobg_speed_cap`: 동일 helper의 speed-cap 분기. [명세](reference/before_speed_cap.md).
+
+- 제곱 속도오차 + 3m 감속: `_velocity_l2_squared`, [명세](reference/before_velocity_squared.md).
+
+- 먼거리 접근 하한/추종 혼합: `_velocity_l2_squared_floorblend`, [명세](reference/before_velocity_floorblend.md).
+
+- `*_velocity_l2_squared_floorblend_speed08`: floorblend 비교 설정. 속도 기준0.8m/s, tau3.75로 감속거리3m 유지. 기존 구현·전용 train/test/VNC/eval wrapper 사용.

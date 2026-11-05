@@ -181,3 +181,19 @@ TOKENHSI_GPU=5 PORT=6088 ATTENTION_MAP=1 ATTENTION_PORT=6089 TASK_GRAPH=before_s
 - `_wait_penalty_v2_soft_entry1m`: 기존 경계 바깥1m에서부터 속도 벌점을 부드럽게 켠다. [수식·latch·변경 범위](reference/before_soft_wait_entry.md).
 
 - `_wait_penalty_v2_relfusion_zerobg`: 로컬 fusion 구현·전용 train/test/vnc/eval 사용 가능. [모델·보상·checkpoint 안내](reference/before_relfusion_zerobg.md). 기존 soft-entry 모델과 별도이며 soft entry를 포함하지 않는다.
+
+## relfusion velocity-L2 실험
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_velocity_l2`은 원본 relfusion 네트워크와 기존 progress/state/success를 유지하며 SIT/CLIMB 및 최초 HOLDING 성공 후 ON_TOP의 이동벌점을 변경한다. [명세](reference/before_target_velocity.md). 기본 학습 초기화는 기존 relfusion과 같은 Stage1 PUSH26k 전이이며 relfusion3500 자동 resume가 아니다. 기존 checkpoint는 옛 보상 계약을 포함하므로 새 이름 wrapper만 바꿔 실행하면 새 보상을 검증한 것이 아니다. 새 설정의 학습 checkpoint를 사용한다.
+
+## 속도 상한 설정
+
+`_relfusion_zerobg_speed_cap`은 방향을 추종하지 않고 실제 수평속력이 거리별 상한을 넘은 양만 벌준다. 선행 최초 성공 후 완전히 해제한다. [명세](reference/before_speed_cap.md). 사용자 요청으로 학습은 아직 실행하지 않았다. 이전 속도추종 checkpoint와 보상 계약은 다르다.
+
+## 제곱 속도오차
+
+`_relfusion_zerobg_velocity_l2_squared`는 계수1의 제곱XY오차 및3m 감속을 사용한다. 선행 완료 후OFF, ON_TOP 최초집기 활성 유지. [명세](reference/before_velocity_squared.md). 기존 checkpoint resume가 아닌 새 Stage1 PUSH26k 전이 학습으로 실행했다.
+
+## 접근 하한 혼합
+
+`_velocity_l2_squared_floorblend`는 경계4m밖 접근속도 하한0.5, 4→3m smoothstep 혼합, 마지막3m 제곱오차 추종 감속이다. 선행 완료OFF·ON_TOP 집기 후 활성 유지. [명세](reference/before_velocity_floorblend.md).

@@ -2,6 +2,91 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-05
+
+### floorblend 속도 기준0.8m/s 비교 학습 GPU6
+
+- 사용자 요청으로 `_floorblend_speed08` 독립 env/train 및 train/test/VNC/eval 진입점 등록. max_speed0.5→0.8, tau6→3.75로 감속거리3m 유지. 혼합폭1m·제곱오차·선행완료 후 OFF·ON_TOP 첫 집기 후 활성 조건 유지.
+- GPU6 기존 MPS2946883에 연결, learner228707/launcher228614. 4명×1024환경×8물체, seed42, Stage1 PUSH26k에서 새 전이 학습. 기존 GPU2 학습65643 및 GPU6 기존2085005 보존.
+- 관련 CPU27개 통과, 새 설정의 SIT/CLIMB/ON_TOP 속도·release/집기 전 벌점 확인. 실제 saved config와 source_epoch26000, TensorBoard scalar 및 학습 반복 진행 확인. 실행 메타데이터는 `output/*_floorblend_speed08/launch.json`.
+
+### Stage1 26k 단독 SIT·CLIMB·ON_TOP 속도 진단
+
+- BEFORE 없는 stage1_single을 스킬별512환경×30초/seed0로 GPU2에서 수집. 세 실행 rc0, 기존 학습 유지. native XY속도와 실제 HOLDING own_success를 기록.
+- 접근 구간 속력 중앙값 SIT1.104, CLIMB1.248, ON_TOP 집기 전1.319/운반 root1.141/payload1.132m/s. 위치차0.2초 교차확인 중앙값 차이<0.01m/s.
+- 프레임 선정·분포·한계 및 재현 스크립트: `output_etc/check/stage1_26000_skill_speed/REPORT.md`. 보상·학습 설정 변경 없음.
+
+### 원본 relfusion3500 이동 속도 재분석
+
+- 기존512환경×3시드×40초 평가 trace를 재사용. 0.2초 XY위치차, 초기0.5초/낙상 제외, goal거리>1m·goal방향속도>0.1 접근프레임 분석. ON_TOP은 실제HOLDING이 없는 동행이동 proxy로 명시.
+- 수평 중앙값 SIT0.780/CLIMB0.811/ON_TOP root0.961/payload0.923m/s, radial0.569/0.644/0.653/0.614. 경계4m밖 radial중앙값은0.35–0.39로 낮아 하한0.5가 항상 느슨하지 않음을 확인. gate별 분리·최적속도/인과 주장 아님.
+- 보고서/그림 `output_etc/check/original_relfusion_speed_analysis/`. GPU 추가 실행 및 학습 설정 변경 없음.
+
+### 현재 floorblend와 원본 relfusion TensorBoard 비교
+
+- 사용자 요청으로6021에 원본 ksh hard wait relfusion과 현재 floorblend 제곱추종 학습을 함께 표시. 원본 읽기 전용, 기존6020/학습/MPS 유지. PID112494, 10초 reload.
+- API200, 두 run 각각284 scalar tags 로딩 확인(원본12071epoch/현재132epoch 조회 시점). 대용량 원본251MB 초기 로딩 후 확인. 실행·검증 기록 `output_etc/check/tensorboard_floorblend_vs_original/`. 보상 정의가 다르므로 total reward 직접 성능비교는 주의.
+
+### 접근 하한→제곱 추종 smoothstep 혼합 GPU2 학습
+
+- 사용자 합의에 따라 `_velocity_l2_squared_floorblend` 생성. 경계4m밖에서는 goal방향 접근속도0.5 하한만, 4→3m smoothstep 가중 혼합, 마지막3m 기존0.5→0 감속 제곱추종. k1, 선행 최초 성공OFF·ON_TOP 최초HOLDING latch 유지. 모델/progress/state/success 동일.
+- CPU119 passed(방향투영 하한, 0/0.5/1 혼합, 4m/3m 연속성, 3skill활성·해제, legacy회귀), diff/shell검증 통과. 기존43613을 MPS terminate_client3343262 result0으로 종료.
+- GPU2 learner65643/launcher65559, 4명1024환경8객체seed42, Stage1 PUSH26k fresh transfer로 시작. 저장config 모든옵션 확인, 첫4iteration 진행. 기록 `output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_velocity_l2_squared_floorblend/launch.json`, train.log. 다른 MPS clients 보존.
+
+### 제곱 속도 오차 + 3m 감속 GPU2 학습
+
+- 사용자 요청으로 별도 `_velocity_l2_squared` 등록. −k sum((vXY−vTarget)^2), k1 유지. 추가 요청에 따라 deceleration_time6s/max_speed0.5로 마지막3m 감속. 선행 완료OFF·ON_TOP 최초집기 활성 유지. 기존21706을 MPS terminate_client3343262 result0으로 종료 후 새 Stage1 PUSH26k 전이 학습.
+- CPU102 passed, diff 검증. GPU2 learner43613/launcher43515, 4명1024환경8객체seed42. 저장 config의 squared/6s/0.5/after_release=disable 검증, 첫5iteration 확인. 기록 `output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_velocity_l2_squared/launch.json`, train.log. 모델구조와 기존 progress/state/success 유지.
+
+### 사용자 정정: 속도 상한 종료, 목표 속도 L2 추종 학습
+
+- 사용자 ‘상한 말고 속도 추정’ 정정에 따라 speed-cap14573을 MPS terminate_client(3343262, return0)로 종료. 목표 속도와 실제 XY속도 L2 추종으로 새 전이 학습 시작. 선행 최초 성공 후 규제OFF, ON_TOP 최초HOLDING 활성 유지.
+- GPU2 learner21706/launcher21541, 4명1024환경8객체seed42, Stage1 PUSH26k fresh transfer. 저장 config에서 sit_climb_l2_v1/after_release=disable/first_holding_success 확인, 첫3iteration 정상 진행. 로그 `output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_velocity_l2/tracking_releaseoff_20261105_141913/train.log`, 실행 metadata launch.json. 이전 로그 보존.
+
+### 속도 상한 본학습 GPU2 시작
+
+- 사용자 명시 선택에 따라 `_relfusion_zerobg_speed_cap` 본학습 시작. 4명/1024환경/8객체/seed42, Stage1 PUSH26k fresh transfer. learner14573, launcher14467, MPS3343262. 첫6iteration 확인.
+- 저장 config에서 speed_cap 모드, after_release=disable, ON_TOP first_holding_success 검증. CPU92에 더해 GPU2 4환경8step 물리 검증 통과(3 SIT/CLIMB+5 ON_TOP, latch 주입/완료해제/합산/finite). 이전 학습은 모두 종료 상태이며 다른 프로세스 종료 없음.
+- 실행 기록 `output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_speed_cap/launch.json`, train.log. run `Stage2BeforePushNear50Pair50Source5VirtualGoal5GoalRouteWaitPenaltyV2RelFusionZeroBgSpeedCap_05-14-16-25`.
+
+### 선행 완료 후 규제 해제 및 속도 상한 방식으로 전환 — 학습 미실행
+
+- 사용자 요청으로 after_release=disable 추가: 최초 선행 성공 후 거리/속력과 무관하게 비용0, 재닫힘에도 해제 유지. 이전 저장 config(옵션 없음)의 완료 후 추종 동작은 보존. CPU76 passed.
+- 사용자 재시작 승인에 따라 기존4122617을 MPS종료하고 releaseoff 중간 학습4168774를 잠시 시작했으나, 후속 속도상한 요청으로 MPS종료(result0). 이어진 ‘학습 바로 올리지 말라’ 요청에 따라 새 학습은 실행하지 않음. 두 PID종료와 server3343262 client없음 확인. 이전 로그 보존.
+- 별도 `_relfusion_zerobg_speed_cap` 등록. 방향 없는 비용 −k max(norm(vXY)−cap(d),0), cap=clip((d−R)/2,0,0.5), R=반대각선+3m. 정지/저속에는0, 접근은 progress 담당. SIT/CLIMB root, ON_TOP 최초HOLDING 후 payload 기준, 선행 완료 후 완전해제.
+- CPU92 passed(방향독립/상한이하0/초과선형/집기활성/완료해제/기존회귀). diff 및 shell syntax 통과. 로그 `output_etc/check/relfusion_speed_cap/cpu.log`, [명세](markdowns/reference/before_speed_cap.md). speed-cap GPU/학습 성능은 아직 검증하지 않음.
+
+### velocity-L2 + ON_TOP 본학습 GPU2 시작
+
+- 사용자 요청으로 GPU2 기존 MPS(server3343262)에 `_relfusion_zerobg_velocity_l2` 본학습 실행. learner4122617, launcher4122496. 기존 soft-entry client1582212 유지. 4명/1024환경/8객체/seed42, Stage1 PUSH26k 새 전이, 첫3iteration 진행 확인.
+- 저장 설정에서 before_zerobg와 ON_TOP first_holding_success 활성, 환경1024 확인. run `Stage2BeforePushNear50Pair50Source5VirtualGoal5GoalRouteWaitPenaltyV2RelFusionZeroBgVelocityL2_05-13-44-45`. `output/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_velocity_l2/launch.json`에 PID/MPS/설정hash 보존, train.log 기록. 기존 학습 및 MPS 중단 없음.
+
+### velocity-L2 ON_TOP 최초 HOLDING 활성화
+
+- 사용자 요청으로 `_velocity_l2`에 ON_TOP 확장. actor+payload가 일치하는 HOLDING edge의 최초 raw 성공을 latch하고, 성공 전에는 기존 hard 벌점을 포함해 속도비용0. ON_TOP의 거리와 속도 모두 운반 박스 XY 기준이며 최초 성공 후 놓쳐도 활성 유지, 부분 리셋은 해당 환경만 해제한다.
+- 선행 완료 전 goal 대기반경, 완료 후 실제 support와 ON_TOP buffer0.1m를 사용하며 도착 근처 fade. SIT/CLIMB는 유지. ontop 옵션 없는 이전 설정의 legacy 동작은 유지한다. 최초 HOLDING 전환은 이산적이며 재집기 중에도 latch 비용이 남을 수 있음을 명세에 기록.
+- CPU72 passed: 집기 전0, 다른 HOLDING/AT는 미활성, 정확한 actor/payload 매칭, 박스 속도 사용, hold 상실 latch, placement fade, 부분reset, 기존회귀. GPU2 MPS4환경×8step 정상 종료(3 SIT/CLIMB+5 ON_TOP); 박스속도 비용·reward sum·finite 통과. GPU 활성 후 분기는 latch 주입으로 확인했고 실제 HOLDING 활성 논리는 CPU검증; 학습 성능 검증은 아님.
+- 로그 `output_etc/check/relfusion_velocity_l2_ontop/`. 본학습/view 미실행, ksh 및 기존 프로세스 변경 없음.
+
+### relfusion 기반 목표 수평속도 L2 벌점
+
+- 별도 `_relfusion_zerobg_velocity_l2` env/train/test/vnc/eval 등록. 원본 relfusion 모델과 progress/state/success는 유지하고 SIT/CLIMB 벌점만 −k‖vXY−vTarget‖로 교체. k1, vmax0.5m/s, 감속시간2s(마지막1m), 대기반경 박스반대각선+3m.
+- 선행 최초 성공 전 goal 경계 접근/정지, 성공 후 실제 support box 접근. 박스 접근반경(반대각선+0.3m) 바깥1m에서 비용을0으로 fade해 최종 스킬 동작에 간섭을 줄인다. release latch와 ON_TOP 기존 XYZ속력 벌점 유지. gate 전환 연속성과 안쪽 침범 방지는 이 버전에서 보장하지 않는다.
+- 설정·checkpoint 계약 분리, `before_target_velocity.py` 순수 계산 및 BeforeWait 선택 분기. 기본 학습 초기화는 기존 Stage1 PUSH26k; relfusion3500 warmstart를 실행한 것이 아니다. 학습/view 미실행, ksh 및 기존 프로세스 변경 없음.
+- CPU67 passed(접근/정지/원주운동, 실제박스 재출발, fade, latch/reset, 회전불변, ON_TOP 동일성, 기존hard/soft/fusion회귀). GPU2 MPS 4환경×8step 정상 종료, SIT/CLIMB3쌍+ON_TOP5쌍 실제 포함, finite/reward sum/비용 일치/partial reset 통과. `output_etc/check/relfusion_velocity_l2/`, [명세](markdowns/reference/before_target_velocity.md).
+
+### Hard wait + relfusion3500 경계 밖 정지 진단
+
+- viewer3921246 정상 창닫기 종료 후 GPU2 headless512환경×1200step, seed0에서 BEFORE580쌍 기록. 초기 밖227쌍 중157쌍에 진입 전1초정지 관측; 초기 밖에서 진입 후 재이탈 정지는0건. SIT27/73, CLIMB60/80, ON_TOP70/74. ON_TOP 거리는 payload 기준이므로 별도 해석.
+- 낙상·선행 완료 후 프레임 제외, 정지 root속력<0.1m/s. 진입 전 대기벌점은0. 미래 벌점 회피 가설과 부합하지만 인과 확정 아님. 초기 rigid-body stale 좌표는 initial.pt로 보정. 코드·보상 변경 없음.
+- 기록: `output_etc/check/wait_boundary_diagnosis_20261105/REPORT.md`, `diagnosis.png`, `boundary_trace.npz`, `summary.json`.
+
+### Soft-entry1m 6000과 원본 hard wait penalty 6000 비교
+
+- viewer3696059는 WM_DELETE_WINDOW로 정상 종료 확인. 초기 relfusion3500 대상 오해를 사용자 정정에 따라 soft6000으로 바로잡았다. ksh는 원본6000 복사에만 읽기 접근했다.
+- GPU2, 동일512환경×3평가시드×1200step, 원본/soft 모두 정상 종료. BEFORE region simultaneous ever 평균: 원본32.13±1.19%, soft28.20±1.16%, -3.93%p. SIT -17.21%p, CLIMB +0.93%p, ON_TOP -1.22%p. ±는 평가 시드 표준편차이며 학습시드 반복 아님.
+- 시드별 task packet/box sizes/goals/predecessor/groups 모두 일치. 기록: `output_etc/check/compare_wait_soft6000_20261105/REPORT.md`, checkpoint 출처·hash는 launch.json. 대기 순서 준수 평가와는 구분한다.
+
 ## 2026-11-04
 
 ### relfusion_zerobg base 설정 로컬 복사
