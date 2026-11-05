@@ -82,6 +82,8 @@ def load_cfg(args):
     with open(args.cfg_train) as stream:
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
+    if getattr(args, 'disable_before_wait_termination', False) and not is_eval:
+        raise ValueError('--disable_before_wait_termination is only available for inference')
     cfg, source_path = load_environment(name, args.cfg_env, args.checkpoint,
                                          saved=is_eval or args.resume > 0)
     from utils.experiments import experiment_horizon
@@ -146,6 +148,17 @@ def load_cfg(args):
     pickup_carry_mode = getattr(args, 'before_pickup_carry_rsi', 'loco')
     if pickup_carry_mode != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('follower_pickup_carry_rsi')):
         raise ValueError('--before_pickup_carry_rsi requires the follower pickup/carry RSI evaluation config')
+    goal_distance = getattr(args, 'before_at_goal_distance', None)
+    follower_distance = getattr(args, 'before_follower_goal_distance', None)
+    if goal_distance is not None or follower_distance is not None:
+        from utils.before_goal_sampling import DISTANCE_MIXTURE
+        if (not is_eval or cfg['env'].get('before', {}).get('distance_mixture') != DISTANCE_MIXTURE
+                or cfg['env']['eval']['skill'] != ['loco']):
+            raise ValueError('BEFORE goal distance overrides require goalroute BEFORE loco inference')
+        for name, value in (('before_at_goal_distance', goal_distance),
+                            ('before_follower_goal_distance', follower_distance)):
+            if value is not None and (not np.isfinite(value) or value <= 0):
+                raise ValueError('--'+name+' must be finite and positive')
     before_short = getattr(args, "before_follower_short", False)
     if getattr(args, "before_follower_near", False) or before_short:
         if not args.eval or 'before' not in cfg['env']:
@@ -215,6 +228,12 @@ def load_cfg(args):
           f"agents={cfg['env']['numAgents']} envs={cfg['env']['numEnvs']} objects={cfg['env']['numObjects']} "
           f"headless={args.headless} checkpoint={args.checkpoint}")
     print(f"[run] follower_rsi={args.before_pickup_carry_rsi if is_eval else 'training config'} output={args.output_path}")
+    if getattr(args, 'disable_before_wait_termination', False):
+        print('[run] BEFORE waiting termination disabled for inference; fall/time limits unchanged')
+    if goal_distance is not None:
+        print(f'[run] BEFORE leader box-to-goal XY distance={goal_distance}m (inference only)')
+    if follower_distance is not None:
+        print(f'[run] BEFORE goal-to-follower human XY distance={follower_distance}m (manual placement replaces near50)')
     return (cfg, cfg_train, logdir)
 
 
@@ -360,7 +379,13 @@ def get_args():
          "help": "BEFORE ON_TOP follower RSI evaluation mode"},
         {"name": "--before_follower_short", "action": "store_true", "default": False,
          "help": "Three-mode BEFORE evaluation: force the saved config's shortest distance mode"},
+        {"name": "--before_at_goal_distance", "type": float, "default": None,
+         "help": "Goalroute BEFORE inference: fixed leader box-to-AT-goal XY distance in meters"},
+        {"name": "--before_follower_goal_distance", "type": float, "default": None,
+         "help": "Goalroute BEFORE inference: fixed AT-goal-to-follower human XY distance in meters"},
         {"name": "--eval_protocol", "type": str, "choices": ["", "general", "stage1_single"], "default": ""},
+        {"name": "--disable_before_wait_termination", "action": "store_true", "default": False,
+         "help": "Disable only BEFORE waiting termination during inference"},
         {"name": "--eval_single_task", "type": str, "default": ""},
         {
             "name": "--eval_repeats",

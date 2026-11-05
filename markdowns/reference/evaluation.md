@@ -50,6 +50,8 @@ BEFORE는 점·영역 각각 다음 세 지표를 저장한다.
 
 둘 다/동시 성공의 분모는 **실제로 선행 관계가 있는 follower**만이다. solo/leader에는 해당 없음이다. follower 개인 성공도 같은 pair 분모로 별도 저장한다. 선행자가 낙상 전 얻은 ever는 둘 다 ever에 남지만 낙상 후 상태로 새로운 동시 성공을 얻지는 않는다. 엄격한 ‘A 이후에만 B’ 시간 순서를 강제하는 지표는 추가하지 않았다.
 
+BEFORE 후행 결과를 보고할 때는 **같은 쌍·후행 행동·거리 부분집합·분모의 선행 AT 개인 Ever**를 항상 함께 표시한다. 전체·근거리·행동별·checkpoint 추세 모두에 적용한다. 같은 표본에서 `후행 동시 Ever ≤ 선행 AT 개인 Ever`이므로 후행 동시 성공률의 상한을 확인할 수 있다. 후행 개인 Ever에는 이 상한을 적용하지 않으며, 행동별 선행 AT를 전체 선행 AT 평균으로 대체하지 않는다.
+
 ## 통계·산출물·실행
 
 각 행동의 seed별 성공률3개의 **평균 ± 표본 표준편차(ddof=1)**를 %/%p로 보고한다. macro는 각 seed에서 네 행동 성공률을 먼저 평균낸 뒤 세 seed 평균/표준편차를 계산한다. 일반 평가의 전체 시도 수로 가중한 평균과 구분한다. solo/leader가 포함된 전체 개인 성공률과 follower 전용 pair 성공률도 분모를 명시한다.
@@ -66,3 +68,12 @@ BEFORE는 점·영역 각각 다음 세 지표를 저장한다.
 현재 전 실험의 학습·정식 평가·viewer 기본은Stage1 900step/Stage2 1200step이다. 이전1200step 결과는 당시 조건의 과거 결과로 보존한다. 기본 Stage1 단독은4행동, `stage1_push` 단독은5행동으로 각각512환경×3seed를 실행한다. PUSH 검사점은 payload 중심, 목표점은 reset 때 지정한 AT 목표이며 점/영역 모두3D거리20cm로 동일하다. 평가에 CONTACT·손 힘·유지시간을 추가하지 않는다. PUSH 크기는 학습167종이며 AT9종 override와 섞지 않는다.
 
 Stage1 PUSH 일반 평가는 checkpoint 저장 분포·2명·4물체·배치를 복원한다. 새 scratch는 AT25/ON_TOP20/SIT10/CLIMB15/PUSH30%, 제공21k finetune은 PUSH50%다. 결과의 `macro4`는 기존네행동, `macro5`는 PUSH포함5행동이고 `macro`는 해당 모델의 전체 과제 평균이다. 점/영역 각각 seed별 macro를 먼저 만든 뒤 평균/표본std를 계산한다.
+
+
+## 대기 페널티 평가의 정지 거리 진단
+
+penalty_v2·fusion v1/v2의 성공률을 평가할 때 같은 고정 checkpoint로 정지 거리 진단도 함께 실행한다. 기본 규모는64환경·seed0·4명·8토큰·최대1200step이며, 사용자 지정 규모/GPU를 우선한다. 학습 random_scenario/near50 배치를 유지하고 일반 장면 낙상 종료를 사용하는 별도 진단이므로 개인 낙상 freeze를 쓰는 정식 성공률과 합산하지 않는다.
+
+선행 AT가 아직 성공하지 않았고 페널티가 활성화된 동안 root XYZ 속력≤0.3m/s가30step 연속 유지된 첫 확인 시점의 목표까지 XY 거리를 집계한다. 행동별 중앙값·정지 건수·활성화 미해제 상태를1초 이상 관찰한 분모를 보고한다. ON_TOP은 사람/payload 거리를 따로 기록하고, 기존payload 진입과fusion_v2의human 진입을 구분한다. 이0.3m/s·1초는 진단 기준이며 학습 페널티에 유예나 속력 임계값을 추가하지 않는다. 정지 root만으로 손발까지 완전히 정지했거나 집기 완료 후 대기했다고 해석하지 않는다.
+
+최신 재사용 진입점과 runtime 진입/해제 검사는 [진단 실행](../../output_etc/check/latest_three_stop64_20261104/run.py)·[진단 기록](../../output_etc/check/latest_three_stop64_20261104/probe.py)에 있다. 모든 산출물은 `output_etc/check/`에 둔다.

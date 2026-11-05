@@ -19,7 +19,9 @@ def configure(args, cfg, name):
         raise ValueError('Formal evaluation reads training settings; scene overrides are forbidden')
     if args.eval_repeats != 1 or args.seed not in (0, 1, 2):
         raise ValueError('Formal evaluation: one first episode, independent seed 0/1/2')
-    if args.before_follower_near or args.before_follower_short or args.before_pickup_carry_rsi != 'loco' or args.task_role_swap:
+    if (args.before_follower_near or args.before_follower_short or args.before_pickup_carry_rsi != 'loco'
+            or args.task_role_swap or getattr(args, 'before_at_goal_distance', None) is not None
+            or getattr(args, 'before_follower_goal_distance', None) is not None):
         raise ValueError('Viewer overrides are forbidden in formal evaluation')
     if args.eval_skills not in ('', 'loco') or args.eval_skill_probs not in ('', '1.0'):
         raise ValueError('Formal evaluation requires loco')

@@ -115,6 +115,12 @@ class EdgeContextTaskMixin:
                 self._box_vel_pen_thre,
             )
         reward = result["agent_task_reward"] + power + collision + speed
+        waiting = None
+        if self.cfg['env'].get('before', {}).get('waiting_penalty') is not None:
+            waiting = self._before_wait.penalty(self._rigid_body_pos[..., 0, :],
+                self._humanoid_root_states[..., 7:10], self._logical_box_values(self._box_states),
+                self._logical_box_values(self._box_size), self._tar_pos, result['raw_own_success'])
+            reward = reward - waiting
         components = [
             owner_sum(result[k], graph)
             for k in ("state_component", "progress_component", "success_component")
@@ -129,7 +135,8 @@ class EdgeContextTaskMixin:
                 + sharing["teammate"] * (c / count).flip(-1)
                 for c in components
             ]
-        terms = torch.stack(components + [power, collision, speed, reward], -1).flatten(
+        terms = torch.stack(components + [power, collision, speed]
+            + ([] if waiting is None else [-waiting]) + [reward], -1).flatten(
             0, 1
         )
         self.rew_buf.copy_(reward.flatten())

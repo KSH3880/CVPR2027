@@ -110,7 +110,63 @@ def test_near_metric_includes_leader_transport_and_ontop_pickup():
     assert torch.equal(second, torch.tensor([2., 3.]))
 
 
-def test_static_screen_excludes_objects_that_will_be_placed_later():
+@pytest.mark.parametrize('distance', [None, 2.5, 7., 10.])
+@pytest.mark.parametrize('follower_distance', [None, .5, 4., 12.])
+@pytest.mark.parametrize('family', [1, 2])
+def test_viewer_goal_distance_preserves_leader_physics_and_other_goals(distance, follower_distance, family):
+    from env.tasks.multi_agent.before_goal_sampling import apply_layout, invalid
+    torch.manual_seed(77)
+    roots = torch.rand(2, 4, 13)
+    boxes = torch.rand(2, 4, 13)
+    goals = torch.rand(2, 4, 3)+torch.tensor([3., 4., 0.])
+    mapping = torch.tensor([3, 1, 0, 2])
+    goal_mapping = torch.tensor([2, 0, 1, 3])
+    task = SimpleNamespace(cfg={'args': SimpleNamespace(before_at_goal_distance=distance,
+                                                     before_follower_goal_distance=follower_distance)},
+        _before_predecessor=torch.tensor([[2, -1, -1, 1], [2, -1, -1, 1]]),
+        _before_near_pairs=torch.zeros(2, 4, dtype=torch.bool),
+        _templates=torch.tensor([[family, 3, 3, 4], [family, 3, 3, 4]]),
+        _humanoid_root_states=roots, _box_states=boxes, _tar_pos=goals,
+        _kinematic_humanoid_rigid_body_states=roots[:, :, None].clone(),
+        _scenario_physical_object=lambda env, owner: mapping[owner],
+        _scenario_goal=lambda env, owner: goal_mapping[owner])
+    old_roots, old_boxes, old_goals = [x.clone() for x in (roots, boxes, goals)]
+    baseline = deepcopy(task)
+    baseline.cfg['args'].before_follower_goal_distance = None
+    rng = torch.get_rng_state()
+    apply_layout(baseline, torch.tensor([0]))
+    torch.set_rng_state(rng)
+    apply_layout(task, torch.tensor([0]))
+    source = boxes[0, [0, 1], :2]
+    old_delta = old_goals[0, [1, 0], :2]-source
+    expected = old_goals[0, [1, 0], :2] if distance is None else source+distance*old_delta/old_delta.norm(dim=-1, keepdim=True)
+    torch.testing.assert_close(goals[0, [1, 0], :2], expected)
+    assert torch.equal(goals[..., 2], old_goals[..., 2])
+    assert torch.equal(goals[0, 2:], old_goals[0, 2:])
+    assert torch.equal(goals[1], old_goals[1])
+    assert torch.equal(roots[0, [1, 2]], old_roots[0, [1, 2]])
+    assert torch.equal(roots[..., 2:], old_roots[..., 2:])
+    assert torch.equal(roots[1], old_roots[1])
+    assert torch.equal(boxes[0, [0, 1, 3]], old_boxes[0, [0, 1, 3]])
+    assert torch.equal(boxes[..., 2:], old_boxes[..., 2:])
+    assert torch.equal(boxes[1], old_boxes[1])
+    if follower_distance is None:
+        assert torch.equal(roots, baseline._humanoid_root_states)
+        assert torch.equal(boxes, baseline._box_states)
+        assert 1.-1e-5 <= float((roots[0, 0, :2]-goals[0, 1, :2]).norm()) <= 10.+1e-5
+        assert 1.-1e-5 <= float((boxes[0, 2, :2]-goals[0, 0, :2]).norm()) <= 5.+1e-5
+    else:
+        actual = (roots[0, [0, 3], :2]-goals[0, [1, 0], :2]).norm(dim=-1)
+        torch.testing.assert_close(actual, torch.full_like(actual, follower_distance), rtol=0, atol=5e-6)
+        torch.testing.assert_close(roots[0, 3, :2]-boxes[0, 2, :2],
+            baseline._humanoid_root_states[0, 3, :2]-baseline._box_states[0, 2, :2])
+        task._before_near_pairs[:] = True
+        assert not invalid(task, torch.tensor([0])).any()
+    assert 1.-1e-5 <= float((roots[0, 3, :2]-boxes[0, 2, :2]).norm()) <= 5.+1e-5
+
+
+@pytest.mark.parametrize('follower_distance', [None, 4.])
+def test_static_screen_excludes_objects_that_will_be_placed_later(follower_distance):
     from env.tasks.multi_agent.before_goal_sampling import static_infeasible
     boxes = torch.zeros(1, 5, 13)
     boxes[..., 6] = 1.
@@ -120,7 +176,8 @@ def test_static_screen_excludes_objects_that_will_be_placed_later():
     bodies = torch.zeros(1, 1, 1, 13)
     bodies[..., 0] = 20.
     bodies[..., 2] = .5
-    task = SimpleNamespace(num_agents=1, num_objects=2, num_physical_objects=5,
+    task = SimpleNamespace(cfg={'args': SimpleNamespace(before_follower_goal_distance=follower_distance)},
+        num_agents=1, num_objects=2, num_physical_objects=5,
         _box_states=boxes, _box_size=torch.ones(1, 5, 3), _templates=torch.tensor([[3]]),
         _before_predecessor=torch.tensor([[-1]]), _before_near_pairs=torch.tensor([[False]]),
         _task_token_count=torch.tensor([1]), _logical_box_order=torch.tensor([[0,4]]),

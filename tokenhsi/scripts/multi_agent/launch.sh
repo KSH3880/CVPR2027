@@ -7,7 +7,7 @@ MODE=$2
 shift 2
 case "$EXPERIMENT" in
   stage2_coupled_push|stage2_coupled_push_goal5|stage2_coupled_push_individual_goal|stage2_coupled_push_individual_goal_solo5) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
-  stage2_before_push|stage2_before_push_near50|stage2_before_push_near50_pair50_source5|stage2_before_push_near50_pair50_source5_virtual|stage2_before_push_near50_pair50_source5_virtual_asym|stage2_before_push_near50_pair50_source5_goal5|stage2_before_push_near50_pair50_source5_virtual_goal5|stage2_before_push_near50_pair50_source5_virtual_asym_goal5|stage2_before_push_near50_pair50_source5_goal5_goalroute|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute|stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
+  stage2_before_push|stage2_before_push_near50|stage2_before_push_near50_pair50_source5|stage2_before_push_near50_pair50_source5_virtual|stage2_before_push_near50_pair50_source5_virtual_asym|stage2_before_push_near50_pair50_source5_goal5|stage2_before_push_near50_pair50_source5_virtual_goal5|stage2_before_push_near50_pair50_source5_virtual_asym_goal5|stage2_before_push_near50_pair50_source5_goal5_goalroute|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg|stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2|stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage1_push) TASK=HumanoidMAPush; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage1) TASK=HumanoidMACarry; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage2_before_nonemask_rsi433_near50|stage2_before|stage2_before_rsi433)
@@ -47,7 +47,18 @@ elif [ "$MODE" = eval ]; then
     --eval_skills "${EVAL_SKILLS:-loco}" --eval_skill_probs "${EVAL_SKILL_PROBS:-1.0}" --test --eval
   if [ "${HEADLESS:-0}" != 0 ]; then set -- "$@" --headless; fi
   if [ "${TASK_ROLE_SWAP:-0}" = 1 ]; then set -- "$@" --task_role_swap; fi
+  case "${BEFORE_WAIT_TERMINATION:-1}" in
+    0) set -- "$@" --disable_before_wait_termination ;;
+    1) ;;
+    *) echo 'BEFORE_WAIT_TERMINATION must be 0 or 1.' >&2; exit 1 ;;
+  esac
   set -- "$@" --episode_length "${EPISODE_LENGTH:-$HORIZON}"
+  if [ -n "${BEFORE_AT_GOAL_DISTANCE:-}" ]; then
+    set -- "$@" --before_at_goal_distance "$BEFORE_AT_GOAL_DISTANCE"
+  fi
+  if [ -n "${BEFORE_FOLLOWER_GOAL_DISTANCE:-}" ]; then
+    set -- "$@" --before_follower_goal_distance "$BEFORE_FOLLOWER_GOAL_DISTANCE"
+  fi
   if { [ "$TASK" = HumanoidMABefore ] || [ "$TASK" = HumanoidMABeforePush ]; }; then
     set -- "$@" --before_pickup_carry_rsi "${BEFORE_PICKUP_CARRY_RSI:-loco}"
     case "${BEFORE_FOLLOWER_NEAR:-0}" in
@@ -62,7 +73,7 @@ else
   exit 1
 fi
 MOTION=tokenhsi/data/dataset_loco_sit_carry_climb.yaml
-if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_asym ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_goal5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_asym_goal5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_goal5_goalroute ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
+if [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_asym ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_goal5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_asym_goal5 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_goal5_goalroute ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
 python tokenhsi/run.py --task "$TASK" \
   --cfg_train "tokenhsi/data/cfg/train/rlg/$EXPERIMENT.yaml" \
   --cfg_env "${ENV_CONFIG:-}" \

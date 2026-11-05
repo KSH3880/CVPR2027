@@ -123,3 +123,37 @@ near50은 생성된 쌍의 절반에 `D_B < D_A`를 강제한다. `D_A=|A−O|+|
 기존 설정의 배치 함수/RNG 경로는 그대로 두며 새 설정의 난수 소비 순서는 다르다. 새 before 계약과 출력·실행 스크립트를 분리했으므로 기존 goal5 checkpoint로 새 실험을 resume하지 않는다. 기본 전이는 동일한 Stage1 26k다.
 
 신규 goalroute의 reset에서는 AT 목표·후행 배치를 PUSH 후보 검사보다 먼저 확정한다. 이후 고정된 과제 물체와 사람의 충돌을 선검사해 이미 불가능한 장면은 기존 외부 재시도로 넘긴다. 이 선검사는 앞으로 배치할 PUSH 상자·distractor·단독 ON_TOP 받침을 제외하며, 최종 전체 장면 검사는 그대로 수행한다. 따라서 물리 판정을 완화하지 않고 불가능한 장면의 PUSH 순차 fallback 반복을 줄인다.
+
+## Virtual 후행 대기 종료
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait`는 virtual_goal5_goalroute에서 `env.before.waiting_termination`만 추가한다. 기존 실험의 관측·모델·보상·Progress 반경·current_at_success Gate·샘플링·AMP/PPO는 유지한다. 기본 전이는 같은 Stage1 26k이며 새 실험 이름·출력·checkpoint 계약으로 분리한다. 기존 virtual checkpoint를 새 실험으로 resume하지 않는다.
+
+BEFORE 후행 SIT/CLIMB의 사람 root XY, ON_TOP의 payload XY와 선행 AT Goal XY의 거리가 공유/받침 상자 XY 반대각선+`radius_buffer: 0.5` 이하면 대기를 활성화한다. 한 번 활성화하면 반경 밖으로 나가도 유지한다. `grace_seconds: 1.0` 동안 감속을 허용한 뒤 사람 root XY 속도가 `speed_threshold: 0.3`m/s를 초과한 상태가 `moving_seconds: 1.0` 연속되면 후행의 terminate와 장면 전체 reset을 켠다. 속도가 임계값 이하면 연속 이동 카운터만 초기화하며 유예 시간은 다시 주지 않는다. 시간은 제어 dt 기준으로 올림한 스텝 수로 계산한다.
+
+선행 AT의 같은 스텝 `raw_own_success`가 참이면 종료 판정보다 먼저 해당 쌍의 대기 제한을 해제한다. 한 번 해제하면 그 에피소드에서는 다시 켜지지 않는다. 보상의 기존 current_at_success Gate는 계속 현재 성공 여부를 사용하며 낙상 종료도 유지한다. 에피소드/부분 reset은 해당 환경의 대기 상태만 초기화한다. 독립 과제·선행·후행 HOLDING·COUPLED에는 새 종료 조건이 없다.
+
+학습과 일반 test/VNC에서 적용한다. 정식 Plane 평가는 기존 첫 episode·개인 낙상·1200step 규약을 유지하기 위해 이 추가 종료 조건을 적용하지 않는다. root XY 속도만 검사하므로 제자리 점프·회전·팔 동작의 정지를 보장하지 않으며, 반경 진입 후 유예 중 추가 접근도 가능하다.
+
+### wait_v2: 유예 없는 누적 XYZ 이동 종료
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2`는 wait에서 대기 반경을 공유/받침 상자 XY 반대각선+1m로, 사람 root 속력을 XYZ norm으로 바꾼다. SIT/CLIMB는 사람 root XY, ON_TOP은 payload XY로 진입을 판정한다. 유예0초로 진입 첫 스텝부터 0.3m/s 초과 스텝을 누적하며 총1초(제어30Hz에서30스텝)에 후행 terminate·전체 장면 reset을 켠다. 중간 정지나 반경 이탈로 누적 시간을 지우지 않는다. 같은 스텝 선행 AT 성공은 종료보다 우선하며 에피소드 끝까지 해제한다. 부분 reset은 해당 환경만 초기화한다.
+
+이 설정의 단독 AT·BEFORE 선행 AT·PUSH AT는 모두 기존3D 거리20cm 성공 판정을 사용하고 추가1mm 높이 제한을 없앤다. 기존 성공 함수 재사용을 위해 `success.at_z_tolerance: 0.2`로 설정한다. 3D 거리20cm 이내이면 Z 오차도20cm 이내라 이 높이 조건은 추가 제약을 만들지 않는다. 현재 성공 Gate와 대기 해제가 동일한 raw 성공을 참조한다. ON_TOP 자체의1mm 높이 성공 기준은 유지한다. 대기 해제는 누적 성공, State/Success Gate는 현재 성공이라는 차이도 유지한다.
+
+Progress 반경·보상 가중치·Virtual 입력·샘플링·네트워크·AMP/PPO는 wait와 같다. 기본 Stage1 26k 전이이며 기존 wait checkpoint와 resume/추론을 혼용하지 않는다. 학습·일반 test/VNC에 대기 종료를 적용하고 정식 Plane 평가에서는 기존과 같이 대기 종료를 제외한다. XYZ root 속력은 수직 움직임도 포함하지만 팔·회전만의 동작까지 정지를 보장하지는 않는다.
+
+
+## Virtual 대기 속도 페널티
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty`는 virtual_goal5_goalroute에서 `before.waiting_penalty: {radius_buffer: 2.0, coefficient: 0.6}`과 AT 추가 높이 허용값0.2m만 변경한다. 기존3D거리20cm 판정이 적용되므로 추가1mm 높이 제한은 없다. ON_TOP 높이 기준은 유지한다.
+
+선행 AT 성공 전 목표 XY 반경 r_box+2m에 한 번 진입하면 감시를 유지한다. SIT/CLIMB 진입 거리는 사람 root, ON_TOP은 payload 중심 기준이다. 감점 속력은 모두 후행 사람 root XYZ norm이며 임계속도·유예·누적시간 없이 매 제어 step `-0.6 × speed`를 해당 후행의 task 보상에서 차감한다. 반경 밖으로 나가도 감시가 유지되며, 같은 step의 선행 raw AT 성공이 있으면 즉시 영구 해제한다. partial reset은 해당 환경의 기록만 초기화한다.
+
+기존 state/success current gate·progress·HOLDING 항·Virtual 관측·AMP/PPO는 유지한다. 단독/선행 AT/PUSH에는 감점하지 않는다. 새 감점은 `wait_penalty` reward term에 음수로 기록되며 AMP 결합 전에 task 가중치0.5를 함께 적용받는다. 대기 위반 종료는 없고 기존 낙상/시간 종료는 유지한다. 정식평가에서도 감점 계산은 유지하지만 성공 채점 규약은 변경하지 않는다.
+
+
+### fusion_v2: 사람 기준 진입 / 반경 +2.5m
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2`는 기존 fusion을 보존하고 `waiting_penalty.radius_buffer: 2.5`, `ontop_distance_source: human`을 사용한다. coefficient는1.0이다. SIT/CLIMB/ON_TOP 모두 후행 사람 root와 선행 AT 목표의 XY 거리가 받침 상자 XY 반대각선+2.5m 이내이면 대기 페널티를 활성화한다. ON_TOP payload 위치나 집기 여부로 진입을 판정하지 않는다. 이후 반경 이탈에도 유지하고 선행 AT의 raw 성공 Ever로 영구 해제하며, 사람 root XYZ 속력으로 감점한다.
+
+`ontop_distance_source`를 생략한 기존 설정은 payload 기준을 유지한다. ON_TOP Progress는 기존 payload 기준이며, 가상 상자 XYZ·회전·fusion/단방향 bias·State/Success current Gate·AT 높이 조건·AMP/PPO·샘플링은 기존 fusion과 같다. 같은 Stage1 26k에서 새로 전이 학습하며 기존 fusion checkpoint와 새 설정의 resume/추론 계약을 분리한다. 실행 명령은 [config](../config.md)를 따른다.

@@ -78,7 +78,8 @@ def test_single_is_stage1_exclusive(name):
 
 
 @pytest.mark.parametrize('kw',[{'num_agents':1},{'num_objects':1},{'episode_length':900},
-    {'task_graph':'sit'},{'before_pickup_carry_rsi':'mix'},{'eval_skills':'sit'}, {'eval_repeats':3}])
+    {'task_graph':'sit'},{'before_pickup_carry_rsi':'mix'},{'eval_skills':'sit'}, {'eval_repeats':3},
+    {'before_at_goal_distance':7.}, {'before_follower_goal_distance':4.}])
 def test_formal_rejects_viewer_overrides(kw):
     with pytest.raises(ValueError):configure(args(**kw),{'env':{}},'stage1')
 

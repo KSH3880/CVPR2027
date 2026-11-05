@@ -2,7 +2,355 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-05
+
+### penalty_v2 12500 / fusion_v1 7500 / fusion_v2 5000 중간 저장본 평가
+
+- GPU3·4·5에서 각 512환경×3seed×1200step Plane Ever 정식 평가, GPU6에서 같은 저장본 각각 64환경×seed0 정지 진단을 수행했다. random_scenario/near50 유지, viewer 거리 지정 해제, GPU0·1 미사용. 기존 운영 코드·학습 설정 변경 없음.
+- 후행 동시/같은 쌍 선행 AT 평균%: penalty_v2 SIT53.79/98.77·CLIMB43.09/92.88·ON_TOP32.76/91.33·전체39.52/93.25, fusion_v1 56.05/97.06·54.84/94.74·33.41/94.57·전체43.09/95.11, fusion_v2 49.72/94.48·42.51/91.55·22.86/94.02·전체32.96/93.56. 단독5행동 평균은 각각94.04/96.89/95.70%다.
+- 중간 저장본을 기존 이력에 삽입해 penalty10→12.5→15k 전체 후행33.47→39.52→44.70%, 선행91.34→93.25→93.47%를 확인했다. 두 구간 모두 전체 후행이3개 평가 seed에서 공통 상승했다. fusion_v1 5→7.5→10k는40.58/95.87→43.09/95.11→40.66/95.99로 등락했고, v2 3→5→7.5k는31.67/93.38→32.96/93.56→35.98/95.33이며 CLIMB는 유지·최근 ON_TOP은3seed 공통 상승했다.
+- 같은5k/7.5k에서 fusion_v2 전체 후행은 v1보다 각각7.62/7.11%p 낮고 모두3seed 공통 차이다. 7.5k 선행은v1 95.11/v2 95.33%로 비슷하므로 후행 격차를 선행 성공률만으로 설명하지 않는다. 모델 외에 대기 반경·ON_TOP 진입 기준도 달라 개별 변경의 인과 효과를 단정하지 않는다.
+- armed·AT Ever 전 root XYZ≤.3m/s·30프레임 정지의 초기거리 감소율 중앙값(SIT/CLIMB/ON_TOP)은 penalty43.5/67.0/2.2%, fusion_v1 12.4/4.2/1.5%, fusion_v2 15.6/1.5/6.3%; 출발점 대비XY 변위 중앙값은1.08/1.76/.44m, .40/.43/.37m, .46/.51/.40m다. 정지/관찰가능 쌍은10/10·9/9·22/27, 9/9·8/8·23/23, 9/11·7/8·17/17이다. penalty12.5k와15k 모두 정지한 CLIMB8쌍의 목표거리 중앙값은 .34→1.89m, 감소율75.4→19.4%로 변했다.64환경·조건부 진단이며 전신/지속 정지를 뜻하지 않는다.
+- 정식9회·진단3회 정상 종료, CPU/GPU/JSON 재채점 일치·float32/64 차이0·동일 초기 상태·native 진입/AT Ever 해제·동결 encoder/RMS·원본 checkpoint·운영파일262개·기존3학습 보존 확인. 이전 평가와 운영파일 해시도 동일하다. [전체 성공률 이력](output_etc/check/midpoint_penalty12500_fusion7500_fusionv2_5000_eval_stop_20261105/before_comparison.csv), [구간/동일 epoch 비교](output_etc/check/midpoint_penalty12500_fusion7500_fusionv2_5000_eval_stop_20261105/comparison.json), [정규화 정지 이력](output_etc/check/midpoint_penalty12500_fusion7500_fusionv2_5000_eval_stop_20261105/stop_comparison.csv), [공통 정지 쌍](output_etc/check/midpoint_penalty12500_fusion7500_fusionv2_5000_eval_stop_20261105/stop_common_pairs.csv), [통합 검증](output_etc/check/midpoint_penalty12500_fusion7500_fusionv2_5000_eval_stop_20261105/combined_verification.json).
+
+### penalty_v2 15000 / fusion_v1 10000 / fusion_v2 7500 최신 평가
+
+- GPU3·4·5에서 시작 시 고정한 세 checkpoint를 각각 512환경×3seed×1200step Plane Ever로 평가하고, GPU6에서 같은 저장본을 각각 64환경×seed0로 정지 진단했다. random_scenario/near50 유지, viewer 거리 지정 해제, GPU0·1 미사용. 운영 코드·학습 설정 변경 없음.
+- 후행 동시/같은 쌍 선행 AT 평균%: penalty_v2 SIT59.64/97.39·CLIMB48.93/91.66·ON_TOP37.54/92.79·전체44.70/93.47, fusion_v1 52.13/96.57·53.95/94.09·30.93/96.54·전체40.66/95.99, fusion_v2 46.84/96.60·42.49/93.92·29.23/95.48·전체35.98/95.33. 단독5행동 평균은 각각96.99/95.81/96.50%다.
+- 직전10k/5k/3k 대비 전체 후행 변화는 +11.23/+0.08/+4.31%p. penalty 세 행동과 fusion_v2 SIT·ON_TOP은3seed 공통 상승했고, fusion_v1 SIT는3seed 공통 하락했다. 서로 다른 epoch의 비교이며 중간 추세를 보간하지 않는다.
+- 첫 armed·선행 AT Ever 전 root XYZ≤.3m/s·30프레임 정지의 사람→목표XY 중앙값(m)은 penalty1.07/1.89/2.51, fusion_v1 1.90/2.11/2.81, fusion_v2 1.49/2.01/1.93(SIT/CLIMB/ON_TOP). 정지/관찰가능 쌍은 각각8/9·8/8·24/28, 9/9·6/7·23/24, 8/9·6/6·15/16이다.
+- 쌍별 초기거리 대비 감소율 `100*(1-d_stop/d_initial)` 중앙값은 penalty32.3/19.4/4.6%, fusion_v1 14.0/−5.4/1.5%, fusion_v2 17.8/−3.3/5.0%; 실제 출발점 대비XY 변위 중앙값은 .63/.64/.47m, .40/.35/.33m, .47/.42/.44m다. 양 checkpoint 모두 정지한 같은 쌍 비교도 별도로 저장했다. root 정지는 전신 정지나 선행 완료까지 지속 대기를 뜻하지 않는다.
+- 정식9회·진단3회 정상 종료, CPU/GPU/JSON 재채점 일치·float32/64 차이0·기존 초기 상태 일치·native 진입/AT Ever 해제·동결 encoder/RMS·checkpoint/운영파일262개·기존3학습 보존을 확인했다. [성공률 비교](output_etc/check/penalty15k_fusion10k_fusionv2_7500_eval_stop_20261105/before_comparison.csv), [정규화 정지 비교](output_etc/check/penalty15k_fusion10k_fusionv2_7500_eval_stop_20261105/stop_comparison.csv), [공통 정지 쌍](output_etc/check/penalty15k_fusion10k_fusionv2_7500_eval_stop_20261105/stop_common_pairs.csv), [통합 검증](output_etc/check/penalty15k_fusion10k_fusionv2_7500_eval_stop_20261105/combined_verification.json).
+
+### fusion_v2 3000 평가 및 세 모델 64환경 정지 거리 추세
+
+- GPU3에서 고정 fusion_v2 3000을512환경×3seed×1200step Plane Ever로 평가하고, GPU4에서 같은 저장본64환경×seed0 정지 진단을 수행했다. 새 viewer 거리 옵션을 명시적으로 해제하고 기존 random_scenario/near50·평가 규약을 유지했다. 운영 코드·학습 설정 변경 없음.
+- 후행 동시/같은 쌍 선행 AT 평균%는 SIT39.97/96.53·CLIMB42.84/90.07·ON_TOP23.95/93.59·전체31.67/93.38. 전체는2k27.33/92.69에서+4.35%p, 단독5행동 평균95.97→96.04. CLIMB/ON_TOP/전체는3seed 공통 상승, SIT 변화는 혼재했다. 같은3k fusion_v1 전체34.40/94.03보다3seed 공통 낮으며 penalty_v2 전체23.16/84.91보다3seed 공통 높다.
+- 첫 root XYZ≤.3m/s·1초 연속 정지의 사람→목표XY 중앙값 SIT1.42m(9/10)·CLIMB1.80m(7/7)·ON_TOP1.90m(18/20), ON_TOP payload1.63m. 2k1.42/1.84/1.88m에서 대체로 유지됐다. 출발지 초기XY .5m 이내 유지16/72쌍, 그중 성공 후3초 관찰가능16쌍 중14쌍이 .5m 이상 이동했다.
+- penalty_v2 6.5/8.5/9/10k·fusion_v1 1.5/3/4/5k·fusion_v2 .5/1/2/3k의64환경 정지 기록을 집계했다. 12개 기록의 초기 상태 정확 일치, root 속력/시간·native 장면 종료 규약을 확인하고32환경 기록은 제외했다. 같은 초기 장면이어도 정지/관찰가능 부분집합은 checkpoint별로 달라지며 정지 위치만으로 접근 후 대기라고 해석하지 않는다.
+- 정식3회/진단1회1200step 정상 종료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·기존 초기 상태 일치·native human 진입/AT Ever 해제·동결 encoder/RMS·checkpoint/운영파일262개·기존3학습 보존 확인. [성공률 비교](output_etc/check/fusion_v2_3000_eval_stop_20261105/before_comparison.csv), [정지 추세](output_etc/check/fusion_v2_3000_eval_stop_20261105/stop_trends.csv), [그래프](output_etc/check/fusion_v2_3000_eval_stop_20261105/stop_trends.png), [검증](output_etc/check/fusion_v2_3000_eval_stop_20261105/combined_verification.json).
+
+### goalroute BEFORE viewer의 목표→후행 사람 거리 지정
+
+- `BEFORE_FOLLOWER_GOAL_DISTANCE=<m>` / `--before_follower_goal_distance <m>`를 추가했다. 사용자 확인에 따라 SIT·CLIMB·ON_TOP 모두 선행 AT 목표→후행 사람 root 초기 XY 거리다. 기존 선행 목표 거리 옵션과 독립 사용/병용 가능하며 생략 시 기존 동작이다.
+- ON_TOP은 샘플링된 사람/payload를 함께 평행 이동해 집기 배치를 유지한다. payload→목표 거리는 그에 따라 변할 수 있다. 수동 거리 지정 시 near50 경로 부등식과 목표→사람 최소1m 제약을 대체하고 기존 물리 충돌 검사는 유지한다. 학습·정식 평가·비loco/비goalroute·잘못된 수치는 거부하며 YAML·checkpoint 계약·모델·보상·gate는 변경하지 않는다. config/USAGE에 명령을 기록했다.
+- CPU76개 통과: .5/4/12m와 선행 목표 거리 조합, 여러 BEFORE 쌍·셔플된 목표/물체 매핑·부분 reset·선행/독립 목표·Z/회전 보존·ON_TOP 집기 벡터 보존·물리 충돌 검사 유지·formal 거부. 실제 CLI 로더의 유효7m+4m 및 잘못된7경로 거부 확인.
+- GPU3·4·5에서 fusion_v1 5000 strict 복원, 각64환경 random_scenario·before_sit·before_climb·before_stack·all_solo 5경우16step finite Actor/Critic·가중치/가상 상자·부분 reset 검증. 총463쌍의 목표7m/후행 사람4m 오차는 .00005m 이내이며 ON_TOP 사람→payload 1–5m를 확인했다. GPU6·PORT6187 실제 VNC wrapper1환경·12step 제한1회 정상 종료. 원본/snapshot checkpoint·비대상 운영파일258개·기존3학습 보존. [검증](output_etc/check/before_follower_goal_distance_20261105/verification.json), [VNC 로그](output_etc/check/before_follower_goal_distance_20261105/vnc.log).
+
+### goalroute BEFORE viewer의 선행 AT 목표 거리 지정
+
+- test/VNC에 `BEFORE_AT_GOAL_DISTANCE=<m>`와 직접 CLI `--before_at_goal_distance <m>`를 추가했다. goalroute BEFORE loco 추론에서 선행 공유상자→AT 목표 초기 XY 거리만 지정하며 기존 목표 방향·Z·사람→상자 샘플링 규칙을 유지한다. 후행은 새 목표/선행 경로 길이를 기준으로 기존 goalroute/near50 배치를 적용한다. 생략 시 기존 동작이며 독립 과제·환경 YAML·checkpoint 계약·모델·보상·gate는 변경하지 않는다.
+- 학습·정식 평가·비loco 및 0/음수/NaN/Inf를 거부한다. 기존 launcher·config CLI·formal guard·goalroute 배치에 최소 연결하고 config 추론 옵션/USAGE에 사용법을 기록했다.
+- CPU50개 통과(새 거리/다중쌍·goal index 매핑·부분 reset·선행 물리 상태/Goal Z/독립 목표 보존 및 formal 거부 포함), 실제 config 로더의 유효7m/잘못된7경로 확인. GPU3·4·5에서 fusion_v1 5000 strict 복원 후 각64환경 random_scenario·before_sit·before_climb·before_stack·all_solo 5경우, 16step finite Actor/Critic·가중치 보존·가상 XYZ/실물 quaternion·부분 reset·near 조건을 확인했다. 총463쌍 목표거리 오차는 float32 월드좌표 기준 .00005m 이내다.
+- GPU6·PORT6186 실제 VNC wrapper의 7m·CLIMB·1환경·12step 제한1회 종료까지 확인했다. 원본/snapshot checkpoint·비대상 운영파일258개·기존3학습 보존. [검증](output_etc/check/before_at_goal_distance_20261105/verification.json), [VNC 로그](output_etc/check/before_at_goal_distance_20261105/vnc.log).
+
+## 2026-11-04
+
+### penalty_v2 10000 / fusion_v1 5000 성공률·정지·출발지 분석
+
+- GPU3·4에서 고정 penalty_v2 10000/fusion_v1 5000을 각각512환경×3seed×1200step Plane Ever로 평가하고, GPU5·6에서 같은 저장본64환경×seed0 정지 진단을 병행했다. 기존 random_scenario/near50·평가 규약 유지, 운영 코드·학습 설정 변경 없음.
+- penalty_v2 9k→10k 후행 동시/같은 쌍 선행 AT 평균%는 전체34.42/91.06→33.47/91.34, 단독5행동 평균94.13→93.67. 행동별 후행/선행은 SIT47.12/96.20·CLIMB39.51/89.79·ON_TOP25.97/90.18. 전체 변화는seed별−5.00/+0.89/+1.27%p로 혼재하여 대체로 정체다.
+- fusion_v1 4k→5k 전체39.39/94.78→40.58/95.87, 단독평균94.68→96.32. SIT59.17/98.31·CLIMB51.33/93.91·ON_TOP29.38/95.82. SIT/전체는3seed 공통 상승, ON_TOP은3seed 공통 하락, CLIMB 변화는 혼재했다. 모델별epoch가다르므로 같은 학습량 비교로 해석하지 않는다.
+- 첫 root XYZ≤.3m/s·1초 연속 정지의 사람→목표XY 중앙값 SIT/CLIMB/ON_TOP(m): penalty .92/.63/2.18(정지/관찰가능9/10·11/11·24/29), fusion1.82/2.01/2.83(9/10·7/8·23/23). ON_TOP payload1.40/1.56m. root 정지는 발/팔 정지를 뜻하지 않으며 정식 성공률과 진단을 합산하지 않는다.
+- 선행 성공 전 관측 구간 내내 초기XY .5m 이내 유지한 후행은 penalty11/72·fusion37/72쌍이다. 모두 성공 후3초를 관찰했고 각각11/11·33/37쌍이 그 안에 .5m 이상 이동했다. fusion 출발지 근처 유지 중14쌍은 성공 전 페널티가 활성화되지 않았으며, 정지 거리만으로 목표 접근 후 대기라고 해석하지 않는다.
+- 정식6회/진단2회1200step 정상 종료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·동일 초기 상태·native 진입/AT Ever 해제/정지 집계 일치·동결 encoder/RMS·checkpoint/운영파일262개 보존·기존3학습 생존 확인. [성공률 비교](output_etc/check/penalty10k_fusion5k_eval_stop_20261104/before_comparison.csv), [정지 비교](output_etc/check/penalty10k_fusion5k_eval_stop_20261104/stop_comparison.csv), [검증](output_etc/check/penalty10k_fusion5k_eval_stop_20261104/combined_verification.json).
+
+### fusion_v2 2000 성공률·정지 거리·출발지 대기 진단
+
+- GPU3에서 고정 fusion_v2 2000을 512환경×3seed×1200step Plane Ever로 평가하고, GPU4에서 같은 저장본 64환경×seed0 정지 진단을 수행했다. 기존 random_scenario/near50 유지, 운영 코드·학습 설정 변경 없음.
+- 후행 동시/같은 쌍 선행 AT 평균%는 SIT40.39/94.28·CLIMB36.74/90.84·ON_TOP18.63/92.88·전체27.33/92.69. 전체는1k11.30/86.10에서 상승했고 후행 세 행동 모두3seed 공통 개선했다. 단독5행동 동일 가중치 평균93.46→95.97%. 같은2k penalty_v2는전체15.58/80.88, fusion_v1은29.41/90.65로 v2의 전체 우위를 확정하지 않는다.
+- 첫 root XYZ≤.3m/s·1초 연속 정지의 사람→목표XY 중앙값 SIT1.42m(9/11)·CLIMB1.84m(8/8)·ON_TOP1.88m(18/18), ON_TOP payload1.51m. 분모는 armed·미해제1초 관찰 가능 쌍이며 발/팔 정지를 뜻하지 않는다.
+- 별도 출발지 분석에서 선행 성공 전 관측 구간 내내 초기XY .5m 이내인 후행13/72쌍, 그중 성공 후3초 관찰 가능한13쌍 중10쌍이3초 내 .5m 이상 이동했다. 출발지 근처 유지와 목표로 접근한 뒤 정지를 구분하며, 정지 거리만으로 접근 후 대기라고 해석하지 않는다.
+- 정식3회/진단1회1200step 정상 완료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·기존 초기 상태 정확 일치·human/+2.5m 진입 및 AT Ever 해제 검증·동결 encoder/RMS·checkpoint/운영파일262개 보존·기존3학습 생존 확인. [비교](output_etc/check/fusion_v2_2000_eval_stop_20261104/before_comparison.csv), [정지](output_etc/check/fusion_v2_2000_eval_stop_20261104/stop_comparison.csv), [출발지 분석](output_etc/check/fusion_v2_2000_eval_stop_20261104/spawn_audit/metrics.json), [검증](output_etc/check/fusion_v2_2000_eval_stop_20261104/combined_verification.json).
+
+### penalty_v2 9000 / fusion_v1 4000 성공률 + 정지 거리
+
+- GPU3·4에서고정penalty_v2 9000/fusion_v1 4000을각512환경×3seed×1200step Plane Ever로평가하고,GPU5·6에서같은저장본각64환경×seed0×1200step 정지진단을병행했다. random_scenario/near50·기존평가규약유지,운영코드/학습설정변경없음.
+- penalty_v2 8k→9k 전체후행동시/같은쌍선행AT 평균% 34.21/90.48→34.42/91.06, 단독5행동평균94.41→94.13. 후행SIT49.77/선행96.50·CLIMB38.68/87.48·ON_TOP26.98/90.53. SIT증가와CLIMB감소가겹쳐전체정체,seed별변화는혼재했다.
+- fusion_v1 3k→4k 전체34.40/94.03→39.39/94.78, 단독평균96.04→94.68. 후행SIT47.52/선행97.68·CLIMB50.59/91.79·ON_TOP31.67/94.95. 전체/ON_TOP은3seed공통상승,SIT평균+8.21%p는seed별편차가크고CLIMB는유지됐다.
+- 정지거리중앙값(사람→목표XY,m)SIT/CLIMB/ON_TOP: penalty_v2 9k .97/.13/2.16, fusion_v1 4k 1.95/2.16/2.84. ON_TOP payload는1.37/1.56m. 정지/관찰가능건수각9/10·10/12·21/27,10/10·9/9·23/23. penalty_v2 CLIMB는8.5k1.84m→9k.13m로가까워졌고progress포화반경밖1초정지는8/12→2/12다. root XYZ≤.3m/s·1초연속첫확인기준이며정식성공률과합산하지않는다.
+- 성공률6회/정지2회1200step 정상완료·CPU/GPU/JSON재채점일치·float32/64차이0·각규모동일초기상태·native진입/AT Ever해제/정지집계일치·동결encoder/RMS·checkpoint/운영파일보존·기존3학습생존확인. [성공률 비교](output_etc/check/penalty9k_fusion4k_eval_stop_20261104/before_comparison.csv), [정지 비교](output_etc/check/penalty9k_fusion4k_eval_stop_20261104/stop_comparison.csv), [통합 검증](output_etc/check/penalty9k_fusion4k_eval_stop_20261104/combined_verification.json).
+
+### fusion_v2 1000 성공률 평가 + 64환경 정지 진단
+
+- 같은고정fusion_v2 1000 저장본으로GPU3·512환경×3seed×1200step Plane Ever 성공률과GPU4·64환경×seed0×1200step 일반 장면 낙상 종료 정지 진단을 병행했다. 기존sampler/near50 유지, 운영 코드/학습 설정 변경 없음.
+- 전체 후행 동시/같은 쌍 선행 AT 평균%는0.5k 9.29/74.11→1k 11.30/86.10, 단독5행동 동일 가중치 평균83.77→93.46%다. 후행SIT10.01/선행91.74·CLIMB5.58/77.80·ON_TOP14.08/87.48%. ON_TOP/전체는3seed 공통 상승했다.
+- 같은1k의fusion_v1은후행/선행전체18.74/86.56%, 단독평균93.41%. v2는후행SIT−10.76·CLIMB−14.91·ON_TOP−3.23·전체−7.44%p이며세행동모두3seed에서v1보다낮았다. 선행전체는비슷해후행차이를선행성공률만으로설명할수없다.
+- 정지거리중앙값(사람→목표XY,m)은SIT .65→1.15·CLIMB .13→1.22·ON_TOP .62→1.81, ON_TOP payload .32→1.46으로변했다. 정지/관찰가능SIT10/12·CLIMB10/13·ON_TOP17/21, progress포화반경밖정지는각10/12·9/13·15/21이다. rootXYZ≤.3m/s·1초연속첫확인기준이며발/팔정지나완료후재실행을보장하는판정은아니다.
+- 성공률3회·정지진단1회1200step 정상종료·CPU/GPU/JSON재채점일치·float32/64차이0·각규모의기존초기상태정확일치·native human진입/AT Ever해제/정지집계일치·동결encoder/RMS·가중치/checkpoint/운영파일보존·기존3학습생존확인. [성공률 비교](output_etc/check/fusion_v2_1000_eval_stop_20261104/before_comparison.csv), [정지 비교](output_etc/check/fusion_v2_1000_eval_stop_20261104/stop_comparison.csv), [통합 검증](output_etc/check/fusion_v2_1000_eval_stop_20261104/combined_verification.json).
+
+### 최신 penalty_v2/fusion v1/v2 64환경 정지 거리 및 평가 동반 규칙
+
+- 사용자 요청에 따라 향후 대기 페널티 계열의 eval에는 같은checkpoint의64환경·seed0 정지 거리 진단을 함께 수행하도록 AGENTS/평가 규약에 기록했다. 성공률 정식 평가와 장면 낙상 종료 기반 정지 진단은 구분한다.
+- GPU3·4·5에서 최신 고정penalty_v2 8500 / fusion_v1 3000 / fusion_v2 500을각64환경·seed0·4명·8토큰·1200step으로 긴급 진단했다. 선행 미완료·armed 이후 root XYZ≤0.3m/s·1초 연속 첫 확인 시점의 XY거리 기준이다.
+- 사람→AT목표 중앙값 SIT/CLIMB/ON_TOP(m): penalty_v2 1.06/1.84/2.01, fusion_v1 1.69/2.08/2.84, fusion_v2 .65/.13/.62. ON_TOP payload→목표는1.28/1.56/.32m. 정지/1초 관찰 가능 건수 SIT/CLIMB/ON_TOP은각7/10·12/12·23/29, 9/9·9/9·23/23, 7/15·13/15·12/25다. 서로epoch가달라v2의반경변경효과를분리해해석하지않는다.
+- 진단 driver는 task용payload 거리와 실제wait 진입 거리를분리해fusion_v2의human 기준을반영하고, 매step native armed/released가해당거리·반경·AT Ever와일치하는지검사했다. 기존학습/운영코드 변경 없음.
+- 3회1200step 정상 종료·finite·동일 초기 상태·runtime 진입/해제/정지 집계 일치·가중치/원본checkpoint/운영파일260개 보존·기존3학습 생존 확인. [거리/건수 CSV](output_etc/check/latest_three_stop64_20261104/distances.csv), [쌍별 기록](output_etc/check/latest_three_stop64_20261104/pairs.csv), [검증](output_etc/check/latest_three_stop64_20261104/verification.json).
+
+### penalty_v2 8000 / fusion3000 / fusion_v2 500 정식 평가
+
+- GPU2·3·4·5에서 고정penalty_v2 8000·fusion3000·fusion_v2 500 및 동일epoch 비교용penalty_v2 3000을각4명·512환경×3seed×1200step, 기존 random_scenario/near50·Plane Ever 규약으로 평가했다. 운영 코드/설정 변경 없음.
+- 전체 후행 동시/같은 쌍 선행 AT 평균%: penalty_v2 8000 34.21/90.48(직전7000대비+2.97/+0.37%p), fusion3000 34.40/94.03(직전2000대비+4.99/+3.38%p), fusion_v2 500 9.29/74.11. 기존penalty_v2 CLIMB/ON_TOP/전체와fusion CLIMB/ON_TOP/전체는3seed 공통 상승했다. 단독5행동 동일 가중치 평균94.41/96.04/83.77%.
+- 동일3000epoch penalty_v2→fusion 후행 SIT31.61→39.32·CLIMB21.74→50.16·ON_TOP20.64→26.12·전체23.16→34.40%, 같은 쌍 선행93.68→95.95·81.63→91.59·83.05→94.32·84.91→94.03%. 세 행동 모두3seed에서fusion우세.
+- 동일500epoch fusion→fusion_v2 후행SIT10.03→8.34·CLIMB6.93→4.89·ON_TOP10.08→11.45·전체9.34→9.29%, 각 쌍 선행79.73→82.16·58.74→67.21·70.35→73.97·69.60→74.11%. ON_TOP은3seed 공통 개선했지만 전체 이득은 아직 없고, 단독평균88.56→83.77%로 저하했다. 초기 checkpoint이고 학습seed 반복 비교가 아니므로 개선/악화를 확정하지 않는다.
+- 12회1200step 정상 완료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·동일 초기 상태·같은 쌍 분모/상한·동결 encoder/RMS·checkpoint 및운영파일262개 보존·기존3학습 생존 확인. 실제 정지 거리/대기 행동 추가 진단 없음. [전체 추세](output_etc/check/penalty8k_fusion3k_fusionv2_500_eval_20261104/trends.csv), [seed별 변화](output_etc/check/penalty8k_fusion3k_fusionv2_500_eval_20261104/comparison.json), [검증](output_etc/check/penalty8k_fusion3k_fusionv2_500_eval_20261104/verification.json).
+
+### fusion_v2 — ON_TOP 사람 기준 진입 / 대기 반경 +2.5m
+
+- 기존fusion을 보존하고 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2` 환경/학습 YAML·train/test/VNC/eval wrapper를 추가했다. ON_TOP 대기 페널티 진입만 `ontop_distance_source: human`으로 선택하고, 모든 후행의 radius_buffer를3→2.5m로 변경했다. coefficient1.0·root XYZ 감점·진입 latch·선행 AT Ever 해제·Progress payload 기준·Virtual/fusion/bias·current Gate·AMP/PPO·샘플링은 유지한다. 같은 Stage1 26k에서 새로 전이한다.
+- `before_wait.py`에 선택적 거리 기준을 연결하고 생략 시 기존payload 동작을 유지했다. validator·실험 등록·launcher·정식평가5개 분류 목록과 config/structure/reference 문서를 갱신했다. 기존/새 checkpoint 계약은 분리한다.
+- CPU121개 통과(신규10개 포함):3행동 +2.5m 경계·XY 진입/XYZ 감점·ON_TOP 사람/payload 반대 위치·해제/부분reset·기존 설정/계약 보존. 27개 실험 설정 validator 및5개 shell 문법 검사 통과. 기존fusion2000 strict 복원/finite 확인.
+- GPU4·4명/1024환경/8토큰 `CHECK=1 MAX_ITERATIONS=1` 학습exit0(기존 루프 저장epoch2). 저장본 strict 복원·Actor encoder/입력RMS 비트단위 동결·Actor/Critic finite·fusion 학습 확인. 새 eval wrapper64환경×seed0×1200step exit0·CPU/GPU/JSON 재채점 일치·float32/64 차이0·실제 runtime human/2.5/1.0 확인. 기존 운영파일250개 보존(승인된공통코드5개수정 제외), 기존프로세스 임의종료/재시작 없음. 본학습 미시작.
+- [검증](output_etc/check/fusion_v2_config_20261104/verification.json), [CPU](output_etc/check/fusion_v2_config_20261104/cpu_tests.log), [학습](output_etc/check/fusion_v2_config_20261104/train.log), [GPU 평가](output_etc/check/fusion_v2_config_20261104/eval/general_seed0/result.json). 실행 명령은 [config](markdowns/config.md)에 추가했다.
+
+### penalty_v2 1/2/4/5/6/7k 및 fusion1/2k·32환경 정지 거리 추세
+
+- GPU2~6에서 요청8개 고정 저장본을각4명·32환경·seed0·1200step으로 진단했다. 기존 root XYZ≤0.3m/s·1초 연속·선행 미완료/armed 이후 첫 정지 기준과 일반 장면 낙상 종료를 유지했다. 운영 코드/설정 변경 없음, ON_TOP 진입은 저장본의 기존payload 기준이다.
+- 사람→AT목표 XY거리 중앙값 SIT/CLIMB/ON_TOP(m): penalty_v2 1k .46/.09/.64, 2k .88/.11/.57, 4k 1.48/.07/1.21, 5k 1.55/.13/1.68, 6k 2.02/1.33/2.42, 7k 1.28/1.27/2.35; fusion1k 1.74/.63/2.75, 2k 2.43/3.01/2.79. ON_TOP payload 중앙값은각.20/.15/1.23/1.49/1.62/1.49/1.80/2.28m다.
+- 동일32장면의 후행 SIT14·CLIMB6·ON_TOP16쌍 중 정지 사례만 거리 집계, 관찰 가능 분모와정지 건수를 CSV에 별도 기록했다. 소표본이고 root정지는발/팔 정지를보장하지않는다. 64환경 진단과표본을혼합하지않는다.
+- 8회1200step 정상 완료·finite·모든 초기 상태 정확 일치·AT Ever 해제/runtime 정지 집계 일치·가중치/원본checkpoint/운영파일254개 보존·기존4학습 생존 확인. [거리/사례 수 CSV](output_etc/check/penalty_fusion_stop32_epochs_20261104/distances.csv), [쌍별 기록](output_etc/check/penalty_fusion_stop32_epochs_20261104/pairs.csv), [검증](output_etc/check/penalty_fusion_stop32_epochs_20261104/verification.json).
+
+### fusion2000 6명/8명·64환경 진단 평가
+
+- GPU3·4에서 같은 fusion2000 고정 저장본을6명/12토큰·8명/16토큰, 각각64환경·seed0·1200step으로 평가했다. 기존 인원 변경 확인 driver에서 Plane Ever·개인 낙상 freeze·random_scenario/near50를 재사용했다. 학습4명에서 변경한 소표본 진단으로512환경×3seed 정식 평가와 구분한다.
+- 6명→8명 후행 동시/같은 쌍 선행 AT(%): SIT31.43/91.43(35쌍)→45.95/97.30(37쌍), CLIMB37.50/75.00(24)→32.56/81.40(43), ON_TOP18.37/83.67(49)→16.22/86.49(74), 전체26.85/84.26(108)→27.92/87.66(154). 단독5행동 동일 가중치 평균95.24→90.41%, 개인 낙상5.21→12.11%. 인원별 초기 장면/표본이 다르므로 순수 인원 효과나 통계적 우열을 확정하지 않는다.
+- 두 실행1200step·CPU/GPU/JSON 재채점 일치·float32/64 차이0·finite·같은 쌍 분모/상한·동결 encoder/RMS·원본checkpoint/운영파일256개 보존·기존4학습 생존 확인. 8명은 초기 배치 검사에 시간이 더 걸렸지만 정책 rollout은 정상 완료됐다. [행동별 집계](output_etc/check/fusion_6_8_eval64_20261104/metrics.json), [BEFORE CSV](output_etc/check/fusion_6_8_eval64_20261104/before.csv), [검증](output_etc/check/fusion_6_8_eval64_20261104/verification.json).
+
+### penalty_v2 7000 / fusion2000 및 동일2000 비교 평가
+
+- GPU3·4·6에서 고정penalty_v2 7000·fusion2000·동일epoch 비교용penalty_v2 2000을각4명·512환경×3seed×1200step, 기존 random_scenario/near50·Plane Ever 규약으로 평가했다.
+- 최신 전체 후행 동시/같은 쌍 선행 AT 평균%: penalty_v2 7000은31.24/90.11(6000대비−2.48/−1.42%p), fusion2000은29.41/90.65(1000대비+10.68/+4.09%p). penalty_v2 전체/ON_TOP은3seed 공통 하락, fusion후행3행동 모두3seed 공통 개선했다. 단독5행동 동일 가중치 평균94.84/94.29%.
+- 동일2000epoch penalty_v2→fusion 후행SIT21.18→35.43·CLIMB14.51→40.87·ON_TOP13.90→22.42·전체15.58→29.41%, 각 쌍 선행92.70→91.86·76.71→87.73·78.20→91.36·80.88→90.65%. 세 행동 모두3seed에서fusion우세. SIT는선행 개선 없이 후행 개선이 관찰됐으나 단일학습run 비교로 기전의 인과 효과를 확정하지 않는다.
+- 9회1200step 정상 완료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·동일 초기 상태·같은 쌍 분모/상한·동결 encoder/RMS·checkpoint/운영파일256개 보존·기존4학습 생존 확인. [전체 추세](output_etc/check/penalty7k_fusion2k_eval_20261104/trends.csv), [seed별 변화](output_etc/check/penalty7k_fusion2k_eval_20261104/comparison.json), [검증](output_etc/check/penalty7k_fusion2k_eval_20261104/verification.json). 실제 대기 행동은이번에추가측정하지 않았다.
+
+### penalty_v1 64환경 정지 거리 비교
+
+- GPU4·최종6500·64환경·seed0·1200step을 직전v2/fusion과 같은 root XYZ≤0.3m/s·1초 연속 기준 및 같은 초기 장면에서 진단했다. 첫 정지 사람→AT목표 XY거리 중앙값 SIT0.34/CLIMB0.15/ON_TOP0.65m, ON_TOP payload→목표0.23m로 v2/fusion보다 중심에 가까웠다.
+- armed 미해제1초 관찰 가능 SIT14/CLIMB14/ON_TOP24쌍 중 root정지9/13/14쌍, progress 포화반경 밖1초 정지는0/1/5쌍이다. root정지 중 발속력까지 유지한 쌍18/36. 거리/행동 동작 후보를 엄밀한 행동 분류로 해석하지 않는다.
+- 1200step 정상 종료·finite·동일 초기 상태·AT Ever 해제/runtime 정지 집계 일치·가중치/원본checkpoint/운영파일254개 보존·기존4학습 생존 확인. [집계](output_etc/check/penalty_v1_stop64_20261104/metrics.json), [쌍별 거리](output_etc/check/penalty_v1_stop64_20261104/pairs.csv), [검증](output_etc/check/penalty_v1_stop64_20261104/verification.json).
+
+### penalty_v2 / fusion 64환경 실제 정지 거리 진단
+
+- GPU3·4에서 최신 고정 penalty_v2 6500 / fusion1500을각64환경·seed0·4명·8토큰·1200step, 학습 random_scenario/near50·일반 장면 낙상 종료로 진단했다. 선행 미완료·대기 armed 이후 root XYZ속력≤0.3m/s가30step 연속 유지된 첫 확인 시점의 XY거리를 측정했다. 정식 성공률 평가와 구분한다.
+- 첫 정지 사람→AT목표 거리 중앙값 SIT/CLIMB/ON_TOP은 penalty_v2 0.93/1.85/2.10m, fusion1.41/1.92/2.26m. ON_TOP payload→목표는1.28/1.46m. 1초 관찰 가능50/47쌍 중42/43쌍 root정지, 이 첫 구간 발속력도≤0.3으로 유지된 쌍은14/13뿐이다. ON_TOP 정지 시 payload높이가 초기보다0.1m 넘게 상승하지 않은 사례18/19·25/25로 집기 전 정지가 많이 포함된다. +3m는 페널티 진입 반경이며 실제 정지 거리를 고정하지 않는다.
+- 두 실행1200step 정상 종료·finite·동일 초기 상태·AT Ever 해제 일치·runtime 정지 집계 일치·가중치/원본checkpoint/운영파일254개 보존·기존4학습 생존 확인. [집계](output_etc/check/penalty_v2_fusion_stop64_20261104/metrics.json), [쌍별 거리/시점](output_etc/check/penalty_v2_fusion_stop64_20261104/pairs.csv), [검증](output_etc/check/penalty_v2_fusion_stop64_20261104/verification.json).
+
+### fusion / penalty_v2 동일1000epoch 평가
+
+- GPU3(penalty_v2)·4(fusion)에서각1000 고정 저장본을4명·512환경×3seed×1200step, 기존 random_scenario/near50·Plane Ever 규약으로 평가했다. 500epoch는 기존 결과를 재사용했다.
+- 1000epoch 전체 후행 동시/같은 쌍 선행 AT 평균%는 penalty_v2 11.25/74.94 → fusion18.74/86.56. 후행 SIT11.99→20.77·CLIMB9.51→20.49·ON_TOP11.67→17.31, 각 쌍 선행81.72→92.79·66.95→81.33·75.72→86.41. 세 행동 모두3seed에서fusion이 우세했다. 단독5행동 동일 가중치 평균90.14→93.41%. 선행 개선도 동반되어 후행만의 인과 효과로 해석하지 않는다.
+- 6회1200step 정상 종료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·기존 초기 상태 동일·같은 쌍 분모/상한·동결 encoder/RMS·원본checkpoint 및 운영파일256개 보존·기존4학습 생존 확인. 정지 행동 추가 진단 없음. [동일epoch 비교](output_etc/check/fusion_penalty_v2_1000_eval_20261104/same_epoch.csv), [행동/거리별 결과](output_etc/check/fusion_penalty_v2_1000_eval_20261104/metrics.json), [검증](output_etc/check/fusion_penalty_v2_1000_eval_20261104/verification.json).
+
+### penalty_v2 6000 평가
+
+- GPU3에서 고정6000 저장본을4명·512환경×3seed×1200step, 기존 random_scenario/near50·Plane Ever 규약으로 평가했다. 전체 후행 동시/같은 쌍 선행 AT는33.73±1.45/91.53±0.25%, 직전5500 대비+3.68/+1.90%p다. 후행 SIT50.39·CLIMB36.90·ON_TOP26.36%, 각 쌍 선행96.34·91.58·89.78%. SIT/ON_TOP/전체는3seed 공통 개선, CLIMB는1seed 상승·2seed 소폭 하락했다. 단독5행동 동일 가중치 평균94.65→93.82%.
+- 3회1200step 정상 종료·CPU/GPU/JSON 재채점 일치·float32/64 차이0·기존 초기 상태 동일·동결 encoder/RMS·원본checkpoint 및 운영파일 보존·기존4학습 생존 확인. 정지→해제 행동 추가 진단은 미실시. [추세 CSV](output_etc/check/penalty_v2_6000_eval_20261104/trends.csv), [행동/거리별 결과](output_etc/check/penalty_v2_6000_eval_20261104/metrics.json), [검증](output_etc/check/penalty_v2_6000_eval_20261104/verification.json).
+
+### 실행 중인4종 평가 — 기본25k/asym24.5k/penalty_v2 5.5k/fusion0.5k
+
+- GPU2·3·4·6에서 고정 snapshot4개를4명/8토큰·512환경×3seed×1200step Plane Ever로 평가했다. random_scenario/near50·기존 정식 평가 규약 유지, 중단된 wait/penalty_v1은 재실행하지 않았다. 운영 코드/설정 변경 없음.
+- 전체 후행 동시/같은 쌍 선행 AT 평균%: 기본40.64/88.66, asym29.34/93.62, penalty_v2 30.04/89.64, fusion9.34/69.60. 직전 대비 기본−2.11%p(후행SIT는3seed 공통 하락), asym+2.92%p, penalty_v2+4.74%p. penalty_v2는후행3행동 모두3seed 공통 개선했다.
+- 동일500epoch penalty_v2→fusion은 전체 후행10.09→9.34·같은 쌍 선행66.29→69.60, 단독SIT60.46±2.84→83.13±0.68이다. 초기 단독 성능 저하 완화는 관측됐으나 BEFORE 후행 개선은 아직 확인되지 않았다. 실제 정지→해제 행동의 추가 진단은 수행하지 않았다.
+- 12회1200step·CPU/GPU/JSON 일치·float32/64 차이0·finite·과거와 동일 초기 상태·같은 쌍 분모/상한·encoder/RMS 동결·원본checkpoint/운영파일 보존·실행 중4학습 생존 확인. [행동별/거리별 수치](output_etc/check/active_four_eval_20261104/before_results.csv), [단독](output_etc/check/active_four_eval_20261104/solo_results.csv), [추세](output_etc/check/active_four_eval_20261104/trends.png), [seed별 변화](output_etc/check/active_four_eval_20261104/comparison.json), [검증](output_etc/check/active_four_eval_20261104/verification.json).
+
+### penalty_v2 BEFORE relation fusion / zero background 실험 추가
+
+- `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg` 환경/학습 YAML과 train/test/VNC/eval wrapper를 추가했다. 기존 penalty_v2에서 `human_relation_fusion: before_zerobg`와 실험 이름만 변경했다. +3m/1.0 속력 페널티·Ever 해제·가상 상자·거리/보상/Gate는 유지한다.
+- 후행 query→선행 key의 BEFORE bias와 후행 attention 출력의 잔차 MLP에 같은64차원 embedding을 사용한다. embedding/MLP는4층 공유, projection은층/head별, Actor/Critic은별도다. SELF/NONE/미사용 COUPLED bias는0 고정, fusion은출력 projection 전에 후행에게만 적용하고 성공 후에도 역할 조건을 유지한다. 기본 경로/기존 checkpoint는 보존하고 새 fusion 계약을 분리했다.
+- CPU 신규14개 포함131개 통과·3개 기존 skip. 별도 기존 테스트1개는 `checkpoints/Stage1PushFinetune_00021000.pth` 부재로 실패했다. 사용 중인26k 전이·초기 항등·gradient·단방향/두 쌍/셔플·Actor/Critic 가상 관측과 원본 packet·기존 penalty_v2 4500 strict 복원은 확인했다.
+- GPU4·4명/1024환경/8토큰 `CHECK=1 MAX_ITERATIONS=2` 학습 exit0(기존 루프 저장 epoch3), Actor encoder 비트 단위 동결·양쪽 fusion/bias 학습·finite 확인. 새 eval wrapper로64환경×1seed×1200step 저장본 재실행 exit0. 기존 YAML/실험 wrapper 보존, 본학습 미시작. [검증](output_etc/check/before_relfusion_zerobg_20261104/verification.json), [학습](output_etc/check/before_relfusion_zerobg_20261104/train.log), [checkpoint 검사](output_etc/check/before_relfusion_zerobg_20261104/checkpoint_verification.json).
+
+### penalty / wait_v2 / wait_v3 실제 정지·거리 비교
+
+- GPU2·3·6에서 penalty6500/wait_v2 10500/wait_v3 7500 각512환경×3seed·일반 장면 낙상 종료로 진단했다. wait 대기 종료ON을 유지하고 반경 밖 정지도 별도 집계했다. penalty_v2 4500 직전3seed 결과를 재사용하고, wait_v2/v3는 같은 seed0의 대기 종료만OFF인 보조 실행을 추가했다(신규11회). 운영 코드/학습 변경 없음.
+- 선행 미완료·진입 후1초 이상 관찰 집단의 반경 안1초 root 정지 SIT/CLIMB/ON_TOP: penalty132/235·229/303·327/662, 첫 정지 중심거리 중앙값0.36/0.12/0.19m. wait_v2는1/114·3/192·4/323, wait_v3는0/165·4/208·2/604에 그쳤다. wait 대기 종료 장면616/1536·926/1536. 기존penalty의 동작 후보 전 바깥 정지는9.8/7.9/18.4%, penalty_v2는66.7/39.7/55.0%였다. 기하 후보 검출이며 정확한 행동 분류는 아니다.
+- 종료OFF seed0 첫 반경 안 정지 거리 SIT/CLIMB/ON_TOP: v2 0.78/0.17/0.20m, v3 0.31/0.22/0.25m. 종료를 제외해도 너무 접근한 뒤 멈추는 사례가 많다. ON/OFF 초기 상태는 동일하지만 분기 이후 공통 생존 궤적도 달라졌으므로 OFF는 별도 재실행 보조 진단으로 기록하고 프레임 단위 인과 비교로 해석하지 않았다.
+- native 종료 판정·raw AT=Plane AT·release=raw AT Ever·초기 상태·finite·원본checkpoint/운영파일249개·기존6학습 보존 확인. [전체/행동별 정지·거리·직접 종료 거리·동일 집단 선행/후행](output_etc/check/wait_stop_comparison_20261104/report.md), [시계열 검증](output_etc/check/wait_stop_comparison_20261104/timing_verification.json), [보존/ON-OFF 차이](output_etc/check/wait_stop_comparison_20261104/verification.json).
+
+### penalty_v2 4500 실제 대기→선행 완료→후행 수행 진단
+
+- GPU2·3·6·512환경×3seed·일반 장면 낙상 종료/1200step에서 +3m/1.0 penalty_v2의 실제 armed/released·root XYZ 속력·발 높이/속력·payload·native/Plane 성공을 기록했다. 기존 정식 평가와 checkpoint·초기 상태 동일, 관측/물리/Gate/정책 변경 없음.
+- 미완료 상태를1초 이상 관찰한1239쌍 중 root1초 정지973, 행동 후보 전에 progress 반경 밖 정지664. 선행 완료와 이후3초 생존을 관찰한 SIT159/CLIMB213/ON_TOP620쌍에서 연속 바깥 대기 유지77/49/245, 이어 재출발67/30/220, 이어 실제 동시 Plane 성공40/24/47이었다. 같은 대상 선행 AT는159/213/620 전부 성공. 조건부 진단이며 정식 전체 성공률과 구분한다.
+- 선행 끝내 미완료230쌍 중179에서 조기 동작 후보 관측. SIT 높이 하강·CLIMB 높은 발 들기·ON_TOP 가상 배치 구역 진입에 기반한 기하 후보이며 행동 분류 정답은 아니다. 정지→해제→성공 사례는 있으나 일관된 대기는 미달. CLIMB 첫 root 정지 거리 중앙값0.57m로 너무 접근한 뒤 정지가 많다. [상세/같은 분모 순서표](output_etc/check/penalty_v2_wait_sequence_20261104/report.md), [성공 시계열](output_etc/check/penalty_v2_wait_sequence_20261104/ordered_success.png), [미완료 중 시도 후보](output_etc/check/penalty_v2_wait_sequence_20261104/premature_without_leader.png).
+- 3seed 실제 종료 판정·초기 상태 일치·native AT와 Plane AT 일치·해제=raw AT Ever/영구 유지·finite·가중치/원본checkpoint/운영파일249개·기존6학습 보존 확인. [검증](output_etc/check/penalty_v2_wait_sequence_20261104/verification.json), [추가 시계열 검증](output_etc/check/penalty_v2_wait_sequence_20261104/sequence_details.json).
+
+### 최신6종 후속 평가 — 기본/asym23.5k 및 wait/penalty 추세
+
+- GPU2·3·6만 사용해 기본23500/asym23500/wait_v2 10500/wait_v3 7500/penalty6500/penalty_v2 4500 고정 snapshot을 4명/8토큰·512환경×3seed×1200step Plane Ever로 평가했다. random_scenario/near50·대기 종료 제외 규약과 이전 평가의 환경 설정·초기 상태를 유지했다. 운영 코드/설정 변경 없음.
+- 전체 후행 동시/같은 쌍 선행 AT 평균%: 기본42.75/88.66, asym26.42/92.96, v2 23.62/88.55, v3 15.49/82.68, penalty17.59/83.67, penalty_v2 25.31/87.85. 기본/asym 직전 하락 후 반등, v2 정체, v3 소폭 개선, 기존penalty 소폭 하락. 새penalty_v2는500→4500에서 단독SIT60.46→92.60으로 회복했으나 중간 checkpoint 추세·실제 정지 행동은 이번에 검증하지 않았다.
+- 18회1200step·CPU/GPU/JSON 일치·float32/64 판정 차이0·finite·동일 초기 상태·같은 쌍 분모/상한·거리 분할 합계·동결 encoder/RMS·checkpoint 및 운영파일249개 보존·기존6학습 생존 확인. [행동별/거리별/단독/최근 추세](output_etc/check/needed_eval_followup_20261104/report_plane.md), [그래프](output_etc/check/needed_eval_followup_20261104/trends.png), [seed별 변화](output_etc/check/needed_eval_followup_20261104/comparison.json), [검증](output_etc/check/needed_eval_followup_20261104/verification.json).
+
+### 필요한 최신6종 평가 — GPU0·1 제외
+
+- GPU2·3·6에서 기본20000/asym19500/wait_v2 8000/wait_v3 4500/penalty3500/penalty_v2 500 고정 snapshot을4명/8토큰·512환경×3seed×1200step Plane Ever로 평가했다. random_scenario/near50와 wait 대기 종료 제외 규약 유지. 중간 checkpoint 추가 평가는 생략하고 기존 최근2개 및500epoch 대조 결과를 재사용했다.
+- 전체 후행 동시/같은 쌍 선행 AT 평균%: 기본38.93/88.77, asym24.11/93.36, v2 23.86/86.92, v3 13.10/80.66, penalty18.47/83.66, 새penalty_v2 10.09/66.29. 최근 기본/asym 후행 하락·v3 정체, v2/기존penalty 개선. 같은500에서 기존/new penalty 전체9.18/71.88→10.09/66.29이나 단독SIT85.07→60.46으로 저하. 실제 정지 행동의 추가 진단은 수행하지 않았다. [전체·거리별 같은 쌍 선행/후행·단독·추세·std](output_etc/check/needed_eval_20261104/report_plane.md), [그래프](output_etc/check/needed_eval_20261104/trends.png).
+- 앞서 추가한 penalty_v2가 `evaluate.py`의5개 실험 분류 목록에서 누락되어 task/motion/PUSH 경로 등록만 보완했다. 평가 CPU18개 통과. 초기 GPU3/6 MPS 상속 설정 불일치는 실행 전 차단됐고, 평가 자식 환경의 상속 pipe를 해제해 각 GPU 검증 daemon으로 재시도했다. 실제 평가 GPU UUID→2/3/6 확인.
+- 최종18회1200step·CPU/GPU/JSON 재채점·float32/64 판정 일치·finite·동일 초기 상태·같은 쌍 분모/상한·거리 분할 합계·encoder/RMS 동결·checkpoint 및 등록 보완 후 운영파일249개 해시 보존 확인. 기존6개 학습 생존. [검증](output_etc/check/needed_eval_20261104/verification.json).
+
+## 2026-11-03
+
+### wait_penalty_v2 — 진입 반경 +3m / 속력 가중치1.0
+
+- 기존 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty`를 보존하고 `_v2` 환경/학습 YAML과 train/test/VNC/eval wrapper를 추가했다. radius_buffer만2→3m, coefficient만0.6→1.0으로 변경했다. 진입 Ever·선행 성공 Ever 해제, root XYZ 속력, 기존 Progress/current State·Success Gate·AT 높이 제한 해제는 유지하며 대기 조기 종료는 없다. 실험/output 이름을 분리하고 registry/launcher/config/structure를 연결했다.
+- CPU103개 통과 및 새 설정의3행동 진입 경계·XYZ 감점·이탈 후 유지·성공 후 해제·부분 reset·기존 checkpoint 계약 분리 확인. GPU0·4명/1024환경/8토큰 `CHECK=1` 짧은 학습 exit0, Actor/Critic 실행·checkpoint 저장·저장된+3/1.0 설정 확인. 기존 penalty YAML/스크립트6개 해시 보존. 본학습은 시작하지 않았다. [검증](output_etc/check/wait_penalty_v2_config_20261103/verification.json), [학습 로그](output_etc/check/wait_penalty_v2_config_20261103/train.log).
+
+### wait_v3 3500 가상 상자 거리 개입 CLIMB 토이
+
+- GPU0·32환경·seed2에서 선택 후행 Alias GTA XY만 root 기준3.5→0.2m로 당겼다가 멀리 보내는12초 주기3회와 동일 초기 상태3.5m 대조군을 실행했다. 대기 종료만 끄고 원래 낙상/시간 종료를 유지했다. 운영 코드/weight/물리 상태 직접 수정 없음.
+- 발 중심 Z>0.45m 3step 기준 시도 후보 시작 거리 중앙값1/2/3차0.73/0.99/0.99m, 2회 이상 검출28/32 대 대조군0/32. 선행 AT가 끝내 성공하지 않은 env6에서도0.75/0.66/0.88m에서 높은 발 올리기를 반복했고 실제 영상으로 확인했다. 고정 행동 임계값·정지 성공·학습 성공률로 해석하지 않는다. [결과/한계](output_etc/check/virtual_climb_trigger_20261103/report.md), [거리·발/골반 높이](output_etc/check/virtual_climb_trigger_20261103/distance_and_height.png), [0.5배속 영상2개 ZIP](output_etc/check/virtual_climb_trigger_20261103/virtual_climb_toy_slow.zip).
+- 입력 변경 범위·초기 상태 동일·계측 위치/높이 및 선행 성공의 렌더 재현·MP4 decode/ZIP CRC·운영파일241개/checkpoint/기존5학습 보존 확인. 접촉 힘/native done 일부는 렌더 유무에 따라 달라 원본 trace를 집계했으며 대표 env6 생존은 동일하다. [검증](output_etc/check/virtual_climb_trigger_20261103/verification.json).
+
+### source5/asym goalroute 전체 평가 추세 재집계
+
+- 신규 시뮬레이션 없이 현재 goal5_goalroute의0.5/1/1.5/6/7/9/14.5/15.5/17/18k, 두 모델20checkpoint를 통합했다. BEFORE 행동별·거리별 후행/같은 쌍 선행 AT와 단독5행동·표준편차를 [전체 표](output_etc/check/source5_asym_full_trends_20261103/report.md), [BEFORE 그래프](output_etc/check/source5_asym_full_trends_20261103/before_trends.png), [단독 그래프](output_etc/check/source5_asym_full_trends_20261103/solo_trends.png)에 기록했다. 다른 거리 설정·8명·AT9 평가는 섞지 않았다.
+- seed별 동일 부분집합 분모·후행 성공 상한·평균/std 재계산 일치를 확인했다. 장기적으로 기본3행동은 개선됐으나 최근 정체, asym은9k 이후 CLIMB 개선이 뚜렷하고 SIT/ON_TOP 개선은 작거나 변동이 크다. 운영 코드/학습 변경 없음.
+
+### wait_v3 3000 +2m 실제 대기 조기 종료 영상
+
+- GPU0·3k 고정 checkpoint·seed2·4명/8물체·행동별 preset으로 SIT/CLIMB/ON_TOP 해당 후행의 실제 대기 종료를 촬영했다. 모두 r_box+2m 반경 밖 접근부터 누적 XYZ 이동 위반1초 종료까지 연속이며 실제 길이3.63/5.27/2.70초. ON_TOP은 자연 실행에서 사례를 먼저 찾아 같은 종료 frame/속력이 재현된 장면을 촬영했다. 처음 고른 부적절한 ON_TOP 촬영만 중단·교체했다.
+- 1280×800·0.5배속·시작2초/끝4초 정지, 사람/목표/반경·속력·누적 위반 자막을 표시했다. 초기 미갱신 렌더1프레임만 제외, 물리/정책 상태 조작 없음. [영상 폴더](output_etc/check/wait_v3_3000_videos_20261103/slow_videos/), [ZIP 약4.6MB](output_etc/check/wait_v3_3000_videos_20261103/wait_v3_3000_early_termination_slow.zip).
+- 3건 모두 해당 후행 waiting 종료·선행 미해제·누적1초 확인. 전체 MP4 decode·ZIP CRC·시작/종료 화면 확인·checkpoint 및 운영파일241개 해시·기존5개 학습 보존. 선택 사례이며 성능 통계가 아니다. [검증](output_etc/check/wait_v3_3000_videos_20261103/verification.json).
+
+### wait_v2/v3/penalty 동일 epoch 비교 — v2는1k 간격
+
+- 사용자 범위 축소에 따라 v2는1000/2000/3000만, v3는500~3000의500간격, penalty는요청 시점 생성된500~2000의500간격을 비교했다. 진행 중이던 평가 전용 v2 500을 중단하고1500/2500 대기 작업은 취소했으며 본학습은 보존했다. v2 2000/3000·v3 3000·penalty1000만 GPU0·512환경×3seed×1200step 신규 평가12회, 기존9checkpoint는 trace 재집계로 재사용했다.
+- 같은3k 전체 후행 동시/같은 쌍 선행 AT 평균%는 v2 15.95/80.91·v3 13.73/77.68. 같은2k는 v2 14.64/77.32·v3 11.42/77.00·penalty15.70/79.04. v2는3k ON_TOP이 높고 CLIMB는v3와 비슷하며, penalty는2k SIT가 높다. [전체/거리별 같은 쌍 선행·후행 및 단독 표](output_etc/check/matched_wait_epochs_20261103/report_plane.md), [같은 epoch 그래프](output_etc/check/matched_wait_epochs_20261103/matched_trends.png).
+- 총13checkpoint/39rollout의 CPU/GPU/JSON 일치·finite·float32/64 판정 차이0·동일 초기 상태·seed별 동일 부분집합 분모 확인. 신규 checkpoint/운영파일243개 해시·encoder/RMS 동결·기존5개 학습 보존. wait 조기 종료 제외 규약 유지, 실제 대기 행동 추가 진단 없음. [검증](output_etc/check/matched_wait_epochs_20261103/verification.json).
+
+### source5/asym18000·wait_v2 7000·wait_v3 2500·penalty2000 추세 평가
+
+- 비어 있던 GPU0에서 고정5개 checkpoint·4명/8토큰·512환경×3seed×1200step Plane Ever 평가15회를 완료했다. 학습 random_scenario/near50 및 기존 정식 규약(wait 대기 종료 제외)을 유지했다. 전체 후행 동시/같은 쌍 선행 AT 평균%는 source5 40.33/86.68·asym26.48/90.59·v2 22.34/85.17·v3 13.85/76.66·penalty15.70/79.04.
+- 직전 대비 기본/asym 전체 하락, v2/v3/penalty 반등. asym CLIMB는 개선됐지만 SIT는 하락했다. 단독 SIT는 v3 88.15→96.13·penalty80.02→88.02로 회복했다. 학습량·AT 추가 높이 조건 차이를 명시하고 행동별/거리별 같은 쌍 선행·단독·과거 추세·표본std를 [보고서](output_etc/check/next_trends_20261103/report_plane.md), [그래프](output_etc/check/next_trends_20261103/trends.png)에 기록했다. 실제 대기 행동의 추가 진단은 수행하지 않았다.
+- 15회1200step·CPU/GPU/JSON 재채점 일치·float32/64 판정 차이0·finite·과거 및 모델 간 초기 상태 동일·같은 쌍 상한·거리 분할 합계 확인. encoder/RMS 동결·checkpoint/운영파일243개 해시·기존5개 학습 보존. 운영 코드/설정 변경 없음. [검증](output_etc/check/next_trends_20261103/verification.json).
+
+### source5/asym17000·wait_v2 6500·wait_v3 2000 평가 및 추세
+
+- GPU4·4명/8토큰·512환경×3seed×1200step Plane Ever, 학습 random_scenario/near50 유지·wait 대기 종료 제외. 새4개 checkpoint를 고정해12회 평가했다. 전체 후행 동시/같은 쌍 선행 AT 평균%는 source5 42.77/87.42·asym29.21/92.19·v2 20.35/84.10·v3 11.42/77.00. 직전 대비 기본/asym 상승·v2 유지·v3 하락이며 v3 단독 SIT95.03→88.15. penalty1500은 기존 평가를 재사용했다.
+- 행동별 같은 쌍 선행/후행·거리 부분집합·단독·checkpoint 추세와 표본std를 [통합 보고서](output_etc/check/combined_trends_20261103/report_plane.md), [추세 그래프](output_etc/check/combined_trends_20261103/trends.png)에 기록했다. 모델별 학습량 및 AT 추가 높이 조건 차이를 명시했다. 과거1500 대기 진단은2000 행동 검증으로 간주하지 않는다.
+- 12회 완료·CPU/GPU/JSON 재채점 일치·finite·초기 상태 일치·같은 쌍 상한·거리 분할 합계 확인. checkpoint/운영파일243개 해시 보존·기존5개 학습 생존. 운영 코드/설정 변경 없음. [통합 검증](output_etc/check/combined_trends_20261103/verification.json), [v3 검증](output_etc/check/wait_v3_eval2000_20261103/verification.json).
+
+### penalty1500 정식 평가·wait_v3 동일1500 대기/해제 비교
+
+- GPU4·512환경×3seed×1200step Plane Ever. penalty1500 후행 동시/같은 쌍 선행 AT 평균%는 SIT14.17/87.79·CLIMB8.49/69.29·ON_TOP14.86/80.12, 전체13.22/79.24. penalty500 대비 SIT/ON_TOP 상승·CLIMB 정체, 단독 SIT85.07→80.02. 동일1500 wait_v3와 전체 성능은 비슷하고 행동별 차이가 있다. 기본15500/wait_v2 6000은 학습량이 다른 참고값으로 분리했다. [정식 비교·판단 요약](output_etc/check/penalty_eval1500_20261103/report_plane.md).
+- 같은 초기512환경·seed0으로 v3 종료ON/OFF 및 penalty 일반 장면 종료 진단. 진입 후1초 root 정지2/402·184/450·221/461, 동일 진입 집단 선행 Plane Ever9/402·261/450·314/461. v3 ON은364/512장면 대기 종료·평균12.05초(OFF32.77, penalty34.85). OFF/penalty 첫 정지 목표 거리 중앙값 약0.20m, 정지 사례 대부분 이미 누적 이동1초 초과. CLIMB 해제 직전 정지·이후3초 관찰 가능 집단의 이동 재개는 v3 OFF4/20·penalty1/18, 해당 집단 장면 끝까지 후행 동시/선행 Ever는1/20·20/20 및0/18·18/18. 1seed 조건부 표본이며 root 정지가 스킬 시작 전 대기를 보장하지 않는다. [대기 상세](output_etc/check/penalty_eval1500_20261103/report_wait.md).
+- 정식3회 CPU/GPU/JSON 일치·float32/64 차이0·finite·penalty500/v3 1500 초기 상태 일치. 진단3건 실제 종료 판정·가중치 보존·정식seed0 포함 초기 상태 정확 일치. checkpoint/운영파일243개 해시·기존5개 학습 보존. 운영 코드/설정 변경 없음. [정식 검증](output_etc/check/penalty_eval1500_20261103/verification.json), [진단 검증](output_etc/check/penalty_eval1500_20261103/native_verification.json).
+
+### wait_v3 1500 정식 평가·500/1000 추세
+
+- GPU4·4명/8토큰·512환경×seed0/1/2×1200step Plane Ever, 학습 random_scenario/near50 유지·정식 규약상 대기 종료 제외. 고정1500 snapshot의 후행 동시/같은 쌍 선행 AT 평균%는 SIT11.20/86.82·CLIMB12.90/62.89·ON_TOP13.48/76.59, 전체12.86/75.55였다. 1000 대비 전체12.43→12.86, CLIMB13.34→12.90으로500의26.09에는 회복하지 못했다. 단독·동일 쌍 거리별 선행/후행·3checkpoint 추세와std는 [보고서](output_etc/check/wait_v3_eval1500_20261103/report_plane.md)에 기록했다.
+- 3회1200step·CPU/GPU/JSON 일치·float32/64 누적 판정 차이0·finite·500/1000 초기 상태 정확 일치·같은 쌍 상한·거리 분할 합계 확인. encoder/RMS 동결·checkpoint/운영파일243개 해시 보존·기존5개 학습 생존. 운영 코드/설정 변경 없음. [검증](output_etc/check/wait_v3_eval1500_20261103/verification.json).
+
+### wait_v2 6000 정식 평가·5500 대비
+
+- GPU4·4명/8토큰·512환경×seed0/1/2×1200step Plane Ever, 학습 random_scenario/near50 유지 및 정식 규약상 대기 종료 제외. 최신 번호6000 snapshot의 후행 동시/같은 쌍 선행 AT 평균%는 SIT22.81/91.93·CLIMB17.87/81.64·ON_TOP20.40/84.61, 전체20.31/85.42였다. 5500 대비 전체 후행17.99→20.31, 세 행동 평균 모두 상승. 단독·거리 부분집합·표본std는 [보고서](output_etc/check/wait_v2_eval6000_20261103/report_plane.md)에 기록했다.
+- 3회1200step·CPU/GPU/JSON 일치·float32/64 누적 판정 차이0·finite·5500 초기 상태 정확 일치·같은 쌍 상한·거리 분할 합계 확인. encoder/RMS 동결·checkpoint/운영파일243개 해시 보존·기존5개 학습 생존. 운영 코드/설정 변경 없음. [검증](output_etc/check/wait_v2_eval6000_20261103/verification.json).
+
+### wait_v3 1000 정식 평가·500 대비
+
+- GPU4·4명/8토큰·512환경×seed0/1/2×1200step Plane Ever, 학습 random_scenario/near50 유지 및 정식 규약상 대기 조기 종료 제외. 고정1000 snapshot으로 후행 동시/같은 쌍 선행 AT 평균%는 SIT10.42/80.38·CLIMB13.34/63.48·ON_TOP12.80/75.31, 전체12.43/73.63이었다. 500 대비 후행 CLIMB26.09→13.34, 전체15.26→12.43. 단독·거리 부분집합·표본std는 [보고서](output_etc/check/wait_v3_eval1000_20261103/report_plane.md)에 기록했다.
+- 3회1200step·CPU/GPU/JSON 일치·float32/64 누적 판정 차이0·finite·500 초기 상태 정확 일치·같은 쌍 상한·거리 분할 합계 확인. encoder/RMS 동결·checkpoint/운영파일 해시 보존·기존5개 학습 생존. 정식 성공률이며 대기 행동 학습 여부를 판정하지 않는다. [검증](output_etc/check/wait_v3_eval1000_20261103/verification.json).
+
+### wait_v3 / penalty 500 실제 장면 0.5배속 묶음
+
+- 직전 평가와 같은 두 모델500 snapshot으로 GPU4·seed2·행동별 preset·4명/8물체에서 SIT/CLIMB/ON_TOP을 촬영했다. wait_v3 대기 종료 ON, penalty 개인 감점 유지. 초기부터 종료/최대20초까지 실제 상태를 기록하고 반경·속력·종료 누적/감점량을 표시했다. ON_TOP 다른 쌍 종료 사례를 포함한7개 MP4를 [한 폴더](output_etc/check/wait_v3_penalty_videos_20261103/slow_videos/) 및 [ZIP](output_etc/check/wait_v3_penalty_videos_20261103/wait_v3_penalty_500_slow_videos.zip)에 모았다.
+- 1280×800·0.5배속·시작2초/끝4초 정지 화면, reset 직후 미갱신 렌더1프레임만 제외. MP4 전체 decode·ZIP CRC·checkpoint 해시 확인, 기존5개 학습 생존. 촬영 프로세스 중단 후 미완료 penalty2건만 재실행했다. 선택 장면은 성능 통계가 아니며 episode/종료 사유는 README와 verification.json에 기록했다. 운영 코드/설정 변경 없음.
+
+### 실행 중5개 최신 저장본 GPU4 Plane Ever 평가
+
+- 요청 시점 기본15500·asym15500(15k resume run)·wait_v2 5500·wait_v3 500을 고정하고, 아직 저장본이 없던 penalty는 첫500 생성 후 포함했다. 모든 입력을 검증 경로에 snapshot으로 보존해 GPU4·4명/8토큰·512환경×seed0/1/2×1200step로 평가했다. 학습 random_scenario/near50 유지, wait_v2/v3 대기 종료는 정식 규약상 제외했다.
+- 전체 후행 동시/같은 쌍 선행 AT Ever 평균%는 기본40.59/86.86·asym22.43/89.24·wait_v2 17.99/84.77·wait_v3 15.26/74.37·penalty9.18/71.88이었다. 행동별·단독·후행/선행 근거리·직전 평가 추세와 표본std는 [보고서](output_etc/check/latest_five_eval_20261103/report_plane.md)에 기록했다. 모델epoch 및 기존 AT 추가1mm 학습 조건 차이를 명시했다.
+- 15회 모두1200step·CPU/GPU/JSON 재채점 일치·float32/64 누적 판정 차이0·finite·초기 상태 동일·같은 쌍 상한·거리 분할 합계 검증. encoder73tensor/입력 RMS 동결·checkpoint 해시·운영파일240개 보존·기존5개 학습 생존 확인. 평가 중 요청받은 viewer 토글3개 파일 변경은 별도 해시로 추적했으며 정식평가 동작에는 영향 없다. [검증](output_etc/check/latest_five_eval_20261103/verification.json).
+
+### BEFORE viewer 대기 조기 종료 선택 옵션
+
+- 요청에 따라 wait/wait_v2/wait_v3 test/VNC의 `BEFORE_WAIT_TERMINATION=0`을 추가했다(기본1). `--disable_before_wait_termination`으로 추론 중 대기 위반 종료만 건너뛰며, 낙상/시간 종료·checkpoint 설정·학습·penalty 보상은 유지한다. 학습 직접 CLI 사용은 거부한다. USAGE/config에 명령을 기록했다.
+- GPU4·wait_v3 500에서8환경16step 및 상태 주입 ON/OFF 검사로 기존 대기 종료·옵션OFF 시 낙상/시간 종료 버퍼 보존·부분 reset·정식평가 우회를 확인했다. 실제 test wrapper도1환경8step 정상 완료했고 플래그 전달/학습 거부·shell 문법을 확인했다. [물리 검증](output_etc/check/viewer_wait_toggle_20261103/physics/physics_validation.json), [wrapper 로그](output_etc/check/viewer_wait_toggle_20261103/wrapper.log).
+- 진행 중 최신5개 정식평가는 원래 대기 종료를 우회하므로 이 추론 옵션 추가는 채점 동작을 바꾸지 않는다. 해당3개 파일의 승인된 변경 해시는 평가 검증에서 별도 추적한다.
+
+### Virtual wait_penalty: 개인 연속 XYZ 속도 감점
+
+- virtual_goal5_goalroute 기반 `_wait_penalty` env/train·train/test/VNC/eval·registry·평가 목록을 추가했다. AT 추가1mm 높이 제한 해제(기존3D20cm 유지), 목표 XY r_box+2m 최초 진입 후 후행 개인 task 보상에서 `0.6×root XYZ 속력`을 매 step 차감한다. 선행 raw AT 최초 성공 시 같은 step부터 영구 해제하며 기존 state/success current gate·progress·HOLDING·AMP는 유지한다. 대기 위반 종료는 없다.
+- 기존 BeforeWait의 진입/해제 기록을 공유하고 새 감점을 별도 reward term에 기록했다. 기존 설정/계약은 보존하고 새 계약/출력은 분리했다. config/USAGE/structure/상세 문서에 실행법과 의미를 추가했다.
+- CPU183통과·3skip. GPU4·4명/1024환경 짧은 학습2epoch/262144frame 완료·finite·actor encoder73tensor/입력 RMS 동결, wait_penalty 로그 확인. 8환경×6preset 각16step 및 상태 주입 검사에서 개인 감점량·타 보상 항 보존·종료 버퍼 불변·진입/성공 기록·부분 reset·Virtual 관측 확인. 기존 YAML46개 해시 보존. 본학습은 시작하지 않았다. [검증 보고서](output_etc/check/before_wait_penalty_20261103/report.md).
+
+### wait_v3: 대기 진입 반경 +2m
+
+- 사용자 요청으로 wait_v2를 보존하고 `_wait_v3` env/train YAML·train/test/VNC/eval wrapper·registry·실행/평가 목록을 연결했다. 동작 설정 차이는 `waiting_termination.radius_buffer: 1.0 → 2.0` 하나이며 progress·XYZ 속력0.3m/s·유예0초·누적1초 종료·선행 성공 시 영구 해제·AT 기준을 유지했다. 기본 Stage1 26k 전이로 별도 새 학습한다. config/USAGE/structure에 경로와 명령을 추가했다.
+- 기존 대기 CPU87개 통과. SIT/CLIMB/ON_TOP별 +2m 경계 안팎 및 +1.5m 진입·30step 누적 종료·선행 성공 즉시/영구 해제9사례, v2 설정/스크립트 해시 보존·반경 외 YAML 동일·checkpoint 계약 분리·shell 문법 통과. GPU4에서4명·1024환경 짧은 학습2epoch/262144frame 정상 종료·저장, 실제 저장 설정+2m·모델 finite 확인. 본학습 시작/기존 프로세스 종료 없음. [설정 검증](output_etc/check/before_wait_v3_20261103/config_check.json), [실행 검증](output_etc/check/before_wait_v3_20261103/training_check.json).
+
+### wait_v2 4500 행동 전 정지 진단·실제 장면
+
+- GPU4·512환경·seed0 첫 episode에서 일반 낙상/대기 종료를 유지했다. 선행 성공 전 반경 진입 후행298건 중 반경 안 root XYZ≤0.3m/s 1초 연속 정지는 SIT0/65·CLIMB2/82·ON_TOP5/151이었다. 대기 위반 종료267/512, 평균18.91초. 같은 쌍 선행 AT Ever를 진입 집단/전체별 함께 기록했다.
+- 실제 선택 장면에서 CLIMB·ON_TOP은 반경 진입 후 정지하지 않고 발 들기/상자 내리기 동작을 시작한 뒤 누적 위반1초로 종료됐다. 세 영상 모두 선행 AT 성공 전이며 SIT는 계속 접근하다 종료됐다. 0.5배속 접근부터 종료까지 영상 및 [보고서](output_etc/check/wait4500_stop_20261103/report.md). 정지 지표만으로 행동 전 대기 성공을 뜻하지 않으며 정식평가와 구분한다.
+- 1k 진단과 초기 상태 정확 일치·실제 종료 판정 일치·checkpoint/운영파일229개 해시 보존·기존4개 학습 생존 확인. 운영 코드/설정 변경 없음.
+
+### 기본/virtual/asym/wait 최신4개 GPU4 Plane Ever 평가
+
+- 요청 시점 최신 저장본 source5 14500·virtual13500(재개 run)·asym14500·wait_v2 4500을 GPU4에서 각512환경×seed0/1/2×1200step·4명/8토큰으로 평가했다. 사용자 명칭에 맞춰 이번 보고서의 wait는 wait_v2이며 기존 wait 실험과 파일명은 보존했다. 정식평가에서는 대기 종료를 제외했다.
+- BEFORE 후행 SIT/CLIMB/ON_TOP 평균%는 기본60.87/53.69/28.09, virtual34.87/7.14/20.08, asym16.14/40.94/17.96, wait23.99/23.52/20.42였다. 전체 후행/같은 쌍 선행AT는40.80/86.75·20.13/83.51·22.89/91.49·21.85/83.31%. 각 행동·전체/후행근거리/선행근거리마다 같은 쌍 AT Ever 및std를 함께 기록했다. 단독5행동·직전 평가 추세도 [보고서](output_etc/check/latest_four_eval_20261103/report_plane.md)에 정리했다.
+- 12회 모두1200step·CPU/GPU/JSON 재채점 일치·float32/64 누적 차이0·finite·seed별 초기 상태 동일·같은 쌍 AT 상한·거리 분할 합계 통과. 각 checkpoint의 encoder73tensor/입력 RMS 동결, checkpoint 및 운영파일229개 해시 보존, 기존4개 학습 프로세스 생존을 확인했다. 운영 코드/설정 변경 없음. [검증](output_etc/check/latest_four_eval_20261103/verification.json).
+
+### wait_v2 1000 GPU4 정식 평가·실제 대기 종료 진단
+
+- 사용자 요청으로1k를 GPU4에서4명·8토큰·512환경×seed0/1/2×1200step Plane Ever 평가했다. 정식평가에서 대기 종료는 제외한다. 전체 BEFORE 후행 동시 Ever/같은 쌍 선행 AT Ever는 SIT12.91±0.82/82.31±3.74%, CLIMB21.52±1.44/60.72±4.19%, ON_TOP13.78±1.00/74.26±4.09%였다. 전체15.39±0.94/72.78±4.11%, 기존wait1k 후행9.17% 대비 높았다. 단독 SIT91.55·CLIMB98.59·AT85.38·ON_TOP86.41·PUSH95.65%. 전체/후행근거리/선행근거리·동일1k 비교는 [정식 보고서](output_etc/check/wait_v2_eval1000_20261103/report_plane.md).
+- 같은1k·seed0·512환경 첫 episode로 일반 장면 낙상 종료를 유지하고 대기 종료 ON/OFF를 비교했다. 초기 상태 정확 일치. ON은297/512장면이 대기 위반 포함 종료, 평균16.67초(OFF31.99초). 진입327후행 중 AT 성공 전 반경 안에서 root XYZ≤0.3m/s로1초 연속 정지1명. 위반9432프레임 중 XY만으로는 위반하지 않고 XYZ로만 추가된 경우117(1.24%). 같은 쌍 선행 AT Ever는 ON26.72%/OFF62.07%로 종료에 따른 수행 기회 감소를 확인했다. 이는1seed 진단이며 정식3seed 성능표와 구분한다. [대기 보고서](output_etc/check/wait_v2_eval1000_20261103/report_native.md).
+- 정식 wrapper 실행 중 `evaluate.py`의 wait/wait_v2 등록 누락으로 task 선택이 실패했다. 반복된 기존 실험 목록5곳에 두 이름만 추가해 task·모션·PUSH 집계를 연결했으며 재실행3seed 완료·CPU18테스트 통과. 학습 코드/보상/종료 설정은 수정하지 않았다.
+- CPU float64/GPU/JSON 채점 일치·float32/64 누적 차이0·1200step/finite·기존virtual과seed별 초기 상태 동일·encoder73tensor/입력 RMS 동결·checkpoint/운영파일 해시 보존·기존4개 학습 생존을 확인했다. [검증](output_etc/check/wait_v2_eval1000_20261103/verification.json).
+
 ## 2026-11-02
+
+### Virtual wait_v2: 유예 제거·누적 XYZ 위반·AT 높이 제한 해제
+
+- 기존 wait를 보존하고 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2` env/train·train/test/VNC/eval·registry·GPU4 명령을 추가했다. XY 대기 반경을 r_box+1m로 늘리고 유예0초·root XYZ 속력0.3m/s 초과 누적1초 종료를 적용했다. 정지/반경 이탈은 누적값을 지우지 않으며 선행 AT 성공은 즉시 에피소드 끝까지 해제한다. Progress는 그대로다.
+- 새 설정의 단독/선행/PUSH AT는3D20cm를 공통 사용한다. `at_z_tolerance=.2`로 추가1mm 제약을 없앴고 ON_TOP 자체 높이 조건은 유지했다. 기존 성공 함수를 재사용하며 AT 설정을 checkpoint 계약에 반영했다. 기존 설정은 XY·유예·연속 모드를 그대로 사용한다.
+- CPU174통과·1skip. GPU4에서4명·1024환경 짧은 학습2epoch/262144frame 완료, Stage1 26k165tensor 전이·encoder73tensor/입력 RMS 동결·head6tensor 갱신·finite 확인. 저장본8환경×6preset 실제16step 및 reset 주입 검사에서 수직 이동/누적 종료·AT 성공 즉시/영구 해제·부분 reset·독립 행동·정식평가 bypass 통과. 기존 YAML 해시 및4개 학습 프로세스를 보존했다. [검증](output_etc/check/before_wait_v2_20261102/report.md).
+
+### wait1500 실제 대기 종료 장면 촬영
+
+- 앞부분 부족·카메라 혼잡에 대한 사용자 피드백으로 같은 GPU5·wait1500에서 한 후행의 에피소드 시작부터 연속 재촬영했다. 선행/후행 색 구분·목표/대기 반경의 설명용 표시·추적 카메라를 적용했으며 영상은0.5배속이다. 실제 시간 SIT3.97초·CLIMB12.30초 후 대기 종료, ON_TOP15초 동안 대기 종료 없음을 기록했다. 세 장면 모두 반경 진입 전부터 시작하고 에피소드가 이어짐·checkpoint/기존4개 학습 보존을 확인했다. [연속 영상 검증](output_etc/check/wait_capture_context_20261102/verification.json).
+- 사용자 요청으로 GPU5에서 wait1500을 행동별4명·8환경·8토큰·seed2 deterministic 일반 실행으로 촬영했다. 상태/속도 주입 없이 실제 카메라 화면에 거리·root XY 속도·유예/연속 위반 시간을 표시했다. SIT·CLIMB는 연속 위반1초와 장면 reset을 함께 확인했고, ON_TOP은900step 동안 대기 종료가 없었으며 최대 연속 위반0.90초였다. [영상·판정 기록](output_etc/check/wait_capture_20261102/verification.json).
+- 촬영기만 output_etc/check 아래 추가했으며 카메라 월드 좌표를 보정했다. 최초 촬영의 시뮬레이터 정리 단계 오류 후 재촬영을 정상 완료했다. 체크포인트 해시와 기존4개 학습 PID 생존을 확인했으며 운영 코드·대기 조건은 변경하지 않았다.
+
+### Virtual wait1500 GPU5 Plane Ever 평가
+
+- 사용자 요청으로 GPU5에서 wait1500을4명·8토큰·512환경×seed0·1·2×1200step·deterministic 첫 episode로 평가했다. 정식 규약상 대기 위반 종료는 제외하고 기존 개인 낙상을 적용했다. wait500/1000·virtual1500과 비교하고 전체/후행 경로 짧음/선행 경로 짧음 모두 행동별 동일 쌍 선행 AT를 함께 집계했다.
+- 전체 후행 동시 Plane Ever/같은 쌍 선행 AT는 SIT11.67/86.98%, CLIMB8.45/63.22%, ON_TOP10.82/72.89%, 전체10.48±0.40/73.58±1.38%였다. 후행 경로가 짧은 집단은11.62/86.07·4.28/62.38·10.18/69.13%, 선행 경로가 짧은 집단은12.47/89.80·25.10/66.49·13.19/86.74%였다. 단독 SIT90.40·AT92.39·ON_TOP93.00%였다. [추세·virtual1500·거리별 표](output_etc/check/wait_eval1500_20261102/report_plane.md).
+- 3회 모두1200step·CPU float64/GPU/JSON 일치·trace finite·float32/64 누적 차이0, 모든seed 기존 virtual과 초기 상태 정확 일치, 같은 쌍 선행 AT 상한·거리 분할 합 재현·encoder73tensor/입력 RMS 동결·checkpoint/운영 파일223개 해시 보존을 통과했다. 기존4개 학습 PID도 유지했다. [검증](output_etc/check/wait_eval1500_20261102/verification.json).
+
+### BEFORE 실제 근거리 추세·wait와 같은 쌍 선행 AT 보고
+
+- 반대 집단인 선행 접근+운반 경로 < 후행 수행 경로도367쌍(21.73%, SIT83·CLIMB80·ON_TOP204)으로 집계했다. 동거리0건이며 기존 후행 근거리 집단의 정확한 여집합이다. 최신 CLIMB 후행/같은 선행AT는 source5 45.18/84.54%, virtual23.30/85.93%, asym25.77/89.32%, wait1000 23.74/64.30%였다. 실제 완료 순서가 아닌 초기 XY 경로 합 분류다. [전체 checkpoint·평균/std·분모](output_etc/check/goalroute_leader_near_trends_wait_20261102/report.md).
+- 기존 goalroute 세 모델의500/1000/1500/중간6000·5500/7000/최신9000·8500 저장본18개와 wait500/1000의 평가2개를 새 시뮬레이션 없이 CPU 집계했다. 초기 후행 수행 경로 < 선행 접근+운반 경로인1322/1689쌍(78.27%)을 동일하게 분리했으며 SIT265·CLIMB311·ON_TOP746쌍이다. 강제 near50 선택 플래그가 아닌 실제 거리 기준이다.
+- 최신 근거리 후행 동시 Plane Ever는 source5 SIT44.98·CLIMB40.17·ON_TOP21.86%, virtual35.13·2.91·20.23%, asym11.16·9.34·16.77%였다. 같은 쌍 선행 AT는 각각83.06·73.97·85.93%,93.19·69.90·85.00%,94.76·85.22·89.55%였다. wait1000은7.55·4.27·9.23%, 같은 선행 AT81.60·57.04·64.98%였다. [전체 추세·평균/std·분모](output_etc/check/goalroute_near_trends_wait_20261102/report.md).
+- 모든 평가/seed의 거리·분류 일치, near+나머지의 건수/성공 합과 전체 평가 재현, 기존 근거리 보고서의6개 모델·checkpoint 결과 재현, 후행 동시 Ever≤같은 쌍 선행 AT Ever를 확인했다. 사용자 요청으로 AGENTS/evaluation 보고 규칙에 전체·행동별·거리별·추세의 후행과 같은 분모 선행 AT 동시 보고를 추가했다. 학습·관측/보상·평가 지표 코드는 변경하지 않았다. [검증](output_etc/check/goalroute_near_trends_wait_20261102/verification.json).
+
+### Virtual wait 500/1000 GPU5 Plane Ever 평가
+
+- 사용자 지정 GPU5에서 `_wait`의500·1000 고정 checkpoint를 각각4명·8토큰·512환경×seed0·1·2×1200step·deterministic 첫 episode로 평가했다. 기존 정식 규약에 따라 대기 이동 종료를 제외하고 개인 낙상만 적용했으며 기존 virtual500/1000 결과를 비교용으로 재사용했다.
+- wait500→1000 후행 동시 Plane Ever는 SIT6.83→7.79%, CLIMB6.83→8.22%, ON_TOP7.79→10.07%, 선행 AT64.85→69.13%였다. 단독 SIT89.64→86.87%이며 기존 virtual1000의79.63%보다는 높았다. virtual1000 대비 후행 SIT/ON_TOP·선행 AT는 낮았다. [500/1000·기존 virtual 비교표](output_etc/check/wait_eval500_1000_20261102/report_plane.md).
+- 6회 모두1200step·CPU float64/GPU/JSON 일치·trace finite·float32/64 누적 판정 차이0, 모든seed의 기존 virtual 초기 상태 정확 일치, encoder73tensor/입력 RMS 동결·checkpoint·운영 파일223개 해시 보존을 통과했다. 기존4개 학습 PID도 유지했다. 정지 행동 자체의 진입/속도 지표는 이번 성공률 평가에 포함하지 않았다. [검증](output_etc/check/wait_eval500_1000_20261102/verification.json).
+
+### goalroute 세 모델 최신9000/8500/9000 GPU2 Plane Ever 평가
+
+- 사용자 지정 GPU2만 사용해 시작 시 최신 고정 저장본 source5 9000·virtual8500·virtual_asym9000을4명·8토큰·512환경×seed0·1·2×1200step·deterministic 첫 episode로 정식 평가했다. 각 checkpoint의 기존 random_scenario/near50·크기·거리 설정을 유지했으며 AT9 override와 새 wait 실험은 적용하지 않았다.
+- 후행 동시 Plane Ever는 SIT45.17/32.29/12.91%, CLIMB41.16/7.15/12.82%, ON_TOP22.31/20.31/18.24%(source5/virtual/asym 순서)였다. 전체31.39±1.11/19.72±0.77/15.88±0.91%, 단독 SIT93.85/92.36/86.48%, 선행 AT84.20/85.21/90.67%였다. [행동별·단독·선행 AT 표](output_etc/check/goalroute_eval_latest_gpu2_20261102/report_plane.md). 모델epoch는 서로 다르다.
+- 9개 rollout 모두1200step·CPU float64/GPU/JSON 판정 일치·trace finite·float32/64 누적 판정 차이0, 같은seed 세 모델 및 이전7000 평가의 초기 상태 정확 일치, 입력 checkpoint·운영 파일 해시 보존을 통과했다. 기존 세 학습 PID 생존·학습 scalar finite도 확인했다. [입력 조건](output_etc/check/goalroute_eval_latest_gpu2_20261102/plan.json), [전체 수치](output_etc/check/goalroute_eval_latest_gpu2_20261102/comparison.json), [검증](output_etc/check/goalroute_eval_latest_gpu2_20261102/verification.json).
+
+### source5·virtual AT 지정9종·64환경 진단 평가
+
+- GPU4에서 source5 9000·virtual8500을 각각4명·8토큰·64혼합환경·seed2·1200step·deterministic Plane Ever로 평가했다. 평가 프로세스에서9종 제안 크기로 기존 크기 호환 역할 sampler를 한 번 실행해 첫 episode 역할을 고정하고, 실제 단독/선행 AT 물리 자산만9종으로 교체했다. ON_TOP payload 등 비AT 크기·기존 near50/거리/충돌 배치를 유지하며 운영 코드·checkpoint는 변경하지 않았다.
+- 단독 AT96.30/96.30%(각26/27), BEFORE 선행 AT87.67/84.93%(64/73·62/73)였다. 후행 SIT/CLIMB/ON_TOP별 선행 AT는76.19/82.35/97.14%와85.71/76.47/88.57%였다. 전체 AT100건에서9종 모두 포함됐고 단독0.42³는 표본0건이다. 작은1seed 진단이며 모델epoch가 다르다. 두 모델 초기 상태 정확 일치·실제 AT 자산/관측 크기 일치·비AT 크기 보존·CPU/GPU/JSON 채점 일치·trace finite·checkpoint/운영 파일 해시 보존을 확인했다. 최초 공용 bank 전체 교체 예비 결과는 제외했다. [행동별·크기별 결과](output_etc/check/at9_eval64_20261102/report.md), [검증](output_etc/check/at9_eval64_20261102/verification.json).
+
+### Virtual goalroute 후행 대기 이동 종료 실험
+
+- 기존 virtual_goal5_goalroute를 보존하고 `_wait` 환경/학습 YAML·train/test/VNC/eval·출력/checkpoint 계약을 추가했다. 새 설정만 BEFORE 후행의 XY 거리(root 또는 ON_TOP payload)가 공유 상자 반대각선+0.5m 이내면 진입을 유지하고,1초 유예 후 root XY 속도>0.3m/s가1초 연속이면 후행 terminate/장면 reset을 적용한다. 선행 AT의 같은 스텝 raw_own_success로 episode 내 영구 해제하며 부분 reset은 해당 환경만 초기화한다. 기존 Progress·보상/Gate·낙상·샘플링·모델을 유지하고 정식 Plane 평가는 기존 규약상 새 종료를 제외한다. config/structure/USAGE/상세 문서를 갱신했다.
+- GPU4만 사용해4명·1024환경·8토큰 CHECK를 epoch3/frame393216까지 실행했다.26k165tensor 전이·encoder73tensor/입력 RMS 동결·head6tensor 갱신·모델/optimizer/지표 finite, CPU212개 통과(기존1개 skip·전이3개 제외),6개preset의8환경16step actor/critic·Virtual·종료 버퍼 연결·동시 성공 해제·latch·부분 reset을 확인했다. 강제 SIT/CLIMB 검사는 호환 bank로 별도 초기화했다. 기존 세 goalroute YAML6개 해시·문서 링크/21개 설정 목록·wrapper 구문/diff 검사도 통과했다. 본학습·학습된 대기 성능·장기 속도는 미검증이다. [검증 보고서](output_etc/check/before_wait_20261102/report.md).
+
+### goalroute 세 모델 7000 checkpoint 4명 Plane Ever 평가
+
+- 사용자 지정 GPU5·6에서 세 실험 모두 epoch7000/frame917504000 저장본으로4명·8토큰·512환경×seed0·1·2×1200step·deterministic 첫 episode를 정식 평가했다. random_scenario/near50을 포함한 저장 설정을 유지하고 기존 학습·checkpoint·운영 코드는 보존했다.
+- BEFORE 후행 동시 Plane Ever는 SIT34.55/29.61/12.03%, CLIMB31.40/6.36/7.67%, ON_TOP18.82/19.03/16.48%(source5/virtual/asym 순서)였다. 전체25.02±1.35/18.29±2.13/13.54±0.79%, 단독 SIT96.94/92.34/82.69%, 선행 AT84.63/83.29/87.65%였다. [행동별·단독·선행 AT 표](output_etc/check/goalroute_eval7000_20261102/report_plane.md).
+- 9개 rollout 모두1200step·CPU float64/GPU/JSON 판정 일치·trace finite·float32/64 누적 판정 차이0·세 모델의 같은seed 초기 상태 정확 일치·입력 checkpoint 및 운영 파일281개 해시 보존을 통과했다. 기존 세 학습 PID 생존도 확인했다. [입력 조건](output_etc/check/goalroute_eval7000_20261102/plan.json), [전체 수치](output_etc/check/goalroute_eval7000_20261102/comparison.json), [검증](output_etc/check/goalroute_eval7000_20261102/verification.json).
 
 ### BEFORE 세 모델 8명·16토큰·64환경·1회 평가
 

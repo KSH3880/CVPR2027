@@ -42,6 +42,16 @@ BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는
 - `BEFORE_PICKUP_CARRY_RSI=loco`가 기본이다. RSI433 두 설정은 `mix`, `pickup`, `carry`를 지원한다. `mix`는 후행 ON_TOP의40/30/30 요청 분포이며 유효 프레임/배치 실패는 loco로 fallback한다. mix226 loco 설정은 loco만 지원한다.
 - `BEFORE_FOLLOWER_NEAR=0`은 저장된 혼합을 쓴다.1은 near50의 상대 가까움 또는 mix226 중간 모드다.2는 mix226의 가장 짧은 모드이며 near50에서는 거부한다.
 - `TASK_ROLE_SWAP=1`은 fixed preset의 역할 교환이다. 과제·스킬 값은 [추론 옵션](config.md#추론-옵션)을 따른다.
+- `BEFORE_AT_GOAL_DISTANCE=7`은 goalroute BEFORE test/VNC에서 선행 공유상자 중심→AT 목표의 초기 XY 거리를7m로 고정한다. 양의 유한한 실수(m)를 지정하며 생략하면 저장된 샘플링을 유지한다. 기존 목표 방향·Z와 사람→상자 배치 규칙은 유지하고, 후행은 변경된 목표와 선행 경로 길이를 기준으로 기존 goalroute/near50 절차를 적용한다. 독립 과제의 목표·모델·보상·gate·checkpoint 계약은 바꾸지 않는다. loco 추론 전용이며 학습/direct 정식 평가 CLI에서는 거부한다. 직접 실행 인자는 `--before_at_goal_distance 7`이다.
+- `BEFORE_FOLLOWER_GOAL_DISTANCE=4`는 선행 AT 목표→후행 사람 root의 초기 XY 거리를4m로 고정한다. SIT·CLIMB·ON_TOP 모두 사람 기준이며 위 선행 거리와 독립적으로 지정할 수 있다. ON_TOP은 사람과 payload를 함께 평행 이동하여 사람→payload 배치를 유지하므로 payload→목표 거리는 기존1–5m 범위를 벗어날 수 있다. 수동 배치에서는 near50 경로 부등식과 목표→사람 최소1m 조건을 대체하되 물리 충돌 검사는 유지한다. 양의 유한한 실수만 허용하며 생략 시 기존 샘플링이다. goalroute loco 추론 전용이며 정식 평가·학습에서는 거부한다. 직접 인자는 `--before_follower_goal_distance 4`다.
+
+```bash
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=6 PORT=6080 SEED=2 TASK_GRAPH=before_climb BEFORE_AT_GOAL_DISTANCE=7 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=6 PORT=6187 SEED=2 TASK_GRAPH=before_climb BEFORE_AT_GOAL_DISTANCE=7 BEFORE_FOLLOWER_GOAL_DISTANCE=4 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
+```
 
 ## 서버 viewer
 
@@ -140,3 +150,23 @@ PUSH AT의 viewer/VNC에는 바닥 링(반지름35cm)·세로선·와이어 구(
 ### goal5 기반 BEFORE 목표 중심 후행 배치
 
 세 `stage2_before_push_near50_pair50_source5*_goal5_goalroute`는 각각 기존 goal5의 단독 거리·모델·보상·Virtual/비대칭 설정을 유지하고 BEFORE 후행 배치와 near50 거리 정의만 바꾼다. 기본 Stage1 26k 전이로 새 학습하며, 기존 goal5 저장본과 resume/추론을 혼용하지 않는다. 실행 명령은 [config](config.md), 상세 거리·샘플링 순서는 [BEFORE PUSH](reference/stage2_before_push.md#goal5-기반-목표-중심-후행-배치)를 따른다.
+
+### Virtual 후행 대기 종료
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait`는 기존 virtual_goal5_goalroute에서 대기 중 연속 이동 종료만 추가한 별도 실험이다. 기본 Stage1 26k 전이를 사용하며 기존 virtual 저장본과 resume/추론을 혼용하지 않는다. 설정·해제 조건·정식 평가 적용 범위는 [BEFORE PUSH 상세](reference/stage2_before_push.md#virtual-후행-대기-종료), 실행은 [config](config.md)를 따른다.
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2`는 대기 반경+1m·유예0초·XYZ 속력의 누적1초 위반 종료와 AT3D20cm 성공 기준을 사용한다. 기본 Stage1 26k 전이로 시작하며 기존 wait 저장본을 resume하지 않는다. [wait_v2 상세](reference/stage2_before_push.md#wait_v2-유예-없는-누적-xyz-이동-종료), [GPU4 실행 명령](config.md)을 따른다.
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3`는 wait_v2와 동일하며 대기 진입 반경만 r_box+2m다. 전용 설정/출력으로 Stage1 26k부터 새 학습하며 wait_v2 checkpoint의 직접 resume은 계약이 달라 허용하지 않는다. [실행 명령](config.md).
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty`는 virtual_goal5_goalroute 기반으로 AT 추가1mm 높이 제한을 해제하고, 대기 반경 진입 후 개인 XYZ 속도 페널티를 적용한다. 대기 위반으로 조기 종료하지 않는다. 별도 Stage1 26k 전이로 새 학습하며 기존 virtual/wait checkpoint와 resume을 혼용하지 않는다. [페널티 상세](reference/stage2_before_push.md#virtual-대기-속도-페널티), [실행 명령](config.md).
+
+
+### BEFORE viewer 대기 종료 끄기
+
+`BEFORE_WAIT_TERMINATION=0`을 wait/wait_v2/wait_v3의 `_test.sh` 또는 `_vnc.sh` 앞에 붙이면 해당 실행에서 대기 위반 조기 종료만 끈다. 기본값1은 기존 동작이다. 낙상/시간 종료·보상·성공 gate·checkpoint 설정은 유지하며 penalty 모델의 속도 감점도 바꾸지 않는다. 직접 run.py 추론에서는 `--disable_before_wait_termination`을 사용한다. 학습에는 이 CLI 옵션을 허용하지 않는다. 정식 평가는 기존 규약대로 이미 대기 종료를 제외한다.
+
+```bash
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3
+BEFORE_WAIT_TERMINATION=0 TOKENHSI_GPU=4 PORT=6080 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3_vnc.sh "$CKPT" 4 1 8 10
+```

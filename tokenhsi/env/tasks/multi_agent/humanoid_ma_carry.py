@@ -126,6 +126,8 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
             "box_speed",
             "total",
         )
+        if cfg['env'].get('before', {}).get('waiting_penalty') is not None:
+            self.REWARD_TERM_NAMES = self.REWARD_TERM_NAMES[:-1] + ('wait_penalty', 'total')
         self._enable_task_obs = cfg["env"]["enableTaskObs"]
         self._only_vel_reward = cfg["env"]["onlyVelReward"]
         self._only_height_handheld_reward = cfg["env"]["onlyHeightHandHeldReward"]

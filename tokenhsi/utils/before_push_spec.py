@@ -16,6 +16,8 @@ def validate_env(env, evaluation=False):
     from utils.experiments import native_config
     from utils.task_role_spec import TASK_PROBS
     from utils.before_object_alias import MODE, VIRTUAL_MODE
+    if env['relationGraph'].get('human_relation_fusion', 'none') not in ('none', 'before_zerobg'):
+        raise ValueError('Invalid BEFORE human relation fusion mode')
     virtual = env['relationGraph'].get('before_virtual_object')
     if virtual is not None and (virtual != VIRTUAL_MODE or env['relationGraph'].get('before_object_alias') != MODE):
         raise ValueError('BEFORE virtual objects require at_goal_xyz_v1 and object aliases')
@@ -48,6 +50,8 @@ def validate_env(env, evaluation=False):
     before=deepcopy(env['before'])
     goal_distance=before.pop('goal_distance',None)
     asymmetric=before.pop('asymmetric_progress',None)
+    waiting=before.pop('waiting_termination',None)
+    penalty=before.pop('waiting_penalty',None)
     if before.get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
         if goal_distance != [1.,5.] or before.get('source_max_distance') != 5.:
             raise ValueError('Goal-centered BEFORE requires source5 and goal5')
@@ -62,6 +66,25 @@ def validate_env(env, evaluation=False):
         if (type(goal_distance) is not list or goal_distance!=[1.,5.]
                 or any(type(value) not in (int,float) for value in goal_distance) or before!=limited):
             raise ValueError('BEFORE goal distances require source5 and [1.0, 5.0]')
+    if 'waiting_termination' in env['before']:
+        keys={'radius_buffer','speed_threshold','grace_seconds','moving_seconds'}
+        if (not isinstance(waiting,dict) or not keys <= set(waiting)
+                or set(waiting)-keys-{'speed_axes','violation_mode'}
+                or any(type(waiting[k]) not in (int,float) or not math.isfinite(waiting[k])
+                       or (waiting[k]<0 if k=='grace_seconds' else waiting[k]<=0) for k in keys)
+                or waiting.get('speed_axes','xy') not in ('xy','xyz')
+                or waiting.get('violation_mode','continuous') not in ('continuous','cumulative')
+                or before!=limited or virtual!=VIRTUAL_MODE or asymmetric is not None):
+            raise ValueError('BEFORE waiting termination requires source5 virtual, valid movement modes and finite positive parameters (grace may be zero)')
+    if 'waiting_penalty' in env['before']:
+        keys={'radius_buffer','coefficient'}
+        if (not isinstance(penalty,dict) or not keys <= set(penalty)
+                or set(penalty)-keys-{'ontop_distance_source'}
+                or any(type(penalty[k]) not in (int,float) or not math.isfinite(penalty[k]) or penalty[k]<=0 for k in keys)
+                or penalty.get('ontop_distance_source','payload') not in ('payload','human')
+                or 'waiting_termination' in env['before'] or asymmetric is not None
+                or before!=limited or virtual!=VIRTUAL_MODE):
+            raise ValueError('BEFORE waiting penalty requires source5 virtual, positive radius/coefficient and no waiting termination')
     if before not in (original,near,limited):
         raise ValueError('BEFORE PUSH requires the mix226 or near50 distance contract with loco-only initialization')
     old=deepcopy(env)

@@ -74,6 +74,33 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
         from env.tasks.multi_agent.before_reward import BeforeRuntime
         self.relation_runtime = BeforeRuntime(self.num_envs, self.relation_runtime.graph,
                                               self._relation_cfg, self.device)
+        self._before_wait = None
+        option = self.cfg['env']['before'].get('waiting_termination')
+        if option is None:
+            option = self.cfg['env']['before'].get('waiting_penalty')
+        if option is not None:
+            from env.tasks.multi_agent.before_wait import BeforeWait
+            self._before_wait = BeforeWait(self.relation_runtime.graph, self.num_envs,
+                                          self.dt, option, self.device)
+
+    def _reset_relation_history(self, env_ids):
+        super()._reset_relation_history(env_ids)
+        if self._before_wait is not None:
+            self._before_wait.reset(env_ids, self.relation_runtime.graph,
+                                    self.relation_runtime.own_success)
+
+    def _compute_reset(self):
+        super()._compute_reset()
+        if (self._before_wait is None or self.cfg['env']['before'].get('waiting_termination') is None
+                or getattr(self.cfg['args'], 'eval_protocol', '')
+                or getattr(self.cfg['args'], 'disable_before_wait_termination', False)):
+            return
+        terminate = self._before_wait.step(self._rigid_body_pos[..., 0, :],
+            self._humanoid_root_states[..., 7:10], self._logical_box_values(self._box_states),
+            self._logical_box_values(self._box_size), self._tar_pos,
+            self.relation_runtime.last_result['raw_own_success'])
+        self._terminate_buf[:] |= terminate.flatten().to(self._terminate_buf.dtype)
+        self.reset_buf[:] |= terminate.any(-1).to(self.reset_buf.dtype)
 
     def _evaluate_ontop_context(self, env_ids=None):
         phi, diag = super()._evaluate_ontop_context(env_ids)

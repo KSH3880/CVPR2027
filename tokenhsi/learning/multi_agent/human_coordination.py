@@ -70,9 +70,23 @@ class HumanCoordination(nn.Module):
         shuffle_human_order=False,
         bias_mode="all",
         relations=3,
+        relation_fusion="none",
     ):
         super().__init__()
         self.shuffle_human_order = shuffle_human_order
+        self.relation_fusion = None
+        if relation_fusion not in ('none', 'before_zerobg'):
+            raise ValueError('Unknown human relation fusion mode')
+        if relation_fusion == 'before_zerobg':
+            if relations != 4 or bias_mode != 'all':
+                raise ValueError('BEFORE fusion requires four relations and unmasked attention')
+            from learning.multi_agent.before_relation_fusion import BeforeRelationFusion, BeforeFusionCoordinationBlock
+            self.blocks = nn.ModuleList([
+                BeforeFusionCoordinationBlock(width, heads, feedforward_dim)
+                for _ in range(num_layers)
+            ])
+            self.relation_fusion = BeforeRelationFusion(width)
+            return
         self.blocks = nn.ModuleList(
             [
                 CoordinationBlock(width, heads, feedforward_dim, relations, bias_mode=bias_mode)
@@ -81,6 +95,8 @@ class HumanCoordination(nn.Module):
         )
 
     def init_identity(self):
+        if self.relation_fusion is not None:
+            self.relation_fusion.reset_output()
         for block in self.blocks:
             nn.init.zeros_(block.attention.out_proj.weight)
             nn.init.zeros_(block.attention.out_proj.bias)
@@ -98,7 +114,10 @@ class HumanCoordination(nn.Module):
             relations = relations[:, order][:, :, order]
         padding = torch.zeros((), device=humans.device, dtype=torch.bool)
         for block in self.blocks:
-            context = block(context, None, relations, padding)
+            if self.relation_fusion is None:
+                context = block(context, None, relations, padding)
+            else:
+                context = block(context, None, relations, padding, self.relation_fusion)
         if self.shuffle_human_order:
             context = context[:, order.argsort()]
         has_task = packet.reshape(packet.shape[0], -1, 5)[..., 0].bool().any(-1)

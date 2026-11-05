@@ -16,11 +16,25 @@ def apply_layout(task, ids):
     if not len(env):
         return
     goal = task._tar_pos[env, goal_index, :2]
+    distance = getattr(task.cfg['args'], 'before_at_goal_distance', None)
+    if distance is not None:
+        source_xy = task._box_states[env, source, :2]
+        direction = goal-source_xy
+        goal = source_xy+distance*direction/direction.norm(dim=-1, keepdim=True)
+        task._tar_pos[env, goal_index, :2] = goal
     roots = task._humanoid_root_states
     leader_route = ((roots[env, leader, :2]-task._box_states[env, source, :2]).norm(dim=-1)
                     +(task._box_states[env, source, :2]-goal).norm(dim=-1))
-    desired, payload = sample_layout(goal, leader_route, task._templates[env, follower],
-                                    task._before_near_pairs[env, follower])
+    follower_distance = getattr(task.cfg['args'], 'before_follower_goal_distance', None)
+    near = task._before_near_pairs[env, follower]
+    if follower_distance is not None:
+        near = torch.zeros_like(near)
+    desired, payload = sample_layout(goal, leader_route, task._templates[env, follower], near)
+    if follower_distance is not None:
+        direction = desired-goal
+        fixed = goal+follower_distance*direction/direction.norm(dim=-1, keepdim=True)
+        payload += fixed-desired
+        desired = fixed
     delta = desired-roots[env, follower, :2]
     roots[env, follower, :2] += delta
     task._kinematic_humanoid_rigid_body_states[env, follower, :, :2] += delta[:, None]
@@ -30,6 +44,8 @@ def apply_layout(task, ids):
 
 
 def invalid(task, ids, margin=0.):
+    if getattr(task.cfg['args'], 'before_follower_goal_distance', None) is not None:
+        return torch.zeros(len(ids), dtype=torch.bool, device=ids.device)
     row, env, follower, leader, source, goal_index = pair_values(task, ids)
     payload = task._scenario_physical_object(env, follower)
     goal = task._tar_pos[env, goal_index, :2]
