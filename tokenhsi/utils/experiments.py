@@ -25,11 +25,18 @@ COUPLED_SHRINK1="stage2_coupled_push_individual_goal_solo5_shrink1"
 COUPLED_CARRY5_GROUND="stage2_coupled_push_individual_goal_solo5_carry5_ground"
 COUPLED_RELFUSION_A="stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg"
 COUPLED_RELFUSION_B="stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg"
-NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B)
+STAGE2 = 'stage2'
+DISTILL = 'stage2_distill'
+STAGE2_900 = 'stage2_900'
+DISTILL_900 = 'stage2_distill_900'
+STAGE2_NAMES = (STAGE2, DISTILL, STAGE2_900, DISTILL_900)
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B, STAGE2, DISTILL, STAGE2_900, DISTILL_900)
 
 
 def experiment_horizon(name):
-    return 1200 if name.startswith("stage2_") else 900
+    if name in (STAGE2_900, DISTILL_900):
+        return 900
+    return 1200 if name == STAGE2 or name.startswith("stage2_") else 900
 BEFORE_NAMES = (NEAR, MIX, MIX_RSI)
 
 
@@ -101,6 +108,20 @@ def validate_experiment(name, env, train, evaluation=False):
             raise ValueError('PUSH policy requires its own saved environment')
         from utils.stage1_jointpush import validate_env
         validate_env(env)
+    elif name in STAGE2_NAMES:
+        from utils.stage2_spec import validate_env
+        from utils.coupled_push_spec import checkpoint_contract
+        validate_env(env)
+        if not evaluation and env['numAgents'] != 4:
+            raise ValueError('stage2 training uses four people; larger scenes are inference-only')
+        if checkpoint_contract(env, inference=True) != checkpoint_contract(native['env']):
+            raise ValueError('stage2 environment differs from selected experiment')
+        if not evaluation and env['episodeLength'] != experiment_horizon(name):
+            raise ValueError(f'{name} training requires {experiment_horizon(name)} steps')
+        params['config']['minibatch_size'] = params['config'].get('scene_minibatch_size', 4096)*env['numAgents']
+        if name in (DISTILL, DISTILL_900):
+            from utils.stage2_distill_spec import validate_config
+            validate_config(params)
     elif name in (COUPLED, COUPLED_GOAL5, COUPLED_INDIVIDUAL, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B):
         from utils.coupled_push_spec import checkpoint_contract,validate_env
         validate_env(env)

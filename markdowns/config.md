@@ -4,14 +4,17 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 스무 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 유지하는 실험은 아래 스물네 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
 - 학습 인자: `[agents] [envs] [objects]`. 기본값은 Stage1·Stage1 PUSH **2명·2048환경·4물체**, BEFORE·coupled **4명·1024환경·8토큰**이다. BEFORE는 인원 N≥1·토큰 M≥2N, coupled는 인원 N≥1·토큰 M≥N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_coupled_push_individual_goal_solo5_carry5`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`·`stage2_coupled_push_individual_goal_solo5_keep1`·`stage2_coupled_push_individual_goal_solo5_shrink1`·`stage2_coupled_push_individual_goal_solo5_carry5_ground`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`은 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
-- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이다.
+- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`은 학습·평가·viewer 모두 **900step**이다.
+- 정식 평가의 기존 과제/관계 지표와 추가 interaction group 성공률 정의는 [평가 규약](reference/evaluation.md#통합-stage2의-interaction-group-성공률)을 따른다.
 - 모든 test의 기본값은 viewer다. 로컬 추론은 `HEADLESS=0`, 화면 없는 진단은 `HEADLESS=1`이다. **정식 평가는 `*_eval.sh`**, 1명 단독 평가는 **Stage1 계열 전용 `stage1_single_eval.sh`·`stage1_push_single_eval.sh`**로 구분한다. 일반 평가는 저장된 학습 인원·물체 수를 유지한다.
+
+- `stage2`·`stage2_distill`·`stage2_900`·`stage2_distill_900` 학습은 4명·1024환경·8토큰이 기본이다. N≥4·M≥N을 지원하며 5명 이상은 전용 그룹 스폰 옵션을 사용한다. 두 teacher viewer와 확장 인자는 [USAGE](USAGE.md#두-teacher-제로샷-viewer)를 따른다. 전이는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`를 사용한다.
 
 ## 현재 컨피그
 
@@ -37,6 +40,10 @@
 | [stage2_coupled_push_individual_goal_solo5_carry5_ground.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground.yaml) | [stage2_coupled_push_individual_goal_solo5_carry5_ground.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push_individual_goal_solo5_carry5_ground.yaml) |
 | [stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg.yaml) | [stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg.yaml) |
 | [stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg.yaml) | [stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg.yaml) |
+| [stage2.yaml](../tokenhsi/data/cfg/multi_agent/stage2.yaml) | [stage2.yaml](../tokenhsi/data/cfg/train/rlg/stage2.yaml) |
+| [stage2_distill.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill.yaml) | [stage2_distill.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill.yaml) |
+| [stage2_900.yaml](../tokenhsi/data/cfg/multi_agent/stage2_900.yaml) | [stage2_900.yaml](../tokenhsi/data/cfg/train/rlg/stage2_900.yaml) |
+| [stage2_distill_900.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900.yaml) | [stage2_distill_900.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900.yaml) |
 
 ## 학습
 
@@ -100,6 +107,18 @@ TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_
 
 # stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg
 TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg_train.sh 4 1024 8
+
+# stage2
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_train.sh 4 1024 8
+
+# stage2_distill
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_train.sh 4 1024 8
+
+# stage2_900
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_900_train.sh 4 1024 8
+
+# stage2_distill_900
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -166,6 +185,18 @@ TOKENHSI_GPU=2 HEADLESS=0 COUPLED_ASSIGNMENT=ordered bash tokenhsi/scripts/multi
 
 # stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg
 TOKENHSI_GPU=2 HEADLESS=0 COUPLED_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg_test.sh "$CKPT" 4 1 8 10
+
+# stage2
+TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_test.sh "$CKPT" 4 1 8 10
+
+# stage2_distill
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_test.sh "$CKPT" 4 1 8 10
+
+# stage2_900
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_900_test.sh "$CKPT" 4 1 8 10
+
+# stage2_distill_900
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_900_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -232,6 +263,18 @@ TOKENHSI_GPU=2 COUPLED_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stag
 
 # stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg
 TOKENHSI_GPU=2 COUPLED_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_distill
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_900
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_900_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_distill_900
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -239,7 +282,7 @@ TOKENHSI_GPU=2 COUPLED_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stag
 - `TASK_GRAPH=random_scenario`가 기본이다. Stage1: `sit`, `climb`, `holding_at`, `holding_ontop`, `sit_climb`. BEFORE: `before_sit`, `before_climb`, `before_stack`, `one_pair_sit`, `one_pair_climb`, `one_pair_stack`, `all_solo`, `sit`, `climb`, `holding_at`, `holding_ontop`.
 - `EVAL_SKILLS`와 `EVAL_SKILL_PROBS`는 함께 지정한다. 예: `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`. BEFORE의 기본 초기화는 loco이며 후행 RSI는 별도 옵션으로 선택한다.
 - `TASK_CAMERA=stack` 또는 `agent`로 viewer 카메라를 선택한다. 그 외 초기화·거리·resume·실행 환경 옵션은 [USAGE](USAGE.md)를 따른다.
-- coupled test/VNC의 `COUPLED_ASSIGNMENT=random|ordered|distance|optimal`(기본 random)은 공동 사람↔구역 배정이다. ordered는 좌우 정렬, distance는 총 접근 거리 최소화, optimal은 교차 우선이다. 직접 실행은 `--coupled_assignment`; 학습/resume·정식 평가의 비random 변경은 받지 않는다. [계산 방식·인원별 탐색](USAGE.md#공통-stage2-push와-coupled).
+- coupled test/VNC의 `COUPLED_ASSIGNMENT=random|ordered|distance|optimal`(기본 random)은 공동 사람↔구역 배정이다. ordered는 좌우 정렬, distance는 총 접근 거리 최소화, optimal은 교차 우선이다. 직접 실행은 `--coupled_assignment`; 학습/resume·기본 정식 평가의 비random 변경은 받지 않는다. 통합 Stage2 네 컨피그의 viewer/eval은 ordered가 기본이며 인원·토큰 확장 평가도 지원한다. [계산 방식·인원별 탐색](USAGE.md#공통-stage2-push와-coupled).
 - 개인 목표 coupled test/VNC의 `COUPLED_PEERS=all|keep3|shrink3`(기본 all)은 5명 이상 공동 그룹의 사람 attention 상대 선택이다. keep3은 미접촉 상대 우선 최대3명을 유지하고, shrink3은 접촉한 상대를 빼 전원 접촉 시0명으로 줄인다. 직접 실행은 `--coupled_peers`; [접촉·갱신 규칙](USAGE.md#공통-stage2-push와-coupled).
 - 이후 사용자 공동 PUSH 평가는 ordered를 사용하며, 현재는 전용 비교 실행기로 채점한다. [ordered 평가 실행법](USAGE.md#공통-stage2-push와-coupled).
 
@@ -362,3 +405,5 @@ TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_
 # stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg
 TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg_eval.sh "$CKPT" --output output_etc/check/stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg_general
 ```
+
+- `stage2`의 `TASK_GRAPH`는 `random_scenario`, `before`, `coupled`, `mixed`, `all_solo`, `all_coupled`, `before_sit`, `before_climb`, `before_stack` 및 기존 단독 과제 preset을 지원한다.

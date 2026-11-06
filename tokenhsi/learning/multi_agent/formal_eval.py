@@ -6,6 +6,7 @@ import torch
 from utils.evaluation_protocol import HORIZON, TASK_NAMES, spatial_success, predecessors, coupled_current_success, coupled_scores
 from utils.task_role_spec import task_graph_packet
 from utils.evaluation_protocol import shared_center_success, shared_center_scores
+from utils.evaluation_protocol import interaction_group_scores
 
 
 def freeze_fallen(task, newly_fallen):
@@ -44,6 +45,9 @@ def run_formal_eval(player):
     goals = task._tar_pos.clone()
     groups=(obs["obs"][:,-m:].long().clone() if getattr(task,"_stage2_push",False)
             else torch.arange(m,device=task.device)[None].expand(n,-1))
+    if task.cfg['env'].get('stage2') is not None:
+        from utils.stage2_spec import evaluation_groups
+        groups = evaluation_groups(packet, groups)
     individual_goals = getattr(task, '_individual_push_goals', False)
     coupled_ever = torch.zeros_like(ever)
     if individual_goals:
@@ -112,10 +116,21 @@ def run_formal_eval(player):
                 horizon=horizon, simulated_steps=step, deterministic=True, control_dt=task.dt, scores=scores,
                 falls=int((fall_step >= 0).sum()), fall_rate=float((fall_step >= 0).double().mean()),
                 source_config=args.resolved_env_config)
+    if task.cfg['env'].get('stage2') is not None:
+        data['coupled_assignment'] = args.coupled_assignment
+    if getattr(args, 'teacher_before', ''):
+        data['policy'] = 'two_teachers'
+        data['teachers'] = json.loads((path/'teachers.json').read_text())
+    if getattr(args, 'group_spawn_over4', False):
+        data['group_spawn_over4'] = dict(min_center_gap=5., coupled_cap=4,
+            sampler='sequential_solo_before_coupled', unused_distractors=False,
+            coupled_assignment=args.coupled_assignment)
     if individual_goals:
         data['push_goal_mode'] = 'individual'
         data['coupled_scores'] = coupled_scores(groups, ever, current, coupled_ever, coupled_current)
         data['shared_center_scores'] = shared_center_scores(groups, center_ever, center_current)
+        data['interaction_group_scores'] = interaction_group_scores(
+            packet[..., 0].bool(), parent, groups, ever, center_ever)
     if peer_mode != 'all':
         data['coupled_peer_selection'] = peer_mode
         data['unselected_coupled'] = 'NONE'

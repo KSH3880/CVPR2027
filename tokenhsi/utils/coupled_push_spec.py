@@ -15,6 +15,9 @@ def checkpoint_contract(env, inference=False):
     result = dict(policy=deepcopy(env['stage2Policy']),push=push_contract(env),
         coupled=deepcopy(env['stage2JointPush']),graph=deepcopy(env['relationGraph']),
         box=deepcopy(env['box']),people=env['numAgents'],objects=env['numObjects'])
+    if env.get('stage2') is not None:
+        result.update(stage2=deepcopy(env['stage2']), before=deepcopy(env['before']),
+                      reward=deepcopy(env['relationReward']))
     if inference and env['numAgents'] >= 1 and env['numObjects'] >= env['numAgents']:
         result.update(people=4, objects=8)
         result['coupled']['physical_boxes'] = physical_box_count(4)

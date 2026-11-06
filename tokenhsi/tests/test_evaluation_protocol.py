@@ -4,6 +4,48 @@ import math
 import pytest
 import torch
 from utils.evaluation_protocol import configure, spatial_success, single_at_sizes, AT_SIZES
+from utils.evaluation_protocol import interaction_group_scores, summarize_interaction_groups, INTERACTION_METRICS
+
+
+def test_interaction_groups_exclude_enabling_leader_and_count_coupled_groups_once():
+    valid = torch.ones(1, 10, dtype=torch.bool)
+    parent = torch.tensor([[-1, 0, -1, -1, -1, -1, -1, -1, -1, -1]])
+    groups = torch.tensor([[0, 1, 2, 2, 2, 2, 6, 6, 8, 9]])
+    ever = torch.zeros(1, 10, 2, dtype=torch.bool)
+    ever[0, 0] = True
+    ever[0, 1, 0] = True
+    ever[0, 8] = True
+    ever[0, 9, 1] = True
+    centers = torch.tensor([[False, False, True, True, True, True, False, False, False, False]])
+    scores = interaction_group_scores(valid, parent, groups, ever, centers)
+    for label, rates in [('point', [.5, 1., .5, 2/3]), ('region', [1., 0., .5, .5])]:
+        assert [scores[label][name]['rate'] for name in INTERACTION_METRICS] == rates
+        assert [scores[label][name]['groups'] for name in INTERACTION_METRICS[:3]] == [2, 1, 2]
+
+
+def test_missing_interaction_type_does_not_become_zero_or_partial_macro():
+    scores = interaction_group_scores(torch.tensor([[True, False]]),
+        torch.tensor([[-1, -1]]), torch.tensor([[0, 1]]),
+        torch.ones(1, 2, 2, dtype=torch.bool), torch.zeros(1, 2, dtype=torch.bool))
+    for label in ('point', 'region'):
+        assert scores[label][INTERACTION_METRICS[0]] == dict(groups=1, success=1, rate=1.)
+        assert scores[label][INTERACTION_METRICS[1]]['rate'] is None
+        assert scores[label][INTERACTION_METRICS[-1]]['rate'] is None
+
+
+def test_interaction_summary_averages_seed_rates_before_pooling_counts():
+    runs = []
+    for rates, counts in [([1., 0., 0.], [1, 1, 1]), ([0., 1., 1.], [9, 1, 1])]:
+        scores = {name: dict(groups=count, success=int(rate*count), rate=rate)
+                  for name, rate, count in zip(INTERACTION_METRICS, rates, counts)}
+        scores[INTERACTION_METRICS[-1]] = dict(rate=sum(rates)/3)
+        runs.append(dict(point=scores, region=scores))
+    result = summarize_interaction_groups(runs)
+    assert result['point'][INTERACTION_METRICS[0]]['mean'] == .5
+    assert result['point'][INTERACTION_METRICS[0]]['groups'] == 10
+    macro = result['point'][INTERACTION_METRICS[-1]]
+    assert macro['mean'] == .5
+    assert macro['std'] == pytest.approx(math.sqrt(1/18))
 
 
 def inputs(kind):

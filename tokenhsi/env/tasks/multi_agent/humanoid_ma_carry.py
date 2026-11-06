@@ -46,7 +46,7 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
     ):
         self._coupled = cfg["env"].get("stage2JointPush") is not None
         self._stage2_push = cfg["env"].get("stage2Policy") is not None
-        self._before = cfg["env"].get("before") is not None
+        self._before = cfg["env"].get("before") is not None and cfg['env'].get('stage2') is None
         self._relation_cfg = cfg["env"]["relationReward"]
         validate_relation_config(self._relation_cfg)
         from utils.unified_training import validate_unified_env
@@ -69,6 +69,9 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
             allowed_presets = (*PRESETS, "push") if cfg["env"].get("jointPush") is not None else PRESETS
         if self._coupled:
             from utils.coupled_push_spec import PRESETS
+            allowed_presets = PRESETS
+        if cfg['env'].get('stage2') is not None:
+            from utils.stage2_spec import PRESETS
             allowed_presets = PRESETS
         if self._task_graph_preset not in allowed_presets or getattr(
             cfg["args"], "task_camera", "stack"
@@ -126,6 +129,8 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
             "box_speed",
             "total",
         )
+        if cfg['env'].get('before', {}).get('waiting_penalty') is not None:
+            self.REWARD_TERM_NAMES = self.REWARD_TERM_NAMES[:-1] + ('wait_penalty', 'total')
         self._enable_task_obs = cfg["env"]["enableTaskObs"]
         self._only_vel_reward = cfg["env"]["onlyVelReward"]
         self._only_height_handheld_reward = cfg["env"]["onlyHeightHandHeldReward"]

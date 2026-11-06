@@ -2,7 +2,52 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-06
+
+### Distill900 0.5k·1k·1.5k 평가와 interaction group 성공률
+
+- 기존 모든 지표를 보존하고 풀네임의 Independent Interaction Success Rate·Enabling Interaction Group Success Rate·Coupled Interaction Group Success Rate·Mixed Interaction Group Success Rate를 point/region별로 추가했다. Enable은 선행/후행 각각 ever, coupled는 실제 공유 상자 중심 ever, mixed는 seed별 세 유형 동일 가중 평균이다. Enable 선행자를 solo에 중복 집계하지 않고 공동 그룹은 인원과 관계없이1개로 센다. Seed 평균/표본std와 CPU trace 재채점도 연결했다. [정의](markdowns/reference/evaluation.md#통합-stage2의-interaction-group-성공률).
+- 사용자 지정0.5k/1k/1.5k PTH를4명·8토큰·512환경×seed0/1/2·ordered·native random_scenario·900step으로 GPU6/7/2에서 평가했다. CPU21 passed,9회 모두 GPU/CPU 기존·새 지표/건수·finite 일치,3모델×각seed 초기 상태 전체필드 exact 일치,epoch/frame/SHA256·관계 분모 분할을 확인했다. 기존 학습 PID265779는 보존했고 평가 프로세스는 모두 종료했다. [보고서](output_etc/check/stage2_distill_900_eval_0500_1000_1500_20261106/report.md), [검증](output_etc/check/stage2_distill_900_eval_0500_1000_1500_20261106/verification.json).
+- 영역 Mixed Interaction Group Success Rate는0.5k/1k/1.5k=75.79±0.14/75.73±0.47/76.32±0.21%다. Enabling Interaction Group Success Rate는41.99±1.04/40.67±0.56/42.66±1.24%다. 이번 Independent 지표는 혼합 샘플 안 solo이며 독립 전용 장면 또는2/8/16명 확장 평가 결과가 아니다.
+
+### 900step VNC의 GPU UUID 거부 수정
+
+- VNC가 숫자 GPU를 UUID로 바꾼 뒤 자식 launcher에 전달할 때900 버전 GPU 제한이 이를 거부하던 오류를 수정했다. `nvidia-smi`로 UUID/숫자를 물리 인덱스로 확인한 뒤 기존2/6/7 제한을 적용한다. 실행 명령과 실행 중 학습은 변경하지 않았다.
+- GUI→자식 launcher의 숫자/UUID 허용·제외 GPU 거부를 포함해 CPU12 passed. GPU6의 실제 runtime UUID를 그대로 자식 test wrapper에 전달해500iteration student PTH·4명·혼합·1환경·2step 화면 없는 추론을 완료했다. 검증 프로세스는 종료했으며 VNC 화면은 새로 실행하지 않았다. [CPU](output_etc/check/stage2_900_gui_uuid_20261106/cpu.log), [추론](output_etc/check/stage2_900_gui_uuid_20261106/rollout.log).
+
+### Distill900 teacher 사용자 지정21k·17k
+
+- `stage2_distill_900` 학습 YAML의 teacher 경로만 사용자 지정 enable21k(11월5일22:58 run)·coupled17k로 변경했다. 1200step `stage2_distill`의 teacher와 공용 심링크는 유지한다. 실행 명령은 기존900 버전 train wrapper 그대로다.
+- CPU에서 두 PTH의 epoch·원래 fusion·모델/RMS strict 로드·동결·사람별 행동 선택·finite를 확인했다. 학습과 시뮬레이션은 실행하지 않았다. [검증](output_etc/check/stage2_distill_900_teachers_21k17k_20261106/verification.json).
+
+### 통합 RL·distillation 900step 컨피그
+
+- 사용자 요청으로 `stage2_900`·`stage2_distill_900` 환경/학습 YAML과 전용 train/test/VNC/eval wrapper를 추가했다. 기존1200step 설정에서 에피소드 제한과 실험/저장 이름만 분리했으며 모델·샘플링·보상·teacher·수집/업데이트 설정은 같다. 학습 검증·viewer·정식 평가도900step으로 연결했다. 새 wrapper의 GPU는2/6/7만 허용하며 기본6이다. [명령](markdowns/config.md), [추가 옵션](markdowns/USAGE.md#통합-stage2-900step-버전).
+- CPU203 passed/3 skipped, 원본과 YAML 차이·1024환경 학습 CLI 설정·잘못된1200step 입력 거부·wrapper/Python 구문·새 문서 링크를 확인했다. GPU6/7에서 각각16환경×6장면의 finite·alias·부분 reset·가중치 보존과899step 미종료/900step 종료·reset을 확인했다. Distill900 환경에서 기존1200step teacher 두 개의 로드/행동/동결도 확인했다. 학습 업데이트와 viewer는 실행하지 않았다. [CPU](output_etc/check/stage2_900_20261106/cpu.log), [RL 물리](output_etc/check/stage2_900_20261106/physics_rl/physics_validation.json), [distill 물리](output_etc/check/stage2_900_20261106/physics_distill/physics_validation.json).
+
+- GPU2/6에서 기존 확인용 PTH로 각각16환경×seed0·ordered·900step 평가를 완료하고 CPU 재채점/성공 건수 exact 일치·finite를 확인했다. 이는 실행 경로 검증이며 새 모델 학습/성능 실험이 아니다. 검증 시뮬레이션은 모두 종료했다. [검증 요약](output_etc/check/stage2_900_20261106/verification.json).
+
+### 통합 M≥N 토큰 예산 · ordered eval · Stage2 distillation
+
+- 사용자 요청으로 통합 `stage2`의 M≥2N 제한을 M≥N으로 완화했다. 관계/행동을 뽑은 뒤 실제 작업 슬롯·ON_TOP 받침·enable alias를 합산하고 부족한 환경 행만 재샘플링한다. M≥2N은 기존 샘플/RNG를 보존한다. 불가능한 고정 프리셋과 M=N 고정mixed의 크기 비호환은 명확한 오류로 처리한다. [명세](markdowns/reference/stage2.md#물체와-관측).
+- 통합 `stage2`·`stage2_distill` 및 두 teacher의4명/확장 viewer·eval 기본 배정을 ordered로 맞췄다. 단일 모델 eval에도 인원/토큰/5m 확장 인자를 연결하고 manifest/result에 배정 방식을 기록한다. 학습의 랜덤 구역 배정은 유지했다.
+- `stage2_distill` 환경/학습 YAML·train/test/VNC/eval wrapper와 실행 가능한 teacher 모방 루프를 추가했다. Stage1 26k에서 시작해 actor encoder/RMS·critic/AMP를 고정하고 actor coordination/fusion/action head만 평균 행동 MSE로 학습한다. Enable/solo는 enable13.5k, 공동 PUSH는 coupled25.5k teacher 정답을 사용한다. Teacher 실행20iteration 후180iteration 선형 전환·65,536scene replay·optimizer/replay/epoch 복원을 지원한다. [실행](markdowns/USAGE.md#stage2-distillation), [학습 명세](markdowns/reference/stage2_distill.md).
+- CPU265 passed/3 skipped/1 deselected. GPU5/6에서1024환경·기본1iteration 및 이어학습2iteration, 별도 설정의4명4토큰·student-only 수집1iteration을 확인했다. 검증 배치 MSE는 기본0.00963→0.00313, 이어학습0.00313→0.00209, student-only0.00778→0.00319로 감소했다. Stage1 원본의 action head 외159개 tensor와 입력RMS exact 일치·모델 finite·replay/optimizer 복원을 확인했다. [CPU](output_etc/check/stage2_distill_20261106/cpu_full.log), [체크포인트](output_etc/check/stage2_distill_20261106/checkpoint_verification.json).
+- 두 teacher8명8토큰, student4명4토큰·8명8토큰을각16환경×seed0·ordered·1200step 실행하고 CPU 재채점/건수 exact 일치·finite를 확인했다. Student eval은 teacher를 로드하지 않는다. [teacher](output_etc/check/stage2_distill_20261106/teachers_eval8_m8/rescore.json), [student4](output_etc/check/stage2_distill_20261106/student_eval4_m4/general_seed0/rescore.json), [student8](output_etc/check/stage2_distill_20261106/student_eval8_m8/general_seed0/rescore.json). 이는 짧은 실행 검증이며 장기 성능 결과가 아니다. Viewer와 장기 학습은 실행하지 않았다.
+
 ## 2026-11-05
+
+### 두 teacher 제로샷 viewer · 5명 이상 통합 그룹 배치
+
+- enable/coupled PTH를 각각 원래 모델·전처리·RMS로 복원하고 공동 PUSH 그룹원만 coupled, enable 선행/후행·solo는 enable의 평균 행동으로 제어하는 test/VNC/eval wrapper를 추가했다. enable13.5k/coupled25.5k 정기 저장본의 읽기 전용 링크를 연결했다. 학습·가중치 병합은 없으며 경로/epoch/frame/해시·담당 규칙을 `teachers.json`에 기록한다. [실행법](markdowns/USAGE.md#두-teacher-제로샷-viewer).
+- 5명 이상 추론은 solo/enable/coupled를 그룹 단위1:1:1로 순차 선택하고 1/2/2~4명을 할당한다. 초기 그룹 중심5m·BEFORE 배치 후 쌍 전체 중심 복원·불필요한 물체 물리/관측 제외·필수 alias/받침 보존·ordered 구역 배정을 viewer/eval에 공통 적용했다. 4명 학습은 유지한다. distillation 학습은 후속 작업이다. [설계](markdowns/reference/stage2.md).
+- GPU5/6만 사용했다. CPU209 passed/3 skipped/1 deselected, 두 teacher 모델 각279개 tensor·RMS exact 복원/동결·행동 선택·제외 물체 영향 차단을 확인했다. 5/8/16명 각32환경×6장면에서5m·최대4명·관계/alias·부분 reset·finite·가중치 보존을 확인했다. 8명16환경×seed0의1200step 공간 채점과 CPU 재채점/성공 건수가 exact 일치했고 실제8명 VNC 렌더링을 확인했다. 기존 coupled 테스트 fixture와의 호환 오류를 수정 후 재검증했다. [CPU](output_etc/check/stage2_teachers_20261105/cpu_verified.log), [5명](output_etc/check/stage2_teachers_20261105/ordered5/physics_validation.json), [8명](output_etc/check/stage2_teachers_20261105/ordered8/physics_validation.json), [16명](output_etc/check/stage2_teachers_20261105/ordered16/physics_validation.json), [재채점](output_etc/check/stage2_teachers_20261105/eval8_ordered/rescore.json), [화면](output_etc/check/stage2_teachers_20261105/viewer_live.png).
+
+### 통합 stage2 · BEFORE/COUPLED 관계별 RL 학습
+
+- 사용자 승인 명세로 `stage2` 환경/학습 YAML과 train/test/VNC/eval 진입점을 추가했다. 4명 장면은 enable/coupled/혼합을 1:1:1로 샘플링하고 혼합은 BEFORE 2명+COUPLED 2명이다. 원래 관계별 물체·배치·보상을 연결하고 BEFORE AT는 20cm, solo/COUPLED AT는 3D 20cm 및 높이 1mm를 적용한다. [통합 명세](markdowns/reference/stage2.md).
+- BEFORE/COUPLED 독립 임베딩과 공유 coordination/fusion을 추가했다. Stage1 26k에서 전이하고 actor encoder·입력 RMS를 동결한다. alias 물체 슬롯 충돌을 방지하고 BEFORE goalroute·대기 속도 감점을 연결했다. distillation과 5명 이상 실행은 아직 포함하지 않았다.
+- CPU 검증 182 passed/3 skipped/1 deselected, wrapper 구문·문서 링크·diff 검사를 통과했다. 1024환경 확인 학습은 epoch2/frame262144까지 완료했으며 actor encoder 73개 tensor·입력 RMS의 전이 원본 exact 일치와 모델 finite를 확인했다. [검증](output_etc/check/stage2_20261105/checkpoint_verification.json), [CPU 로그](output_etc/check/stage2_20261105/cpu_tests.log). 사용자 지정 GPU5에서 64환경×6장면의 관계/alias·부분 reset·AMP/action/value/reward finite·가중치 보존을 확인했다. [물리 검사](output_etc/check/stage2_20261105/physics_gpu5/physics_validation.json). GPU5의 16환경×seed0 정식 평가 경로를 1200step 실행하고 CPU 재채점·성공 건수 exact 일치·finite를 확인했다. [재채점](output_etc/check/stage2_20261105/eval_gpu5/general_seed0/rescore.json). 이는 실행 검증이며 학습 성능 평가는 아니다.
 
 ### zerobg16k–20k ·1k 간격 정밀 평가 완료 ·17k 최종 추천
 

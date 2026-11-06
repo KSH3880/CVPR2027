@@ -63,10 +63,26 @@ BEFORE는 점·영역 각각 다음 세 지표를 저장한다.
 
 ## PUSH 확장 및Stage1 900step/Stage2 1200step 개정
 
-현재 전 실험의 학습·정식 평가·viewer 기본은Stage1 900step/Stage2 1200step이다. 이전1200step 결과는 당시 조건의 과거 결과로 보존한다. 기본 Stage1 단독은4행동, `stage1_push` 단독은5행동으로 각각512환경×3seed를 실행한다. PUSH 검사점은 payload 중심, 목표점은 reset 때 지정한 AT 목표이며 점/영역 모두3D거리20cm로 동일하다. 평가에 CONTACT·손 힘·유지시간을 추가하지 않는다. PUSH 크기는 학습167종이며 AT9종 override와 섞지 않는다.
+학습·정식 평가·viewer 기본은Stage1 900step/Stage2 1200step이며 `stage2_900`·`stage2_distill_900`은900step이다. 이전1200step 결과는 당시 조건의 과거 결과로 보존한다. 기본 Stage1 단독은4행동, `stage1_push` 단독은5행동으로 각각512환경×3seed를 실행한다. PUSH 검사점은 payload 중심, 목표점은 reset 때 지정한 AT 목표이며 점/영역 모두3D거리20cm로 동일하다. 평가에 CONTACT·손 힘·유지시간을 추가하지 않는다. PUSH 크기는 학습167종이며 AT9종 override와 섞지 않는다.
 
 Stage1 PUSH 일반 평가는 checkpoint 저장 분포·2명·4물체·배치를 복원한다. 새 scratch는 AT25/ON_TOP20/SIT10/CLIMB15/PUSH30%, 제공21k finetune은 PUSH50%다. 결과의 `macro4`는 기존네행동, `macro5`는 PUSH포함5행동이고 `macro`는 해당 모델의 전체 과제 평균이다. 점/영역 각각 seed별 macro를 먼저 만든 뒤 평균/표본std를 계산한다.
 
 개인 목표 coupled 설정(`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`)은 기존 개인/전원 동시 `coupled_scores`와 별도로 `shared_center_scores`를 저장한다. 실제 공유 상자 중심과 고정 공유 중심 목표의3D 거리≤0.20m를2/3/4명 그룹별 `ever_success`·`final_success`·성공률로 보고하며, 구성원 최소1명이 유효한 frame만 인정한다. `result.json`은 seed별, `summary.json`은 그룹 수/성공 수 합산 결과다. 새 trace에는 실제 중심·공유 목표·ever/final mask를 추가한다. 과거 개인 목표 trace의 재채점은 균등 분할 토큰/목표 평균을 사용하며 계산 방식은 `rescore.json`의 `shared_center_source`에 기록한다. 기존 과제·개인 전원 동시 지표와 학습 보상은 유지한다.
 
 2026-11-01 사용자 지정 이후 공동 PUSH 평가의 배정은 `ordered`다. 현재는 전용 비교 실행기로 수행하고 `formal_report=false`를 기록하며, 기존 random 배정 정식 결과와 구분한다. ever/final을 분리하고 SIT/CLIMB/ON_TOP은 점/영역을 슬래시로 병기하며 AT/PUSH는 점만 표시한다. [실행법](../USAGE.md#공통-stage2-push와-coupled).
+
+
+## 통합 Stage2의 interaction group 성공률
+
+기존 과제별 point/region·BEFORE 개인/both-ever/동시·coupled 개인/전원 동시·공유 상자 중심 ever/final 지표를 유지하고 `interaction_group_scores`를 추가한다. JSON과 표의 지표 이름은 아래 풀네임을 사용한다.
+
+| 지표 | 분모와 성공 |
+| --- | --- |
+| Independent Interaction Success Rate | enable 선행/후행과 coupled 참여자를 제외한 solo 개인 수. 에피소드 중 한 번 이상 공간 조건을 만족하면 성공. |
+| Enabling Interaction Group Success Rate | 선행/후행 쌍 수. 두 사람이 각각 한 번 이상 성공하면 그룹 성공이며 시간 순서·동시성은 요구하지 않는다. |
+| Coupled Interaction Group Success Rate | 실제 공동 PUSH 그룹 수. 공동 상자 중심과 공동 목표의3D 거리≤20cm를 한 번 이상 만족하면 성공. 2/3/4명 그룹에 동일 가중치를 준다. |
+| Mixed Interaction Group Success Rate | 해당 seed의 위 세 성공률을1/3씩 평균한다. 전체 사람/그룹 수로 가중하지 않는다. |
+
+Point와 region을 각각 계산하며 공동 상자 중심 기준은 둘이 같다. 각 seed의 성공률·세 유형 macro를 먼저 계산한 뒤3개 seed의 평균과 표본 표준편차를 낸다. 어떤 유형의 분모가0이면 해당 성공률과 mixed macro는 null이며0으로 채우거나 나머지 유형만 평균하지 않는다. 유형별 성공/그룹 수를 함께 기록한다. CPU trace 재채점도 같은 추가 집계를 검증한다.
+
+여기의 Independent Interaction Success Rate는 혼합 샘플 안의 solo 성능이다. 독립 과제만 있는 장면의 평가를 별도로 대체하지 않는다. 기본4명 평가는 기존 enable용/coupled용/혼합용1:1:1 sampler와 ordered 배정을 유지한다. 2/4/8/16명에 동일한 순차 그룹 sampler를 적용하는 논문용 벤치마크는 이 집계 추가와 별개다.

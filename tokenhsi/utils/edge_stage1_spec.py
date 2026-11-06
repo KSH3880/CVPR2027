@@ -141,6 +141,9 @@ def validate_stage1_context_config(config):
 
 
 def compile_stage1_graph(spec, m, o, device=None):
+    if spec.get('sampler') == 'stage2_relations':
+        from utils.coupled_push_spec import compile_graph
+        return compile_graph(spec, m, o, device)
     if spec.get("sampler") == "stage2_jointpush":
         from utils.coupled_push_spec import compile_graph
         return compile_graph(spec,m,o,device)

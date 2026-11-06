@@ -58,6 +58,8 @@ def path_goals(task, ids):
 
 
 def required_supports(task, ids):
+    if hasattr(task, '_stage2_task_slots'):
+        return task._stage2_task_slots[ids, task.num_agents:]
     graph = task.relation_runtime.graph
     slots = torch.arange(task.num_agents, task.num_objects, device=task.device)
     used = (graph.edge_relation[ids] == 8) & graph.edge_valid[ids]
@@ -165,6 +167,9 @@ def sample_push(task, ids):
 
 
 def place_distractors(task, ids):
+    if task.num_agents > 4 and hasattr(task, '_stage2_task_slots'):
+        from env.tasks.multi_agent.stage2_group_layout import park_unused
+        return park_unused(task, ids)
     supports = required_supports(task, ids)
     for slot in range(task.num_agents, task.num_objects):
         pending = ids[~supports[:,slot-task.num_agents]]

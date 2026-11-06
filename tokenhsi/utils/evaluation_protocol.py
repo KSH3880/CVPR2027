@@ -1,5 +1,6 @@
 """Formal evaluation settings. General scenes and Stage1-only single tasks differ."""
 import torch
+import statistics
 
 HORIZON = 900
 TASK_NAMES = ('SIT', 'CLIMB', 'AT', 'ON_TOP', 'PUSH')
@@ -7,6 +8,9 @@ SINGLE_PRESETS = {'AT': ('holding_at', 1), 'ON_TOP': ('holding_ontop', 2),
                   'SIT': ('sit', 1), 'CLIMB': ('climb', 1), 'PUSH': ('push', 1)}
 AT_SIZES = ((.22,)*3, (.27,)*3, (.32,)*3, (.37,)*3, (.42,)*3,
             (.47,)*3, (.52,)*3, (.57,)*3, (.30,.30,.40))
+INTERACTION_METRICS = ('Independent Interaction Success Rate',
+    'Enabling Interaction Group Success Rate', 'Coupled Interaction Group Success Rate',
+    'Mixed Interaction Group Success Rate')
 
 
 def configure(args, cfg, name):
@@ -15,7 +19,9 @@ def configure(args, cfg, name):
         return
     if not (args.eval and args.test and args.headless):
         raise ValueError('Formal evaluation requires --test --eval --headless')
-    if args.cfg_env or args.num_agents or args.num_objects or args.episode_length:
+    from utils.experiments import STAGE2_NAMES
+    unified = name in STAGE2_NAMES
+    if args.cfg_env or args.episode_length or ((args.num_agents or args.num_objects) and not unified):
         raise ValueError('Formal evaluation reads training settings; scene overrides are forbidden')
     if args.eval_repeats != 1 or args.seed not in (0, 1, 2):
         raise ValueError('Formal evaluation: one first episode, independent seed 0/1/2')
@@ -125,6 +131,47 @@ def shared_center_scores(groups, ever, final):
         for metric in ('ever', 'final'):
             row[metric+'_rate'] = row[metric+'_success']/count if count else None
         result[str(size)] = row
+    return result
+
+
+def interaction_group_scores(valid, parent, groups, ever, center_ever):
+    follower = parent >= 0
+    enabling = follower.clone()
+    rows, people = follower.nonzero(as_tuple=True)
+    enabling[rows, parent[rows, people]] = True
+    members = (groups[:, :, None] == groups[:, None, :]).sum(-1)
+    coupled = (members > 1) & ~enabling
+    leader = groups == torch.arange(groups.shape[1], device=groups.device)[None]
+    independent = valid & ~enabling & ~coupled
+    both = ever & ever[torch.arange(len(parent), device=parent.device)[:, None], parent.clamp_min(0)]
+    result = {}
+    for label, index in (('point', 0), ('region', 1)):
+        values = (ever[..., index][independent], both[..., index][follower & valid],
+                  center_ever[coupled & leader & valid])
+        scores = {}
+        for name, successes in zip(INTERACTION_METRICS, values):
+            count, success = successes.numel(), int(successes.sum())
+            scores[name] = dict(groups=count, success=success, rate=success/count if count else None)
+        rates = [row['rate'] for row in scores.values()]
+        scores[INTERACTION_METRICS[-1]] = dict(rate=sum(rates)/3 if None not in rates else None)
+        result[label] = scores
+    return result
+
+
+def summarize_interaction_groups(runs):
+    result = {}
+    for label in ('point', 'region'):
+        result[label] = {}
+        for name in INTERACTION_METRICS:
+            rows = [run[label][name] for run in runs]
+            rates = [row['rate'] for row in rows]
+            complete = bool(rates) and None not in rates
+            item = dict(mean=statistics.mean(rates) if complete else None,
+                std=statistics.stdev(rates) if complete and len(rates) > 1 else None, seeds=rates)
+            if name != INTERACTION_METRICS[-1]:
+                item.update(groups=sum(row['groups'] for row in rows),
+                            successes=sum(row['success'] for row in rows))
+            result[label][name] = item
     return result
 
 

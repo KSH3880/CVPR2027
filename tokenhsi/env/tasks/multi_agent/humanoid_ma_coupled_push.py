@@ -156,7 +156,9 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self._reset_actors(ids)
         saved = (self._reset_ref_slots.copy(),self._reset_ref_motion_ids.copy(),self._reset_ref_motion_times.copy())
         pending = ids
-        for _ in range(self.cfg['env']['stage2JointPush']['layout_attempts']):
+        for attempt in range(self.cfg['env']['stage2JointPush']['layout_attempts']):
+            if attempt and self.cfg['env'].get('stage2') is not None:
+                saved = self._resample_before_references(pending, saved)
             self._reset_ref_slots,self._reset_ref_motion_ids,self._reset_ref_motion_times = (v.copy() for v in saved)
             self._keep_reset_slots_for_envs(pending)
             self._reset_boxes(pending)
@@ -168,7 +170,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
             scene.place_distractors(self,pending)
             from utils.stage1_platforms import reset_stage1_platforms
             reset_stage1_platforms(self,pending)
-            rejected |= scene.scene_infeasible(self,pending)
+            rejected |= self._ontop_scene_infeasible(pending)
             self._sampling_retries += rejected.sum()
             pending = pending[rejected]
             if not len(pending):
@@ -182,6 +184,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
                 self._assigned_box_values(self._box_states, ids),
                 self._assigned_box_values(self._box_size, ids), self._regions[ids],
                 self._coupled_assignment, self.cfg['env']['stage2JointPush']['human_clearance'])
+            self._regions[ids] = torch.where(self._members[ids] > 1, self._regions[ids], 0)
         if self._individual_push_goals:
             boxes = self._assigned_box_values(self._box_states, ids)
             sizes = self._assigned_box_values(self._box_size, ids)
@@ -303,6 +306,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         solo=spec.expected_solo_fraction(self.num_agents,self.cfg['env']['stage2JointPush']['coupled_probability'])
         p=self._relation_graph_spec['template_probabilities']
         weights=torch.tensor([solo*(p['HOLDING_AT']+p['HOLDING_ON_TOP']),solo*p['SIT'],solo*p['CLIMB'],1-solo+solo*p['PUSH_AT']],device=self.device)
+        if hasattr(self, '_stage2_amp_weights'):
+            weights = self._stage2_amp_weights
         family = torch.multinomial(weights,count,replacement=True)
         result = torch.empty(count,self.get_num_amp_obs(),device=self.device)
         for index,name in enumerate(('carry','sit','climb','push')):

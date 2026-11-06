@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from learning.multi_agent.before_network import BeforeBuilder,transfer_stage1 as transfer_before
 from learning.multi_agent.human_coordination import HumanCoordination
-from utils.before_object_alias import encoder_packet
+from utils.before_object_alias import VIRTUAL_MODE, encoder_packet, goal_aligned_scene
 
 
 class Stage2PushBuilder(BeforeBuilder):
@@ -31,7 +31,10 @@ class Stage2PushBuilder(BeforeBuilder):
             # packets pass through unchanged; config flags must not select a path.
             width=5*self.num_agents
             packet=encoder_packet(scene[:,-width:],self.num_agents,self.num_objects)
-            return encoder(torch.cat((scene[:,:-width],packet),-1))
+            if self.relation_graph_spec.get('before_virtual_object') == VIRTUAL_MODE:
+                scene=goal_aligned_scene(scene,self.num_agents,self.num_objects)
+            return encoder(torch.cat((scene[:,:-width],packet),-1),
+                           object_valid=getattr(self, 'object_valid', None))
 
         def _encode(self,encoder,coordination,obs):
             m=self.num_agents

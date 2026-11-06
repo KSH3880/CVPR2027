@@ -13,6 +13,14 @@ HELPER = Path(__file__).resolve().parents[1] / 'scripts/multi_agent/gui_gpu_env.
 def gpu_env(tmp_path):
     stub = tmp_path / 'nvidia-smi'
     stub.write_text('''#!/bin/sh
+if [ "$1" = -i ]; then
+  case "$2" in
+    6|GPU-test-six) echo 6 ;;
+    0|GPU-test-zero) echo 0 ;;
+    *) exit 1 ;;
+  esac
+  exit 0
+fi
 case "$1" in
   --id=6|--id=GPU-test-six) echo '6, GPU-test-six' ;;
   --id=0) echo '0, GPU-test-zero' ;;
@@ -56,3 +64,31 @@ def test_invalid_gpu_does_not_fall_back_to_zero(gpu_env, selection):
                             env=gpu_env, text=True, capture_output=True)
     assert result.returncode != 0
     assert selection in result.stderr
+
+
+@pytest.mark.parametrize('name', ['stage2_900', 'stage2_distill_900'])
+@pytest.mark.parametrize('selection', ['6', 'GPU-test-six', '0'])
+def test_900_launcher_accepts_gui_uuid_and_preserves_gpu_limit(tmp_path, gpu_env, name, selection):
+    python = tmp_path/'python'
+    python.write_text('#!/bin/sh\ncase "$1" in\n'
+        '*output_paths.py) echo "$OUTPUT_PATH" ;;\n'
+        '*) printf "%s\\n" "$@" > "$CAPTURE" ;;\nesac\n')
+    python.chmod(0o755)
+    checkpoint = tmp_path/'model.pth'
+    checkpoint.touch()
+    capture = tmp_path/'args.txt'
+    gpu_env.update(TOKENHSI_GPU=selection, CONDA_DEFAULT_ENV='tokenhsi',
+        TOKENHSI_CONDA_ENV='tokenhsi', MPS_GPU_ROOT=str(tmp_path/'no_mps'),
+        OUTPUT_PATH='output_etc/check/gui_gpu_test', CAPTURE=str(capture), HEADLESS='1')
+    for key in ('CUDA_MPS_PIPE_DIRECTORY', 'RESUME_CHECKPOINT', 'ENV_CONFIG', 'MAX_ITERATIONS'):
+        gpu_env.pop(key, None)
+    launcher = HELPER.with_name('launch.sh')
+    result = subprocess.run(['bash', '-c', '. "$1"; exec bash "$2" "$3" eval "$4"',
+        '--', str(HELPER), str(launcher), name, str(checkpoint)],
+        cwd=HELPER.parents[3], env=gpu_env, text=True, capture_output=True)
+    if selection == '0':
+        assert result.returncode != 0 and not capture.exists()
+        assert 'Use TOKENHSI_GPU=2, 6 or 7.' in result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
+        assert '--checkpoint\n'+str(checkpoint) in capture.read_text()

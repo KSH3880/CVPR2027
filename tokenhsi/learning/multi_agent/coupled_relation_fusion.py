@@ -38,6 +38,9 @@ class FusionCoordinationBlock(CoordinationBlock):
         before = coupled.new_zeros(coupled.shape)
         return torch.cat((self.background_bias, before[:, None], coupled[:, None]), dim=-1)
 
+    def active_relations(self, relations, padding):
+        return ((relations[:, None] == 3) & ~padding).any(-1).any(1)
+
     def forward(self, humans, tokens, relations, padding, fusion):
         query = self.query_norm(humans)
         batch, people, width = query.shape
@@ -49,7 +52,7 @@ class FusionCoordinationBlock(CoordinationBlock):
         bias = bias.masked_fill(padding, float('-inf'))
         context = F.scaled_dot_product_attention(q, k, v, attn_mask=bias, dropout_p=0.0)
         context = context.transpose(1, 2).reshape(batch, people, width)
-        active = ((relations[:, None] == 3) & ~padding).any(-1).any(1)
+        active = self.active_relations(relations, padding)
         context = fusion(context, active)
         humans = humans + self.attention.out_proj(context)
         return humans + self.ffn(self.ffn_norm(humans))

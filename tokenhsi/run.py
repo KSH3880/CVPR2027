@@ -156,6 +156,9 @@ def build_alg_runner(algo_observer):
 
     runner.algo_factory.register_builder('ma', lambda **kwargs : ma_agent.MAAgent(**kwargs))
     runner.player_factory.register_builder('ma', lambda **kwargs : ma_players.MAPlayerContinuous(**kwargs))
+    from learning.multi_agent.stage2_distill_agent import Stage2DistillAgent
+    runner.algo_factory.register_builder('ma_distill', lambda **kwargs: Stage2DistillAgent(**kwargs))
+    runner.player_factory.register_builder('ma_distill', lambda **kwargs: ma_players.MAPlayerContinuous(**kwargs))
     from learning.multi_agent.before_network import BeforeBuilder
     runner.model_builder.network_factory.register_builder('amp_multi_agent_before', lambda **kwargs: BeforeBuilder())
     runner.model_builder.network_factory.register_builder('amp_multi_agent', lambda **kwargs : amp_network_builder_ma.AMPMultiAgentBuilder())

@@ -20,6 +20,7 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
 
     def __init__(self, config):
         self._coupled_peer_selector = None
+        self._teachers = None
         super().__init__(config)
         debug_cfg = self.env.task.cfg["env"].get("debug", {})
         self._reward_debug = debug_cfg.get("reward", False)
@@ -28,6 +29,10 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         self._task_reward_w = config["task_reward_w"]
         self._disc_reward_w = config["disc_reward_w"]
         task = self.env.task
+        if getattr(task.cfg['args'], 'teacher_before', ''):
+            from learning.multi_agent.stage2_teachers import Stage2Teachers
+            self._teachers = Stage2Teachers(task, task.cfg['args'].teacher_before,
+                                           task.cfg['args'].teacher_coupled)
         mode = getattr(task.cfg['args'], 'coupled_peers', 'all')
         if mode != 'all':
             from utils.coupled_push_peer_selection import CoupledPeerSelection
@@ -48,6 +53,16 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         return obs
 
     def get_action(self, obs_dict, is_determenistic=False):
+        task = self.env.task
+        object_valid = (task._stage2_task_slots if task.cfg['env'].get('stage2') is not None
+                        and task.num_agents > 4 else None)
+        if self._teachers is not None:
+            from rl_games.algos_torch.players import rescale_actions
+            action = self._teachers.means(obs_dict['obs'], task._members > 1, object_valid)
+            if self.clip_actions:
+                action = rescale_actions(self.actions_low, self.actions_high, action.clamp(-1., 1.))
+            return action
+        self.model.a2c_network.object_valid = object_valid
         if self._coupled_peer_selector is not None:
             task = self.env.task
             ids = torch.arange(task.num_envs, device=task.device)
@@ -125,6 +140,8 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
         return result
 
     def _post_step(self, info):
+        if self._teachers is not None:
+            return
         super()._post_step(info)
         if not self._reward_debug or "reward_terms" not in info:
             return

@@ -75,21 +75,27 @@ def set_seed(seed, torch_deterministic=False):
 
 def load_cfg(args):
     from pathlib import Path
-    from utils.experiments import load_environment, validate_experiment, NAMES
+    from utils.experiments import load_environment, validate_experiment, NAMES, STAGE2_NAMES
     name = Path(args.cfg_train).stem
     if name not in NAMES:
         raise ValueError('Unsupported experiment: ' + name)
     with open(args.cfg_train) as stream:
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
+    if args.coupled_assignment is None:
+        args.coupled_assignment = 'ordered' if name in STAGE2_NAMES and is_eval else 'random'
+    teachers = bool(args.teacher_before or args.teacher_coupled)
+    if teachers and (not (args.teacher_before and args.teacher_coupled) or name != 'stage2'
+                     or not is_eval or args.resume or args.checkpoint != 'Base'):
+        raise ValueError('Two-teacher inference requires stage2 evaluation, both teachers and no --checkpoint/resume')
     from utils.coupled_push_assignment import validate_mode
     validate_mode(getattr(args, 'coupled_assignment', 'random'), args.task, is_eval,
-                  getattr(args, 'eval_protocol', ''), args.resume)
+                  '' if name in STAGE2_NAMES and is_eval else getattr(args, 'eval_protocol', ''), args.resume)
     from utils.coupled_push_peer_selection import validate_mode as validate_peers
     validate_peers(getattr(args, 'coupled_peers', 'all'), args.task, is_eval,
                    getattr(args, 'eval_protocol', ''), args.resume)
     cfg, source_path = load_environment(name, args.cfg_env, args.checkpoint,
-                                         saved=is_eval or args.resume > 0)
+                                         saved=(is_eval or args.resume > 0) and not teachers)
     if (getattr(args, 'coupled_peers', 'all') != 'all'
             and cfg['env']['stage2JointPush'].get('goal_mode') != 'individual'):
         raise ValueError('--coupled_peers requires individual coupled PUSH goals')
@@ -124,6 +130,10 @@ def load_cfg(args):
         cfg["env"]["numAgents"] = args.num_agents
     if getattr(args, "num_objects", 0) > 0:
         cfg["env"]["numObjects"] = args.num_objects
+    if args.group_spawn_over4 and (name not in STAGE2_NAMES or not is_eval or cfg['env']['numAgents'] <= 4):
+        raise ValueError('--group_spawn_over4 requires stage2 inference with at least five people')
+    if name in STAGE2_NAMES and cfg['env']['numAgents'] > 4 and not args.group_spawn_over4:
+        raise ValueError('Stage2 inference above four people requires --group_spawn_over4')
     if cfg['env'].get('stage2JointPush'):
         from utils.coupled_push_spec import physical_box_count
         cfg['env']['stage2JointPush']['physical_boxes'] = physical_box_count(cfg['env']['numAgents'], cfg['env']['numObjects'])
@@ -212,7 +222,7 @@ def load_cfg(args):
     cfg["args"] = args
     from utils.unified_training import validate_unified_env
     validate_unified_env(cfg['env'])
-    if is_eval and args.checkpoint == 'Base':
+    if is_eval and args.checkpoint == 'Base' and not teachers:
         raise ValueError('Evaluation requires --checkpoint')
     expected_task = ('HumanoidMACoupledPush' if cfg['env'].get('stage2JointPush') is not None
         else 'HumanoidMABeforePush' if cfg['env'].get('jointPush') is not None and cfg['env'].get('before')
@@ -369,8 +379,14 @@ def get_args():
             "default": 0,
             "help": "Object tokens per environment (0 keeps config)",
         },
-        {"name": "--coupled_assignment", "type": str, "choices": ["random", "ordered", "distance", "optimal"], "default": "random",
+        {"name": "--coupled_assignment", "type": str, "choices": ["random", "ordered", "distance", "optimal"], "default": None,
          "help": "Coupled viewer-only person-to-region assignment"},
+        {"name": "--group_spawn_over4", "action": "store_true", "default": False,
+         "help": "Stage2 inference above four people: sequential groups, 5m spacing and no unused distractors"},
+        {"name": "--teacher_before", "type": str, "default": "",
+         "help": "Frozen enable teacher checkpoint; requires --teacher_coupled"},
+        {"name": "--teacher_coupled", "type": str, "default": "",
+         "help": "Frozen coupled teacher checkpoint; solo uses the enable teacher"},
         {"name": "--coupled_peers", "type": str, "choices": ["all", "keep3", "shrink3"], "default": "all",
          "help": "Viewer-only contact-aware coupled peer attention selection"},
         {"name": "--before_follower_near", "action": "store_true", "default": False,

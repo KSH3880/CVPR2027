@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from utils.evaluation_protocol import spatial_success, coupled_current_success, coupled_scores
 from utils.evaluation_protocol import shared_center_success, shared_center_scores, shared_centers_from_tokens
+from utils.evaluation_protocol import interaction_group_scores
 
 
 def rescore(path):
@@ -75,6 +76,9 @@ def rescore(path):
         recorded=json.loads((path/'result.json').read_text())
         if individual_goals:
             assert recorded['coupled_scores']==coupled_scores(groups,ever,current,group_ever,group_current)
+            interactions=interaction_group_scores(packet[...,0].bool(),parent,groups,ever,center_ever)
+            if 'interaction_group_scores' in recorded:
+                assert recorded['interaction_group_scores']==interactions
             center_scores=shared_center_scores(groups,center_ever,center_current)
             if 'shared_center_scores' in recorded:
                 assert recorded['shared_center_scores']==center_scores
@@ -105,7 +109,7 @@ def rescore(path):
             result['finite'] &= bool(np.isfinite(data['shared_centers']).all() and np.isfinite(data['shared_center_goals']).all())
         assert result['finite']
         if individual_goals:
-            result.update(shared_center_scores=center_scores,
+            result.update(interaction_group_scores=interactions, shared_center_scores=center_scores,
                 shared_center_source='physical_trace' if physical_centers else 'legacy_tokens_mean',
                 shared_center_cpu_gpu_exact=True if physical_centers else None,
                 shared_center_float32_float64_frame_differences=center_precision_differences,

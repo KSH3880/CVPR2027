@@ -11,8 +11,12 @@ def parse_task(args, cfg, cfg_train, sim_params):
         from env.tasks.multi_agent.humanoid_ma_push import HumanoidMAPush
         task_class = HumanoidMAPush
     elif args.task == 'HumanoidMACoupledPush':
-        from env.tasks.multi_agent.humanoid_ma_coupled_push import HumanoidMACoupledPush
-        task_class=HumanoidMACoupledPush
+        if cfg['env'].get('stage2') is not None:
+            from env.tasks.multi_agent.humanoid_ma_stage2 import HumanoidMAStage2
+            task_class = HumanoidMAStage2
+        else:
+            from env.tasks.multi_agent.humanoid_ma_coupled_push import HumanoidMACoupledPush
+            task_class=HumanoidMACoupledPush
     elif args.task == 'HumanoidMABeforePush':
         from env.tasks.multi_agent.humanoid_ma_before_push import HumanoidMABeforePush
         task_class = HumanoidMABeforePush
