@@ -4,6 +4,10 @@
 
 ## 공통 규칙
 
+- 로컬 8/16명 랜덤 혼합 뷰어(공동 PUSH 팀당 최대4명)는 `.local/README.txt`의 전용 실행 명령을 사용한다.
+
+- 로컬 2/4명·2+2·3+1 공동밀기 촬영은 `.local/README.txt`의 전용 실행 명령을 사용한다. 목표는 상자당 점 하나, `N` 다음 에피소드, `L` 프레임 저장이다.
+
 - 로컬 전용 `.local/run.sh`가 준비된 PC에서는 `bash .local/run.sh train` 또는 `bash .local/run.sh test <checkpoint.pth>`를 사용한다. 환경·호환 처리·데이터 링크는 Git 제외이며 상세는 `.local/README.txt`에 있다.
 
 - 유지하는 실험은 아래 열여덟 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.

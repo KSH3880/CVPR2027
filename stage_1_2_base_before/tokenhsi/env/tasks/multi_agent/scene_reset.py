@@ -1,5 +1,6 @@
 """SceneResetMixin: shared fixed Stage1/BEFORE environment behavior."""
 import numpy as np
+from utils.demo_reset import task_only_demo_boxes
 import torch
 from isaacgym import gymapi
 from isaacgym import gymtorch
@@ -409,7 +410,12 @@ class SceneResetMixin:
         centers = self._env_origins[env_ids, 0:2]
         agent_xy = self._humanoid_root_states[env_ids, :, 0:2]
         positions = torch.zeros(K, O, 2, device=self.device)
+        active = self._active_physical(env_ids) if task_only_demo_boxes(self) else torch.ones(K,O,dtype=torch.bool,device=self.device)
+        if task_only_demo_boxes(self):
+            positions[:]=centers[:,None]+1000+torch.arange(O,device=self.device)[None,:,None]*3
         for object_id in range(O):
+            if not active[:,object_id].any():
+                continue
             candidate = self._sample_arena_xy(centers)
             for _ in range(64):
                 near_agent = (
@@ -431,10 +437,11 @@ class SceneResetMixin:
                     invalid = torch.logical_or(near_agent, near_box)
                 else:
                     invalid = near_agent
+                invalid &= active[:,object_id]
                 if not torch.any(invalid):
                     break
                 candidate[invalid] = self._sample_arena_xy(centers[invalid])
-            positions[:, object_id] = candidate
+            positions[:, object_id] = torch.where(active[:,object_id,None],candidate,positions[:,object_id])
         self._box_states[env_ids, :, 0:2] = positions
         self._box_states[env_ids, :, 2] = self._box_size[env_ids, :, 2] / 2.0
         axis = torch.zeros(K * O, 3, device=self.device)

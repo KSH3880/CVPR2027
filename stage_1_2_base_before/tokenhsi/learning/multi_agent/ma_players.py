@@ -123,6 +123,12 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
     @torch.no_grad()
     def run_eval(self):
         task = self.env.task
+        if os.environ.get("RANDOM_DEMO_SEARCH") == "1":
+            from learning.multi_agent.random_demo import search
+            return search(self)
+        if os.environ.get("ONTOP_DEMO_SEARCH") == "1":
+            from learning.multi_agent.ontop_demo import search
+            return search(self)
         if getattr(task.cfg["args"], "eval_protocol", ""):
             from learning.multi_agent.formal_eval import run_formal_eval
             return run_formal_eval(self)

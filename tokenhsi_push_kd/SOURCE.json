@@ -1,0 +1,7 @@
+{
+  "baseline_snapshot": "/home/inkyu/projects/CVPR2027/TokenHSI",
+  "reference_26k_sha256": "ec4215803b529bab1dd1be430154604418392e24faed59bca69b5c61adafe67c",
+  "teacher_sha256": "60142bc2a0b44614e78e0ae28537a3ec4d4059cf171278c255793d6083d8db83",
+  "push_integration": "intern delivery 2026-10-31; overridden PUSH physics/reward/reset/AMP/RSI",
+  "reference_geometry": "stage1_2_jointpush_st; copied without policy/GTA"
+}

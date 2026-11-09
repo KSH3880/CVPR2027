@@ -1,0 +1,877 @@
+{
+ "lambda_": [
+  0.012799999676644802,
+  0.025599999353289604,
+  0.025599999353289604
+ ],
+ "warmup_epochs": 40,
+ "measure_epochs": 3,
+ "minibatches": 36,
+ "counts": [
+  {
+   "push": 5452,
+   "kd": 5471,
+   "sit": 825,
+   "kl_sit": 0.8847262859344482,
+   "carry": 3727,
+   "kl_carry": 0.7768129110336304,
+   "climb": 919,
+   "kl_climb": 0.9008041620254517
+  },
+  {
+   "push": 5396,
+   "kd": 5459,
+   "sit": 862,
+   "kl_sit": 0.9296969771385193,
+   "carry": 3689,
+   "kl_carry": 0.792115330696106,
+   "climb": 908,
+   "kl_climb": 0.8777336478233337
+  },
+  {
+   "push": 5569,
+   "kd": 5395,
+   "sit": 859,
+   "kl_sit": 0.9387670159339905,
+   "carry": 3685,
+   "kl_carry": 0.8052489757537842,
+   "climb": 851,
+   "kl_climb": 0.8806179165840149
+  },
+  {
+   "push": 5347,
+   "kd": 5508,
+   "sit": 833,
+   "kl_sit": 0.9424775838851929,
+   "carry": 3793,
+   "kl_carry": 0.81219482421875,
+   "climb": 882,
+   "kl_climb": 0.8644567131996155
+  },
+  {
+   "push": 5340,
+   "kd": 5441,
+   "sit": 805,
+   "kl_sit": 1.0420209169387817,
+   "carry": 3767,
+   "kl_carry": 0.7546773552894592,
+   "climb": 869,
+   "kl_climb": 0.9171993732452393
+  },
+  {
+   "push": 5393,
+   "kd": 5525,
+   "sit": 871,
+   "kl_sit": 0.9042018055915833,
+   "carry": 3744,
+   "kl_carry": 0.8024736046791077,
+   "climb": 910,
+   "kl_climb": 0.908218502998352
+  },
+  {
+   "push": 5577,
+   "kd": 5403,
+   "sit": 834,
+   "kl_sit": 0.8864908814430237,
+   "carry": 3703,
+   "kl_carry": 0.7538430094718933,
+   "climb": 866,
+   "kl_climb": 0.9573207497596741
+  },
+  {
+   "push": 5374,
+   "kd": 5482,
+   "sit": 790,
+   "kl_sit": 0.8728317618370056,
+   "carry": 3753,
+   "kl_carry": 0.7777718901634216,
+   "climb": 939,
+   "kl_climb": 0.9298120141029358
+  },
+  {
+   "push": 5439,
+   "kd": 5476,
+   "sit": 842,
+   "kl_sit": 0.8758665919303894,
+   "carry": 3754,
+   "kl_carry": 0.7738569974899292,
+   "climb": 880,
+   "kl_climb": 0.9497884511947632
+  },
+  {
+   "push": 5421,
+   "kd": 5462,
+   "sit": 839,
+   "kl_sit": 0.9375072121620178,
+   "carry": 3691,
+   "kl_carry": 0.7935574054718018,
+   "climb": 932,
+   "kl_climb": 0.9226108193397522
+  },
+  {
+   "push": 5432,
+   "kd": 5472,
+   "sit": 835,
+   "kl_sit": 0.8725743293762207,
+   "carry": 3801,
+   "kl_carry": 0.7774075269699097,
+   "climb": 836,
+   "kl_climb": 0.8679856061935425
+  },
+  {
+   "push": 5412,
+   "kd": 5442,
+   "sit": 847,
+   "kl_sit": 0.8941079378128052,
+   "carry": 3746,
+   "kl_carry": 0.7931468486785889,
+   "climb": 849,
+   "kl_climb": 0.955915629863739
+  },
+  {
+   "push": 5430,
+   "kd": 5507,
+   "sit": 839,
+   "kl_sit": 0.9013105034828186,
+   "carry": 3668,
+   "kl_carry": 0.8262709975242615,
+   "climb": 1000,
+   "kl_climb": 0.8669987916946411
+  },
+  {
+   "push": 5384,
+   "kd": 5511,
+   "sit": 801,
+   "kl_sit": 0.9073051810264587,
+   "carry": 3741,
+   "kl_carry": 0.8173534870147705,
+   "climb": 969,
+   "kl_climb": 0.915407657623291
+  },
+  {
+   "push": 5516,
+   "kd": 5395,
+   "sit": 790,
+   "kl_sit": 0.8705833554267883,
+   "carry": 3688,
+   "kl_carry": 0.7732447385787964,
+   "climb": 917,
+   "kl_climb": 0.9688045382499695
+  },
+  {
+   "push": 5386,
+   "kd": 5467,
+   "sit": 868,
+   "kl_sit": 0.8907963633537292,
+   "carry": 3669,
+   "kl_carry": 0.7733446359634399,
+   "climb": 930,
+   "kl_climb": 0.8887956738471985
+  },
+  {
+   "push": 5349,
+   "kd": 5563,
+   "sit": 787,
+   "kl_sit": 0.8652334213256836,
+   "carry": 3787,
+   "kl_carry": 0.8048380017280579,
+   "climb": 989,
+   "kl_climb": 0.8503584265708923
+  },
+  {
+   "push": 5511,
+   "kd": 5458,
+   "sit": 843,
+   "kl_sit": 0.879198431968689,
+   "carry": 3651,
+   "kl_carry": 0.7582354545593262,
+   "climb": 964,
+   "kl_climb": 0.9078070521354675
+  },
+  {
+   "push": 5405,
+   "kd": 5529,
+   "sit": 783,
+   "kl_sit": 0.9194886088371277,
+   "carry": 3777,
+   "kl_carry": 0.7813506722450256,
+   "climb": 969,
+   "kl_climb": 0.9167938232421875
+  },
+  {
+   "push": 5375,
+   "kd": 5450,
+   "sit": 848,
+   "kl_sit": 0.8421083688735962,
+   "carry": 3639,
+   "kl_carry": 0.7870972156524658,
+   "climb": 963,
+   "kl_climb": 0.8491614460945129
+  },
+  {
+   "push": 5411,
+   "kd": 5436,
+   "sit": 781,
+   "kl_sit": 0.8585110902786255,
+   "carry": 3669,
+   "kl_carry": 0.7943365573883057,
+   "climb": 986,
+   "kl_climb": 0.8190687298774719
+  },
+  {
+   "push": 5427,
+   "kd": 5413,
+   "sit": 773,
+   "kl_sit": 0.8440247178077698,
+   "carry": 3666,
+   "kl_carry": 0.7412453889846802,
+   "climb": 974,
+   "kl_climb": 1.0024998188018799
+  },
+  {
+   "push": 5403,
+   "kd": 5458,
+   "sit": 824,
+   "kl_sit": 0.8482663631439209,
+   "carry": 3700,
+   "kl_carry": 0.7952184081077576,
+   "climb": 934,
+   "kl_climb": 0.9104940295219421
+  },
+  {
+   "push": 5555,
+   "kd": 5349,
+   "sit": 785,
+   "kl_sit": 0.9012277722358704,
+   "carry": 3628,
+   "kl_carry": 0.7813757061958313,
+   "climb": 936,
+   "kl_climb": 0.9221739768981934
+  },
+  {
+   "push": 5442,
+   "kd": 5407,
+   "sit": 775,
+   "kl_sit": 0.9652775526046753,
+   "carry": 3645,
+   "kl_carry": 0.7723761796951294,
+   "climb": 987,
+   "kl_climb": 0.8178370594978333
+  },
+  {
+   "push": 5427,
+   "kd": 5451,
+   "sit": 794,
+   "kl_sit": 0.9223172664642334,
+   "carry": 3687,
+   "kl_carry": 0.7766976356506348,
+   "climb": 970,
+   "kl_climb": 0.7914898991584778
+  },
+  {
+   "push": 5418,
+   "kd": 5502,
+   "sit": 760,
+   "kl_sit": 0.9153527617454529,
+   "carry": 3738,
+   "kl_carry": 0.802293598651886,
+   "climb": 1004,
+   "kl_climb": 0.7935081720352173
+  },
+  {
+   "push": 5351,
+   "kd": 5530,
+   "sit": 771,
+   "kl_sit": 0.9344632625579834,
+   "carry": 3764,
+   "kl_carry": 0.810858964920044,
+   "climb": 995,
+   "kl_climb": 0.8520997762680054
+  },
+  {
+   "push": 5343,
+   "kd": 5498,
+   "sit": 774,
+   "kl_sit": 0.9453908205032349,
+   "carry": 3718,
+   "kl_carry": 0.7938466668128967,
+   "climb": 1006,
+   "kl_climb": 0.8178818225860596
+  },
+  {
+   "push": 5414,
+   "kd": 5342,
+   "sit": 758,
+   "kl_sit": 0.92051762342453,
+   "carry": 3602,
+   "kl_carry": 0.7908390760421753,
+   "climb": 982,
+   "kl_climb": 0.8350600600242615
+  },
+  {
+   "push": 5457,
+   "kd": 5506,
+   "sit": 737,
+   "kl_sit": 0.9374161958694458,
+   "carry": 3794,
+   "kl_carry": 0.8491194844245911,
+   "climb": 975,
+   "kl_climb": 0.8356247544288635
+  },
+  {
+   "push": 5372,
+   "kd": 5518,
+   "sit": 778,
+   "kl_sit": 0.9454073309898376,
+   "carry": 3743,
+   "kl_carry": 0.7896937131881714,
+   "climb": 997,
+   "kl_climb": 0.7876253128051758
+  },
+  {
+   "push": 5437,
+   "kd": 5495,
+   "sit": 793,
+   "kl_sit": 0.9625506401062012,
+   "carry": 3723,
+   "kl_carry": 0.75792396068573,
+   "climb": 979,
+   "kl_climb": 0.8543028235435486
+  },
+  {
+   "push": 5532,
+   "kd": 5348,
+   "sit": 744,
+   "kl_sit": 0.9345948696136475,
+   "carry": 3666,
+   "kl_carry": 0.8022090196609497,
+   "climb": 938,
+   "kl_climb": 0.7866445183753967
+  },
+  {
+   "push": 5443,
+   "kd": 5463,
+   "sit": 777,
+   "kl_sit": 0.915459156036377,
+   "carry": 3729,
+   "kl_carry": 0.7731854319572449,
+   "climb": 957,
+   "kl_climb": 0.802718997001648
+  },
+  {
+   "push": 5516,
+   "kd": 5476,
+   "sit": 774,
+   "kl_sit": 0.9231034517288208,
+   "carry": 3683,
+   "kl_carry": 0.7940807938575745,
+   "climb": 1019,
+   "kl_climb": 0.8849225044250488
+  }
+ ],
+ "groups": {
+  "all": {
+   "numel": 6626210,
+   "norm": {
+    "ppo": 72.68027842763799,
+    "kd_sit": 0.6565259387043361,
+    "kd_carry": 5.356697165256072,
+    "kd_climb": 2.8616166971161667
+   },
+   "cos_ppo": {
+    "kd_sit": 0.037740057906253524,
+    "kd_carry": -0.07290982344298433,
+    "kd_climb": -0.07975176034463145
+   },
+   "cos_ppo_kd_total": -0.07440662824389667,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.3735238611855228,
+    "kd_sit|kd_climb": 0.4139321696671908,
+    "kd_carry|kd_climb": 0.7252245352174266
+   },
+   "half_consistency": {
+    "ppo": 0.07701391967306324,
+    "kd_sit": 0.9585248543707723,
+    "kd_carry": 0.9816273882740757,
+    "kd_climb": 0.9836857412803304
+   }
+  },
+  "a2c_network.weight_token": {
+   "numel": 128,
+   "norm": {
+    "ppo": 7.124772083831735,
+    "kd_sit": 0.11694383833546242,
+    "kd_carry": 1.0236407209326135,
+    "kd_climb": 0.4288269283645489
+   },
+   "cos_ppo": {
+    "kd_sit": 0.2515986285814115,
+    "kd_carry": 0.19756279488985443,
+    "kd_climb": -0.0031788951862277517
+   },
+   "cos_ppo_kd_total": 0.16607695708831846,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.09913399316366146,
+    "kd_sit|kd_climb": 0.324294898612283,
+    "kd_carry|kd_climb": 0.7075394417767862
+   },
+   "half_consistency": {
+    "ppo": -0.18528033834279994,
+    "kd_sit": 0.9699750102941659,
+    "kd_carry": 0.9809723624236838,
+    "kd_climb": 0.9888951289806786
+   }
+  },
+  "a2c_network.self_encoder": {
+   "numel": 98496,
+   "norm": {
+    "ppo": 42.94600000967987,
+    "kd_sit": 0.3918367824709307,
+    "kd_carry": 3.780922050209538,
+    "kd_climb": 2.1905780653582303
+   },
+   "cos_ppo": {
+    "kd_sit": 0.04851417658411645,
+    "kd_carry": -0.06072614127379049,
+    "kd_climb": -0.10378628364815336
+   },
+   "cos_ppo_kd_total": -0.07317816180379344,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.5071291751957218,
+    "kd_sit|kd_climb": 0.5191778336488012,
+    "kd_carry|kd_climb": 0.8556800301985799
+   },
+   "half_consistency": {
+    "ppo": 0.0425971556641029,
+    "kd_sit": 0.9510211521063363,
+    "kd_carry": 0.9829835408895524,
+    "kd_climb": 0.9851928647054743
+   }
+  },
+  "a2c_network.task_encoder": {
+   "numel": 250304,
+   "norm": {
+    "ppo": 10.827228716615783,
+    "kd_sit": 0.1198723126907453,
+    "kd_carry": 0.9098642833195724,
+    "kd_climb": 0.5413849110309803
+   },
+   "cos_ppo": {
+    "kd_sit": 0.0,
+    "kd_carry": 0.0,
+    "kd_climb": 0.0
+   },
+   "cos_ppo_kd_total": 0.0,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.0,
+    "kd_sit|kd_climb": 0.0,
+    "kd_carry|kd_climb": 0.0
+   },
+   "half_consistency": {
+    "ppo": -0.20578952490273464,
+    "kd_sit": 0.9214550942122162,
+    "kd_carry": 0.9315595924820979,
+    "kd_climb": 0.9823912728509651
+   }
+  },
+  "a2c_network.transformer_encoder": {
+   "numel": 332032,
+   "norm": {
+    "ppo": 26.773617502845184,
+    "kd_sit": 0.30898056533396573,
+    "kd_carry": 2.2156785571720876,
+    "kd_climb": 1.2582841515398782
+   },
+   "cos_ppo": {
+    "kd_sit": 0.043175023097121075,
+    "kd_carry": -0.01054662157401626,
+    "kd_climb": -0.05767750000060009
+   },
+   "cos_ppo_kd_total": -0.02518644943176844,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.20027367193687523,
+    "kd_sit|kd_climb": 0.33291577810824696,
+    "kd_carry|kd_climb": 0.651902298492479
+   },
+   "half_consistency": {
+    "ppo": -0.030955574974885745,
+    "kd_sit": 0.9531015883268956,
+    "kd_carry": 0.9782115674656322,
+    "kd_climb": 0.982768645975411
+   }
+  },
+  "a2c_network.composer": {
+   "numel": 607776,
+   "norm": {
+    "ppo": 50.7801860078684,
+    "kd_sit": 0.4010161497099561,
+    "kd_carry": 2.852687912294858,
+    "kd_climb": 1.192432373609376
+   },
+   "cos_ppo": {
+    "kd_sit": 0.02565611327673271,
+    "kd_carry": -0.1285382967991088,
+    "kd_climb": -0.08051299770681516
+   },
+   "cos_ppo_kd_total": -0.11656809758344527,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.36649205118356404,
+    "kd_sit|kd_climb": 0.40667324253760284,
+    "kd_carry|kd_climb": 0.6047023178756601
+   },
+   "half_consistency": {
+    "ppo": 0.16290340066837236,
+    "kd_sit": 0.9724527909023806,
+    "kd_carry": 0.9869992951831507,
+    "kd_climb": 0.9810118382284311
+   }
+  },
+  "a2c_network.self_encoder.0": {
+   "numel": 57344,
+   "norm": {
+    "ppo": 17.813023337721557,
+    "kd_sit": 0.1274526274961151,
+    "kd_carry": 0.9689684521850768,
+    "kd_climb": 0.5411133131478317
+   },
+   "cos_ppo": {
+    "kd_sit": -0.015673173986920228,
+    "kd_carry": -0.025194355615837306,
+    "kd_climb": -0.022418175892545345
+   },
+   "cos_ppo_kd_total": -0.027103551162521725,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.3155080239081066,
+    "kd_sit|kd_climb": 0.3342959574859708,
+    "kd_carry|kd_climb": 0.6199056452560958
+   },
+   "half_consistency": {
+    "ppo": 0.05938010797591172,
+    "kd_sit": 0.896824361273804,
+    "kd_carry": 0.9511134421002468,
+    "kd_climb": 0.9503166050576644
+   }
+  },
+  "a2c_network.self_encoder.2": {
+   "numel": 32896,
+   "norm": {
+    "ppo": 22.626519677953116,
+    "kd_sit": 0.187007410114789,
+    "kd_carry": 1.7316182968239873,
+    "kd_climb": 0.9876975625071676
+   },
+   "cos_ppo": {
+    "kd_sit": 0.057449611004847606,
+    "kd_carry": -0.026805948020832745,
+    "kd_climb": -0.04605013763878869
+   },
+   "cos_ppo_kd_total": -0.03000783445323631,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.4501787190416489,
+    "kd_sit|kd_climb": 0.4681829965960924,
+    "kd_carry|kd_climb": 0.8305704396442938
+   },
+   "half_consistency": {
+    "ppo": 0.03177487385210517,
+    "kd_sit": 0.943443493006837,
+    "kd_carry": 0.9782900825830355,
+    "kd_climb": 0.9823428110903428
+   }
+  },
+  "a2c_network.self_encoder.4": {
+   "numel": 8256,
+   "norm": {
+    "ppo": 31.860566907454913,
+    "kd_sit": 0.31987516378060227,
+    "kd_carry": 3.2183799903888213,
+    "kd_climb": 1.8789045126829045
+   },
+   "cos_ppo": {
+    "kd_sit": 0.05974475482798438,
+    "kd_carry": -0.08167888584167234,
+    "kd_climb": -0.14230227152051317
+   },
+   "cos_ppo_kd_total": -0.09933111468709818,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.5503461566318469,
+    "kd_sit|kd_climb": 0.5592275442313833,
+    "kd_carry|kd_climb": 0.8833299023475918
+   },
+   "half_consistency": {
+    "ppo": 0.04303525716741106,
+    "kd_sit": 0.9626414952576169,
+    "kd_carry": 0.9872934721876266,
+    "kd_climb": 0.988940161757955
+   }
+  },
+  "a2c_network.task_encoder.1": {
+   "numel": 51136,
+   "norm": {
+    "ppo": 0.0,
+    "kd_sit": 0.1198723126907453,
+    "kd_carry": 0.0,
+    "kd_climb": 0.0
+   },
+   "cos_ppo": {
+    "kd_sit": NaN,
+    "kd_carry": NaN,
+    "kd_climb": NaN
+   },
+   "cos_ppo_kd_total": NaN,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": NaN,
+    "kd_sit|kd_climb": NaN,
+    "kd_carry|kd_climb": NaN
+   },
+   "half_consistency": {
+    "ppo": NaN,
+    "kd_sit": 0.9214550942122162,
+    "kd_carry": NaN,
+    "kd_climb": NaN
+   }
+  },
+  "a2c_network.task_encoder.2": {
+   "numel": 52160,
+   "norm": {
+    "ppo": 0.0,
+    "kd_sit": 0.0,
+    "kd_carry": 0.9098642833195724,
+    "kd_climb": 0.0
+   },
+   "cos_ppo": {
+    "kd_sit": NaN,
+    "kd_carry": NaN,
+    "kd_climb": NaN
+   },
+   "cos_ppo_kd_total": NaN,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": NaN,
+    "kd_sit|kd_climb": NaN,
+    "kd_carry|kd_climb": NaN
+   },
+   "half_consistency": {
+    "ppo": NaN,
+    "kd_sit": NaN,
+    "kd_carry": 0.9315595924820979,
+    "kd_climb": NaN
+   }
+  },
+  "a2c_network.task_encoder.3": {
+   "numel": 48320,
+   "norm": {
+    "ppo": 0.0,
+    "kd_sit": 0.0,
+    "kd_carry": 0.0,
+    "kd_climb": 0.5413849110309803
+   },
+   "cos_ppo": {
+    "kd_sit": NaN,
+    "kd_carry": NaN,
+    "kd_climb": NaN
+   },
+   "cos_ppo_kd_total": NaN,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": NaN,
+    "kd_sit|kd_climb": NaN,
+    "kd_carry|kd_climb": NaN
+   },
+   "half_consistency": {
+    "ppo": NaN,
+    "kd_sit": NaN,
+    "kd_carry": NaN,
+    "kd_climb": 0.9823912728509651
+   }
+  },
+  "a2c_network.task_encoder.4": {
+   "numel": 52160,
+   "norm": {
+    "ppo": 10.827228716615783,
+    "kd_sit": 0.0,
+    "kd_carry": 0.0,
+    "kd_climb": 0.0
+   },
+   "cos_ppo": {
+    "kd_sit": NaN,
+    "kd_carry": NaN,
+    "kd_climb": NaN
+   },
+   "cos_ppo_kd_total": NaN,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": NaN,
+    "kd_sit|kd_climb": NaN,
+    "kd_carry|kd_climb": NaN
+   },
+   "half_consistency": {
+    "ppo": -0.2057895249027347,
+    "kd_sit": NaN,
+    "kd_carry": NaN,
+    "kd_climb": NaN
+   }
+  },
+  "a2c_network.transformer_encoder.layers": {
+   "numel": 332032,
+   "norm": {
+    "ppo": 26.773617502845184,
+    "kd_sit": 0.30898056533396573,
+    "kd_carry": 2.2156785571720876,
+    "kd_climb": 1.2582841515398782
+   },
+   "cos_ppo": {
+    "kd_sit": 0.043175023097121075,
+    "kd_carry": -0.01054662157401626,
+    "kd_climb": -0.05767750000060009
+   },
+   "cos_ppo_kd_total": -0.02518644943176844,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.20027367193687523,
+    "kd_sit|kd_climb": 0.33291577810824696,
+    "kd_carry|kd_climb": 0.651902298492479
+   },
+   "half_consistency": {
+    "ppo": -0.030955574974885745,
+    "kd_sit": 0.9531015883268956,
+    "kd_carry": 0.9782115674656322,
+    "kd_climb": 0.982768645975411
+   }
+  },
+  "a2c_network.composer.actors": {
+   "numel": 607776,
+   "norm": {
+    "ppo": 50.7801860078684,
+    "kd_sit": 0.4010161497099561,
+    "kd_carry": 2.852687912294858,
+    "kd_climb": 1.192432373609376
+   },
+   "cos_ppo": {
+    "kd_sit": 0.02565611327673271,
+    "kd_carry": -0.1285382967991088,
+    "kd_climb": -0.08051299770681516
+   },
+   "cos_ppo_kd_total": -0.11656809758344527,
+   "cos_kd_pairs": {
+    "kd_sit|kd_carry": 0.36649205118356404,
+    "kd_sit|kd_climb": 0.40667324253760284,
+    "kd_carry|kd_climb": 0.6047023178756601
+   },
+   "half_consistency": {
+    "ppo": 0.16290340066837236,
+    "kd_sit": 0.9724527909023806,
+    "kd_carry": 0.9869992951831507,
+    "kd_climb": 0.9810118382284311
+   }
+  }
+ },
+ "minibatch_cos_ppo_mean": {
+  "kd_sit": -0.0038209028454832747,
+  "kd_carry": -0.008945960680106228,
+  "kd_climb": -0.005340146635918407
+ },
+ "param_names": [
+  "a2c_network.weight_token",
+  "a2c_network.pos_embed",
+  "a2c_network.critic_mlp.0.weight",
+  "a2c_network.critic_mlp.0.bias",
+  "a2c_network.critic_mlp.2.weight",
+  "a2c_network.critic_mlp.2.bias",
+  "a2c_network.critic_mlp.4.weight",
+  "a2c_network.critic_mlp.4.bias",
+  "a2c_network.value.weight",
+  "a2c_network.value.bias",
+  "a2c_network._disc_mlp.0.weight",
+  "a2c_network._disc_mlp.0.bias",
+  "a2c_network._disc_mlp.2.weight",
+  "a2c_network._disc_mlp.2.bias",
+  "a2c_network._disc_logits.weight",
+  "a2c_network._disc_logits.bias",
+  "a2c_network.self_encoder.0.weight",
+  "a2c_network.self_encoder.0.bias",
+  "a2c_network.self_encoder.2.weight",
+  "a2c_network.self_encoder.2.bias",
+  "a2c_network.self_encoder.4.weight",
+  "a2c_network.self_encoder.4.bias",
+  "a2c_network.task_encoder.0.0.weight",
+  "a2c_network.task_encoder.0.0.bias",
+  "a2c_network.task_encoder.0.2.weight",
+  "a2c_network.task_encoder.0.2.bias",
+  "a2c_network.task_encoder.0.4.weight",
+  "a2c_network.task_encoder.0.4.bias",
+  "a2c_network.task_encoder.1.0.weight",
+  "a2c_network.task_encoder.1.0.bias",
+  "a2c_network.task_encoder.1.2.weight",
+  "a2c_network.task_encoder.1.2.bias",
+  "a2c_network.task_encoder.1.4.weight",
+  "a2c_network.task_encoder.1.4.bias",
+  "a2c_network.task_encoder.2.0.weight",
+  "a2c_network.task_encoder.2.0.bias",
+  "a2c_network.task_encoder.2.2.weight",
+  "a2c_network.task_encoder.2.2.bias",
+  "a2c_network.task_encoder.2.4.weight",
+  "a2c_network.task_encoder.2.4.bias",
+  "a2c_network.task_encoder.3.0.weight",
+  "a2c_network.task_encoder.3.0.bias",
+  "a2c_network.task_encoder.3.2.weight",
+  "a2c_network.task_encoder.3.2.bias",
+  "a2c_network.task_encoder.3.4.weight",
+  "a2c_network.task_encoder.3.4.bias",
+  "a2c_network.task_encoder.4.0.weight",
+  "a2c_network.task_encoder.4.0.bias",
+  "a2c_network.task_encoder.4.2.weight",
+  "a2c_network.task_encoder.4.2.bias",
+  "a2c_network.task_encoder.4.4.weight",
+  "a2c_network.task_encoder.4.4.bias",
+  "a2c_network.transformer_encoder.layers.0.self_attn.in_proj_weight",
+  "a2c_network.transformer_encoder.layers.0.self_attn.in_proj_bias",
+  "a2c_network.transformer_encoder.layers.0.self_attn.out_proj.weight",
+  "a2c_network.transformer_encoder.layers.0.self_attn.out_proj.bias",
+  "a2c_network.transformer_encoder.layers.0.linear1.weight",
+  "a2c_network.transformer_encoder.layers.0.linear1.bias",
+  "a2c_network.transformer_encoder.layers.0.linear2.weight",
+  "a2c_network.transformer_encoder.layers.0.linear2.bias",
+  "a2c_network.transformer_encoder.layers.0.norm1.weight",
+  "a2c_network.transformer_encoder.layers.0.norm1.bias",
+  "a2c_network.transformer_encoder.layers.0.norm2.weight",
+  "a2c_network.transformer_encoder.layers.0.norm2.bias",
+  "a2c_network.transformer_encoder.layers.1.self_attn.in_proj_weight",
+  "a2c_network.transformer_encoder.layers.1.self_attn.in_proj_bias",
+  "a2c_network.transformer_encoder.layers.1.self_attn.out_proj.weight",
+  "a2c_network.transformer_encoder.layers.1.self_attn.out_proj.bias",
+  "a2c_network.transformer_encoder.layers.1.linear1.weight",
+  "a2c_network.transformer_encoder.layers.1.linear1.bias",
+  "a2c_network.transformer_encoder.layers.1.linear2.weight",
+  "a2c_network.transformer_encoder.layers.1.linear2.bias",
+  "a2c_network.transformer_encoder.layers.1.norm1.weight",
+  "a2c_network.transformer_encoder.layers.1.norm1.bias",
+  "a2c_network.transformer_encoder.layers.1.norm2.weight",
+  "a2c_network.transformer_encoder.layers.1.norm2.bias",
+  "a2c_network.transformer_encoder.layers.2.self_attn.in_proj_weight",
+  "a2c_network.transformer_encoder.layers.2.self_attn.in_proj_bias",
+  "a2c_network.transformer_encoder.layers.2.self_attn.out_proj.weight",
+  "a2c_network.transformer_encoder.layers.2.self_attn.out_proj.bias",
+  "a2c_network.transformer_encoder.layers.2.linear1.weight",
+  "a2c_network.transformer_encoder.layers.2.linear1.bias",
+  "a2c_network.transformer_encoder.layers.2.linear2.weight",
+  "a2c_network.transformer_encoder.layers.2.linear2.bias",
+  "a2c_network.transformer_encoder.layers.2.norm1.weight",
+  "a2c_network.transformer_encoder.layers.2.norm1.bias",
+  "a2c_network.transformer_encoder.layers.2.norm2.weight",
+  "a2c_network.transformer_encoder.layers.2.norm2.bias",
+  "a2c_network.transformer_encoder.layers.3.self_attn.in_proj_weight",
+  "a2c_network.transformer_encoder.layers.3.self_attn.in_proj_bias",
+  "a2c_network.transformer_encoder.layers.3.self_attn.out_proj.weight",
+  "a2c_network.transformer_encoder.layers.3.self_attn.out_proj.bias",
+  "a2c_network.transformer_encoder.layers.3.linear1.weight",
+  "a2c_network.transformer_encoder.layers.3.linear1.bias",
+  "a2c_network.transformer_encoder.layers.3.linear2.weight",
+  "a2c_network.transformer_encoder.layers.3.linear2.bias",
+  "a2c_network.transformer_encoder.layers.3.norm1.weight",
+  "a2c_network.transformer_encoder.layers.3.norm1.bias",
+  "a2c_network.transformer_encoder.layers.3.norm2.weight",
+  "a2c_network.transformer_encoder.layers.3.norm2.bias",
+  "a2c_network.composer.actors.0.weight",
+  "a2c_network.composer.actors.0.bias",
+  "a2c_network.composer.actors.2.weight",
+  "a2c_network.composer.actors.2.bias",
+  "a2c_network.composer.actors.4.weight",
+  "a2c_network.composer.actors.4.bias"
+ ]
+}

@@ -1,0 +1,1243 @@
+--- a/scripts/eval_teacher_original.py
++++ b/scripts/eval_teacher_original.py
+@@ -0,0 +1,48 @@
++"""Teacher baseline on the ORIGINAL TokenHSI code, with the same warm-up as the student eval.
++
++The original checkout is not modified: its player's run_eval is wrapped in-process, then
++tokenhsi/run.py runs with the arguments of the original scripts/tokenhsi/stage1_eval.sh.
++
++    ORIG_ROOT=/path/to/TokenHSI EVAL_TASK=climb SEED=0 python scripts/eval_teacher_original.py
++
++ORIG_ROOT must hold the original code with its datasets and output/tokenhsi/ckpt_stage1.pth.
++NATIVE_EVAL_WARMUP=0 reproduces the unmodified original eval.
++"""
++import importlib.util
++import os
++import runpy
++import sys
++
++import isaacgym  # must precede torch
++
++bundle = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++spec = importlib.util.spec_from_file_location(
++    'native_eval_warmup', os.path.join(bundle, 'tokenhsi/learning/native_eval_warmup.py'))
++warmup = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(warmup)
++
++root = os.path.abspath(os.environ['ORIG_ROOT'])
++os.chdir(root)
++sys.path.insert(0, os.path.join(root, 'tokenhsi'))
++from learning.transformer import trans_players  # the original player
++
++original_run_eval = trans_players.TransPlayerContinuous.run_eval
++
++
++def run_eval(self):
++    steps = warmup.warmup_steps()
++    if steps > 0:
++        warmup.run_warmup(self, steps)
++    return original_run_eval(self)
++
++
++trans_players.TransPlayerContinuous.run_eval = run_eval
++
++sys.argv = ['tokenhsi/run.py', '--task', 'HumanoidTrajSitCarryClimb',
++            '--cfg_train', 'tokenhsi/data/cfg/train/rlg/amp_imitation_task_transformer_multi_task.yaml',
++            '--cfg_env', 'tokenhsi/data/cfg/multi_task/amp_humanoid_traj_sit_carry_climb.yaml',
++            '--motion_file', 'tokenhsi/data/dataset_loco_sit_carry_climb.yaml',
++            '--checkpoint', os.environ.get('CHECKPOINT', 'output/tokenhsi/ckpt_stage1.pth'),
++            '--test', '--num_envs', os.environ.get('NUM_ENVS', '512'), '--headless',
++            '--eval', '--eval_task', os.environ['EVAL_TASK'], '--seed', os.environ.get('SEED', '0')]
++runpy.run_path('tokenhsi/run.py', run_name='__main__')
+--- a/scripts/grad_diag.py
++++ b/scripts/grad_diag.py
+@@ -0,0 +1,151 @@
++"""Gradient-conflict diagnostic for a PUSH KD checkpoint (no learning).
++
++Resumes a checkpoint through the normal training entry point with every optimizer lr forced to 0, so the
++policy, critic and discriminator stay at the checkpoint. After DIAG_WARMUP_EPOCHS rollout epochs (to move away
++from the reset distribution), it measures, on the first mini-epoch of DIAG_MEASURE_EPOCHS epochs, the gradient
++of each loss term that the training loss adds up:
++  ppo        PUSH actor loss (+ bounds, entropy) exactly as in calc_gradients
++  kd_<task>  lambda_k * (n_k / n) * mean KL_k, the term of task k inside lagrange_kd_loss
++and reports cosine similarities and norms of the summed gradients per parameter group.
++Lagrange coefficients are held at the checkpoint values.
++Usage: python scripts/grad_diag.py <run.py args...>   (env: DIAG_OUT, DIAG_WARMUP_EPOCHS, DIAG_MEASURE_EPOCHS)
++"""
++import json
++import os
++import runpy
++import sys
++
++WARM = int(os.environ.get('DIAG_WARMUP_EPOCHS', 40))
++MEAS = int(os.environ.get('DIAG_MEASURE_EPOCHS', 3))
++OUT = os.environ.get('DIAG_OUT', 'grad_diag.json')
++
++
++def main():
++    from isaacgym import gymapi  # noqa: F401  (Isaac Gym must be imported before torch)
++    import torch
++    import learning.push_kd_agent as A
++    from learning.push_kd_losses import gaussian_forward_kl_per_sample
++
++    st = dict(epoch=0, call=0, lam=None, names=None, sums={}, halves=[{}, {}], mb=[], counts=[])
++    orig_train_epoch, orig_calc = A.PushKDAgent.train_epoch, A.PushKDAgent.calc_gradients
++
++    def add(acc, key, grads):
++        if key not in acc:
++            acc[key] = [g.detach().clone() for g in grads]
++        else:
++            for a, g in zip(acc[key], grads):
++                a.add_(g)
++
++    def flat(grads, idx):
++        return torch.cat([grads[i].reshape(-1) for i in idx]).double()
++
++    def cos(a, b):
++        na, nb = a.norm(), b.norm()
++        return float((a @ b) / (na * nb)) if na > 0 and nb > 0 else float('nan')
++
++    def measure(self, d):
++        if st['lam'] is None:
++            st['lam'] = self._kd_lambda.detach().clone()
++            st['names'] = [n for n, p in self.model.named_parameters() if p.requires_grad]
++        params = [p for p in self.model.parameters() if p.requires_grad]
++        rms = (self.running_mean_std, self._amp_input_mean_std)
++        modes = [m.training for m in rms]
++        for m in rms:
++            m.eval()  # the original calc_gradients call below does the usual statistics update once
++        self.set_train()
++        obs = self._preproc_obs(d['obs'])
++        amp = self._preproc_amp_obs(self._sample_push_amp(self._amp_minibatch_size))
++        demo, replay = self._amp_minibatch()
++        batch = {'is_train': True, 'prev_actions': d['actions'], 'obs': obs, 'not_normalized_obs': d['obs'],
++                 'amp_obs': amp, 'amp_obs_replay': self._preproc_amp_obs(replay),
++                 'amp_obs_demo': self._preproc_amp_obs(demo)}
++        for m, mode in zip(rms, modes):
++            m.train(mode)
++        res = self.model(batch)
++        mu = res['mus']
++        sigma = res['sigmas'].expand_as(mu)
++        mask = d['rand_action_mask']
++        total = mask.sum().clamp_min(1)
++        a = self._actor_loss(d['old_logp_actions'], res['prev_neglogp'], d['advantages'], self.e_clip)['actor_loss']
++        losses = {'ppo': (mask * a).sum() / total - self.entropy_coef * (mask * res['entropy']).sum() / total
++                  + self.bounds_loss_coef * (mask * self.bound_loss(mu)).sum() / total}
++        old = d['kd_mask']
++        per = gaussian_forward_kl_per_sample(mu[old], sigma[old], d['teacher_mu'][old], d['teacher_sigma'][old])
++        task = d['obs'][old][:, A.KD_TASK_ONEHOT].argmax(-1)
++        n = max(len(per), 1)
++        counts = dict(push=int(d['push_mask'].sum()), kd=len(per))
++        for k, name in enumerate(A.KD_TASKS):
++            sel = task == k
++            counts[name] = int(sel.sum())
++            counts['kl_' + name] = float(per[sel].mean()) if sel.any() else float('nan')
++            losses['kd_' + name] = st['lam'][k] * per[sel].sum() / n
++        st['counts'].append(counts)
++        grads = {}
++        keys = list(losses)
++        for i, key in enumerate(keys):
++            g = torch.autograd.grad(losses[key], params, retain_graph=i < len(keys) - 1, allow_unused=True)
++            grads[key] = [torch.zeros_like(p) if x is None else x for p, x in zip(params, g)]
++            add(st['sums'], key, grads[key])
++            add(st['halves'][st['call'] % 2], key, grads[key])
++        idx = range(len(params))
++        f = {k: flat(v, idx) for k, v in grads.items()}
++        st['mb'].append({k: cos(f['ppo'], f[k]) for k in keys if k != 'ppo'})
++
++    def calc_gradients(self, input_dict):
++        if st['epoch'] > WARM and st['call'] < len(self.dataset):
++            measure(self, input_dict)
++        st['call'] += 1
++        for group in self.optimizer.param_groups:
++            group['lr'] = 0.0  # keep every parameter at the checkpoint
++        return orig_calc(self, input_dict)
++
++    def train_epoch(self):
++        st['epoch'] += 1
++        st['call'] = 0
++        keep = self._kd_lambda.detach().clone()
++        info = orig_train_epoch(self)
++        self._kd_lambda = keep  # hold the Lagrange coefficients at the checkpoint
++        print('GRAD_DIAG epoch {} ({} warmup, {} measure)'.format(st['epoch'], WARM, MEAS), flush=True)
++        if st['epoch'] >= WARM + MEAS:
++            finish()
++            os._exit(0)
++        return info
++
++    def finish():
++        names = st['names']
++        groups = {'all': list(range(len(names)))}
++        for depth in (2, 3):
++            for i, name in enumerate(names):
++                groups.setdefault('.'.join(name.split('.')[:depth]), []).append(i)
++        keys = list(st['sums'])
++        result = dict(lambda_=st['lam'].tolist(), warmup_epochs=WARM, measure_epochs=MEAS,
++                      minibatches=len(st['mb']), counts=st['counts'], groups={})
++        for gname, idx in groups.items():
++            f = {k: flat(st['sums'][k], idx) for k in keys}
++            h = [{k: flat(half[k], idx) for k in keys} for half in st['halves']]
++            norms = {k: float(v.norm()) for k, v in f.items()}
++            if all(v == 0 for v in norms.values()):
++                continue
++            kd = sum(f[k] for k in keys if k != 'ppo')
++            result['groups'][gname] = dict(
++                numel=int(f['ppo'].numel()), norm=norms,
++                cos_ppo={k: cos(f['ppo'], f[k]) for k in keys if k != 'ppo'},
++                cos_ppo_kd_total=cos(f['ppo'], kd),
++                cos_kd_pairs={a + '|' + b: cos(f[a], f[b]) for i, a in enumerate(keys) for b in keys[i + 1:]
++                              if a != 'ppo' and b != 'ppo'},
++                half_consistency={k: cos(h[0][k], h[1][k]) for k in keys})
++        mb = st['mb']
++        result['minibatch_cos_ppo_mean'] = {k: sum(x[k] for x in mb) / len(mb) for k in mb[0]}
++        result['param_names'] = names
++        with open(OUT, 'w') as fh:
++            json.dump(result, fh, indent=1)
++        print('GRAD_DIAG wrote', OUT, flush=True)
++
++    A.PushKDAgent.train_epoch = train_epoch
++    A.PushKDAgent.calc_gradients = calc_gradients
++    sys.argv = ['tokenhsi/run.py'] + sys.argv[1:]
++    runpy.run_path('tokenhsi/run.py', run_name='__main__')
++
++
++if __name__ == '__main__':
++    main()
+--- a/scripts/train.sh
++++ b/scripts/train.sh
+@@ -17,7 +17,7 @@
+ fi
+ export CUDA_VISIBLE_DEVICES="$TOKENHSI_GPU"
+ export PYTHONPATH="$PWD:$PWD/tokenhsi${PYTHONPATH:+:$PYTHONPATH}"
+-args=(--task HumanoidTokenHSIPushKD --cfg_env tokenhsi/data/cfg/multi_task/push_kd.yaml --cfg_train tokenhsi/data/cfg/train/rlg/push_kd.yaml --motion_file tokenhsi/data/dataset_push_kd.yaml --num_envs 2048 --headless --sim_device cuda:0 --rl_device cuda:0 --pipeline gpu --seed "${SEED:-42}" --output_path "${OUTPUT_PATH:-output/push_kd}")
++args=(--task HumanoidTokenHSIPushKD --cfg_env tokenhsi/data/cfg/multi_task/push_kd.yaml --cfg_train "${CFG_TRAIN:-tokenhsi/data/cfg/train/rlg/push_kd.yaml}" --motion_file tokenhsi/data/dataset_push_kd.yaml --num_envs "${NUM_ENVS:-2048}" --headless --sim_device cuda:0 --rl_device cuda:0 --pipeline gpu --seed "${SEED:-42}" --output_path "${OUTPUT_PATH:-output/push_kd}")
+ if [[ -n "${RESUME_CHECKPOINT:-}" ]]; then args+=(--resume 1 --checkpoint "$RESUME_CHECKPOINT"); fi
+ if [[ -n "${MAX_ITERATIONS:-}" ]]; then args+=(--max_iterations "$MAX_ITERATIONS"); fi
+ exec python tokenhsi/run.py "${args[@]}"
+--- a/tests/test_amp_used_rows.py
++++ b/tests/test_amp_used_rows.py
+@@ -0,0 +1,60 @@
++"""AMP demo/replay memory fix: the per-epoch batch_size draw shrinks to one minibatch, and each
++minibatch draws amp_minibatch_size fresh demo/replay rows from the buffers (PUSH samples while the
++replay buffer is still empty), matching what the original read at shuffled AMPDataset indices."""
++import ast
++from pathlib import Path
++from types import SimpleNamespace
++
++import torch
++
++BATCH, AMP_MINIBATCH = 96, 8
++
++
++def _methods(*names):
++    # Same approach as test_optimizer_routing: take methods from source without importing Isaac Gym.
++    path = Path(__file__).resolve().parents[1]/'tokenhsi/learning/push_kd_agent.py'
++    cls = next(x for x in ast.parse(path.read_text()).body if isinstance(x, ast.ClassDef))
++    body = [x for x in cls.body if isinstance(x, ast.FunctionDef) and x.name in names]
++    namespace = {}
++    exec(compile(ast.Module(body=body, type_ignores=[]), str(path), 'exec'), namespace)
++    return SimpleNamespace(**{name: namespace[name] for name in names})
++
++
++M = _methods('_amp_rows', '_amp_minibatch')
++
++
++class Buffer:
++    def __init__(self, fill, total):
++        self.fill, self.total, self.calls = fill, total, []
++    def get_total_count(self):
++        return self.total
++    def sample(self, n):
++        self.calls.append(n)
++        return {'amp_obs': torch.full((n, 1340), float(self.fill))}
++
++
++def _agent(used_rows, replay_total):
++    agent = SimpleNamespace(batch_size=BATCH, _amp_minibatch_size=AMP_MINIBATCH, _amp_used_rows=used_rows, ppo_device='cpu',
++                            _amp_obs_demo_buffer=Buffer(1, 500), _amp_replay_buffer=Buffer(2, replay_total),
++                            _sample_push_amp=lambda n: torch.full((n, 1340), 3.))
++    return agent
++
++
++def test_epoch_draw_shrinks_only_when_on():
++    assert M._amp_rows(_agent(True, 0), BATCH) == AMP_MINIBATCH
++    assert M._amp_rows(_agent(True, 0), 50) == 50  # other sizes untouched
++    assert M._amp_rows(_agent(False, 0), BATCH) == BATCH
++
++
++def test_minibatch_draws_from_buffers():
++    agent = _agent(True, replay_total=100)
++    demo, replay = M._amp_minibatch(agent)
++    assert demo.shape == replay.shape == (AMP_MINIBATCH, 1340)
++    assert (demo == 1).all() and (replay == 2).all()
++    assert agent._amp_obs_demo_buffer.calls == [AMP_MINIBATCH] and agent._amp_replay_buffer.calls == [AMP_MINIBATCH]
++
++
++def test_first_epoch_replay_uses_push_samples():
++    agent = _agent(True, replay_total=0)
++    _, replay = M._amp_minibatch(agent)
++    assert (replay == 3).all() and agent._amp_replay_buffer.calls == []
+--- a/tests/test_lagrange_kd.py
++++ b/tests/test_lagrange_kd.py
+@@ -0,0 +1,61 @@
++"""Lagrange (adaptive per-task coefficient) KD: loss reduces to the fixed-coefficient loss when the
++coefficients are equal, per-task KL is reported per task, and the coefficient update follows the
++adaptive KL penalty rule."""
++import math
++
++import torch
++
++from learning.push_kd_losses import (adapt_coefficient, gaussian_forward_kl, gaussian_forward_kl_per_sample,
++                                     lagrange_kd_loss)
++
++
++def _sample(n=12, actions=32, seed=0):
++    g = torch.Generator().manual_seed(seed)
++    mu = torch.randn(n, actions, generator=g, requires_grad=True)
++    teacher_mu = torch.randn(n, actions, generator=g)
++    sigma = torch.full((n, actions), 0.055)
++    return mu, sigma, teacher_mu, sigma.clone()
++
++
++def test_equal_coefficients_match_fixed_loss():
++    mu, sigma, tmu, ts = _sample()
++    task = torch.tensor([0, 1, 2] * 4)
++    per = gaussian_forward_kl_per_sample(mu, sigma, tmu, ts)
++    loss, _ = lagrange_kd_loss(per, task, torch.full((3,), 0.001))
++    assert torch.allclose(loss, 0.001 * gaussian_forward_kl(mu, sigma, tmu, ts))
++
++
++def test_per_task_mean_and_absent_task():
++    per = torch.tensor([1., 3., 10., 20.])
++    task = torch.tensor([0, 0, 2, 2])
++    loss, mean = lagrange_kd_loss(per, task, torch.tensor([1., 1., 2.]))
++    assert mean[0] == 2 and math.isnan(mean[1]) and mean[2] == 15
++    assert torch.isclose(loss, torch.tensor((1 * 4 + 2 * 30) / 4))
++
++
++def test_gradient_scales_with_task_coefficient():
++    mu, sigma, tmu, ts = _sample(n=2)
++    task = torch.tensor([0, 1])
++    per = gaussian_forward_kl_per_sample(mu, sigma, tmu, ts)
++    loss, _ = lagrange_kd_loss(per, task, torch.tensor([1., 0., 0.]))
++    loss.backward()
++    assert mu.grad[0].abs().sum() > 0 and mu.grad[1].abs().sum() == 0
++
++
++def test_adaptive_rule():
++    coef = torch.tensor([0.01, 0.01, 0.01, 0.01, 8.0, 1.5e-4])
++    kl = torch.tensor([4.0, 0.5, 1.2, float('nan'), 9.0, 0.1])  # target 1, tolerance 1.5
++    new = adapt_coefficient(coef, kl, target=1.0, factor=2.0, tolerance=1.5, low=1e-4, high=10.0)
++    expected = torch.tensor([0.02, 0.005, 0.01, 0.01, 10.0, 1e-4])  # up, down, hold, absent, clamp high, clamp low
++    assert torch.allclose(new, expected)
++
++
++def test_feature_distill_loss():
++    from learning.push_kd_losses import feature_distill_loss
++    s = torch.tensor([[1., 3.], [0., 0.]], requires_grad=True)
++    t = torch.tensor([[0., 1.], [0., 0.]], requires_grad=True)
++    loss = feature_distill_loss(s, t)
++    assert torch.isclose(loss, torch.tensor((1 + 4 + 0 + 0) / 4))
++    loss.backward()
++    assert t.grad is None or (t.grad == 0).all()  # teacher feature is a fixed target
++    assert feature_distill_loss(s[:0], t[:0]) == 0
+--- a/tests/test_optimizer_routing.py
++++ b/tests/test_optimizer_routing.py
+@@ -5,15 +5,24 @@
+ import torch
+ from torch import nn
+ from learning.push_kd_losses import gaussian_forward_kl, masked_mean
++from learning.push_kd_losses import gaussian_forward_kl_per_sample, lagrange_kd_loss, feature_distill_loss
+ 
+ 
+-def test_actual_optimizer_step_only_updates_push_critic_and_old_kd():
++def _calc_gradients():
+     path = Path(__file__).resolve().parents[1]/'tokenhsi/learning/push_kd_agent.py'
+     cls = next(x for x in ast.parse(path.read_text()).body if isinstance(x, ast.ClassDef))
+     method = next(x for x in cls.body if isinstance(x, ast.FunctionDef) and x.name == 'calc_gradients')
+     namespace = dict(torch=torch, nn=nn, masked_mean=masked_mean, gaussian_forward_kl=gaussian_forward_kl,
++                     gaussian_forward_kl_per_sample=gaussian_forward_kl_per_sample,
++                     lagrange_kd_loss=lagrange_kd_loss, feature_distill_loss=feature_distill_loss,
++                     KD_TASK_ONEHOT=slice(393, 396),
+                      torch_ext=SimpleNamespace(policy_kl=lambda *args: torch.tensor(0.)))
+     exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
++    return namespace
++
++
++def test_actual_optimizer_step_only_updates_push_critic_and_old_kd():
++    namespace = _calc_gradients()
+ 
+     class Toy(nn.Module):
+         def __init__(self):
+@@ -59,3 +68,102 @@
+     assert torch.equal(model.mu[~push & ~kd].detach(), torch.full((2,32), .1))
+     assert teacher_mu.grad is None
+     assert all(torch.isfinite(p).all() for p in model.parameters())
++
++
++def test_lagrange_kd_routes_by_task_onehot():
++    """Lagrange mode: KD row 4 is SIT, row 5 is CLIMB; lambda_climb = 0 must leave row 5 untouched."""
++    namespace = _calc_gradients()
++
++    class Toy(nn.Module):
++        def __init__(self):
++            super().__init__()
++            self.mu = nn.Parameter(torch.ones(8, 32)*.1)
++            self.value = nn.Parameter(torch.ones(8, 1))
++            self.disc = nn.Parameter(torch.ones(1))
++        def forward(self, data):
++            logits = self.disc.expand(len(data['amp_obs']), 1)
++            return dict(prev_neglogp=self.mu.sum(-1), values=self.value, entropy=self.mu.sum(-1)*0,
++                        mus=self.mu, sigmas=torch.ones(32),  # fixed_sigma: one vector, as in training
++                        disc_agent_logit=logits, disc_agent_replay_logit=logits, disc_demo_logit=logits)
++    model = Toy()
++    actor = SimpleNamespace(model=model, set_train=lambda: None, _preproc_obs=lambda x: x,
++        _preproc_amp_obs=lambda x: x, _amp_minibatch_size=4, last_lr=.001, e_clip=.2,
++        mixed_precision=False, is_rnn=False, critic_coef=1., entropy_coef=0.,
++        bounds_loss_coef=0., _disc_coef=1., _reg_loss_enabled=False, _kd_coef=.001,
++        _kd_mode='lagrange', _kd_lambda=torch.tensor([1., 1., 0.]),
++        _kd_epoch_kl=torch.zeros(3), _kd_epoch_count=torch.zeros(3),
++        multi_gpu=False, truncate_grads=False, clip_value=False,
++        optimizer=torch.optim.Adam(model.parameters(), lr=.01),
++        scaler=torch.cuda.amp.GradScaler(enabled=False))
++    actor._actor_loss = lambda old, new, adv, clip: dict(actor_loss=new*adv, actor_clipped=torch.zeros_like(new))
++    actor._critic_loss = lambda old, new, clip, ret, enabled: dict(critic_loss=(new-ret).square())
++    actor.bound_loss = lambda mu: mu.square().sum(-1)
++    actor._disc_loss = lambda a,b,c: dict(disc_loss=a.square().mean())
++    amp = torch.zeros(8, 1340); amp[:, 133] = 1
++    actor._sample_push_amp = lambda n: amp[:n]
++    push = torch.arange(8) < 4
++    kd = (torch.arange(8) >= 4) & (torch.arange(8) < 6)
++    obs = torch.zeros(8, 397)
++    obs[:4, 396] = 1   # PUSH
++    obs[4, 393] = 1    # SIT
++    obs[5, 395] = 1    # CLIMB
++    data = dict(old_values=torch.zeros(8,1), old_logp_actions=torch.zeros(8), advantages=torch.ones(8),
++                mu=torch.zeros(8,32), sigma=torch.ones(8,32), returns=torch.zeros(8,1),
++                actions=torch.zeros(8,32), obs=obs, amp_obs=amp,
++                amp_obs_replay=amp, amp_obs_demo=amp, rand_action_mask=push.float(),
++                push_mask=push, kd_mask=kd, teacher_mu=torch.zeros(8, 32), teacher_sigma=torch.ones(8,32))
++    namespace['calc_gradients'](actor, data)
++    assert (model.mu[4].detach() < .1).all()                          # SIT row pulled to teacher
++    assert torch.equal(model.mu[5].detach(), torch.full((32,), .1))   # CLIMB row: lambda 0
++    assert torch.equal(model.mu[6:].detach(), torch.full((2, 32), .1))
++    assert torch.equal(actor._kd_epoch_count, torch.tensor([1., 0., 1.]))
++    assert actor._kd_epoch_kl[0] > 0 and actor._kd_epoch_kl[1] == 0
++
++
++def test_feature_distillation_only_moves_kd_rows():
++    """Feature KD: the student feature (here the toy's per-row parameters, standing in for the hooked
++    transformer output) is pulled to the teacher feature on KD rows only."""
++    namespace = _calc_gradients()
++
++    class Toy(nn.Module):
++        def __init__(self, actor):
++            super().__init__()
++            self.actor = actor
++            self.mu = nn.Parameter(torch.ones(8, 32)*.1)
++            self.feature = nn.Parameter(torch.ones(8, 64)*.5)
++            self.value = nn.Parameter(torch.ones(8, 1))
++            self.disc = nn.Parameter(torch.ones(1))
++        def forward(self, data):
++            self.actor._features['student'] = self.feature  # what the forward hook stores
++            logits = self.disc.expand(len(data['amp_obs']), 1)
++            return dict(prev_neglogp=self.mu.sum(-1), values=self.value, entropy=self.mu.sum(-1)*0,
++                        mus=self.mu, sigmas=torch.ones(32),
++                        disc_agent_logit=logits, disc_agent_replay_logit=logits, disc_demo_logit=logits)
++    actor = SimpleNamespace(set_train=lambda: None, _preproc_obs=lambda x: x,
++        _preproc_amp_obs=lambda x: x, _amp_minibatch_size=4, last_lr=.001, e_clip=.2,
++        mixed_precision=False, is_rnn=False, critic_coef=1., entropy_coef=0.,
++        bounds_loss_coef=0., _disc_coef=1., _reg_loss_enabled=False, _kd_coef=0.,
++        _kd_feature_coef=1., _features={},
++        multi_gpu=False, truncate_grads=False, clip_value=False,
++        scaler=torch.cuda.amp.GradScaler(enabled=False))
++    model = Toy(actor)
++    actor.model = model
++    actor.optimizer = torch.optim.Adam(model.parameters(), lr=.01)
++    actor._actor_loss = lambda old, new, adv, clip: dict(actor_loss=new*adv, actor_clipped=torch.zeros_like(new))
++    actor._critic_loss = lambda old, new, clip, ret, enabled: dict(critic_loss=(new-ret).square())
++    actor.bound_loss = lambda mu: mu.square().sum(-1)
++    actor._disc_loss = lambda a,b,c: dict(disc_loss=a.square().mean())
++    amp = torch.zeros(8, 1340); amp[:, 133] = 1
++    actor._sample_push_amp = lambda n: amp[:n]
++    push = torch.arange(8) < 4
++    kd = (torch.arange(8) >= 4) & (torch.arange(8) < 6)
++    data = dict(old_values=torch.zeros(8,1), old_logp_actions=torch.zeros(8), advantages=torch.ones(8),
++                mu=torch.zeros(8,32), sigma=torch.ones(8,32), returns=torch.zeros(8,1),
++                actions=torch.zeros(8,32), obs=torch.zeros(8,397), amp_obs=amp,
++                amp_obs_replay=amp, amp_obs_demo=amp, rand_action_mask=push.float(),
++                push_mask=push, kd_mask=kd, teacher_mu=torch.zeros(8, 32), teacher_sigma=torch.ones(8,32),
++                teacher_feature=torch.zeros(8, 64))
++    namespace['calc_gradients'](actor, data)
++    assert (model.feature[kd].detach() < .5).all()                     # pulled toward teacher feature 0
++    assert torch.equal(model.feature[~kd].detach(), torch.full((6, 64), .5))
++    assert actor.train_result['feature_mse'] > 0
+--- a/tests/test_overlapped_step.py
++++ b/tests/test_overlapped_step.py
+@@ -0,0 +1,98 @@
++"""MixedReferenceEnv.step overlaps the native worker with the reference simulator: the native step is sent
++first and received after the reference step. The two pools share no state, so every output must equal what
++the sequential order (reference step, then native step) produces."""
++import ast
++from pathlib import Path
++from types import SimpleNamespace
++
++import torch
++
++ROOT = Path(__file__).resolve().parents[1]
++N_REF, N_NATIVE = 3, 4   # reference scenes (two rows each) and native envs
++
++
++def _method(path, cls_name, name, namespace):
++    # Same approach as test_optimizer_routing: take the method from source without importing Isaac Gym.
++    tree = ast.parse((ROOT/path).read_text())
++    cls = next(x for x in tree.body if isinstance(x, ast.ClassDef) and x.name == cls_name)
++    body = [x for x in cls.body if isinstance(x, ast.FunctionDef) and x.name == name]
++    exec(compile(ast.Module(body=body, type_ignores=[]), path, 'exec'), namespace)
++    return namespace[name]
++
++
++class Reference:
++    def __init__(self, log):
++        self.log = log
++    def step(self, actions):
++        self.log.append('reference step')
++        a = actions.sum(-1).reshape(N_REF, 2)
++        self.rew_buf, self._terminate_buf = a, a > 0
++        self.reset_buf = (a[:, 0] > 0).long()
++        self.extras = {'amp_obs': actions.repeat(1, 42)[:, :1340]}
++        self.relation_runtime = SimpleNamespace(done=a < 0)
++        self._box_states = torch.stack((a, -a, a), -1)
++        self._tar_pos = torch.zeros(N_REF, 2, 3)
++
++
++class Native:
++    def __init__(self, log):
++        self.log, self.pending = log, None
++    def send_step(self, actions):
++        self.log.append('native send')
++        self.pending = actions.clone()
++    def wait_step(self):
++        self.log.append('native wait')
++        a = self.pending
++        self.obs_buf = a.repeat(1, 12)[:, :354]
++        self.rew_buf, self.reset_buf = a[:, 0], (a[:, 1] > 0).long()
++        self._terminate_buf, self._success_buf, self._precision_buf = a[:, 2] > 0, a[:, 3] > 0, a[:, 4]
++        self.extras = {'amp_obs': a.repeat(1, 42)[:, :1330]}
++    def step(self, actions):
++        self.send_step(actions)
++        self.wait_step()
++
++
++def _env(log):
++    env = SimpleNamespace(reference=Reference(log), native=Native(log), reference_rows=2*N_REF, rl_device='cpu',
++                          num_envs=2*N_REF+N_NATIVE, _projection_reset=None, _ever=torch.zeros(2*N_REF, dtype=torch.bool))
++    project = lambda ref, reset: torch.cat((ref.rew_buf.reshape(-1, 1).expand(-1, 392), torch.eye(5)[torch.arange(2*N_REF) % 5]), -1)
++    namespace = dict(torch=torch, project=project, amp_to_tokenhsi=lambda x: x)
++    env._obs = _method('tokenhsi/env/mixed_reference_env.py', 'MixedReferenceEnv', '_obs', namespace).__get__(env)
++    env.step = _method('tokenhsi/env/mixed_reference_env.py', 'MixedReferenceEnv', 'step', namespace).__get__(env)
++    return env
++
++
++def _sequential(env, actions):
++    """The order used before the overlap: reference step, then a blocking native step."""
++    ref, nat = env.reference, env.native
++    ref.step(actions[:env.reference_rows].clamp(-1, 1))
++    nat.step(actions[env.reference_rows:].clamp(-1, 1))
++    obs = env._obs()
++    amp = nat.extras['amp_obs'].reshape(-1, 10, 133)
++    return dict(obs=obs,
++                reward=torch.cat((ref.rew_buf.flatten(), torch.zeros_like(nat.rew_buf))),
++                done=torch.cat((ref.reset_buf.repeat_interleave(2), nat.reset_buf)),
++                amp=torch.cat((ref.extras['amp_obs'], torch.cat((amp, amp.new_zeros(*amp.shape[:-1], 1)), -1).flatten(1))),
++                terminate=torch.cat((ref._terminate_buf.flatten(), nat._terminate_buf)),
++                success=torch.cat((ref.relation_runtime.done.flatten(), nat._success_buf)),
++                precision=torch.cat(((ref._box_states[:, :2, :2]-ref._tar_pos[..., :2]).norm(dim=-1).flatten(), nat._precision_buf)))
++
++
++def test_native_step_is_sent_before_the_reference_step_and_received_after():
++    log = []
++    env = _env(log)
++    env.step(torch.randn(env.num_envs, 32))
++    assert log == ['native send', 'reference step', 'native wait']
++
++
++def test_overlapped_step_matches_sequential_order():
++    torch.manual_seed(0)
++    for _ in range(3):
++        actions = 2*torch.randn(2*N_REF+N_NATIVE, 32)
++        obs, reward, done, info = _env([]).step(actions)
++        expected = _sequential(_env([]), actions)
++        torch.testing.assert_close(obs, expected['obs'])
++        torch.testing.assert_close(reward, expected['reward'])
++        torch.testing.assert_close(done, expected['done'])
++        for key in ('amp', 'terminate', 'success', 'precision'):
++            torch.testing.assert_close(info['amp_obs' if key == 'amp' else key], expected[key])
+--- a/tokenhsi/data/cfg/train/rlg/push_kd_lagrange.yaml
++++ b/tokenhsi/data/cfg/train/rlg/push_kd_lagrange.yaml
+@@ -0,0 +1,108 @@
++params:
++  seed: -1
++  algo:
++    name: trans
++  model:
++    name: amp
++  network:
++    name: amp_transformer_multi_task
++    separate: true
++    network_structure_id: 2
++    transformer:
++      num_features: 64
++      tokenizer_units:
++      - 256
++      - 128
++      num_layers: 4
++      layer_num_heads: 2
++      layer_dim_feedforward: 512
++      use_pos_embed: false
++      extra_mlp_units:
++      - 1024
++      - 512
++    space:
++      continuous:
++        mu_activation: None
++        sigma_activation: None
++        mu_init:
++          name: default
++        sigma_init:
++          name: const_initializer
++          val: -2.9
++        fixed_sigma: true
++        learn_sigma: false
++    mlp:
++      units:
++      - 2048
++      - 1024
++      - 512
++      activation: relu
++      d2rl: false
++      initializer:
++        name: default
++      regularizer:
++        name: None
++    disc:
++      units:
++      - 1024
++      - 512
++      activation: relu
++      initializer:
++        name: default
++  load_checkpoint: false
++  config:
++    name: TokenHSIPushKD
++    env_name: rlgpu
++    multi_gpu: false
++    ppo: true
++    mixed_precision: false
++    normalize_input: true
++    normalize_value: true
++    reward_shaper:
++      scale_value: 1
++    normalize_advantage: true
++    gamma: 0.99
++    tau: 0.95
++    learning_rate: 2e-5
++    lr_schedule: constant
++    score_to_win: 20000
++    max_epochs: 26000
++    save_best_after: 50
++    save_frequency: 100
++    save_intermediate: true
++    print_stats: true
++    grad_norm: 1.0
++    entropy_coef: 0.0
++    truncate_grads: false
++    e_clip: 0.2
++    horizon_length: 32
++    minibatch_size: 16384
++    mini_epochs: 6
++    critic_coef: 5
++    clip_value: false
++    seq_len: 4
++    bounds_loss_coef: 10
++    amp_obs_demo_buffer_size: 200000
++    amp_replay_buffer_size: 200000
++    amp_replay_keep_prob: 0.01
++    amp_batch_size: 512
++    amp_minibatch_size: 4096
++    disc_coef: 5
++    disc_logit_reg: 0.01
++    disc_grad_penalty: 5
++    disc_reward_scale: 2
++    disc_weight_decay: 0.0001
++    normalize_amp_input: true
++    enable_eps_greedy: false
++    task_reward_w: 0.5
++    disc_reward_w: 0.5
++    teacher_checkpoint: weights/teacher_stage1.pth
++    initial_checkpoint: weights/push_init.pth
++    kd_coef: 0.001
++    # Lagrange KD (per-task adaptive coefficient). kd_coef is the starting coefficient for each task.
++    kd_mode: lagrange
++    kd_target_kl: 1.0          # epsilon: per-task KL target (decided from A 500-epoch eval, seeds 0-2)
++    kd_adapt_factor: 2.0
++    kd_adapt_tolerance: 1.5
++    kd_coef_min: 0.0001
++    kd_coef_max: 10.0
+--- a/tokenhsi/env/mixed_reference_env.py
++++ b/tokenhsi/env/mixed_reference_env.py
+@@ -111,6 +111,9 @@
+ 
+     def step(self, actions):
+         rewards, dones, amps, terms, successes, precision = [], [], [], [], [], []
++        if self.native:
++            # The two pools share no state, so the native worker steps while the reference simulator runs.
++            self.native.send_step(actions[self.reference_rows:].clamp(-1, 1))
+         if self.reference:
+             r = self.reference
+             r.step(actions[:self.reference_rows].clamp(-1, 1))
+@@ -124,7 +127,7 @@
+             precision.append((r._box_states[:, :2, :2]-r._tar_pos[..., :2]).norm(dim=-1).flatten().to(self.rl_device))
+         if self.native:
+             r = self.native
+-            r.step(actions[self.reference_rows:].clamp(-1, 1))
++            r.wait_step()
+             rewards.append(torch.zeros_like(r.rew_buf).to(self.rl_device))
+             dones.append(r.reset_buf.to(self.rl_device))
+             amp = r.extras['amp_obs'].reshape(-1,10,133)
+--- a/tokenhsi/env/native_pool_worker.py
++++ b/tokenhsi/env/native_pool_worker.py
+@@ -84,7 +84,14 @@
+         self.extras = dict(amp_obs=data['amp'])
+ 
+     def step(self, actions):
++        self.send_step(actions)
++        self.wait_step()
++
++    def send_step(self, actions):
++        # Start a step without waiting, so the caller can run other work while the worker simulates.
+         self._pipe.send(('step', actions.detach().cpu().numpy().copy()))
++
++    def wait_step(self):
+         self._receive()
+ 
+     def reset(self, ids):
+--- a/tokenhsi/learning/native_eval_warmup.py
++++ b/tokenhsi/learning/native_eval_warmup.py
+@@ -0,0 +1,26 @@
++"""Warm-up before the native SIT/CARRY/CLIMB eval, shared by the student (PushKDPlayer) and the
++original-code teacher eval (scripts/eval_teacher_original.py) so both follow the same protocol.
++
++The original TokenHSI eval counts the first episode after env creation, where CLIMB collapses
++(about 3% vs 99.8% in later repeats, for the teacher in the original code too). Running the policy
++for longer than one episode (600 steps) first removes that artifact. Warm-up steps are not counted.
++"""
++import os
++
++DEFAULT_STEPS = 700  # > episodeLength 600, so every env finishes at least one full episode
++
++
++def warmup_steps():
++    return int(os.environ.get('NATIVE_EVAL_WARMUP', DEFAULT_STEPS))
++
++
++def run_warmup(player, steps):
++    """Step the evaluated policy (deterministic) and reset finished envs, as run_eval does."""
++    print('native eval warm-up: {} steps (not counted)'.format(steps), flush=True)
++    obs = player.env_reset()
++    player.get_batch_size(obs['obs'], 1)
++    done_ids = []
++    for _ in range(steps):
++        obs = player.env_reset(done_ids)
++        _, _, done, _ = player.env_step(player.env, player.get_action(obs, True))
++        done_ids = done.nonzero(as_tuple=False)[:, 0]
+--- a/tokenhsi/learning/push_kd_agent.py
++++ b/tokenhsi/learning/push_kd_agent.py
+@@ -2,6 +2,7 @@
+ import copy
+ import hashlib
+ import json
++import os
+ from pathlib import Path
+ import torch
+ from torch import nn
+@@ -11,6 +12,10 @@
+ from learning.transformer.amp_network_builder_transformer import AMPTransformerMultiTaskBuilder
+ from learning.amp_models import ModelAMPContinuous
+ from learning.push_kd_losses import gaussian_forward_kl, masked_mean, push_advantages, teacher_observation, normalize_policy
++from learning.push_kd_losses import gaussian_forward_kl_per_sample, lagrange_kd_loss, adapt_coefficient, feature_distill_loss
++
++KD_TASKS = ('sit', 'carry', 'climb')
++KD_TASK_ONEHOT = slice(393, 396)  # 397D obs one-hot: traj 392, sit 393, carry 394, climb 395, push 396
+ import yaml
+ 
+ 
+@@ -22,6 +27,21 @@
+         self._kd_coef = float(config.get('kd_coef', .001))
+         if not 0 <= self._kd_coef < float('inf'):
+             raise ValueError('kd_coef must be finite and nonnegative')
++        # kd_mode 'fixed' (default): one constant kd_coef. 'lagrange': one coefficient per old task
++        # (sit, carry, climb), starting at kd_coef and adapted each epoch toward KL <= kd_target_kl.
++        self._kd_mode = config.get('kd_mode', 'fixed')
++        if self._kd_mode not in ('fixed', 'lagrange'):
++            raise ValueError('kd_mode must be fixed or lagrange')
++        if self._kd_mode == 'lagrange':
++            self._kd_target = float(config['kd_target_kl'])
++            self._kd_factor = float(config.get('kd_adapt_factor', 2.0))
++            self._kd_tolerance = float(config.get('kd_adapt_tolerance', 1.5))
++            self._kd_bounds = (float(config.get('kd_coef_min', 1e-4)), float(config.get('kd_coef_max', 10.0)))
++            if not (self._kd_target > 0 and self._kd_factor > 1 and self._kd_tolerance > 1):
++                raise ValueError('lagrange KD needs kd_target_kl > 0, kd_adapt_factor > 1, kd_adapt_tolerance > 1')
++            self._kd_lambda = torch.full((len(KD_TASKS),), self._kd_coef, device=self.ppo_device)
++            self._kd_epoch_kl = torch.zeros(len(KD_TASKS), device=self.ppo_device)
++            self._kd_epoch_count = torch.zeros(len(KD_TASKS), device=self.ppo_device)
+         path = Path(config['teacher_checkpoint'])
+         self._teacher_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+         teacher = torch.load(path, map_location=self.ppo_device, weights_only=True)
+@@ -44,12 +64,65 @@
+         contract_env = copy.deepcopy(task.cfg['env'])
+         contract_env.pop('checkpoint', None)
+         self._contract = dict(version=2, teacher_sha256=self._teacher_sha, kd_coef=self._kd_coef, reference_26k=task.cfg['env']['push']['reference_checkpoint_sha256'], env=contract_env, scene='reference_2humans_4boxes_plus_native_kd', ppo='push_only', amp='push_only')
++        # Feature distillation (off by default): on old-task rows, also match the transformer output at the
++        # summary (weight) token, the 64-d input of the action composer, to the frozen teacher's. Training only;
++        # captured with forward hooks, so the network and the saved policy are unchanged.
++        self._kd_feature_coef = float(config.get('kd_feature_coef', 0.0))
++        if self._kd_feature_coef > 0:
++            self._features = {}
++            def capture(name):
++                def hook(module, inputs, output):
++                    self._features[name] = output[:, 0]
++                return hook
++            self.model.a2c_network.transformer_encoder.register_forward_hook(capture('student'))
++            self._teacher.a2c_network.transformer_encoder.register_forward_hook(capture('teacher'))
++            self._feature_size = self._teacher.a2c_network.weight_token.shape[-1]
++            self._contract.update(kd_feature_coef=self._kd_feature_coef, kd_feature='transformer_output_summary_token')
++        if self._kd_mode == 'lagrange':  # fixed-mode contract stays as before so existing runs still resume
++            self._contract.update(kd_mode='lagrange', kd_target_kl=self._kd_target, kd_adapt_factor=self._kd_factor,
++                                  kd_adapt_tolerance=self._kd_tolerance, kd_coef_bounds=list(self._kd_bounds))
+         self._contract['reference_environment'] = yaml.safe_load(Path('tokenhsi/data/cfg/multi_task/push_reference.yaml').read_text())
+         self._contract['reference_source_sha256'] = hashlib.sha256(Path('push_reference/PROVENANCE.json').read_bytes()).hexdigest()
+         Path(self.experiment_dir, 'method_contract.json').write_text(json.dumps(self._contract, indent=2, default=str))
++        # Memory fix (on by default; PUSH_KD_AMP_USED_ROWS=0 restores the original sampling). The original draws
++        # batch_size demo and replay rows per epoch (about 1 GB each here, OOM on 24 GB at epoch 2), and each
++        # minibatch then reads amp_minibatch_size of them at shuffled AMPDataset indices. That is a fresh
++        # without-replacement draw of amp_minibatch_size rows per minibatch, so draw exactly that from the buffers
++        # in calc_gradients and keep demo/replay out of the dataset. Only the RNG draws differ.
++        # The buffers are built later, in init_tensors (amp_agent._build_amp_buffers); they are wrapped there.
++        self._amp_used_rows = os.environ.get('PUSH_KD_AMP_USED_ROWS', '1') == '1'
++
++    def _amp_rows(self, count):
++        # the per-epoch batch_size draw in amp_agent.train_epoch is unused when the fix is on; keep it small
++        return self._amp_minibatch_size if self._amp_used_rows and count == self.batch_size else count
++
++    def _limit_sample(self, sample):
++        return lambda count: sample(self._amp_rows(count))
++
++    def _amp_minibatch(self):
++        """Fresh demo and replay rows for one minibatch (memory fix); first epoch has no replay yet: PUSH samples."""
++        count = self._amp_minibatch_size
++        demo = self._amp_obs_demo_buffer.sample(count)['amp_obs'].to(self.ppo_device, non_blocking=True)
++        if self._amp_replay_buffer.get_total_count() == 0:
++            replay = self._sample_push_amp(count)
++        else:
++            replay = self._amp_replay_buffer.sample(count)['amp_obs'].to(self.ppo_device, non_blocking=True)
++        return demo, replay
+ 
+     def init_tensors(self):
+         super().init_tensors()
++        if self._amp_used_rows:
++            for buffer in (self._amp_obs_demo_buffer, self._amp_replay_buffer):
++                buffer.sample = self._limit_sample(buffer.sample)
++            print('PUSH_KD_AMP_USED_ROWS: demo/replay drawn per minibatch ({} rows each) instead of {} rows per epoch'.format(
++                self._amp_minibatch_size, self.batch_size), flush=True)
++            # Keep the two 200k-row AMP buffers (about 1.07 GB each) in CPU RAM; each minibatch moves only its
++            # amp_minibatch_size rows to the GPU. Their storage is created at the first store, after this point.
++            if os.environ.get('PUSH_KD_AMP_BUFFERS_ON_CPU', '1') == '1':
++                for buffer in (self._amp_obs_demo_buffer, self._amp_replay_buffer):
++                    assert buffer._data_buf is None
++                    buffer._device = 'cpu'
++                print('PUSH_KD_AMP_BUFFERS_ON_CPU: AMP demo and replay buffers kept in CPU memory', flush=True)
+         self.update_list = list(self.update_list)
+         shape = self.experience_buffer.obs_base_shape
+         for key in ('teacher_mu', 'teacher_sigma'):
+@@ -59,6 +132,10 @@
+         self.experience_buffer.tensor_dict['kd_mask'] = torch.zeros(shape, dtype=torch.bool, device=self.ppo_device)
+         self.tensor_list.append('kd_mask')
+         self.update_list.append('kd_mask')
++        if self._kd_feature_coef > 0:
++            self.experience_buffer.tensor_dict['teacher_feature'] = torch.zeros(shape+(self._feature_size,), device=self.ppo_device)
++            self.tensor_list.append('teacher_feature')
++            self.update_list.append('teacher_feature')
+ 
+     def _preproc_obs(self, obs):
+         return normalize_policy(obs, self.running_mean_std, 5) if self.normalize_input else obs
+@@ -76,7 +153,10 @@
+         old = self.vec_env.env.task.kd_mask
+         result['kd_mask'] = old
+         result['teacher_mu'] = torch.zeros_like(result['mus'])
+-        result['teacher_sigma'] = torch.ones_like(result['sigmas'])
++        # fixed_sigma: 'sigmas' is one [actions] vector, so size per-row buffers from 'mus'
++        result['teacher_sigma'] = torch.ones_like(result['mus'])
++        if self._kd_feature_coef > 0:
++            result['teacher_feature'] = result['mus'].new_zeros(len(result['mus']), self._feature_size)
+         with torch.no_grad():
+             if old.any():
+                 raw = teacher_observation(obs_dict['obs'][old])
+@@ -84,6 +164,8 @@
+                 mu, logstd = self._teacher.a2c_network.eval_actor(normalized, raw)
+                 result['teacher_mu'][old] = mu
+                 result['teacher_sigma'][old] = logstd.exp().expand_as(mu)
++                if self._kd_feature_coef > 0:  # captured by the teacher hook during eval_actor
++                    result['teacher_feature'][old] = self._features['teacher']
+         # Used by inherited GAE advantage normalization and actor masking.
+         result['rand_action_mask'] *= (obs_dict['obs'][:, -1] > .5).float()
+         return result
+@@ -126,11 +208,13 @@
+             self.value_mean_std.eval()
+             values, returns = self.value_mean_std(values), self.value_mean_std(returns)
+         data = dict(old_values=values, returns=returns, advantages=advantages, old_logp_actions=batch['neglogpacs'], actions=batch['actions'], obs=batch['obses'], mu=batch['mus'], sigma=batch['sigmas'], rnn_states=None, rnn_masks=None)
+-        for k in ('amp_obs','amp_obs_demo','amp_obs_replay','rand_action_mask','teacher_mu','teacher_sigma','kd_mask'):
++        amp_keys = ('amp_obs',) if self._amp_used_rows else ('amp_obs','amp_obs_demo','amp_obs_replay')
++        feature_keys = ('teacher_feature',) if self._kd_feature_coef > 0 else ()
++        for k in amp_keys + ('rand_action_mask','teacher_mu','teacher_sigma','kd_mask') + feature_keys:
+             data[k] = batch[k]
+         data['push_mask'] = push
+         # First epoch has no replay yet: substitute ONLY PUSH samples.
+-        if self._amp_replay_buffer.get_total_count() == 0:
++        if not self._amp_used_rows and self._amp_replay_buffer.get_total_count() == 0:
+             data['amp_obs_replay'] = self._sample_push_amp(len(push))
+         self.dataset.update_values_dict(data)
+ 
+@@ -140,17 +224,56 @@
+     def get_full_state_weights(self):
+         weights = super().get_full_state_weights()
+         weights['push_kd_contract'] = self._contract
++        if self._kd_mode == 'lagrange':
++            weights['kd_lambda'] = self._kd_lambda.detach().cpu().clone()
+         return weights
+ 
+     def set_full_state_weights(self, weights):
+         if weights.get('push_kd_contract') != self._contract:
+             raise ValueError('PUSH KD resume contract mismatch')
+         super().set_full_state_weights(weights)
++        if self._kd_mode == 'lagrange':
++            self._kd_lambda = weights['kd_lambda'].to(self.ppo_device).clone()
++
++    def train_epoch(self):
++        if os.environ.get('PUSH_KD_GPU_MEM_GB') and torch.cuda.is_available():
++            # Under a cache cap the allocator can fail on fragmentation alone (C hit OOM at 8.6 GB allocated,
++            # 13.75 GB reserved, cap 14), so drop unused cached blocks once per epoch. Computation is unchanged.
++            torch.cuda.empty_cache()
++        info = super().train_epoch()
++        if torch.cuda.is_available():
++            # PyTorch peak allocation of this epoch (what a per-process cache cap must exceed) and current reservation
++            info['gpu_peak_allocated_gb'] = torch.cuda.max_memory_allocated() / 2**30
++            info['gpu_reserved_gb'] = torch.cuda.memory_reserved() / 2**30
++            torch.cuda.reset_peak_memory_stats()
++            print('GPU_MEM peak_allocated {:.2f} GB reserved {:.2f} GB'.format(
++                info['gpu_peak_allocated_gb'], info['gpu_reserved_gb']), flush=True)
++        if self._kd_mode == 'lagrange':
++            # Epoch-mean KL per task over all minibatch updates of this epoch, then the dual step.
++            kl = torch.where(self._kd_epoch_count > 0, self._kd_epoch_kl / self._kd_epoch_count.clamp_min(1),
++                             torch.full_like(self._kd_epoch_kl, float('nan')))
++            info['kd_task_kl'] = kl.clone()
++            self._kd_lambda = adapt_coefficient(self._kd_lambda, kl, self._kd_target, self._kd_factor,
++                                                self._kd_tolerance, *self._kd_bounds)
++            info['kd_lambda'] = self._kd_lambda.clone()
++            self._kd_epoch_kl.zero_()
++            self._kd_epoch_count.zero_()
++        return info
+ 
+     def _log_train_info(self, info, frame):
+         super()._log_train_info(info, frame)
+         self.writer.add_scalar('distill/teacher_kl', torch_ext.mean_list(info['teacher_kl']).item(), frame)
+         self.writer.add_scalar('distill/coefficient', self._kd_coef, frame)
++        if 'feature_mse' in info:
++            self.writer.add_scalar('distill/feature_mse', torch_ext.mean_list(info['feature_mse']).item(), frame)
++        if 'gpu_peak_allocated_gb' in info:
++            self.writer.add_scalar('memory/peak_allocated_gb', info['gpu_peak_allocated_gb'], frame)
++            self.writer.add_scalar('memory/reserved_gb', info['gpu_reserved_gb'], frame)
++        if self._kd_mode == 'lagrange':
++            for i, name in enumerate(KD_TASKS):
++                self.writer.add_scalar('distill/lambda_'+name, info['kd_lambda'][i].item(), frame)
++                if not torch.isnan(info['kd_task_kl'][i]):
++                    self.writer.add_scalar('distill/kl_'+name, info['kd_task_kl'][i].item(), frame)
+         self.writer.add_scalar('samples/push_rollout', self._rollout_push_mask.sum().item(), frame)
+         self.writer.add_scalar('samples/kd_rollout', self.vec_env.env.task.kd_mask.sum().item()*self.horizon_length, frame)
+ 
+@@ -169,10 +292,13 @@
+ 
+         amp_obs = self._sample_push_amp(self._amp_minibatch_size)
+         amp_obs = self._preproc_amp_obs(amp_obs)
+-        amp_obs_replay = input_dict['amp_obs_replay'][0:self._amp_minibatch_size]
++        if getattr(self, '_amp_used_rows', False):
++            amp_obs_demo, amp_obs_replay = self._amp_minibatch()
++        else:
++            amp_obs_replay = input_dict['amp_obs_replay'][0:self._amp_minibatch_size]
++            amp_obs_demo = input_dict['amp_obs_demo'][0:self._amp_minibatch_size]
+         amp_obs_replay = self._preproc_amp_obs(amp_obs_replay)
+ 
+-        amp_obs_demo = input_dict['amp_obs_demo'][0:self._amp_minibatch_size]
+         amp_obs_demo = self._preproc_amp_obs(amp_obs_demo)
+         amp_obs_demo.requires_grad_(True)
+         
+@@ -206,7 +332,8 @@
+             values = res_dict['values']
+             entropy = res_dict['entropy']
+             mu = res_dict['mus']
+-            sigma = res_dict['sigmas']
++            # fixed_sigma returns one [actions] vector; expand so row masks below can index it
++            sigma = res_dict['sigmas'].expand_as(mu)
+             disc_agent_logit = res_dict['disc_agent_logit']
+             disc_agent_replay_logit = res_dict['disc_agent_replay_logit']
+             disc_demo_logit = res_dict['disc_demo_logit']
+@@ -240,8 +367,22 @@
+                 loss += reg_loss_v
+             
+             old = input_dict['kd_mask']
+-            teacher_kl = gaussian_forward_kl(mu[old], sigma[old], input_dict['teacher_mu'][old], input_dict['teacher_sigma'][old])
+-            loss = loss + self._kd_coef * teacher_kl
++            if getattr(self, '_kd_mode', 'fixed') == 'lagrange':
++                per_sample = gaussian_forward_kl_per_sample(mu[old], sigma[old], input_dict['teacher_mu'][old], input_dict['teacher_sigma'][old])
++                task = input_dict['obs'][old][:, KD_TASK_ONEHOT].argmax(-1)
++                kd_loss, task_kl = lagrange_kd_loss(per_sample, task, self._kd_lambda)
++                teacher_kl = per_sample.mean() if per_sample.numel() else mu.sum() * 0
++                seen = ~torch.isnan(task_kl)
++                self._kd_epoch_kl[seen] += task_kl[seen].detach()
++                self._kd_epoch_count[seen] += 1
++                loss = loss + kd_loss
++            else:
++                teacher_kl = gaussian_forward_kl(mu[old], sigma[old], input_dict['teacher_mu'][old], input_dict['teacher_sigma'][old])
++                loss = loss + self._kd_coef * teacher_kl
++            feature_mse = None
++            if getattr(self, '_kd_feature_coef', 0) > 0:  # student feature captured by the hook in self.model(...)
++                feature_mse = feature_distill_loss(self._features['student'][old], input_dict['teacher_feature'][old])
++                loss = loss + self._kd_feature_coef * feature_mse
+             a_info['actor_loss'] = a_loss
+             a_info['actor_clip_frac'] = a_clip_frac
+             c_info['critic_loss'] = c_loss
+@@ -287,6 +428,8 @@
+             'teacher_kl': teacher_kl.detach(),
+             'push_samples': input_dict['push_mask'].sum().detach()
+         }
++        if feature_mse is not None:
++            self.train_result['feature_mse'] = feature_mse.detach()
+         self.train_result.update(a_info)
+         self.train_result.update(c_info)
+         self.train_result.update(disc_info)
+--- a/tokenhsi/learning/push_kd_losses.py
++++ b/tokenhsi/learning/push_kd_losses.py
+@@ -2,14 +2,48 @@
+ import torch
+ 
+ 
++def gaussian_forward_kl_per_sample(mu, sigma, teacher_mu, teacher_sigma):
++    """KL(teacher || student) per sample, summed over actions."""
++    tmu, ts = teacher_mu.detach().float(), teacher_sigma.detach().float()
++    mu, sigma = mu.float(), sigma.float()
++    return (torch.log(sigma / ts) + (ts.square() + (tmu-mu).square()) /
++            (2*sigma.square()) - .5).sum(-1)
++
++
+ def gaussian_forward_kl(mu, sigma, teacher_mu, teacher_sigma):
+     """KL(teacher || student), sum over actions, mean over samples."""
+     if mu.shape[0] == 0:
+         return mu.sum() * 0
+-    tmu, ts = teacher_mu.detach().float(), teacher_sigma.detach().float()
+-    mu, sigma = mu.float(), sigma.float()
+-    return (torch.log(sigma / ts) + (ts.square() + (tmu-mu).square()) /
+-            (2*sigma.square()) - .5).sum(-1).mean()
++    return gaussian_forward_kl_per_sample(mu, sigma, teacher_mu, teacher_sigma).mean()
++
++
++def lagrange_kd_loss(per_sample_kl, task, coef):
++    """Per-task weighted KD: sum_k coef_k * (n_k / n) * mean KL_k over tasks k = 0..len(coef)-1.
++    With equal coefficients this equals coef * mean KL, i.e. the fixed-coefficient loss.
++    Returns (loss, per-task mean KL with NaN for absent tasks)."""
++    n = len(coef)
++    count = torch.bincount(task, minlength=n).to(per_sample_kl.dtype)
++    total = torch.zeros(n, dtype=per_sample_kl.dtype, device=per_sample_kl.device).index_add(0, task, per_sample_kl)
++    loss = (coef.to(per_sample_kl.dtype) * total).sum() / count.sum().clamp_min(1)
++    mean = torch.where(count > 0, total / count.clamp_min(1), torch.full_like(total, float('nan')))
++    return loss, mean
++
++
++def feature_distill_loss(student_feature, teacher_feature):
++    """Mean squared distance between student and frozen-teacher features (mean over dims and samples)."""
++    if student_feature.shape[0] == 0:
++        return student_feature.sum() * 0
++    return (student_feature.float() - teacher_feature.detach().float()).square().mean()
++
++
++def adapt_coefficient(coef, kl, target, factor, tolerance, low, high):
++    """Adaptive KL penalty (Schulman et al. 2017, PPO): double the coefficient when KL exceeds
++    tolerance x target, halve it when below target / tolerance. NaN KL (task absent) keeps coef."""
++    seen = ~torch.isnan(kl)
++    up = seen & (kl > tolerance * target)
++    down = seen & (kl < target / tolerance)
++    coef = torch.where(up, coef * factor, torch.where(down, coef / factor, coef))
++    return coef.clamp(low, high)
+ 
+ 
+ def masked_mean(value, mask):
+--- a/tokenhsi/learning/push_kd_player.py
++++ b/tokenhsi/learning/push_kd_player.py
+@@ -1,42 +1,123 @@
+ """Student-only evaluation, reporting final and ever success separately."""
+ import json
++import os
+ from pathlib import Path
+ import torch
+ from learning.transformer.trans_players import TransPlayerContinuous
++from learning.native_eval_warmup import run_warmup, warmup_steps
+ 
+ 
+ class PushKDPlayer(TransPlayerContinuous):
++    def env_reset(self, env_ids=None):
++        # Native eval: original TokenHSI resets every env when env_ids is None (humanoid.py reset),
++        # but MixedReferenceEnv.reset(None) resets nothing, so each repeat would continue the previous one.
++        if env_ids is None and self._eval and self._eval_task != 'push':
++            env_ids = torch.arange(self.env.num_envs, device=self.device)
++        return super().env_reset(env_ids)
++
+     def run_eval(self):
+         if self._eval_task != 'push':
++            steps = warmup_steps()
++            if steps > 0:
++                run_warmup(self, steps)
+             return super().run_eval()
+         count = self.env.num_envs
++        ref = self.env.reference
+         collected = torch.zeros(count, dtype=torch.bool, device=self.device)
+         success = torch.zeros_like(collected)
+         ever, fell = success.clone(), success.clone()
++        # Requested PUSH criterion (EVALUATION.md): own box centre within 0.2 m of its goal in 3D,
++        # no height tolerance or contact condition. Same box/goal pairing as the policy observation
++        # (reference_projection.project: row = scene*2 + owner -> _box_states/_tar_pos[scene, owner]).
++        region_final, region_ever = success.clone(), success.clone()
++        push_row = success.clone()
+         final_distance = torch.zeros(count, device=self.device)
++        final_distance_3d = torch.zeros(count, device=self.device)
++        final_step = torch.zeros(count, dtype=torch.long, device=self.device)
++        # Behaviour diagnostics (do not change any success metric): where each own box started, how close it
++        # got, how far and in which direction it moved, and how often the hands met the reward's CONTACT test.
++        start_distance_3d = torch.zeros(count, device=self.device)
++        min_distance_3d = torch.full((count,), float('inf'), device=self.device)
++        start_box_xy = torch.zeros(count, 2, device=self.device)
++        start_goal_xy = torch.zeros(count, 2, device=self.device)
++        final_box_xy = torch.zeros(count, 2, device=self.device)
++        contact_steps = torch.zeros(count, device=self.device)
++        episode_steps = torch.zeros(count, device=self.device)
+         done_ids = []
+         obs = self.env_reset()
+-        for _ in range(1201):
++        # as in TransPlayerContinuous.run_eval; without it get_action adds an extra batch dim (crash)
++        self.get_batch_size(obs['obs'], 1)
++        for step in range(1, 1202):
+             obs = self.env_reset(done_ids)
+             action = self.get_action(obs, True)
+             obs, _, done, info = self.env_step(self.env, action)
++            distance_3d = (ref._box_states[:, :2, :3]-ref._tar_pos[..., :3]).norm(dim=-1).flatten().to(self.device)
++            box_xy = ref._box_states[:, :2, :2].reshape(-1, 2).to(self.device)
++            hits = getattr(ref, '_push_hits', torch.zeros(count//2, 2, dtype=torch.bool)).flatten().to(self.device)
++            in_region = distance_3d <= REGION_DISTANCE
++            open_rows = ~collected
++            if step == 1:
++                start_distance_3d[:] = distance_3d
++                start_box_xy[:] = box_xy
++                start_goal_xy[:] = ref._tar_pos[..., :2].reshape(-1, 2).to(self.device)
++            min_distance_3d[open_rows] = torch.minimum(min_distance_3d[open_rows], distance_3d[open_rows])
++            contact_steps[open_rows] += hits[open_rows].float()
++            episode_steps[open_rows] += 1
++            region_ever[open_rows] |= in_region[open_rows]
++            push_row[open_rows] |= info['push'][open_rows]
+             fresh = done.bool() & ~collected
+             success[fresh] = info['success'][fresh].bool()
+             ever[fresh] = info['push_success_ever'][fresh]
+             fell[fresh] = info['terminate'][fresh].bool()
+             final_distance[fresh] = info['precision'][fresh]
++            final_distance_3d[fresh] = distance_3d[fresh]
++            region_final[fresh] = in_region[fresh]
++            final_box_xy[fresh] = box_xy[fresh]
++            final_step[fresh] = step
+             collected |= fresh
+             done_ids = done.nonzero().flatten()
+             if collected.all():
+                 break
+         if not collected.all():
+             raise RuntimeError('Incomplete first-episode PUSH evaluation')
+-        report = dict(task='push', episodes=count, deterministic=True, horizon=1200,
+-                      success_distance=.2, height_tolerance=.001,
+-                      final_success=success.float().mean().item(), ever_success=ever.float().mean().item(),
+-                      falls=fell.float().mean().item(), final_distance_median=final_distance.median().item(),
+-                      scene='reference_2humans_4boxes', checkpoint=self._checkpoint_fn)
+-        output = Path(self.config.get('eval_output', 'output_etc/check/push_eval.json')) if hasattr(self, 'config') else Path('output_etc/check/push_eval.json')
++        rows = push_row
++        rate = lambda x: x[rows].float().mean().item()
++        median = lambda x: x[rows].median().item()
++        displacement = final_box_xy - start_box_xy
++        to_goal = start_goal_xy - start_box_xy
++        direction = to_goal / to_goal.norm(dim=-1, keepdim=True).clamp_min(1e-6)
++        progress = (displacement * direction).sum(-1)                     # + toward the goal, - away
++        lateral = (displacement - progress[:, None] * direction).norm(dim=-1)
++        moved = displacement.norm(dim=-1)
++        contact_rate = contact_steps / episode_steps.clamp_min(1)
++        diagnostics = dict(start_distance_3d_median=median(start_distance_3d), min_distance_3d_median=median(min_distance_3d),
++                           box_moved_median=median(moved), progress_toward_goal_median=median(progress),
++                           progress_positive=rate(progress > 0), progress_over_1m=rate(progress > 1.0),
++                           moved_under_0p5m=rate(moved < 0.5), lateral_median=median(lateral),
++                           progress_ratio_median=median(progress / to_goal.norm(dim=-1).clamp_min(1e-6)),
++                           contact_ever=rate(contact_steps > 0), contact_step_rate_mean=contact_rate[rows].mean().item(),
++                           episode_steps_median=median(episode_steps))
++        report = dict(task='push', episodes=int(rows.sum()), rows_total=count, non_push_rows=int((~rows).sum()),
++                      deterministic=True, horizon=1200, seed=self.config.get('seed') if hasattr(self, 'config') else None,
++                      region_distance_3d=REGION_DISTANCE,
++                      final_success=rate(region_final), ever_success=rate(region_ever),
++                      native_final_success=rate(success), native_ever_success=rate(ever),
++                      native_success_rule='reference AT success: distance 0.2 m and height error <= 0.001 m',
++                      falls=rate(fell),
++                      final_distance_3d_median=final_distance_3d[rows].median().item(),
++                      final_distance_3d_mean=final_distance_3d[rows].mean().item(),
++                      final_distance_xy_median=final_distance[rows].median().item(),
++                      scene='reference_2humans_4boxes', checkpoint=self._checkpoint_fn, diagnostics=diagnostics)
++        output = Path(os.environ.get('PUSH_EVAL_OUT') or (self.config.get('eval_output', 'output_etc/check/push_eval.json') if hasattr(self, 'config') else 'output_etc/check/push_eval.json'))
+         output.parent.mkdir(parents=True, exist_ok=True)
+         output.write_text(json.dumps(report, indent=2))
++        per_row = dict(push_row=push_row, region_final=region_final, region_ever=region_ever,
++                       native_final=success, native_ever=ever, fell=fell, final_step=final_step,
++                       final_distance_3d=final_distance_3d, final_distance_xy=final_distance,
++                       start_distance_3d=start_distance_3d, min_distance_3d=min_distance_3d, box_moved=moved,
++                       progress_toward_goal=progress, lateral=lateral, contact_steps=contact_steps, episode_steps=episode_steps)
++        output.with_suffix('.rows.json').write_text(json.dumps({k: v.tolist() for k, v in per_row.items()}))
+         print('PUSH_EVAL '+json.dumps(report), flush=True)
++
++
++REGION_DISTANCE = 0.2
+--- a/tokenhsi/learning/transformer/trans_players.py
++++ b/tokenhsi/learning/transformer/trans_players.py
+@@ -218,7 +218,7 @@
+         num_envs = self.env.num_envs
+         num_trials = num_envs
+         assert num_envs == num_trials
+-        num_repeat = 3
++        num_repeat = int(os.environ.get('NATIVE_EVAL_REPEATS', 3))  # original eval: 3; quick monitoring eval: 1
+ 
+         print("evaluating policy: {} trials".format(num_envs))
+ 
+--- a/tokenhsi/run.py
++++ b/tokenhsi/run.py
+@@ -212,6 +212,14 @@
+     args = get_args()
+     cfg, cfg_train, logdir = load_cfg(args)
+ 
++    # Optional cap on this process's PyTorch CUDA cache, so two runs can share one GPU. It limits only how much
++    # the caching allocator may hold (computation is unchanged); a run that truly needs more fails with OOM.
++    cap_gb = os.environ.get('PUSH_KD_GPU_MEM_GB')
++    if cap_gb and torch.cuda.is_available():
++        total = torch.cuda.get_device_properties(0).total_memory
++        torch.cuda.set_per_process_memory_fraction(min(1.0, float(cap_gb) * 2**30 / total), 0)
++        print('PUSH_KD_GPU_MEM_GB: PyTorch cache capped at {} GB of {:.1f} GB'.format(cap_gb, total / 2**30), flush=True)
++
+     cfg_train['params']['seed'] = cfg_train['params']['config']['seed'] = set_seed(cfg_train['params'].get("seed", -1), cfg_train['params'].get("torch_deterministic", False))
+ 
+     cfg['seed'] = int(cfg_train['params']['seed'])

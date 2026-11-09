@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+output/
+output_etc/
+weights/*.pth
+*.pth
+*.npy
+*.npz
+*.mp4
+/tokenhsi/data/**/motions
+/tokenhsi/data/**/objects
+/tokenhsi/data/**/smpl_params

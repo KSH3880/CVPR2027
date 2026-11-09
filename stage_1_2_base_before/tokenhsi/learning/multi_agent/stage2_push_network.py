@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from learning.multi_agent.before_network import BeforeBuilder,transfer_stage1 as transfer_before
 from learning.multi_agent.human_coordination import HumanCoordination
-from utils.before_object_alias import VIRTUAL_MODE, encoder_packet, goal_aligned_scene
+from utils.before_object_alias import VIRTUAL_MODE, encoder_packet, goal_aligned_scene, alias_layout
 
 
 class Stage2PushBuilder(BeforeBuilder):
@@ -29,7 +29,11 @@ class Stage2PushBuilder(BeforeBuilder):
             packet=encoder_packet(scene[:,-width:],self.num_agents,self.num_objects)
             if self.relation_graph_spec.get('before_virtual_object') == VIRTUAL_MODE:
                 scene=goal_aligned_scene(scene,self.num_agents,self.num_objects)
-            return encoder(torch.cat((scene[:,:-width],packet),-1))
+            object_valid=None
+            if getattr(self,'demo_task_boxes_only',False):
+                dependent,_,_,count=alias_layout(scene[:,-width:],self.num_agents,self.num_objects)
+                object_valid=torch.arange(self.num_objects,device=scene.device)[None]<(count+dependent.sum(-1))[:,None]
+            return encoder(torch.cat((scene[:,:-width],packet),-1),object_valid=object_valid)
 
         def _encode(self,encoder,coordination,obs):
             m=self.num_agents

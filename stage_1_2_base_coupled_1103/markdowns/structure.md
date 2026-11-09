@@ -68,3 +68,7 @@
 `test_coupled_scene_sampling.py`는 비PUSH 사람의 경로 장애물 유지·공동 상자의 전체 크기·distractor 재시도와 ON_TOP 받침 보존을 검사한다.
 
 [PUSH](reference/stage1_push.md), [BEFORE PUSH](reference/stage2_before_push.md), [공통 Stage2/coupled](reference/stage2_coupled_push.md), [평가 규약](reference/evaluation.md), [Stage1 단독](../evaluation_single.md), [공통 정책](reference/ma_clean_scene_gta.md), [BEFORE](reference/stage2_before.md), [지표](reference/relation_diagnostics.md), [이관](reference/PORTING_GUIDE.md)을 참고한다. 이전 실험은 [legacy](legacy/README.md)에 보존한다.
+
+로컬 전용 촬영: `.local/clean_push_view.py` — 2/4명·2+2·3+1 공동 PUSH 시각 에셋·단일 목표 점·카메라·N 키 처리 (`LOCAL_CLEAN_PUSH_VIEW=1`에서만 활성).
+
+`.local/mixed_eight_view.py`: 8/16명 랜덤 혼합 과제 촬영, 공동 PUSH 팀당 최대4명 (`LOCAL_MIXED_EIGHT_VIEW=1`).

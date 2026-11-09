@@ -1,5 +1,6 @@
 """Physical object activation, distractors and loco reference sampling."""
 import torch
+from utils.demo_reset import task_only_demo_boxes, task_physical_mask
 
 class LocoRsi:
     def __init__(self, task):
@@ -19,11 +20,17 @@ class LocoRsi:
 
 class SceneLayoutMixin:
     def _active_physical(self, ids):
+        if task_only_demo_boxes(self):
+            return task_physical_mask(self._logical_box_order[ids],self._task_token_count[ids],self.num_physical_objects)
         active = torch.zeros(len(ids), self.num_physical_objects, dtype=torch.bool, device=self.device)
         active.scatter_(1, self._logical_box_order[ids], True)
         return active
 
     def _place_distractors(self, ids):
+        if task_only_demo_boxes(self):
+            row,box=(~self._active_physical(ids)).nonzero(as_tuple=True)
+            self._box_states[ids[row],box,:2]=self._env_origins[ids[row],:2]+1000+box[:,None]*3
+            return
         mapping = self._logical_box_order[ids]
         task_slots = torch.arange(self.num_objects, device=self.device)[None] < self._task_token_count[ids, None]
         occupied = torch.zeros(len(ids), self.num_physical_objects, dtype=torch.long, device=self.device)

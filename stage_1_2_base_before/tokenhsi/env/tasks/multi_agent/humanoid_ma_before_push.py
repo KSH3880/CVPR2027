@@ -1,5 +1,6 @@
 """Original BEFORE coordination with Stage1 PUSH only on independent people."""
 import torch
+from utils.demo_reset import bounded_demo_reset
 from isaacgym import gymapi
 from env.tasks.multi_agent.humanoid_ma_before import HumanoidMABefore
 from env.tasks.multi_agent.humanoid_ma_push import HumanoidMAPush
@@ -175,7 +176,7 @@ class HumanoidMABeforePush(HumanoidMABefore):
         try:
             boxes,goals=sampler(self._box_states[ids],self._box_size[ids],self._humanoid_root_states[ids,:,:3],
                 self._templates[ids]==5,primary,self._active_physical(ids),scene,
-                max_attempts=128 if retry_scene else 4096)
+                max_attempts=(16 if bounded_demo_reset(self) else 128) if retry_scene else 4096)
         except PushLayoutError as error:
             if not retry_scene:raise
             boxes,goals=error.boxes,error.goals
@@ -183,7 +184,8 @@ class HumanoidMABeforePush(HumanoidMABefore):
             try:
                 extra_boxes,extra_goals=sample_sequential_layout(boxes[pending],self._box_size[ids[pending]],
                     self._humanoid_root_states[ids[pending],:,:3],self._templates[ids[pending]]==5,
-                    primary[pending],self._active_physical(ids[pending]),scene)
+                    primary[pending],self._active_physical(ids[pending]),scene,
+                    **(dict(max_restarts=2,candidate_batch=32,max_attempts=2) if bounded_demo_reset(self) else {}))
             except PushLayoutError as unresolved:
                 extra_boxes,extra_goals=unresolved.boxes,unresolved.goals
                 self._push_layout_failed[ids[pending[unresolved.pending]]]=True

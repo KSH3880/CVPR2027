@@ -2,6 +2,7 @@
 
 import json
 import hashlib
+from utils.demo_reset import bounded_demo_reset, DemoResetRejected
 import torch
 from utils.edge_context_spec import AT
 from utils.edge_ontop_spec import ON_TOP, expand_graph, select_graph, copy_graph_rows
@@ -158,8 +159,10 @@ class SampledOnTopTaskMixin:
         accepted_ref_motion_ids = {}
         accepted_ref_motion_times = {}
         pending = env_ids
-        max_attempts = 64
+        max_attempts = 4 if bounded_demo_reset(self) else 64
         for attempt in range(max_attempts):
+            if bounded_demo_reset(self):
+                print(f"[demo reset] attempt={attempt+1}/{max_attempts} pending={len(pending)}",flush=True)
             self._reset_default_slots = None
             self._reset_ref_slots = {}
             self._reset_ref_motion_ids = {}
@@ -207,7 +210,8 @@ class SampledOnTopTaskMixin:
                 pending[:16].tolist(),
                 flush=True,
             )
-            raise RuntimeError(
+            error_type = DemoResetRejected if bounded_demo_reset(self) else RuntimeError
+            raise error_type(
                 "OnTop physical scene infeasible after {} attempts (graph was not resampled)".format(
                     max_attempts
                 )

@@ -2,7 +2,73 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-04
+
+### TensorBoard runs 로딩 오류 복구
+
+- TensorBoard2.14의 HParams API가 protobuf의 삭제된 including_default_value_fields 인자를 전달해500을 반환했다. `.local/tensorboard_compat.py` 실행기에서 JSON 함수 옵션을 새 이름으로 변환하며 conda 패키지/학습 프로세스는 유지한다.
+- 기존6018에서 재실행 후 runs/HParams experiment/session_groups/scalars tags 모두 HTTP200 및 기존·재개 run5개 확인. PID32665 학습 생존 확인. 로그: `../runs/jointpush/tensorboard_6018_compat.log`.
+
+### ground premature 학습 9k 재개
+
+- 사용자 요청으로 중지했던9k 저장본에서 GPU0·4명·1024환경·8토큰·seed42로 optimizer/epoch resume 실행했다. 촬영용 local hooks는 해제하고 기존 학습 설정을 유지했다.
+- 체크포인트 로드 및 TensorBoard info/epochs=9005와 학습 스텝 진행 확인. 실행 정보: `../runs/jointpush/ground_training_resume.json`; 새 출력 `output/stage2_coupled_push_individual_goal_solo5_carry5_ground_premature_motion/Stage2CoupledPushIndividualGoalSolo5Carry5GroundPrematureMotion_04-20-04-22`. 기존 기록과 함께 localhost:6018 TensorBoard 재실행.
+
+### 혼합 촬영 미사용 상자 분산
+
+- 사용자 요청으로 로컬 mixed viewer의 비필수 distractor만 환경 중심6~18m 면적 균등 분포로 배치한다. native 이동 경로/사람 충돌 재추첨과 전체 배치 검증을 유지한다. 필요한 ON_TOP 받침은 제외한다.
+- active/support 상태 불변·미사용 상자 반경 assert 및 실제 화면 확인: `output_etc/check/view_penalty8000_mixed16_max4_20261104_154110_retry_scatter/preview.png`. 촬영 환경의 distractor 위치는 정책 관측에도 반영되며 본학습/정식평가 설정은 변경하지 않았다.
+
+### 혼합 촬영 뷰어 배치 실패 복구
+
+- 16명 viewer 종료 원인은 CUDA OOM이 아니라 native 64회 배치 재시도 소진(`Stage2 jointpush layout exhausted`)이었다. 로컬 mixed reset에서 이 오류만 잡아 팀/과제를 새로 뽑아 최대16회 다시 시도한다. 거리/충돌 판정 및 학습 코드는 유지한다. 다른 RuntimeError는 그대로 전달한다.
+- 실제 렌더 및 N 전환 확인, 실제 retry 코드의 주입 오류 회복/비배치 오류 전달 검증 통과. 재실행: `output_etc/check/view_penalty8000_mixed16_max4_20261104_154110_retry/`. 촬영 장면 선택에는 배치 가능성에 따른 편향이 있으므로 정식 평가에 사용하지 않는다.
+
+### 16명 랜덤 혼합 뷰어
+
+- 같은 8k 모델을 16명·32토큰·1환경으로 zero-shot 실행했다. 공동 팀 최대4명/복수 팀/원래 개인 과제 확률/목표 표시/사선 카메라/N/L을 유지했다.
+- 실제16명 및 팀 크기 assert, 캡처 확인. 첫 구성은4+4+3+2+1+1+1, 개인 CLIMB/운반, 다음 장면 SIT 포함. 결과: `output_etc/check/view_penalty8000_mixed16_max4_20261104_154110/`. 학습 중지 상태 유지.
+
+### 8명 랜덤 혼합 과제, 공동 PUSH 최대4명
+
+- 로컬 `.local/mixed_eight_view.py`/`LOCAL_MIXED_EIGHT_VIEW=1`를 추가했다. native 그룹 sampler의 공동 인원 선택 범위만 2~min(4,남은인원)으로 제한하고 여러 공동 팀/개인 과제를 허용한다. 8k 모델·8명·16토큰·1환경 zero-shot이며 solo 과제 확률과 물성을 유지한다.
+- PUSH 목표 구는 물리 상자당 하나로 합치고 다른 과제 목표/필수 물체 및 native distractor는 유지한다. 카메라는 전체 과제를 포함하고 N은 새 에피소드, L은 기존 프레임 저장이다.
+- 4096 샘플 모두 최대4명, 4+4/3+3+1+1/2+2+2+1+1 포함. 실제 첫 장면4+2+1+1, 다음2+2+1+1+1+1 및 CLIMB/ON_TOP 확인. 캡처·구성 로그·검증은 `output_etc/check/view_penalty8000_mixed8_max4_20261104_152551_resetfix/`. 초기 empty-reset 목록 오류 수정 후 정상 실행, 학습 중지 유지.
+
+### 3+1 PUSH 촬영
+
+- `LOCAL_CLEAN_PUSH_LAYOUT=3plus1`로 [0,0,0,3]을 고정해 3명 공동 PUSH와 1명 단독 PUSH를 함께 표시한다. native assignment로 활성 상자 두 개, 대표 중심 목표 점 두 개를 선택하고 사선 카메라/N/L/여분 물체 숨김을 유지한다.
+- 8k·4명·1환경의 그룹/활성 상자 assert 및 화면 캡처 확인: `output_etc/check/view_penalty8000_3plus1_clean_20261104_151302/preview.png`. 본학습은 중지 상태다.
+
+### 2+2 공동 PUSH 촬영
+
+- `LOCAL_CLEAN_PUSH_LAYOUT=2plus2`에서 로컬 sampler를 [0,0,2,2] 두 팀으로 고정했다. 두 활성 상자를 native assignment로 선택하고 각 팀 대표 중심 목표 점만 표시하며 카메라는 두 상자 전체와 두 목표를 포함한다. 기존 all 레이아웃과 N/L 동작을 유지한다.
+- 8k·4명·1환경 렌더와 `active_boxes=2 goals=2 groups=[0,0,2,2]` 검증 통과: `output_etc/check/view_penalty8000_2plus2_clean_20261104_150747/preview.png`. 학습 재시작 없음.
+
+### 촬영 기본 카메라 사선 각도
+
+- 사용자 참고 이미지에 맞춰 상자 끝에서 내려다보는 사선 시점으로 변경했다. 밀기 방향 기준 eye XY=(0.4 forward - side)×radius, 높이=target Z+0.8×radius이며 실제 상자 회전/전체 모서리를 프레이밍에 포함한다. N reset에서도 같은 상대 각도를 사용한다.
+- `output_etc/check/view_penalty8000_all4_camera_20261104_145207_framed/preview.png` 렌더 확인. 목표 표시 높이·물리·정책 설정은 그대로다.
+
+### 4명 공동 PUSH 촬영 뷰어
+
+- 로컬 촬영 훅의 물리 상자 슬롯을 native physical_assignment로 계산하도록 확장해 2/4명 모두 지원한다. 8k·4명·1환경·8토큰·all_coupled로 전환하고 단일 목표 점/숨김/N/L 설정을 유지했다.
+- `output_etc/check/view_penalty8000_all4_clean_20261104_144848/preview.png`에서 사람4·공동상자1·목표점1 표시 확인. 실행 로그의 동적 상자 슬롯 assert 통과, 본학습은 중지 상태 유지.
+
+### 로컬 2명 공동 PUSH 촬영 뷰어
+
+- `.local/clean_push_view.py`와 `LOCAL_CLEAN_PUSH_VIEW=1`로 8k·2명·1환경·all_coupled 촬영 화면을 구성했다. 여분 상자는 collision/질량/관성 설정을 가진 숨김 시각 에셋으로 대체하고 미사용 개인 목표 표시는 숨긴다. 실제 공동 상자 에셋과 정책/보상/개인 목표는 유지한다.
+- 목표 점은 `_center_tar_pos` XYZ(박스 중심 높이)에 빨간 구 1개로 표시한다. 카메라는 밀기 방향 뒤쪽에서 사람·상자·목표를 담는다. `N`으로 현재 에피소드 종료, `L`로 프레임 저장을 토글한다.
+- 최종 화면 캡처 확인 및 실제 N 키 입력 후 `CLEAN_PUSH_VIEW_NEXT_EPISODE`와 다음 장면 진행 확인. 실행/출력: `output_etc/check/view_penalty8000_pair_clean_20261104_143044_visual_dot_center_keys/run.sh`. 초기 높임/바닥 목표 및 root 이동 시도는 최종 실행에 사용하지 않는다.
+- 사용자 요청으로 본학습 중지 확인. 최근 저장본 9000iter를 보존하고 `../runs/jointpush/ground_training_stop_20261104.json`에 재개용 실행 정보를 기록했다.
+
 ## 2026-11-03
+
+### 로컬 뷰어 검은 화면 수정
+
+- Git 제외 `.local/run.sh`의 화면 test 실행에 기존 `gui_gpu_env.sh`를 연결해 NVIDIA Vulkan 장치를 명시했다. 학습은 유지하고1.5k 뷰어만 재실행했다.
+- 180 render 호출 후 캡처를 직접 확인하여 사람·상자·바닥 표시를 검증했다: `output_etc/check/view_penalty1500_20261103_194632_graphics/preview.png`.
+
 
 ### 로컬 baseline·패널티 비교 평가 시작
 
