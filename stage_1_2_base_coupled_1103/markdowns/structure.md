@@ -14,6 +14,7 @@
 | `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 54개 |
 | `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가18개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
 | `tokenhsi/evaluate.py`, `rescore.py` | 독립 seed 실행·통계, 저장 trace CPU 재채점 |
+| `tokenhsi/score_tcoop.py`, `utils/cooperative_push_metric.py` | 공동 PUSH 실제 상자 표면 양손 근접 시간 비율; 변위/속도 시작 조건 CPU 재집계 ([정의·명령](reference/t_coop.md)) |
 | `tokenhsi/utils/evaluation_protocol.py`, `learning/multi_agent/formal_eval.py` | 학습 인원/단독 구분·점/영역/BEFORE·개인/공유 중심 공동 PUSH 지표·개인 낙상 제어 |
 | `tokenhsi/scripts/multi_agent/launch.sh`, `runtime_env.sh` | 공통 인자·출력 경로·conda·GPU |
 | `tokenhsi/scripts/multi_agent/{gui_gpu_env,run-gui,mps_auto_env}.sh` | viewer GPU, VNC, 기존 MPS 연결 |

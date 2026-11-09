@@ -2,6 +2,21 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-09
+
+### t_coop 평가 원시 저장·CPU 재집계
+
+- 실제 공유 상자 전체 표면의 최소 3D 거리로 최초 2·3·4명 전원의 양손 접촉 비율을 계산한다. 20cm 변위/1초 속도 지속 시작, 접촉 6·8·12cm와 속도 0.2~1.0m/s sweep, 실패·정지 포함 및 시작 실패 0%를 구현했다.
+- 정식 individual-goal 평가에 reset 포함 손/물리 상자 상태·크기·중심 목표·최초 그룹·episode 종료 저장을 연결했다. `score_tcoop.py`는 numpy만으로 재집계하며 trial별 산술평균과 시작 실패 수를 보고한다. 정의·명령은 `markdowns/reference/t_coop.md`에 기록했다.
+- CPU 합성 테스트 9개 통과. GPU 사용 요청 제한에 따라 시뮬레이션·학습·평가는 실행하지 않았으며 실제 수집 경로의 런타임 검증은 남아 있다.
+
+### 공동 PUSH 이동 패널티 전달용 문서
+
+- 원본/패널티 8k 동일 초기 상태 평가를 추가했다. seed별 원시 집계로 과제·그룹 성공률, 50cm 대기 위반률, 차이와 평가 seed 범위를 계산하고 기존 REPORT 수치와 대조했다. 평가를 새로 실행하지 않았다.
+
+- `markdowns/reference/joint_push_premature_motion_penalty.md`에 현재 코드 기준 준비 판정, 속도·접촉력 배분 수식, task/AMP 보상 합산, 수치 예시와 TensorBoard 해석을 정리했다. USAGE에 문서 링크를 추가했다.
+- 구현·설정과 수식 및 참조 경로를 대조했다. 문서만 변경했으며 학습·평가는 실행하지 않았다.
+
 ## 2026-11-04
 
 ### TensorBoard runs 로딩 오류 복구

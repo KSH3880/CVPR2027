@@ -62,6 +62,14 @@ def run_formal_eval(player):
     torch.save(initial, path/'initial.pt')
     roots_trace, boxes_trace, valid_trace = [], [], []
     centers_trace = []
+    # Physical boxes, not individual region tokens. Keep all originally assigned
+    # participants, including fallen agents, for offline t_coop reaggregation.
+    capture_tcoop = individual_goals and hasattr(task, '_templates_by_owner')
+    if capture_tcoop:
+        tcoop_hands = [task._rigid_body_pos[:, :, task._key_body_ids[:2]].cpu().numpy().copy()]
+        tcoop_boxes = [task._assigned_box_values(task._box_states).cpu().numpy().copy()]
+        tcoop_sizes = task._assigned_box_values(task._box_size).cpu().numpy().copy()
+        tcoop_templates = task._templates_by_owner.cpu().numpy().copy()
     for step in range(1, horizon+1):
         action = player.get_action(obs, True)
         action = action.reshape(n, m, -1) * alive[..., None]
@@ -83,6 +91,9 @@ def run_formal_eval(player):
         roots_trace.append(roots.cpu().numpy().copy())
         boxes_trace.append(boxes.cpu().numpy().copy())
         valid_trace.append(alive.cpu().numpy().copy())
+        if capture_tcoop:
+            tcoop_hands.append(task._rigid_body_pos[:, :, task._key_body_ids[:2]].cpu().numpy().copy())
+            tcoop_boxes.append(task._assigned_box_values(task._box_states).cpu().numpy().copy())
         fallen = task._terminate_buf.reshape(n, m).bool() & alive
         fall_step[fallen] = step
         freeze_fallen(task, fallen)
@@ -128,5 +139,18 @@ def run_formal_eval(player):
                         fall_step=fall_step.cpu().numpy(), ever=ever.cpu().numpy(),
                         both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(), **center_trace)
     (path/'trace.pending.npz').replace(path/'trace.npz')
+    if capture_tcoop:
+        falls = fall_step.cpu().numpy()
+        # Formal evaluation keeps an environment until all its agents fall or
+        # the horizon ends. Do not censor at the first team member's fall.
+        end_step = np.where((falls >= 0).all(-1), falls.max(-1), step)
+        np.savez_compressed(path/'tcoop_trace.pending.npz',
+                            hands=np.stack(tcoop_hands), boxes=np.stack(tcoop_boxes),
+                            sizes=tcoop_sizes, goals=center_goals.cpu().numpy(),
+                            groups=groups.cpu().numpy(), templates=tcoop_templates,
+                            dt=np.asarray(task.dt), end_step=end_step,
+                            schema_version=np.asarray(1))
+        (path/'tcoop_trace.pending.npz').replace(path/'tcoop_trace.npz')
+        print('[t_coop] saved physical trace; reaggregate with score_tcoop.py', flush=True)
     print('[formal eval result]', json.dumps(data), flush=True)
     return data

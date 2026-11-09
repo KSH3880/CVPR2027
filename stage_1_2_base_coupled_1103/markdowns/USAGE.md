@@ -211,6 +211,10 @@ PUSH AT의 viewer/VNC에는 바닥 링(반지름35cm)·세로선·와이어 구(
 
 ## 공동 PUSH 접촉력 배분 이동 패널티
 
+공동 접촉 시간 지표 `t_coop`의 정의·원시 저장·CPU 재집계 명령은 [t_coop 평가](reference/t_coop.md)를 참고한다. 시작 방식 두 종류와 접촉 6·8·12cm를 비교하며 기존 gate 지표와 구분한다.
+
+수식·보상 합산·수치 예시·지표 해석은 [전원 접촉 전 이동 패널티 정리](reference/joint_push_premature_motion_penalty.md)를 참고한다.
+
 `stage2_coupled_push_individual_goal_solo5_carry5_ground_premature_motion`은 ground 환경에 선택형 패널티만 추가한다. 원본 ground 컨피그에는 활성화하지 않는다.
 
 - 전원이 선택된 접촉 면에 양손을 18cm 이내로 대지 않은 동안, 수평 상자 속도 0.05m/s 초과분에 가중치 0.2를 곱한다.
