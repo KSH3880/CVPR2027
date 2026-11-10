@@ -28,6 +28,31 @@ def score_frame(name, roots, boxes, sizes, goals, xy_fraction=.8):
     return metrics_frame(name, roots, boxes, sizes, goals, xy_fraction)[0]
 
 
+def validate_state_layout(ref):
+    """Check simulator-owned state and actor indices before policy execution."""
+    state = ref._root_states
+    if state.ndim != 2 or state.shape[1] != 13 or not state.is_contiguous():
+        raise ValueError('Unexpected simulator root-state layout')
+    if not bool(torch.isfinite(state).all()):
+        raise ValueError('Non-finite initial simulator root state')
+    task = getattr(ref, 'native', ref)
+    checked = []
+    for name, ids in vars(task).items():
+        if not name.endswith('_actor_ids') or not torch.is_tensor(ids) or not ids.numel():
+            continue
+        if ids.dtype != torch.int32 or not ids.is_contiguous():
+            raise ValueError('Actor indices must be contiguous int32: '+name)
+        if int(ids.min()) < 0 or int(ids.max()) >= state.shape[0]:
+            raise ValueError('Actor indices outside simulator root state: '+name)
+        checked.append(name)
+    for handles in ref.humanoid_handles_all:
+        if any(int(handle) < 0 for handle in handles):
+            raise ValueError('Humanoid actor creation failed')
+    if state.is_cuda:
+        torch.cuda.synchronize(state.device)
+    print('CVPR_STATE_LAYOUT '+json.dumps(dict(actors=state.shape[0], checked_indices=checked)), flush=True)
+
+
 def cpu_rescore(directory):
     directory = Path(directory)
     report = json.loads((directory/'result.json').read_text())
@@ -78,6 +103,7 @@ def run_single_eval(player):
     frozen_stats = {k: v.clone() for k, v in player.running_mean_std.state_dict().items()} if player.normalize_input else {}
     if hasattr(player, '_amp_input_mean_std'):
         player._amp_input_mean_std.eval()
+    validate_state_layout(ref)
     obs = player.env_reset()  # Uses the already constructed FIRST loco reset; no warm-up.
     player.get_batch_size(obs['obs'], 1)
     cpu = lambda x: x.detach().cpu().numpy().copy()
@@ -128,6 +154,11 @@ def run_single_eval(player):
     minimum = np.full((n, 2), np.inf, dtype=np.float64)
     fall_step = np.full(n, -1, np.int32)
     for step in range(HORIZON):
+        stop_file = os.environ.get('CVPR_EVAL_STOP_FILE')
+        if stop_file and Path(stop_file).exists():
+            if ref._root_states.is_cuda:
+                torch.cuda.synchronize(ref._root_states.device)
+            raise RuntimeError('Cooperative evaluation stop requested; partial run is not scored')
         actions = player.get_action(obs, True)
         actions *= torch.as_tensor(alive, device=actions.device)[:, None]
         obs, _, _, _ = player.env_step(player.env, actions)

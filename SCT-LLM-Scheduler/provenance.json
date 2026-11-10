@@ -1,0 +1,23 @@
+{
+  "source_root": "/home/hwanhee/ksh/stage1_2_base_teacher",
+  "access": "read-only",
+  "created": "2026-11-10",
+  "files": [
+    {
+      "path": "FSM/controller.py",
+      "sha256": "63856db73867044b6b316f3ba66595b8200fbad480aeeb7e8943eaf006faf098"
+    },
+    {
+      "path": "FSM/entry.py",
+      "sha256": "75ff5bd143e884c7bb3f1f0f4b8bbf1de40d3106c4e186f8b1539f4dc6030cb3"
+    },
+    {
+      "path": "FSM/state.py",
+      "sha256": "f03dd814e4230aae26f6418589d9452df7036205b09e48a94f1e43e1388c71bc"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "d0d188f5b08ec03da7fdd0371f39d274e4de5b2f82f68b77ed4aa1bc817c0f11"
+    }
+  ]
+}

@@ -1,1 +1,0 @@
-../../ksh_jointpush/scripts/ksh_jointpush_train.sh

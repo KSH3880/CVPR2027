@@ -1,5 +1,10 @@
 # 공동 PUSH 접촉 시간 비율: t_coop
 
+## 이번 비교의 확정 집계 기준 (2026-11-09 사용자 확인)
+
+밀기 시작 조건(`start_frame` 존재)을 달성한 팀만 평균에 포함하며, 미달성 팀은 0점이 아니라 집계에서 제외한다. 목표 도달 성공 팀만 고르는 조건은 아니다. 모델별 달성 팀 수를 분모로 쓰므로 비교 집합은 달라질 수 있다. [전체84조건·분모·조건별 구간](../../output_etc/check/tcoop_8000_compare_20261109/STARTED_ONLY.md)과 `rescore_started_only.py`를 따른다. 아래 기본 scorer의 미달성0점 방식은 이전 지표 구현 설명이며 그대로 보존한다.
+
+
 `tokenhsi/utils/cooperative_push_metric.py` 구현. 시작 정의가 미정이므로 단일 시작 방식을 확정하지 않고 두 방식의 결과를 모두 보존한다. 기존 보상·hand gate·성공률 계산을 변경하지 않는 평가 전용 지표다.
 
 ## 정의
@@ -31,7 +36,7 @@ t_coop (%) = 100 × 전원 양손 근접 프레임 수 / 측정 구간 프레임
 
 ## 저장과 실행
 
-individual-goal 공동 PUSH의 기존 정식 평가가 끝나면 seed 폴더에 `tcoop_trace.npz`를 추가로 저장한다. GPU에서 재평가를 돌리는 명령은 바꾸지 않는다. 이 변경의 시뮬레이션 실행 검증은 아직 하지 않았다.
+individual-goal 공동 PUSH의 기존 정식 평가가 끝나면 seed 폴더에 `tcoop_trace.npz`를 추가로 저장한다. GPU에서 재평가를 돌리는 명령은 바꾸지 않는다. 실제 수집 경로는 아래 64환경 비교에서 실행 검증했다.
 
 저장 필드:
 
@@ -79,4 +84,6 @@ CPU 합성 궤적으로 회전 상자 표면 거리, 내부·모서리 거리, s
 python -m unittest discover -s tokenhsi/tests -p test_cooperative_push_metric.py
 ```
 
-GPU 시뮬레이션 및 실제 정책 궤적의 수치 검증은 미실행이다.
+2026-11-09에 GPU7 기존 MPS로 원본/패널티 8000 checkpoint 각각 64환경·평가 seed0/1/2를 실행했다. 실제 물리 trace 저장, 세 seed 초기 상태 완전 일치, 1/1.5/2초의 30/45/60프레임 지속 판정과 CPU 재집계를 확인했다. 모델당 접촉3종 × (변위1종 + 속도9종 × 지속3종) = 84조건이다. 512환경 정식 보고용 평가가 아닌 빠른 비교다.
+
+[전체 비교 결과·원시 궤적·CPU 재집계 명령](../../output_etc/check/tcoop_8000_compare_20261109/REPORT.md). 기존 GPU7 MPS 서버와 학습 두 개는 유지했으며 평가 클라이언트만 정상 종료했다.

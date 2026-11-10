@@ -1,1 +1,0 @@
-../ksh_jointpush/ksh_soft_gate.py

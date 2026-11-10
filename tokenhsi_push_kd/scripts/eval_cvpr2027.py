@@ -18,6 +18,8 @@ def main():
     p.add_argument('--tasks', nargs='+', default=['sit', 'climb', 'at', 'on_top', 'push'], choices=['sit', 'climb', 'at', 'on_top', 'push'])
     p.add_argument('--output')
     p.add_argument('--gpu', default='0')
+    p.add_argument('--cuda-launch-blocking', choices=['0', '1'], default='0',
+                   help='CUDA synchronization debugging (1); normal execution defaults to 0')
     p.add_argument('--cpu', action='store_true')
     p.add_argument('--protocol', choices=['1109', '1108'], default='1109')
     p.add_argument('--seeds', nargs=3, type=int, help='Three distinct user-selected seeds; required for full evaluation')
@@ -42,6 +44,7 @@ def main():
                CXX='/usr/bin/g++-11', MAX_JOBS='2', TOKENHSI_LOCAL_CUDA_COMPAT='1',
                TORCH_EXTENSIONS_DIR=str(ROOT/'output_etc/check/torch_extensions'), PYTHONUNBUFFERED='1',
                CUDA_VISIBLE_DEVICES='' if args.cpu else args.gpu,
+               CUDA_LAUNCH_BLOCKING=args.cuda_launch_blocking,
                TOKENHSI_EVAL_PROTOCOL='cvpr2027_single', CVPR_PROTOCOL_REVISION=args.protocol,
                NATIVE_EVAL_WARMUP='0', TOKENHSI_PUSH_INIT='loco')
     seeds = [0] if args.smoke else args.seeds

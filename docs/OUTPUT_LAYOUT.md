@@ -49,3 +49,19 @@ KSH의 새 실행은 [EXECUTION.md](../ksh_jointpush/EXECUTION.md), 로컬 변�
 사용자 요청으로 balanced 학습을 공식 MPS client 종료 후 중단했다. `runs/jointpush/ksh_jointpush_rsi/{output,output_etc}`를 `ksh_jointpush/{output,output_etc}`로 이동하고 프로젝트 쪽 역방향 링크를 제거했다. 구 runs 출력 경로의 호환 링크는 생성하지 않았다. 생성 설정·launch 기록은 runs에 보존한다.
 
 weight 28개의 inode·크기를 이동 전후 대조했고, 학습/평가 bootstrap의 출력 검증 root도 `ksh_jointpush/`로 변경했다. TensorBoard 6016만 새 경로로 재연결했으며 다른 학습과 MPS 서버는 유지했다. 기록: `runs/ksh_output_relocation_20261028.json`.
+
+## 2026-11-08 runs/jointpush 심링크 제거
+
+사용자 명시 요청으로 `runs/jointpush/` 아래 심링크 61개(깨진 링크 3개 포함)를 제거했다. 과거 학습 결과 호환 링크와 workspace의 코드·라이브러리 링크도 포함되므로 해당 구 링크 경로는 더 이상 제공하지 않는다. 링크만 unlink했으며 실제 파일 27,914개와 존재하던 최종 대상 22곳의 inode·크기·mtime 불변을 확인했다. 하위 잔여 심링크는 0개이며 프로세스는 종료하지 않았다. 삭제한 링크와 원래 대상은 [정리 기록](../runs/cleanup_jointpush_symlinks_20261108_161055.json)에 보존했다.
+
+## 2026-11-08 runs 로그·평가·smoke 산출물 삭제
+
+사용자 명시 요청으로 `runs/`의 텍스트·TensorBoard 로그, 평가 trace·통계·보고서, smoke·진단·뷰어 이미지·영상과 과거 로그 압축본 등 3,485파일(1.6185GiB)을 영구 삭제하고 이번 삭제로 비게 된 폴더를 제거했다. 실행 코드·설정·에셋·모션·캐시, 큐 원장·트랙 설정·환경 sidecar, 운영 이력과 checkpoint 62개는 보존했다. 이 자료가 남아 있는 평가·smoke 폴더 자체는 유지했다.
+
+삭제 직전 조회 가능한 프로세스의 실행 인자·cwd·열린 파일과 보존 심링크의 삭제 파일 참조가 없음을 확인했다. 보존 파일 46,279개의 inode·크기·mtime와 심링크 145개의 문자열을 전후 대조했다. 프로세스는 종료하지 않았으며, 과거 문서·보관 인덱스의 평가 근거와 로그 압축본 경로 일부는 이번 정리로 사라졌다. 삭제 목록과 검증: [정리 기록](../runs/cleanup_runs_artifacts_20261108_161942.json).
+
+## 2026-11-08 Chair 운반 에셋 중복 제거
+
+사용자 요청으로 `runs/chair_hold_at_78k_20261026_135444/assets/`와 `runs/chair_hold_at_78k_z5cm_20261026_205729/assets/`의 동일 파일 1,350개를 하드링크로 통합했다. 두 트리의 상대경로·파일 크기·권한·소유자·mtime 및 SHA-256을 대조한 뒤 z5cm 쪽 중복 파일을 첫 실험 쪽과 같은 inode로 원자적으로 교체했다. 중복 데이터 635.33MiB를 제거했으며 기존 링크 수·할당 블록 기준 약639MiB가 해제되었다.
+
+각 실행기의 기존 에셋 경로를 그대로 유지하며 두 경로는 같은 실제 파일을 공유한다. 새 심링크는 만들지 않았고 두 실험의 checkpoint 4개·설정·기타 파일·기존 심링크는 보존했다. 작업 직전 조회 가능한 프로세스의 실행 인자·cwd·열린 파일 참조가 없음을 확인했고, 통합 후 1,350파일의 해시·inode 동일성과 보존 파일 메타데이터를 전수 검증했다. 기록: [에셋 중복 제거](../runs/dedup_chair_assets_20261108_185430.json).

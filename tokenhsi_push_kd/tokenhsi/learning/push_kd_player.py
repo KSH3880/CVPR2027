@@ -17,6 +17,9 @@ class PushKDPlayer(TransPlayerContinuous):
 
     def run_eval(self):
         if getattr(self.env, 'cvpr_single', False):
+            if os.environ.get('CVPR_CLIMB_RESET_DIAGNOSTIC') == '1':
+                from learning.climb_reset_diagnostic import run_diagnostic
+                return run_diagnostic(self)
             from learning.cvpr2027_eval import run_single_eval
             return run_single_eval(self)
         if self._eval_task != 'push':

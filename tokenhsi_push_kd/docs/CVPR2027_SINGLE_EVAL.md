@@ -35,6 +35,10 @@
 
 ## 실행
 
+`eval_cvpr2027.py`는 CUDA 동기화 진단 옵션 `--cuda-launch-blocking 0|1`을 받는다. 기본값0은 일반 비동기 실행이고, 작은 GPU 사전 검사에서1을 지정하면 오류 위치를 동기화해 확인할 수 있다. 자식 평가 프로세스에만 적용되며 기존 MPS·다른 프로세스의 환경은 변경하지 않는다.
+
+정책 실행 전 simulator root-state의 배치·유한값 및 actor 인덱스의 int32·연속성·범위를 검사한다. `CVPR_EVAL_STOP_FILE`을 지정하면 매 프레임 시작 전에 정지 파일을 확인하고 CUDA 동기화 후 정상 정리 경로로 종료한다. 이때 부분 실행은 채점하지 않는다. 단독 평가의 simulator 종료 전에도 CUDA 작업을 동기화한다. MPS 클라이언트 중지에 강제 signal을 사용하지 않는다.
+
 ```bash
 EVAL_SEEDS="0 1 2" TOKENHSI_GPU=0 CHECKPOINT=/absolute/student.pth bash scripts/eval.sh
 EVAL_SEEDS="0 1 2" TOKENHSI_GPU=0 CHECKPOINT=/absolute/student.pth EVAL_TASK=push bash scripts/eval.sh
@@ -78,3 +82,15 @@ ON_TOP의 두 번째 슬롯은 실제 받침이다. 그 외 과제의 두 번째
 - `output_etc/check/cvpr2027_final_smoke`: 스킬 5종 각각 CPU 2장면, 최대900 step 실행 완료. 모든 실행에서 normalization 불변 및 저장 궤적 CPU 재채점 일치 확인.
 - `output_etc/check/cvpr2027_replay_smoke`: PUSH 초기 snapshot 복원 실행 완료. initial의 모든 필드가 원본과 동일하고 CPU 재채점 통과.
 - 512장면×3 seeds 전체 성능 평가는 아직 실행하지 않았다. 진행 중 GPU 학습은 유지했다.
+
+## 2026-11-10 사용자 지정 AT/ON_TOP 운반 상자 세트
+
+`CVPR_CARRY_BOX_SET=tokenhsi_test`와 `CVPR_CARRY_SOURCE_CONFIG=<원본 config 복사본>`을 지정하면 AT/ON_TOP의 운반 대상만 원본 TokenHSI carry testSizes 9종으로 생성한다. 원본과 AST가 동일한 로컬 BoxLib를 사용한다. N≥9이면 각 크기를 한 번 포함한 뒤 나머지를 균등 복원 추출하고 섞는다. 밀도100kg/m³, 실제 물리 형상·크기 관측·BPS를 함께 변경한다. ON_TOP 받침/distractor 및 거리·목표·채점은1109를 유지한다. 원본 native carry 전체 환경의 재현을 뜻하지 않는다.
+
+옵션을 지정하지 않으면 기존 PUSH 및 공통 상자 평가가 유지된다. 원본 config 경로·SHA256·크기 목록·적용 범위는 각 seed environment.json의 cvpr_carry_box_override에 저장한다. 원본 TokenHSI와 ksh 파일은 변경하지 않는다.
+
+## CLIMB 최초 GPU 초기화 진단 (2026-11-10)
+
+CLIMB31k 진단 완료: 동일 초기 장면·관측에서 첫episode4.62±0.63%, 두번째99.80±0.20%, 세번째99.93±0.11%. 새환경에서0-action1step후동일reset도99.93±0.11%로 재현. 700step정책워밍업은 필요조건이 아님. GPU raw rigid-body/contact 초기 버퍼 차이를 관찰했으나 특정PhysX 내부 원인은 확정하지 않음.12회CPU재채점·유한값·initial동일성검증 통과. 기본1109 첫episode경로는 유지. 상세 output_etc/check/kd31k_climb_reset_diagnostic_20261110/report.md.
+
+진단 실행은 CVPR_CLIMB_RESET_DIAGNOSTIC=1. 추가로 CVPR_CLIMB_PRESTEP=1이면 최초zero-action1step뒤동일RNGreset한900step만측정한다. 기본값은 비활성. 이후reset결과는공식첫episode결과와혼합하지않는다.

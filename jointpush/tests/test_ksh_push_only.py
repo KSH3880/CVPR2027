@@ -1,1 +1,0 @@
-../../ksh_jointpush/tests/test_ksh_push_only.py

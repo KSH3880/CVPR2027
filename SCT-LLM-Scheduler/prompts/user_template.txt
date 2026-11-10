@@ -1,0 +1,34 @@
+Predict event durations and generate an initial release schedule for CURRENT_SCENE.
+
+The five demonstrations are separate historical executions of the same
+pretrained controller. Their measured trajectories and outcomes are available
+for in-context calibration. CURRENT_SCENE has not been executed.
+
+UNITS AND REPRESENTATION
+{{UNITS_COORDINATE_FRAME_AND_FIELD_DEFINITIONS}}
+
+TASK GLOSSARY
+{{PLAIN_LANGUAGE_TASK_DEFINITIONS}}
+
+EVENT DEFINITIONS
+{{EXACT_READINESS_ENABLING_AND_COMPLETION_CONDITIONS}}
+
+DEMONSTRATION 1
+{{RECORDED_EXAMPLE_1_JSON}}
+
+DEMONSTRATION 2
+{{RECORDED_EXAMPLE_2_JSON}}
+
+DEMONSTRATION 3
+{{RECORDED_EXAMPLE_3_JSON}}
+
+DEMONSTRATION 4
+{{RECORDED_EXAMPLE_4_JSON}}
+
+DEMONSTRATION 5
+{{RECORDED_EXAMPLE_5_JSON}}
+
+CURRENT_SCENE
+{{CURRENT_INITIAL_OBSERVATION_TASKS_TARGETS_AND_DEPENDENCIES_JSON}}
+
+Return only the JSON object specified in the system prompt.

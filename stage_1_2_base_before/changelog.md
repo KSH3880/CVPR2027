@@ -2,7 +2,43 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-06
+
+### 저장 학습 로그 CPU 간접 성능 검토
+
+- 원본·floorblend0.5·0.8 이벤트를 GPU 없이 추출. 최종iter15385/3048/2581, 공통2301–2500 비교. BEFORE 성공상태 점유16.92/16.42/17.75%, edge_state0.23509/0.23347/0.23438.
+- 0.5 최근2849–3048 점유18.54%로 회복하나 동일구간원본18.81%와 비슷. 로그프레임점유와 정식eval 성공률의 정의 차이를 명시; 0.8 실제 성능 우세 미확정.
+- 분석·그래프·한계: `output_etc/check/training_log_review_20261106/REPORT.md`. 실행 프로세스 변경 없음.
+
 ## 2026-11-05
+
+### 2.5k 원본 대비 floorblend0.5 평가 GPU2
+
+- 각512환경×3시드×40초, 원본·현재2.5k 모두 정상종료. 모든시드 packet/sizes/goals/predecessor/groups 일치.
+- BEFORE region simultaneous ever 원본29.40±2.36%→현재32.99±1.03%(+3.59pp). SIT+8.39/CLIMB+2.57/ON_TOP+2.25pp. 현재2k30.81→2.5k32.99%.
+- 단독 스킬 대체로 유지(CLlMB−0.25pp), 전체 낙상5.01→3.06%. 모델별 학습1회 비교로 재현성 확정 아님. 보고서·원시: `output_etc/check/compare_floorblend05_2500_20261105_214148/REPORT.md`. GPU5 view·학습 유지.
+
+### 2k 원본 대비 floorblend0.5 평가 GPU2
+
+- 사용자 지정GPU2에서 각512환경×3평가시드×40초, 두2k checkpoint 정상 종료. 전 시드 과제·물체·목표·선행관계 동일.
+- BEFORE region simultaneous ever 원본28.89±0.62%→현재30.81±2.96%(+1.93pp). SIT+3.55/CLIMB+1.92/ON_TOP+1.40pp. 1k 대비 현재 전체22.20→30.81%, 원본 대비 격차는 축소. 평가 시드 산포이며 확정 우월성 주장 아님.
+- 단독 스킬은 대체로 유지, CLIMB−1.38pp·ON_TOP−0.16pp. 전체낙상4.79→3.40%. 원시 및 재현 집계: `output_etc/check/compare_floorblend05_2000_20261105_194821/REPORT.md`. 기존 학습 유지.
+
+### 1k 경계 근접 시작 viewer
+
+- 사용자 요청으로0.5/1k 모델 GPU6 viewer524831/6088. `output_etc/check/view_near_boundary_1k/view.py` 프로세스 한정 초기 배치 hook: 경계 바깥0.5–1m, ON_TOP payload 기준 및 pickup1.05m. 기존 충돌·near route 검증 유지, 보상·학습 코드 불변.
+- 첫 두 ON_TOP pair 시작 gap0.689/0.534m 확인. 경계0.15m 이내 도달 step125/211이 각각 선행 완료182/229보다 빠름. 완전 정지·순서준수 성공을 증명하는 지표는 아니며 선택 초기 배치 시각 진단이다.
+
+### 1k 원본 대비 floorblend0.5 정식 평가
+
+- GPU5에서 두1k checkpoint 각512환경×3평가시드×40초, 모두 rc0. 모든 시드 장면·목표·선행관계 일치 확인.
+- BEFORE region simultaneous ever: 원본18.28±0.77%→현재22.20±1.55%(+3.92pp); SIT+7.16pp, CLIMB+10.68pp, ON_TOP−0.05pp. 평가 시드 산포이며 학습 재현성 아님.
+- 결과·명령·원시 trace: `output_etc/check/compare_floorblend05_1000_20261105_171215/REPORT.md`. 기존 viewer와 학습 유지.
+
+### 500 iter viewer 종료 및 0.8 TensorBoard 추가
+
+- 사용자 요청으로 viewer298883만 GPU6 MPS terminate_client2946883으로 종료(rc0), PID·6088 포트 종료 확인. 기존 GPU2/GPU6 학습 유지.
+- 6021 TensorBoard를 원본 hard relfusion·현재0.5·새0.8 세 run으로 재시작(PID316399). 실행·API 검증은 `output_etc/check/tensorboard_floorblend_vs_original/`에 보존.
 
 ### floorblend 속도 기준0.8m/s 비교 학습 GPU6
 

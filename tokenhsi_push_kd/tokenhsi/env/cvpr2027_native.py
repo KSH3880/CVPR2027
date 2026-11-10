@@ -77,6 +77,12 @@ class NativeProtocolEnv:
         native_cfg.update(args=copy.copy(args), headless=args.headless, seed=cfg['seed'])
         self.native = HumanoidTrajSitCarryClimb(native_cfg, copy.deepcopy(sim_params), args.physics_engine,
                                                args.device,args.device_id,args.headless)
+        import os
+        if os.environ.get('CVPR_CLIMB_RESET_DIAGNOSTIC') == '1':
+            if args.eval_task != 'climb':
+                raise ValueError('Reset diagnostic is CLIMB-only')
+            from learning.climb_reset_diagnostic import capture_rng
+            self.diagnostic_reset_rng = capture_rng(self.native.device)
         self.native.reset(torch.arange(self.native.num_envs,device=self.native.device))
         self.reference = NativeStateAdapter(self.native,args.eval_task)
         self.rl_device = args.rl_device

@@ -1,4 +1,9 @@
 """Evaluation-only single-person scenes. Never selected by the training path."""
+import os
+from pathlib import Path
+import hashlib
+import yaml
+from isaacgym import gymapi
 import numpy as np
 import torch
 from push_reference.env.tasks.multi_agent.humanoid_ma_stage1_jointpush import HumanoidMAStage1JointPush
@@ -15,6 +20,35 @@ class CVPRSingleTask(HumanoidMAStage1JointPush):
             raise ValueError('CVPRSingleTask is evaluation-only: one person, two object slots')
         if abs(self.dt - 1/30) > 1e-6:
             raise ValueError('Protocol requires 30 Hz policy control')
+
+    def _load_box_asset(self):
+        super()._load_box_asset()
+        if os.environ.get('CVPR_CARRY_BOX_SET', 'protocol') != 'tokenhsi_test':
+            return
+        if self.cvpr_task not in ('at', 'on_top'):
+            raise ValueError('tokenhsi_test box override is only for AT/ON_TOP')
+        from env.tasks.multi_task.humanoid_traj_sit_carry_climb import BoxLib
+        source = Path(os.environ['CVPR_CARRY_SOURCE_CONFIG'])
+        box_cfg = yaml.safe_load(source.read_text())['env']['carry']['box']
+        lib = BoxLib('test', box_cfg, self.num_envs, self.device)
+        self._box_size[:, 0] = lib._box_size
+        self._rsi_asset_sizes[:, 0] = lib._box_size
+        self._box_scale = self._box_size/self._box_size.new_tensor(self._build_base_size)
+        self._box_density.view(self.num_envs, self.num_objects)[:, 0] = 100.
+        for i, dims in enumerate(lib._box_size.cpu().tolist()):
+            options = gymapi.AssetOptions()
+            options.density = 100.
+            options.angular_damping = .01
+            options.linear_damping = .01
+            options.max_angular_velocity = 100.
+            options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+            self._box_assets[i*self.num_objects] = self.gym.create_box(self.sim, *dims, options)
+        self.cfg['cvpr_carry_box_override'] = dict(
+            name='tokenhsi_test', source=str(source),
+            source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+            test_sizes=box_cfg['build']['testSizes'], density=100.,
+            sampling='Original BoxLib test sampler; all nine once then uniform replacement and shuffle',
+            scope='Payload only; support/distractor and layout/scoring retain protocol1109')
 
     def _reset_boxes(self, ids):
         roots = self._humanoid_root_states[ids, 0, :3].cpu().numpy()

@@ -1,1 +1,0 @@
-../../ksh_jointpush/tests/check_ksh_rsi_modes.py

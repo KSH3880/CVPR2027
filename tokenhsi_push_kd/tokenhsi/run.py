@@ -254,6 +254,8 @@ def main():
         runner.run(vargs)
     finally:
         if _active_environment is not None:
+            if os.environ.get('TOKENHSI_EVAL_PROTOCOL') == 'cvpr2027_single' and torch.cuda.is_available():
+                torch.cuda.synchronize()
             _active_environment.close()
 
     return

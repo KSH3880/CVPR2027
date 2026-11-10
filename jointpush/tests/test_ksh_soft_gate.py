@@ -1,1 +1,0 @@
-../../ksh_jointpush/tests/test_ksh_soft_gate.py

@@ -1,4 +1,31 @@
+## 2026-11-10
+
+### TokenHSI* Table 1·2 다인 평가 시작
+
+사용자 지정 `TokenHSIPushKD_00031000.pth`(SHA256 `413e77b4d35d5543211d30a52114ca3f47cc8258deacebcc203a0ea333d78542`)를 공통 SCT 물리 장면에서 평가한다. `/home/hwanhee/ksh/stage1_2_base_teacher`는 읽기 전용으로 참조하고 코드 복사본·실행기·모든 결과를 `output_etc/check/tokenhsi31k_tables12_20261110/`에 둔다. Table1 Independent/Mixed × 2/4/8/16H, Table2 Enable3종/Coupled2·3·4H에 seed1/6/7·512환경·900step, 총42회다.
+
+원본 TokenHSI397D 입력과 저장 정규화·가중치를 고정하며 Enable에는 목표 정렬 가상 받침, Coupled에는 개인별 PUSH 구역을 입력한다. 물리 장면·공통 낙상·SR·Time·t_coop 판정은 공통 평가기를 재사용한다. Native TokenHSI에는 SCT scene attention이 없으므로 자기 상태·배정된 과제 물체만 입력한다. 자기 상태 함수 AST 및 SIT/CARRY/CLIMB/PUSH packing의 원본 단일 행동 함수와 CPU exact 일치를 검증했다. 체크포인트 strict load·가중치/정규화 불변 검증도 통과했다.
+
+GPU6·7 기존 MPS에 연결하며 데몬·기존 학습을 조작하지 않는다. 자연 종료와 CUDA 동기화를 사용하며 signal/timeout/reset은 사용하지 않는다. 각GPU의2H 선행 정식 평가가900step·초기snapshot exact·CPU/GPU SR/Error 재채점(공동PUSH는Time/contact도) 검증을 통과하여 나머지40회 자동 분배를 시작했다. 동시에 GPU당 작은평가 최대3개 또는8/16H평가1개로 제한하고 메모리 여유도 검사한다. 진행은 `status.json`, 집계는 `summary.json`·`report.md`, 원시는 `carrier/output_etc/check/tables12/`를 참조한다. 최종 수치 완료로 기록한 것은 아니다.
+
+
+### 31k 추가 평가용 원본 carry testSizes
+
+사용자 요청으로 AT/ON_TOP 운반 상자에 원본 TokenHSI9종 testSizes를 선택할 수 있는 평가 전용 옵션을 추가했다. 원본과 동일한 BoxLib 샘플러를 사용하며 물리 형상·관측 크기·BPS를 일치시킨다. 받침과1109 채점은 유지한다. PUSH/학습 기본 경로는 변경하지 않았다. 원본 config와 SHA256은 평가 결과에 보존한다. CPU scoring/scene 테스트17개 통과, BoxLib AST 동일 확인. 실제 smoke 및 정식 결과는 output_etc/check/kd31k_native_extra_20261110/에 저장한다.
+
 ## 2026-11-09 CVPR2027 저장소 복사
+
+### 23k 체크포인트 GPU7 MPS 단독 평가
+
+- 최종 사용자 지시에 따라 ON_TOP을 제외하고 PUSH를 우선했다. 기존 MPS 평가의 AT seed1은 정지 파일로 프레임 경계에서 동기화·정상 정리했으며 부분 궤적은 미채점 보존했다. PUSH512×seed0/1/2·900step·revision1109 정식3회를 완료하고 추가 GPU 평가 없이 종료했다. Point/Region Ever는251/512·281/512·253/512, **51.11±3.28%**, 성공 trial의 최소거리Error는7.86±0.42cm, 낙상률1.43±0.49%다. 이 수치는 final SR이 아니다.
+- 앞서 완료된 SIT99.67±0.11%·CLIMB3.32±1.28%(각native Point·3seed), AT66.21%(seed0만)를 함께 보존했다. 완료10회 정규화 고정·CPU 재채점·물리/관절/접촉/거리 유한값·공통 소스 해시 일치, 체크포인트 SHA 불변을 확인했다. 완료 로그에 CUDA/에셋/메모리 오류가 없고 기존MPS PID112084/112102와 학습880633 생존·TensorBoard 갱신을 종료 후 확인했다. [보고서](output_etc/check/kd23k_eval_mps_20261109/report.md), [검증](output_etc/check/kd23k_eval_mps_20261109/verification.json), [PUSH 원시 집계](output_etc/check/kd23k_eval_mps_20261109/push_priority/formal/summary.json).
+- 사용자 지정 `output/push4096_kd0p1_sharedv2/TokenHSIPushKD_00023000.pth`를 CPU에서 로드해 epoch23000·모델107 tensor finite·KD0.1/shared v2 계약을 확인했다. SHA256은 `a2a327c46d4f56bd813438026167212e6f08d385c021f78004e6d823350743cb`다.
+- 이관 시 제외된 데이터는 이 checkout의 `tokenhsi/data/`에만 공유 데이터 심링크6개를 만들고, 제공 template으로 runtime manifest3개를 생성했다. 원본 공유 디렉터리는 수정하지 않았다. 사용 모션/물체 참조458건 존재, PUSH21개 계약 해시 및 연결 데이터1667개 bundle 해시 일치를 확인했다.
+- 기존 scoring/scene CPU 테스트17개와 5개 단독 스킬 CPU2장면×900step smoke/재채점이 통과했다. 초기 GPU7 사전 검사는 평가 프로세스의 MPS 접속만 비활성화한 별도 CUDA 방식으로 수행했고, 이후 아래의 사용자 요청으로 기존 MPS에 접속하는 실행으로 전환했다. MPS 데몬·기존 학습은 조작하지 않았다.
+- 초기 실행·검증 산출물은 `output_etc/check/kd23k_eval_20261109/`에 보존한다. CPU/GPU smoke는 성능 수치로 사용하지 않는다.
+- 평가 실행기에 `--cuda-launch-blocking 0|1`을 추가했다. 기본0은 정식 평가의 일반 실행,1은 작은 사전 검사의 동기화 진단용이다. 점수·물리·정규화 설정과 기존 MPS는 변경하지 않았다.
+- 이후 사용자 요청으로 GPU7의 기존 MPS 서버에 접속하는 별도 실행으로 전환했다. 기존 비MPS 사전 검사 AT185frame에서 해당 비MPS 프로세스에만 SIGINT를 전달해 기존 정리 경로로 종료했고, 원시 로그를 보존했다. MPS 데몬/기존 학습에는 signal이나 설정 변경을 하지 않았다. 새 평가 클라이언트만 SM25% 상한·일반 CUDA 실행을 사용하며 산출물은 `output_etc/check/kd23k_eval_mps_20261109/`에 분리한다.
+- 평가 시작 전 root-state와 actor 인덱스 불변조건 검사를 추가하고, 단독 평가 종료 전 CUDA 동기화 및 `CVPR_EVAL_STOP_FILE`을 통한 프레임 경계 정상 중지를 지원한다. CPU의 정상/음수/범위초과/int64/비연속 인덱스 검사와 기존17개 테스트가 통과했다. 채점·물리·학습 손실은 변경하지 않았다.
 
 - 작업 폴더의 코드·설정·문서를 `CVPR2027/tokenhsi_push_kd/`로 복사했다. 기존 실행 경로와 학습 프로세스는 유지한다.
 - 체크포인트, 실행 로그/output, motion/object/SMPL 데이터와 캐시는 제외했다. 실행에 필요한 데이터·가중치는 별도로 준비해야 한다.
@@ -183,3 +210,11 @@
 - Stage1 26k의167크기·밀도3·마찰0.4·목표2~10m/±45°·RSI949후보·AMP50:50·CONTACT+AT·20cm/Z1mm 성공 연결. 1인 장면과2인 원본의 차이를 METHOD에 명시.
 - CPU6테스트 통과: real checkpoint strict 로드와 기존행동 보존, KL/gradient 분리, 실제 training method의 optimizer step, reward/데이터 계약. Python compileall/셸 문법 통과.130모션 경로 존재 및 PUSH21개·asset/mesh hash 일치.
 - Isaac Gym full task import는 외부 읽기 전용 JIT cache lock에서 중단. Simulator/rollout/학습 통합·장기 성공률 미검증. 본학습 실행 없음.
+
+31k 추가 평가 완료: SIT99.61±0.39%, CLIMB4.69±0.70%, AT90.56±1.77%, ON_TOP Region89.65±2.17%. 각512×3seed, 원본9종운반상자 검증·12회CPU재채점·유한값 검사 통과. SIT 낙상1499/1536으로 ever와 유지성능을 구분해야 함. 결과 output_etc/check/kd31k_native_extra_20261110/report.md.
+
+### CLIMB 첫 에피소드 대 동일 RNG reset 진단
+
+`CVPR_CLIMB_RESET_DIAGNOSTIC=1`인 경우에만 native 최초 reset 직전 RNG를 보존하고, 첫900step 뒤 동일 RNG로 reset한2·3번째900step을 따로 측정한다. 낙상으로 해제한 모터 설정을 복구하고 root·관절·목표·관측·rigid-body·접촉을 기록한다. 원본 teacher의3%/99.8%는 과거 주석이며 이번 측정으로 단정하지 않는다. CPU2장면3episode 및 재채점 통과, 기존 CPU테스트17개 통과. 기본1109 결과는 첫episode만으로 유지하며 이후 결과는 진단으로 분리한다. 결과: output_etc/check/kd31k_climb_reset_diagnostic_20261110/.
+
+CLIMB31k 진단 완료: 동일 초기 장면·관측에서 첫episode4.62±0.63%, 두번째99.80±0.20%, 세번째99.93±0.11%. 새환경에서0-action1step후동일reset도99.93±0.11%로 재현. 700step정책워밍업은 필요조건이 아님. GPU raw rigid-body/contact 초기 버퍼 차이를 관찰했으나 특정PhysX 내부 원인은 확정하지 않음.12회CPU재채점·유한값·initial동일성검증 통과. 기본1109 첫episode경로는 유지. 상세 output_etc/check/kd31k_climb_reset_diagnostic_20261110/report.md.

@@ -2,6 +2,12 @@
 
 최신 변경부터 기록한다. 현재 실행법은 [config.md](markdowns/config.md), 코드 위치는 [structure.md](markdowns/structure.md)를 참조한다. 실행 중인 GPU/PID는 이 파일에 고정하지 않고 실제 프로세스로 확인한다.
 
+## 2026-11-08
+
+### 체크포인트 없는 테스트·뷰어·평가 로그 정리
+
+사용자 요청으로 `output/`의 체크포인트 없는 테스트·분석·뷰어 7폴더와 학습 run 바깥의 평가 diagnostics·metrics·quick_eval 7폴더를 삭제했다(110파일, 57.05MiB). 삭제 전 조회 가능한 프로세스의 실행 인자·cwd·열린 파일 및 workspace 내 외부 심링크 참조가 없음을 확인했다. 당시 남아 있던 checkpoint 246개를 포함한 보존 파일 293개의 inode·크기·mtime·링크 문자열을 전후 대조했고, 학습 run 내부 TensorBoard·진단·설정과 RSI 캐시를 유지했다. 과거 기록이 참조하는 해당 테스트 산출물 일부는 이번 정리로 제거되었다. 삭제 목록: [cleanup 기록](../runs/cleanup_stage1_fix_output_20261108_155805.json).
+
 ## 2026-10-28
 
 ### 실험 폴더를 소속 output/runs로 추가 통합

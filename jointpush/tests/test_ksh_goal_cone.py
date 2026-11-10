@@ -1,1 +1,0 @@
-../../ksh_jointpush/tests/test_ksh_goal_cone.py
