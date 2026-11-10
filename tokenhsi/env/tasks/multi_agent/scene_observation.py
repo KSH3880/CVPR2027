@@ -98,6 +98,9 @@ class SceneObservationMixin:
             box_bps = self._logical_box_values(self._box_bps, env_ids)
             tar_pos = self._tar_pos[env_ids]
             origins = self._env_origins[env_ids]
+        if self._design:
+            from env.tasks.multi_agent.viewer_design import observed_boxes
+            box_states = observed_boxes(self, box_states, env_ids)
         B, M, O = (body_pos.shape[0], self.num_agents, self.num_objects)
         human_nodes = self._compute_clean_humanoid_nodes(
             body_pos, body_rot, body_vel, body_ang_vel, origins

@@ -1,18 +1,30 @@
 # 레포 구조
 
-유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_coupled_push_individual_goal_solo5_carry5`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`, `stage2_coupled_push_individual_goal_solo5_keep1`, `stage2_coupled_push_individual_goal_solo5_shrink1`, `stage2_coupled_push_individual_goal_solo5_carry5_ground`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`, `stage2`, `stage2_distill`, `stage2_900`, `stage2_distill_900`이다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
+유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_coupled_push_individual_goal_solo5_carry5`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`, `stage2_coupled_push_individual_goal_solo5_keep1`, `stage2_coupled_push_individual_goal_solo5_shrink1`, `stage2_coupled_push_individual_goal_solo5_carry5_ground`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`, `stage2`, `stage2_distill`, `stage2_900`, `stage2_distill_900`, `stage2_distill_900_v2`, `stage2_distill_900_v3`이다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
 
 ## 실행과 설정
 
 | 경로 | 역할 |
 | --- | --- |
 | `tokenhsi/run.py`, `utils/parse_task.py` | MA 학습/평가·Stage1/BEFORE 모델 등록과 환경 생성 |
-| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 스물네 실험 계약, 학습/추론/resume env/sim 로딩 |
-| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 스물네 개 |
-| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 72개 |
-| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가24개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
+| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 스물여섯 실험 계약, 학습/추론/resume env/sim 로딩 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 스물여섯 개 |
+| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 78개 |
+| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가26개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
 | `tokenhsi/scripts/multi_agent/stage2_teachers_{test,vnc,eval}.sh` | enable/coupled 두 PTH의 관계별 제로샷 viewer·공간 채점, 5명 이상 그룹 배치 |
 | `tokenhsi/evaluate.py`, `rescore.py` | 독립 seed 실행·통계, 저장 trace CPU 재채점 |
+| `tokenhsi/utils/evaluation_errors.py` | 공통 Point/Region Error의 유효 frame 최솟값·성공 필터·공동 그룹 중복 제거·seed 통계 |
+| `eval/` | 평가 보조 작업공간. `compare_enabling_success.py`는 각각-ever·동시 성공, `compare_region_extent.py`는 XY80%·100%를 저장 trace에서 비교하며 메인 eval은 기존 위치 유지 |
+| `eval/stage2_protocol_eval.py`, `stage2_distractor_physics.py`, `summarize_stage2_protocol.py` | 새 프로토콜 4명·512환경의 초기 snapshot 생성·관측/물리 분리 실행·초기 상태/CPU 재채점 검증·seed별 비교 |
+| `eval/run_stage2_scalability.py`, `stage2_scalability_eval.py`, `stage2_scalability_layout.py`, `stage2_protocol_sampling.py`, `stage2_xy100.py`, `summarize_stage2_scalability.py` | 보조 경로의 Independent/Mixed 2·4·8·16명 평가·그룹별 distractor 배분·XY100% 채점·CPU 검증·기존4H Mixed 재사용 집계 |
+| `eval/stage2_sampling_audit.py` | 선택적 초기 배치 단계별 RNG/상태 비교; 공유 상자 중복 초기화 진단 |
+| `eval/stage1_protocol_eval.py`, `stage1_protocol_policy.py`, `stage2_full_observation.py`, `compare_stage1_scalability.py` | 동일 초기 장면에서 Stage1 원본 정책 비교·가상 받침/개인 PUSH 입력 변환·native 행동 검증·Stage1/Full distractor attention 보존·읽기 전용 원본 재사용 비교표 |
+| `eval/run_table2.py`, `table2_eval.py`, `table2_sampling.py` | Table 2 전용 단일 Enable 쌍/공동 PUSH 그룹의 Stage1·Stage2 평가·3명 지원·동일 초기 장면 검증 |
+| `eval/table2_metrics.py`, `rescore_table2.py`, `summarize_table2.py`, `test_table2.py` | Time·t_coop 기록·손 원시 좌표 저장·접촉 거리/시작 변위/손 접근 CPU 재집계·표/seed별 집계·경계/실패/낙상 테스트 |
+| `eval/rescore_table2_speed.py` | t_coop 시작의 XY 속도·지속 시간/손 접근 조건 CPU 비교·인원/seed별 비율·시작률·trial별 프레임 수 보존 |
+| `FSM/` | SCT 26k + 관계별 state freeze/일회 해제 viewer·Enable3종/Coupled2/3/4명·공통 formal SR·VNC/로컬 진입점·상태 테스트. 명령은 `FSM/README.md` |
+| `FSM/collision_probe.py` | 같은 자세/상자에서 freeze 충돌·해제 충돌·해제 무충돌을 비교하는 물리 확인 viewer. SR 평가와 분리 |
+| `FSM/eval_run.py`, `eval_entry.py`, `eval_verify.py`, `eval_summary.py` | SCT26k+FSM Table1 Independent/Mixed·Table2 단일 관계 평가, 기존 초기 장면 재사용·CPU SR/FSM 재검증·seed별 집계 |
 | `tokenhsi/utils/evaluation_protocol.py`, `learning/multi_agent/formal_eval.py` | 학습 인원/단독 구분·점/영역/BEFORE·개인/공유 중심 공동 PUSH·interaction group 성공률과 seed 통계·개인 낙상 제어 |
 | `tokenhsi/scripts/multi_agent/launch.sh`, `runtime_env.sh` | 공통 인자·출력 경로·conda·GPU |
 | `tokenhsi/scripts/multi_agent/{gui_gpu_env,run-gui,mps_auto_env}.sh` | viewer GPU, VNC, 기존 MPS 연결 |
@@ -34,6 +46,8 @@
 | `humanoid_ma_stage2.py`, `stage2_layout.py`, `stage2_reward.py`, `stage2_wait.py` | 통합 Stage2의 관계별 배치·AT/접촉/선후행 gate·대기 속도 감점 |
 | `humanoid_ma_coupled_push.py`, `coupled_push_reward.py` | 공동 상자·가상 구역·그룹 gate·goal saturation |
 | `push_goal_markers.py` | PUSH 목표의 viewer/VNC 선 표시만 추가; actor·reset·scale 수정 없음 |
+| `viewer_design.py` | `DESIGN=1`의 distractor 관측/물리 분리·그룹 색 확장·Enable 역할별 채도/밝기·공유 상자 중간 톤·목표 구 숨김·표시 호출; 기본 실행은 비활성 |
+| `viewer_goal_markers.py` | 디자인 전용 과제별 목표 테두리·윗면 표시·방향 화살표 |
 | `humanoid_ma_before.py` | BEFORE 역할·공유 물체·AT progress·후행 초기화 |
 | `scene_layout.py`, `scene_validation.py` | 활성 물체·distractor·loco 참조·물리 유효성 |
 | `before_rsi_cache.py`, `native_rsi_cache.py` | 후행 pickUp/carryWith native 크기별 screening |
@@ -49,6 +63,7 @@
 - `stage2_relation_fusion.py`, `utils/stage2_spec.py`, `utils/before_goal_sampling.py`: BEFORE/COUPLED 독립 임베딩과 공통 fusion MLP·세 장면 유형 1:1:1·충돌 없는 alias 배정·goalroute 배치. `test_stage2.py`에서 관계·토큰·보상·전이·gradient·재로드를 검사한다.
 - `stage2_teachers.py`, `before_relation_fusion.py`: 원본 teacher별 네트워크·RMS 복원과 사람별 행동 선택. `utils/stage2_group_sampling.py`, `env/tasks/multi_agent/stage2_group_layout.py`는 추론 전용 순차 그룹 선택·5m 중심 배치·BEFORE 중심 복원·distractor 제외·카메라를 담당한다. `test_stage2_teachers.py`, `tests/check_stage2.py`에서 가중치/담당 선택·관측 제외·물리/부분 reset을 검사한다.
 - `coupled_relation_fusion.py`: ground A/B의 COUPLED 64차원 공유 임베딩·레이어/헤드 bias 투영·output projection 전 residual fusion. SELF/NONE만 A는 lookup 학습, B는 0 고정이다. `test_coupled_relation_fusion.py`에서 계산 동치·단독 생략·인원/셔플·gradient·전이/재로드를 검사한다.
+- `utils/stage2_eval_sizes.py`: general 평가 전용 enable 행동별 크기 교집합·공유 물리 상자/질량 생성·첫 episode 관계/역할 고정. `test_stage2_eval_sizes.py`에서 범위·격자·solo/coupled 보존·native 역할 샘플링을 검사한다.
 - `stage2_distill_agent.py`, `distill_replay.py`, `utils/stage2_distill_spec.py`: 고정 두 teacher의 사람별 평균 행동 모방·scene 단위 teacher/student 실행 전환·누적 replay·actor coordination/action head 업데이트·체크포인트/optimizer/replay 복원. [distillation 명세](reference/stage2_distill.md).
 - `viewer_diagnostics.py`: viewer 전용 native 보상 성공 진단, 정식 평가와 별도.
 - `ma_agent.py`, `ma_players.py`, `scene_normalizer.py`: 장면 단위 PPO/AMP·저장/복원·평가·정규화.
@@ -66,6 +81,8 @@
 - `lpanlib/poselib/`: 기존 모션 배열 로딩 라이브러리.
 
 ## 검증과 문서
+
+논문 Table 1–3의 평가 조건·테이블 구성·미정 항목은 루트의 [CVPR2027 평가 프로토콜](../cvpr2027_evaluation_protocol.md)에 둔다.
 
 `tokenhsi/tests/`는 보상·배치·GTA·mask·RSI·전이·재로드·출력 경로를 검사한다. `before_test_utils.py`, `stage1_test_utils.py`는 CPU fixture다. `check_before_object_alias.py`·`check_before_push.py`·`check_coupled_push.py`는 실제 물리·부분 reset·추론 검사 진입점이다.
 

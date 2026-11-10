@@ -45,6 +45,25 @@ BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는
 
 로컬 viewer는 화면 세션이 필요하다. VNC는 Xvfb·x11vnc·noVNC·websockify가 필요하며 `PORT`, `RESOLUTION`, `VNC_DIR`, `X11VNC`, `NOVNC_DIR`, `WEBSOCKIFY`로 위치·화면을 지정한다. GUI 로그는 `output_etc/check/gui/`다. 종료 시 이번 wrapper가 띄운 VNC 서비스만 종료한다.
 
+일반 test/VNC에 `DESIGN=1`(직접 실행 `--design`)을 붙이면 다음 변경을 함께 적용한다. 생략 또는 `DESIGN=0`은 기존 화면·물리 동작이다.
+
+- Distractor를 화면·충돌 영역 밖으로 옮긴다. 작업 물체·받침·공유 alias는 보존하고, distractor의 관측 pose·속도·형상·토큰은 초기 샘플 상태를 유지한다.
+- PUSH AT은 구 없이 바닥 링·세로선만 표시하고, 공동 PUSH는 그룹당 공유 중심 목표 하나를 쓴다. 정책의 개인 목표와 보상·성공 판정은 유지한다.
+- CARRY AT은 상자를 놓을 바닥 높이에 상자 크기의 사각 테두리를 표시한다. ON_TOP은 실제 받침 윗면의 놓을 영역 네 모서리·아래 화살표, SIT은 윗면 테두리·옅은 선 채움, CLIMB는 윗면 테두리·위 화살표를 표시한다. 기존 목표 구와 공중 십자 표시는 숨긴다.
+- Enable·Coupled 그룹의 사람·작업 상자·목표에 같은 색 계열을 쓴다. Enable 선행은 채도를 낮추고 밝게, 후행은 채도를 높이고 조금 어둡게 표시한다. 개별 작업 상자·목표는 담당 역할의 톤, 공유 상자는 두 역할의 중간 톤을 사용한다. Coupled·단독 색은 유지한다.
+- 숫자·연결선·원형 배지는 표시하지 않는다.
+- 장면 내 서로 다른 그룹과 단독 사람은 색을 중복하지 않는다. 기존 4색을 먼저 쓰고 부족하면 추가한다.
+
+```bash
+# stage2_distill_900_v2: 과제별 목표·그룹 색·Enable 역할별 톤을 함께 적용
+TOKENHSI_GPU=6 DESIGN=1 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v2_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_distill_900_v2: 로컬 viewer
+TOKENHSI_GPU=6 DESIGN=1 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v2_test.sh "$CKPT" 4 1 8 10
+```
+
+반복·부분 reset마다 새 장면에 적용하며 카메라는 치운 물체를 제외한다. 학습/resume·정식 평가에는 사용하지 않는다. 장면 샘플러·near50·채점 등 전체 논문 프로토콜을 적용하는 옵션은 아니다. 5명 이상 통합 Stage2의 기존 distractor 관측 마스킹은 유지한다.
+
 ## 이전 이름의 저장본
 
 기존 Stage1 78000과 정리 전 BEFORE 저장본은 그대로 읽을 수 있다. `checkpoint_compat.py`가 저장 설정의 reward 태그·RSI 경로·로컬 전이 링크만 현재 이름으로 변환한다. 모델 tensor와 보상 수치·실험별 계약 검사는 유지한다. 새 학습의 출력 경로와 실험 이름은 현재 컨피그 이름을 따른다.
@@ -336,15 +355,32 @@ TOKENHSI_GPU=6 GROUP_SPAWN_OVER4=1 TASK_GRAPH=mixed bash tokenhsi/scripts/multi_
 
 Distill teacher PTH는 `tokenhsi/data/cfg/train/rlg/stage2_distill_900.yaml`의 `params.config.distillation.teacher_before`·`teacher_coupled`에서 각각 지정한다. 현재900 버전은 사용자 지정 enable21k(11월5일22:58 run)·coupled17k를 사용하며 기존1200step teacher를 그대로 불러온다. 1200step `stage2_distill`의 teacher 선택은 유지한다. `rollout_steps=32`와 teacher20+180iteration 전환은 유지한다.
 
+`stage2_distill_900_v2`는 기존900 설정을 복사하고 enable teacher만 `Stage2BeforeTotal_00019500.pth`로 변경했다. Coupled17k·solo의 enable 담당·모든 학습 설정은 유지하며 출력은 `output/stage2_distill_900_v2/Stage2Distill900V2_*`로 분리한다. Teacher 전체 경로는 전용 학습 YAML에 있다. 새 논문 평가 프로토콜을 기본 학습·공용 eval에 적용하는 변경은 포함하지 않는다.
+
+`stage2_distill_900_v3`는 V2를 복사하고 enable teacher만 같은 run의 `Stage2BeforeTotal_00027000.pth`로 교체했다. Coupled17k·Stage1 26k 초기화·solo의 enable 담당·나머지 설정은 같으며 출력은 `output/stage2_distill_900_v3/Stage2Distill900V3_*`다. 전체 teacher 경로는 `tokenhsi/data/cfg/train/rlg/stage2_distill_900_v3.yaml`에서 지정한다.
+
 ```bash
 # stage2_900: checkpoint 공간 평가
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_900_eval.sh "$CKPT" --output output_etc/check/stage2_900_eval
 
 # stage2_distill_900: student PTH 하나로 공간 평가
 TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_distill_900_eval.sh "$CKPT" --output output_etc/check/stage2_distill_900_eval
+
+# stage2_distill_900_v2: student PTH 하나로 공간 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v2_eval.sh "$CKPT" --output output_etc/check/stage2_distill_900_v2_eval
+
+# stage2_distill_900_v3: student PTH 하나로 공간 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v3_eval.sh "$CKPT" --output output_etc/check/stage2_distill_900_v3_eval
 ```
 
 같은512환경 rollout에서 기존 지표와 네 가지 interaction group 성공률을 함께 기록한다. Enable은선행/후행 각각 한 번 이상 성공, coupled는 실제 공유 상자 중심 도달 기준이다. `summary.json`의 `interaction_group_scores`에 풀네임별 seed 평균/표본std와 건수를 저장한다. [정의](reference/evaluation.md#통합-stage2의-interaction-group-성공률).
+
+Enable 공유 상자를 후행 행동별 운반/받침 크기 교집합으로 제한한 별도 평가는 다음과 같다. 기존 solo·coupled의 크기/성공 기준은 유지한다. [범위와 생성 방식](reference/evaluation.md#enable-행동별-크기-교집합-평가).
+
+```bash
+# stage2_distill_900: enable 행동별 크기 교집합
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_eval.sh "$CKPT" --envs 512 --seeds 0 1 2 --enable_size_mode per_action_intersection --output output_etc/check/stage2_distill_900_action_intersection_eval
+```
 
 ### Stage2 distillation
 

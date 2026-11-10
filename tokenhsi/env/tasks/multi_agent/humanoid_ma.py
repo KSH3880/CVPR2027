@@ -22,10 +22,24 @@ class HumanoidMA(Humanoid):
         color = cls._AGENT_COLOR_PALETTE[agent_id % len(cls._AGENT_COLOR_PALETTE)]
         return gymapi.Vec3(*color)
 
+    def _viewer_agent_color(self, env_id, agent_id):
+        if self._design and hasattr(self, '_design_colors'):
+            return gymapi.Vec3(*self._design_colors[env_id][agent_id])
+        return self._agent_color(agent_id)
+
+    def render(self, sync_frame_time=False):
+        if self._design and self.viewer is not None:
+            self._update_camera()
+            from env.tasks.multi_agent.viewer_design import draw_design
+            draw_design(self)
+            return BaseTask.render(self, sync_frame_time)
+        return super().render(sync_frame_time)
+
     def __init__(
         self, cfg, sim_params, physics_engine, device_type, device_id, headless
     ):
         self.cfg = cfg
+        self._design = getattr(cfg['args'], 'design', False)
         self.sim_params = sim_params
         self.physics_engine = physics_engine
         self.num_agents = cfg["env"].get("numAgents", 1)

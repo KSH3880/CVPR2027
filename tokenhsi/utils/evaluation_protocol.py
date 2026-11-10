@@ -3,6 +3,7 @@ import torch
 import statistics
 
 HORIZON = 900
+ENABLING_SUCCESS = 'simultaneous'
 TASK_NAMES = ('SIT', 'CLIMB', 'AT', 'ON_TOP', 'PUSH')
 SINGLE_PRESETS = {'AT': ('holding_at', 1), 'ON_TOP': ('holding_ontop', 2),
                   'SIT': ('sit', 1), 'CLIMB': ('climb', 1), 'PUSH': ('push', 1)}
@@ -23,8 +24,8 @@ def configure(args, cfg, name):
     unified = name in STAGE2_NAMES
     if args.cfg_env or args.episode_length or ((args.num_agents or args.num_objects) and not unified):
         raise ValueError('Formal evaluation reads training settings; scene overrides are forbidden')
-    if args.eval_repeats != 1 or args.seed not in (0, 1, 2):
-        raise ValueError('Formal evaluation: one first episode, independent seed 0/1/2')
+    if args.eval_repeats != 1 or args.seed < 0:
+        raise ValueError('Formal evaluation: one first episode, nonnegative seed')
     if args.before_follower_near or args.before_follower_short or args.before_pickup_carry_rsi != 'loco' or args.task_role_swap:
         raise ValueError('Viewer overrides are forbidden in formal evaluation')
     if args.eval_skills not in ('', 'loco') or args.eval_skill_probs not in ('', '1.0'):
@@ -52,8 +53,7 @@ def single_at_sizes(n, device):
     return torch.tensor(AT_SIZES, device=device)[ids[torch.randperm(n, device=device)]]
 
 
-def spatial_success(packet, roots, boxes, sizes, goals, dtype=torch.float64):
-    """Float64 geometry, entirely independent of native reward success/gates."""
+def _spatial_distances(packet, roots, boxes, sizes, goals, dtype=torch.float64):
     from env.tasks.multi_agent.edge_ontop_reward import vertical_extent, inner_xy_region_error
     n, m, _ = packet.shape
     o = boxes.shape[1]
@@ -70,10 +70,16 @@ def spatial_success(packet, roots, boxes, sizes, goals, dtype=torch.float64):
     offset = torch.where(task == 0, .10, torch.where(task == 1, .94, sizes[rows, payload_idx, 2]/2))
     goal[..., 2] += offset
     goal = torch.where(((task == 2) | (task == 4))[..., None], goals[rows, (target-m-o).clamp(0, m-1)], goal)
-    point_ok = (point-goal).norm(dim=-1) <= .20
-    region_ok = ((inner_xy_region_error(point[..., :2], support, support_size, .10) <= 0)
-                 & ((point[..., 2]-goal[..., 2]).abs() <= .20))
-    region_ok = torch.where((task == 2) | (task == 4), point_ok, region_ok)
+    return ((point-goal).norm(dim=-1),
+            inner_xy_region_error(point[..., :2], support, support_size, .10),
+            (point[..., 2]-goal[..., 2]).abs(), (task == 2) | (task == 4), valid.bool())
+
+
+def spatial_success(packet, roots, boxes, sizes, goals, dtype=torch.float64):
+    """Float64 geometry, entirely independent of native reward success/gates."""
+    point, xy, z, point_task, valid = _spatial_distances(packet, roots, boxes, sizes, goals, dtype)
+    point_ok = point <= .20
+    region_ok = torch.where(point_task, point_ok, (xy <= 0) & (z <= .20))
     return torch.stack((point_ok & valid.bool(), region_ok & valid.bool()), -1)
 
 
@@ -134,7 +140,8 @@ def shared_center_scores(groups, ever, final):
     return result
 
 
-def interaction_group_scores(valid, parent, groups, ever, center_ever):
+def interaction_group_scores(valid, parent, groups, ever, center_ever, simultaneous,
+                             enabling_success=ENABLING_SUCCESS):
     follower = parent >= 0
     enabling = follower.clone()
     rows, people = follower.nonzero(as_tuple=True)
@@ -143,10 +150,14 @@ def interaction_group_scores(valid, parent, groups, ever, center_ever):
     coupled = (members > 1) & ~enabling
     leader = groups == torch.arange(groups.shape[1], device=groups.device)[None]
     independent = valid & ~enabling & ~coupled
-    both = ever & ever[torch.arange(len(parent), device=parent.device)[:, None], parent.clamp_min(0)]
+    pair_success = simultaneous
+    if enabling_success == 'both_ever':
+        pair_success = ever & ever[torch.arange(len(parent), device=parent.device)[:, None], parent.clamp_min(0)]
+    elif enabling_success != ENABLING_SUCCESS:
+        raise ValueError('Unknown enabling success criterion: ' + enabling_success)
     result = {}
     for label, index in (('point', 0), ('region', 1)):
-        values = (ever[..., index][independent], both[..., index][follower & valid],
+        values = (ever[..., index][independent], pair_success[..., index][follower & valid],
                   center_ever[coupled & leader & valid])
         scores = {}
         for name, successes in zip(INTERACTION_METRICS, values):

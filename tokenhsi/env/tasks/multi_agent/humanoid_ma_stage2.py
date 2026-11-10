@@ -14,6 +14,15 @@ from env.tasks.multi_agent import stage2_group_layout as group_layout
 class HumanoidMAStage2(HumanoidMACoupledPush):
     _resample_before_references = resample_before_references
 
+    def _box_asset_bank(self):
+        sizes, masses = super()._box_asset_bank()
+        self._intersection_episode = None
+        if getattr(self.cfg['args'], 'enable_size_mode', 'native') == 'per_action_intersection':
+            from utils.stage2_eval_sizes import prepare_intersection_bank
+            self._intersection_episode = prepare_intersection_bank(
+                sizes, masses, self.cfg['env'], self._task_graph_preset)
+        return sizes, masses
+
     def _load_box_asset(self):
         ranges = self.cfg['env']['box']['build']['taskSizeRanges']
         original = ranges['HOLDING_AT']
@@ -63,10 +72,13 @@ class HumanoidMAStage2(HumanoidMACoupledPush):
                                        self.cfg['env']['before']['waiting_penalty'], self.device)
 
     def _sample_episode_graph(self, ids):
-        domain, groups, predecessor, templates = spec.sample_episode(
-            self._box_size[ids, :self.num_agents], self.cfg['env']['box']['build']['taskSizeRanges'],
-            self._relation_graph_spec['template_probabilities'], self._task_graph_preset,
-            self.cfg['env']['stage2']['scene_weights'], num_objects=self.num_objects)
+        if self._intersection_episode is not None:
+            domain, groups, predecessor, templates = [value[ids] for value in self._intersection_episode]
+        else:
+            domain, groups, predecessor, templates = spec.sample_episode(
+                self._box_size[ids, :self.num_agents], self.cfg['env']['box']['build']['taskSizeRanges'],
+                self._relation_graph_spec['template_probabilities'], self._task_graph_preset,
+                self.cfg['env']['stage2']['scene_weights'], num_objects=self.num_objects)
         graph = spec.compose_graph(templates, groups, predecessor, self.num_objects,
                                    self._relation_graph_spec['shuffle_edge_order'])
         mapping, primary, slots = spec.physical_mapping(templates, groups, predecessor, graph)

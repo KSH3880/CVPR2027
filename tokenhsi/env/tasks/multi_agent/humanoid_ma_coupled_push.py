@@ -29,9 +29,12 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def get_relation_suffix_size(self):
         return (6 + (self._coupled_peer_mode != 'all'))*self.num_agents
 
+    def _box_asset_bank(self):
+        return spec.asset_bank(self.num_envs, self.cfg['env'], self.device)
+
     def _load_box_asset(self):
         self._box_spawn_radius = 4.5
-        self._box_size, masses = spec.asset_bank(self.num_envs, self.cfg['env'], self.device)
+        self._box_size, masses = self._box_asset_bank()
         self._box_scale = self._box_size/self._box_size.new_tensor(self._build_base_size)
         self._box_density = (masses/self._box_size.prod(-1)).flatten()
         self._box_assets = []

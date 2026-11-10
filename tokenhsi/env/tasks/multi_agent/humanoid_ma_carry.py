@@ -670,6 +670,11 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
                     if len(owners) > 1
                     else self._agent_color(next(iter(owners))) if owners else unassigned_color
                 )
+                if self._design and owners:
+                    if hasattr(self, '_design_box_colors') and physical_box in self._design_box_colors[env_id]:
+                        color = gymapi.Vec3(*self._design_box_colors[env_id][physical_box])
+                    else:
+                        color = self._viewer_agent_color(env_id, min(owners))
                 self.gym.set_rigid_body_color(
                     env_ptr, box_handle, 0, gymapi.MESH_VISUAL, color
                 )

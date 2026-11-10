@@ -5,8 +5,9 @@ import numpy as np
 import torch
 from utils.evaluation_protocol import HORIZON, TASK_NAMES, spatial_success, predecessors, coupled_current_success, coupled_scores
 from utils.task_role_spec import task_graph_packet
-from utils.evaluation_protocol import shared_center_success, shared_center_scores
-from utils.evaluation_protocol import interaction_group_scores
+from utils.evaluation_protocol import shared_center_success, shared_center_scores, shared_centers_from_tokens
+from utils.evaluation_protocol import ENABLING_SUCCESS, interaction_group_scores
+from utils.evaluation_errors import error_scores, update_error_minima
 
 
 def freeze_fallen(task, newly_fallen):
@@ -49,6 +50,11 @@ def run_formal_eval(player):
         from utils.stage2_spec import evaluation_groups
         groups = evaluation_groups(packet, groups)
     individual_goals = getattr(task, '_individual_push_goals', False)
+    minimum_errors = torch.full((n, m, 2), float('inf'), dtype=torch.float64, device=task.device)
+    has_coupled = bool(((groups[:, :, None] == groups[:, None, :]).sum(-1) > 1).any())
+    center_minimum = torch.full((n, m), float('inf'), dtype=torch.float64, device=task.device) if has_coupled else None
+    error_center_ever = torch.zeros_like(alive) if has_coupled else None
+    error_centers = error_goals = None
     coupled_ever = torch.zeros_like(ever)
     if individual_goals:
         center_goals = task._center_tar_pos.clone()
@@ -83,6 +89,14 @@ def run_formal_eval(player):
             center_current = shared_center_success(centers, center_goals, groups, alive)
             center_ever |= center_current
             centers_trace.append(centers.cpu().numpy().copy())
+        if has_coupled:
+            if individual_goals:
+                error_centers, error_goals = centers, center_goals
+            else:
+                error_centers, error_goals = shared_centers_from_tokens(packet, boxes, goals, groups)
+            error_center_ever |= shared_center_success(error_centers, error_goals, groups, alive)
+        update_error_minima(minimum_errors, packet, roots, boxes, sizes, goals, alive,
+                            center_minimum, error_centers, error_goals, groups)
         simultaneous |= current & current[batch, parent.clamp_min(0)] & dependent[..., None]
         roots_trace.append(roots.cpu().numpy().copy())
         boxes_trace.append(boxes.cpu().numpy().copy())
@@ -116,8 +130,11 @@ def run_formal_eval(player):
                 horizon=horizon, simulated_steps=step, deterministic=True, control_dt=task.dt, scores=scores,
                 falls=int((fall_step >= 0).sum()), fall_rate=float((fall_step >= 0).double().mean()),
                 source_config=args.resolved_env_config)
+    data['errors'] = error_scores(packet, parent, groups, ever, simultaneous, minimum_errors,
+                                 error_center_ever, center_minimum)
     if task.cfg['env'].get('stage2') is not None:
         data['coupled_assignment'] = args.coupled_assignment
+        data['enable_size_mode'] = getattr(args, 'enable_size_mode', 'native')
     if getattr(args, 'teacher_before', ''):
         data['policy'] = 'two_teachers'
         data['teachers'] = json.loads((path/'teachers.json').read_text())
@@ -127,21 +144,25 @@ def run_formal_eval(player):
             coupled_assignment=args.coupled_assignment)
     if individual_goals:
         data['push_goal_mode'] = 'individual'
+        data['enabling_success'] = ENABLING_SUCCESS
         data['coupled_scores'] = coupled_scores(groups, ever, current, coupled_ever, coupled_current)
         data['shared_center_scores'] = shared_center_scores(groups, center_ever, center_current)
         data['interaction_group_scores'] = interaction_group_scores(
-            packet[..., 0].bool(), parent, groups, ever, center_ever)
+            packet[..., 0].bool(), parent, groups, ever, center_ever, simultaneous)
     if peer_mode != 'all':
         data['coupled_peer_selection'] = peer_mode
         data['unselected_coupled'] = 'NONE'
     (path/'result.json').write_text(json.dumps(data, indent=2))
     center_trace = dict(shared_centers=np.stack(centers_trace), shared_center_goals=center_goals.cpu().numpy(),
                         shared_center_ever=center_ever.cpu().numpy(), shared_center_final=center_current.cpu().numpy()) if individual_goals else {}
+    if center_minimum is not None:
+        center_trace['shared_center_minimum_error'] = center_minimum.cpu().numpy()
     np.savez_compressed(path/'trace.pending.npz', roots=np.stack(roots_trace), boxes=np.stack(boxes_trace),
                         valid=np.stack(valid_trace), packet=packet.cpu().numpy(), sizes=sizes.cpu().numpy(),
                         goals=goals.cpu().numpy(), predecessor=parent.cpu().numpy(),groups=groups.cpu().numpy(),
                         fall_step=fall_step.cpu().numpy(), ever=ever.cpu().numpy(),
-                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(), **center_trace)
+                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(),
+                        minimum_errors=minimum_errors.cpu().numpy(), **center_trace)
     (path/'trace.pending.npz').replace(path/'trace.npz')
     print('[formal eval result]', json.dumps(data), flush=True)
     return data

@@ -7,6 +7,7 @@ import torch
 from utils.evaluation_protocol import spatial_success, coupled_current_success, coupled_scores
 from utils.evaluation_protocol import shared_center_success, shared_center_scores, shared_centers_from_tokens
 from utils.evaluation_protocol import interaction_group_scores
+from utils.evaluation_errors import error_scores, update_error_minima
 
 
 def rescore(path):
@@ -27,6 +28,12 @@ def rescore(path):
         previous=torch.ones(n,m,dtype=torch.bool)
         recorded=json.loads((path/'result.json').read_text())
         individual_goals=recorded.get('push_goal_mode')=='individual'
+        groups=torch.from_numpy(data['groups'])
+        has_coupled=bool(((groups[:,:,None]==groups[:,None,:]).sum(-1)>1).any())
+        minimum_errors=torch.full((n,m,2),float('inf'),dtype=torch.float64)
+        center_minimum=torch.full((n,m),float('inf'),dtype=torch.float64) if has_coupled else None
+        error_center_ever=torch.zeros(n,m,dtype=torch.bool) if has_coupled else None
+        error_centers=error_goals=None
         if individual_goals:
             groups=torch.from_numpy(data['groups'])
             group_ever=torch.zeros_like(ever)
@@ -58,6 +65,16 @@ def rescore(path):
                 center_ever |= center_current
                 center_ever32 |= center_current32
                 center_precision_differences += int((center_current32 != center_current).sum())
+            if has_coupled:
+                if individual_goals:
+                    error_centers,error_goals=centers,center_goals
+                else:
+                    error_centers,error_goals=shared_centers_from_tokens(packet,
+                        torch.from_numpy(data['boxes'][frame]),goals,groups)
+                error_center_ever |= shared_center_success(error_centers,error_goals,groups,valid)
+            update_error_minima(minimum_errors,packet,torch.from_numpy(data['roots'][frame]),
+                torch.from_numpy(data['boxes'][frame]),sizes,goals,valid,
+                center_minimum,error_centers,error_goals,groups)
             simultaneous |= current & current[rows,parent.clamp_min(0)] & dependent[...,None]
             previous=valid
         both=ever & ever[rows,parent.clamp_min(0)] & dependent[...,None]
@@ -76,7 +93,9 @@ def rescore(path):
         recorded=json.loads((path/'result.json').read_text())
         if individual_goals:
             assert recorded['coupled_scores']==coupled_scores(groups,ever,current,group_ever,group_current)
-            interactions=interaction_group_scores(packet[...,0].bool(),parent,groups,ever,center_ever)
+            enabling_success=recorded.get('enabling_success','both_ever')
+            interactions=interaction_group_scores(packet[...,0].bool(),parent,groups,ever,center_ever,
+                simultaneous,enabling_success=enabling_success)
             if 'interaction_group_scores' in recorded:
                 assert recorded['interaction_group_scores']==interactions
             center_scores=shared_center_scores(groups,center_ever,center_current)
@@ -108,8 +127,27 @@ def rescore(path):
         if individual_goals and physical_centers:
             result['finite'] &= bool(np.isfinite(data['shared_centers']).all() and np.isfinite(data['shared_center_goals']).all())
         assert result['finite']
+        errors=error_scores(packet,parent,groups,ever,simultaneous,minimum_errors,
+                            error_center_ever,center_minimum)
+        if 'errors' in recorded:
+            for section in ('per_task','coupled_by_size'):
+                for name,row in errors[section].items():
+                    expected=recorded['errors'][section][name]
+                    assert row['successes']==expected['successes']
+                    for metric in ('point_error_cm','region_error_cm'):
+                        assert (row[metric] is None and expected[metric] is None) or (
+                            row[metric] is not None and expected[metric] is not None
+                            and abs(row[metric]-expected[metric])<=1e-6), (section,name,metric)
+            assert recorded['errors']['protocol']==errors['protocol']
+        if 'minimum_errors' in data:
+            assert np.allclose(minimum_errors.numpy(),data['minimum_errors'],rtol=0,atol=1e-8)
+        if 'shared_center_minimum_error' in data:
+            assert np.allclose(center_minimum.numpy(),data['shared_center_minimum_error'],rtol=0,atol=1e-8)
+        result['errors']=errors
+        result['errors_match_recorded']=True if 'errors' in recorded else None
         if individual_goals:
-            result.update(interaction_group_scores=interactions, shared_center_scores=center_scores,
+            result.update(enabling_success=enabling_success,
+                interaction_group_scores=interactions, shared_center_scores=center_scores,
                 shared_center_source='physical_trace' if physical_centers else 'legacy_tokens_mean',
                 shared_center_cpu_gpu_exact=True if physical_centers else None,
                 shared_center_float32_float64_frame_differences=center_precision_differences,

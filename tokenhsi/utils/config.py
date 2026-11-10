@@ -82,6 +82,11 @@ def load_cfg(args):
     with open(args.cfg_train) as stream:
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
+    if getattr(args, 'design', False) and (not is_eval or args.resume or args.eval_protocol):
+        raise ValueError('--design requires test/VNC without resume or formal evaluation')
+    if args.enable_size_mode != 'native' and (name not in STAGE2_NAMES or not is_eval
+            or args.eval_protocol != 'general' or args.resume):
+        raise ValueError('--enable_size_mode requires unified stage2 general evaluation')
     if args.coupled_assignment is None:
         args.coupled_assignment = 'ordered' if name in STAGE2_NAMES and is_eval else 'random'
     teachers = bool(args.teacher_before or args.teacher_coupled)
@@ -383,6 +388,10 @@ def get_args():
          "help": "Coupled viewer-only person-to-region assignment"},
         {"name": "--group_spawn_over4", "action": "store_true", "default": False,
          "help": "Stage2 inference above four people: sequential groups, 5m spacing and no unused distractors"},
+        {"name": "--design", "action": "store_true", "default": False,
+         "help": "Viewer: remove distractor physics, group colors and one shared PUSH goal"},
+        {"name": "--enable_size_mode", "type": str, "choices": ["native", "per_action_intersection"], "default": "native",
+         "help": "General evaluation only: restrict enable shared boxes to per-action size intersections"},
         {"name": "--teacher_before", "type": str, "default": "",
          "help": "Frozen enable teacher checkpoint; requires --teacher_coupled"},
         {"name": "--teacher_coupled", "type": str, "default": "",

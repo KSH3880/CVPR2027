@@ -2,7 +2,279 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-10
+
+### V3 2k ·seed1/6/7 Table1/2 평가 완료
+
+- GPU6/7에서512환경·900step·XY100%의 V3 2k/SCT26k/SCT+FSM Table1/2 총126회(신규67·재사용59)를 모두 완료했다. 최종 실패0·모든 큐 종료, 초기 상태/전체 관측 exact·CPU SR/건수/Error 검증·모델별 그룹 수 일치·seed 평균/표본표준편차 일치·원본/checkpoint SHA 불변을 확인했다. Table2 신규 결과의 CPU Time/접촉 재집계와 FSM replay도 통과했다. 기존 학습은 보존했다.
+- V3 Table1 Independent2/4/8/16H는97.88±0.54/97.59±0.28/95.97±0.07/80.43±0.12%, Mixed는90.27±0.77/86.97±0.87/84.66±0.87/71.62±0.64%다. Table2 Enable 평균 SR77.63±1.05%·성공 Time11.24±0.23s, Coupled 평균 SR91.41±1.09%·20cm 시작/양손6cm 접촉 t_coop40.21±0.93%다. [전체 비교·seed별 결과](output_etc/check/v3_2000_tables12_seeds167_20261110/report.md), [완료 검증](output_etc/check/v3_2000_tables12_seeds167_20261110/completion_verification.json).
+
+### V3 2k ·seed1/6/7 Table1/2 평가 시작
+
+- 사용자 요청으로 GPU6/7에 V3 2k·SCT26k·SCT+FSM의512환경·900step·XY100%·M=2N 평가 큐를 시작했다. Table1 Independent/Mixed2/4/8/16H와 Table2 Enable3종/Coupled2/3/4H의126회 중 기존59회를 재사용하고67회를 추가한다. 기존 seed1/6과 V3의4H Mixed 초기 reference exact 및 대표5개 재사용 경로의 검증을 확인했다. Table2 seed1/6은 GPU별2개 추가 worker로 먼저 실행하며, 완료한 검증은 본 큐가 재사용한다.
+- 실행은 [전용 큐](output_etc/check/v3_2000_tables12_seeds167_20261110/run_suite.py)·추가 Table2 큐와 기존 보조 평가/CPU 검증을 사용한다. 메인 코드·학습·V2 실행기·공통 MD seed는 변경하지 않았다. 재사용 symlink의 검증 파일 경로 오류를 수정하면서 자체 큐 부모만 교체했고 진행 중이던4개 평가 자식은 보존·인계했다. 최초 오류 기록은 `first_attempt_status.json`에 보존했다. 구문·대표 재사용 검증·부분 집계를 확인했으며 전체 성능은 아직 완료 결과가 아니다. [상태](output_etc/check/v3_2000_tables12_seeds167_20261110/status.json), [집계표](output_etc/check/v3_2000_tables12_seeds167_20261110/report.md). 실행 안내는 `eval/README.md`에 기록했다.
+
+### V3 2.5k ·512환경 seed1/6/7/8 평가
+
+- 사용자 요청으로 V3 2.5k를4명 Mixed·8토큰·512환경·900step·XY100%에서 GPU6(seed1/6)·GPU7(seed7/8)로 평가했다. 같은 seed의2k 초기 snapshot을 재사용했고4개 worker·최종 집계 모두 exit0다. 기존 학습·메인 코드·공통 MD seed는 변경하지 않았다.
+- Independent/Enabling/Coupled/Mixed는97.18±0.97/71.09±3.17/91.83±1.00/86.70±1.27%다. 동일4seed의2k 대비 각각-0.21/-1.96/+1.53/-0.22pp이며 Independent는 Mixed 안 solo다. [seed별·2k 비교](output_etc/check/stage2_distill_900_v3_2500_mixed_env512_seeds1678_20261110/report.md).
+- 4회 초기 상태/전체 관측 exact·각901회 물리 분리·attention 유지·CPU SR/건수 exact·Error 일치,2k와 초기 상태 모든 필드/그룹 수 exact·checkpoint/기존 산출물 SHA 불변을 확인했다. [검증](output_etc/check/stage2_distill_900_v3_2500_mixed_env512_seeds1678_20261110/verification.json).
+
+### V3 2k ·512환경 seed9 /2.5k ·64환경 seed0–8 평가
+
+- 사용자 요청으로 같은 V3 run의2k512환경 seed9와 새2.5k(epoch2500/frame327680000·가중치 finite)의64환경 seed0–8을 GPU6/7에서 평가했다.4명 Mixed·8토큰·900step·XY100%를 유지했다.2.5k는1.5k/2k의 seed별 초기 reference를 재사용했고6개 worker와 두 집계 모두 exit0다.11월9일 시작한 산출물 경로를 유지한다.
+- 2k512환경 seed9의 Independent/Enabling/Coupled/Mixed는98.38/70.79/91.10/86.76%다.2.5k64환경9seed는97.73±1.71/74.19±6.87/91.64±4.44/87.85±3.03%이며2k 대비 Mixed +1.61pp다. Independent는 Mixed 안 solo다. [512환경 seed9](output_etc/check/stage2_distill_900_v3_2000_mixed_env512_seed9_20261109/report.md), [2.5k seed별·세 checkpoint 비교](output_etc/check/stage2_distill_900_v3_2500_mixed_env64_seeds0to8_20261109/report.md).
+- 신규10회 초기 상태/전체 관측 exact·각901회 물리 분리·attention 유지·CPU SR/건수 exact·Error 일치,2.5k/2k 초기 상태 모든 필드 exact·그룹 수 커버리지·checkpoint/기존 결과 SHA 불변을 확인했다. 기존 학습·메인 코드·공통 MD seed는 변경하지 않았다. [2.5k 검증](output_etc/check/stage2_distill_900_v3_2500_mixed_env64_seeds0to8_20261109/verification.json), [512환경 검증](output_etc/check/stage2_distill_900_v3_2000_mixed_env512_seed9_20261109/verification.json).
+
+## 2026-11-09
+
+### V3 2k ·512환경 seed7 /64환경 seed9–11 추가 평가
+
+- 사용자 요청으로 같은 V3 2k·4명 Mixed·8토큰·900step·XY100%의512환경 seed7과64환경 seed9/10/11을 GPU6/7에서 병렬 평가했다.4개 worker와 집계 모두 exit0이며 각 초기 상태/전체 관측 exact·901회 물리 분리·attention 유지·CPU SR/건수 exact·Error 일치·그룹 수 커버리지·checkpoint/기존 결과 SHA 불변을 확인했다. 메인 코드·기존 학습·공통 MD seed는 변경하지 않았다.
+- Independent/Enabling/Coupled/Mixed는512환경 seed7에서97.26/72.16/89.81/86.41%,64환경 seed9는98.57/74.42/94.59/89.19%, seed10은98.44/58.82/88.24/81.83%, seed11은98.41/66.67/87.88/84.32%다. Independent는 Mixed 안 solo다. [추가4개·현재512환경 결과](output_etc/check/stage2_distill_900_v3_2000_mixed_env64_seeds91011_20261109/all_results.md), [512환경 검증](output_etc/check/stage2_distill_900_v3_2000_mixed_env512_seed7_20261109/verification.json), [64환경 검증](output_etc/check/stage2_distill_900_v3_2000_mixed_env64_seeds91011_20261109/verification.json).
+
+### V3 2k ·512환경 Mixed seed1/6/8 평가
+
+- 사용자 지정 seed1/6/8로 같은 V3 2k를4명·8토큰·512환경·900step·XY100%에서 평가했다. GPU6(seed1/6)·GPU7(seed8) 세 worker 모두 exit0이며512환경 초기 reference를 새로 생성했다. 기존 학습·64환경 결과와 공통 MD의 seed 기본값은 유지했다.
+- Independent/Enabling/Coupled/Mixed는97.44±0.99/73.35±3.09/90.46±0.32/87.09±0.78%다. Independent는 Mixed 안 solo다. 초기 상태/전체 관측 exact·각901회 물리 분리·attention 유지·CPU SR/건수 exact·Error 일치·그룹 수 커버리지·checkpoint/기존64환경 산출물 SHA 불변을 확인했다. 메인 코드는 변경하지 않았다. [seed별 결과·64환경 비교](output_etc/check/stage2_distill_900_v3_2000_mixed_env512_seeds168_20261109/report.md), [검증](output_etc/check/stage2_distill_900_v3_2000_mixed_env512_seeds168_20261109/verification.json).
+
+### V3 2k ·64환경 Mixed seed0–8 평가
+
+- 사용자 요청으로 같은 V3 run의 `00002000.pth`(epoch2000/frame262144000·가중치 finite)를4명·8토큰·64환경·900step·XY100%에서9seed 평가했다. GPU6/7 각 최대3개 worker를 사용했고6개 worker 모두 exit0다.1.5k의 seed별 초기 reference를 재사용했으며 기존 학습·원본 결과는 보존했다.
+- Independent/Enabling/Coupled/Mixed는97.61±2.42/70.04±9.79/91.05±4.07/86.24±3.46%다.1.5k 대비 평균 차이는-0.32/-0.62/+1.54/+0.20pp이며 Independent는 Mixed 안 solo다.9회 초기 상태/전체 관측 exact·각901회 물리 분리·attention 유지·CPU SR/건수 exact·Error 일치,1.5k와 초기 상태 모든 필드 exact·그룹 수 커버리지·두 checkpoint/기존 산출물 SHA 불변을 확인했다. 메인 코드는 변경하지 않았다. [seed별·checkpoint별 비교](output_etc/check/stage2_distill_900_v3_2000_mixed_env64_seeds0to8_20261109/report.md), [검증](output_etc/check/stage2_distill_900_v3_2000_mixed_env64_seeds0to8_20261109/verification.json).
+
+### V3 1.5k ·64환경 Mixed seed3–8 추가 확인
+
+- 같은 V3 1.5k·4명/8토큰·64환경·900step·XY100%에서 seed3/4/5는 GPU6, seed6/7/8은 GPU7로 추가 평가했다. 여섯 worker exit0, 각 초기 상태/관측 exact·901회 물리 분리·attention 유지·CPU SR/건수 exact·Error 일치를 확인했다. 기존 학습과 seed0/1/2 결과는 보존했다.
+- 추가6seed Independent/Enabling/Coupled/Mixed는98.06±1.39/68.11±8.97/89.40±5.03/85.19±3.95%, 기존0–2를 합친 전체9seed는97.93±1.20/70.66±8.19/89.51±4.42/86.03±3.54%다. Independent는 Mixed 안 solo다. 기존 산출물/checkpoint SHA 불변·기존3seed 집계 exact·그룹 수 커버리지를 확인했다. [seed별·전체 결과](output_etc/check/stage2_distill_900_v3_1500_mixed_env64_seeds345678_20261109/report.md), [검증](output_etc/check/stage2_distill_900_v3_1500_mixed_env64_seeds345678_20261109/verification.json).
+
+### V3 1.5k ·64환경 Mixed seed0/1/2 확인
+
+- 사용자 지정 V3 `00001500.pth`(epoch1500/frame196608000·가중치 finite)을4명·8토큰·64환경·900step·XY100%의 현재 Mixed 프로토콜로 평가했다. GPU6(seed0/1)·GPU7(seed2) 두 worker exit0이며 기존 학습은 유지했다. 전용 V3 학습 YAML과 새64환경 초기 snapshot을 사용했다.
+- Independent/Enabling/Coupled/Mixed Interaction Group 지표는97.67±0.88/75.76±2.88/89.72±3.85/87.72±2.18%다. Independent는 Mixed 안 solo다. 세 실행 초기 상태/전체 관측 exact·각901회 물리/관측 분리·attention 유지·CPU/GPU SR/건수 exact·Error 일치·checkpoint SHA 불변을 확인했다. 메인 평가 코드는 변경하지 않았다. [seed별 SR](output_etc/check/stage2_distill_900_v3_1500_mixed_env64_20261109/report.md), [검증](output_etc/check/stage2_distill_900_v3_1500_mixed_env64_20261109/verification.json).
+
+### Stage2 Distill900 V3 ·enable Total27k
+
+- 사용자 요청으로 V2 환경/학습 YAML을 복사해 `stage2_distill_900_v3`를 추가했다. Enable teacher만 같은 Total run의 `Stage2BeforeTotal_00027000.pth`로 바꾸고 실험·저장 이름을 분리했다. Coupled17k·Stage1 26k 초기화·solo의 enable 담당·900step·나머지 설정은 유지했다.
+- train/test/VNC/eval wrapper, 실험·900step·distillation 검사·공용 eval 등록과 config/USAGE/structure를 갱신했다. V2와의 YAML 차이가 이름·enable 경로뿐임, 두 teacher/전이 파일 존재, 학습/평가 계약·wrapper 동일성·Python/shell 구문·eval CLI 등록·diff 검사를 확인했다. Teacher 가중치 로드·GPU 실행·학습은 하지 않았다. [정적 확인](output_etc/check/stage2_distill_900_v3_config_20261109/verification.json).
+
+### SCT + FSM Table1/2 평가 완료
+
+- GPU6/7에서512환경·900step·임시 seed1/3/6의14설정42회를 모두 완료했다. 42회 초기 상태/관측 exact·원본 Stage1 정책 불변·distractor901회·CPU SR/Error·FSM replay·고정 root 변위0과 Table2 18회 CPU 재집계를 확인했다. 14개 manifest/최종 summary 완료·seed 평균/표본표준편차 exact·두 checkpoint SHA 불변을 확인했고 평가 프로세스는 모두 종료됐다.
+- Table1 Independent2/4/8/16H는90.62±0.68/89.68±1.16/87.40±0.51/70.84±0.68%, Mixed는71.58±0.51/68.15±0.96/64.26±0.66/52.54±0.57%다. Table2 Enabling/Coupled 평균 Group SR은39.37±1.07/75.61±1.23%, 성공 Enabling Time은14.76±0.20s다. t_coop는 미확정이므로20cm 시작·6/8/12cm 접촉 참고값과 원시 궤적으로 보존했다. [최종 결과](output_etc/check/sct_fsm_eval_v2_20261109/report.md), [완료 검증](output_etc/check/sct_fsm_eval_v2_20261109/completion_verification.json).
+
+### SCT + FSM 평가 GPU당3개 병렬 실행
+
+- 추가 병렬화 요청으로 단일 seed worker·seed별 잠금·전체 canonical seed 완료 시에만 설정 완료 집계를 추가했다. 대기 중 Enable CLIMB seed3/6·Coupled4H seed3/6의4개 실행을 추가해 남은 seed를 모두 동시에 처리한다. 기존 자식 rollout은 보존하고 해당 큐 부모만 종료/교체했으며 마지막 Independent2H seed6 큐는 그대로 재개했다. 구문/diff 검사와 기존 완료 rollout의 seed worker 검증을 확인했다. 37/42회 검증 완료 시점에 남은5개 모두 실제 실행 중이며 메모리는 두 GPU 모두 여유가 있었다.
+- 사용자 요청으로 GPU6/7의 평가를 각3개, 총6개 worker로 늘렸다. `--worker a/b` 상태 분리·설정별 실행 잠금·manifest 원자적 저장·집계 잠금을 추가했다. 기존 계산 중인 자식 실행은 종료까지 유지한 뒤 자체 큐 부모만 교체했고 완료된 rollout/검증은 재사용했다. 다른 학습 프로세스는 건드리지 않았다.
+- 구문/diff 검사를 통과했고 6개 worker의 서로 다른 설정 실행과 GPU 메모리 여유를 확인했다. 42회 중9회 검증 완료 시점에 나머지를 재배분했으며 실행/seed/환경 조건은 유지했다. [분배 계획](output_etc/check/sct_fsm_eval_v2_20261109/parallel_plan.json). 실행 명령은 `FSM/README.md`에 갱신했다.
+- 29/42회 검증 완료 후 GPU7 main 큐가 끝난 자리에 `--worker c --jobs coupled_4`를 추가해 대기 중인4H PUSH를 앞당겼다. 기존 worker a의 같은 설정은 파일 잠금과 완료 결과 재사용으로 중복 시뮬레이션을 방지한다. [추가 worker](output_etc/check/sct_fsm_eval_v2_20261109/worker_gpu7_c.json).
+
+### SCT + FSM 누적 도착 해제·Table1/2 평가 연결
+
+- 사용자 확정으로 Coupled를 양손 표면12cm 도착 이력 누적으로 바꿨다. 마지막 도착자는 freeze하지 않고 전원 일회 해제하며, Mixed의 접촉 기준은 각 참여자의 배정 물리 상자를 사용한다. SR 기준은 유지한다. `FSM/` 안에서 기존 샘플러·Stage1 입력·메인 SR/CPU 재채점·Table2 기록을 재사용하는 실행/검증/집계를 추가했다. 프로토콜의 FSM 설명과 실행 안내를 갱신했으며 t_coop 정의 절은 보존했다.
+- 첫 본평가에서 초기 freeze의 indexed setter가 대기 중 전체 reset을 덮어써 비고정 사람이 기본 위치로 돌아가는 문제를 발견했다. 처음 freeze 뒤 전체 root/DOF reset을 재제출하고 첫 물리 프레임 변위 검사도 추가했다. 기존 `sct_fsm_eval_20261109`는 자체 worker만 종료하고 전부 제외 표시했다. 앞선 viewer/소규모 확인도 초기 freeze가 있는 rollout의 성능 근거로 사용하지 않는다. 초기 smoke의 그룹 간격 검사 역시 실제 관계 그룹 기준으로 수정했다.
+- CPU7 passed·구문/diff 통과. 수정 후 GPU6 Mixed2H64환경40step·GPU7 Enable SIT2환경220step/Mixed8H2환경220step에서 초기 장면/관측 exact·첫 프레임 위치 유지·원본 정책/정규화 exact·가중치 불변·coordination0·CPU SR/Error·FSM replay·고정 root 변위0을 확인했다. 이전 잘못된 초기화가 새 검사에서 거부되는 것도 확인했다. Coupled3H의 누적 도착 해제도 짧은 실행에서 확인했다. [검증](output_etc/check/fsm_reset_smoke_20261109/verification.json).
+- GPU6/7에서512환경·900step·임시 seed1/3/6의 Table1 Independent/Mixed2/4/8/16H와 Table2 Enable3종/Coupled2/3/4H, 총42회 큐를 새 폴더에서 다시 시작했다. 아직 본평가 완료 결과는 아니다. 매 실행은 초기 상태·관측/물리 분리·원본 정책·CPU SR/Error/FSM을 검증하고 접촉 원시 궤적을 보존한다. [실행 상태](output_etc/check/sct_fsm_eval_v2_20261109/worker_gpu6.json), [GPU7](output_etc/check/sct_fsm_eval_v2_20261109/worker_gpu7.json).
+- 첫 Mixed2H/Coupled2H seed1의512환경900step은 초기 상태 exact·첫 프레임 위치 유지·distractor901회·CPU SR/Error/FSM·고정 root 변위0 검증을 완료했고 각 worker는 seed3을 실행 중이다. CPU 검증은 압축 FSM trace를 한 번 읽도록 바꾸고 자체 worker만 재시작했다. 완료 rollout은 보존·재사용하고 중단한 seed3 준비 산출물은 `interrupted_before_verifier_reload/`에 보관했다. 전체 완료 시 `report.md`/`summary.json`을 자동 생성한다.
+
+### Freeze 충돌 확인 viewer
+
+- `FSM/`에 `--collision-probe`를 추가했다. 같은 초기 자세·PD 목표에서 freeze 충돌/해제 충돌/해제 비충돌을 비교하며 기존 FSM·SR 경로는 유지한다. 실행 명령은 `FSM/README.md`에 기록했다.
+- GPU6/7 headless·실제 viewer에서 사람 고정 오차0과 공중 충돌 시 상자 X 속도2.998→1.717m/s를 확인했다. 정상 FSM30step의 원본 정책/정규화 exact·가중치 불변·coordination0, CPU6 passed·구문/shell 검사를 통과했다. 접촉력 최댓값에는 바닥 접촉도 포함되며 진짜 kinematic actor는 아니다. [비교·화면](output_etc/check/fsm_collision_20261109/report.md), [검증](output_etc/check/fsm_collision_20261109/verification.json).
+
+### SCT + FSM state freeze viewer
+
+- 사용자 승인으로 `FSM/`에 원본 SCT26k + Enable 후행 대기/선행 AT 성공 시 일회 해제·Coupled 양손 표면12cm 도착자 대기/전원 같은 프레임 접촉 시 일괄 일회 해제를 구현했다. 대기자는 파란색이며 root/DOF·속도·관측 자세를 물리 서브스텝마다 고정한다. 진짜 kinematic actor 전환은 아니고 충돌체·반력은 유지하며 상자 상태는 덮어쓰지 않는다. 코드/실행 명령은 `FSM/README.md`에 두고 메인 학습·eval 코드는 변경하지 않았다.
+- CPU6 passed·구문/shell/diff 검사를 통과했다. GPU6/7에서 Enable3종·Coupled2/3/4명 각2환경·900step과 SIT/C2의2 episode 재초기화, 실제 Enable/C2 VNC900step·마지막 코드C2 220step을 확인했다. 11개 episode의 CPU SR exact/Error 일치·root/DOF 고정 오차0·원본165개 SCT 가중치/정규화/행동 exact·coordination0·checkpoint SHA 불변을 확인했다. 추가 상태 trace가 있는6개 episode는 CPU FSM replay·공통 trace의 정지 구간 root 변위0도 확인했다. 두 GPU worker·두 VNC·최종 확인·CPU 검증 exit0이며 확인 프로세스는 종료됐다.
+- 일부 Coupled 장면에서는 상자가 먼저 움직여 기다리던 손에서 멀어진 뒤 전원 동시 접촉을 만족하지 못해 계속 대기했다. 합의한 barrier는 완화하지 않고 이 한계를 안내했다. config/structure/프로토콜에 FSM 경로·규칙을 반영했으며 t_coop3.4절은 보존했다. [검증](output_etc/check/fsm_checks_20261109/verification.json), [Enable 해제 화면](output_etc/check/fsm_checks_20261109/gui_enable_sit/episode_000/0182_transition.png), [Coupled 해제 화면](output_etc/check/fsm_checks_20261109/gui_coupled_2/episode_000/0156_transition.png).
+
+### 평가 프로토콜 문서와 현재 SR 평가 동기화
+
+- 사용자 요청으로 `cvpr2027_evaluation_protocol.md`에 공통 SR/Region Error의XY100%·모든 인원수의 순차 Mixed 샘플러·Stage1 가상 받침/개인 PUSH 입력·원본 정책 고정·distractor attention 유지를 반영했다. 일반 메인 eval의XY80% 기본값과 보조 경로의 차이, 기존80% Error와의 구분도 명시했다. seed는 확정하지 않았다.
+- 문서만 수정했다. t_coop3.4절 원문 완전 보존·SR/Error 수식 일관성·Mixed 미정 항목 제거·참조 스크립트 경로·diff 검사를 확인했으며 시뮬레이션은 실행하지 않았다. [검증](output_etc/check/protocol_md_sync_20261109/verification.json).
+
+### t_coop 속도 시작의 손 접근 조건 제거 비교
+
+- `eval/rescore_table2_speed.py`에 `--no-start-hand`를 추가해 시작을 상자 XY 속도·연속 유지 시간만으로 정할 수 있게 했다. 공동 접촉의 전원 양손12cm·낙상 제외는 유지하며 기존 손 접근 옵션/기본 프로토콜은 보존했다.
+- CPU25 passed·구문/diff 검사 통과. 두 모델·2/3/4명·seed1/3/6 저장 궤적18개에서0.2~1.0m/s(0.1간격)·1초 유지9조합을 CPU 재집계했다. 최초 성공/기존12cm 접촉 프레임 수 exact·원본 hash 불변·trial별 비율 검증과 손12cm 대비 시작 집합 확대/시작 시점 비지연을 확인했다. 82,944개 trial×속도 쌍 중 시작 변경181개·추가 시작78개로 평균 접촉 비율 차이는 작았다. [비교표](output_etc/check/table2_speed_02_10_1s_nohand_20261109/comparison.md), [검증](output_etc/check/table2_speed_02_10_1s_nohand_20261109/verification.json).
+
+### t_coop 속도·지속 시간9조합 재집계
+
+- `eval/rescore_table2_speed.py`로 XY 속도0.05/0.1/0.2m/s × 지속0.1/0.3/0.5초의 CPU 비교를 추가했다. 속도는 프레임 간 실제 상자 중심 XY 변위/control dt이며 초기 프레임은 초기 중심을 사용한다. 연속 구간 내 매 프레임 유효 참여자의 한 손 이상이 표면16cm 미만이어야 하고, 최초 성공 전까지 확인된 첫 연속 구간의 첫 프레임으로 시작을 소급한다. 변위 조건을 대체하며 접촉은 전원 양손12cm·실패 포함·미시작0%다. 기본 프로토콜은 유지했다.
+- CPU21 passed·구문/diff 검사 통과. 저장 궤적18개·각9조합을 GPU 없이 완료했고 최초 성공 프레임/기존12cm 접촉 프레임 수 exact·원본 결과 hash 불변·저장 trial별 분모/분자 재산출 일치를 확인했다. 0.1m/s·0.3초의 Stage1/Stage2 평균은28.84±0.83/43.39±0.25%, 0.2m/s·0.5초는34.64±0.75/50.79±0.26%다. 인원/seed별 결과와 시작률·프레임 수를 보존했다. [비교표](output_etc/check/table2_speed_start_20261109/report.md), [검증](output_etc/check/table2_speed_start_20261109/verification.json).
+
+### t_coop 손 접근 시작 조건 비교
+
+- `eval/rescore_table2.py`에 선택적 `--start-hand-distance-cm`을 추가했다. 시작 변위와 같은 프레임에 유효 참여자의 한 손 이상이 실제 상자 표면 문턱 미만이어야 시작하며 시작 상태는 유지한다. 기본값/공통 프로토콜은 변경하지 않았다.
+- CPU16 passed·기존20cm GPU 기록 프레임 수 exact 재현 후 저장 궤적18개를 시작20cm+손16cm·전원 양손 접촉6/8/12cm로 CPU 재집계했다. 최초 성공 프레임 exact·SR/완료 시간 불변·원본 결과 hash 불변을 확인했다. 접촉12cm 평균은 Stage1 33.97±1.01%, Stage2 50.77±0.13%로 손 접근 시작 조건 추가 영향은 매우 작았다. [비교·seed별 결과](output_etc/check/table2_handstart16_20261109/report.md).
+
+### t_coop 시작 변위40cm 재집계
+
+- 사용자 요청으로 `eval/rescore_table2.py`에 `--start-displacement-cm`을 추가했다. 기본20cm·메인 프로토콜은 유지하며 시작 변위 변경 시 최초 성공 프레임/SR을 검증하고 측정 구간만 재계산한다.
+- CPU13 passed·기존20cm 프레임 수 exact 재현 후 저장 궤적18개(Stage1/Stage2·2/3/4명·seed1/3/6)를40cm 시작·접촉6/8/12cm로 재집계했다. GPU 재실행 없이 SR/완료 시간 불변·원본 결과 hash 불변을 확인했다. 인원별 동일 가중 평균은 Stage1 29.51/35.22/40.41%, Stage2 46.28/54.55/60.41%다. [비교표·seed별 결과](output_etc/check/table2_start40_20261109/report.md).
+
+### Table 2 전용 평가 구현·36회 완료
+
+- 사용자 승인으로 `eval/`에 단일 Enable 쌍3종·공동 PUSH2/3/4명 전용 실행·3명 환경 검사·초기 상자 대표 쓰기·Stage1 native 정책 검증을 추가했다. 메인 formal eval의 장면 상태·낙상·SR을 재사용하며 학습 코드는 변경하지 않았다.
+- Enabling Time은 최초 동시 성공·성공 trial만 평균한다. Coupled t_coop는 초기 수평 변위20cm부터 최초 성공(실패는 종료)까지 전원 양손의 실제 공유 상자 표면3D 거리6cm 미만·힘 조건 없음·30Hz·양끝 포함이다. 원시 손/상자 좌표를 끝까지 저장하고8/12cm 재집계·실제 압축 용량/시간·CPU/GPU exact 검증을 추가했다. Table 2 Error 열은 제외하고 메인 Error는 유지했다.
+- CPU68 passed·구문 검사 통과. GPU6의 Stage1 3명 PUSH와 GPU7 Enable3종을 각16환경·900step 검증한 뒤512환경×임시 seed1/3/6·두 모델36회를 GPU6/7에서 완료했다. 모든 실행의 초기 상태/관측 exact·각901회 물리/관측 분리·SR/Error·Table2 프레임 수 CPU/GPU exact, Stage1 원본 행동/정규화 exact·coordination0, 모델 간18개 초기 장면 묶음 exact와 checkpoint SHA 불변을 확인했다. 원시 손 좌표 finite·최초 성공 cutoff·문턱별 포함 관계, 공동 배치4,608장면/13,824명의 거리·rear·ordered·크기 확장도 확인했다. 두 worker·최종 집계 exit0다.
+- Stage1/Stage2 Enabling Avg.는25.98±0.90/70.51±1.05%, Time은12.27±0.28/11.03±0.16s다. Coupled Avg.는73.81±0.94/91.12±0.82%, t_coop6cm는24.61±0.96/38.79±0.11%다. 추가 원시 기록은 총673.42MiB·저장 평균1.29초/실행이며6/8/12cm·seed별 값을 보존했다. 프로토콜/실행 안내/structure를 갱신했고 seed는 공통 MD에 고정하지 않았다. [Table 2 결과](output_etc/check/table2_20261109/report.md), [검증](output_etc/check/table2_20261109/verification.json), [공동 배치 검사](output_etc/check/table2_20261109/coupled_geometry_verification.json).
+
+### Enable 숫자 제거 ·역할별 채도
+
+- 사용자 요청으로 `DESIGN=1`의 숫자 표시 코드·호출을 제거했다. Enable은 같은 색상에서 선행을 밝고 낮은 채도, 후행을 높은 채도·조금 어두운 톤으로 구분한다. 개별 작업 상자·목표는 담당자 톤, 공유 상자는 두 역할의 중간 톤을 사용한다. Coupled·단독·기본 화면과 과제별 목표 표시는 유지한다.
+- config/USAGE/structure에서 번호 안내를 역할별 톤으로 바꿨다. CPU58 passed·구문/diff 검사를 통과했고 GPU2의4명/16명·각2환경·6 preset에서 각12회 reset/48step의 초기 관측/정책 목표 exact·물리 분리·실제 색 지정·가중치 불변을 확인했다. 두 실행 exit0이며 실제 화면에서 숫자 제거·역할별 톤을 확인했다. [검증](output_etc/check/design_saturation_20261109/verification.json), [4명 화면](output_etc/check/design_saturation_20261109/gui4/before.png), [16명 화면](output_etc/check/design_saturation_20261109/gui16/before.png).
+
+### DESIGN 과제별 목표 ·Enable 번호 표시
+
+- `DESIGN=1`의 목표 구·공중 십자를 숨기고 PUSH AT 링/세로선, CARRY AT 바닥 사각 테두리, ON_TOP 윗면 모서리/아래 화살표, SIT 윗면 테두리/옅은 선 채움, CLIMB 윗면 테두리/위 화살표로 바꿨다. 공동 PUSH 공유 중심·정책 개인 목표·그룹 색·distractor 분리는 유지한다.
+- Enable 사람·작업 상자에 선행1/후행2, 공유 상자에1·2를 표시한다. 카메라 방향·화면 높이 약28px·흰색/어두운 외곽선·겹침 완화를 적용하고 상자 번호는 목표 화살표 위로 띄웠다. 연결선/원형 배지는 추가하지 않았으며 config/USAGE/structure를 갱신했다.
+- CPU59 passed·구문/diff 검사 통과. GPU7의4명/16명·각2환경에서6 preset·각12회 reset/48step의 관측/정책 목표 exact·물리 분리·색·가중치 불변을 확인하고 화면을 검사했다. SIT/CLIMB/ON_TOP 확대 검사와8명·12토큰 VNC/기본 옵션 off의 각2장면×4step도 exit0다. [검증](output_etc/check/design_markers_20261109/verification.json), [16명 실제 화면](output_etc/check/design_markers_20261109/gui16_final/before.png).
+
+### Stage1 26k ·Full V2 2k 인원수별 비교 완료
+
+- 임시 seed1/3/6·512환경·900step·XY100%로 Stage1의2/4/8/16H Independent/Mixed24회와 distractor attention 보존 Full8/16H12회를 GPU6/7에서 완료했다. Full2/4H12개 결과는 재사용했다. Stage1 Independent는91.02±0.49/89.01±1.19/87.65±0.89/71.13±0.68%, Mixed는64.33±1.05/62.42±1.64/57.83±0.88/47.04±0.39%다.
+- 재평가한 Full8/16H Independent는95.57±0.19/80.96±0.20%, Mixed는84.03±0.41/71.02±0.33%다. 이전 distractor attention 제외 결과는 보존하고 새 결과로 구분했다. [모델별·seed별 SR과 그룹 수](output_etc/check/stage1_26k_protocol_20261108/report.md).
+- 신규36회 초기 물리/관측 exact·각901회 distractor 물리 분리·CPU/GPU SR/건수 exact·Error 일치, Stage1 원본 행동 exact·165개 가중치/정규화 불변·coordination 호출0, checkpoint SHA 불변과 그룹 수 커버리지를 확인했다. 두 최종 worker·최종 비교 집계 exit0이다. 실패한 초기 기준/이름 충돌·조기 집계 로그는 최종 결과에서 제외하고 검증 파일에 명시했다. [검증](output_etc/check/stage1_26k_protocol_20261108/verification.json).
+
+## 2026-11-08
+
+### Viewer DESIGN=1
+
+- 일반 test/VNC에 `DESIGN=1`(직접 실행 `--design`)을 추가했다. Distractor는 초기 관측을 보존하며 화면·충돌 영역 밖으로 옮기고, 공동 PUSH 목표는 정책의 개인 목표를 유지한 채 공유 중심 하나만 표시한다. Enable·Coupled의 사람·작업 상자·목표는 그룹 색으로 통일하고 기존4색 이후에는 중복 없는 색을 추가한다. 기본 실행·장면 샘플링·정식 평가 기준은 유지한다.
+- 작업 물체·받침·alias 보존, 반복/부분 reset과 카메라 제외를 연결하고 config/USAGE/structure에 옵션·명령을 기록했다. 학습/resume·formal eval에는 허용하지 않는다.
+- CPU54 passed. GPU6의4명/8명·각2환경에서6개 preset·각12회 reset/48step을 실행해 초기 전체 관측·정책 목표 exact 보존, 물리 분리·색 지정·공유 마커·가중치 불변을 확인했다. 실제 화면을 확인했고 일반 test wrapper의 옵션 on/off도 각2장면×4step exit0다. [검증](output_etc/check/design_20261108/verification.json), [4명 혼합 화면](output_etc/check/design_20261108/gui4_verified/mixed.png), [8명 색 확장](output_etc/check/design_20261108/gui8_verified/all_solo.png).
+
+### Stage1 26k 비교 경로 ·distractor attention 수정
+
+- 사용자 요청으로 Stage1 26k를 같은 초기 물리 장면·채점에서 평가하는 보조 진입점을 추가했다. Enable은 목표 정렬 가상 받침, Coupled는 개인 PUSH 구역 입력을 사용한다. 첫 행동 전에 원본165개 가중치·정규화를 복원하고 Stage2 coordination을 우회하며 native Stage1 행동 exact·가중치 불변·coordination 호출0을 검사한다. 초기 장면 생성에만 Full checkpoint를 사용한다.
+- 기존5명 이상 Full 플레이어가 task-slot mask로 distractor attention을 제외하던 부분을 발견했다. 보조 평가에서 마스크를 해제하고 매 encoder 호출을 검사한다. 이전8·16H 결과는 보존하고 재평가한다. 뷰어 코드의 지역 import와 평가 관측 훅의 이름 충돌은 훅 이름만 분리해 수정했다.
+- CPU62 passed·구문 검사를 통과했다. Stage1 2H Independent의 임시 seed1/3/6은 초기 물리/관측 exact·native 정책 exact·900step·CPU SR/Error 검증을 완료했고, 나머지 평가는11월9일 완료했다. 메인 학습·프로토콜 MD·기본 seed/XY 판정은 변경하지 않았다.
+
+### V2 2.5k ·seed0/1/2 평가와 1.5k·2k 비교
+
+- 사용자 요청으로 V2 `00002500.pth`(epoch2500/frame327680000·finite·SHA256 확인)를4H Mixed·8토큰·512환경·900step에서 GPU6(seed0)·GPU7(seed1/2)로 평가했다. 세 실행과 CPU 재채점은 exit0, 각901회 물리/관측 분리·SR/건수 exact·Error 일치와 세 checkpoint의 seed별 초기 상태 전체 필드 exact를 확인했다. 1.5k·2k는 재실행하지 않았고 원본 결과/summary hash를 보존했다.
+- 기존 XY80%의 Independent/Enabling/Coupled/Mixed는2.5k에서96.99±0.46/64.46±0.74/91.63±0.37/84.36±0.48%다. 동일 궤적의 XY100%는97.53±0.37/66.77±0.46/91.63±0.37/85.31±0.35%이며 Mixed1.5k/2k/2.5k는85.63±1.18/85.52±0.57/85.31±0.35%다. XY100%의1.5k만 저장 궤적으로 추가 계산하고2k는 기존 캐시를 재사용했다. Error는 원래 XY80% 값을 유지했다. [세 checkpoint·seed별 비교](output_etc/check/stage2_distill_900_v2_2500_new_protocol_env512_20261108/checkpoint_comparison.md), [검증](output_etc/check/stage2_distill_900_v2_2500_new_protocol_env512_20261108/verification.json).
+- 일반 VNC는 학습 샘플러·보상 기반 진단을 사용하며 논문 샘플링/물리 제거·formal SR/낙상 처리와 다름을 README/config에 명시했다. 실제 viewer는 실행하지 않았다. XY 비교 보조 보고서의 고정2k 문구만 checkpoint 공통 표현으로 바꿨으며 메인/학습/기본 seed·프로토콜 MD는 변경하지 않았다.
+
+### V2 2k ·Independent/Mixed 2·4·8·16H 평가
+
+- 임시 seed1/3/6·XY100%·512환경·900step의 Independent 전용/Mixed 분리 평가21회를 GPU6/7에서 완료하고 기존4H Mixed SR을 재사용했다. Independent2/4/8/16H는97.30±0.44/97.43±0.20/95.35±0.21/79.49±0.19%, Mixed는88.40±0.77/86.25±0.28/82.85±0.31/71.16±0.62%다. [관계별·seed별 결과와 그룹 수](output_etc/check/stage2_scalability_20261108/report.md).
+- 보조 경로에2H 검사·균등 단독 행동·5명 이상 그룹별2k 잔여 토큰 distractor 배분/관측 보존을 추가했다. 16H 초기 장면 불일치는 같은 공동 상자에 참가자별 초기 상태를 중복 대입하던 GPU 쓰기에서 발생해, 5명 이상 초기 상자 쓰기를 그룹 대표로 제한했다. 최종 coupled 거리·크기·ordered 함수와 native 모션 추출은 유지했다. XY100%는 채점/Error에만 적용하며 프로토콜 MD·기본 seed·메인 채점80%·학습 설정은 변경하지 않았다.
+- CPU42 passed·그룹 예산12개 구성·XY100% 경계/Error/보상 기하 불변을 확인했다. 본평가21회 모두 초기 작업 상태/전체 관측 exact·각901회 물리 분리·CPU/GPU SR/건수 exact·Error 일치를 검증했다. Coupled18,299명 초기 배치의 거리·rear/+Y 목표·ordered·native profile·최대4명도 확인했고 checkpoint/재사용 원본은 불변이다. 두 worker와 집계 exit0, 실패한 초기화 진단은 별도 보존했다. [검증](output_etc/check/stage2_scalability_20261108/verification.json).
+
+### V2 2k ·XY100% 전체 seed0–8 정리
+
+- 사용자 요청으로 기존 seed2/6/7/8 XY100% 결과를 재사용하고 미계산 seed0/1/3/4/5만 저장 궤적으로 CPU 재채점했다. 기존80% SR·최종 성공 flag exact 및100% 성공 포함 관계를 확인했고, 캐시 중복6/8·기존80% 전체9seed 집계·Point 불변·원본 파일 hash 불변을 검증했다. 보조 보고서의 seed 개수 표시만 실제 개수로 맞췄으며 GPU·시뮬레이션·메인 기준/프로토콜/Error 변경은 없었다.
+- XY100% 전체9seed Independent/Enabling/Coupled/Mixed는97.51±0.42/69.00±1.15/91.13±1.01/85.88±0.53%다. XY80% 대비 Mixed +0.87pp다. [seed별 표·80% 비교](output_etc/check/stage2_v2_2000_xy100_allseeds_20261108/report.md), [검증](output_etc/check/stage2_v2_2000_xy100_allseeds_20261108/verification.json).
+
+### V2 2k seed2/6/8 ·XY80%·100% 재집계
+
+- 사용자 요청으로 저장된 V2 2k·512환경·900step 궤적의 seed2/6/8을 CPU 재집계했다. 기존80% SR·ever/simultaneous exact,100% 성공 포함 관계·Point 불변·기존6/8 비교값 exact·원본 결과 hash 불변을 확인했다. GPU·시뮬레이션·메인 코드/기준 변경은 없었다.
+- Region Independent/Enabling/Coupled/Mixed는80%에서97.20±0.24/67.99±1.57/90.19±1.22/85.13±0.59%,100%에서97.56±0.26/69.47±1.67/90.19±1.22/85.74±0.73%다. [비교표](output_etc/check/stage2_v2_2000_xy100_seeds268_20261108/report.md), [검증](output_etc/check/stage2_v2_2000_xy100_seeds268_20261108/verification.json).
+
+### V2 2k seed6/7/8 ·XY80%·100% 성공률 비교
+
+- 사용자 질문에 따라 같은 V2 2k·512환경×seed6/7/8·900step 저장 궤적을 CPU 재채점했다. SIT/CLIMB/ON_TOP의 XY만 축별±0.4L→±0.5L로 넓히고 높이±20cm·AT/PUSH·낙상·Enable 동시 성공은 유지했다. `eval/compare_region_extent.py`에서 기존80% SR·최종 ever/simultaneous exact, Point 불변·성공 포함 관계·원본 결과 불변을 확인했다. GPU·시뮬레이션은 실행하지 않았고 메인 eval·프로토콜·Error 기준은80%로 보존했다.
+- Region Independent/Enabling/Coupled/Mixed는80%의97.51±0.67/67.95±1.61/90.90±0.98/85.45±0.19%에서100%의97.93±0.46/69.91±1.27/90.90±0.98/86.25±0.16%로 변했다. Mixed +0.79pp이며 동일 정책의 판정 범위 변경 결과다. 보조 코드 안내·structure를 갱신했다. [비교표](output_etc/check/stage2_v2_2000_xy100_seeds678_20261108/report.md).
+
+### Distill900 V2 2k ·seed3–8 GPU6/7 추가 평가
+
+- 사용자 지정대로 같은 V2 2k·4명/8토큰·512환경·900step·ordered·새 프로토콜의 seed3/4/5는 GPU6, seed6/7/8은 GPU7에서 평가했다. 이전1.5k seed별 기준 snapshot을 재사용했고 GPU7도 초기 전체 상태·관측 exact를 확인했다. 6개 실행과 CPU 재채점 모두 exit0, 매 실행901회 물리/관측 분리·SR/건수 exact·Error 허용오차 이내 일치를 확인했다. 코드·기존 학습·원본 결과는 변경하지 않았다.
+- Region Independent/Enabling/Coupled/Mixed는 seed3/4/5에서97.06±0.46/66.09±0.58/91.78±0.64/84.98±0.54%, seed6/7/8에서97.51±0.67/67.95±1.61/90.90±0.98/85.45±0.19%다. 기존2k seed0/1/2를 합친 전체9seed는97.17±0.51/66.73±1.31/91.13±1.01/85.01±0.47%이며 1.5k 전체9seed 대비+0.52/+3.10/-1.37/+0.75pp다. Independent는 Mixed 내 solo다.
+- [전체9seed SR·1.5k 비교·Error](output_etc/check/stage2_distill_900_v2_2000_new_protocol_seeds678_20261108/combined_report.md), [GPU6 seed3–5](output_etc/check/stage2_distill_900_v2_2000_new_protocol_seeds345_20261108/report.md), [GPU7 seed6–8](output_etc/check/stage2_distill_900_v2_2000_new_protocol_seeds678_20261108/report.md).
+
+### Distill900 V2 2k ·seed0/1/2 새 프로토콜 평가
+
+- 사용자 요청으로 같은 run의 `Stage2Distill900V2_00002000.pth`(epoch2000/frame262144000·finite·SHA256 확인)를 GPU6·4명/8토큰·512환경×seed0/1/2·900step·ordered·새 프로토콜로 평가했다. 기존0/1/2 기준 snapshot을 재사용했으며 V2 1.5k와 초기 전체 상태 필드·관측 exact를 확인했다. 매 실행901회 물리/관측 분리와 CPU/GPU SR·건수 exact·Error 허용오차 이내 일치, 실행·재채점 exit0를 확인했다. 코드·기존 결과·학습 프로세스는 보존했다.
+- Region Independent/Enabling/Coupled/Mixed는 96.93±0.33/66.14±0.73/90.71±1.30/84.60±0.12%다. 동일 seed의 V2 1.5k 대비 각각 +0.42/+0.43/-1.95/-0.37pp다. Independent는 Mixed 내 solo다. [seed별 SR·Error·1.5k 비교](output_etc/check/stage2_distill_900_v2_2000_new_protocol_env512_20261108/report.md), [검증](output_etc/check/stage2_distill_900_v2_2000_new_protocol_env512_20261108/verification.json), [초기 상태 비교](output_etc/check/stage2_distill_900_v2_2000_new_protocol_env512_20261108/initial_comparison.json).
+
+### Distill900 V2 1.5k ·추가 seed6/7/8
+
+- 사용자 요청으로 같은 V2 1.5k·GPU6·4명/8토큰·512환경·900step·ordered·새 프로토콜을 seed6/7/8에 추가 평가했다. 각 seed의 초기-only 기준 snapshot과 실제 평가의 과제/작업 상태/전체 관측 exact, 매 실행901회 관측/물리 분리, CPU/GPU SR·건수 exact·Error 허용오차 이내 일치를 확인했다. 세 실행·재채점 exit0이며 checkpoint·실행 소스 hash는 이전 평가와 같다. 코드·기존 결과·학습 프로세스는 변경하지 않았다.
+- Region Independent/Enabling/Coupled/Mixed는 96.55±0.58/62.15±1.27/92.89±1.15/83.86±0.48%다. 기존0–5 Mixed84.46±1.07% 대비 -0.60pp이고 전체0–8은 84.26±0.93%다. Independent는 Mixed 내 solo이며 최종 논문 seed 선택은 별도다. [seed별 SR·Error·9seed 집계](output_etc/check/stage2_distill_900_v2_1500_new_protocol_seeds678_20261108/report.md), [검증](output_etc/check/stage2_distill_900_v2_1500_new_protocol_seeds678_20261108/verification.json).
+
+### Distill900 V2 1.5k ·추가 seed3/4/5
+
+- 사용자 요청으로 같은 V2 1.5k·GPU6·4명/8토큰·512환경·900step·ordered·새 프로토콜을 seed3/4/5에 추가 평가했다. 각 seed의 초기-only 기준 snapshot을 먼저 생성하고 공통 교집합·near50 해제·균등 sampler·distractor 관측 유지/물리 제거·동시 성공 SR·두 Error를 유지했다. 세 실행과 재채점은 exit0, 초기 과제/작업 물체/관측 exact·매 실행901회 물리 분리·CPU/GPU SR/건수 exact·Error 허용오차 이내 일치를 확인했다.
+- Region Independent/Enabling/Coupled/Mixed는 96.89±0.43/63.03±0.30/91.95±1.94/83.96±0.58%다. 기존0/1/2의 Mixed84.96±1.32% 대비 -1.00pp이며 0–5 전체는 84.46±1.07%다. 기존 결과와 학습 프로세스는 보존했고 최종 논문 seed 선택은 확정하지 않았다. [seed별 SR·Error·6seed 집계](output_etc/check/stage2_distill_900_v2_1500_new_protocol_seeds345_20261108/report.md), [검증](output_etc/check/stage2_distill_900_v2_1500_new_protocol_seeds345_20261108/verification.json).
+- Formal eval의0/1/2 제한을 비음수 seed로 완화하고 과제 macro도 실제 실행 seed로 계산한다. 보조 진입점은 기준 snapshot 생성·경로 지정과 seed별 보고를 지원한다. 물리 hook은 검증된 기존 구현에서 reference 경로만 분리해 `eval/stage2_distractor_physics.py`에 뒀다. CPU37 passed, hook의 경로 외 동일성과 실행 소스 hash를 확인하고 config/평가 규약/structure/eval 안내를 갱신했다.
+
+### Distill900 V2 1.5k 새 프로토콜 평가
+
+- Enable Total19.5k·Coupled17k teacher의 V2 student `Stage2Distill900V2_08-19-13-51/nn/Stage2Distill900V2_00001500.pth`(epoch1500/frame196608000·finite·SHA256 확인)를 GPU6·4명·8토큰·512환경×seed0/1/2·900step·ordered로 평가했다. 공통 교집합·near50 해제·균등 순차 I/E/C/행동·distractor 관측 유지/물리 제거와 동시 성공 SR·공통 Error를 적용했다.
+- 이전 V1 평가와 세 seed 초기 상태 전체 필드·관측 exact, 매 실행901회 관측/물리 분리, CPU/GPU SR·건수 exact·Error 허용오차 이내 일치를 확인했다. 3개 실행·재채점은 정상 완료했고 기존 학습·원본 결과는 보존했다. Region Independent/Enabling/Coupled/Mixed는 96.52±0.61/65.71±3.08/92.66±2.10/84.96±1.32%다. Independent는 Mixed 내 solo이며 이전 동시 기준 Mixed84.89±1.19% 대비 +0.07pp다.
+- 사용자 지정 `eval/`에 기존 검증 sampler/hook·초기 snapshot을 재사용하는 실행 진입점과 검증/요약 보조 코드를 두고 README·structure를 갱신했다. 메인 환경·학습 코드는 변경하지 않았다. [seed별 SR·Error·V1 비교](output_etc/check/stage2_distill_900_v2_1500_new_protocol_env512_20261108/report.md), [재채점 검증](output_etc/check/stage2_distill_900_v2_1500_new_protocol_env512_20261108/verification.json), [초기 상태 비교](output_etc/check/stage2_distill_900_v2_1500_new_protocol_env512_20261108/initial_comparison.json).
+
+### 공통 Point/Region Error ·Table 2 지표 정의
+
+- 사용자 요청으로 메인 eval·seed 요약·CPU 재채점에 Region 성공 trial의 Point/Region 최소 3D 거리(cm)를 추가했다. Enable은 동시 성공한 쌍의 선행·후행만, Coupled는 성공한 실제 공유 상자를 그룹당 한 번 집계한다. 목표 기하는 기존 SR과 공유하며 Region Error는 높이 허용오차 없는 목표 평면까지 잰다. 행동별·공동 인원별 평균/성공 표본 수와 seed 통계, N/A·유효 frame 규칙을 기록한다.
+- `errors.protocol=region_success_min_distance_v1`과 manifest를 연결하고 과거 Error 없는 결과의 새 평가 재사용·혼합 요약을 막았다. 논문 프로토콜·평가 규약·config/structure·eval 안내에 반영했다. Time은 성공 trial 최초 동시 완료, t_coop는 실패 포함 밀기 구간의 전원 양손 접촉 비율로 문서화했으며 두 지표의 코드는 추후 `eval/` Table 2용으로 남겼다.
+- CPU32 passed. GPU6·16환경·900step 메인 eval의 SR/건수 exact·Error CPU/GPU 0.000001cm 이내·저장 최솟값 일치를 확인했다. 기존 512환경×3 seeds의 900step 저장 trace에서도 SR·통계 exact를 보존하며 Error를 산출했다. 원본 결과·기존 학습 프로세스는 보존했다. [검증](output_etc/check/stage2_point_region_errors_20261108/verification.json), [행동별 Error](output_etc/check/stage2_point_region_errors_20261108/report.md).
+
+### Enabling 그룹 SR을 동시 성공으로 변경
+
+- 사용자 요청으로 논문 프로토콜·평가 규약·config 공통 안내와 메인 interaction group 집계를 `ever(AT AND follower)`로 변경했다. Mixed도 같은 Enable SR을 사용한다. 완료 시간 기준안은 첫 동시 성공 시각으로 맞췄으며 기존 과제별 각각-ever·동시 성공 보조 지표는 유지한다.
+- 결과·manifest·summary에 `enabling_success=simultaneous`를 기록하고 기존 기준의 결과 재사용·혼합 집계를 거부한다. CPU 재채점은 필드 없는 과거 결과를 `both_ever`로 보존하며 보조 비교기는 두 버전 모두 읽는다. 장면 샘플링·학습 설정은 변경하지 않았다.
+- CPU23 passed. 저장된 512환경×seed0/1/2의 900step trace를 별도 경로에서 새 기준으로 재채점해 point/region·seed 통계가 비교 결과와 exact 일치했고, 과거 seed0의 재채점 호환도 확인했다. 원본 결과는 보존했으며 GPU·시뮬레이션·학습은 실행하지 않았다. [검증](output_etc/check/stage2_enabling_simultaneous_code_20261108/verification.json).
+
+### Enabling 각각-ever·동시 성공 재집계
+
+- 사용자 요청으로 새 프로토콜 1.5k·512환경×seed0/1/2의 CPU 검증된 저장 trace를 `eval/compare_enabling_success.py`에서 재집계했다. Point/Region의 각각-ever·동시 성공 flag와 기존 행동별·그룹 건수 일치, 동시 성공의 부분집합 관계를 확인했다. 원본 결과·메인 eval·프로토콜 기준은 변경하지 않았으며 GPU·시뮬레이션은 실행하지 않았다.
+- Region Enabling은 66.45±2.59→66.03±2.52%, Mixed는 85.03±1.19→84.89±1.19%다. 951쌍 중 4쌍이 동시 성공 조건에서 제외됐다. [비교·seed별 건수](output_etc/check/stage2_enabling_simultaneous_1500_env512_20261108/report.md).
+
+### 5명 이상 distractor 배분 확정
+
+- 사용자 결정으로 그룹 k명당 2k 토큰에서 필수 토큰을 뺀 나머지를 그룹 중심 반경 4.5m에 배치하는 관측용 distractor 규칙을 프로토콜에 반영했다. 물리 제거는 유지하고 평가 seed는 사용자 탐색 후 확정으로 남겼다. 문서 변경만 확인했으며 메인 eval·학습·실행 프로세스는 변경하지 않았다.
+
+### 평가 보조 작업공간
+
+- 사용자 지정 루트 `eval/`에 보조 스크립트 용도와 `output_etc/check/` 산출물 규칙을 기록하고 structure에 등록했다. 메인 eval·기존 확인용 코드·산출물은 이동하지 않았다. 문서 경로·diff만 확인했으며 학습·평가는 실행하지 않았다.
+
+### Stage2 Distill900 V2 ·enable Total19.5k
+
+- 사용자 요청으로 `stage2_distill_900_v2` 환경/학습 YAML과 train/test/VNC/eval wrapper를 기존900 버전에서 복사했다. Enable teacher만 `Stage2BeforeTotal_06-22-22-14/nn/Stage2BeforeTotal_00019500.pth`로 교체하고 실험·저장 이름을 분리했다. Coupled17k·Stage1 26k 초기화·900step·학습 샘플링/보상·distillation 설정은 유지했다. 새 이름의 실행 등록·900step/GPU2/6/7·공용 평가 연결과 config/USAGE/structure를 갱신했다.
+- YAML 차이가 이름·enable 경로뿐임과 teacher 파일 존재·distillation 스키마·실험 등록/900step·Python/shell 구문·eval CLI help·문서 경로를 확인했다. Teacher 가중치 로드·GPU 실행·학습·시뮬레이션은 하지 않았다. [정적 확인](output_etc/check/stage2_distill_900_v2_config_20261108/verification.json).
+
+### 새 프로토콜 Distill900 1.5k ·512환경×3 seeds
+
+- GPU6에서 같은 1.5k student를 4명·8토큰·512환경×seed0/1/2·ordered·900step으로 평가했다. 순차 균등 I/E/C·단독/후행 균등 행동·공통 교집합·near50 해제/거리표·distractor 관측 유지/물리 제거를 적용했다. Seed별 초기-only snapshot과 초기 관측 전체·과제·사람·목표·DOF·작업 물체 상태 exact, 900step 관측/물리 분리·CPU/GPU 재채점·건수·finite를 확인했다.
+- 영역 Independent/Enabling/Coupled/Mixed는 96.93±0.83/66.45±2.59/91.72±1.50/85.03±1.19%다. Independent는 Mixed 안 solo다. Seed0은 초기 좌표 반올림 precheck를 조정했으며 최종 초기값은 exact 일치했다. Rollout·trace 완료 후 검증 정보 출력 오타는 저장 trace/로그로 복구했고 성공수·궤적은 변경하지 않았다. 공용 eval·학습 코드·기존 프로세스는 보존했다. [seed별 결과·분포](output_etc/check/stage2_new_protocol_1500_env512_20261108/report.md), [검증](output_etc/check/stage2_new_protocol_1500_env512_20261108/verification.json).
+
+### 논문 프로토콜 distractor 물리 제거 확정
+
+- 사용자 결정으로 모든 방법·인원수에서 distractor 관측 유지·물리 제거를 [프로토콜](cvpr2027_evaluation_protocol.md)에 확정했다. 작업 물체·받침·alias·구역은 보존하고, 관측 pose·선속도·각속도는 초기 샘플 값으로 고정하며 형상/BPS·토큰은 유지한다. 미정 항목에서는 5명 이상 관측용 배치 영역만 남겼다. 문서 diff·미정 표의 일관성을 확인했으며 공용 eval 코드·학습·실행 프로세스는 변경하지 않았다.
+
+### Distill900 1.5k distractor 물리 제거 비교
+
+- GPU6에서 기존·새 프로토콜 각각 4명·8토큰·64환경×seed0/1/2·ordered·900step으로 distractor 물리 제거 6회를 완료했다. 이전 물리 유지 결과를 재사용했고, 작업 물체·받침·alias·구역은 보존했다. Distractor는 장면 생성 후 물리 장면 밖으로 이동하고, 관측은 같은 baseline 초기 snapshot의 위치·회전·속도·형상을 유지했다. 공용 eval·학습 코드와 기존 프로세스는 보존했다.
+- 영역 Independent/Enabling/Coupled/Mixed는 기존 물리 제거 95.01±3.55/69.35±2.40/91.33±2.35/85.23±0.59%, 새 조건 물리 제거 98.13±2.12/69.62±7.92/92.16±2.60/86.64±1.36%다. 물리 유지 대비 Mixed 변화는 기존 -0.37pp, 새 조건 +0.90pp다. 각 프로토콜의 유지/제거 초기 과제·그룹·크기·사람·목표·DOF·작업 물체와 관측 물체 상태 exact, 900step 관측/물리 분리·CPU/GPU 재채점·건수·finite를 확인했다. 좌표 반올림 및 추가 초기화 경로 검증 중 제외한 시도는 별도 보관하고 최종 표에 포함하지 않았다. [비교표·조건](output_etc/check/stage2_distractor_physics_1500_env64_20261108/report.md), [검증](output_etc/check/stage2_distractor_physics_1500_env64_20261108/verification.json).
+
+### Distill900 1.5k 기존·새 프로토콜 64환경 비교
+
+- GPU6에서 같은 1.5k PTH를 4명·8토큰·64환경×seed0/1/2·ordered·900step으로 각 3회 평가했다. 기존은 행동별 교집합/native 샘플링, 새 조건은 공통 교집합·near50 해제/거리표·균등 행동·순차 I/E/C다. Distractor 관측·물리는 양쪽 유지했고 새 조건은 확인용 driver에만 적용했다. 공용 eval·학습 코드·기존 프로세스는 변경하지 않았다.
+- 영역 Independent/Enabling/Coupled/Mixed는 기존 97.63±2.71/65.99±5.20/93.18±5.22/85.60±1.24%, 새 조건 97.23±0.13/69.52±1.82/90.46±2.77/85.74±0.99%다. Independent는 Mixed 내 solo이며, 같은 seed라도 초기 장면은 다르다. 6회 모두 CPU/GPU 재채점·건수·finite 일치, 새 크기·거리·near50 해제를 검증했다. [조건·비교](output_etc/check/stage2_protocol_compare_1500_env64_20261108/report.md), [검증](output_etc/check/stage2_protocol_compare_1500_env64_20261108/verification.json).
+
+### CVPR2027 논문 평가 프로토콜 정리
+
+- 사용자 요청으로 [평가 설계 문서](cvpr2027_evaluation_protocol.md)를 추가했다. Table 2는 enable 2명 한 쌍·coupled 2/3/4명 한 그룹만, M=2N, 균등 행동, 공통 공유 크기, 합일치/near50 해제, 각각-ever 성공·기존 낙상 보존을 반영했다.
+- 사용자 지정 루트 경로에서 공통 규칙→enable 변경→coupled 변경→장면/테이블→미정/구현 상태로 재구성했다. 공통에 실제 크기·거리 기본값, PUSH 167개 profile 제약·물성, 행동별 공간 성공·낙상·통계를 모으고 승계안과 확정 조건을 구분했다. 이동된 파일의 내부·참조 링크도 갱신했다.
+- 사용자 요청으로 중복 설명·코드 경로·과거 결과·구현 이력을 덜어내고 조건표·수치·그룹 성공·테이블 구성·미정 항목만 남겼다. 기본값의 미확정 상태는 유지했다.
+- 현재 평가 규약과 structure에서 새 문서를 연결했다. 문서 링크·상대 경로·diff를 확인했으며 실행 코드·학습 설정·PDF는 변경하지 않았다. GPU 실행·학습·평가는 수행하지 않았다.
+
 ## 2026-11-06
+
+### Distill900 2.5k 행동별 교집합 평가
+
+- 사용자 요청으로 2.5k 저장을 기다린 뒤 GPU6에서 기존과 같은 4명·8토큰·512환경×seed0/1/2·ordered·900step·행동별 교집합 평가를 완료했다. 학습 종료·재시작은 하지 않았다. PTH epoch2500/frame327680000·hash·teacher 설정·finite, 세 seed의 이전 0.5k/1k/1.5k/2k 초기 상태 전체 필드 exact, 공유 상자 범위/격자, 기존·추가 지표 CPU/GPU 재채점 일치를 확인했다.
+- 영역 Independent/Enabling/Coupled/Mixed Interaction Group Success Rate는 95.76±1.09/63.69±1.04/90.76±0.41/83.40±0.14%다. Mixed 평균은 1.5k 84.33±0.60%보다 0.93pp 낮아 현재 비교의 최고 평균은 1.5k다. [전체 지표·비교·재현](output_etc/check/stage2_distill_900_intersection_2500_20261106/report.md), [검증](output_etc/check/stage2_distill_900_intersection_2500_20261106/verification.json).
+
+### Enable 행동별 교집합·Distill900 0.5k/1k/1.5k/2k 평가
+
+- 사용자 선택으로 general 평가 전용 `--enable_size_mode per_action_intersection`을 추가했다. Native 관계/후행 행동을 먼저 뽑고 실제 asset 생성 전에 enable 선행자/후행 받침 공유 상자만 운반∩SIT/CLIMB/SUPPORT 크기 격자로 샘플링한다. 밀도 유지·질량 재계산·첫 episode 역할 고정으로 물리/관측/과제 연결을 일치시킨다. Solo·coupled·후행 payload 크기, 기본 학습과 native 평가는 유지했다. Manifest/result에 모드를 기록하고 학습/resume/viewer에서는 거부한다. [정의](markdowns/reference/evaluation.md#enable-행동별-크기-교집합-평가), [명령](markdowns/USAGE.md#통합-stage2-900step-버전).
+- CPU111 passed,16환경900step 실행 및 학습 CLI 거부를 검증했다. 사용자 지정4개 PTH를4명·8토큰·512환경×seed0/1/2·ordered·900step으로 GPU2/6/7에서 총12회 평가했다. 모든 enable 공유 크기 범위, 체크포인트 간 동일seed 초기 상태 전체필드 exact,epoch/frame/hash/teacher 일치·finite,기존/추가 지표 CPU/GPU exact를 확인했다. 기존 학습 PID265779는 유지했고 평가 프로세스는 종료했다. [보고서](output_etc/check/stage2_distill_900_intersection_0500_1000_1500_2000_20261106/report.md), [검증](output_etc/check/stage2_distill_900_intersection_0500_1000_1500_2000_20261106/verification.json).
+- 영역 Mixed Interaction Group Success Rate는0.5k/1k/1.5k/2k=83.02±1.15/83.05±1.17/84.33±0.60/82.83±1.42%, Enabling Interaction Group Success Rate는63.75±2.42/61.60±2.79/64.68±2.08/62.77±3.56%다. 이전 native ON_TOP enabling592쌍 중 행동별 받침 교집합 안에 있었던 것은65쌍이었다. 이번은 새 크기/초기 장면 분포의 별도 rollout이며 이전 trace 조건부 필터가 아니다.
 
 ### Distill900 0.5k·1k·1.5k 평가와 interaction group 성공률
 

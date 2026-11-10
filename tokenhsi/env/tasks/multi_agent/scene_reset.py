@@ -327,6 +327,9 @@ class SceneResetMixin:
         return
 
     def _reset_env_tensors(self, env_ids):
+        if self._design:
+            from env.tasks.multi_agent.viewer_design import prepare_scene
+            prepare_scene(self, env_ids)
         super()._reset_env_tensors(env_ids)
         if self._is_eval:
             flat = self._flat_slot_ids(env_ids)
@@ -367,8 +370,11 @@ class SceneResetMixin:
                     marker,
                     0,
                     gymapi.MESH_VISUAL,
-                    self._agent_color(owner),
+                    self._viewer_agent_color(env_id, owner),
                 )
+            if self._design:
+                from env.tasks.multi_agent.viewer_design import hide_goal_markers
+                hide_goal_markers(self, env_ids)
             ids.append(self._marker_actor_ids[env_ids].contiguous().view(-1))
         self._platform_states[env_ids, :, 3:6] = 0.0
         self._platform_states[env_ids, :, 6] = 1.0

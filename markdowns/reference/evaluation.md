@@ -1,6 +1,10 @@
 # 정식 평가 규약 (2026-10-29)
 
+논문용 새 벤치마크의 확정 조건·미정 항목·테이블별 구성은 [CVPR2027 평가 프로토콜](../../cvpr2027_evaluation_protocol.md)에 정리했다. 아래는 현재 실행 경로의 규약이며 새 설계가 모두 구현된 상태는 아니다.
+
 프로토콜은 `general`과 `stage1_single` 두 개다. **일반 평가는 학습 인원**, **1명 단독 평가는 Stage1 전용**이다. BEFORE의 solo는 다인 장면 안에서 선행 관계가 없는 역할을 뜻하며 1명 단독 평가와 다르다. viewer용 `*_test.sh`/`*_vnc.sh`의 진단값도 정식 평가표와 구분한다.
+
+평가 seed 기본값은 0/1/2다. `--seeds`에 중복 없는 비음수 정수를 지정할 수 있으며 모든 과제 macro·interaction SR·Error 통계는 실제 실행된 seed를 사용한다. 새 프로토콜의 기준 snapshot 생성은 [보조 실행 안내](../../eval/README.md)를 따른다.
 
 ## 장면·초기화
 
@@ -79,10 +83,38 @@ Stage1 PUSH 일반 평가는 checkpoint 저장 분포·2명·4물체·배치를 
 | 지표 | 분모와 성공 |
 | --- | --- |
 | Independent Interaction Success Rate | enable 선행/후행과 coupled 참여자를 제외한 solo 개인 수. 에피소드 중 한 번 이상 공간 조건을 만족하면 성공. |
-| Enabling Interaction Group Success Rate | 선행/후행 쌍 수. 두 사람이 각각 한 번 이상 성공하면 그룹 성공이며 시간 순서·동시성은 요구하지 않는다. |
+| Enabling Interaction Group Success Rate | 선행/후행 쌍 수. 같은 유효 스텝에 선행 AT와 후행 행동이 모두 성공한 적이 있어야 그룹 성공이다. 별도 시간 순서·유지시간 조건은 없다. |
 | Coupled Interaction Group Success Rate | 실제 공동 PUSH 그룹 수. 공동 상자 중심과 공동 목표의3D 거리≤20cm를 한 번 이상 만족하면 성공. 2/3/4명 그룹에 동일 가중치를 준다. |
 | Mixed Interaction Group Success Rate | 해당 seed의 위 세 성공률을1/3씩 평균한다. 전체 사람/그룹 수로 가중하지 않는다. |
 
-Point와 region을 각각 계산하며 공동 상자 중심 기준은 둘이 같다. 각 seed의 성공률·세 유형 macro를 먼저 계산한 뒤3개 seed의 평균과 표본 표준편차를 낸다. 어떤 유형의 분모가0이면 해당 성공률과 mixed macro는 null이며0으로 채우거나 나머지 유형만 평균하지 않는다. 유형별 성공/그룹 수를 함께 기록한다. CPU trace 재채점도 같은 추가 집계를 검증한다.
+Point와 region을 각각 계산하며 공동 상자 중심 기준은 둘이 같다. 각 seed의 성공률·세 유형 macro를 먼저 계산한 뒤 지정한 seed들의 평균과 표본 표준편차를 낸다. 어떤 유형의 분모가0이면 해당 성공률과 mixed macro는 null이며0으로 채우거나 나머지 유형만 평균하지 않는다. 유형별 성공/그룹 수를 함께 기록한다. CPU trace 재채점도 같은 추가 집계를 검증한다.
+
+현재 결과·manifest·summary는 `enabling_success=simultaneous`를 기록한다. 이 필드가 없는 과거 결과는 `both_ever`로 재채점하며 서로 다른 기준의 결과는 합산하거나 새 평가에서 재사용하지 않는다. 기존 과제별 `both_ever`·`simultaneous` 보조 지표는 모두 유지한다.
 
 여기의 Independent Interaction Success Rate는 혼합 샘플 안의 solo 성능이다. 독립 과제만 있는 장면의 평가를 별도로 대체하지 않는다. 기본4명 평가는 기존 enable용/coupled용/혼합용1:1:1 sampler와 ordered 배정을 유지한다. 2/4/8/16명에 동일한 순차 그룹 sampler를 적용하는 논문용 벤치마크는 이 집계 추가와 별개다.
+
+## 공통 Point Error·Region Error
+
+메인 eval의 `result.json`·`summary.json`은 `errors`에 행동별 Point Error·Region Error(cm)와 성공 표본 수, Coupled 인원별 결과를 함께 저장한다. 정의는 [논문 프로토콜 1.8절](../../cvpr2027_evaluation_protocol.md#18-공통-error--메인-eval)을 따른다.
+
+- 두 Error 모두 **Region 성공 trial만** 사용한다. Independent는 개인 성공, Enable은 동시 성공한 쌍의 선행·후행, Coupled는 공유 상자 중심 성공을 기준으로 그룹당 한 번 집계한다.
+- Point는 기존 목표 중심점까지, Region은 중앙 80%의 목표 높이 평면까지 유효 frame 최소 3D 거리다. 높이 ±20cm 성공 허용오차를 거리에서 빼지 않는다. AT/PUSH는 두 Error가 같다.
+- 성공 전·후를 포함한 유효 frame에서 최솟값을 취한다. 개인 낙상 이후는 제외하고, 공동 상자는 최소 한 명이 유효한 frame까지 측정한다.
+- 성공 표본별 평균 → seed별 평균±표본표준편차. 표본 없는 seed는 null이며 해당 지표의 전체 평균·표준편차도 null이다. 행동 간 전체 macro는 추가하지 않는다.
+- `errors.protocol=region_success_min_distance_v1`로 구분한다. Error가 없는 과거 결과는 새 평가에서 재사용하지 않으며 저장 trace의 CPU 재채점으로 추가 산출할 수 있다. CPU/GPU Error 비교 허용오차는 0.000001cm다.
+- Time·t_coop는 `eval/run_table2.py`의 Table 2 보조 평가에서 산출한다. Time은 성공한 Enable 쌍의 최초 동시 성공, t_coop는 전원 양손과 실제 공유 상자 표면의3D 거리6cm 미만 비율이다. 상자 수평 변위20cm부터 최초 성공(실패는 종료)까지30Hz·양끝 포함으로 측정하고 원시 좌표를 저장해8/12cm도 재집계한다. 메인 eval의 기본 기준은 유지한다.
+
+
+## Enable 행동별 크기 교집합 평가
+
+통합 Stage2 general 평가에서 `--enable_size_mode per_action_intersection`을 지정하면 enable 선행 운반 물체이자 후행 받침인 공유 상자만 다음 full-size 범위로 다시 생성한다. 단위는m이며 기존0.05m 격자에서 각 축을 균등 샘플링한다.
+
+| 후행 행동 | X | Y | Z |
+| --- | --- | --- | --- |
+| SIT | 0.25–0.60 | 0.25–0.60 | 0.35–0.50 |
+| CLIMB | 0.40–0.60 | 0.40–0.60 | 0.20–0.60 |
+| ON_TOP 받침 | 0.40–0.60 | 0.40–0.60 | 0.25–0.50 |
+
+기본 후보 bank와 native sampler로 관계·역할·후행 행동을 먼저 뽑고, 선택된 enable 선행자의 물리 상자 크기만 수정한 뒤 실제 Isaac Gym asset을 만든다. 밀도는 유지하고 질량을 부피에 맞춘다. Solo·coupled 및 ON_TOP 후행 payload의 크기는 수정하지 않는다. 첫 episode에서 그 상자에 대응하는 관계·역할을 재사용한다. 초기화·거리·near·배치 재시도·성공 기준·900/1200step 설정은 선택한 실험의 기존 규칙을 따른다.
+
+이 옵션은 학습/resume·viewer·Stage1 평가에서는 거부한다. 기본값은 `native`이며 기본 학습과 평가의 RNG/크기 분포를 바꾸지 않는다. `manifest.json`·`result.json`에 모드를 기록하고 기본 평가와 결과 폴더를 분리한다. 교집합 평가는 분포를 제한한 비교 실험이라512환경×3seed여도 `formal_report=false`로 표시한다. 이전 trace에서 범위 밖 표본을 제외한 조건부 재집계와는 다른 새 rollout이다. [명령](../USAGE.md#통합-stage2-900step-버전).

@@ -761,6 +761,9 @@ class SampledOnTopTaskMixin:
         points = torch.cat(
             [self._humanoid_root_states[0, :, :3], self._logical_box_values(self._box_states)[0, :, :3]], 0
         )
+        if self._design and hasattr(self, '_design_box_mask'):
+            boxes = self._logical_box_values(self._box_states)[0, ~self._design_box_mask[0], :3]
+            points = torch.cat((self._humanoid_root_states[0, :, :3], boxes, self._tar_pos[0]), 0)
         low = points.amin(0)
         high = points.amax(0)
         center = (low + high) / 2
@@ -780,7 +783,7 @@ class SampledOnTopTaskMixin:
         self._cam_prev_char_pos[:] = self._humanoid_root_states[0, 0, :3].cpu().numpy()
 
     def _draw_ontop_context(self):
-        if self.viewer is None or self._ontop_last_diag is None:
+        if self._design or self.viewer is None or self._ontop_last_diag is None:
             return
         import numpy as np
 
@@ -797,7 +800,7 @@ class SampledOnTopTaskMixin:
                 delta[axis] = 0.12
                 vertices.extend([target - delta, target + delta])
             owner = int(g.edge_owner[0, e])
-            color = self._agent_color(owner)
+            color = self._viewer_agent_color(0, owner)
             colors = np.tile([color.x, color.y, color.z], (3, 1)).astype(np.float32)
             self.gym.add_lines(
                 self.viewer,

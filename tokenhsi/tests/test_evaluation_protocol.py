@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from copy import deepcopy
 import math
+import json
 import pytest
 import torch
 from utils.evaluation_protocol import configure, spatial_success, single_at_sizes, AT_SIZES
@@ -17,7 +18,9 @@ def test_interaction_groups_exclude_enabling_leader_and_count_coupled_groups_onc
     ever[0, 8] = True
     ever[0, 9, 1] = True
     centers = torch.tensor([[False, False, True, True, True, True, False, False, False, False]])
-    scores = interaction_group_scores(valid, parent, groups, ever, centers)
+    simultaneous = torch.zeros_like(ever)
+    simultaneous[0, 1, 0] = True
+    scores = interaction_group_scores(valid, parent, groups, ever, centers, simultaneous)
     for label, rates in [('point', [.5, 1., .5, 2/3]), ('region', [1., 0., .5, .5])]:
         assert [scores[label][name]['rate'] for name in INTERACTION_METRICS] == rates
         assert [scores[label][name]['groups'] for name in INTERACTION_METRICS[:3]] == [2, 1, 2]
@@ -26,11 +29,30 @@ def test_interaction_groups_exclude_enabling_leader_and_count_coupled_groups_onc
 def test_missing_interaction_type_does_not_become_zero_or_partial_macro():
     scores = interaction_group_scores(torch.tensor([[True, False]]),
         torch.tensor([[-1, -1]]), torch.tensor([[0, 1]]),
-        torch.ones(1, 2, 2, dtype=torch.bool), torch.zeros(1, 2, dtype=torch.bool))
+        torch.ones(1, 2, 2, dtype=torch.bool), torch.zeros(1, 2, dtype=torch.bool),
+        torch.zeros(1, 2, 2, dtype=torch.bool))
     for label in ('point', 'region'):
         assert scores[label][INTERACTION_METRICS[0]] == dict(groups=1, success=1, rate=1.)
         assert scores[label][INTERACTION_METRICS[1]]['rate'] is None
         assert scores[label][INTERACTION_METRICS[-1]]['rate'] is None
+
+
+def test_enabling_requires_success_in_the_same_frame():
+    parent = torch.tensor([[-1, 0, -1, 2]])
+    current = torch.zeros(2, 1, 4, 2, dtype=torch.bool)
+    current[0, 0, 0] = True
+    current[1, 0, 1:] = True
+    ever = current.any(0)
+    simultaneous = (current & current[:, torch.arange(1)[:, None], parent.clamp_min(0)]).any(0)
+    valid = torch.ones(1, 4, dtype=torch.bool)
+    groups = torch.arange(4)[None]
+    centers = torch.zeros_like(valid)
+    scores = interaction_group_scores(valid, parent, groups, ever, centers, simultaneous)
+    legacy = interaction_group_scores(valid, parent, groups, ever, centers, simultaneous,
+                                     enabling_success='both_ever')
+    for label in ('point', 'region'):
+        assert scores[label][INTERACTION_METRICS[1]] == dict(groups=2, success=1, rate=.5)
+        assert legacy[label][INTERACTION_METRICS[1]] == dict(groups=2, success=2, rate=1.)
 
 
 def test_interaction_summary_averages_seed_rates_before_pooling_counts():
@@ -46,6 +68,33 @@ def test_interaction_summary_averages_seed_rates_before_pooling_counts():
     macro = result['point'][INTERACTION_METRICS[-1]]
     assert macro['mean'] == .5
     assert macro['std'] == pytest.approx(math.sqrt(1/18))
+
+
+def test_summary_rejects_mixed_enabling_success_criteria(tmp_path):
+    from evaluate import summarize
+    for seed, mode in enumerate((None, 'simultaneous')):
+        path = tmp_path / ('general_seed' + str(seed))
+        path.mkdir()
+        data = dict(interaction_group_scores={})
+        if mode:
+            data['enabling_success'] = mode
+        (path / 'result.json').write_text(json.dumps(data))
+    with pytest.raises(ValueError, match='different enabling success criteria'):
+        summarize(tmp_path)
+
+
+def test_task_macros_use_the_requested_seeds(tmp_path):
+    from evaluate import summarize
+    for seed, rate in ((3, .2), (4, .4), (5, .9)):
+        path = tmp_path / ('general_seed' + str(seed))
+        path.mkdir()
+        tasks = {name: dict(trials=10, success=int(rate * 10), rate=rate, pair_trials=0)
+                 for name in ('SIT', 'CLIMB', 'AT', 'ON_TOP', 'PUSH')}
+        data = dict(seed=seed, protocol='general', scores=dict(point=tasks, region=tasks))
+        (path / 'result.json').write_text(json.dumps(data))
+    summary = summarize(tmp_path)
+    assert summary['scores']['region']['macro5']['seeds'] == pytest.approx([.2, .4, .9])
+    assert summary['scores']['region']['macro5']['mean'] == pytest.approx(.5)
 
 
 def inputs(kind):
@@ -111,6 +160,18 @@ def test_general_keeps_saved_counts_and_sizes():
     assert cfg['env']['numAgents']==4 and cfg['env']['numObjects']==8
     assert cfg['env']['episodeLength']==1200
     assert cfg['env']['box']=={'range':'saved'}
+
+
+@pytest.mark.parametrize('seed', [3, 4, 5])
+def test_formal_accepts_additional_seeds(seed):
+    cfg = {'env': {'eval': {}}}
+    configure(args(seed=seed), cfg, 'stage2_900')
+    assert cfg['env']['episodeLength'] == 900
+
+
+def test_formal_rejects_random_seed_sentinel():
+    with pytest.raises(ValueError, match='nonnegative seed'):
+        configure(args(seed=-1), {'env': {}}, 'stage2_900')
 
 
 @pytest.mark.parametrize('name', ['stage2_before','stage2_before_rsi433','stage2_before_nonemask_rsi433_near50'])
