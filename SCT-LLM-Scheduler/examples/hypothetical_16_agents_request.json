@@ -1,0 +1,802 @@
+{
+  "environment_spec": {
+    "units": {
+      "position": "meters",
+      "time": "seconds",
+      "angle": "radians"
+    },
+    "coordinate_system": {
+      "frame": "shared world frame within this scene",
+      "up_axis": "z",
+      "heading": "yaw measured counterclockwise from +x"
+    },
+    "controller": {
+      "description": "A fixed pretrained controller executes each assigned task after release.",
+      "scheduler_control": "One initial release time per agent.",
+      "before_release": "The agent is physically frozen.",
+      "after_release": "The agent acts autonomously without further scheduling intervention."
+    },
+    "task_glossary": {
+      "PLACE_SUPPORT": "Approach, grasp, carry and place the assigned support at its intended final state.",
+      "SIT": "Approach the support at its intended final state, turn and sit on it.",
+      "PUSH": "Approach assigned hand targets on a shared box and push it toward the object goal."
+    },
+    "example_notice": "Hypothetical input illustration only. Coordinates and detector thresholds are authored examples, not simulator observations. No measured durations or controller calibration are supplied.",
+    "field_definitions": {
+      "position_m": "Object center in world coordinates.",
+      "dimensions_m": "Full object extents along local x/y/z.",
+      "root_position_m": "Agent root position in world coordinates.",
+      "root_yaw_rad": "Agent yaw in radians.",
+      "left_hand_target_world_m": "Assigned left hand readiness target in world coordinates.",
+      "right_hand_target_world_m": "Assigned right hand readiness target in world coordinates.",
+      "intended_final_state": "Planned object target state, not a future measurement.",
+      "group_id": "Task grouping label; coordination_constraints defines the timing relationships."
+    }
+  },
+  "current_scene": {
+    "scene_id": "HYPOTHETICAL_16_AGENTS_NOT_EXECUTED",
+    "controller_id": "ILLUSTRATION_ONLY_NOT_A_CHECKPOINT",
+    "coordination_type": "mixed",
+    "initial_observation": {
+      "agents": [
+        {
+          "agent_id": "A01",
+          "root_position_m": [
+            -4,
+            0,
+            0.9
+          ],
+          "root_yaw_rad": 0,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A01"
+        },
+        {
+          "agent_id": "A02",
+          "root_position_m": [
+            4,
+            2,
+            0.9
+          ],
+          "root_yaw_rad": 3.14,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A02"
+        },
+        {
+          "agent_id": "A03",
+          "root_position_m": [
+            -4,
+            8,
+            0.9
+          ],
+          "root_yaw_rad": 0,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A03"
+        },
+        {
+          "agent_id": "A04",
+          "root_position_m": [
+            4,
+            10,
+            0.9
+          ],
+          "root_yaw_rad": 3.14,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A04"
+        },
+        {
+          "agent_id": "A05",
+          "root_position_m": [
+            -3,
+            15.5,
+            0.9
+          ],
+          "root_yaw_rad": 0.0,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A05"
+        },
+        {
+          "agent_id": "A06",
+          "root_position_m": [
+            -4,
+            16.5,
+            0.9
+          ],
+          "root_yaw_rad": 0.15,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A06"
+        },
+        {
+          "agent_id": "A07",
+          "root_position_m": [
+            -3,
+            23.0,
+            0.9
+          ],
+          "root_yaw_rad": 0.0,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A07"
+        },
+        {
+          "agent_id": "A08",
+          "root_position_m": [
+            -4,
+            24.0,
+            0.9
+          ],
+          "root_yaw_rad": 0.15,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A08"
+        },
+        {
+          "agent_id": "A09",
+          "root_position_m": [
+            -5,
+            25.0,
+            0.9
+          ],
+          "root_yaw_rad": 0.3,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A09"
+        },
+        {
+          "agent_id": "A10",
+          "root_position_m": [
+            -3,
+            31.0,
+            0.9
+          ],
+          "root_yaw_rad": 0.0,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A10"
+        },
+        {
+          "agent_id": "A11",
+          "root_position_m": [
+            -4,
+            32.0,
+            0.9
+          ],
+          "root_yaw_rad": 0.15,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A11"
+        },
+        {
+          "agent_id": "A12",
+          "root_position_m": [
+            -5,
+            33.0,
+            0.9
+          ],
+          "root_yaw_rad": 0.3,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A12"
+        },
+        {
+          "agent_id": "A13",
+          "root_position_m": [
+            -3,
+            38.5,
+            0.9
+          ],
+          "root_yaw_rad": 0.0,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A13"
+        },
+        {
+          "agent_id": "A14",
+          "root_position_m": [
+            -4,
+            39.5,
+            0.9
+          ],
+          "root_yaw_rad": 0.15,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A14"
+        },
+        {
+          "agent_id": "A15",
+          "root_position_m": [
+            -5,
+            40.5,
+            0.9
+          ],
+          "root_yaw_rad": 0.3,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A15"
+        },
+        {
+          "agent_id": "A16",
+          "root_position_m": [
+            -6,
+            41.5,
+            0.9
+          ],
+          "root_yaw_rad": 0.44999999999999996,
+          "root_linear_velocity_mps": [
+            0,
+            0,
+            0
+          ],
+          "task_id": "task_A16"
+        }
+      ],
+      "objects": [
+        {
+          "object_id": "support_1",
+          "position_m": [
+            -2,
+            0,
+            0.3
+          ],
+          "dimensions_m": [
+            0.8,
+            0.8,
+            0.6
+          ],
+          "yaw_rad": 0
+        },
+        {
+          "object_id": "support_2",
+          "position_m": [
+            -2,
+            8,
+            0.3
+          ],
+          "dimensions_m": [
+            0.8,
+            0.8,
+            0.6
+          ],
+          "yaw_rad": 0
+        },
+        {
+          "object_id": "push_box_1",
+          "position_m": [
+            0,
+            16,
+            0.5
+          ],
+          "dimensions_m": [
+            1,
+            2.0,
+            1
+          ],
+          "yaw_rad": 0
+        },
+        {
+          "object_id": "push_box_2",
+          "position_m": [
+            0,
+            24,
+            0.5
+          ],
+          "dimensions_m": [
+            1,
+            3.0,
+            1
+          ],
+          "yaw_rad": 0
+        },
+        {
+          "object_id": "push_box_3",
+          "position_m": [
+            0,
+            32,
+            0.5
+          ],
+          "dimensions_m": [
+            1,
+            3.0,
+            1
+          ],
+          "yaw_rad": 0
+        },
+        {
+          "object_id": "push_box_4",
+          "position_m": [
+            0,
+            40,
+            0.5
+          ],
+          "dimensions_m": [
+            1,
+            4.0,
+            1
+          ],
+          "yaw_rad": 0
+        }
+      ],
+      "obstacles": []
+    },
+    "tasks": [
+      {
+        "task_id": "task_A01",
+        "agent_id": "A01",
+        "task_type": "PLACE_SUPPORT",
+        "group_id": "enable_1",
+        "description": "Carry and place the support at its goal so the follower can sit. Start immediately at episode time 0.",
+        "object_id": "support_1",
+        "intended_final_state": {
+          "position_m": [
+            0,
+            0,
+            0.3
+          ],
+          "yaw_rad": 0
+        },
+        "enabling_event_id": "A01_enabled"
+      },
+      {
+        "task_id": "task_A02",
+        "agent_id": "A02",
+        "task_type": "SIT",
+        "group_id": "enable_1",
+        "description": "Approach the intended final support location, turn and sit. Only the initial freeze release time is adjustable.",
+        "object_id": "support_1",
+        "intended_final_state": {
+          "position_m": [
+            0,
+            0,
+            0.3
+          ],
+          "yaw_rad": 0
+        },
+        "seat_target_world_m": [
+          0,
+          0,
+          0.6
+        ],
+        "dependency_sensitive_event_id": "A02_seat_contact"
+      },
+      {
+        "task_id": "task_A03",
+        "agent_id": "A03",
+        "task_type": "PLACE_SUPPORT",
+        "group_id": "enable_2",
+        "description": "Carry and place the support at its goal so the follower can sit. Start immediately at episode time 0.",
+        "object_id": "support_2",
+        "intended_final_state": {
+          "position_m": [
+            0,
+            8,
+            0.3
+          ],
+          "yaw_rad": 0
+        },
+        "enabling_event_id": "A03_enabled"
+      },
+      {
+        "task_id": "task_A04",
+        "agent_id": "A04",
+        "task_type": "SIT",
+        "group_id": "enable_2",
+        "description": "Approach the intended final support location, turn and sit. Only the initial freeze release time is adjustable.",
+        "object_id": "support_2",
+        "intended_final_state": {
+          "position_m": [
+            0,
+            8,
+            0.3
+          ],
+          "yaw_rad": 0
+        },
+        "seat_target_world_m": [
+          0,
+          8,
+          0.6
+        ],
+        "dependency_sensitive_event_id": "A04_seat_contact"
+      },
+      {
+        "task_id": "task_A05",
+        "agent_id": "A05",
+        "task_type": "PUSH",
+        "group_id": "coupled_1",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_1",
+        "left_hand_target_world_m": [
+          -0.5,
+          15.65,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          15.35,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          16,
+          0.5
+        ],
+        "readiness_event_id": "A05_ready"
+      },
+      {
+        "task_id": "task_A06",
+        "agent_id": "A06",
+        "task_type": "PUSH",
+        "group_id": "coupled_1",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_1",
+        "left_hand_target_world_m": [
+          -0.5,
+          16.65,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          16.35,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          16,
+          0.5
+        ],
+        "readiness_event_id": "A06_ready"
+      },
+      {
+        "task_id": "task_A07",
+        "agent_id": "A07",
+        "task_type": "PUSH",
+        "group_id": "coupled_2",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_2",
+        "left_hand_target_world_m": [
+          -0.5,
+          23.15,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          22.85,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          24,
+          0.5
+        ],
+        "readiness_event_id": "A07_ready"
+      },
+      {
+        "task_id": "task_A08",
+        "agent_id": "A08",
+        "task_type": "PUSH",
+        "group_id": "coupled_2",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_2",
+        "left_hand_target_world_m": [
+          -0.5,
+          24.15,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          23.85,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          24,
+          0.5
+        ],
+        "readiness_event_id": "A08_ready"
+      },
+      {
+        "task_id": "task_A09",
+        "agent_id": "A09",
+        "task_type": "PUSH",
+        "group_id": "coupled_2",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_2",
+        "left_hand_target_world_m": [
+          -0.5,
+          25.15,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          24.85,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          24,
+          0.5
+        ],
+        "readiness_event_id": "A09_ready"
+      },
+      {
+        "task_id": "task_A10",
+        "agent_id": "A10",
+        "task_type": "PUSH",
+        "group_id": "coupled_3",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_3",
+        "left_hand_target_world_m": [
+          -0.5,
+          31.15,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          30.85,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          32,
+          0.5
+        ],
+        "readiness_event_id": "A10_ready"
+      },
+      {
+        "task_id": "task_A11",
+        "agent_id": "A11",
+        "task_type": "PUSH",
+        "group_id": "coupled_3",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_3",
+        "left_hand_target_world_m": [
+          -0.5,
+          32.15,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          31.85,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          32,
+          0.5
+        ],
+        "readiness_event_id": "A11_ready"
+      },
+      {
+        "task_id": "task_A12",
+        "agent_id": "A12",
+        "task_type": "PUSH",
+        "group_id": "coupled_3",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_3",
+        "left_hand_target_world_m": [
+          -0.5,
+          33.15,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          32.85,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          32,
+          0.5
+        ],
+        "readiness_event_id": "A12_ready"
+      },
+      {
+        "task_id": "task_A13",
+        "agent_id": "A13",
+        "task_type": "PUSH",
+        "group_id": "coupled_4",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_4",
+        "left_hand_target_world_m": [
+          -0.5,
+          38.65,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          38.35,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          40,
+          0.5
+        ],
+        "readiness_event_id": "A13_ready"
+      },
+      {
+        "task_id": "task_A14",
+        "agent_id": "A14",
+        "task_type": "PUSH",
+        "group_id": "coupled_4",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_4",
+        "left_hand_target_world_m": [
+          -0.5,
+          39.65,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          39.35,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          40,
+          0.5
+        ],
+        "readiness_event_id": "A14_ready"
+      },
+      {
+        "task_id": "task_A15",
+        "agent_id": "A15",
+        "task_type": "PUSH",
+        "group_id": "coupled_4",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_4",
+        "left_hand_target_world_m": [
+          -0.5,
+          40.65,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          40.35,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          40,
+          0.5
+        ],
+        "readiness_event_id": "A15_ready"
+      },
+      {
+        "task_id": "task_A16",
+        "agent_id": "A16",
+        "task_type": "PUSH",
+        "group_id": "coupled_4",
+        "description": "Approach assigned hand targets on the shared box and push toward its goal. Choose this agent's own initial release time.",
+        "object_id": "push_box_4",
+        "left_hand_target_world_m": [
+          -0.5,
+          41.65,
+          0.8
+        ],
+        "right_hand_target_world_m": [
+          -0.5,
+          41.35,
+          0.8
+        ],
+        "object_goal_position_m": [
+          3,
+          40,
+          0.5
+        ],
+        "readiness_event_id": "A16_ready"
+      }
+    ],
+    "event_definitions": {
+      "A01_enabled": "First frame when support_1 center is within 0.10 m Euclidean distance of [0, 0, 0.3], its linear speed is below 0.10 m/s, and neither hand of A01 is in contact with it.",
+      "A02_seat_contact": "First frame when the simulator contact detector reports pelvis/seat contact between A02 and the top surface of support_1. Approach and turning occur before this event; it is not root arrival.",
+      "A03_enabled": "First frame when support_2 center is within 0.10 m Euclidean distance of [0, 8, 0.3], its linear speed is below 0.10 m/s, and neither hand of A03 is in contact with it.",
+      "A04_seat_contact": "First frame when the simulator contact detector reports pelvis/seat contact between A04 and the top surface of support_2. Approach and turning occur before this event; it is not root arrival.",
+      "A05_ready": "First frame when both of A05's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A06_ready": "First frame when both of A06's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A07_ready": "First frame when both of A07's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A08_ready": "First frame when both of A08's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A09_ready": "First frame when both of A09's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A10_ready": "First frame when both of A10's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A11_ready": "First frame when both of A11's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A12_ready": "First frame when both of A12's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A13_ready": "First frame when both of A13's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A14_ready": "First frame when both of A14's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A15_ready": "First frame when both of A15's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector.",
+      "A16_ready": "First frame when both of A16's hands are within 0.12 m Euclidean distance of their respective assigned world-frame hand targets. This illustrative readiness detector is not task completion or a contact-force detector."
+    },
+    "coordination_constraints": [
+      {
+        "type": "enabling",
+        "enabling_event_id": "A01_enabled",
+        "dependent_event_id": "A02_seat_contact"
+      },
+      {
+        "type": "enabling",
+        "enabling_event_id": "A03_enabled",
+        "dependent_event_id": "A04_seat_contact"
+      },
+      {
+        "type": "align_events",
+        "event_ids": [
+          "A05_ready",
+          "A06_ready"
+        ]
+      },
+      {
+        "type": "align_events",
+        "event_ids": [
+          "A07_ready",
+          "A08_ready",
+          "A09_ready"
+        ]
+      },
+      {
+        "type": "align_events",
+        "event_ids": [
+          "A10_ready",
+          "A11_ready",
+          "A12_ready"
+        ]
+      },
+      {
+        "type": "align_events",
+        "event_ids": [
+          "A13_ready",
+          "A14_ready",
+          "A15_ready",
+          "A16_ready"
+        ]
+      }
+    ]
+  }
+}

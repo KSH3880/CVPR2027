@@ -146,3 +146,11 @@ TokenHSI-coord/output
 
 # Verified archives of retired runs
 **/output_etc/archive/
+
+# Local image and Blender files
+*.jpg
+*.blend
+*.png
+
+# Local figures
+/figures/

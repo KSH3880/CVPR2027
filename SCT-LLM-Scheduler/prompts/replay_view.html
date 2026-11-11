@@ -1,0 +1,39 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>16-agent release replay</title>
+<style>body{margin:0;background:#0c1220;color:#e6edf7;font:14px system-ui}main{max-width:1500px;margin:auto;padding:20px}h1{font-size:23px;margin:0 0 8px}.note{color:#9bacbf;margin-bottom:15px}button,select{background:#1d2b40;color:white;border:1px solid #405475;border-radius:6px;padding:8px;margin-right:8px}canvas{width:100%;height:65vh;min-height:420px;background:#101b2a;border:1px solid #30435d;border-radius:10px}input{width:65%;vertical-align:middle}#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:14px}.card{border-left:4px solid;padding:8px;background:#172336;border-radius:5px;font-size:12px}.controls{margin:12px 0}b{font-variant-numeric:tabular-nums}small{color:#aebbd0}</style>
+<main><h1>실제 16명 rollout · 초기 freeze / release</h1><div class="note">실측 root·관절·물체 궤적을 재생하는 도식 뷰입니다. Isaac Gym 원본 렌더가 아닙니다. 흰 테두리 = 초기 freeze 대기. 해제 후 재동결 없음.</div>
+<div class="controls"><button id="play">▶ 재생</button><button id="reset">처음</button><select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select><select id="group"><option value="all">전체 16명</option></select><select id="projection"><option value="iso">입체 도식</option><option value="top">위에서 보기</option></select><button id="rotate">시점 회전</button><button id="zoomIn">확대 +</button><button id="zoomOut">축소 −</button></div>
+<canvas id="canvas"></canvas><div class="controls"><input id="time" type="range" min="0" step="0.01" value="0"><b id="clock"></b></div><div id="cards"></div>
+<small>점선 표식: 초기 위치 · 십자: 지정 목표 · 상자: 실측 물체 · 색상: agent ID. 접촉/작업 성공 여부를 이 뷰에서 자동 판정하지 않습니다.</small></main>
+<script>
+const D=__REPLAY_DATA__,T=D.trace,C=document.querySelector('#canvas'),ctx=C.getContext('2d'),$=s=>document.querySelector(s);
+const agents=D.scene.initial_observation.agents, tasks=D.scene.tasks, ids=agents.map(a=>a.agent_id),total=T.time_s.at(-1),requested=Object.fromEntries(D.schedule.map(r=>[r.agent_id,r.release_time_s])),actual=D.release.quantized_release_times_s[0];
+let playing=false,time=0,prev=0,angle=-.65,zoom=1; $('#time').max=total;
+const groups=[...new Set(tasks.map(t=>t.group_id))]; for(const g of groups){let o=document.createElement('option');o.value=g;o.textContent=tasks.filter(t=>t.group_id===g).map(t=>t.agent_id).join(' / ');$('#group').append(o)}
+function visible(){return ids.map((_,i)=>i).filter(i=>$('#group').value==='all'||tasks[i].group_id===$('#group').value)}
+const color=i=>`hsl(${i*137.508%360} 75% 65%)`;
+function index(){let i=0;while(i<T.time_s.length-1&&T.time_s[i+1]<=time)i++;return i}
+function draw(){let rect=C.getBoundingClientRect(),dpr=devicePixelRatio||1;C.width=rect.width*dpr;C.height=rect.height*dpr;ctx.scale(dpr,dpr);let w=rect.width,h=rect.height,selected=visible(),f=index(),top=$('#projection').value==='top';
+const xy=p=>[p[0]*Math.cos(angle)-p[1]*Math.sin(angle),(p[0]*Math.sin(angle)+p[1]*Math.cos(angle))*(top?1:.6)-(top?0:p[2]*1.3)];
+let points=[];for(let i of selected){points.push(T.roots[0][i].slice(0,3));let task=tasks[i];if(task.object_goal_position_m)points.push(task.object_goal_position_m);if(task.support_intended_final_center_m)points.push(task.support_intended_final_center_m)}
+let projected=points.map(xy),xs=projected.map(p=>p[0]),ys=projected.map(p=>p[1]),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2,scale=Math.min((w-110)/(Math.max(...xs)-Math.min(...xs)+6),(h-100)/(Math.max(...ys)-Math.min(...ys)+6))*zoom;
+const project=p=>{let q=xy(p);return[w/2+(q[0]-cx)*scale,h/2-(q[1]-cy)*scale]};
+ctx.fillStyle='#101b2a';ctx.fillRect(0,0,w,h);
+function line(a,b,c,width=1,dash=[]){ctx.strokeStyle=c;ctx.lineWidth=width;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();ctx.setLineDash([])}
+function label(p,text,c){ctx.font='12px system-ui';ctx.fillStyle=c;ctx.fillText(text,p[0]+8,p[1]-8)}
+let objectIds=new Set();for(let i of selected){for(let key of ['object_id','support_object_id'])if(tasks[i][key])objectIds.add(Number(tasks[i][key].split('_')[1]))}
+for(let bi=0;bi<T.box_ids.length;bi++){if($('#group').value!=='all'&&!objectIds.has(T.box_ids[bi]))continue;let b=T.boxes[f][bi],size=T.box_sizes[bi],q=b.slice(3,7),corners=[];
+function rotate(v){let[x,y,z,w]=q;let tx=2*(y*v[2]-z*v[1]),ty=2*(z*v[0]-x*v[2]),tz=2*(x*v[1]-y*v[0]);return[v[0]+w*tx+y*tz-z*ty+b[0],v[1]+w*ty+z*tx-x*tz+b[1],v[2]+w*tz+x*ty-y*tx+b[2]]}
+for(let k=0;k<8;k++)corners.push(project(rotate(size.map((s,a)=>s/2*((k>>a)&1?1:-1)))));
+for(let k=0;k<8;k++)for(let a=0;a<3;a++)if(!(k&(1<<a)))line(corners[k],corners[k|(1<<a)],objectIds.has(T.box_ids[bi])?'#93a9c7':'#36465c',1.2);
+}
+for(let i of selected){let col=color(i),task=tasks[i],goal=task.object_goal_position_m||task.support_intended_final_center_m;if(goal){let p=project(goal);line([p[0]-6,p[1]],[p[0]+6,p[1]],col);line([p[0],p[1]-6],[p[0],p[1]+6],col)}
+let start=project(T.roots[0][i]);ctx.strokeStyle=col;ctx.setLineDash([3,4]);ctx.beginPath();ctx.arc(...start,7,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);
+let root=project(T.roots[f][i]);let frozen=time<actual[ids[i]];for(let [a,b] of D.links)line(project(T.bodies[f][i][a]),project(T.bodies[f][i][b]),col,2);
+ctx.fillStyle=col;ctx.beginPath();ctx.arc(...root,4,0,2*Math.PI);ctx.fill();if(frozen){ctx.strokeStyle='white';ctx.lineWidth=2;ctx.beginPath();ctx.arc(...root,11,0,2*Math.PI);ctx.stroke()}
+label(root,ids[i]+(frozen?' WAIT':''),col);
+}
+$('#clock').textContent=`${time.toFixed(2)} / ${total.toFixed(2)} s`;
+$('#cards').innerHTML=selected.map(i=>`<div class="card" style="border-color:${color(i)}"><b>${ids[i]} · ${tasks[i].task_label}</b> · ${time<actual[ids[i]]?'❄ 대기':'▶ 실행'}<br>요청 ${requested[ids[i]].toFixed(2)}s / 실제 해제 ${actual[ids[i]].toFixed(3)}s${T.terminated[f][i]?'<br>종료/낙상 flag 발생':''}</div>`).join('');}
+$('#play').onclick=()=>{playing=!playing;$('#play').textContent=playing?'❚❚ 일시정지':'▶ 재생'};$('#reset').onclick=()=>{time=0;$('#time').value=0;draw()};$('#time').oninput=e=>{time=+e.target.value;draw()};$('#group').onchange=()=>{zoom=1;draw()};$('#projection').onchange=draw;$('#rotate').onclick=()=>{angle+=Math.PI/4;draw()};$('#zoomIn').onclick=()=>{zoom*=1.3;draw()};$('#zoomOut').onclick=()=>{zoom/=1.3;draw()};window.onresize=draw;
+function tick(now){if(playing&&prev){time=Math.min(total,time+(now-prev)/1000*+$('#speed').value);$('#time').value=time;draw();if(time>=total){playing=false;$('#play').textContent='▶ 재생'}}prev=now;requestAnimationFrame(tick)}draw();requestAnimationFrame(tick);
+</script></html>

@@ -1,13 +1,9 @@
 {
-  "status": "ok",
   "predictions": [
     {
       "agent_id": "A",
       "event_id": "A_ready",
       "estimated_elapsed_time_s": 4.0,
-      "supporting_example_ids": [
-        "synthetic_0"
-      ],
       "confidence": "low",
       "basis": "Synthetic plumbing fixture only."
     },
@@ -15,9 +11,6 @@
       "agent_id": "B",
       "event_id": "B_ready",
       "estimated_elapsed_time_s": 6.0,
-      "supporting_example_ids": [
-        "synthetic_0"
-      ],
       "confidence": "low",
       "basis": "Synthetic plumbing fixture only."
     }
@@ -43,8 +36,5 @@
       "event_id": "B_ready",
       "episode_time_s": 6.0
     }
-  ],
-  "limitations": [
-    "Synthetic data; no physical success or LLM quality measured."
   ]
 }

@@ -20,7 +20,7 @@ def check_gpu_mapping(physical_gpu):
 
 
 class InitialReleaseFreeze:
-    def __init__(self, task, requests, responses, agent_order, *, physical_gpu):
+    def __init__(self, task, requests, responses, agent_order, *, physical_gpu, execution_only=False):
         check_gpu_mapping(physical_gpu)
         from isaacgym import gymtorch
         import torch
@@ -30,8 +30,11 @@ class InitialReleaseFreeze:
         self.clocks = []
         self.agent_order = [list(row) for row in agent_order]
         for request, response, order in zip(requests, responses, self.agent_order):
-            validate_response(request, response)
-            require(response['status'] == 'ok', 'Non-ok schedule cannot run')
+            if execution_only:
+                from .executable import validate_executable
+                validate_executable(request, response)
+            else:
+                validate_response(request, response)
             releases = {r['agent_id']: r['release_time_s'] for r in response['schedule']}
             require(len(order) == task.num_agents and len(set(order)) == len(order) and set(order) == set(releases),
                     'Explicit actor-slot to agent-ID bijection required')
@@ -76,6 +79,13 @@ class InitialReleaseFreeze:
         task._action_to_pd_targets = targets
         task._sct_initial_release_adapter = self
         try:
+            # Reset poses exist in kinematic buffers until the first simulate.
+            # Populate observation buffers for ALL agents, including release=0.
+            body = task._kinematic_humanoid_rigid_body_states
+            task._rigid_body_pos.copy_(body[..., :3])
+            task._rigid_body_rot.copy_(body[..., 3:7])
+            task._rigid_body_vel.copy_(body[..., 7:10])
+            task._rigid_body_ang_vel.copy_(body[..., 10:13])
             self.project(submit=True)
             if self.frozen.any():
                 # Gym keeps the last submitted actor indices: retain pending full reset.
@@ -100,6 +110,17 @@ class InitialReleaseFreeze:
         self.frozen = self._mask(frame)
         self.frame = frame
         self.project(submit=True)
+        if frame == 0:
+            # before_action(0) must not replace the pending full reset with
+            # frozen-only actor indices. Otherwise release=0 actors stay at
+            # stale simulator spawn poses and jump on the first physics step.
+            task, gymtorch = self.task, self.gymtorch
+            actors = self.torch.arange(len(task._root_states), device=task.device, dtype=self.torch.int32)
+            humans = task._humanoid_actor_ids.flatten().contiguous()
+            task.gym.set_actor_root_state_tensor_indexed(task.sim, gymtorch.unwrap_tensor(task._root_states),
+                                                        gymtorch.unwrap_tensor(actors), len(actors))
+            task.gym.set_dof_state_tensor_indexed(task.sim, gymtorch.unwrap_tensor(task._dof_state),
+                                                 gymtorch.unwrap_tensor(humans), len(humans))
 
     def mask_actions(self, actions):
         return actions.reshape(self.task.num_envs, self.task.num_agents, -1).masked_fill(

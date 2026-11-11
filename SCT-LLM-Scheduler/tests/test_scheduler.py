@@ -23,7 +23,7 @@ class SchedulerTests(unittest.TestCase):
     def test_enabling_formula(self):
         request, response = fixture('enabling')
         validate_response(request, response)
-        self.assertEqual(earliest_schedule(request['current_scene'], response['predictions']), {'A': 0., 'B': 2.})
+        self.assertEqual(earliest_schedule(request['current_scene'], response['predictions']), {'A': 0., 'B': 2.01})
         response['predictions'][1]['estimated_elapsed_time_s'] = 7.
         self.assertEqual(earliest_schedule(request['current_scene'], response['predictions']), {'A': 0., 'B': 0.})
 
@@ -34,7 +34,44 @@ class SchedulerTests(unittest.TestCase):
         scene['event_agents'] = {'C_ready': 'C'}
         scene['coordination_constraints'].append({'type': 'enabling', 'enabling_event_id': 'B_ready', 'dependent_event_id': 'C_ready'})
         predictions = self.response['predictions'] + [{'event_id': 'C_ready', 'estimated_elapsed_time_s': 1.}]
-        self.assertEqual(earliest_schedule(scene, predictions), {'A': 2., 'B': 0., 'C': 5.})
+        self.assertEqual(earliest_schedule(scene, predictions), {'A': 2., 'B': 0., 'C': 5.01})
+
+    def test_enabling_simultaneous_event_rejected(self):
+        request, response = fixture('enabling')
+        response['schedule'][1]['release_time_s'] = 2.
+        response['predicted_episode_events'][1]['episode_time_s'] = 5.
+        with self.assertRaisesRegex(ValueError, 'violates constraints'):
+            validate_response(request, response)
+
+    def test_enabling_additional_wait_allowed(self):
+        request, response = fixture('enabling')
+        response['schedule'][1]['release_time_s'] = 8.
+        response['predicted_episode_events'][1]['episode_time_s'] = 11.
+        validate_response(request, response)
+
+    def test_independent_agents_start_immediately(self):
+        request,response=fixture()
+        request['current_scene']['coordination_constraints']=[]
+        for row in response['schedule']:row['release_time_s']=0.
+        for row,pred in zip(response['predicted_episode_events'],response['predictions']):
+            row['episode_time_s']=pred['estimated_elapsed_time_s']
+        validate_response(request,response)
+        response['schedule'][0]['release_time_s']=1.
+        response['predicted_episode_events'][0]['episode_time_s']+=1.
+        with self.assertRaisesRegex(ValueError,'Independent agents'):
+            validate_response(request,response)
+
+    def test_enabling_predecessor_still_fixed_at_zero(self):
+        request, response = fixture('enabling')
+        response['schedule'][0]['release_time_s'] = 1.
+        response['schedule'][1]['release_time_s'] = 0.
+        with self.assertRaisesRegex(ValueError, 'predecessor must start at zero'):
+            validate_response(request, response)
+
+    def test_enabling_equal_durations_requires_later_follower(self):
+        request, response = fixture('enabling')
+        response['predictions'][1]['estimated_elapsed_time_s'] = 5.
+        self.assertEqual(earliest_schedule(request['current_scene'], response['predictions']), {'A': 0., 'B': .01})
 
     def test_infeasible_cycle(self):
         scene = self.request['current_scene']
@@ -45,29 +82,16 @@ class SchedulerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Infeasible'):
             earliest_schedule(scene, predictions)
 
-    def test_five_demos(self):
-        self.request['demonstrations'].pop()
-        with self.assertRaises(ValueError):
-            build_messages(self.request)
-
-    def test_wrong_controller(self):
-        self.request['demonstrations'][0]['controller_id'] = 'different'
-        with self.assertRaises(ValueError):
-            validate_request(self.request)
-
-    def test_waiting_is_not_active_duration(self):
-        self.request['demonstrations'][0]['measured_events'][0]['elapsed_since_release_s'] = 5.
-        with self.assertRaises(ValueError):
-            validate_request(self.request)
-
-    def test_censored_events_preserved(self):
-        event = self.request['demonstrations'][0]['measured_events'][0]
-        event.update(reached=False, episode_time_s=None, elapsed_since_release_s=None)
+    def test_request_contains_only_environment_and_initial_scene(self):
         messages = build_messages(self.request)
-        self.assertIsNone(json.loads(messages[1]['content'])['demonstrations'][0]['measured_events'][0]['episode_time_s'])
-        event['episode_time_s'] = 0
-        with self.assertRaises(ValueError):
-            validate_request(self.request)
+        payload = json.loads(messages[1]['content'])
+        self.assertEqual(set(payload), {'environment_spec', 'current_scene'})
+        self.assertEqual(payload, self.request)
+
+    def test_legacy_demonstrations_rejected(self):
+        self.request['demonstrations'] = []
+        with self.assertRaisesRegex(ValueError, 'Invalid request keys'):
+            build_messages(self.request)
 
     def test_current_future_data_rejected(self):
         self.request['current_scene']['initial_observation']['measured_events'] = []
@@ -98,7 +122,7 @@ class SchedulerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_response(self.request, self.response)
 
-    def test_unknown_evidence_rejected(self):
+    def test_legacy_example_citations_rejected(self):
         self.response['predictions'][0]['supporting_example_ids'] = ['invented']
         with self.assertRaises(ValueError):
             validate_response(self.request, self.response)
@@ -108,12 +132,20 @@ class SchedulerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_response(self.request, self.response)
 
-    def test_non_ok_has_no_schedule(self):
-        self.response.update(status='insufficient_information', schedule=[], predicted_episode_events=[], predictions=[])
-        validate_response(self.request, self.response)
-        self.response['schedule'] = [{'agent_id': 'A', 'release_time_s': 0}]
+    def test_empty_schedule_rejected(self):
+        self.response['schedule'] = []
         with self.assertRaises(ValueError):
             validate_response(self.request, self.response)
+
+    def test_status_field_removed(self):
+        for status in ('ok', 'infeasible', 'insufficient_information'):
+            with self.subTest(status=status), self.assertRaisesRegex(ValueError, 'Invalid response keys'):
+                validate_response(self.request, dict(self.response, status=status))
+
+    def test_limitations_field_removed(self):
+        validate_response(self.request, self.response)
+        with self.assertRaisesRegex(ValueError, 'Invalid response keys'):
+            validate_response(self.request, dict(self.response, limitations=[]))
 
     def test_strict_json(self):
         for text in ('{"x": 1, "x": 2}', '{"x": NaN}', '```json\n{}\n```'):

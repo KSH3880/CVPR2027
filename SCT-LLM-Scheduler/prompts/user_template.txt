@@ -1,8 +1,27 @@
 Predict event durations and generate an initial release schedule for CURRENT_SCENE.
 
-The five demonstrations are separate historical executions of the same
-pretrained controller. Their measured trajectories and outcomes are available
-for in-context calibration. CURRENT_SCENE has not been executed.
+CURRENT_SCENE has not been executed.
+Estimate each agent's elapsed time from release to the specified event
+using the supplied scene information and any provided timing examples.
+Exclude initial frozen waiting from these estimates.
+State any necessary timing assumptions, and mark estimates with low
+confidence when timing evidence is insufficient.
+Produce numeric best-effort estimates and a complete release schedule
+even without timing calibration.
+For each two-agent enabling unit, fix the predecessor's release to 0 and
+choose only the follower's freeze release time. For each two-to-four-agent coupled
+PUSH group, choose every member's release time and thereby who starts first.
+Read each group's actual membership from the scene; do not assume four members
+or equate total scene population with a single PUSH group's size.
+Return all agents in schedule, including enabling predecessors fixed at 0.
+Agents outside enabling and coupled constraints start at time 0.
+These are initial policy release times; there is no separate PUSH start gate.
+For enabling, the follower's dependency-sensitive event must occur strictly
+after the predecessor's enabling event, never simultaneously. Additional initial
+waiting is allowed; the follower need not start at the earliest feasible time.
+No fixed timing gap is specified. Base any additional enabling delay on timing uncertainty or explicitly
+supplied settling requirements, and briefly explain it in the follower's
+prediction basis. Respect any supplied validity window for the enabling condition.
 
 UNITS AND REPRESENTATION
 {{UNITS_COORDINATE_FRAME_AND_FIELD_DEFINITIONS}}
@@ -12,21 +31,6 @@ TASK GLOSSARY
 
 EVENT DEFINITIONS
 {{EXACT_READINESS_ENABLING_AND_COMPLETION_CONDITIONS}}
-
-DEMONSTRATION 1
-{{RECORDED_EXAMPLE_1_JSON}}
-
-DEMONSTRATION 2
-{{RECORDED_EXAMPLE_2_JSON}}
-
-DEMONSTRATION 3
-{{RECORDED_EXAMPLE_3_JSON}}
-
-DEMONSTRATION 4
-{{RECORDED_EXAMPLE_4_JSON}}
-
-DEMONSTRATION 5
-{{RECORDED_EXAMPLE_5_JSON}}
 
 CURRENT_SCENE
 {{CURRENT_INITIAL_OBSERVATION_TASKS_TARGETS_AND_DEPENDENCIES_JSON}}

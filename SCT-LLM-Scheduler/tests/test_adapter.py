@@ -62,6 +62,9 @@ class AdapterTests(unittest.TestCase):
                                                [['A', 'B'], ['B', 'A']], physical_gpu=6)
             self.assertEqual(controller.frozen.tolist(), [[True, False], [False, True]])
             self.assertIn(('root', [0, 1, 2, 3, 4, 5]), task.gym.submissions)
+            controller.before_action(0)
+            self.assertEqual(task.gym.submissions[-2:], [('root', [0, 1, 2, 3, 4, 5]),
+                                                        ('dof', [0, 1, 3, 4])])
             task._humanoid_root_states[..., 0] = 9
             task._dof_pos[:] = 7
             task._dof_vel[:] = 5

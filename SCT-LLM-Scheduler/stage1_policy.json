@@ -1,0 +1,10 @@
+{
+  "checkpoint_local": "/home/hwanhee/juan/CVPR2027/SCT-LLM-Scheduler/teacher_runtime/checkpoints/stage1/Stage1JointPushDensity3Cone90Finetune_00026000.pth",
+  "checkpoint_source": "/home/hwanhee/ksh/stage1_2_base_jointpush/pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth",
+  "sha256": "ec4215803b529bab1dd1be430154604418392e24faed59bca69b5c61adafe67c",
+  "epoch": 26000,
+  "controller_id": "sha256:ec4215803b529bab1dd1be430154604418392e24faed59bca69b5c61adafe67c",
+  "policy": "Stage1 SCT 26k",
+  "adapter": "eval/stage1_protocol_policy.py",
+  "stage2_coordination": false
+}

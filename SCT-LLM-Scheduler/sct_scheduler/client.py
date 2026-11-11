@@ -5,7 +5,9 @@ import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
 from .core import build_messages, validate_response, require
+from .config import REASONING_EFFORTS
 
 
 def loads(text):
@@ -20,23 +22,39 @@ def loads(text):
     return json.loads(text, object_pairs_hook=pairs, parse_constant=invalid)
 
 
-def chat_transport(endpoint, model, api_key=None, timeout_s=120):
+def chat_transport(endpoint, model, api_key=None, timeout_s=120, json_mode=False, reasoning_effort=None):
     """Explicit chat-completions-compatible endpoint; no retries or default model."""
     parsed = urlparse(endpoint)
+    require(bool(parsed.netloc) and parsed.username is None and parsed.password is None
+            and not parsed.query and not parsed.fragment, 'Invalid endpoint URL')
     require(parsed.scheme == 'https' or (parsed.scheme == 'http' and parsed.hostname in ('localhost', '127.0.0.1', '::1')),
             'Use HTTPS except for loopback inference')
     require(bool(model), 'Explicit model required')
+    require(reasoning_effort is None or reasoning_effort in REASONING_EFFORTS, 'Invalid reasoning effort')
     def call(messages):
-        payload = {'model': model, 'messages': messages, 'stream': False,
-                   'response_format': {'type': 'json_object'}}
+        payload = {'model': model, 'messages': messages, 'stream': False}
+        if reasoning_effort is not None:
+            payload['reasoning_effort'] = reasoning_effort
+        if json_mode:
+            payload['response_format'] = {'type': 'json_object'}
         headers = {'Content-Type': 'application/json'}
         if api_key:
             headers['Authorization'] = 'Bearer ' + api_key
         req = Request(endpoint, data=json.dumps(payload, allow_nan=False).encode(), headers=headers)
-        with urlopen(req, timeout=timeout_s) as result:
-            envelope = loads(result.read().decode())
+        try:
+            with urlopen(req, timeout=timeout_s) as result:
+                envelope = loads(result.read().decode())
+        except HTTPError as exc:
+            # Avoid persisting provider error bodies that might echo credentials.
+            raise RuntimeError(f'LLM HTTP {exc.code}; check API key, model and endpoint. No retry performed.') from None
+        except URLError:
+            raise RuntimeError('LLM connection failed. No retry performed.') from None
+        require(isinstance(envelope, dict) and bool(envelope.get('choices')), 'Missing completion choices')
+        require(isinstance(envelope['choices'][0].get('message', {}).get('content'), str),
+                'Missing text completion (refusal or unsupported response format)')
         return envelope['choices'][0]['message']['content'], {
             'model': envelope.get('model', model), 'usage': envelope.get('usage'),
+            'reasoning_effort': reasoning_effort,
             'response_id': envelope.get('id'), 'finish_reason': envelope['choices'][0].get('finish_reason')}
     return call
 

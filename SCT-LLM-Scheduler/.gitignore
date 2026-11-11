@@ -3,3 +3,9 @@ __pycache__/
 output/
 output_etc/
 .env
+teacher_runtime/*
+!teacher_runtime/record_entry.py
+!teacher_runtime/capture_initial_entry.py
+!teacher_runtime/replay_schedule_entry.py
+!teacher_runtime/view_schedule_entry.py
+!teacher_runtime/batch_eval_entry.py

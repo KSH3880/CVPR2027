@@ -60,12 +60,12 @@ def scene_index(scene):
 
 
 def validate_request(request):
-    require(set(request) == {'environment_spec', 'demonstrations', 'current_scene'}, 'Invalid request keys')
-    # Reject NaN/Infinity anywhere, including observations and demonstration samples.
+    require(set(request) == {'environment_spec', 'current_scene'}, 'Invalid request keys')
+    # Reject NaN/Infinity anywhere, including initial observations.
     json.dumps(request, allow_nan=False)
     env = request['environment_spec']
     require(env['units'] == {'position': 'meters', 'time': 'seconds', 'angle': 'radians'}, 'Unsupported units')
-    require(bool(env.get('coordinate_system')) and bool(env.get('trajectory_format')), 'Missing field definitions')
+    require(bool(env.get('coordinate_system')), 'Missing field definitions')
     scene = request['current_scene']
     allowed = {'scene_id', 'controller_id', 'coordination_type', 'initial_observation', 'tasks',
                'event_definitions', 'event_agents', 'coordination_constraints', 'planned_geometric_paths'}
@@ -83,47 +83,6 @@ def validate_request(request):
     check_initial(scene)
     scene_index(scene)
     require(bool(scene['scene_id']) and bool(scene['controller_id']), 'Scene/controller ID required')
-    demos = request['demonstrations']
-    require(len(demos) == 5, 'Exactly five separate historical demonstrations required')
-    unique(demos, 'example_id')
-    for d in demos:
-        require(d['controller_id'] == scene['controller_id'], 'Controller/checkpoint mismatch')
-        require(d.get('scene_id', d['example_id']) != scene['scene_id'], 'Current scene is not historical evidence')
-        agents, owners, _ = scene_index(d)
-        releases = d['executed_release_times_s']
-        require(set(releases) == set(agents), 'Incomplete demonstration release times')
-        for t in releases.values():
-            seconds(t)
-        end = seconds(d['observation_end_time_s'])
-        seen = set()
-        for e in d['measured_events']:
-            event = e['event_id']
-            require(event in owners and owners[event] == e['agent_id'], 'Invalid measured event owner')
-            require(event not in seen, 'Duplicate measured event')
-            seen.add(event)
-            require(type(e['reached']) is bool, 'reached must be boolean')
-            if e['reached']:
-                t = seconds(e['episode_time_s'])
-                elapsed = seconds(e['elapsed_since_release_s'])
-                require(t <= end and abs(t - releases[e['agent_id']] - elapsed) < 1e-6,
-                        'Event label includes waiting or is outside observation window')
-            else:
-                require(e.get('episode_time_s') is None and e.get('elapsed_since_release_s') is None,
-                        'Censored event must have null timing labels')
-        require(seen == set(owners), 'Annotate every event, including censored failures')
-        for prefix, ids in [('agent', set(agents)),
-                            ('object', {o['object_id'] for o in d['initial_observation'].get('objects', [])})]:
-            columns = d['trajectory_columns' if prefix == 'agent' else 'object_trajectory_columns']
-            traces = d[prefix + '_trajectories']
-            require(columns and columns[0] == 'episode_time_s', 'Trajectory timestamps must be episode time')
-            require(set(traces) == ids, 'Missing or extra trajectory IDs; use [] for unavailable samples')
-            for rows in traces.values():
-                previous = -1
-                for row in rows:
-                    require(len(row) == len(columns), 'Trajectory column mismatch')
-                    t = seconds(row[0])
-                    require(previous <= t <= end, 'Unordered or out-of-window trajectory')
-                    previous = t
     return request
 
 
@@ -137,19 +96,23 @@ def build_messages(request):
 def earliest_schedule(scene, predictions):
     """Componentwise earliest releases, in integer centiseconds.
 
-    r[v] >= r[u] + duration[u_event] - duration[v_event].
+    Enabling uses strict event ordering on the output's centisecond grid.
+    Alignment uses equality; no physical safety margin is added.
     Alignment contributes edges in both directions. A positive cycle is infeasible.
-    This is a checker/reference solver; never silently rewrites an LLM answer.
+    Optional reference solver for fixtures/preflight, not the acceptance rule.
+    Never silently rewrites an LLM answer; later enabling releases are valid.
     """
     agents, owners, required = scene_index(scene)
     duration = {p['event_id']: seconds(p['estimated_elapsed_time_s'], True) for p in predictions}
     require(required <= duration.keys(), 'Missing prediction for constrained event')
     edges = []
-    def edge(first, second):
-        edges.append((owners[first], owners[second], duration[first] - duration[second]))
+    fixed = set()
+    def edge(first, second, strict=False):
+        edges.append((owners[first], owners[second], duration[first] - duration[second] + int(strict)))
     for c in scene['coordination_constraints']:
         if c['type'] == 'enabling':
-            edge(c['enabling_event_id'], c['dependent_event_id'])
+            edge(c['enabling_event_id'], c['dependent_event_id'], strict=True)
+            fixed.add(owners[c['enabling_event_id']])
         else:
             first = c['event_ids'][0]
             for other in c['event_ids'][1:]:
@@ -160,6 +123,7 @@ def earliest_schedule(scene, predictions):
         changed = False
         for u, v, weight in edges:
             if release[v] < release[u] + weight:
+                require(v not in fixed, 'Infeasible timing constraints: enabling predecessor must start at zero')
                 release[v] = release[u] + weight
                 changed = True
         if not changed:
@@ -169,35 +133,22 @@ def earliest_schedule(scene, predictions):
 
 def validate_response(request, response):
     validate_request(request)
-    require(set(response) == {'status', 'predictions', 'schedule', 'predicted_episode_events', 'limitations'},
+    require(set(response) == {'predictions', 'schedule', 'predicted_episode_events'},
             'Invalid response keys')
     json.dumps(response, allow_nan=False)
-    for key in ('predictions', 'schedule', 'predicted_episode_events', 'limitations'):
+    for key in ('predictions', 'schedule', 'predicted_episode_events'):
         require(isinstance(response[key], list), f'{key} must be a list')
-    status = response['status']
-    require(status in ('ok', 'insufficient_information', 'infeasible'), 'Unknown status')
-    require(all(isinstance(x, str) and x.strip() for x in response['limitations']), 'Invalid limitations')
     scene = request['current_scene']
     agents, owners, required = scene_index(scene)
-    example_ids = {d['example_id'] for d in request['demonstrations']}
     predictions = response['predictions']
     unique(predictions, 'event_id')
     for p in predictions:
         require(set(p) == {'agent_id', 'event_id', 'estimated_elapsed_time_s',
-                           'supporting_example_ids', 'confidence', 'basis'}, 'Invalid prediction keys')
+                           'confidence', 'basis'}, 'Invalid prediction keys')
         require(p['event_id'] in owners and p['agent_id'] == owners[p['event_id']], 'Invalid prediction owner')
         seconds(p['estimated_elapsed_time_s'], True)
-        support = p['supporting_example_ids']
-        require(isinstance(support, list) and bool(support) and
-                all(isinstance(s, str) for s in support) and set(support) <= example_ids,
-                'Prediction must cite supplied empirical examples')
         require(p['confidence'] in ('low', 'medium', 'high'), 'Invalid confidence')
         require(isinstance(p['basis'], str) and bool(p['basis'].strip()), 'Missing prediction evidence')
-    if status != 'ok':
-        require(response['schedule'] == [] and response['predicted_episode_events'] == [],
-                'Non-ok answer cannot be executed or have episode event times')
-        require(bool(response['limitations']), 'Explain non-ok status')
-        return response
     require(required <= {p['event_id'] for p in predictions}, 'Missing required predictions')
     schedule = response['schedule']
     require(set(unique(schedule, 'agent_id')) == set(agents), 'Schedule must cover every agent exactly once')
@@ -206,8 +157,21 @@ def validate_response(request, response):
         seconds(row['release_time_s'], True)
     releases = {r['agent_id']: r['release_time_s'] for r in schedule}
     require(min(releases.values()) == 0, 'At least one release must be zero')
-    require(releases == earliest_schedule(scene, predictions),
-            'Schedule violates constraints or adds unnecessary waiting')
+    participating = {owners[e] for e in required}
+    require(all(releases[a] == 0 for a in agents if a not in participating),
+            'Independent agents must start at zero')
+    duration = {p['event_id']: seconds(p['estimated_elapsed_time_s'], True) for p in predictions}
+    episode = {event: seconds(releases[owners[event]], True) + elapsed
+               for event, elapsed in duration.items()}
+    for constraint in scene['coordination_constraints']:
+        if constraint['type'] == 'enabling':
+            first, second = constraint['enabling_event_id'], constraint['dependent_event_id']
+            require(releases[owners[first]] == 0, 'Enabling predecessor must start at zero')
+            require(episode[second] > episode[first],
+                    'Schedule violates constraints: follower event must be strictly later')
+        else:
+            require(len({episode[e] for e in constraint['event_ids']}) == 1,
+                    'Schedule violates constraints: coupled events must align')
     events = response['predicted_episode_events']
     require(set(unique(events, 'event_id')) == {p['event_id'] for p in predictions}, 'Episode event coverage mismatch')
     duration = {p['event_id']: seconds(p['estimated_elapsed_time_s'], True) for p in predictions}

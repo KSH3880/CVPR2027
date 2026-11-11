@@ -1,3 +1,20 @@
+## 2026-11-11
+
+### 40.5K Table 1·2 동일 조건 평가 시작
+
+사용자 요청으로 `TokenHSIPushKD_00040500.pth`를 기존31K/36K와 동일한 seed1/6/7·512환경·900step·42회로 평가한다. CPU strict load·epoch40500·모델finite·가중치/정규화 불변 검증 통과. SHA256 `18e474bab417985aacc7a3cf3b381a9062824038854baec6b3bee8484059c8d6`. 코드·결과는 `output_etc/check/tokenhsi40p5k_tables12_20261111/`에 분리했다. 관측·물리·채점은36K 평가 복사본 그대로이며 초기상태는canonical과31K 대응 실행에 대조한다.
+
+GPU6/7에서 다른 평가가 실행 중이므로 GPU당1개로 제한하고 신규작업 전 작은평가20GB·8/16H평가30GB 메모리 여유를 요구한다. 선행2회 검증 후 나머지40회 자동 실행 및Table1/2·행동별Ind.·31K비교 집계. Conda bin·lib 및CUDA12.8 경로를명시해 런타임 누락을보완했다. `/ksh`·기존결과·MPS데몬·기존프로세스는수정/종료하지않는다. 본 기록은 평가시작이며 완료수치는아니다.
+
+
+### 36K Table 1·2 동일 조건 평가 시작
+
+사용자 요청으로 `output/push4096_kd0p1_sharedv2/TokenHSIPushKD_00036000.pth`를 31K와 동일한 Table1/2 조건으로 평가한다. CPU strict load, epoch36000, 전체 모델 finite 및 가중치/정규화 불변 검증을 통과했다. SHA256은 `2815cd729008876763219087782f2f425677b3ee078279586761d6e351041025`다.
+
+31K의 검증된 평가 코드를 `output_etc/check/tokenhsi36k_tables12_20261111/carrier/`에 복사하여 물리·정책 입력·채점은 그대로 유지했다. 시드1/6/7·512환경·900step, Table1 I/M×2/4/8/16H와 Table2 Enable3종·Coupled2/3/4H 총42회. 초기 상태는 기존 canonical뿐 아니라 완료된31K 대응 실행과 tensor exact 일치도 검사한다. `/ksh`·31K 평가 코드/결과는 수정하지 않았다.
+
+GPU6·7 기존MPS 연결을 확인하고 정식2H Independent·Coupled 선행2회를 시작했다. 검증 통과 시 나머지40회를 자동 진행한다. 현재 GPU7에는 학습3개가 있어 작은평가는 GPU6 최대3개·GPU7 최대2개로 제한하며,8/16H는GPU별1개 및30GB 여유를 요구한다. signal·MPS daemon 제어·GPU reset 없이 자연 종료한다. `status.json`·`report.md`, 행동별 `ind_tasks.md`,31K 비교 `comparison_31k.md`에 진행/완료 결과를 기록한다. 이 기록은 실행 시작이며 최종 수치 완료를 뜻하지 않는다.
+
 ## 2026-11-10
 
 ### TokenHSI* Table 1·2 다인 평가 시작

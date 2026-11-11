@@ -21,7 +21,6 @@ def run_episode(task, requests, agent_order, scheduler, output_dir, *, physical_
     require(root.resolve() in output.parents, 'Episode outputs must stay under local output_etc/check/')
     output.mkdir(parents=True, exist_ok=False)
     answers = [scheduler.schedule(request, output / f'env_{i:04d}') for i, request in enumerate(requests)]
-    require(all(answer['status'] == 'ok' for answer in answers), 'Non-ok prediction: no simulation executed')
     controller = InitialReleaseFreeze(task, requests, answers, agent_order, physical_gpu=physical_gpu)
     import torch
     try:
