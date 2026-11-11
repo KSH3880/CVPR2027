@@ -7,9 +7,10 @@
 - `push_reference/`: PUSH reference 물리 환경 의존성.
 - `lpanlib/`: 실행에 필요한 유틸리티.
 - `scripts/`, `tests/`, `docs/`, `handoff_support/`: 실행기·검증·문서·데이터 경로 템플릿.
-- 가중치, 실제 모션/메시 데이터, 로컬 심링크, output/output_etc, 과거 제출 묶음은 제외했다.
+- 가중치, 외부 모션 데이터, 로컬 심링크, output/output_etc, 과거 제출 묶음은 제외했다.
 
-환경·데이터·teacher/초기student 체크포인트는 별도로 준비해야 한다.
+기본 humanoid XML/OBJ 에셋은 포함한다. 환경·외부 데이터·teacher/초기student 체크포인트는 별도로 준비해야 한다.
+`BUNDLE_SHA256.json`과 HANDOFF 문서는 원래 전달본의 출처 기록이며, 이 독립 snapshot의 전체 파일 검증 목록은 `EXPORT_MANIFEST.json`이다.
 `handoff_support/manifests`와 `scripts/prepare_paths.py`를 참고한다.
 `output_etc`에 보관된 다인 Table1/2 평가 실행기·결과는 이 코드 snapshot에 포함하지 않는다.
 기존 머신의 경로·학습상태를 서술하는 아래 기록은 과거 실행 기록이며 새 clone의 상태가 아니다.
