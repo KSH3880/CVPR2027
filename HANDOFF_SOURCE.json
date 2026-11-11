@@ -1,0 +1,20 @@
+{
+  "branch": "baseline/tokenhsi-push-kd",
+  "commit": "0d6d488639429a97611c6bb379603a315e2d2867",
+  "source_clean": true,
+  "bundled_weights": [
+    "teacher_stage1.pth",
+    "push_init.pth"
+  ],
+  "extra_push_motion_files": 21,
+  "changes": [
+    "Runtime dataset paths use portable templates and prepare_paths.py",
+    "External data symlinks materialized as regular files",
+    "No .git, training results, Isaac Gym SDK, or conda environment included"
+  ],
+  "gpu_training_validated": false,
+  "weight_sha256": {
+    "teacher_stage1.pth": "60142bc2a0b44614e78e0ae28537a3ec4d4059cf171278c255793d6083d8db83",
+    "push_init.pth": "a68dc354d5bfe342089838cbf209fc16ed542709cead5ba6d37f61fbca2cafc0"
+  }
+}
