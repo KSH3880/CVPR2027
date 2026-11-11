@@ -2,7 +2,124 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-11
+
+### TeamHOI식 표면12cm·접촉력제외 t_coop/Jerk · 최종 CPU 재집계
+
+- 중간높이한줄64점의PUSH접촉높이불일치를진단한뒤사용자가t_coop거리대상을실제상자전체표면12cm로선택했다. 전원양손·접촉력제외·기록전체누적·출발6조건·최초공유중심3D20cm종료/실패기록끝·원본counter분모/0~1clip/NaN평균을유지하고t_coop42회를재집계했다. Jerk는원본float32쿼터니언변환/차분함수·dt0.0333·둘레64점·Jerk0제외의45회값을정확히재사용했다. 기존64점근접결과와최초구간내t_coop/Jerk는보존했다. 새GPU실행/학습/일반코드변경없음.
+- 3seed합산인원별trial평균의2/3/4명동일가중요약에서0.5m/s·1초 t_coop은Z18 83.10,Z19 82.24,Z20 81.43,C22 90.43,C23 94.28,C25 93.00,C26 90.42,C28 88.77%다. 같은조건Jerk는Z17 16.28,Z20 16.22,C22 15.92,C23 15.05,C25 13.92,C26 14.40,C28 15.62m/s³다. C23이t_coop6조건중5개최고이고이동1m는C24 93.69%가높다. 원본의에피소드전체분자/구간분모로0.5조건그룹의약72–87%가상한clip되어운반구간내순수시간비율과구분해야한다.
+- 원시180파일SHA·참조4파일SHA불변·270개시작/종료counter·252개원본Torch나눗셈/clip·원본pandas최종trial평균·270개Jerk배열부모와exact·실제손/상자좌표의표면거리CPU대조·공식Jerk실제궤적대조를검증했다. 인원별trial평균과seed평균±표준편차/유효건수/clip율을별도보존하며Z17의t_coop은손기록없어N/A다. [전체표](output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/report.md), [그림](output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/comparison.png), [검증](output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/verification.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+
+### TeamHOI식 접촉력 제외 t_coop/Jerk · 원본 함수/집계 CPU 재현
+
+- 사용자 요청으로 출발6조건·최초공유중심3D20cm성공/실패기록끝·상자중간높이둘레64점·접촉력제외를 적용했다. TeamHOI공개Jerk/쿼터니언변환함수를 스냅샷해float32·dt0.0333·원본시간마스크·XYZ절대평균·최종Jerk=0제외를 사용했다. t_coop은둘레점까지12cm미만전원양손·추가alive필터없이기록전체공동프레임누적·원본counter분모·0~1clip·0/0 NaN평균제외를 보존했다. 2/3/4명각각원본식trial평균과3seed합산/seed통계를 구분하고 동일가중요약을 추가했다. Jerk45회/t_coop42회이며 새GPU실행/일반코드변경은없다.
+- 중간높이한줄64점에대한t_coop은20384그룹중4그룹만양의공동프레임이있어거의0이다. 기존표면12cm동시접촉장면에서도손이상자중심보다20–50cm위여서64점까지12cm를넘는실제2/3/4명예시를검증했다. 계산/좌표오류가아닌PUSH접촉높이와측정기하불일치이며,이설정을공동참여증거로권장하지않는다. 사용자가기하변경을결정하기전에는점높이/거리대상을임의변경하지않고결과를보존한다. [전체표](output_etc/check/teamhoi_noforce_reaggregate_20261111/report.md), [희소성](output_etc/check/teamhoi_noforce_reaggregate_20261111/contact_sparsity.json), [기하진단](output_etc/check/teamhoi_noforce_reaggregate_20261111/geometry_diagnosis.json).
+- 원본식둘레64점Jerk·0.5m/s연속1초의인원동일가중trial평균은Z17 16.28,C22 15.92,C23 15.05,C25 13.92,C26 14.40,C28 15.62m/s³다. 이전float64/실제dt/유효구간재집계와원본회전함수·float32·고정dt·집계가다르므로결과를분리했다.
+- 원시180파일SHA불변·공개참조4파일SHA·270개시작/종료counter·252개원본Torch나눗셈/clip·양의공동프레임그룹포함실제8궤적168개Jerk표본exact·64점거리원시좌표대조·원본pandas의Jerk0제외/t_coop전체trial평균·0/음수분모/NaN처리를검증했다. [검증](output_etc/check/teamhoi_noforce_reaggregate_20261111/verification.json), [실제궤적감사](output_etc/check/teamhoi_noforce_reaggregate_20261111/audit.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+
+### 공동 PUSH Jerk · 출발6조건×둘레64점/꼭짓점8개 CPU 재집계
+
+- 사용자 요청으로 zerobg17k–20k/contact18k–28k의512환경×seed0/1/2·1200step 원시45개를 CPU로 재집계했다. TeamHOI의 XYZ 절대3차차분 평균을 유지하고 상자중간높이 수평둘레64점/위·아래8꼭짓점·출발XY변위20/50/100cm 또는속력0.2/0.5/1m/s 연속1초의12조건을 비교했다. 실제기록dt·float64·무필터이며4좌표모두구간내·최초공유중심성공까지/실패기록끝·미출발/표본부족N/A를 사용한다. 그룹→2/3/4명동일가중→seed통계와 유효율·성공/실패별·속력/시간·Z17공통성공장면 비교를 보존했다.
+- Z17도 공유중심·구역과동일한회전·크기로복원했다. 같은seedZ18과초기12필드exact·실제너비=구역너비×인원/나머지크기동일을검증했고 손기록없는Z17의t_coop은추가하지않았다. 새GPU실행·일반학습/평가코드변경은없다. [전체 표/정의](output_etc/check/jerk_reaggregate_20261111/report.md), [그래프](output_etc/check/jerk_reaggregate_20261111/jerk.png), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+- 둘레64점·0.5m/s연속1초 Jerk(m/s³)는Z17 16.20±0.25,C22 15.85±0.19,C23 14.97±0.19,C25 13.84±0.15,C26 14.31±0.21,C28 15.53±0.32다.8꼭짓점은각각19.20/18.77/17.72/16.37/16.94/18.39다.6조건×15모델쌍630개 중629개의순위가같고0.2m/s의C19/C24만역전됐다. C25는같은장면에서양쪽모두성공한0.5m/s조건에서도15.34 vs Z17 17.30으로낮지만전체평균속력/SR도낮아성능우위로단정하지않는다. 전체Jerk최저C18도SR85.67%로낮아SR과분리해서해석한다.
+- 원시180파일SHA불변·기존42회t_coop의6조건×3접촉거리출발/분모exact·45회그룹SR재현·270개구간/누락분모·인원/seed집계·상수속도/3차위치해석해·쿼터니언부호/평행이동불변·구간밖점제외를검증했다. TeamHOI공식함수와합성float64입력이일치하고실제5개궤적표본대조의최대절대차는8.52e-11이다. [검증](output_etc/check/jerk_reaggregate_20261111/verification.json), [공식함수/집계대조](output_etc/check/jerk_reaggregate_20261111/aggregation_audit.json), [공통성공장면비교](output_etc/check/jerk_reaggregate_20261111/paired_success_vs_z17.csv).
+
+### Contact25k–28k · 미평가1k 체크포인트 SR+t_coop18조건 평가
+
+- 사용자 요청 범위를 contact만으로 좁혀25k/26k/27k/28k PTH/YAML을 고정 복사하고 각512환경×seed0/1/2·4명·8토큰·ordered·loco·평균 액션·기존 스폰/물성·1200step 총12회를 GPU6/7만 사용해 완료했다. 기존30회를 재사용해14모델 SR·접촉6/8/12cm×속력/변위18조건·출발률·인원별/seed별 통계를 저장했다. zerobg 새 평가와 scratch 학습은 실행하지 않았다.
+- 25k/26k/27k/28k의 인원 동일 가중 평균 SR은84.70±0.77/88.76±0.18/88.35±0.75/88.63±0.80%다. contact18k–28k 중 최고 평균은22k90.39±2.15%로 유지된다. 접촉8cm·속력0.5m/s 연속1초 t_coop은79.77±2.27/77.64±1.62/73.18±0.85/72.54±0.79%다.25k는23k보다18조건 중14개 평균이 높지만 SR이 낮으며,27k/28k는18조건 모두23k보다 평균이 낮았다. [전체 표](output_etc/check/contact25k28k_tcoop_gpu67_20261111/report.md), [SR 추세](output_etc/check/contact25k28k_tcoop_gpu67_20261111/sr.png), [t_coop](output_etc/check/contact25k28k_tcoop_gpu67_20261111/tcoop.png).
+- 최초GPU당6회 초기화는 다른 checkout의 동시 평가와 겹쳐 모두 실패했다. GPU7은 OOM, GPU6은MPS 로그에 기존 클라이언트PID85967의09:19:05 치명적 오류가 다른 클라이언트로 전파된 기록이 있다. 해당 오류의 근본 원인은 확인하지 못했다. GPU6 기존 작업 종료도 확인했으며 기존 프로세스나MPS를 종료·재시작하지 않았다. 각 `attempt1/run.log` 및 [MPS 발췌](output_etc/check/contact25k28k_tcoop_gpu67_20261111/initial_attempt_gpu6_mps_excerpt.log)를 보존하고 GPU당 최대2회로 재시도해12회 모두exit0으로 완료했다.
+- 새12회 CPU SR/원시건수/t_coop18조건 재채점 exact·초기12필드 기존 같은seed와 exact·가중치 불변·실제GPU UUID·원본/복사PTH/YAML SHA·epoch/frame 및 재사용30회 통계/그룹 성공 분모 재현을 확인했다. 일반 학습/평가 코드는 변경하지 않았다. [검증](output_etc/check/contact25k28k_tcoop_gpu67_20261111/verification.json), [배치 결과](output_etc/check/contact25k28k_tcoop_gpu67_20261111/batch_status.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+
+## 2026-11-10
+
+### Contact24k · SR+t_coop18조건 추가 평가
+
+- 사용자 요청으로 contact24k PTH/YAML을 고정 복사해512환경×seed0/1/2·4명·8토큰·ordered·loco·평균 액션·기존 스폰/물성·1200step의3회를 완료했다. seed0/2는GPU6,seed1은GPU7만 사용했다. 기존27회를 재사용해 zerobg18k–20k/contact18k–24k의10모델을 비교하고 Z17은 SR 참고 행으로 유지했다.
+- 24k의2/3/4명 SR은89.71±0.33/89.56±2.46/87.70±4.63%, 인원 동일 가중 평균88.99±1.46%다.23k보다0.33pp 높고22k보다1.40pp 낮다. t_coop 평균은23k 대비18조건 중3개,22k 대비15개에서 높았다. 접촉8cm·속력0.5m/s 연속1초77.15±2.35%, 초기XY변위20cm61.40±2.40%,50cm72.88±2.31%다. [전체 표](output_etc/check/contact24k_tcoop_gpu67_20261110/report.md), [SR 그래프](output_etc/check/contact24k_tcoop_gpu67_20261110/sr.png), [t_coop 그래프](output_etc/check/contact24k_tcoop_gpu67_20261110/tcoop.png).
+- 새3회 CPU SR/원시건수/t_coop18조건 재채점 exact·초기12필드 기존 같은seed와 exact·가중치 불변·실제GPU UUID·원본/복사PTH/YAML SHA·epoch24000/frame3145728000을 검증했다. 재사용27회 통계 및 SR/t_coop 그룹 성공/분모를 재현했다. 일반 코드와 기존 프로세스는 변경하지 않았다. [검증](output_etc/check/contact24k_tcoop_gpu67_20261110/verification.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+
+### Contact23k · SR+t_coop18조건 추가 평가
+
+- 사용자 요청으로 contact23k PTH/YAML을 고정 복사해512환경×seed0/1/2·4명·8토큰·ordered·loco·평균 액션·기존 스폰/물성·1200step의3회를 완료했다. seed0/2는GPU6,seed1은GPU7에서 동시 실행했으며 다른GPU는 사용하지 않았다. 기존 zerobg18k–20k/contact18k–22k의24회를 재사용해9모델을 비교하고 Z17의 기존 SR만 참고 행으로 추가했다.
+- 23k의2/3/4명 SR은90.79±2.31/90.02±0.49/85.17±1.75%, 인원 동일 가중 평균88.66±0.43%로22k90.39±2.15%보다 낮았다. t_coop 평균은22k 대비18조건 중16개에서 높았다. 접촉8cm·속력0.5m/s 연속1초77.57±1.22%(22k76.98±1.64), 초기XY변위20cm62.72±1.35%(60.25±1.75),50cm74.18±1.38%(72.80±2.14)다. [전체 SR·속력/이동거리18조건·출발률](output_etc/check/contact23k_tcoop_gpu67_20261110/report.md), [SR 그래프](output_etc/check/contact23k_tcoop_gpu67_20261110/sr.png), [t_coop 그래프](output_etc/check/contact23k_tcoop_gpu67_20261110/tcoop.png).
+- 새3회 CPU 재채점의SR/원시건수/t_coop18조건/그룹별 시작·분모·접촉 프레임 exact·초기12필드 기존 같은seed와 exact·가중치 불변·실제GPU UUID·원본/복사PTH/YAML SHA·epoch23000/frame3014656000 검증을 통과했다. 재사용24회 통계와 SR/t_coop 그룹 성공/분모도 재현했다. 일반 학습/평가 코드와 기존 프로세스는 변경하지 않았다. [검증](output_etc/check/contact23k_tcoop_gpu67_20261110/verification.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+
+### stage2_coupled_contact_scratch · Stage1 PUSH26k에서 새 Stage2 학습
+
+- 사용자 요청으로 기존 contact와 이름 외 환경/학습 설정이 같은 `stage2_coupled_contact_scratch` YAML2개와 train/test/VNC/eval을 추가했다. 기본 train은 Stage1 PUSH26k 정책·관측/AMP 정규화를 전이하고 Stage2 coordination·optimizer·epoch/frame을 새로 시작한다. 기존 contact의zerobg17k 기본resume은 유지하며, 새 실험은4명·1024환경·8토큰·1200step·패널티0.5·zerobg fusion·학습률2e-5·actor encoder 동결 범위를 유지하고 출력 이름을 분리한다. 실험 등록·공통 실행·평가 분기에 새 이름을 추가하고 config 목록/세 실행 명령을 맨 아래에 덧붙였다.
+- 관련 CPU52개 통과. GPU6 실제 train wrapper와 GPU7 계측 실행이 각각epoch0/frame0에서epoch2/frame262144까지 저장했다. Stage1 epoch26000·모델165텐서/관측·AMP 정규화 exact 전이·새 coordination114텐서 유지·optimizer 초기state 비어 있음·actor encoder 동결/학습 후 불변·나머지 모델 업데이트/finite를 확인했다. 실제 패널티 진단도음수로 활성화됐다. `CHECK=1/MAX_ITERATIONS=1`은 공통 학습기의 `epoch > max_epochs` 종료 조건으로 새 학습에서2iteration을 실행하며 기존 로직은 변경하지 않았다.
+- GPU6 headless test8step 및 새 eval wrapper의2환경·seed0·1200step·SR/t_coop18조건 저장/CPU 재채점 exact·원본26k SHA·Python/shell 구문·문서 링크/순서 검증을 통과했다. GUI/VNC는 공통 진입점과 스크립트 구문을 확인했다. 본학습은 시작하지 않고 기존 학습/평가 프로세스를 보존했다. [검증](output_etc/check/stage2_coupled_contact_scratch_20261110/verification.json), [전이 상세](output_etc/check/stage2_coupled_contact_scratch_20261110/transfer_verification.json), [기본 명령](markdowns/config.md), [전이/추가resume](markdowns/USAGE.md#stage2-coupled-contact-scratch).
+
+### Contact21k·22k · SR·접촉거리·속력·이동거리 전체 평가
+
+- 사용자 요청으로 contact21k/22k PTH·YAML을 고정 복사하고 GPU6/7 각각 최대3worker로512환경×seed0/1/2 총6회를 완료했다. 4명·8토큰·ordered·loco·평균 액션·기존 스폰/물성·1200step을 유지하고 기존 zerobg/contact18k–20k의18회를 재사용해8모델을 비교했다. 평균 SR은2/3/4명 SR의 동일 가중 평균으로 표시하고, 접촉6/8/12cm×속력0.2/0.5/1m/s 연속1초 및 XY변위20/50/100cm의18조건 t_coop·출발 인정률·인원별 통계를 모두 보존했다.
+- Contact21k의2/3/4명 SR은89.99±1.37/88.20±2.29/81.82±4.14%, 평균86.67±0.79%다.22k는91.32±2.26/92.14±1.98/87.69±3.99%, 평균90.39±2.15%로 이번contact18k–22k 중 최고 평균이다. 접촉8cm·속력0.5m/s 연속1초 t_coop은21k75.71±0.98%,22k76.98±1.64%; 초기XY변위20cm는59.65±0.77/60.25±1.75%,50cm는71.46±0.95/72.80±2.14%다.22k는20k 대비18조건 중17개,21k 대비14개에서 t_coop 평균이 높았다.
+- 새6회 SR/t_coop CPU 재채점·그룹별 성공/분모/시작/접촉 프레임 exact·초기12필드 기존 같은seed와 exact·모델 가중치 불변·실제GPU UUID·원본/복사PTH/YAML SHA·epoch/frame 검증을 통과했다. 재사용18회의 기존 SR/t_coop 통계도 재현했다. 본학습/기존 평가와 코드는 보존했다. [전체 표](output_etc/check/contact21k22k_tcoop_gpu67_20261110/report.md), [SR](output_etc/check/contact21k22k_tcoop_gpu67_20261110/sr.png), [t_coop](output_etc/check/contact21k22k_tcoop_gpu67_20261110/tcoop.png), [검증](output_etc/check/contact21k22k_tcoop_gpu67_20261110/verification.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가).
+
+### 속력 출발 조건0.2/0.5m/s·1초 유지 설명 영상
+
+- 사용자 요청으로 contact20k·512환경·seed0·ordered·loco·평균 액션의2/3/4명 공동 그룹(env379/250/39)을 GPU6의CUDA/Vulkan만 사용해450step 촬영했다. 같은 장면 위에 두 속력 조건의1초 유지 막대·집계 시작/확인 시각·시작 당시 변위·현재 속력/XY변위·20/50/100cm 도달 시점·동기화 그래프를 합성했다. 실제 행동/평가 조건은 그대로이며, 바닥0.5m 격자만 설명용 배경으로 표시했다. 일반 학습/평가 코드는 수정하지 않았다.
+- [37초 합본](output_etc/check/tcoop_start_video_gpu67_20261110/start_conditions_overview.mp4), [2명0.5배속14초](output_etc/check/tcoop_start_video_gpu67_20261110/group2_slow.mp4), 개별2/3/4명 영상·촬영/합성/검증 스크립트·프레임별 시작/거리 메타데이터는 같은 폴더에 보존했다. 2명0.2/0.5 조건의 집계 시작은2.13/6.23초, 시작 당시 변위0.02/0.70m다. 3명은2.90/6.97초·0.09/1.93m,4명은3.87/5.73초·0.23/1.22m다.
+- 원본 평가와 초기12필드 exact·가중치/소스PTH 불변·SR/t_coop CPU 재채점·영상의 출발/거리 표시 원시 좌표 재현·H.264/1600×1000/30fps·프레임 수/길이·샘플 화면·링크/구문 검증을 통과했다. [검증](output_etc/check/tcoop_start_video_gpu67_20261110/verification.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가). 기존 프로세스는 보존하고 녹화용Xvfb만 생성·종료했다.
+
+### 공동 PUSH 평가의 SR+t_coop 자동 기록·18개 조건 집계
+
+- 사용자 요청으로 formal eval에 실제 양손 좌표·물리 상자 위치/회전/크기·초기 위치와 GPU 표면 거리를 기록하고, 접촉6/8/12cm×출발 XY변위20/50/100cm 또는 속력0.2/0.5/1m/s 연속1초의18가지 t_coop을 추가했다. 원래 그룹 구성원·최초 성공 종료·실패 포함·미출발0%·인원별 동일 가중 평균을 사용하며 SR/물리/액션/초기 난수는 바꾸지 않는다. `result.json`, `cooperation.json`, `cooperation_trials.npz` 및 기본 `evaluate.py`의 `summary.json`에 함께 집계하고 `rescore.py`는 원시 좌표로 CPU 재검증한다.
+- 관련 CPU25개·GPU7의8환경80step smoke·자동 요약18조합·구형 trace 재채점 검증을 통과했다. zerobg/contact18k/19k/20k를512환경×seed0/1/2 총18회, GPU6/7 각각 최대3worker로 완료했다. 18회 모두 SR/t_coop CPU 재채점·그룹별 시작/분모/접촉 프레임 exact·초기12필드 기존 평가와 exact·가중치/원본PTH/YAML 해시·epoch/frame·실제GPU UUID·finite 검증을 통과했다. 처음 발견한8cm 경계의1프레임 차이는 CPU 표면 거리만 float64였던 원인으로, teacher/GPU와 같은 float32로 수정하고 원시 좌표를 재검증했다. 본학습 및 기존 평가 산출물은 보존했다.
+- 같은 epoch의 contact t_coop 평균은18조건 모두 zerobg보다 높았다. 예를 들어 접촉8cm·속력0.5m/s 연속1초에서 zerobg18k/19k/20k62.24±1.55/61.82±0.72/63.19±2.39%, contact70.78±0.59/67.54±1.20/73.51±2.20%다. 반면 공동 SR은 zerobg88.72/91.63/90.82%, contact86.68/88.14/89.24%로 낮았다. [전체18조건·SR·정의](output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/report.md), [그림](output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/tcoop.png), [원시 검증·이전 SR 대비 차이](output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/verification.json), [재현](markdowns/USAGE.md#공동-push-sr와-t_coop-자동-평가). Teacher Table2의 전원 공동900step과는 구분하며 기존 혼합4명1200step 평가 조건을 유지했다.
+
+### Contact18k·19k·20k ·1k 간격 정밀 평가·zerobg 추세 비교
+
+- 사용자 요청으로 contact18k/19k/20k PTH·YAML을 복사 고정하고 GPU6/7에서 각4명·8토큰·512환경×seed0/1/2, 총9회를 완료했다. 기존 zerobg와 같은 ordered·loco·평균 액션·스폰/distractor·원래 거리/물성·1200step을 유지했다. 기존10k–24k의1k 성공률을 재사용하고 원본17k–20k의12회 원시 궤적에서 유형별 SR을 재현했다. [전체 추세·표](output_etc/check/contact18k20k_eval512_gpu67_20261110/report.md), [그래프](output_etc/check/contact18k20k_eval512_gpu67_20261110/trend.png).
+- Contact18k/19k/20k의 Ever 공동 SR은86.68±0.70/87.59±1.88/89.31±1.53%, Mixed SR89.39±0.22/89.82±1.05/89.95±0.95%다. 원본17k는 공동92.31±0.56/Mixed92.70±0.62%이고 같은 누적18k/19k/20k의 원본 공동88.79/91.63/90.76%보다도 낮다. 최초 낙상 전·최초 전원 양손18cm 준비 이전·초기 공유 중심 대비XY50cm 이동률은 원본17k48.15±0.74%에서32.77±0.47/35.00±1.85/33.12±1.53%로 감소했다. 준비 전 이동은 줄었지만 성공률 개선은 확인하지 못했다.
+- 새9회 CPU 재채점·원시 건수·finite·native gate·가중치 불변·초기12필드 원본17k와 exact 일치·GPU6/7 실제 UUID·PTH/YAML SHA·epoch/frame 검증을 통과했다. 원본17k–20k PTH 해시도 유지했다. 평가 worker는 GPU당 최초1개, 후반 최대2개로 실행해 모두exit0이며 기존 학습/평가는 보존했다. 평가/집계 코드와 실행 명령은 `output_etc/check/contact18k20k_eval512_gpu67_20261110/` 및 [USAGE](markdowns/USAGE.md#stage2-coupled-contact-이어학습)에 기록했다. [검증](output_etc/check/contact18k20k_eval512_gpu67_20261110/verification.json).
+
+### stage2_coupled_contact ·zerobg17k resume·조기 이동 패널티0.5
+
+- 사용자 요청으로 zerobg17k에서 모델·optimizer·관측/보상/AMP 정규화·epoch/frame을 복원하는 `stage2_coupled_contact` 환경/학습 YAML과 train/test/VNC/eval을 추가했다. 4명·1024환경·8토큰·1200step·학습률2e-5·zerobg fusion·동결 범위는 유지한다. Train wrapper 기본 소스는 지정17k이며 새 환경 YAML을 명시적으로 읽는다. 패널티 외 계약이 같은 원본17k→contact 전환만 허용하고 기존 실험의 strict 검사는 유지했다.
+- 전원 양손의 선택 면18cm 준비 조건이 깨졌을 때 상자 수평 속력0.05m/s 초과분에0.5를 곱하고 양의 손 미는 힘 비율로 나눈 비용을 추가했다. 힘 합≤1e-6이면0, 두 물리 샘플 평균을 task reward에 가산하며 목표 도착 면제/latch는 없다. 단독/다른 과제와 기존 컨피그 계산은 유지하고 공동 사람×물리 샘플의 비용/미준비 이동률/손 힘을 TensorBoard에 기록한다.
+- 관련 CPU47개·추가 회귀82개 통과. 추가 회귀1개는 기존 `checkpoints/Stage1PushFinetune_00021000.pth` 누락으로 실패했으며 파일/테스트를 변경하지 않았다. GPU7의1024환경12iteration에서 최초17001·최종17012/frame2229796864, 모델/optimizer/세 정규화 exact 복원·동결 encoder 불변·모델 업데이트·768물리 샘플/384보상 스텝의 finite·벌점 부호/범위·평균/보상 가산을 확인했다. GPU6의 실제 train wrapper도 기본17k→17001 저장을 완료했다. [복원/물리 검증](output_etc/check/stage2_coupled_contact_20261110/resume_verification.json), [wrapper 검증](output_etc/check/stage2_coupled_contact_20261110/wrapper_verification.json).
+- 새 저장본의 GPU7 headless test wrapper(2환경·8step)·eval wrapper(2환경·seed0·1200step)·CPU 재채점 SR/원시 건수 exact·finite와 Python/shell 구문·문서 링크/명령·원본PTH SHA256 불변·패널티 외 원본 계약/sim 일치를 확인했다. 검증은 GPU6/7만 사용하고 기존 프로세스와 본학습 출력은 보존했다. 본학습은 시작하지 않았다. [최종 검증](output_etc/check/stage2_coupled_contact_20261110/verification.json). 실행법은 [config](markdowns/config.md), 동작/짧은 검증/추가 resume은 [USAGE](markdowns/USAGE.md#stage2-coupled-contact-이어학습)에 기록했다.
+
+## 2026-11-06
+
+### zerobg17k · 최초 성공 step·900/1200 평가 길이 CPU 재집계
+
+- 사용자 요청으로 기존17k 4명 혼합512환경×seed0/1/2의1200step 궤적을 CPU float64로 재채점해 개인 영역·공유 상자 중심20cm의 최초 성공 step을 구했다. 같은 궤적의 앞900step을 사용한 I/C/Mixed는92.65±0.79/92.04±0.67/92.34±0.72%, 기존1200step은93.08±0.72/92.31±0.56/92.70±0.62%다. 901~1200step에 처음 성공한 것은 단독10명·공동4그룹이다. [길이별 SR·최초 성공 분포](output_etc/check/zerobg17000_first_success_cpu_20261106/report.md).
+- 1200step 성공 사례만 합친 최초 성공 중앙값/95백분위는 공동235/359.85step, 단독165/342.15step이다. 공동 성공의99.70%, 단독 성공의99.53%가900step 이내에 발생했다. 세 seed의 원래 개인·공유 중심 Ever 플래그 및 그룹 건수 exact일치,1200step I/C/Mixed 평균·표준편차 일치,누적 SR 단조성을 확인했다. step1은 첫 액션 후 상태이며step0은 채점하지 않는다. 추가 GPU 실행·학습/평가 설정 변경은 없다. [검증](output_etc/check/zerobg17000_first_success_cpu_20261106/verification.json), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+
 ## 2026-11-05
+
+### zerobg23k·24k · 4명 혼합 정밀 평가 · 17k 후보 유지
+
+- 사용자 요청으로 23k(epoch23000/frame3014656000)·24k(epoch24000/frame3145728000) PTH/YAML을 복사 고정해 각각 GPU3·4에서 4명·8물체 혼합512환경×seed0/1/2, 총6회 평가했다. ordered·loco·평균 액션·기존 스폰/distractor·거리/물성·1200step을 유지하고 검증된10k–22k·19.5k의42회를 재사용했다. [전체 비교](output_etc/check/zerobg23k24k_eval512_gpu34_20261105/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역23k/24k의 그룹 합산 Coupled SR은89.65±1.44/89.02±0.85%, 단독 PUSH93.34±1.69/90.44±0.83%, 나머지4행동 평균93.18±1.97/94.09±0.94%, Mixed SR91.01±0.71/90.60±0.55%다. 공동2/3/4명은23k89.64±1.59/91.47±1.15/86.92±4.04%,24k89.71±0.28/89.96±2.46/85.24±1.16%다. 23k는 단독 PUSH 최고 평균이지만 공동은17k92.31±0.56%보다 낮아 공동 우선 후보는17k를 유지한다.
+- 새6회 CPU/GPU 재채점·finite·원시 개인/그룹 성공 건수·native gate·actor/critic coordination 각1200회·zerobg SELF/NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가 기존14개 모델과 exact일치했다. GPU당 평가 최대3개·최종0개이며 GPU0/1/2와 기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg23k24k_eval512_gpu34_20261105/verification.json), [원시 건수](output_etc/check/zerobg23k24k_eval512_gpu34_20261105/raw_count_audit.json).
+
+### zerobg22k · 4명 혼합 정밀 평가 · 17k/21k 비교
+
+- 사용자 요청으로 22k(epoch22000/frame2883584000) PTH/YAML을 복사 고정해 GPU5에서 4명·8물체 혼합512환경×seed0/1/2를 평가했다. ordered·loco·평균 액션·기존 스폰/distractor·거리/물성·1200step을 유지하고 검증된10k–21k·19.5k의39회를 재사용했다. [전체 비교](output_etc/check/zerobg22000_trend512_gpu5_20261105/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역22k의 그룹 합산 Coupled SR91.42±0.10%, 단독 PUSH92.45±0.80%, 나머지4행동 평균94.03±2.14%, I/C/Mixed=92.79±1.53/91.42±0.10/92.10±0.71%다. 공동2/3/4명92.78±0.79/90.59±3.18/88.98±7.52%다. 21k보다 공동 SR2.80pp 회복했지만17k보다0.90pp 낮고 공동4명 seed 편차가 커, 공동 우선 후보는17k를 유지한다.
+- 새3회 CPU/GPU 재채점·finite·원시 개인/그룹 성공 건수·native gate·actor/critic coordination 각1200회·zerobg SELF/NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가 기존13개 모델과 exact일치했다. GPU5 평가 최대3개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg22000_trend512_gpu5_20261105/verification.json), [원시 건수](output_etc/check/zerobg22000_trend512_gpu5_20261105/raw_count_audit.json).
+
+### zerobg21k · 4명 혼합 정밀 평가 · 17k 후보 유지
+
+- 사용자 요청으로 21k(epoch21000/frame2752512000) PTH/YAML을 복사 고정해 GPU5에서 4명·8물체 혼합512환경×seed0/1/2를 평가했다. ordered·loco·평균 액션·기존 스폰/distractor·거리/물성·1200step을 유지하고 검증된10k–20k·19.5k의36회를 재사용했다. [전체 비교](output_etc/check/zerobg21000_trend512_gpu5_20261105/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- Ever 영역21k의 그룹 합산 Coupled SR88.61±1.01%, 단독 PUSH92.51±1.89%, 나머지4행동 평균94.01±0.69%, I/C/Mixed=92.76±0.75/88.61±1.01/90.69±0.86%다. 공동2/3/4명91.15±1.10/86.67±2.03/84.11±2.19%이며17k 대비 공동 전체3.70pp·공동4명7.77pp 낮다. 단독 PUSH는 비슷하고 공동 우선 후보는17k를 유지한다.
+- 새3회 CPU/GPU 재채점·finite·원시 개인/그룹 성공 건수·native gate·actor/critic coordination 각1200회·zerobg SELF/NONE0·가중치/PTH/YAML/epoch/frame·지면/거리 검증을 통과했다. 같은 seed의 초기12필드가 기존12개 모델과 exact일치했다. GPU5 평가 최대3개·최종0개이며 GPU0/1/2와 기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg21000_trend512_gpu5_20261105/verification.json), [원시 건수](output_etc/check/zerobg21000_trend512_gpu5_20261105/raw_count_audit.json).
+
+### zerobg17k · 6/8/12/16명 혼합 확장 · 두 SR 집계
+
+- 사용자 요청으로 17k의 6·8·12·16명 혼합을 각각 512환경×seed0/1/2, 총12회 GPU3/4/5/6에서 평가하고 기존 4명 정밀 평가 3회를 재사용했다. 공동 그룹 최대4명·ordered·loco·평균 액션·1200step을 유지했다. 4명 초과는 기존 10k/Stage1과 같은 5m 그룹 중심 배치와 불필요한 distractor 물리/관측 제외다. [두 표·10k/Stage1 비교](output_etc/check/zerobg17k_group_gap5_mixed512_20261105/report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 4/6/8/12/16명의 그룹 합산 Coupled SR은 92.31±0.56/91.84±0.50/91.15±0.62/89.87±1.20/85.86±0.57%, Mixed SR은 92.70±0.62/91.63±0.89/90.60±0.39/86.58±0.74/80.15±0.62%다. 모든 인원에서 기존 10k보다 I/C/Mixed 평균이 높다. 유형별 개인·그룹 건수 합산과 기존 행동별·공동 인원별 동일 가중 평균을 구분해 보존했다. Ever 영역·공유 중심20cm·seed 간 표본 표준편차다.
+- 새12회 CPU/GPU 재채점·finite·native actor/critic coordination 각1200회·가중치/PTH/YAML/epoch/frame·그룹 평행이동·5m 간격·거리/충돌·관측 제외 불변 검증을 통과했다. 초기12필드는 같은 인원/seed의 10k·Stage1과 exact일치했다. 배치 최대 재시도는 6/8/12/16명 각4/5/9/52회이며 실패한 환경 제외는 없다. 재사용 포함15회 원시 궤적의 I/C 성공 건수와 Mixed 수식을 대조했다. GPU당 평가 최대1개·최종0개이며 GPU0/1/2·기존 학습/MPS는 변경하지 않았다. [검증](output_etc/check/zerobg17k_group_gap5_mixed512_20261105/verification.json), [원시 건수 검증](output_etc/check/zerobg17k_group_gap5_mixed512_20261105/raw_count_audit.json).
+
+### zerobg17k ·6/8명 전원 공동 all/keep3 ·64환경·20/40cm
+
+- 사용자 요청으로 같은17k(epoch17000/frame2228224000)를 GPU3(6명)·5(8명)에서 각 all/keep3·64환경×seed0·ordered·loco·평균 액션·1200step으로 총4회 평가했다. 원래 인원별 크기/질량·스폰/distractor와 전체 공동 그룹 gate를 유지했다. keep3는 미접촉 우선3명을 유지하고 actor의 선택 밖 COUPLED를NONE으로 전환한다. [결과](output_etc/check/zerobg17000_n68_all_keep3_env64_gpu35_20261105/report.md), [반경 비교](output_etc/check/zerobg17000_n68_all_keep3_env64_gpu35_20261105/radius_report.md), [재현](markdowns/USAGE.md#공통-stage2-push와-coupled).
+- 공유 중심 Ever의 all→keep3는20cm에서6명15.62%(10/64)→25.00%(16/64),8명23.44%(15/64)→29.69%(19/64)다. 같은 궤적을 CPU float64로 재집계한40cm는6명34.38%(22/64)→31.25%(20/64),8명31.25%(20/64)→40.62%(26/64)다. Final은 참고 결과에 보존했다. 20cm에서는 두 인원 모두 keep3가 높은 평균이지만64환경1seed 진단이다.
+- 네 실행의 CPU/GPU 재채점·finite·그룹/개인 건수·가중치/PTH/YAML/epoch/frame·native gate·actor/critic zerobg·선택수/미접촉 우선·actor4레이어4800회 COUPLED→NONE/padding없음 검증을 통과했다. all/keep3 및13k와 초기12필드가 exact일치했다. 20cm 저장 플래그/건수 일치·반경 포함·Final→Ever도 확인했다. GPU당 평가 최대2개·최종0개이며 기존 학습/MPS·GPU0/1/2는 변경하지 않았다. [일반 검증](output_etc/check/zerobg17000_n68_all_keep3_env64_gpu35_20261105/verification.json), [반경 검증](output_etc/check/zerobg17000_n68_all_keep3_env64_gpu35_20261105/radius_verification.json), [13k 초기 장면 비교](output_etc/check/zerobg17000_n68_all_keep3_env64_gpu35_20261105/initial_comparison_to_13k.json).
 
 ### zerobg16k–20k ·1k 간격 정밀 평가 완료 ·17k 최종 추천
 

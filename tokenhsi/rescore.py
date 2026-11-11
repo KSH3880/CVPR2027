@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from utils.evaluation_protocol import spatial_success, coupled_current_success, coupled_scores
 from utils.evaluation_protocol import shared_center_success, shared_center_scores, shared_centers_from_tokens
+from utils.cooperation_metrics import calculate as cooperation_metrics
 
 
 def rescore(path):
@@ -110,6 +111,24 @@ def rescore(path):
                 shared_center_cpu_gpu_exact=True if physical_centers else None,
                 shared_center_float32_float64_frame_differences=center_precision_differences,
                 shared_center_float32_float64_ever_differences=int((center_ever32 != center_ever).sum()))
+    if 'cooperation' in recorded:
+        with np.load(path/'cooperation.npz') as archive:
+            raw = {name: archive[name] for name in archive.files}
+        assert all(np.isfinite(value).all() for value in raw.values()), 'Nonfinite cooperation coordinates'
+        if individual_goals:
+            assert np.array_equal(raw['boxes'][..., :3], data['shared_centers'])
+            assert np.array_equal(raw['goals'], data['shared_center_goals'])
+            initial = torch.load(path/'initial.pt', map_location='cpu', weights_only=False)
+            assert np.array_equal(raw['initial_boxes'][..., :3], initial['shared_centers'].numpy())
+        metrics, trials = cooperation_metrics(raw, data, recorded['control_dt'])
+        assert metrics == recorded['cooperation'], 'Cooperation CPU/GPU summary mismatch'
+        assert metrics == json.loads((path/'cooperation.json').read_text())
+        with np.load(path/'cooperation_trials.npz') as archive:
+            assert set(archive.files) == set(trials)
+            for key, value in trials.items():
+                assert np.array_equal(archive[key], value), f'Cooperation trial mismatch: {key}'
+        result.update(cooperation_cpu_gpu_exact=True, cooperation_variants=len(metrics['variants']),
+                      cooperation_trials=metrics['trials'])
     (path/'rescore.json').write_text(json.dumps(result,indent=2))
     print(json.dumps(result),flush=True)
     return result

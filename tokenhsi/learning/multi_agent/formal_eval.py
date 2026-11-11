@@ -6,6 +6,7 @@ import torch
 from utils.evaluation_protocol import HORIZON, TASK_NAMES, spatial_success, predecessors, coupled_current_success, coupled_scores
 from utils.task_role_spec import task_graph_packet
 from utils.evaluation_protocol import shared_center_success, shared_center_scores
+from utils.cooperation_metrics import surface_distance, calculate as cooperation_metrics
 
 
 def freeze_fallen(task, newly_fallen):
@@ -62,6 +63,12 @@ def run_formal_eval(player):
     torch.save(initial, path/'initial.pt')
     roots_trace, boxes_trace, valid_trace = [], [], []
     centers_trace = []
+    cooperation = hasattr(task, '_individual_push_goals')
+    if cooperation:
+        physical_sizes = task._assigned_box_values(task._box_size).cpu().numpy().copy()
+        initial_boxes = task._assigned_box_values(task._box_states)[..., :7].cpu().numpy().copy()
+        cooperation_goals = (center_goals if individual_goals else goals).cpu().numpy().copy()
+        hands_trace, physical_boxes_trace, distance_trace = [], [], []
     for step in range(1, horizon+1):
         action = player.get_action(obs, True)
         action = action.reshape(n, m, -1) * alive[..., None]
@@ -83,6 +90,13 @@ def run_formal_eval(player):
         roots_trace.append(roots.cpu().numpy().copy())
         boxes_trace.append(boxes.cpu().numpy().copy())
         valid_trace.append(alive.cpu().numpy().copy())
+        if cooperation:
+            hands = task._rigid_body_pos[:, :, task._key_body_ids[:2]]
+            physical_boxes = task._assigned_box_values(task._box_states)[..., :7]
+            distances = surface_distance(hands, physical_boxes, task._assigned_box_values(task._box_size))
+            hands_trace.append(hands.cpu().numpy().copy())
+            physical_boxes_trace.append(physical_boxes.cpu().numpy().copy())
+            distance_trace.append(distances.cpu().numpy().copy())
         fallen = task._terminate_buf.reshape(n, m).bool() & alive
         fall_step[fallen] = step
         freeze_fallen(task, fallen)
@@ -119,6 +133,15 @@ def run_formal_eval(player):
     if peer_mode != 'all':
         data['coupled_peer_selection'] = peer_mode
         data['unselected_coupled'] = 'NONE'
+    if cooperation:
+        raw = dict(hands=np.stack(hands_trace), boxes=np.stack(physical_boxes_trace), sizes=physical_sizes,
+                   initial_boxes=initial_boxes, goals=cooperation_goals, surface_distances=np.stack(distance_trace))
+        cooperation_trace = dict(groups=groups.cpu().numpy(), packet=packet.cpu().numpy(), valid=np.stack(valid_trace))
+        metrics, trials = cooperation_metrics(raw, cooperation_trace, task.dt, raw['surface_distances'])
+        np.savez_compressed(path/'cooperation.npz', **raw)
+        np.savez_compressed(path/'cooperation_trials.npz', **trials)
+        (path/'cooperation.json').write_text(json.dumps(metrics, indent=2))
+        data['cooperation'] = metrics
     (path/'result.json').write_text(json.dumps(data, indent=2))
     center_trace = dict(shared_centers=np.stack(centers_trace), shared_center_goals=center_goals.cpu().numpy(),
                         shared_center_ever=center_ever.cpu().numpy(), shared_center_final=center_current.cpu().numpy()) if individual_goals else {}

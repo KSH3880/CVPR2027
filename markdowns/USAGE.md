@@ -29,6 +29,66 @@ BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는
 - 인원·환경 수·토큰 수·episode 길이·평가 초기화·영상 CLI를 마지막으로 적용하며 실험 계약을 검사한다.
 - 모든 wrapper는 기본 `SEED=42`를 쓴다. `EPISODE_LENGTH`는 추론 episode 길이다.
 
+## Stage2 coupled contact 이어학습
+
+`stage2_coupled_contact`는 지정한 zerobg17k에서 모델·optimizer·정규화·epoch/frame을 복원한다. 기본 train wrapper가 해당 PTH를 선택하며 새 환경 YAML을 명시적으로 로딩해 `premature_motion_penalty`만 추가한다. 4명·1024환경·8토큰·1200step·학습률2e-5·zerobg fusion·기존 동결 범위는 유지한다. 본학습 명령은 [config](config.md)에 있다.
+
+패널티는 공동 PUSH 전원이 선택된 면에 양손18cm 이내로 준비되지 않은 물리 샘플에서 `−0.5 × max(상자 수평 속력−0.05, 0) × 양의 손 미는 힘 비율`이다. 힘 합≤1e-6이면0이며 제어 스텝의 두 물리 샘플을 평균해 task reward에 더한다. 최종 task 혼합 가중치는0.5다. 목표 도착 예외·접촉 latch·물리 고정은 없다. 단독 PUSH/다른 과제에는 적용하지 않는다. TensorBoard의 `relation/premature_push/{penalty,moving_unready_agent_fraction,positive_hand_force_n}`는 공동 사람×물리 샘플 평균이다.
+
+원본 zerobg17k→contact는 기존 계약이 패널티 외 모두 같은 경우만 허용한다. Contact 저장본은 설정이 같은 자기 실험으로 resume하며, 원본 zerobg wrapper로 역방향 혼용하지 않는다. 이후 이어학습에는 `RESUME_CHECKPOINT="$CKPT"`를 지정한다. Viewer/eval에는 새 contact 학습본을 사용한다. 학습 환경은 새 장면으로 reset되며 물리 궤적의 연속 복원은 아니다.
+
+```bash
+# stage2_coupled_contact: 원본17k에서 1iteration 확인 (상한은 누적 epoch 기준)
+TOKENHSI_GPU=7 CHECK=1 MAX_ITERATIONS=17000 OUTPUT_PATH=output_etc/check/stage2_coupled_contact/train bash tokenhsi/scripts/multi_agent/stage2_coupled_contact_train.sh 4 1024 8
+
+# stage2_coupled_contact: 새 저장본 정식 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_coupled_contact_eval.sh "$CKPT" --output output_etc/check/stage2_coupled_contact/eval
+```
+
+Contact18k/19k/20k의1k 간격 평가는 `TOKENHSI_GPU=6 bash output_etc/check/contact18k20k_eval512_gpu67_20261110/run_worker.sh`와 GPU7의 같은 명령으로 재현한다. 원본17k 이후 추가1k/2k/3k이며 각4명·8토큰·512환경×seed0/1/2·ordered·loco·평균 액션·원래 스폰/distractor·물성·1200step을 유지한다. PTH/YAML은 manifest의 고정 복사본을 사용한다. 같은 폴더 `analyze.py`·`report.py`를 `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python`으로 실행하면 기존 zerobg10k–24k의1k 추세와 비교한다. 원본17k–20k의12회 궤적에서 성공 건수를 재검증하고 준비 전50cm/손 이탈 포함 이동을 같은 최초 낙상 전 기준으로 재집계한다. [추세·정의·seed별 집계](../output_etc/check/contact18k20k_eval512_gpu67_20261110/report.md), [검증](../output_etc/check/contact18k20k_eval512_gpu67_20261110/verification.json).
+
+### 공동 PUSH SR와 t_coop 자동 평가
+
+공동 PUSH의 formal eval은 기존 SR와 함께 `cooperation.npz`(매 제어 프레임 양손 좌표·실제 상자 위치/회전·실제 크기·초기 위치·공유 중심 목표·GPU 표면 거리), `cooperation_trials.npz`(그룹별 시작/성공/분모/접촉 프레임), `cooperation.json`을 자동 저장한다. `result.json`과 `evaluate.py`의 `summary.json`에도 t_coop 18개 조합이 포함된다. 예전 평가 폴더에 손 기록이 없으면 완료로 건너뛰지 않고 다시 평가한다. `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi python tokenhsi/rescore.py <평가 폴더>`는 기존 SR 및 새 원시 좌표로 t_coop까지 CPU 검증한다. 예전 trace의 SR 재집계는 계속 지원한다.
+
+t_coop은 출발부터 최초 공유 중심 목표 3D20cm 성공까지(실패는 기록 끝까지), 원래 그룹 전원 양손이 실제 회전 상자 표면의6/8/12cm **미만**에 있는 프레임 비율이다. 표면 거리는 GPU 평가와 teacher의 재집계처럼 float32로 재현하며 중심 성공/변위/속력 계산은 float64다. 출발은 초기 중심 대비 XY 변위20cm/50cm/1m 또는 XY 중심 차분 속력0.2/0.5/1m/s의1초 연속 유지다. 속력 유지가 성공 전까지 확인되면 연속 구간 첫 프레임으로 소급한다. 출발에 손 접근 조건은 없고 한번 출발하면 멈춰도 분모가 계속된다. 시작/종료 프레임을 포함하며 낙상한 원래 구성원은 이후 미접촉으로 처리한다. 미출발은0%, 실패도 실제 비율로 포함한다. 그룹별 비율을2/3/4명 각각 평균한 뒤 인원별 동일 가중 평균을 만들고 seed 평균±표본 표준편차를 보고한다. 현재4명 혼합·1200step·seed0/1/2 SR 장면에 적용하며 teacher Table2의 전원 공동·900step·seed1/3/6과 평가 장면/길이는 다르다.
+
+zerobg/contact18k·19k·20k의 동시 평가는 `TOKENHSI_GPU=6 bash output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/run_worker.sh zerobg_18000`처럼 모델 키를 지정한다. GPU6에는 `zerobg_18000`, `contact_19000`, `zerobg_20000`, GPU7에는 `contact_18000`, `zerobg_19000`, `contact_20000`을 각각 병렬 실행하며 worker별 seed0/1/2는 순차 실행한다. 모델별 PTH/YAML 고정 복사본·512환경·4명·8토큰·ordered·loco·평균 액션·원래 스폰/물성·1200step은 [manifest](../output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/manifest.json)를 따른다.
+
+진행 상태는 `python output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/status.py`, 완료 후 표/CSV/그림 재생성은 `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/report.py`를 사용한다. [전체18조건·SR 비교](../output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/report.md), [원시 검증·이전 SR 대비 차이](../output_etc/check/zerobg_contact18k20k_tcoop_gpu67_20261110/verification.json).
+
+Contact21k/22k 추가 평가는 `TOKENHSI_GPU=6 EVAL_SEEDS=0 bash output_etc/check/contact21k22k_tcoop_gpu67_20261110/run_worker.sh contact_21000`처럼 모델/seed를 지정한다. 21k의seed0/1/2는 GPU6/7/6,22k의seed0/1/2는 GPU7/6/7에 각각 동시에 실행한다. 모델별512환경×3seed·4명·8토큰·ordered·loco·평균 액션·원래 물성/스폰·1200step을 유지하고 [manifest](../output_etc/check/contact21k22k_tcoop_gpu67_20261110/manifest.json)의PTH/YAML 고정 복사본을 사용한다. 상태는 같은 폴더 `status.py`, 재집계는 `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/contact21k22k_tcoop_gpu67_20261110/report.py`다. [전체8모델 SR·접촉6/8/12cm·속력/변위18조건](../output_etc/check/contact21k22k_tcoop_gpu67_20261110/report.md), [인원별·seed별 원시 통계](../output_etc/check/contact21k22k_tcoop_gpu67_20261110/summary.json), [검증](../output_etc/check/contact21k22k_tcoop_gpu67_20261110/verification.json). 평균 SR은2/3/4명 SR의 동일 가중 평균이며 기존 그룹 건수 합산 SR/Mixed는 JSON에 따로 보존한다.
+
+Contact23k 추가 평가는 `TOKENHSI_GPU=6 EVAL_SEEDS=0 bash output_etc/check/contact23k_tcoop_gpu67_20261110/run_worker.sh contact_23000`처럼 실행한다. seed0/2는GPU6,seed1은GPU7에서 동시에 평가하며512환경·4명·8토큰·ordered·loco·평균 액션·기존 스폰/물성·1200step을 유지한다. [manifest](../output_etc/check/contact23k_tcoop_gpu67_20261110/manifest.json)의 고정PTH/YAML을 사용하고, `status.py`로 진행을 확인한다. `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/contact23k_tcoop_gpu67_20261110/report.py`로 기존24회와 새3회를 합친 [SR·t_coop18조건 전체 비교](../output_etc/check/contact23k_tcoop_gpu67_20261110/report.md)·CSV·그림·[검증](../output_etc/check/contact23k_tcoop_gpu67_20261110/verification.json)을 재생성한다. Z17은 같은 초기 조건의 기존 원시 결과에서 SR만 참고 행으로 집계하며, 손 기록이 없어 t_coop에는 넣지 않는다.
+
+Contact24k 추가 평가는 `TOKENHSI_GPU=6 EVAL_SEEDS=0 bash output_etc/check/contact24k_tcoop_gpu67_20261110/run_worker.sh contact_24000`처럼 실행한다. seed0/2는GPU6,seed1은GPU7에서 동시에 실행하며 기존과 같은512환경·4명·8토큰·ordered·loco·평균 액션·원래 스폰/물성·1200step을 사용한다. [manifest](../output_etc/check/contact24k_tcoop_gpu67_20261110/manifest.json)의PTH/YAML 고정 복사본을 사용하고 같은 폴더 `status.py`로 확인한다. `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/contact24k_tcoop_gpu67_20261110/report.py`로 기존27회와 새3회를 합친 [10모델 SR·t_coop18조건 비교](../output_etc/check/contact24k_tcoop_gpu67_20261110/report.md)·CSV·그림·[검증](../output_etc/check/contact24k_tcoop_gpu67_20261110/verification.json)을 재생성한다. Z17은 SR 참고 행으로만 포함한다.
+
+출발 조건을 눈으로 비교하는 [설명 영상](../output_etc/check/tcoop_start_video_gpu67_20261110/start_conditions_overview.mp4)은 contact20k·512환경·seed0의2/3/4명 장면을 GPU6에서 촬영했다. 같은 영상에0.2/0.5m/s 연속1초 유지 막대·집계 시작/출발 확인 시각·현재 XY 속력/초기 위치 대비 변위·20/50/100cm 도달 시각을 함께 표시한다. 바닥0.5m 격자는 설명용 합성 배경이다. [2명 장면0.5배속](../output_etc/check/tcoop_start_video_gpu67_20261110/group2_slow.mp4), 장면/프레임별 시각은 같은 폴더 `annotations.json`, 재현은 `TOKENHSI_GPU=6 bash output_etc/check/tcoop_start_video_gpu67_20261110/run_capture.sh capture_fixed` 후 `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/tcoop_start_video_gpu67_20261110/compose.py`다. CUDA/Vulkan을 같은 GPU에 묶고 녹화용 Xvfb만 생성·종료한다. 일반 평가 코드/물리/보상은 수정하지 않는다.
+
+Contact25k–28k 추가 평가는 `python output_etc/check/contact25k28k_tcoop_gpu67_20261111/run_batch.py`로 실행한다. [manifest](../output_etc/check/contact25k28k_tcoop_gpu67_20261111/manifest.json)에 고정한4개PTH/YAML·각512환경×seed0/1/2·1200step 총12회를 GPU6/7에6회씩 배정하고 GPU당 최대2회씩 진행한다. 최초GPU당6회 동시 초기화는 다른 checkout의 동시 평가와 겹쳐GPU7 OOM/GPU6 MPS 전파 오류로 실패했으며 각 실행의 `attempt1/run.log`에 보존했다. 기존 프로세스/MPS를 종료·재시작하지 않는다. 상태는 같은 폴더 `status.py`, 재집계는 `CUDA_VISIBLE_DEVICES='' PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/contact25k28k_tcoop_gpu67_20261111/report.py`다. [전체 SR·t_coop18조건 비교](../output_etc/check/contact25k28k_tcoop_gpu67_20261111/report.md), [인원별·seed별 통계](../output_etc/check/contact25k28k_tcoop_gpu67_20261111/summary.json), [검증](../output_etc/check/contact25k28k_tcoop_gpu67_20261111/verification.json).
+
+공동 PUSH Jerk 재집계는 GPU 없이 `CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/jerk_reaggregate_20261111/run.py`로 수행한다. zerobg17k–20k/contact18k–28k의45개 저장 궤적에서 출발6조건×상자중간높이둘레64점/위·아래8꼭짓점의12조건을 계산한다. TeamHOI식 XYZ 절대3차차분 평균·실제기록dt·float64·무필터·구간내4좌표·최초성공/실패기록끝을 사용하며 미출발/4좌표미만은N/A와제외건수로 표시한다. `verify.py`로 공식함수/해석적 검증, 계산 후 `report.py`, `audit.py`, `report.py` 순으로 집계·실제궤적대조·최종검증을 갱신한다(동일한 CPU 환경변수/파이썬 사용). [전체12조건·유효율·속력/시간](../output_etc/check/jerk_reaggregate_20261111/report.md), [인원별·seed별·성공/실패 통계](../output_etc/check/jerk_reaggregate_20261111/summary.json), [검증](../output_etc/check/jerk_reaggregate_20261111/verification.json). Z17은같은seedZ18과초기12필드exact·크기복원검증후공유중심/회전을사용하며t_coop은추가하지않는다.
+
+TeamHOI식 접촉력 제외 재집계는 `CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/teamhoi_noforce_reaggregate_20261111/calculate.py`를 사용한다. 같은CPU환경에서 `verify.py`→`calculate.py`→`report.py`→`audit.py`→`diagnose.py`→`report.py` 순으로 함수/계산/요약/실제궤적/기하/최종검증을 재현한다. 원본함수와쿼터니언변환·float32·dt0.0333·Jerk=0제외·에피소드전체t_coop누적/원본counter분모/clip/NaN평균을 유지하고, 출발6조건·20cm종료·상자중간높이둘레64점·접촉력제외를 명시한다. 원본자료의SHA와 공식함수/집계를 대조하며Z17은Jerk만가능하다. 이점배치의t_coop은손의접촉높이와맞지않아거의0이므로PUSH공동참여의증거로해석하지않는다. [전체표/정의](../output_etc/check/teamhoi_noforce_reaggregate_20261111/report.md), [기하진단](../output_etc/check/teamhoi_noforce_reaggregate_20261111/geometry_diagnosis.json), [검증](../output_etc/check/teamhoi_noforce_reaggregate_20261111/verification.json).
+
+최종선택인 **t_coop=실제상자전체표면12cm·접촉력제외/Jerk=둘레64점** 재집계는 같은CPU환경에서 `output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/rescore.py`→`report.py`→`audit.py`→`report.py`를 실행한다. 위중간높이64점 t_coop의접촉높이불일치를확인한뒤사용자가전체표면거리를선택했다. 기존Jerk값은정확히재사용하고 t_coop만GPU에서저장한표면거리로전기록프레임을재집계한다. 출발6조건·20cm종료·원본counter/분모/clip/NaN평균·Jerk0제외는유지한다. [전체6조건·인원별표·clip율](../output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/report.md), [trial/seed통계](../output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/summary.json), [검증](../output_etc/check/teamhoi_surface12_noforce_reaggregate_20261111/verification.json). 이경로는부모폴더의검증된Jerk/참조함수와최초jerk재집계의출발배열을읽으므로함께보존한다.
+
+### Stage2 coupled contact scratch
+
+`stage2_coupled_contact_scratch`는 기존 contact와 같은 환경·보상·패널티0.5·zerobg fusion·학습률2e-5·4명/1024환경/8토큰을 사용하고, 기본 시작만 Stage1 PUSH26k 전이로 바꾼다. `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`의 정책·관측/AMP 정규화를 전이하고 기존 actor encoder 동결 규칙을 유지한다. Stage2 coordination과 optimizer·epoch/frame은 새로 시작한다. 기본 train wrapper에는 zerobg17k resume 설정이 없으며, 기존 contact17k 이어학습 실험과 출력 경로를 분리한다. 본학습/로컬/VNC 명령은 [config](config.md)에 있다.
+
+추가 이어학습을 명시할 때만 `RESUME_CHECKPOINT="$CKPT"`를 사용하며, 다른 Stage1 전이 원본을 명시하려면 `STAGE1_CHECKPOINT`를 사용한다. 기본26k에서 새로 시작할 때에는 두 환경변수를 해제한다. 저장본의 test/VNC/eval은 저장된 설정을 읽으며, 전용 eval에도 SR와 접촉6/8/12cm×출발6종 t_coop이 자동으로 기록된다.
+
+```bash
+# stage2_coupled_contact_scratch: 기본26k 전이 확인
+TOKENHSI_GPU=6 CHECK=1 OUTPUT_PATH=output_etc/check/stage2_coupled_contact_scratch/train bash tokenhsi/scripts/multi_agent/stage2_coupled_contact_scratch_train.sh 4 1024 8
+
+# stage2_coupled_contact_scratch: 저장본 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_coupled_contact_scratch_eval.sh "$CKPT" --output output_etc/check/stage2_coupled_contact_scratch/eval
+```
+
+확인 경로의 `MAX_ITERATIONS=1`은 공통 학습기의 누적 epoch 상한이며 종료 비교가 `epoch > max_epochs`이므로 새 학습은epoch2에서 저장·종료한다. 본학습에는 `CHECK`·`MAX_ITERATIONS`를 해제한다.
+
 ## 확인 실행과 캐시
 
 `CHECK=1`은 기본 `MAX_ITERATIONS=1`의 확인 학습이다. 환경 수는 fixed2048, BEFORE1024를 유지한다. 확인용 `OUTPUT_PATH`는 `output_etc/check/<검사명>` 아래를 지정한다. wrapper와 직접 `run.py` 모두 경로를 검사한다.
@@ -196,6 +256,8 @@ Stage1 26k의같은5m 혼합확장평가는 `TOKENHSI_GPU=3 bash output_etc/chec
 
 zerobg10k의 같은 5m 혼합 확장 평가는 `TOKENHSI_GPU=3 bash output_etc/check/zerobg10k_group_gap5_mixed512_20261104/run_worker.sh 6`으로 실행한다. 나머지는 GPU4/인원8·GPU5/인원12·GPU6/인원16이며 각512환경×seed0/1/2다. Stage2 coordination을 정상 실행하고 같은 인원·seed의 Stage1 초기 장면과 일치를 검사한다. runtime 적용 후 `PYTHONPATH=tokenhsi python output_etc/check/zerobg10k_group_gap5_mixed512_20261104/analyze.py`로 기존 행동별·공동 인원별 평균과 유형별 I/C/Mixed SR을 함께 집계한다. Stage1은 기존 결과를 CPU 재집계하며 Mixed=(I+C)/2다. [두 집계·모델 비교](../output_etc/check/zerobg10k_group_gap5_mixed512_20261104/report.md), [검증](../output_etc/check/zerobg10k_group_gap5_mixed512_20261104/verification.json).
 
+zerobg17k의 동일 혼합 확장 평가는 `TOKENHSI_GPU=3 bash output_etc/check/zerobg17k_group_gap5_mixed512_20261105/run_worker.sh 6` 및 GPU4/인원8·GPU5/인원12·GPU6/인원16으로 실행한다. 각 512환경×seed0/1/2이며 4명 결과는 기존 정밀 평가에서 재사용한다. 공동 그룹 최대4명·5m 그룹 배치·불필요한 distractor 물리/관측 제외를 유지하고 초기 12필드를 zerobg10k·Stage1과 대조한다. runtime 적용 후 같은 폴더의 `analyze.py`와 `audit_counts.py`를 `PYTHONPATH=tokenhsi python`으로 실행해 두 평균 방식과 원시 성공 건수를 검증한다. [17k 두 표·10k/Stage1 비교](../output_etc/check/zerobg17k_group_gap5_mixed512_20261105/report.md), [검증](../output_etc/check/zerobg17k_group_gap5_mixed512_20261105/verification.json).
+
 zerobg11k의기존4명512환경×3회평가는 `TOKENHSI_GPU=4 bash output_etc/check/zerobg11000_trend512_gpu4_20261104/run_worker.sh 0` 및worker1/2로재현한다. 기존사람스폰/distractor·ordered·loco·평균액션·1200step을유지하며runtime 적용후같은폴더 `analyze.py`, `report.py`로기존8k/9k/10k와비교한다. [Ever영역비교표](../output_etc/check/zerobg11000_trend512_gpu4_20261104/report.md), [검증](../output_etc/check/zerobg11000_trend512_gpu4_20261104/verification.json).
 
 zerobg12k의동일4명512환경×3회평가는 `TOKENHSI_GPU=5 bash output_etc/check/zerobg12000_trend512_gpu5_20261104/run_worker.sh 0` 및worker1/2로재현한다. 기존스폰/distractor·ordered·loco·평균액션·원래물성·1200step을유지하고12k만새로평가하며10k/11k 결과를재사용한다. runtime 적용후같은폴더 `analyze.py`, `report.py`로초기배치일치/CPU검증과비교표를생성한다. [10k·11k·12k Ever영역비교표](../output_etc/check/zerobg12000_trend512_gpu5_20261104/report.md), [검증](../output_etc/check/zerobg12000_trend512_gpu5_20261104/verification.json).
@@ -209,6 +271,14 @@ zerobg15k의 같은4명512환경×seed0/1/2 평가는 `TOKENHSI_GPU=5 bash outpu
 요청 시점 최신 zerobg19.5k의 같은4명512환경×seed0/1/2 평가는 `TOKENHSI_GPU=5 bash output_etc/check/zerobg19500_trend512_gpu5_20261105/run_worker.sh 0` 및 worker1/2로 재현한다. 일반 이름 PTH도 epoch19500임을 확인한 뒤 정기 PTH/YAML을 복사 고정했다. 기존 스폰/distractor·ordered·loco·평균 액션·거리/물성·1200step과 GPU5 최대3개를 유지한다. runtime 적용 후 같은 폴더 `analyze.py`를 `PYTHONPATH=tokenhsi python`으로 실행하고 `report.py`로10k–15k 기존 결과와 비교한다. [SR·단독 PUSH·나머지 평균](../output_etc/check/zerobg19500_trend512_gpu5_20261105/report.md), [검증](../output_etc/check/zerobg19500_trend512_gpu5_20261105/verification.json).
 
 zerobg16k–20k의1k 간격 정밀 평가는 `TOKENHSI_GPU=3 bash output_etc/check/zerobg16k20k_eval512_gpu345_20261105/run_worker.sh 0` 및 GPU3/worker1·2(각 seed의16k→19k), GPU4/worker3·4·5(17k→20k), GPU5/worker6·7·8(18k)로 재현한다. 각4명·8물체 혼합512환경×seed0/1/2·ordered·loco·평균 액션·기존 스폰/distractor·거리/물성·1200step이며 GPU당 최대3개다. runtime 적용 후 같은 폴더의 `analyze.py`를 `PYTHONPATH=tokenhsi python`으로 실행하고 `report.py`로 기존10k–15k·19.5k와 비교한다. 공동 그룹 합산 SR을 우선하고 공동4명·단독 PUSH·나머지4행동 평균·I/C/Mixed를 함께 본다. [최종 후보 비교](../output_etc/check/zerobg16k20k_eval512_gpu345_20261105/report.md), [검증](../output_etc/check/zerobg16k20k_eval512_gpu345_20261105/verification.json).
+
+zerobg21k의 동일 4명 혼합 평가는 `TOKENHSI_GPU=5 bash output_etc/check/zerobg21000_trend512_gpu5_20261105/run_worker.sh 0` 및 worker1/2로 재현한다. 각512환경×seed0/1/2·ordered·loco·평균 액션·기존 스폰/distractor·거리/물성·1200step이며 GPU5 최대3개다. runtime 적용 후 같은 폴더의 `analyze.py`, `report.py`를 `PYTHONPATH=tokenhsi python`으로 실행해 검증된10k–20k·19.5k 결과와 비교한다. [Ever 영역·SR 비교](../output_etc/check/zerobg21000_trend512_gpu5_20261105/report.md), [검증](../output_etc/check/zerobg21000_trend512_gpu5_20261105/verification.json).
+
+zerobg22k의 동일 평가는 `TOKENHSI_GPU=5 bash output_etc/check/zerobg22000_trend512_gpu5_20261105/run_worker.sh 0` 및 worker1/2로 재현한다. 4명 혼합·512환경×seed0/1/2와 위21k의 나머지 조건을 유지한다. runtime 적용 후 같은 폴더의 `analyze.py`, `report.py`를 `PYTHONPATH=tokenhsi python`으로 실행해10k–21k와 비교한다. [Ever 영역·SR 비교](../output_etc/check/zerobg22000_trend512_gpu5_20261105/report.md), [검증](../output_etc/check/zerobg22000_trend512_gpu5_20261105/verification.json).
+
+zerobg23k·24k는 `TOKENHSI_GPU=3 bash output_etc/check/zerobg23k24k_eval512_gpu34_20261105/run_worker.sh 0` 및 GPU3/worker1·2(23k), GPU4/worker3·4·5(24k)로 평가한다. 각4명 혼합·512환경×seed0/1/2이며 위22k와 동일 조건, GPU당 최대3개다. runtime 적용 후 같은 폴더의 `analyze.py`, `report.py`를 `PYTHONPATH=tokenhsi python`으로 실행한다. [10k–24k Ever 영역·SR 비교](../output_etc/check/zerobg23k24k_eval512_gpu34_20261105/report.md), [검증](../output_etc/check/zerobg23k24k_eval512_gpu34_20261105/verification.json).
+
+zerobg17k 최초 성공 step과 평가 길이별 SR은 conda `tokenhsi`에서 `PYTHONPATH=tokenhsi python output_etc/check/zerobg17000_first_success_cpu_20261106/analyze.py`로 CPU 재집계한다. 기존4명 혼합512환경×3seed의 저장 궤적을 사용해900/1200step을 비교하며 GPU·평가 설정 변경 없이 원래 Ever 플래그를 검증한다. [최초 성공 분포·길이별 SR](../output_etc/check/zerobg17000_first_success_cpu_20261106/report.md), [검증](../output_etc/check/zerobg17000_first_success_cpu_20261106/verification.json).
 
 유형별Interaction-Group SR 대안집계는 `python output_etc/check/zerobg10k12k_interaction_group_macro_20261104/aggregate.py`로CPU재현한다. I는단독개인전체합산, C는공동2·3·4명그룹전체합산, Mixed=(I+C)/2이며seed별비율의3seed평균±표준편차다. 기존행동별/공동인원별macro집계와별도이며시뮬레이션을추가하지않는다. [정의·비교표](../output_etc/check/zerobg10k12k_interaction_group_macro_20261104/report.md).
 

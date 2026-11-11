@@ -51,6 +51,12 @@ def validate_env(env):
     if peers != 'all' and env['stage2JointPush'].get('goal_mode') != 'individual':
         raise ValueError('Single-peer selection requires individual coupled PUSH goals')
     coupled = deepcopy(env['stage2JointPush'])
+    penalty = coupled.pop('premature_motion_penalty', None)
+    if penalty is not None:
+        from utils.premature_push import validate_config
+        validate_config(penalty)
+        if coupled.get('goal_mode') != 'individual' or coupled.get('contact_face') != 'group_four':
+            raise ValueError('Premature motion penalty requires individual four-face PUSH')
     native = native_config('stage2_coupled_push')['env']['stage2JointPush']
     if coupled.pop('physical_boxes') != physical_box_count(people, env['numObjects']):
         raise ValueError('Coupled PUSH physical bank does not match the people count')

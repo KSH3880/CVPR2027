@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT/'tokenhsi'))
 from utils.experiments import NAMES,experiment_horizon
 from utils.output_paths import resolve_output_path
 from utils.evaluation_protocol import HORIZON
+from utils.cooperation_metrics import summarize as summarize_cooperation
 
 
 def summarize(directory):
@@ -64,6 +65,9 @@ def summarize(directory):
             for metric in ('ever', 'final'):
                 item[metric+'_rate'] = item[metric+'_success']/item['groups'] if item['groups'] else None
             summary['shared_center_scores'][size] = item
+    cooperation = [run['cooperation'] for run in runs if 'cooperation' in run]
+    if cooperation:
+        summary['cooperation'] = summarize_cooperation(cooperation)
     (directory/'summary.json').write_text(json.dumps(summary,indent=2))
     return summary
 
@@ -79,8 +83,8 @@ def main():
     parser.add_argument('--tasks', nargs='+', choices=['AT','ON_TOP','SIT','CLIMB','PUSH'], default=None)
     args=parser.parse_args()
     if args.tasks is None:
-        args.tasks=['AT','ON_TOP','SIT','CLIMB']+(['PUSH'] if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else [])
-    if 'PUSH' in args.tasks and args.experiment not in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none'):
+        args.tasks=['AT','ON_TOP','SIT','CLIMB']+(['PUSH'] if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_contact','stage2_coupled_contact_scratch','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else [])
+    if 'PUSH' in args.tasks and args.experiment not in ('stage1_push','stage2_before_push','stage2_coupled_contact','stage2_coupled_contact_scratch','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none'):
         parser.error('PUSH requires a PUSH experiment')
     if args.envs <= 0 or len(set(args.seeds)) != len(args.seeds) or not set(args.seeds).issubset({0,1,2}):
         parser.error('Use positive environment count and distinct seeds from 0,1,2')
@@ -92,7 +96,7 @@ def main():
     manifest=vars(args).copy()
     manifest["horizon"] = experiment_horizon(args.experiment)
     manifest.update(checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(), resolved_checkpoint=str(checkpoint),
-                    formal_report=(args.envs==512 and args.seeds==[0,1,2] and (args.profile=='general' or set(args.tasks)==({'AT','ON_TOP','SIT','CLIMB','PUSH'} if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else {'AT','ON_TOP','SIT','CLIMB'}))))
+                    formal_report=(args.envs==512 and args.seeds==[0,1,2] and (args.profile=='general' or set(args.tasks)==({'AT','ON_TOP','SIT','CLIMB','PUSH'} if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_contact','stage2_coupled_contact_scratch','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else {'AT','ON_TOP','SIT','CLIMB'}))))
     old_path=directory/'manifest.json'
     if old_path.exists():
         old=json.loads(old_path.read_text())
@@ -105,11 +109,15 @@ def main():
         for seed in args.seeds:
             out=directory/f'{task}_seed{seed}'
             if (out/'result.json').exists() and (out/'trace.npz').exists():
-                continue
+                needs_cooperation = args.experiment.startswith('stage2_coupled_')
+                recorded = json.loads((out/'result.json').read_text())
+                if not needs_cooperation or ('cooperation' in recorded and all(
+                        (out/name).exists() for name in ('cooperation.npz', 'cooperation_trials.npz', 'cooperation.json'))):
+                    continue
             out.mkdir(parents=True,exist_ok=True)
-            cmd=[sys.executable,str(ROOT/'tokenhsi/run.py'),'--task','HumanoidMACoupledPush' if args.experiment in ('stage2_coupled_push','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else 'HumanoidMABeforePush' if args.experiment in ('stage2_before_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5') else 'HumanoidMAPush' if args.experiment=='stage1_push' else 'HumanoidMACarry' if args.experiment=='stage1' else 'HumanoidMABefore',
+            cmd=[sys.executable,str(ROOT/'tokenhsi/run.py'),'--task','HumanoidMACoupledPush' if args.experiment in ('stage2_coupled_contact','stage2_coupled_contact_scratch','stage2_coupled_push','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else 'HumanoidMABeforePush' if args.experiment in ('stage2_before_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5') else 'HumanoidMAPush' if args.experiment=='stage1_push' else 'HumanoidMACarry' if args.experiment=='stage1' else 'HumanoidMABefore',
                  '--cfg_train',f'tokenhsi/data/cfg/train/rlg/{args.experiment}.yaml', '--cfg_env','',
-                 '--motion_file',('tokenhsi/data/dataset_stage1_jointpush.yaml' if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else 'tokenhsi/data/dataset_loco_sit_carry_climb.yaml'), '--checkpoint',str(checkpoint),
+                 '--motion_file',('tokenhsi/data/dataset_stage1_jointpush.yaml' if args.experiment in ('stage1_push','stage2_before_push','stage2_coupled_contact','stage2_coupled_contact_scratch','stage2_coupled_push','stage2_before_push_near50','stage2_before_push_near50_pair50_source5','stage2_coupled_push_goal5','stage2_coupled_push_individual_goal','stage2_coupled_push_individual_goal_solo5','stage2_coupled_push_individual_goal_solo5_carry5','stage2_coupled_push_individual_goal_solo5_carry5_ground','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg','stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg','stage2_coupled_push_individual_goal_solo5_countnorm_coupled','stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none') else 'tokenhsi/data/dataset_loco_sit_carry_climb.yaml'), '--checkpoint',str(checkpoint),
                  '--test','--eval','--headless','--no_video','--eval_protocol',args.profile,
                  '--eval_repeats','1','--num_envs',str(args.envs),'--seed',str(seed),'--output_path',str(out),
                  '--task_graph','random_scenario']

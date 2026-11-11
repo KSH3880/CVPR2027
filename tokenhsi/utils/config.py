@@ -82,6 +82,10 @@ def load_cfg(args):
     with open(args.cfg_train) as stream:
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
+    if name == 'stage2_coupled_contact' and not is_eval:
+        if args.resume <= 0:
+            raise ValueError('stage2_coupled_contact requires resume from zerobg 17000 or its own checkpoint')
+        args.cfg_env = args.cfg_env or str(Path(args.cfg_train).parents[2] / 'multi_agent' / (name + '.yaml'))
     from utils.coupled_push_assignment import validate_mode
     validate_mode(getattr(args, 'coupled_assignment', 'random'), args.task, is_eval,
                   getattr(args, 'eval_protocol', ''), args.resume)

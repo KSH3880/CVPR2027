@@ -42,9 +42,10 @@ def group_face_geometry(hands, boxes, sizes, center_goals, groups, members, regi
     vertical = ((hands[..., 2]-boxes[..., None, 2]).abs()-sizes[..., None, 2]/2).clamp_min(0)
     face_distance = (lateral.square()+depth.square()+vertical.square()).sqrt()
     behind = ((hands[..., :2]-boxes[..., None, :2])*normal[..., None, :]).sum(-1) <= 0
-    on_face = ((face_distance <= tolerance) & behind).all(-1)
+    near = (face_distance <= tolerance) & behind
+    on_face = near.all(-1)
     distance = worst.gather(-1, face[..., None]).squeeze(-1).sqrt()
-    return dict(face=face, distance=distance, normal=normal, on_face=on_face,
+    return dict(face=face, distance=distance, normal=normal, on_face=on_face, near=near,
                 slot_center=select(slot_centers), slot_half=slot_half.gather(-1, face[..., None]).squeeze(-1))
 
 

@@ -171,7 +171,11 @@ class MAAgent(amp_agent.AMPAgent):
                 raise ValueError('PUSH resume requires identical training configuration')
         if getattr(task,"_coupled",False):
             from utils.coupled_push_spec import check_checkpoint
-            check_checkpoint(weights,task.cfg["env"])
+            if task.cfg.get('experiment', {}).get('name') == 'stage2_coupled_contact' and task.cfg['args'].resume > 0:
+                from utils.premature_push import check_contact_resume
+                check_contact_resume(weights, task.cfg['env'])
+            else:
+                check_checkpoint(weights,task.cfg["env"])
         if getattr(task, "_before", False):
             from utils.before_spec import check_checkpoint
             check_checkpoint(weights, task.cfg["env"])

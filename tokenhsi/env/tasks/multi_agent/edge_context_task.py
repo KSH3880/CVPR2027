@@ -115,6 +115,8 @@ class EdgeContextTaskMixin:
                 self._box_vel_pen_thre,
             )
         reward = result["agent_task_reward"] + power + collision + speed
+        if getattr(self, '_premature_cfg', None) is not None:
+            reward = reward + self._premature_penalty
         components = [
             owner_sum(result[k], graph)
             for k in ("state_component", "progress_component", "success_component")

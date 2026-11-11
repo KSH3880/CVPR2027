@@ -133,5 +133,6 @@ G ≥ 2: R = d / [2 sin(π/G)]
 - [viewer 짧은 실행 검증](../../output_etc/check/group_spawn_gap5_layout64_20261104/viewer_checks.json)
 - [Stage1 고정 정책의 혼합 확장 평가](../../output_etc/check/stage1_26k_group_gap5_mixed512_20261104/monitor.py)
 - [zerobg10k 혼합 확장 평가·Stage1과 SR 비교](../../output_etc/check/zerobg10k_group_gap5_mixed512_20261104/report.md)
+- [zerobg17k 동일 혼합 확장 평가·10k/Stage1과 SR 비교](../../output_etc/check/zerobg17k_group_gap5_mixed512_20261105/report.md)
 
 실행 명령은 [USAGE](../USAGE.md#공통-stage2-push와-coupled)를 따른다.
