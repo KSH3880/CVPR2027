@@ -1,0 +1,82 @@
+{
+  "note": "Read-only source snapshots for review. Runtime still imports external roots. Source HEAD alone does not describe uncommitted changes; SHA256 identifies captured bytes.",
+  "files": [
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/common/FSM/controller.py",
+      "source": "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/controller.py",
+      "sha256": "63856db73867044b6b316f3ba66595b8200fbad480aeeb7e8943eaf006faf098",
+      "bytes": 8249,
+      "source_head": "dc3ae3549618c3a0093fb69b313ca72b56e91996"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/common/FSM/state.py",
+      "source": "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/state.py",
+      "sha256": "f03dd814e4230aae26f6418589d9452df7036205b09e48a94f1e43e1388c71bc",
+      "bytes": 1052,
+      "source_head": "dc3ae3549618c3a0093fb69b313ca72b56e91996"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/common/eval/stage1_protocol_policy.py",
+      "source": "/home/hwanhee/ksh/stage1_2_base_teacher/eval/stage1_protocol_policy.py",
+      "sha256": "88eae26c8e4762cb5b6f36bbfebeabda5882d6b9b20c7d1ede8499d35d0a849f",
+      "bytes": 5959,
+      "source_head": "dc3ae3549618c3a0093fb69b313ca72b56e91996"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/common/eval/table2_metrics.py",
+      "source": "/home/hwanhee/ksh/stage1_2_base_teacher/eval/table2_metrics.py",
+      "sha256": "42ca5d02b5222daa1f95a489210109185967e158cfadf1a6399b17f23ecb445b",
+      "bytes": 6903,
+      "source_head": "dc3ae3549618c3a0093fb69b313ca72b56e91996"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/scripts/tokenhsi_table_policy.py",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/scripts/tokenhsi_table_policy.py",
+      "sha256": "f671c0de32990eefbac62c7981e24ba1e9c7558b2df3829f28b8988c1fed45fa",
+      "bytes": 7243,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/tokenhsi/data/cfg/train/rlg/push_kd.yaml",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/tokenhsi/data/cfg/train/rlg/push_kd.yaml",
+      "sha256": "09984274d5f3c331fda5417ff8cc675b30b94498ed8fb95ea138ea1ea860599c",
+      "bytes": 2180,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/tokenhsi/learning/transformer/amp_network_builder_transformer.py",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/tokenhsi/learning/transformer/amp_network_builder_transformer.py",
+      "sha256": "efda485e1375fbb3d7a1f86bd182b2585861490e8a08f434b6dbfb4f515577f0",
+      "bytes": 7999,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/tokenhsi/learning/transformer/composer.py",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/tokenhsi/learning/transformer/composer.py",
+      "sha256": "03716f77a57353bc5008ba217c66c775e911197be4b766e7485a7dda84265cbe",
+      "bytes": 1630,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_carry.py",
+      "sha256": "6d942e993b76fe53af1595072c216daf775bc713613159971be0674539e3bf85",
+      "bytes": 63506,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_sit.py",
+      "sha256": "edc0f5be85c9ab43fbe1938f0792f5f264d9e455c3551aebfd36d018c6501df0",
+      "bytes": 60687,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    },
+    {
+      "snapshot": "tokenhsi/scripts/analysis/enabling_reference/tokenhsi_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py",
+      "source": "/home/hwanhee/ksh/tokenhsi_push/tokenhsi/env/tasks/basic_interaction_skills/humanoid_climb.py",
+      "sha256": "3267ebc9896c3dabedbc4da5e7ecd1804e73b34ba5c73e72de2f37669cd9e1f3",
+      "bytes": 52561,
+      "source_head": "0f6fd296c1aaa483a2c48da01497cd7973e45923"
+    }
+  ]
+}
