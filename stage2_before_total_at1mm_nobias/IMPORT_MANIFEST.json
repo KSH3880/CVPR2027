@@ -1,0 +1,2568 @@
+{
+  "source": "/home/hwanhee/ksh/stage_1_2_base_1031",
+  "branch": "enable_nobias",
+  "commit": "16f8b2c664ee94df482f72e87a961086950bce74",
+  "created_utc": "2026-11-14T17:31:02.628728+00:00",
+  "source_access": "read only; git archive; no source checkout or source execution",
+  "files": [
+    {
+      "path": "LICENSE",
+      "bytes": 1176,
+      "sha256": "d0d188f5b08ec03da7fdd0371f39d274e4de5b2f82f68b77ed4aa1bc817c0f11"
+    },
+    {
+      "path": "changelog.md",
+      "bytes": 396365,
+      "sha256": "784e24767f81c3fd226320ab6cac24cfa26318813f8a0f455dca413d8ed6cfdd"
+    },
+    {
+      "path": "code_copy_manifest.json",
+      "bytes": 3414,
+      "sha256": "4e09f26dcd3b06bb4771391302ce62f04b656f192487fdd6791f0859379a8f9c"
+    },
+    {
+      "path": "evaluation_single.md",
+      "bytes": 1717,
+      "sha256": "6c9168d7e1b9d835803b43a9dee2550da0470719fe33ab2cf61fac96e0d43a23"
+    },
+    {
+      "path": "lpanlib/poselib/__init__.py",
+      "bytes": 1603,
+      "sha256": "18ce45a88ddb9502ee84c2bd80295bce410618920fcfb4b89a93021a7db3fac0"
+    },
+    {
+      "path": "lpanlib/poselib/core/__init__.py",
+      "bytes": 521,
+      "sha256": "8f9b40e15e49814c7d667fae8af58972da336bdbc699cd0f0d9f498e4c5e258c"
+    },
+    {
+      "path": "lpanlib/poselib/core/backend/__init__.py",
+      "bytes": 488,
+      "sha256": "73e67af6fb090b3abd7f40a1140c9655e8507110021103269a2fcb3e9faa3e05"
+    },
+    {
+      "path": "lpanlib/poselib/core/backend/abstract.py",
+      "bytes": 5159,
+      "sha256": "ae98c096f1d452e57d33eeb53b963a2e804440b1a609f4921f362d060193ae49"
+    },
+    {
+      "path": "lpanlib/poselib/core/backend/logger.py",
+      "bytes": 1930,
+      "sha256": "6a8dd1dc63dfd5b06762760fe588b2a3b61fb12518edf54b872579bf410c080c"
+    },
+    {
+      "path": "lpanlib/poselib/core/rotation3d.py",
+      "bytes": 13466,
+      "sha256": "66049e0082db433c58f28ff24cea3a346630392f8bfb1bd68a8a965fa7a4df31"
+    },
+    {
+      "path": "lpanlib/poselib/core/tensor_utils.py",
+      "bytes": 1420,
+      "sha256": "af92d69d6b059997cdf9f724924dec78c5bc113915a9cbbf806dffe17ff752a5"
+    },
+    {
+      "path": "lpanlib/poselib/core/tests/__init__.py",
+      "bytes": 1557,
+      "sha256": "8dce5b7233c902f52621feba238c6305e82c3eda374ba8a294015fd242f041f6"
+    },
+    {
+      "path": "lpanlib/poselib/core/tests/test_rotation.py",
+      "bytes": 3256,
+      "sha256": "ff29924b8a16b051d5ce1e65eaf2089c4d2c2626719c4c0803caefaf1a4c2f42"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/__init__.py",
+      "bytes": 1557,
+      "sha256": "8dce5b7233c902f52621feba238c6305e82c3eda374ba8a294015fd242f041f6"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/fbx/__init__.py",
+      "bytes": 423,
+      "sha256": "ccaf10fb0ad435b08227b360bc5906acc9e77241f417e60f1faf8fee89b18f77"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/fbx/fbx_backend.py",
+      "bytes": 10372,
+      "sha256": "33d0944d40e19798fbc04da30dcaa8926f817b69349d71b3bead04c0ed86df4c"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/backend/fbx/fbx_read_wrapper.py",
+      "bytes": 1253,
+      "sha256": "0f709b8c8671c9a3408dc69eeb80087d7a3b810c781e5792946c8a9021ab6dbc"
+    },
+    {
+      "path": "lpanlib/poselib/skeleton/skeleton3d.py",
+      "bytes": 57916,
+      "sha256": "1db0944462b8f9dda86420c36e0f397a68e8d7073fda630e25219a974abedc5c"
+    },
+    {
+      "path": "markdowns/USAGE.md",
+      "bytes": 31039,
+      "sha256": "c72a282ad67ce2bdb67cb2795b6ac1e14f2264869790952a10937b6b67cb7027"
+    },
+    {
+      "path": "markdowns/config.md",
+      "bytes": 41653,
+      "sha256": "ab5bc274bb8f071221eb3225aaab174131ddf5e1dc553332e8cc60cfea9fa019"
+    },
+    {
+      "path": "markdowns/legacy/README.md",
+      "bytes": 1331,
+      "sha256": "1114e8c106e2a5e59302f3e26a1ea742f850eb5478d4ce7a1b4fc32145377c73"
+    },
+    {
+      "path": "markdowns/legacy/changelog_before_cleanup.md",
+      "bytes": 100598,
+      "sha256": "6f4005a889038d1fe7650754769041f5fa02f3d08b67c013b3f11a3b1157216a"
+    },
+    {
+      "path": "markdowns/legacy/evaluation_single_20261022.md",
+      "bytes": 29792,
+      "sha256": "e3476288c32a2ccba8e57e5d6e22cba64d0df9d760e9cc061e8bfda21f01ec8b"
+    },
+    {
+      "path": "markdowns/legacy/mps/CODEX_SETUP.md",
+      "bytes": 17087,
+      "sha256": "e355c6dea5dd39f886155ea70109ce91a911841da6ce84e5a1d369cc1da5b943"
+    },
+    {
+      "path": "markdowns/legacy/mps/gpu4_gpu6_test.md",
+      "bytes": 5521,
+      "sha256": "a285eedc9c85e8203bec2f1323725a93f303820607018ab8a5860373f09f9dfc"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/PORTING_GUIDE.md",
+      "bytes": 4345,
+      "sha256": "4f898be261aad954f57f126df9b049de455b0cd18f92f9e519ebcd5833cfc3c6"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/README.md",
+      "bytes": 481,
+      "sha256": "8950ac40ddc69430a637e149f96ac9ac7d9d29b67557ab20cffb9808b280efb8"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/USAGE.md",
+      "bytes": 32176,
+      "sha256": "fd8f99ea45db6fb04c5a83ef0e53baab908597682ef62a3f8793f9bc5ce2e4ce"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/changelog.md",
+      "bytes": 70265,
+      "sha256": "645ffacce835f4a75b6ff8c65a580f28e5f563cfe0ff99b3b7b373381dcdb822"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/config.md",
+      "bytes": 27675,
+      "sha256": "17c4d0766fe955028157ec391ce5548a6f1e556c020e25e8db263292aa919067"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/ma_clean_scene_gta.md",
+      "bytes": 4779,
+      "sha256": "df58fd927f6ad2e4afd35109256f826259dfbbe11fbd5e2da3ca9a77c27d13a7"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/relation_diagnostics.md",
+      "bytes": 1582,
+      "sha256": "7d0011de4ed0addec108ffe8c7d16cfa64a39ff5e134124c5562b6464963cbcc"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/shared_support.md",
+      "bytes": 7755,
+      "sha256": "85139228618418775fcf34e19949b7d18ff3b741ab1bec562fa03f046ac7cb6c"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/stage2.md",
+      "bytes": 9614,
+      "sha256": "2e9151e6956291a95aca96ed64bbcc2d11be746806ba9b02997c1aac2d095a27"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/stage2_before.md",
+      "bytes": 36562,
+      "sha256": "831f785800c24c5656264a67f42d38238857ecd0abada6d71e47a8ab4414081c"
+    },
+    {
+      "path": "markdowns/legacy/pre_four_configs/structure.md",
+      "bytes": 17062,
+      "sha256": "e370a113299f4337edf5e72ed56462675492e849af46d6dfbee12c5831550aa3"
+    },
+    {
+      "path": "markdowns/legacy/tokenhsi_original_carry_sit_climb.md",
+      "bytes": 38250,
+      "sha256": "6e17ceae7ce38f24ad1c3d672f0a1c76452b37f1a1c17bd9f310de3704a0eaca"
+    },
+    {
+      "path": "markdowns/legacy/tokenhsi_vs_stage1_v2_train_eval.md",
+      "bytes": 15027,
+      "sha256": "3d00551ed9bf9d498d6c20d597d71ae713b10b3888d0d9727ae9a72845ea26ff"
+    },
+    {
+      "path": "markdowns/reference/PORTING_GUIDE.md",
+      "bytes": 1029,
+      "sha256": "f0e67286158470d7a62e9ef9c5d7507cade52748621d3f8c67e0ba44d59d7a39"
+    },
+    {
+      "path": "markdowns/reference/evaluation.md",
+      "bytes": 11747,
+      "sha256": "1b6e5874315cc267bbdca4c200160ebd3ef7ccbcec9ef80b8eaeeca44e497489"
+    },
+    {
+      "path": "markdowns/reference/ma_clean_scene_gta.md",
+      "bytes": 871,
+      "sha256": "6b48be911c75a91bc0d6d3529f7591e250449d24e9d046cfc7b4c2715b4bf88b"
+    },
+    {
+      "path": "markdowns/reference/relation_diagnostics.md",
+      "bytes": 723,
+      "sha256": "ad227e811d57664ad13bdc9f87c52d2a8e2a9df7a69210d554c179a5b498870a"
+    },
+    {
+      "path": "markdowns/reference/stage1_push.md",
+      "bytes": 5046,
+      "sha256": "01cf9832bd39070d1f6b7c5316adfccae4cd01e77ed4d13021df6e8044b248e7"
+    },
+    {
+      "path": "markdowns/reference/stage2_before.md",
+      "bytes": 2183,
+      "sha256": "f09d597065ecd0dc648619273ef48f4a9a02af694e98094a1be8fab2040a647b"
+    },
+    {
+      "path": "markdowns/reference/stage2_before_push.md",
+      "bytes": 25911,
+      "sha256": "27277971a77accff1d0edf93a31ceca1b95a9b382b919d53a57f2e4e784ce735"
+    },
+    {
+      "path": "markdowns/reference/stage2_coupled_push.md",
+      "bytes": 10650,
+      "sha256": "599f774a157d9ae3c4a2ee0894f1c9e095f60cddbc65a2c3b3e1f54a36353f17"
+    },
+    {
+      "path": "markdowns/structure.md",
+      "bytes": 11961,
+      "sha256": "3fd4aa0e6cf3adf6b78630cf4699e4bbb863bbf1f3aece728c86190a03eb61fc"
+    },
+    {
+      "path": "mps/README.md",
+      "bytes": 8375,
+      "sha256": "5cf4efe3d1705204fe75f8a3b5dc2c3ad42c7cd15172a9267afb495804da1189"
+    },
+    {
+      "path": "mps/commands.md",
+      "bytes": 5108,
+      "sha256": "36141fa1ea3790920041a3d3bd9e698dc7dce9b849637ba5dbd63dbe00ca43d6"
+    },
+    {
+      "path": "mps/heartbeat.py",
+      "bytes": 1235,
+      "sha256": "40825de4636bbad24aecb34e2a2bab283e589d0e6a61b7140f4f40cb90eb59e4"
+    },
+    {
+      "path": "mps/shell.sh",
+      "bytes": 8891,
+      "sha256": "fca023a073454864e573239baedf0fd6ebd9011b1be9c984a0244ec4458f6fa9"
+    },
+    {
+      "path": "mps/test_shell.py",
+      "bytes": 11621,
+      "sha256": "5d82e0f65135238d9fc117a62dd8115acf18a5630381bcc1ced39ccb50d4ec8d"
+    },
+    {
+      "path": "pytest.ini",
+      "bytes": 166,
+      "sha256": "3d3a5f1db160223912db1de68ca47e4ff39a0192ac4073bdb6507e5925cf78e7"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 187,
+      "sha256": "d2b5516332e504184e3ba2ec8d6ea6ec1023ef7de604e4c04f2873e70bdb67f4"
+    },
+    {
+      "path": "tokenhsi/__init__.py",
+      "bytes": 424,
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/location_marker.urdf",
+      "bytes": 419,
+      "sha256": "72bf4b443f328fd362772ff8e12df724fb8b2d0e439d2e2596aca140ed149277"
+    },
+    {
+      "path": "tokenhsi/data/assets/mjcf/phys_humanoid_v3.xml",
+      "bytes": 10868,
+      "sha256": "ee3c898fa22993f15525afcd10ca3ccd614fb5ee3a9f10df46576f970b7aba56"
+    },
+    {
+      "path": "tokenhsi/data/assets/smpl_foot_meshes/left_foot.obj",
+      "bytes": 4980,
+      "sha256": "4911cae4ac3896acbb9e07a067260d9eff377a3d6eb1c977069444237d326d40"
+    },
+    {
+      "path": "tokenhsi/data/assets/smpl_foot_meshes/right_foot.obj",
+      "bytes": 4582,
+      "sha256": "0d5db2564ff8f0c1f9a55e194a91e07f6d8c322f37694e57e8854d5eb728308c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1.yaml",
+      "bytes": 7283,
+      "sha256": "876e8fa980744145026e398113372fac34e1db8ca273b3eb5e45cd6ddb64c9a4"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage1_push.yaml",
+      "bytes": 16002,
+      "sha256": "38514209fe442c6d36079c69c332fd363b367398c69428261049e07eebebfb8a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before.yaml",
+      "bytes": 7932,
+      "sha256": "7be755a8d8b2650cce2b7019e5dcd0a44ee7a0b35fab14103c515df1692ca050"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_at1mm.yaml",
+      "bytes": 16809,
+      "sha256": "f25626b0333295b6de65b3619f9b1551dcc44d1332aa0fb53d85c92566773fd5"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_nonemask_rsi433_near50.yaml",
+      "bytes": 7893,
+      "sha256": "82a8739488cd55b42b6c6e6838d18fb4a147e09eaac3b06821ade911f81db8d1"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push.yaml",
+      "bytes": 16957,
+      "sha256": "7dd31c8e184e8a18294b3ebc702ba11efa6b05c913025d997f83502bbc7bdb61"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50.yaml",
+      "bytes": 16370,
+      "sha256": "fe17a7208fdee9021dffeb44a83c4f575fba7d1e1c8818cbde6baeac1bd6dd7e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5.yaml",
+      "bytes": 16413,
+      "sha256": "66de5401c44a64b3ff0d450201b76f061fb86330525e8c039cfa966478af9bb5"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_goal5.yaml",
+      "bytes": 16459,
+      "sha256": "72dec6b9cae3516806527a69978b66b64c238d5fbcecbd5b0602e07939375a27"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute.yaml",
+      "bytes": 16627,
+      "sha256": "e91b7f7ce99ce6a2028f1176698cdcd7cf00d8966166a9ff3dcfdcdda2b2966a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual.yaml",
+      "bytes": 16474,
+      "sha256": "ecbca73548bf3f9e4a3095617da81c5a42ea5e164f33cd50e8308f0730819814"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym.yaml",
+      "bytes": 16529,
+      "sha256": "c05a854ab37d0a080a834f13910a0580fd143c8bda8fce852c30117d1db236ff"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5.yaml",
+      "bytes": 16564,
+      "sha256": "063b3ee327f8ddd0f18b629847572189d08ec9ec2914975c1bb8f9d79ceb8126"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml",
+      "bytes": 16732,
+      "sha256": "600d02d6e0162eeffeb603780320a4e65b3fab6542e017c2a983e2a1f292a1ae"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5.yaml",
+      "bytes": 16509,
+      "sha256": "d7490010927768de7ccc0d105e6b77654c1a0d6bcb98e27506ec1e346f278ab4"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml",
+      "bytes": 16677,
+      "sha256": "cc820a5334042b2fe64506f5ceda5c44a72676ff5f4df83cb12172cd740dafcf"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait.yaml",
+      "bytes": 16810,
+      "sha256": "bec2412caa935dd40f52e20ac5bb3f8610fdb4051f418bd987f393b0d78f6d4d"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty.yaml",
+      "bytes": 16757,
+      "sha256": "1b643fde81ffa667a7c40b3c79fc29b6ce05cf29536b74dd7e1195419a803dc6"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2.yaml",
+      "bytes": 16760,
+      "sha256": "e1b88ff4aa12daf40f0609d3cf60797e69022c587b38841a6ed6babed37115df"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml",
+      "bytes": 16818,
+      "sha256": "f14c95c934833be5186f7bc4baee3abe5136dcf587aa30b6e08655e5f81cf48b"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k.yaml",
+      "bytes": 16870,
+      "sha256": "3458e72172e06e4661b5444f7ad5a2d8c5d2ecceb792380bc732921628749f9a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2.yaml",
+      "bytes": 16856,
+      "sha256": "96c3b46711f12e650a24d8187407d16bd2e587e8b5c1f7537e8043ca918bbc80"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3.yaml",
+      "bytes": 16856,
+      "sha256": "23a1cf7c0497603b7f8be173208ab6415168b2e948821967231fb16eec15f87a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_ep900.yaml",
+      "bytes": 16861,
+      "sha256": "5abd31313afb4e1de88fad97ac6e9c8a34a43471bd7e8f4bff0749ff1ac8c1be"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v4.yaml",
+      "bytes": 16856,
+      "sha256": "44d5b6839105a294672330a0ce6d5f1351dc43c7ecfdeb6e134671bfa9fe0667"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2.yaml",
+      "bytes": 16866,
+      "sha256": "da6beb53a5cb1e05b58fdaebf8314b37f62496b8d5b82304362959748dc3aaf8"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3.yaml",
+      "bytes": 16866,
+      "sha256": "3b42654b33136633c41003e53a1db426fc99cd4a2a187bbc7a11b4d601817066"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_rsi433.yaml",
+      "bytes": 8127,
+      "sha256": "349fc60ed6ca25294f06fc704fc481215b94160e3469f43b19b3943c35857162"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_total.yaml",
+      "bytes": 16776,
+      "sha256": "0942c5e298719fcf89774d8da8606a30bd2d70b5fdaa51a684372022b20b7052"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_total_at1mm.yaml",
+      "bytes": 16815,
+      "sha256": "a2007c839d9621b05043fdc5900b9af4edaa9668f632e0e80c40fc33c4c08606"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_total_at1mm_climb2.yaml",
+      "bytes": 16853,
+      "sha256": "201e428b7aa5cc600a02c22ec06187e16b38572683194722a0e4aa17f34aed20"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_total_at1mm_nobias.yaml",
+      "bytes": 16829,
+      "sha256": "315ab47360db2cef8442fe1887dabfa435237dbeabea508ef8a237d90bd3b75b"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_total_ft21k.yaml",
+      "bytes": 17055,
+      "sha256": "8cd671b8b1d6f04450dc2743cd56feebeca6369eef501242d7b96a6e94fb05dd"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_before_total_progress0.yaml",
+      "bytes": 16811,
+      "sha256": "d5dc984940e07b544215ffef53b094dae8f0a4e510d298022969ead8a799c8e3"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_coupled_push.yaml",
+      "bytes": 16366,
+      "sha256": "1a32799ff7974664abd3bcd5aa3174b6c87c7245deaeb2e91b6e1fbf02ad31b9"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_coupled_push_goal5.yaml",
+      "bytes": 16446,
+      "sha256": "e61be57a138b22bae2c2eb7cd1affd659834760cd372b219bacd42b4f995fe06"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_coupled_push_individual_goal.yaml",
+      "bytes": 16537,
+      "sha256": "c30997edbc3bccb34c87e0d18856d63dfb95ea9e3620f9dc713d03d85ce85126"
+    },
+    {
+      "path": "tokenhsi/data/cfg/multi_agent/stage2_coupled_push_individual_goal_solo5.yaml",
+      "bytes": 16609,
+      "sha256": "06ea6a5b4d4afd39bec5a757cbd6715663bcd539bfef0b59fbde393315ba58f4"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1.yaml",
+      "bytes": 2879,
+      "sha256": "74c3300c23e63ef8d975370830363e78637abeff49fe157559e4ea1065397dba"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage1_push.yaml",
+      "bytes": 2495,
+      "sha256": "21bfff6f6be10931777a81df05739c11f2ca2f203c3feb9df5cbb1b1463c6e52"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before.yaml",
+      "bytes": 2530,
+      "sha256": "09328094317a87bf85d79343ffc0644f6206c5b53a19e2fcb6fdf5ac24137cd7"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_at1mm.yaml",
+      "bytes": 2540,
+      "sha256": "21e7256586ee69fb3db0a2bb2861a1d4737986eb8e410ecfbd22d13b1424ce7b"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_nonemask_rsi433_near50.yaml",
+      "bytes": 2550,
+      "sha256": "f646f19973fa5a39102d4db817d8a6b08a1008ba8f62ce02de72f94431a542e6"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push.yaml",
+      "bytes": 2539,
+      "sha256": "dadf6a00ecb22df7896c6136ad004165a45e7f8b52ce603ab8b42f46475b119e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50.yaml",
+      "bytes": 2545,
+      "sha256": "d9b6b35444e8cfbaf8c8784592a8768e76afa20fb2b60960193066c2b2a69eb6"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5.yaml",
+      "bytes": 2558,
+      "sha256": "b8144bca59b464854ce05652aa04ff8a1ca98f776cf5902666a8cd94e5a14fd7"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_goal5.yaml",
+      "bytes": 2563,
+      "sha256": "e091f01a07baaf290ea7f51a9987bc6a2ae423e9fc643f1c22cfddf3b8f7e48c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_goal5_goalroute.yaml",
+      "bytes": 2572,
+      "sha256": "64ee899cb160e40bacfed438bc1515ec41cbdd86c038f7ff3881c5226aef0d2e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual.yaml",
+      "bytes": 2565,
+      "sha256": "5c9379f1a18a4afe9b84fef6e438f31739ee9dd07313926a0df3978139dcaf80"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym.yaml",
+      "bytes": 2569,
+      "sha256": "3d887e50ff8166a525c202033a373d1be1686c41f5547aca5b9b6560a89419b2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym_goal5.yaml",
+      "bytes": 2574,
+      "sha256": "f2c05bceaa7614eb8e51cf616fb9d314c38dbe78a9beb33b93b583251c03b56e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute.yaml",
+      "bytes": 2583,
+      "sha256": "f79821ab535b5c129c47dc73218a128e641e1635df1d073cb6e9312f634ae8a2"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5.yaml",
+      "bytes": 2570,
+      "sha256": "dc5200668e614c7d05b0ac3d26aba74a024b293ee9daf4c52b7f5ef1eb9d9c4e"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute.yaml",
+      "bytes": 2579,
+      "sha256": "47fe8f9e88bb95dc6ef5d3782d85fa187a20fe9ee27daf1c2d53b75510be834c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait.yaml",
+      "bytes": 2583,
+      "sha256": "5778ce3215803045cb7637258b0a9a5c5202e560e6fe1a3f3bf23cafa8865d46"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty.yaml",
+      "bytes": 2590,
+      "sha256": "f11db3d162a089db7be55e0d2b92fa732a9a7dcd7a508f5f3482e466a36b176a"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2.yaml",
+      "bytes": 2592,
+      "sha256": "42597f41fc12c96402debe4da6c75d7deb87b4c6e9ee9ce9ed55ba734e076714"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg.yaml",
+      "bytes": 2607,
+      "sha256": "55624559d4f6dd0969a1391fe43485180213a888473fdb8fbfc83b5682b90acc"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k.yaml",
+      "bytes": 2622,
+      "sha256": "62d61f3ef3c3cd887124d21057a6e69d0077d6b9bd1262006e1eb57ebadbf082"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2.yaml",
+      "bytes": 2609,
+      "sha256": "9d4a510059cb8146299924fdc78526c8c2b77392b3be47205890f68fb677e300"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3.yaml",
+      "bytes": 2609,
+      "sha256": "b6ebb4698490c77a09559449de4b8b9cf51bc48a87503d3f155a390e74be4190"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_ep900.yaml",
+      "bytes": 2614,
+      "sha256": "20d8b0e52938e23b5b5e8b1eefe1c2a80d12a26ed9dfabe51f546b3c4837950c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v4.yaml",
+      "bytes": 2609,
+      "sha256": "8cb55ca274b68e3e13c7797cad21e494cfce88c257a5312b727148c1f0e4c2ac"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2.yaml",
+      "bytes": 2585,
+      "sha256": "71a9effc8d56b77c6e6e71adf50aca0bac0cb3ac75408d7ee37bd69db9a92ae7"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3.yaml",
+      "bytes": 2585,
+      "sha256": "dc67c62a4ca709d69e1bc1d782e5c2b28c5426f94330e6fc7b08368a69540a41"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_rsi433.yaml",
+      "bytes": 2536,
+      "sha256": "bfadc735493e000a1ef56006ed8364f8c4dfe047aee907cab37b5956c57a584c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_total.yaml",
+      "bytes": 2540,
+      "sha256": "9a4c1fdf790d46b3db4bb32cb7defc1be6dd41d36ee62386a48495c7b05cb3f6"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_total_at1mm.yaml",
+      "bytes": 2545,
+      "sha256": "a44e3a71ea9d2e2eccd306e2ade39350563f13621a322d5e31f76a1990483217"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_total_at1mm_climb2.yaml",
+      "bytes": 2551,
+      "sha256": "5974cec62d4579f02d3e03e1e748a94faca1d51d5452851e90bfd6e2c4d006bd"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_total_at1mm_nobias.yaml",
+      "bytes": 2551,
+      "sha256": "775890089562de7fc25d5a82f723d4897cad0f2af99b28ca85c3999e26a92574"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_total_ft21k.yaml",
+      "bytes": 2545,
+      "sha256": "f0d41bc5cfb3450d47c4431ccfa16cae48b71a57a8b16cc899e8690e31607796"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_before_total_progress0.yaml",
+      "bytes": 2549,
+      "sha256": "898e1e41a5f047c9f25a46391cb92f800513ccdb2628a24a0ef8a3aac14ae08d"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_coupled_push.yaml",
+      "bytes": 2540,
+      "sha256": "b42e63b9c48e5a777e837874766c1fb2baaeeb2c9403682dd1dc095ac06e511c"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_coupled_push_goal5.yaml",
+      "bytes": 2545,
+      "sha256": "e039100eea65863fac2abc9c05486783ddee2e8345b5af36b48a398e3280b905"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_coupled_push_individual_goal.yaml",
+      "bytes": 2554,
+      "sha256": "4d065ad6576bb05f12f266c0303977198764ae15bba338c6424ba007659b63e1"
+    },
+    {
+      "path": "tokenhsi/data/cfg/train/rlg/stage2_coupled_push_individual_goal_solo5.yaml",
+      "bytes": 2559,
+      "sha256": "54e8938f5682e21a229ea3357fd7527cea59963f768113640babc2e4e42c4b82"
+    },
+    {
+      "path": "tokenhsi/data/dataset_loco_sit_carry_climb.yaml",
+      "bytes": 21377,
+      "sha256": "762c3a4bbd92ab3ea22593987ed34905c702efffdbefafd6f95e475172c90104"
+    },
+    {
+      "path": "tokenhsi/data/dataset_stage1_jointpush.yaml",
+      "bytes": 22903,
+      "sha256": "3d8001cf2089f9882d1437207947c1c5e7cb4f0e4ca599167a6078b68f35d490"
+    },
+    {
+      "path": "tokenhsi/data/stage1_jointpush_rsi_bank.json",
+      "bytes": 274364,
+      "sha256": "89e672124218fdf0a2575676b53fa85840585153325348a98e3268014f4f640f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/__init__.py",
+      "bytes": 424,
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/base_task.py",
+      "bytes": 21549,
+      "sha256": "b43ad85990486c66ac5b56af11416c339e9a2c530deddd6dd2e85f123eb1f609"
+    },
+    {
+      "path": "tokenhsi/env/tasks/humanoid.py",
+      "bytes": 31337,
+      "sha256": "37e04cbf9183545e77051426b30d10fb790f8d1b83a1015fad2b1e1f2a8e5b6f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_goal_sampling.py",
+      "bytes": 3703,
+      "sha256": "4f94aa7f658f1c9742e8db697315334bb5b894e538be2c345f21f16edbd2f2c6"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_pickup_carry_rsi.py",
+      "bytes": 2476,
+      "sha256": "cef8e1fd9f648b774eac5cad9553447c25f2ec25031352eb3d0bf60d39c56e50"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_push_reward.py",
+      "bytes": 1945,
+      "sha256": "ecb94475228786dac7d8c5c8487cc9cc8ef192f884d999458f3b00b8e1f3d60c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_relative_sampling.py",
+      "bytes": 2341,
+      "sha256": "54b83da5f63efbf5f7f34416721a600050f4b3652bd077c997b2e7a064a612b3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_reward.py",
+      "bytes": 5261,
+      "sha256": "251f6c20dd50ed54523fbf0831a1afafbf10e0a15397c8043125620b014db462"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_rsi_cache.py",
+      "bytes": 7171,
+      "sha256": "e0f63732078b2b629da4004da2fb0a3b0581d46aea7ee31f81364c2d687f203b"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/before_wait.py",
+      "bytes": 4649,
+      "sha256": "91e339737b6fab84f28239eacb076db6c76e1200fa3599f9e2ad5d6907920bfb"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/collision_reward.py",
+      "bytes": 3040,
+      "sha256": "c3db37e73ef2a42b9967e87849b965b66c7c45ee57f82d87f507107ab5cbcb11"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/coupled_push_reward.py",
+      "bytes": 999,
+      "sha256": "b36ddf598a002d422667c3fc1887d24245dcd5e2d5f90308fcf677c6eea1a2c2"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_reward.py",
+      "bytes": 720,
+      "sha256": "d151c48ef8259a0539ef8f36b5be9bd7367749a86987582cd8efc170196a198d"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_context_task.py",
+      "bytes": 14133,
+      "sha256": "8ae8b7767f7231c24b87e26b0a1f52b180332b597e59cf3c0322cb5814527354"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_interaction_reward.py",
+      "bytes": 5178,
+      "sha256": "9780af2f2838a3c8e899451340b5d73b1f5c747618c4764b3b75722abecc8e1f"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_reward.py",
+      "bytes": 4806,
+      "sha256": "dfbc0270643b1cc8264e1d12d9431ecfe64391a5701009d058786d6191078ed8"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_ontop_task.py",
+      "bytes": 35254,
+      "sha256": "da2a52e23c525227a35de8942000c1cdfa38222f28c24cba6da8e1e14f067357"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/edge_stage1_reward.py",
+      "bytes": 3290,
+      "sha256": "60adaa5c8c9586e9cade03e4af1aa462ecc44c3ab9e20d3c43307b81b4652d2b"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma.py",
+      "bytes": 25780,
+      "sha256": "7fa7260c46ae773860aea96fcdb32075e0f20a9c5e0351411929852a55ad0171"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_before.py",
+      "bytes": 20102,
+      "sha256": "30283325786c28ef66350a9fdacf3c5a3d3277b89d13b43b9ef1b2e293dc0c57"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_before_push.py",
+      "bytes": 13402,
+      "sha256": "03b58ce88d1638b15be1d15afb6ee72c4738b0846eca520d46bf9e5cdff33a56"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_carry.py",
+      "bytes": 34660,
+      "sha256": "2ea63b34d4a17781e83841e23644267902c8b13fed9a9bf6961e5b8d8527a4ac"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_coupled_push.py",
+      "bytes": 18428,
+      "sha256": "85f3dbce4654ca57e1232b4dcf0b58c6e1457fba1d3abe89ccf5e8f5f426844d"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/humanoid_ma_push.py",
+      "bytes": 16493,
+      "sha256": "48db3ddd067badf5bba96be8219e81303bd959ccde3a7dddf5e6deadd9e3dede"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/jointpush_reward.py",
+      "bytes": 4621,
+      "sha256": "a6bdc04f2d820ed75ca7ccb1fc691a135d56d61f0e69ff406e3772111f0879c6"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/native_rsi_cache.py",
+      "bytes": 8094,
+      "sha256": "e610e18a9b3359be2c4a26dba655d9ba40541bd95a0db30a028174c3070302ce"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/push_goal_markers.py",
+      "bytes": 1873,
+      "sha256": "e62c7c76534b208c3a1bf653353539217abc59f5a73c026d79caacd0793e6141"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/reference_motion.py",
+      "bytes": 11343,
+      "sha256": "73d355bf542588a88e974557c0ea816bdb75babfa77595b32c76e874362d2f2e"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_diagnostics.py",
+      "bytes": 139,
+      "sha256": "c3e6dab6813f66ee321c02cf833c1e4b743baa7746447eea860f10857d9a6a98"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/relation_reward.py",
+      "bytes": 333,
+      "sha256": "21df5afe31fc05e2a2b25e2adce5d238461b0b8f8c0ff47183f525184c58d773"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_features.py",
+      "bytes": 5005,
+      "sha256": "9d8126ae6d770b0a03ee70e3dc292d844a2187329a2b185d8480fb099d52966e"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_layout.py",
+      "bytes": 2427,
+      "sha256": "4c8fcf6c90fee542c956d96c959782407fcb757a2afbd16c3475f399e57d751c"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_observation.py",
+      "bytes": 5489,
+      "sha256": "487e8b77efa942f826c53601d30b02b4bdcd2aa2ef6e60a94fc6a3abd5001750"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_reset.py",
+      "bytes": 20496,
+      "sha256": "0cb017fb6d2a0f91049db2f8d3c43ee748153657e9187d161dde9d920abce7a3"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/scene_validation.py",
+      "bytes": 1801,
+      "sha256": "dece7b38629cb223c4c15173007ce192c53f34f51905baec61886945c98d34e8"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/size_rsi_cache.py",
+      "bytes": 16192,
+      "sha256": "a3b73fc81565936c2fe11d8eaf6abe60c7a6789c4aae9055ad54773e28bcaed1"
+    },
+    {
+      "path": "tokenhsi/env/tasks/multi_agent/vec_task_wrapper_ma.py",
+      "bytes": 1943,
+      "sha256": "2dc26e8eebfc6de3c1ddcafebec96db6c0a4cd24f70625d464a447af66b939af"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task.py",
+      "bytes": 2796,
+      "sha256": "4fc38c14f75e954e5445198062920435f5a3d433ae447eb98081473b7483f5ba"
+    },
+    {
+      "path": "tokenhsi/env/tasks/vec_task_wrappers.py",
+      "bytes": 2359,
+      "sha256": "f8386867ce34cd8245f33529c036935fbe49343c0385b1164491ed65c1f55993"
+    },
+    {
+      "path": "tokenhsi/evaluate.py",
+      "bytes": 17055,
+      "sha256": "045859187afee6749208921d3ea8ac92c36c9e332df2f7d44c5b79eed8ec2dad"
+    },
+    {
+      "path": "tokenhsi/learning/amp_agent.py",
+      "bytes": 29976,
+      "sha256": "5308e12866d8affa4ec40ee747719abd9af5141a5881d3879af72a2128da945a"
+    },
+    {
+      "path": "tokenhsi/learning/amp_datasets.py",
+      "bytes": 2563,
+      "sha256": "8e2802113413e9d88e31559c1b3b8b233ae1b6f4b6b9e82440eb0f0aa1eeebb7"
+    },
+    {
+      "path": "tokenhsi/learning/amp_models.py",
+      "bytes": 2919,
+      "sha256": "ee4fa05d5a6a2bc885291339d0cd41e14ac66383b9ffc6b49e6347b568e8c84e"
+    },
+    {
+      "path": "tokenhsi/learning/amp_network_builder.py",
+      "bytes": 5880,
+      "sha256": "f24600408591754033043a6e072b2b10e07b2088c4229a2d2ee1fcb3d00be819"
+    },
+    {
+      "path": "tokenhsi/learning/amp_players.py",
+      "bytes": 10243,
+      "sha256": "2cf5845886f5d067d2530c707a3e9e09f8979ac2e78ad09ba1dd87bdf45490ae"
+    },
+    {
+      "path": "tokenhsi/learning/common_agent.py",
+      "bytes": 24735,
+      "sha256": "7a7cc63bea28b62db9f96fc678f4fb9fc15046a7c3591a887c6609d8c4023a63"
+    },
+    {
+      "path": "tokenhsi/learning/common_player.py",
+      "bytes": 8399,
+      "sha256": "bd37d2597217e9258dc6fad0a27500e1e7a26c8246643f1a7b5198a7d6199b45"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/amp_network_builder_ma.py",
+      "bytes": 24991,
+      "sha256": "1033a2bdadfdba7c3abd135fa45eace529baeab89295e44407f72dd79ecb3d71"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/before_network.py",
+      "bytes": 4271,
+      "sha256": "9480921403764a08a1bf5034c3ca31af2dff7eb42eb8cfd7cf43c2a1b1008d18"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/before_push_network.py",
+      "bytes": 239,
+      "sha256": "345cbeabc7498ab2f0ea9331c81411d10f6f92fa7b9d479b5aa4d03e07d12da5"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/before_relation_fusion.py",
+      "bytes": 2585,
+      "sha256": "c5f8a56a1077af3d5fd16c48195e8c4395f7176a0b80bb6b722bbe0ac31cc45b"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/formal_eval.py",
+      "bytes": 6856,
+      "sha256": "e19fc9c2ff14e208549edda8bfd31375a216854ab71ac941c485e710593e6cc9"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/human_coordination.py",
+      "bytes": 6327,
+      "sha256": "34203052b62ced0edfb989a886cb180d14ac225621f79e0c45dbccffa6f7fd2d"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_agent.py",
+      "bytes": 29481,
+      "sha256": "c7710fbf2736c7199f1cb1464f1243ee0903886e8859d54bd4a7078b6161e0b8"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/ma_players.py",
+      "bytes": 5534,
+      "sha256": "dcb322423a0e199c22a0696501f6cc18f3761df6c57e343a1324f354d53780d4"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/scene_normalizer.py",
+      "bytes": 2614,
+      "sha256": "40085d119636e6b42e41f54e411f428761ecd73003b4c4b7e834de7866a6c976"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/stage1_push_network.py",
+      "bytes": 2347,
+      "sha256": "c807c13e9718c6a2e2c72a74c7c329a8113271429e9c3b9cc9f4972b736205d9"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/stage2_push_network.py",
+      "bytes": 3070,
+      "sha256": "08adeb383693f32be49cd7866f9239b92f4409f12f3948ef9b133fa73a417af0"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/task_role_encoder.py",
+      "bytes": 4347,
+      "sha256": "cefbe99f7694ecd414cf82b9eb3501d0e7d2f83f89d84f20677c11123bc929b8"
+    },
+    {
+      "path": "tokenhsi/learning/multi_agent/viewer_diagnostics.py",
+      "bytes": 4317,
+      "sha256": "a2ec949934e535ec935fc7f5de530db061d06b47b547913461529b61a3615183"
+    },
+    {
+      "path": "tokenhsi/learning/replay_buffer.py",
+      "bytes": 3986,
+      "sha256": "9f4097a1f3ea44d132d18dc0b72a9141051c093b193443e4e9bd578d28844a5c"
+    },
+    {
+      "path": "tokenhsi/rescore.py",
+      "bytes": 5158,
+      "sha256": "2ceba2b84f2ecd84146a4fdf9fb9b3a741e4712b6de6e94c50e5dd6090b3349d"
+    },
+    {
+      "path": "tokenhsi/run.py",
+      "bytes": 8427,
+      "sha256": "b22c71fc93e2802f05c3dfafd9f0af21340a977bd66d4edacb36ac54b8710b1c"
+    },
+    {
+      "path": "tokenhsi/scripts/gen_data.sh",
+      "bytes": 1458,
+      "sha256": "49356f26a57806e3cecd1e42fb2a8ec2eab47ebe8401afde2681c6cacaa4eb9d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/before_chain3_test.sh",
+      "bytes": 968,
+      "sha256": "5f07c9c5b2a436b4e813dd785656d69aab4bbb29fbd1e76979af8858652dcc29"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/before_chain3_vnc.sh",
+      "bytes": 201,
+      "sha256": "1084a383299bf831e02e265463060a4696ded8d73efd02352f9f8758445a41b0"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/evaluate.sh",
+      "bytes": 126,
+      "sha256": "9259c316a5dcc6287d6ce83e5990043e5c3c7a9e292395f79906dd0baec5dbf0"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/gui_gpu_env.sh",
+      "bytes": 2218,
+      "sha256": "211087f9d9b56a37e6bc94431629430a399234051dcc4a94be6ea2e2b921d1cb"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/launch.sh",
+      "bytes": 8471,
+      "sha256": "6f1369daf074acd26ffed376ccad7041937b493e470957460d6c895f5c67eecf"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/mps_auto_env.sh",
+      "bytes": 2497,
+      "sha256": "97901b4b15844d52951930dc4fbfc803b7029a6eca1477a371413a297d92ee30"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/output_paths.sh",
+      "bytes": 492,
+      "sha256": "54915a27a4999f2db6e25d05df85a05c9a5742ef0734015f946b711a54f6f71b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/run-gui.sh",
+      "bytes": 6457,
+      "sha256": "6bb3e1d366dcc17e6b5cc66d5f58c4848af339bd9ce797cdef48bf2dde8f24d5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/runtime_env.sh",
+      "bytes": 4133,
+      "sha256": "53b3b7fb1c257b3c7984131a7dfd4bf768a7704c79197aff869ae33d4abfddc6"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_eval.sh",
+      "bytes": 145,
+      "sha256": "1bb7b92448ab1d697639b8c1265686a6b9a3c996de179d32acf28a980965cd96"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_push_eval.sh",
+      "bytes": 112,
+      "sha256": "7719bb154f22d6b8cc50de60fb8d0718f9dc27613555ab5eff93d844a1183df4"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_push_single_eval.sh",
+      "bytes": 118,
+      "sha256": "443a98aac7323047db08faa7ed1ee8484667ee5dd6283d832e0a09510fd810b6"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_push_test.sh",
+      "bytes": 80,
+      "sha256": "21dfeb5bc7f7a9b60832d4564f258c47deceaa8f8f5620a549f55d2739be22a2"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_push_train.sh",
+      "bytes": 81,
+      "sha256": "91058a6dc0e0892a1cfb83a6825cacc159fc9fcfe54ca9d7e1b1bd2eedf8c6f8"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_push_vnc.sh",
+      "bytes": 79,
+      "sha256": "f762e651dbc7712c8d78b1545c10f59eff8094a3f315796308fc445293aac64e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_single_eval.sh",
+      "bytes": 151,
+      "sha256": "e3758d39a9ee953c19bc77be2483574763f6d7c560d47956af131a734d3c75d7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_test.sh",
+      "bytes": 82,
+      "sha256": "fafec42efc1fc7136a0cce8df34f024d04b0e302af0f97c6ebaa8e5a47d50c4b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_train.sh",
+      "bytes": 84,
+      "sha256": "cbca08b687823d8a8b232ff3025998930e93856490c2eb4e26fd27beea896aea"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage1_vnc.sh",
+      "bytes": 80,
+      "sha256": "1581fe564918fb0718700537b31d838ed7b435636ef7e76a56c94bc54a3ccf32"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_at1mm_eval.sh",
+      "bytes": 158,
+      "sha256": "61d63cce700917de361665e50831f3edb7ed314bd2910f997808183b3b5d7137"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_at1mm_test.sh",
+      "bytes": 108,
+      "sha256": "d0b486696b90843c7cecb9f8b4ae6a3c1286f48f9be063a91fa62c31ac50e060"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_at1mm_train.sh",
+      "bytes": 110,
+      "sha256": "e6b5e8306beb8b6ddd9043dcaa55316814f15de3bb71aca83b97996405d65d1d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_at1mm_vnc.sh",
+      "bytes": 106,
+      "sha256": "6b2a0349ae682b86a2ae81228ad6ab6a032a1af164dea744939980cef3f48490"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_eval.sh",
+      "bytes": 152,
+      "sha256": "47a3734151e18a1f447158cba2492fe10dca0656da04164c16de5ef18407cb7a"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_nonemask_rsi433_near50_eval.sh",
+      "bytes": 175,
+      "sha256": "5ec7caa664e32655726674a5ed92ea0b8c3f9ec4295d4e3ae2d6fd66a2d27c13"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_nonemask_rsi433_near50_test.sh",
+      "bytes": 142,
+      "sha256": "dcd675b8ea77717407ba0b7d3c3b974f507e5e9b48d0b820b34b456cb016c570"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_nonemask_rsi433_near50_train.sh",
+      "bytes": 144,
+      "sha256": "a7875f0ff3baa355ea205d41dc0a6895f24b0a8eab64037d1eb0270318bb60c7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_nonemask_rsi433_near50_vnc.sh",
+      "bytes": 140,
+      "sha256": "1c95e4abb99b50e87564a9c91f683788aa8a865860af0f57f8373fc8f54f9708"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_eval.sh",
+      "bytes": 157,
+      "sha256": "94c74f09b3b2aa2e24db5d31312fbb70e6ce82d754518748f75e36cd7d38404e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_eval.sh",
+      "bytes": 164,
+      "sha256": "5f841832635d7dcdc9e1ac1239691923edd6d1370863f154506607d39e17afc9"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_eval.sh",
+      "bytes": 179,
+      "sha256": "9cedec2f0d9d808991a7ed17e2b5c50ed20e26f5d4bbd7edc52bd360f2c45f22"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_eval.sh",
+      "bytes": 185,
+      "sha256": "3b4a2a86bce592abb6e5d43541d7e24a771f1a85d964446dac377730ca4b978b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_eval.sh",
+      "bytes": 195,
+      "sha256": "c3ce64b2c5d98cfb143426b8e44bbf02d480366b8f5c6676d16e456f9f5d4865"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_test.sh",
+      "bytes": 182,
+      "sha256": "35ba0b386344716598bd5f32ba25ac436ee3b00fd690f4d859ef301bdcd793e4"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_train.sh",
+      "bytes": 184,
+      "sha256": "c554b996042fc230366de1e57318578f72f0b3d9dd92d78e31377b0cc979120c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_goalroute_vnc.sh",
+      "bytes": 180,
+      "sha256": "e9ce723d1e9962787baae7c7759d801c6a116919584955f55dcf5da4cb756ab1"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_test.sh",
+      "bytes": 162,
+      "sha256": "67b9505a523b6c4bbf7f57c2309b84c4f18f9cc58486210bb303194b8ca902d7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_train.sh",
+      "bytes": 164,
+      "sha256": "afa3ef459606066c93f1e8949f4698c0699bf28b5dba006009fb58c772bcac72"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_goal5_vnc.sh",
+      "bytes": 160,
+      "sha256": "f4b00ad0738cadf3f35f360948092b0d9b8c663ba9e9dd534c13077ae54ba5c1"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_test.sh",
+      "bytes": 150,
+      "sha256": "7eb444ed9313a84e377d9c4c885665a26153761171f241cd9ece07485e7e6889"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_train.sh",
+      "bytes": 152,
+      "sha256": "add9f7e87f5e2079c34db06546b29d71b8ba7ecac2854f9a1b1bbf147f9320c4"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_eval.sh",
+      "bytes": 192,
+      "sha256": "5e0ca92e6a2218f1974a9629bbd2dabcfded520f1270506669a09f34cf5f7985"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_eval.sh",
+      "bytes": 198,
+      "sha256": "6d16eae9a2cd3014904b9157bc888a3ecca6366714cf9282da50229abc788f0a"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_eval.sh",
+      "bytes": 208,
+      "sha256": "dd9d148aa895eef784223e16251d50c589e9c895a1c320330ebcff9ba430197f"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_test.sh",
+      "bytes": 208,
+      "sha256": "28c7406e75642977a7883a1219abc7bfe1a7fafb22c4f6ff374bb612558bd178"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_train.sh",
+      "bytes": 210,
+      "sha256": "ccefaf27ac386cd5600fc3b87b5256951622cdcac41515b736848bc54d8e643a"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_goalroute_vnc.sh",
+      "bytes": 206,
+      "sha256": "d980adfd53beeb0f571e774e4ca3e62d8d0a96316b97b2dd29b2a776297f313c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_test.sh",
+      "bytes": 188,
+      "sha256": "e7a685987799f180ea76f92956a8dbb16ae69a5568bc98db6ce93ade8906a8b2"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_train.sh",
+      "bytes": 190,
+      "sha256": "8c9f36d354710057af77c1cd2722f7a675bf7301bea6907e0c098d3ca2046f22"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_goal5_vnc.sh",
+      "bytes": 186,
+      "sha256": "9cf8b84eee91d945bf270a69e7f218e28e5e224b63b9e5907996b939600a9fe2"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_test.sh",
+      "bytes": 176,
+      "sha256": "725b03417ee867003e147d43b499e5d0f17a1739f24a6593f3ff9b924efe0f0c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_train.sh",
+      "bytes": 178,
+      "sha256": "21ebf9ea39ddb498421baece5dd4ec2c1be3ec4a75b91db2255ef304220dede8"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_asym_vnc.sh",
+      "bytes": 174,
+      "sha256": "01db4a2d66811997d48c151236c3a3be11603f407c273fee12d72318b797e53c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_eval.sh",
+      "bytes": 187,
+      "sha256": "e422090feebd5139a9f500d392dc3e84c94f1eeba7d82a937f1817d53716d1f7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_eval.sh",
+      "bytes": 193,
+      "sha256": "df3e7a1a94709d2417eee3c9beaf8c6169911f1d4254a90e01cbfb9c3ee07c7a"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_eval.sh",
+      "bytes": 203,
+      "sha256": "be349a5f49ebc366ce888f0bef44d81df15dca3b77114793f23e858163919a5b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_test.sh",
+      "bytes": 198,
+      "sha256": "95e42022e7f9c4c7b6653b61294d1810acc66f863cb36a8ff1aba351996966df"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_train.sh",
+      "bytes": 200,
+      "sha256": "b94fe12d316407ea8a56364e3809045a97b3387377910f34893a6ec6b2c8ee4d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_vnc.sh",
+      "bytes": 196,
+      "sha256": "076775d415e8e29acf97eabf9d3a1cc4d1884f6d4f36f0f23d951fc5d64f85b9"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_eval.sh",
+      "bytes": 208,
+      "sha256": "57c5d82eb4070673f31aca594df7aed14754f25f60d632b40335330747fe2d5b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_eval.sh",
+      "bytes": 216,
+      "sha256": "573033f916bb558ea3b80e7063b98a7fe05e866bf02953f8199d5eccd70115bc"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_test.sh",
+      "bytes": 224,
+      "sha256": "12aaa7bd36c78b810c264833520c456561141996607647f80eab6f26f8906047"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_train.sh",
+      "bytes": 226,
+      "sha256": "a4eca48edb8b84ba54d6572535ce63e1968f748d78990f1ca6d07602e16c0ab2"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_eval.sh",
+      "bytes": 219,
+      "sha256": "38faad4be07769095dbeb2977ef2c6687dd1c8c9c7f8b21e11a5c14659b19e6f"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_eval.sh",
+      "bytes": 236,
+      "sha256": "9075ebc41cfad76130ed968fa487230d30059c934dfda8af12a412566a19b9f1"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k_eval.sh",
+      "bytes": 253,
+      "sha256": "fbe7cf0b1f476a31a405f9f8acc79ed7cafa96325e8a7d24cc8b7df9e87f13af"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k_test.sh",
+      "bytes": 298,
+      "sha256": "67ad1403e0ac4ef6449b2fbf9904667494aa944640d63f4400577d69c2bcbd57"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k_train.sh",
+      "bytes": 687,
+      "sha256": "e2a91449d8617ce7d8c99fabedd388ae798a516da309da33f6d91057087a2572"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k_vnc.sh",
+      "bytes": 296,
+      "sha256": "f282a9cbe523900e68d3dbe4d2378118b351d01e0298880c580d100ccda81a01"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_test.sh",
+      "bytes": 264,
+      "sha256": "4becbaf06d141aa5f69a59be0417aa5e3b3c987074a11b38ac296fb5a3054212"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_train.sh",
+      "bytes": 266,
+      "sha256": "a8970ccacd2b08ad5d8d76904b498d94a8b4bc04c7ec392f169be73075efccf2"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2_eval.sh",
+      "bytes": 239,
+      "sha256": "442057f558e05aaeea1037120ae9b2343cfce4f8b281e5ed53ff52b758aa6bf8"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2_test.sh",
+      "bytes": 270,
+      "sha256": "6f10af3f248b86f01d146110d1b359a983863c416451feee1cc62506a6a662ef"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2_train.sh",
+      "bytes": 272,
+      "sha256": "bf2532a5c7f67676322cd7d5f8f748863c2da3276cc13015f4a87e215ed58d22"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2_vnc.sh",
+      "bytes": 268,
+      "sha256": "4f0807f53e9ae99111e84b850cbc0b0cc8e98e669bd181448758c733262b0dd2"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_ep900_eval.sh",
+      "bytes": 245,
+      "sha256": "dc9e14c0277bcf98a3b63257b3b1aaf736d79f9c3b19f86791113e446bcf8a88"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_ep900_test.sh",
+      "bytes": 282,
+      "sha256": "5bc89fd85a15fa5417d91cebfa150dd5e4963068ce7f6855695c0099cdf1315b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_ep900_train.sh",
+      "bytes": 284,
+      "sha256": "faab2ccf09cb7203572d15c422ae559f65429b69e8603f576d2abdf1bfca4854"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_ep900_vnc.sh",
+      "bytes": 280,
+      "sha256": "71cea5556fbf8eac141f741780baf4a64461ffb7568421866790f94db4ac8714"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_eval.sh",
+      "bytes": 239,
+      "sha256": "57b3f76855603c3ccd1e914f24346b208619fb521e47ed3b5a16cc32a0b45fe9"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_test.sh",
+      "bytes": 270,
+      "sha256": "8cd66c3eaea66e0ca4f22bd13ade416207e7155d296de30ff43b233e09ee0a00"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_train.sh",
+      "bytes": 272,
+      "sha256": "8f2786a149730bfe5ae5534f152945a906b8879970bb7e2e72d98c8f36fb4cdc"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v3_vnc.sh",
+      "bytes": 268,
+      "sha256": "259d5ca957a83cbf57da76ddac366b98ef7643cfd92553ee5f335476f031242d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v4_eval.sh",
+      "bytes": 239,
+      "sha256": "b7549dd2114b6a5d7b589dbf9eefaf981c8956176ae2f51308615d41e0cfbebe"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v4_test.sh",
+      "bytes": 270,
+      "sha256": "1a448b600d2dfde3e0d49c8c9d906c0ba1182c20c7b740be3f208fb8f5d07ee5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v4_train.sh",
+      "bytes": 272,
+      "sha256": "994b0b7ebdacc08378b5d956172bed0da8e067a254190556f23a3010f135381c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v4_vnc.sh",
+      "bytes": 268,
+      "sha256": "afe2661eef9c010e1cec87785f105b0478102fd6f970b41c0f10a0e290092d18"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh",
+      "bytes": 262,
+      "sha256": "4bc525d1a91f7e9ad271f164b4a3621c36063afd68119fe016e0ec508b46afa0"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_test.sh",
+      "bytes": 230,
+      "sha256": "96260b6fde43d78c4563e6ffdb4921e3b0c643cb51a38b6fff2b388a7cfeeb6b"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_train.sh",
+      "bytes": 232,
+      "sha256": "dae613da2166d879013e785a45db8acc9b852c5cb84bbdc92297a112ed0d41ce"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_vnc.sh",
+      "bytes": 228,
+      "sha256": "513f178495584e49bec27509acee1909dd1b1acb4d89db1876c0ead5118f19f0"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_vnc.sh",
+      "bytes": 222,
+      "sha256": "da380730f45238e78c60974abbd6f9bc73ebd946d3f9a4beb739b5d456739c77"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_test.sh",
+      "bytes": 208,
+      "sha256": "0faaaf226c1e813119805246dabb6cfc1e46a96e960ac07f597af364c927adbd"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_train.sh",
+      "bytes": 210,
+      "sha256": "e828bca56b95d403064d44735bf449862f943e670b86513da394294ba62557f3"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2_eval.sh",
+      "bytes": 211,
+      "sha256": "63dd21909a261777c583c4fa8ae3713b4801270884eb6ff2f84dc38f84c2e003"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2_test.sh",
+      "bytes": 214,
+      "sha256": "69cc8ac1dbae1ee50a28de4c8227dbbb7e16c97f0c3a2889d83d53d6ab1b7cb5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2_train.sh",
+      "bytes": 216,
+      "sha256": "6e53ad8da8764e077ac278905dde4bcdf2677eb1a1bbb48ace39c42403e0cef8"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2_vnc.sh",
+      "bytes": 212,
+      "sha256": "405efee62cbc7f0c15738b2e6c85934ee6aaaa3ac8489de3502375631fb8d833"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3_eval.sh",
+      "bytes": 211,
+      "sha256": "4284a34e3e01ad9d3bebd1752b8b592667e2f1fdcc98309e6f0ea50640c06adb"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3_test.sh",
+      "bytes": 214,
+      "sha256": "b5a95b244a6561ea0cde0d0e474b31dc09796ce100873a23312523daaffa792f"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3_train.sh",
+      "bytes": 216,
+      "sha256": "32ca55afaf09ef4b2a3ce945795d1f4e5fd699785b524123747be4718fcaae99"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3_vnc.sh",
+      "bytes": 212,
+      "sha256": "40f347e744e828d77e2b07a7360f330ccc23651c82f42e1e1216228d6387f4ce"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_vnc.sh",
+      "bytes": 206,
+      "sha256": "7037223bcc50b1d9a8cd396ae11e60328159d1ed32267022d4d074a91109b3ff"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_test.sh",
+      "bytes": 178,
+      "sha256": "2ae3bf6a548d8ba7966206cdaacfb62829848e2d24d2f4a73c4972357072c7d7"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_train.sh",
+      "bytes": 180,
+      "sha256": "f9e4b2b6105941702db70a3a683ee63a0a2cac7b354610cf61e2b2fb0dff601e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_vnc.sh",
+      "bytes": 176,
+      "sha256": "2e7c8605e73f0d580679aa5543993ea155a9e66327fcf2f2362bb106e0782abc"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_test.sh",
+      "bytes": 166,
+      "sha256": "e7bebdb485afc0f9204be3eef3a2f35e889965ff35e7a8cc87f4037c29469f21"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_train.sh",
+      "bytes": 168,
+      "sha256": "e4cebe4aa26af458c0f849813359892355c454c0a9e6a3504b39c9892b135cb8"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_vnc.sh",
+      "bytes": 164,
+      "sha256": "c0d36141c93bd7c2c321163a6cfeda1eabe197edde7807d85ae66f11ab788fe9"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_vnc.sh",
+      "bytes": 148,
+      "sha256": "cd76e7db34d7ab2df6315a327da9d582aa34ab0b7185c38395e24daf6ee06e1e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_test.sh",
+      "bytes": 120,
+      "sha256": "2bdf9ae62f6641f931e8ffecaf6ae6501f03593a5a327d57eea2a0afcdd16841"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_train.sh",
+      "bytes": 122,
+      "sha256": "7c22d59b3fbe3eab973f5cf7fee707a4a217f8ecdfa9ed637cc2cc3f2b1e6bf5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_near50_vnc.sh",
+      "bytes": 118,
+      "sha256": "b21a2af35e07bc58aad56b7a8b0e50c6c2d4fe3542ced4f625338edde2273951"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_test.sh",
+      "bytes": 106,
+      "sha256": "b492bd4b987e69691d3dd7ab817d7a41927efa7f605e42d0480fb077240050f0"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_train.sh",
+      "bytes": 108,
+      "sha256": "beec6c59b034f9fd3f1f3704d32b09a01cd5d7505ee7bfcb8c711a8d92f8ad6e"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_push_vnc.sh",
+      "bytes": 104,
+      "sha256": "2a45bbb0f0620f5be9738387a7fafda25ec0b2a37f118d73e46610df7e9055ba"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_rsi433_eval.sh",
+      "bytes": 159,
+      "sha256": "4981ef5be460299c4ca3ed819e24efd2d43a6dd7b1eccbd6ed1c018d420fcffd"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_rsi433_test.sh",
+      "bytes": 110,
+      "sha256": "2744b0ad417c264ed0ca57e110a52a72ebe5a9bce1fb4ca1f73d56f177b430dd"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_rsi433_train.sh",
+      "bytes": 112,
+      "sha256": "48a467a43eb2ddfbd2d7d9b055936bc16aacc4d8470f876afd6ad1c7592eac5f"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_rsi433_vnc.sh",
+      "bytes": 108,
+      "sha256": "d1027b7bdd558a6a6c43116601bcf5c06273e66f92a64999bc21be00fad953c3"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_test.sh",
+      "bytes": 96,
+      "sha256": "a2b6acce705f2992d45c44f27276b402ab9edd2bf94e75ceb6ec40959d252312"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_climb2_eval.sh",
+      "bytes": 171,
+      "sha256": "b4b4bb6f0fe2e9573b12f2fd8643443753b5ee8975eaf29c801b6237c3e63eef"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_climb2_test.sh",
+      "bytes": 134,
+      "sha256": "e0be960a5a887016e90caebbdf756cbba798e7ee474d9cc32ba960b5a2017415"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_climb2_train.sh",
+      "bytes": 405,
+      "sha256": "1346e00075dacbd01631286af6f5e62425ee8d79a94f5ec3a4e70e2a1ce33bef"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_climb2_vnc.sh",
+      "bytes": 132,
+      "sha256": "96ee26738c1a754f9214a3d0ceac91997b182abd177a29f5ffd1dcbd1604c4e5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_eval.sh",
+      "bytes": 164,
+      "sha256": "47a569a1a98418ec1bfa9c4a56ca640763d480e78e9012a9c72d02999ecce688"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_nobias_eval.sh",
+      "bytes": 171,
+      "sha256": "b47aa3c8e7a91f96bf6e7a0699d2392b4e5eef0eff5ec949aaf58f918a7ce8dc"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_nobias_test.sh",
+      "bytes": 134,
+      "sha256": "120e2469dd0f17e2624acc376b4753467ad672f11f14c2439c8d1fa65264da15"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_nobias_train.sh",
+      "bytes": 136,
+      "sha256": "74485a089969b6d55f145eb45f4e3cb9e9c1b12ddce7f9980a5d019933792518"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_nobias_vnc.sh",
+      "bytes": 132,
+      "sha256": "174a40b425e5ca457e9bed3531b92fe065715aa90064a71eeb148ab00c9ad231"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_test.sh",
+      "bytes": 120,
+      "sha256": "2b8979f29fff4caccf3efcb91c45589387b71d31595a5eb682591ce643c7333a"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_train.sh",
+      "bytes": 122,
+      "sha256": "db89b9e55c326891da7afaff572784a279a45388fb0a7a450beaf389b81aca83"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_vnc.sh",
+      "bytes": 118,
+      "sha256": "3a30c8d1a07e407d2dee95213f0c4ffde5fa7561aba85769ec4eb59434cedca6"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_eval.sh",
+      "bytes": 158,
+      "sha256": "f79bfb7207254ffd922c31d5cb89f90182996f1fe0aca3875cd24c2da5327a18"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_ft21k_eval.sh",
+      "bytes": 164,
+      "sha256": "72acebf98c69eb32fb593879079b49d80f3fa5456b51105264bf739b46f1aa99"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_ft21k_test.sh",
+      "bytes": 120,
+      "sha256": "cd76482df283259de08535f5df4def59c4681def7528bf5e9a407f563db7e55c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_ft21k_train.sh",
+      "bytes": 122,
+      "sha256": "91725054c5a048a7c6cb839c5540f60aa8b4fc204a98cb40d7bf4fe55ad90843"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_ft21k_vnc.sh",
+      "bytes": 118,
+      "sha256": "38dff8d232423b8b91e8cdd91e1f09a892f5db1f292db8bbf3e93e36e04d3464"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_progress0_eval.sh",
+      "bytes": 168,
+      "sha256": "d259a983e448907ff111d3ecfaf628699470e34272914943cbc6c3e464dcec59"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_progress0_test.sh",
+      "bytes": 128,
+      "sha256": "31cd8ffe177eb8212fa8ffeeeeb60d5e4eb439d56d9ef82c6045d872d79ce55d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_progress0_train.sh",
+      "bytes": 398,
+      "sha256": "9dfbe70bb26464b3df8aaec8aea7df5ed7b56ce9651161f001553159b79c59fa"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_progress0_vnc.sh",
+      "bytes": 126,
+      "sha256": "f1947f57546810512471ee5490d0bf0532dc11b9fa5c7ef7bd78f6c0216f0242"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_test.sh",
+      "bytes": 108,
+      "sha256": "602058d61a5bcf59b3e459eb39dd7a09b3796752622cba31e1b06e1a1952ea32"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_train.sh",
+      "bytes": 110,
+      "sha256": "b4b33cfd072e4d4e0947471e3914a7e39db64e20790e9f341c785520d4c6399d"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_total_vnc.sh",
+      "bytes": 106,
+      "sha256": "366f3aeb965e82ed72ae3d405a60261f215631d56c336427ae931821a9406123"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_train.sh",
+      "bytes": 98,
+      "sha256": "d8ad8ee70ed37ca20e3c9613335a3743206d508c69b4db25f414944e0c1a81cd"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_before_vnc.sh",
+      "bytes": 94,
+      "sha256": "9a5eee24dfd5687a85dbd2473026b5b6ddb63cfd61e444ab4dffb9c868605e37"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_eval.sh",
+      "bytes": 158,
+      "sha256": "791409ffcedc91b57b9d8dabcd8e34b8f5e84f13b277c33d0ed74fa097a62e11"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_goal5_eval.sh",
+      "bytes": 164,
+      "sha256": "dddd2e767a63031543517bd2e2da442b7975ccfd307166d69b764cb11a27b09c"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_goal5_test.sh",
+      "bytes": 120,
+      "sha256": "4b21f64f224819967a27c2421168195725b180aa83e30d7f573508ec0d80c6ce"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_goal5_train.sh",
+      "bytes": 122,
+      "sha256": "a0bb8bceba10b50cf82f1f4df9cef4da51d54d42284ab188cbd57b6a062100b5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_goal5_vnc.sh",
+      "bytes": 118,
+      "sha256": "4594178ef2e23f3c41807697e09859a461f005cd1530f23373404703ff9e1499"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_eval.sh",
+      "bytes": 174,
+      "sha256": "27842c7b9330f3d5d5c5223157edca3a79940db4f1293aaa1db9514d51e030e5"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_eval.sh",
+      "bytes": 180,
+      "sha256": "30a1e6cde15f988f84642c8590f9c51d353831c71e67a2bdec014f212ee482cc"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_test.sh",
+      "bytes": 152,
+      "sha256": "891543f660a98565541dc1ead3754077bed45f0b8239a789f004e0bc84dd6df6"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_train.sh",
+      "bytes": 154,
+      "sha256": "af08dd997654b879a86ee751e69e0b91fbcf3b8d4f57882f44135f0723a1fea4"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_solo5_vnc.sh",
+      "bytes": 150,
+      "sha256": "296c7d949c3a8dbd3662ed799a641d68227c53543c2b6469a571b9305082b900"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_test.sh",
+      "bytes": 140,
+      "sha256": "5c2c0b8daa04175490fb851568d86bacc044465ee9ef4eca70595d5fa3d64914"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_train.sh",
+      "bytes": 142,
+      "sha256": "52f0ea1b66860b1b3b0e4a04866d9d1c4e434ee1bfd0b62ba247de8918d781fb"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_goal_vnc.sh",
+      "bytes": 138,
+      "sha256": "4c792589758350d956dfed1a7b98f2d8833d9f73e85dde3188dd915df32ecccf"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_test.sh",
+      "bytes": 108,
+      "sha256": "e41a56cbd8d500d408c96cb1ac2502c60d84dc29bd4fa19eb16141463f26be65"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_train.sh",
+      "bytes": 110,
+      "sha256": "034cb6d5d532ce1ad6f6383cc4bd213a6e1e84179585a466a965c2935b8de564"
+    },
+    {
+      "path": "tokenhsi/scripts/multi_agent/stage2_coupled_push_vnc.sh",
+      "bytes": 106,
+      "sha256": "ebba1941875bf01566d10965e4bbf89ea779aba5eee7291f9e4cd896e0e701d4"
+    },
+    {
+      "path": "tokenhsi/summarize_before_stops.py",
+      "bytes": 746,
+      "sha256": "1a772d9ff6a525b0626a62f38328175b2df12b2fc982e1712f984f39cec5d9d8"
+    },
+    {
+      "path": "tokenhsi/tests/before_test_utils.py",
+      "bytes": 1771,
+      "sha256": "90f2b2b3111559fdbbda38ba0c66d4bca246dbb6ca6064a5551c8ed477237e9d"
+    },
+    {
+      "path": "tokenhsi/tests/check_before.py",
+      "bytes": 2698,
+      "sha256": "1b8121f0a92c47151f38c2a4d4907feef3938e9149682913ebbcef1e2720d2e4"
+    },
+    {
+      "path": "tokenhsi/tests/check_before_asymmetric_progress.py",
+      "bytes": 5437,
+      "sha256": "500934770a22201af37b2044862d2b72394e6fea0191a36af0f25b7b8a67557b"
+    },
+    {
+      "path": "tokenhsi/tests/check_before_object_alias.py",
+      "bytes": 6315,
+      "sha256": "44f63f9f79f4c46fb9707880e2d45baa536fdd6b6544c55a3954ef6407827516"
+    },
+    {
+      "path": "tokenhsi/tests/check_before_pickup_carry_rsi.py",
+      "bytes": 6564,
+      "sha256": "6277d4805f3d5d1f942de41f681bd9764cff27e7439fc05286ca2ba3abb40660"
+    },
+    {
+      "path": "tokenhsi/tests/check_before_push.py",
+      "bytes": 3544,
+      "sha256": "c815c31d2160a5edeffeaf891b2c7803618dfa5d12d4df8b133908e5816a6f84"
+    },
+    {
+      "path": "tokenhsi/tests/check_before_virtual_object.py",
+      "bytes": 2371,
+      "sha256": "31781a632dd7979da2e68d1783f0f2a6c475445d9d0aee36a92cdbec3a14eea9"
+    },
+    {
+      "path": "tokenhsi/tests/check_before_wait.py",
+      "bytes": 4410,
+      "sha256": "75f32ff9335199f98484001b69cd87e063c43cbc6a64096610071139a513982e"
+    },
+    {
+      "path": "tokenhsi/tests/check_coupled_push.py",
+      "bytes": 8096,
+      "sha256": "ff4d102c1245732965bdfab0c5edf628489ae6ced28e5fd1c5388f2ec70bec62"
+    },
+    {
+      "path": "tokenhsi/tests/smoke_stage1_sim.py",
+      "bytes": 11320,
+      "sha256": "04c31f20605275ca6a733a326842c720785ee2a5390d087f9a6a10a7104b5fa8"
+    },
+    {
+      "path": "tokenhsi/tests/stage1_test_utils.py",
+      "bytes": 1919,
+      "sha256": "99f02d6d0e6d73fe9c07130b00b21648d108e79c042c628d41fe704a0b81bc89"
+    },
+    {
+      "path": "tokenhsi/tests/test_agent_cpa_collision.py",
+      "bytes": 6723,
+      "sha256": "c69cdc4f1eb11097a6a37ab1c8c9a7308ff42aa87e73383c9f5f7195eecc8de9"
+    },
+    {
+      "path": "tokenhsi/tests/test_before.py",
+      "bytes": 7784,
+      "sha256": "449c018b31048b33a13d0c18c17c6ebad2939ac2d5005560ee6efad05c933376"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_asymmetric_progress.py",
+      "bytes": 9813,
+      "sha256": "826a2a50e06d491eaae72b027cbd7d049b0555b8f83d63625b88d5c2d92df19e"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_atprogress.py",
+      "bytes": 6252,
+      "sha256": "37f08cd741749f107b7d1222540202e1566730e86bac8a648178bee3e23bce43"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_box_size.py",
+      "bytes": 2455,
+      "sha256": "7875caeb46108b8e51150e910467bd96320ccc923973659b90dfb7f4a88d833b"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_chain_viewer.py",
+      "bytes": 2470,
+      "sha256": "b1776d35109719b0957ecd1417732318b6b080aaa0fe77d695ab10c744d83650"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_fusion_human3.py",
+      "bytes": 3986,
+      "sha256": "efb045efeffada711eb7d916230daa3f2a8fb5ca83387a116485b0ae004605b2"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_fusion_v2.py",
+      "bytes": 4114,
+      "sha256": "a7d8c833aa55264b7712e1f0ea64ba7621de2aa5d745b498e6d4872483b6a2b2"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_fusion_v3.py",
+      "bytes": 2549,
+      "sha256": "05c1a4af7d8587fe2af623e6ea30820b2803b7484d7cc472c35566e8960a82e6"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_fusion_v3_ep900.py",
+      "bytes": 1980,
+      "sha256": "24690f092899be3068fe6f9e7dcf6407ab554d4bc0c7d7c314615b7c31783df6"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_goal_sampling.py",
+      "bytes": 10012,
+      "sha256": "cafa48bd229afcb307696a85d78afe4d9694597138dfbfbe6b4c033b4a803e14"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_mix226.py",
+      "bytes": 3127,
+      "sha256": "41d6ffd1a6619eba45415209e563d16d9ef706a06d364da0d58a9f3a18f7bd14"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_none_mask.py",
+      "bytes": 2493,
+      "sha256": "693945b822cb83ca1d77996d6bce92fec2680689c5bf60b53b325e2465d5c29b"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_object_alias.py",
+      "bytes": 9814,
+      "sha256": "80959c21d5b11ed651831655744d336305beb64c8f88852220182937ac30273b"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_pickup_carry_rsi.py",
+      "bytes": 2764,
+      "sha256": "3200cf4834de12431ebe4f494c900b3a72b5255a474240796730d5144eac18e1"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_push.py",
+      "bytes": 8595,
+      "sha256": "ef4b7af7b57508344020e54299391a9bc963d91d635866ebaa3b387cd0f6fed6"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_push_batched.py",
+      "bytes": 4947,
+      "sha256": "7837bc7381acfadf7548e7087887daf5f0220b44929019a12c76644efb76d80e"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_push_goal5.py",
+      "bytes": 4535,
+      "sha256": "df676adc18dfd4ffc86927c7d2bc23046543bd6155a8564389b4a229683090ce"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_push_near50.py",
+      "bytes": 2887,
+      "sha256": "7bf612538aa3d2a1a4cb5aa90c9328b6d56e6b2e4f276b3f0163eb7895154607"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_push_source5.py",
+      "bytes": 10208,
+      "sha256": "c3142ce93fee4c4473065507b9b0e7fb0a3195ce3d7c6f9476f25e8094a14c11"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_push_viewer_budget.py",
+      "bytes": 3009,
+      "sha256": "ac927ec7dfea9acfd17c1985b634c9d4c46a5b4f9b1d4f1118c91a8831fcd249"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_relation_fusion.py",
+      "bytes": 8875,
+      "sha256": "23adb282f73b8ecb2462ee58ad7a9d8a80ef8fb0fa34071f35f4bbed5c5bbf1e"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_relative_sampling.py",
+      "bytes": 3205,
+      "sha256": "f356ddfb1f36e1cedb7e165165abddce80be203a04f766631e4a1b9cfac6ae86"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_stop_evaluation.py",
+      "bytes": 5824,
+      "sha256": "b6694e184a4fc4e6c871b7b3d3023272a48a26dda665619c8268c82bf6893567"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_total.py",
+      "bytes": 4400,
+      "sha256": "a4d1c1c76f8ab980af06eea85b68d512ebc556fe2bcb34ba13e5c7ba951b8e6f"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_total_at1mm.py",
+      "bytes": 5844,
+      "sha256": "27b45b5fb0c2db3af75b2d6ebc32c7829015b2f393748a9a4b775a7fa88c6870"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_total_at1mm_climb2.py",
+      "bytes": 6396,
+      "sha256": "d78391bd9f5b445f9f7f2e140777d061525af3a42afc881c7b1e4c591ee83069"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_total_at1mm_nobias.py",
+      "bytes": 6540,
+      "sha256": "5df93920e692e8d262227789786b8080034a52bd06a07adea7344bbb4c802713"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_total_finetune.py",
+      "bytes": 4789,
+      "sha256": "dfcd17d7621e1e28bbf8a3f487550404334b93b9b9277c6f6fb4e721bc1a9dca"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_total_progress0.py",
+      "bytes": 3557,
+      "sha256": "5c87fbc5747c7a6ae3a0eaaf1c39e6b5060d333044ae9fe17d569a4546145279"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_virtual_object.py",
+      "bytes": 8849,
+      "sha256": "cb33393bebd95dfc29a899a5791134c6b4ff74c44ae700f6e5e87352360155ff"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_wait.py",
+      "bytes": 7958,
+      "sha256": "e88312f59be2120ad0201edd9530a1107058925d7f4fa049777c7c21a25bd666"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_wait_penalty.py",
+      "bytes": 3736,
+      "sha256": "f1a389d6291243c0405ea52db9a3f60811d6f1c0d3f270884620fb780a075c36"
+    },
+    {
+      "path": "tokenhsi/tests/test_before_wait_v2.py",
+      "bytes": 6802,
+      "sha256": "2aa69de80dbddfd8fe96ace596a0fb8daea6acd31377f912cacb71f0bcc9a1b9"
+    },
+    {
+      "path": "tokenhsi/tests/test_checkpoint_compat.py",
+      "bytes": 2345,
+      "sha256": "a0638a8323b07159dd54a607880fb3e74ae52fb32c42d2ffea634039c2ed374d"
+    },
+    {
+      "path": "tokenhsi/tests/test_coupled_individual_goal.py",
+      "bytes": 9831,
+      "sha256": "584146df59aa38e67d6fab46d5294492002c501d3cd41a8be816bae732dec41a"
+    },
+    {
+      "path": "tokenhsi/tests/test_evaluation_protocol.py",
+      "bytes": 4989,
+      "sha256": "aa3af36f0e1008ed8f7fc8d17ff4a5ee749a5de24331f41370e2971fc98b28c9"
+    },
+    {
+      "path": "tokenhsi/tests/test_experiments.py",
+      "bytes": 3641,
+      "sha256": "2ea2b83ee90e6dea951b27cc23ddf52cb31186367f6d2ac078938a1a1e33eba9"
+    },
+    {
+      "path": "tokenhsi/tests/test_generic_task_scenario.py",
+      "bytes": 4277,
+      "sha256": "9478de522f3eae4e4591dc04597319bc2c02ba7f7337f128e90476717ff5e6a4"
+    },
+    {
+      "path": "tokenhsi/tests/test_graph_box_speed_penalty.py",
+      "bytes": 2573,
+      "sha256": "021d80fe8fbfb5fa3738176d2c383cfccc883aec7efb94685fd905077adf315e"
+    },
+    {
+      "path": "tokenhsi/tests/test_gui_gpu.py",
+      "bytes": 2379,
+      "sha256": "5172abc28bbc20eeee3eff47ca3bf797e6e37855c3287d3f17a39bca0a24e7c9"
+    },
+    {
+      "path": "tokenhsi/tests/test_ma_scene_features.py",
+      "bytes": 2849,
+      "sha256": "70333a0da1602f834335b5afd9db8cd7059595ee5712ca202f4eeda85a470106"
+    },
+    {
+      "path": "tokenhsi/tests/test_output_paths.py",
+      "bytes": 2964,
+      "sha256": "bc0483a6177b81fbef7f9bbb10945767b3674402a351a08cfa5fe1da61d7a41c"
+    },
+    {
+      "path": "tokenhsi/tests/test_runtime.py",
+      "bytes": 2731,
+      "sha256": "d4116b7eedc821182a3caecff90df43c8f6f93546a595dd995a68f8330f2812a"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1.py",
+      "bytes": 7177,
+      "sha256": "2a07dbcecd2e027909cea97f11baffa1cc67d20dcba8df363151826d66e5403d"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_config.py",
+      "bytes": 2469,
+      "sha256": "47d88c30f1e175a0d777a86d2666b6aaf902c5866609bedf51bbf998d01bbb22"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_geometry.py",
+      "bytes": 6642,
+      "sha256": "46e027970bae6f48fcc3b756d13094a6808cd506a2dec900e63093c13ac5b7d7"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_gta.py",
+      "bytes": 4829,
+      "sha256": "9ed0ec091910fb811ddf0a65c8c63274b0eb90febb13c94c42c5ff3ce97bff00"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_policy.py",
+      "bytes": 14432,
+      "sha256": "10861f553afea785083dd408635a1a7e21517a0ce55fa3fa5616342598b8982c"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_push.py",
+      "bytes": 8595,
+      "sha256": "ed2f1b9b72235819e195276e7008c368c1d0736f47a15dad4c025a2f48a75c18"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_sampling.py",
+      "bytes": 4498,
+      "sha256": "ccb75a94b1ef84185119756da7cd64c23f70b998b3cd557b5b44acd678918d41"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage1_wrapper.py",
+      "bytes": 695,
+      "sha256": "c03650d129113f897f1c74db025699fa4fada5e0e36fa085c16005f571c70a8c"
+    },
+    {
+      "path": "tokenhsi/tests/test_stage2_push_common.py",
+      "bytes": 12854,
+      "sha256": "3f2846babac9e12f4c9d85c2a764b027a80e9f39ca608d30c91ef95ebe8cc842"
+    },
+    {
+      "path": "tokenhsi/utils/__init__.py",
+      "bytes": 424,
+      "sha256": "0f615356952f0f1a3c5e55fbf78d0cb7b70c6983b7a09a1befedc73cd7d65a5c"
+    },
+    {
+      "path": "tokenhsi/utils/before_box_size.py",
+      "bytes": 1372,
+      "sha256": "50ea8c01c3fee10d83b53690c383ccf3301c315bb5d2f46b9caf4c7ed6aee77f"
+    },
+    {
+      "path": "tokenhsi/utils/before_chain_viewer.py",
+      "bytes": 9735,
+      "sha256": "abaa7cf026d0086405b997d6016ac20e1d479626e38b0a0e65a38f221c22f2f2"
+    },
+    {
+      "path": "tokenhsi/utils/before_fusion_resume.py",
+      "bytes": 2514,
+      "sha256": "da767c79054135a67833d44616e26f5e07e43cc3b9df27b9a2288baa531e609d"
+    },
+    {
+      "path": "tokenhsi/utils/before_goal_sampling.py",
+      "bytes": 2005,
+      "sha256": "710cb4e891ba3069453fb3884ba851e0a487634d5454ec40ae15f0fa69ec665d"
+    },
+    {
+      "path": "tokenhsi/utils/before_layout.py",
+      "bytes": 640,
+      "sha256": "cfd1c60bd424a67734d7fde23356f2cc08769152c5f2c48a5d0a0dd2f21c06c0"
+    },
+    {
+      "path": "tokenhsi/utils/before_object_alias.py",
+      "bytes": 3542,
+      "sha256": "3a556db94775ef741c9b941f7027661918db7730ee3a550e88c285b02eb47214"
+    },
+    {
+      "path": "tokenhsi/utils/before_pickup_carry_rsi.py",
+      "bytes": 934,
+      "sha256": "4b6313b36f7af693bf91dfcadfc6cfd3be1c0af4947ab9f548d3ba619ec44ba7"
+    },
+    {
+      "path": "tokenhsi/utils/before_push_layout.py",
+      "bytes": 8745,
+      "sha256": "2e2873ac1544724887f0918e40358f0a8aa2bc45b7809f32869e980bb23ed03b"
+    },
+    {
+      "path": "tokenhsi/utils/before_push_spec.py",
+      "bytes": 9931,
+      "sha256": "cbc32b1b927cd3466e4090372a6d8dc63d281fbcfe59b7d82c80686065153e6e"
+    },
+    {
+      "path": "tokenhsi/utils/before_relative_sampling.py",
+      "bytes": 1558,
+      "sha256": "7153813e960359369912f37cfd1c8127c17af5610433995ef77c055ed75c7be0"
+    },
+    {
+      "path": "tokenhsi/utils/before_sampling.py",
+      "bytes": 3687,
+      "sha256": "11a22be6db3cd622ee396e7d3d16aabd505500de543869a02c706a2d5b1d736a"
+    },
+    {
+      "path": "tokenhsi/utils/before_spec.py",
+      "bytes": 9954,
+      "sha256": "d8692c3d967d55bd0d6786b62c5070fec83f8ff9637fe4b79cf233408fd1151f"
+    },
+    {
+      "path": "tokenhsi/utils/before_stop_evaluation.py",
+      "bytes": 5433,
+      "sha256": "45c081c573d136c25c2132db90767d39ea456d0f6e112b2069a697c105176df7"
+    },
+    {
+      "path": "tokenhsi/utils/before_total_at1mm_climb2_resume.py",
+      "bytes": 2746,
+      "sha256": "5679a300a14d69cb5b2c0b09cd30794a26c611dc3fe87e973415850ce6f188bc"
+    },
+    {
+      "path": "tokenhsi/utils/before_total_finetune.py",
+      "bytes": 1556,
+      "sha256": "c1e6520699f011691c3822b84a04406409a924a282849621648c346e1f01b763"
+    },
+    {
+      "path": "tokenhsi/utils/before_total_progress_resume.py",
+      "bytes": 2636,
+      "sha256": "89402626b32de7688bdfa4199b62ce82a49b291c81ed7e282c98a2e2dd1e2496"
+    },
+    {
+      "path": "tokenhsi/utils/checkpoint_compat.py",
+      "bytes": 1134,
+      "sha256": "36d1c711c8aaf237763de0ebc717375cc12607d0df42c7916b16ff06c65c5d14"
+    },
+    {
+      "path": "tokenhsi/utils/config.py",
+      "bytes": 21218,
+      "sha256": "48898af0274c5aba80ca636b0789ada35822ec13b807243febe6ce2c6af68772"
+    },
+    {
+      "path": "tokenhsi/utils/coupled_push_contact.py",
+      "bytes": 3365,
+      "sha256": "529e3e2d6aa5c29de99516c1de97896964489cd28b22de35312cacf165b83713"
+    },
+    {
+      "path": "tokenhsi/utils/coupled_push_scene.py",
+      "bytes": 12915,
+      "sha256": "01ae41e04afe96b05fa521f893ad5fbadb84277a001c886fe448bcebca4f64fa"
+    },
+    {
+      "path": "tokenhsi/utils/coupled_push_spec.py",
+      "bytes": 8933,
+      "sha256": "f873f22f9757986427499ea35363e54a29a390df486e5aba493d9edd24de2913"
+    },
+    {
+      "path": "tokenhsi/utils/edge_context_spec.py",
+      "bytes": 1708,
+      "sha256": "57311f3c01f7b33b149f789f7c4be68d8ba04a65b62f0abdcc3eaf954b213a5e"
+    },
+    {
+      "path": "tokenhsi/utils/edge_interaction_spec.py",
+      "bytes": 87,
+      "sha256": "26411719f5bc774ba2b565ac8fb2561cab0e34391647cb9f3af02524c87ce120"
+    },
+    {
+      "path": "tokenhsi/utils/edge_ontop_spec.py",
+      "bytes": 3447,
+      "sha256": "6822fafaf2fc183f85e29a105994e036f02dea783704904308bb00e56ceb1473"
+    },
+    {
+      "path": "tokenhsi/utils/edge_scenario_spec.py",
+      "bytes": 10748,
+      "sha256": "bac9af5978591ad41b1d726e0d49fbd1c63555991a11cedf9749eec4c6976017"
+    },
+    {
+      "path": "tokenhsi/utils/edge_stage1_spec.py",
+      "bytes": 6064,
+      "sha256": "371bfa6fac3d1e2dd7e3611ea19aad0e4fb5c272ab8376d812ddb579d2627ec5"
+    },
+    {
+      "path": "tokenhsi/utils/evaluation_protocol.py",
+      "bytes": 5951,
+      "sha256": "8f97c82123f7b86be9b585f4a16cff310b3d16fca5a174ee8dd93e3d3585694c"
+    },
+    {
+      "path": "tokenhsi/utils/experiments.py",
+      "bytes": 8257,
+      "sha256": "c8f050bfe296ad6fe4e6b68b84637acda97b462fd36567358f82e23588db5333"
+    },
+    {
+      "path": "tokenhsi/utils/geometry.py",
+      "bytes": 239,
+      "sha256": "e25d80eef5f59be2d7a36f3056b92a5f7a826d5f64d7a6f67e715be903e0a7e7"
+    },
+    {
+      "path": "tokenhsi/utils/jointpush_geometry.py",
+      "bytes": 5055,
+      "sha256": "6bc72057f50e5d28d32426e7f6696089c9f0db6dc3ea900dbe57b7041143f388"
+    },
+    {
+      "path": "tokenhsi/utils/jointpush_rsi.py",
+      "bytes": 3032,
+      "sha256": "c852f44e4059e2568a2190c9af5cfa98a09cafe45285640e737b556c9d0714ad"
+    },
+    {
+      "path": "tokenhsi/utils/jointpush_rsi_geometry.py",
+      "bytes": 6830,
+      "sha256": "94e75c1a5b61dacf9eb6185777974230663105a4b8c82fece75a52448dca452a"
+    },
+    {
+      "path": "tokenhsi/utils/jointpush_scene.py",
+      "bytes": 6231,
+      "sha256": "057a33c5acbf4c25c1a32a91263d80aa96aab9bfdb6fa5df300bf3f4ad030531"
+    },
+    {
+      "path": "tokenhsi/utils/motion_lib.py",
+      "bytes": 20207,
+      "sha256": "50f28b8f5cc705d520a7a8693dab3f8b57907a8a015d0bdf80f67f8326313d4d"
+    },
+    {
+      "path": "tokenhsi/utils/output_paths.py",
+      "bytes": 2656,
+      "sha256": "22a5af04a1c378e03c38260327c8e763bcdbe1dca3dc6f5bcc9f0e6cdae2e397"
+    },
+    {
+      "path": "tokenhsi/utils/parse_task.py",
+      "bytes": 1540,
+      "sha256": "9fb59c26c1b93fd32d6e06d9aa7163df7fc28fbba63749ab1946f981d1d11a58"
+    },
+    {
+      "path": "tokenhsi/utils/relation_task_spec.py",
+      "bytes": 1758,
+      "sha256": "e99270301490f22f483463800351dff972cc4e9ddfdb9de0c2977c460df5492c"
+    },
+    {
+      "path": "tokenhsi/utils/size_rsi.py",
+      "bytes": 4749,
+      "sha256": "a39fe29fa95c89aea11c5227da4c04b997ad9fe0d7957d75f3e86ac3c28e7b26"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_config.py",
+      "bytes": 2356,
+      "sha256": "e21fcf3e189d15452bde0ed30cc0d51c034c2a9bd8e220245dff34f651fe9c27"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_geometry.py",
+      "bytes": 2403,
+      "sha256": "b879952c50fbe367f47b797d1d11056acaa7bfa25d232cb789087646727cae5f"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_jointpush.py",
+      "bytes": 6070,
+      "sha256": "674c6bcb365602a0fded9bec46d90e9cc806f4acd3e1cfd8c4b5d79c753bb8e2"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_platforms.py",
+      "bytes": 3561,
+      "sha256": "0a9ae171fe6b28cab3c8bc0138cb161907c9288e87361726b7e37d2679cd9f02"
+    },
+    {
+      "path": "tokenhsi/utils/stage1_sampling.py",
+      "bytes": 3152,
+      "sha256": "2b2b1a5d142c91727c057dc6cfe4957d8441590a8141d55da5d8e7e099a59264"
+    },
+    {
+      "path": "tokenhsi/utils/task_role_spec.py",
+      "bytes": 2648,
+      "sha256": "25415922a8afe1136534f52967b50a93d431108714399773e08d64e700bdf4fe"
+    },
+    {
+      "path": "tokenhsi/utils/torch_utils.py",
+      "bytes": 6369,
+      "sha256": "475f10346cc088b8878b5127d8a8209dae18c991b9de8c0f7abd89d200af4b4b"
+    },
+    {
+      "path": "tokenhsi/utils/unified_training.py",
+      "bytes": 6566,
+      "sha256": "d33b6ad7755cb96fab5e0e8c0b53c6d23a2a813da20a387eef976c8e01186543"
+    },
+    {
+      "path": "tokenhsi/view_before_chain.py",
+      "bytes": 3040,
+      "sha256": "e7ee27f3682cc4f4f6f2a82eea0a9342aa4ecdbbcf687982b1b2a2b92943bf68"
+    },
+    {
+      "path": "pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth",
+      "bytes": 50158591,
+      "sha256": "ec4215803b529bab1dd1be430154604418392e24faed59bca69b5c61adafe67c",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push/motions/push_obstacle_180_003__A342/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 217077,
+      "sha256": "20aa94e4d981db81dec78c5db29b8bc5ebb1889dcedc408556ac0abfc59518e3",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push/motions/push_obstacle_180_101__A341/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 226257,
+      "sha256": "d374df64b37beef3bf55a05722b4948f8641e1a4a7937e1fd8a9d5bc93515e4d",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_001__A344_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 197493,
+      "sha256": "5459336b1e94036e3c0a5155c89419cb08d37f042598eb5375177ccfd5563932",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_002__A342/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 215853,
+      "sha256": "ec5fb47016214883c55fe98abbe623f98a145cee33e1f75fdb387a08156cea86",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_002__A342_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 215853,
+      "sha256": "38f2302df648e861e61187b06b438417460d68c97778a9bdb9bc60375a55f39b",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_002__A344/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 217077,
+      "sha256": "6a9d98335b708435f358aec29ba4428acc9fe56edb01562c71972047de0cd32e",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_002__A344_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 217077,
+      "sha256": "14b6bc6b90872af625cf1f5cda1e76134dd276c7c1672e23a6de4a0641263084",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_003__A342_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 217077,
+      "sha256": "cdb0ec18014291659b3adf09234d2794a867eaa22b226c1ca38987cae1303a43",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_003__A344/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 209733,
+      "sha256": "3624699f84114462f14e167172f63b08c1f709a273c376f02242aa0523a254e3",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_003__A344_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 209733,
+      "sha256": "f177f5dedd9ebc7c9dcf8d5fcc0e3902d35fcda44ba5638c4a3ba564db51f5b7",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_101__A341_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 226257,
+      "sha256": "962a56788b0e4e957e8cc572dc8c4422316346c2b92a97f902d63355187774d5",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_101__A343/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 288681,
+      "sha256": "1b2b2146754315e8f95f6f108086714ec321935fb587cb7654f126c8b55abd58",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_101__A343_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 288681,
+      "sha256": "1e202de929130931b378e2be27cedf994d851614fb1b1e118685ed433d8e8746",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_102__A341/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 217077,
+      "sha256": "ec7285d2ceb6ddc5d9177809fb26ebc795edd331476c137f7c013e7442c1a146",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_102__A341_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 217077,
+      "sha256": "5f3d3b6a07282c3585d84a068a69861e0bc206ee220a24993e408fe7756a93a7",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_102__A343/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 262977,
+      "sha256": "7acc1b0633f4397d26aa10abe472c66c2e28ebb4618685e523857c3056f8565b",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_102__A343_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 262977,
+      "sha256": "d7e49b5b8a4c07d0e442afe2b5f1b54d358321bbbdb517014b8d2c0ada30975d",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_103__A341/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 237885,
+      "sha256": "5a2ba42e17efc101a75702965163b9b6923a94f9cba977e109a94cafd1386ea9",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_103__A341_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 237885,
+      "sha256": "5fe24a5444c3878bab80a29e6de342eac3eb2c11f629084ec61209ba5d58a937",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_103__A343/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 275829,
+      "sha256": "8cbc0c4e48ac2a8cc7af122bff2d7b2df11cb65bceebdd359ec0c148253419d7",
+      "git_tracked": false
+    },
+    {
+      "path": "tokenhsi/data/jointpush_motions/dataset_bones_push180/motions/push_obstacle_180_103__A343_M/phys_humanoid_v3/ref_motion.npy",
+      "bytes": 275829,
+      "sha256": "bdedc3b473246c68335df105b5ead7b8f978c44a068b3002d1ed5a1a4e4fb6dc",
+      "git_tracked": false
+    }
+  ],
+  "shared_data_links": [
+    {
+      "path": "tokenhsi/data/dataset_sit/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_sit/motions",
+      "access": "read only"
+    },
+    {
+      "path": "tokenhsi/data/dataset_carry/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_carry/motions",
+      "access": "read only"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_climb/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_climb/motions",
+      "access": "read only"
+    },
+    {
+      "path": "tokenhsi/data/dataset_amass_loco/motions",
+      "target": "/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/dataset_amass_loco/motions",
+      "access": "read only"
+    }
+  ]
+}

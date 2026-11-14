@@ -1,0 +1,9 @@
+output/
+output_etc/
+pth/
+tokenhsi/data/jointpush_motions/
+tokenhsi/data/dataset_*/motions
+# The parent repository ignores dataset_*; ship the training motion manifests.
+!tokenhsi/data/dataset_*.yaml
+__pycache__/
+*.pyc

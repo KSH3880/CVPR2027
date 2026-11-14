@@ -1,0 +1,233 @@
+# 설치와 추가 실행 옵션
+
+기본 명령은 [config](config.md), 구현 위치는 [structure](structure.md)를 따른다.
+
+## 실행 환경
+
+모든 wrapper는 `runtime_env.sh`로 기본 conda `tokenhsi`를 활성화하고 저장소 루트에서 실행한다. 다른 환경은 `TOKENHSI_CONDA_ENV=<이름>`, conda 설치 위치는 `CONDA_BASE`로 명시한다.
+
+`TOKENHSI_GPU=0`처럼 물리 GPU를 한 번 지정한다. CUDA·기존 MPS·viewer Vulkan에 같은 GPU를 전달한다. `mps/`는 기존 daemon을 검사하며 실행 wrapper가 daemon을 시작하거나 종료하지 않는다.
+
+PyTorch는 서버 GPU/CUDA 호환 설치본을 사용하며 Isaac Gym은 torch보다 먼저 import한다. `requirements.txt`는 남은 의존성이다. 현재 서버의 conda에는 Isaac Gym과 CUDA 라이브러리 활성화 설정이 있다.
+
+## 데이터와 체크포인트
+
+`tokenhsi/data/dataset_loco_sit_carry_climb.yaml`이 참조하는 `dataset_{amass_loco,amass_climb,sit,carry}/motions`를 공유 데이터에 심링크로 연결한다. 외부 데이터와 원본 checkout은 읽기 전용이다.
+
+현재 네 모션 링크는 `/home/hwanhee/CVPR2027/TokenHSI/tokenhsi/data/` 아래 각 데이터셋을 가리킨다. `tokenhsi/data/jointpush_motions`는 `/home/hwanhee/ksh/stage1_2_jointpush/tokenhsi/data/jointpush_motions`에 연결되어 있다.
+
+PUSH 기반 Stage2의 대체 전이 파일 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`는 `/home/hwanhee/ksh/stage1_2_base_jointpush/pth/`의 동명 파일에 연결되어 있다. `STAGE1_CHECKPOINT=pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`로 지정한다.
+
+기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`다. 현재 링크 대상은 `/home/cvlab/Desktop/CVPR2027/stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth`다. 다른 머신은 링크를 연결하거나 `STAGE1_CHECKPOINT=<절대경로>`로 BEFORE 새 학습의 source를 지정한다.
+
+BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는 기존 run의 `relation_config.yaml`도 필요하다. 확인 학습 저장본은 장기 성능 검증을 의미하지 않는다.
+
+## 설정과 resume
+
+- 새 학습은 선택한 환경·학습 YAML을 읽는다.
+- 추론과 `RESUME_CHECKPOINT=<pth>`는 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다. 학습 YAML은 해당 실험 것을 사용한다.
+- `ENV_CONFIG=<yaml>`은 명시적인 환경 설정이다. fixed/BEFORE 모두 같은 옵션을 쓴다. 저장 설정이 없으면 현재 YAML로 조용히 대체하지 않는다.
+- 기존 fixed snapshot에 sim 전체가 없으면 native fixed sim을 보완한다. 부분 sim과 rest_offset 불일치는 거부한다.
+- 인원·환경 수·토큰 수·episode 길이·평가 초기화·영상 CLI를 마지막으로 적용하며 실험 계약을 검사한다.
+- 모든 wrapper는 기본 `SEED=42`를 쓴다. `EPISODE_LENGTH`는 추론 episode 길이다.
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_human3_resume21k`의 train wrapper는 기본 v1 21k에서 모델·optimizer·정규화 상태·epoch를 유지해 이어 학습한다. ON_TOP 진입 기준만 사람으로 바꾼 재개용 복사본을 `output_etc/check/before_fusion_human3_resume21k_initial/`에 자동 생성하며 원본 PTH는 보존한다. 반경+3m·가중치1.0·1200step을 유지한다. 이후에는 이 실험의 PTH를 `RESUME_CHECKPOINT`로 지정하면 그대로 재개한다. epoch는21k부터 이어지므로 추가1k 저장본은22k다. 일반 resume의 계약 검사는 유지한다.
+
+`stage2_before_total`은 Stage1 26k에서 새 Stage2 학습을 시작한다. 기본900step·대기 반경+1.5m·가중치1.0이며, ON_TOP 진입은 payload–목표XY, SIT/CLIMB는 사람–목표XY다. 페널티는 모두 사람 root XYZ 속력에 적용한다. 진입은 누적 유지되고 선행AT가 한 번 성공하면 해당 episode에서 해제된다. 기존 실험의 resume용 설정과 구분한다.
+
+`stage2_before_total_ft21k`는 fusion v1 최고21k의 모델 전체(actor/critic/AMP)와 입력·AMP·value 정규화를 초기값으로 가져온다. 환경은 total과 동일(+1.5m·ON_TOP payload·가중치1.0·900step)이며 optimizer·epoch·frame·환경 상태는 새로 시작한다. 기본 train 명령에는 `RESUME_CHECKPOINT`를 지정하지 않는다. 미세조정 후 저장본부터는 이 실험의 `RESUME_CHECKPOINT`로 정상 재개한다. 원본 v1 checkpoint는 변경하지 않으며 기존 resume 계약 검사도 유지한다.
+
+`stage2_before_total_progress0`은 기본 total9k에서 optimizer·모델·정규화·epoch/frame을 유지해 재개한다. BEFORE 후행 수행 edge의 Progress만 `p=1/(1+d)`로 바꾼다(SIT/CLIMB 사람XY, ON_TOP payloadXY→선행G). 실제 성공 시 보상 포화, gate, 대기 페널티, 단독/HOLDING, 900step은 유지한다. train wrapper가 원본을 보존한 재개용 복사본을 `output_etc/check/before_total_progress0_initial/`에 자동 준비한다. 초기 실행에는 `RESUME_CHECKPOINT`·`ENV_CONFIG`를 해제하고, 이후에는 이 실험 PTH를 `RESUME_CHECKPOINT`로 지정한다. 추가1k 학습 저장본은10k로 표기된다. 확인 실행은 `CHECK=1 MAX_ITERATIONS=9001`로9k 이후 짧게 검증한다.
+
+`stage2_before_total_at1mm`은 기본 새 학습이며, total12k에서 이어갈 때는 아래 준비된 이관본을 지정한다. 모델·optimizer·정규화·epoch/frame은 그대로 유지하고 AT 보상 전용1mm 옵션과 실험 이름/계약만 바꾼 복사본이다. 원본 total checkpoint는 보존한다. 추가1k 후 저장본은13k이며, 이후에는 새 실험에서 생성된 PTH로 일반 resume하면 된다. 이관본과 같은 폴더의 `relation_config.yaml`을 함께 유지한다. 이관본 재생성은 `python output_etc/check/total_at1mm_resume12k_20261108/prepare.py`다.
+
+```bash
+unset CHECK MAX_ITERATIONS OUTPUT_PATH RESUME_CHECKPOINT ENV_CONFIG STAGE1_CHECKPOINT
+TOKENHSI_GPU=6 \
+RESUME_CHECKPOINT="output_etc/check/total_at1mm_resume12k_20261108/Stage2BeforeTotalAt1mm_00012000.pth" \
+bash tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_train.sh 4 1024 8
+```
+
+`stage2_before_total_at1mm_climb2`의 train wrapper는 기본 total12k에서 재개한다. 기존 at1mm 재개와 같은 출발점이며, BEFORE CLIMB 수행 edge의 진입 반경만 `r_box+2m`로 늘린다. SIT/ON_TOP은 `r_box+1.5m`, ON_TOP은 payload 기준, 가중치1.0·900step·AT 보상1mm·후행 Current/Ever20cm gate는 그대로다. `climb_radius_buffer`가 없는 기존 실험은 기존 공통 반경을 유지한다.
+
+초기 실행 시 `RESUME_CHECKPOINT`를 해제하면 `before_total_at1mm_climb2_resume.py`가 total12k 원본을 보존하고 `output_etc/check/before_total_at1mm_climb2_initial/`에 이관본을 준비한다. 모델·optimizer·정규화·epoch/frame을 유지하므로 추가1k 후13k다. 이후에는 이 실험의 PTH를 `RESUME_CHECKPOINT`로 지정한다. 이전 at1mm 실행 중간 PTH를 자동 변환하는 기능은 없으며, 새 wrapper를 호출하기 전에는 학습이나 이관본 생성이 시작되지 않는다.
+
+```bash
+unset CHECK MAX_ITERATIONS OUTPUT_PATH RESUME_CHECKPOINT ENV_CONFIG STAGE1_CHECKPOINT
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_climb2_train.sh 4 1024 8
+```
+
+## 확인 실행과 캐시
+
+`CHECK=1`은 기본 `MAX_ITERATIONS=1`의 확인 학습이다. 환경 수는 fixed2048, BEFORE1024를 유지한다. 확인용 `OUTPUT_PATH`는 `output_etc/check/<검사명>` 아래를 지정한다. wrapper와 직접 `run.py` 모두 경로를 검사한다.
+
+본학습 checkpoint·공용 캐시는 `output/`, 확인 작업과 그 RSI 캐시는 `output_etc/check/`에 둔다. screening 코드 변경 시 캐시 키가 바뀌며 물리 검사를 다시 수행할 수 있다. 원본 캐시는 수정하지 않는다.
+
+## BEFORE 추론 초기화와 거리
+
+- `BEFORE_PICKUP_CARRY_RSI=loco`가 기본이다. RSI433 두 설정은 `mix`, `pickup`, `carry`를 지원한다. `mix`는 후행 ON_TOP의40/30/30 요청 분포이며 유효 프레임/배치 실패는 loco로 fallback한다. mix226 loco 설정은 loco만 지원한다.
+- `BEFORE_FOLLOWER_NEAR=0`은 저장된 혼합을 쓴다.1은 near50의 상대 가까움 또는 mix226 중간 모드다.2는 mix226의 가장 짧은 모드이며 near50에서는 거부한다.
+- `TASK_ROLE_SWAP=1`은 fixed preset의 역할 교환이다. 과제·스킬 값은 [추론 옵션](config.md#추론-옵션)을 따른다.
+- `BEFORE_BOX_SIZE=original|family|common`은 BEFORE PUSH 계열 test/VNC의 공유상자 크기를 고른다. 기본 `original`은 기존 샘플링이다. `family`는 선행 AT와 후행 SIT/CLIMB/ON_TOP 받침의 행동별 크기 교집합, `common`은 세 행동 전체공통 교집합을5cm 격자로 샘플링한다. 선행 공유 물리상자와 그 Alias 크기에만 적용하며 단독 상자·ON_TOP payload·PUSH 상자의 크기 규칙은 유지한다. 교집합 모드는 평가와 동일하게 시작 시 뽑은 쌍·행동을 반복 간 고정하고 위치·목표를 다시 샘플링한다. 새로운 쌍·크기는 viewer를 다시 실행해 뽑는다. 학습·일반 정식 평가에는 적용하지 않으며 직접 추론 인자는 `--before_box_size family` 또는 `common`이다.
+- `BEFORE_AT_GOAL_DISTANCE=7`은 goalroute BEFORE test/VNC에서 선행 공유상자 중심→AT 목표의 초기 XY 거리를7m로 고정한다. 양의 유한한 실수(m)를 지정하며 생략하면 저장된 샘플링을 유지한다. 기존 목표 방향·Z와 사람→상자 배치 규칙은 유지하고, 후행은 변경된 목표와 선행 경로 길이를 기준으로 기존 goalroute/near50 절차를 적용한다. 독립 과제의 목표·모델·보상·gate·checkpoint 계약은 바꾸지 않는다. loco 추론 전용이며 학습/direct 정식 평가 CLI에서는 거부한다. 직접 실행 인자는 `--before_at_goal_distance 7`이다.
+- `BEFORE_FOLLOWER_GOAL_DISTANCE=4`는 선행 AT 목표→후행 사람 root의 초기 XY 거리를4m로 고정한다. SIT·CLIMB·ON_TOP 모두 사람 기준이며 위 선행 거리와 독립적으로 지정할 수 있다. ON_TOP은 사람과 payload를 함께 평행 이동하여 사람→payload 배치를 유지하므로 payload→목표 거리는 기존1–5m 범위를 벗어날 수 있다. 수동 배치에서는 near50 경로 부등식과 목표→사람 최소1m 조건을 대체하되 물리 충돌 검사는 유지한다. 양의 유한한 실수만 허용하며 생략 시 기존 샘플링이다. goalroute loco 추론 전용이며 정식 평가·학습에서는 거부한다. 직접 인자는 `--before_follower_goal_distance 4`다.
+
+```bash
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=6 PORT=6080 SEED=2 TASK_GRAPH=before_stack BEFORE_BOX_SIZE=family bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=6 PORT=6080 SEED=2 TASK_GRAPH=before_climb BEFORE_AT_GOAL_DISTANCE=7 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg
+TOKENHSI_GPU=6 PORT=6187 SEED=2 TASK_GRAPH=before_climb BEFORE_AT_GOAL_DISTANCE=7 BEFORE_FOLLOWER_GOAL_DISTANCE=4 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_vnc.sh "$CKPT" 4 1 8 10
+```
+
+## 서버 viewer
+
+로컬 viewer는 화면 세션이 필요하다. VNC는 Xvfb·x11vnc·noVNC·websockify가 필요하며 `PORT`, `RESOLUTION`, `VNC_DIR`, `X11VNC`, `NOVNC_DIR`, `WEBSOCKIFY`로 위치·화면을 지정한다. GUI 로그는 `output_etc/check/gui/`다. 종료 시 이번 wrapper가 띄운 VNC 서비스만 종료한다.
+
+## 이전 이름의 저장본
+
+기존 Stage1 78000과 정리 전 BEFORE 저장본은 그대로 읽을 수 있다. `checkpoint_compat.py`가 저장 설정의 reward 태그·RSI 경로·로컬 전이 링크만 현재 이름으로 변환한다. 모델 tensor와 보상 수치·실험별 계약 검사는 유지한다. 새 학습의 출력 경로와 실험 이름은 현재 컨피그 이름을 따른다.
+
+## 정식 평가와 viewer 구분
+
+`*_test.sh`/`*_vnc.sh`는 인원·RSI를 바꿔 관찰하는 viewer/진단이다. `HEADLESS=1`만 붙여도 정식 프로토콜로 바뀌지는 않는다. 일반 정식 평가는 `*_eval.sh`로 학습 인원을 유지하고, Stage1 전용1명 비교는 `stage1_single_eval.sh`로 실행한다. 시간은 정식 평가·viewer 모두 기본 Stage1 900step, Stage2 1200step이다. [실행 명령](config.md), [평가 규약](reference/evaluation.md)을 따른다.
+
+
+## Stage1 PUSH
+
+`stage1_push`는 AT25/ON_TOP20/SIT10/CLIMB15/PUSH30%의 사용자 지정 비율을 사용하는 스크래치 학습이다. 기본2명·2048환경·4물체·900step, 같은 `tokenhsi` runtime을 사용한다. 주어진21k finetune PTH의 일반 평가는 저장된 PUSH50% 분포를 복원하고 시간만900으로 맞춘다. 옆에 `relation_config.yaml`이 없으면 PTH의 `relation_experiment_config`를 읽는다. 서로 다른 분포/horizon의 PTH를 resume하지 않는다.
+
+`stage1_push_single_eval.sh`는 실제1명·행동별 평가이며 PUSH도 포함한다. AT만9종 크기를 쓰고 PUSH는 학습167종 크기를 쓴다. 기존4과제 macro와 전체5과제 macro를 별도로 보존한다. [실행 명령](config.md), [구현 상세](reference/stage1_push.md)를 따른다.
+
+PUSH 모션21개는 `tokenhsi/data/jointpush_motions/` 아래 읽기 전용 원본으로 연결한다. 기본 원본은 `/home/cvlab/Downloads/push_amp_raw_rsi_environment_final_20261024/data/motions/`이고 bank의 파일 해시를 검증한다. `checkpoints/Stage1PushFinetune_00021000.pth`는 Downloads의 원본 PTH를 가리킨다. 원격 파일 이름의 jointpush는 여기서는 독립 과제 통합이며 Stage2 공동 PUSH를 포함하지 않는다.
+
+## BEFORE PUSH
+
+`stage2_before_push`는 `stage2_before`의 독립 역할에 PUSH를 추가한다. 학습 진입점과 viewer/VNC/일반 평가 명령은 [config](config.md), 샘플링·물리·전이 설정은 [BEFORE PUSH](reference/stage2_before_push.md)에 있다.
+
+새 학습은 기본 `checkpoints/Stage1PushFinetune_00021000.pth`에서 전이한다. `STAGE1_CHECKPOINT=/absolute/path/to/stage1_push.pth`로 다른 Stage1 PUSH 학습본을 선택할 수 있다. 기존 4과제 Stage1 가중치는 사용할 수 없다. resume는 `RESUME_CHECKPOINT`에 같은 BEFORE PUSH 실험의 PTH를 지정한다. viewer와 일반 평가에도 **Stage2 BEFORE PUSH PTH**를 사용한다. 전이 원본인 Stage1 PUSH PTH를 Stage2 저장본으로 대신 사용하지 않는다.
+
+`TASK_GRAPH=push`는 4명 모두 독립 PUSH, `all_solo`는 다섯 행동 독립 샘플링이다. `before_sit`·`before_climb`·`before_stack`은 기존처럼 BEFORE 쌍을 고정한다. 일반 정식 평가는 저장된 학습 설정의 `random_scenario`를 사용하며, Stage2용 1명 단독 평가 wrapper는 제공하지 않는다.
+
+BEFORE PUSH 계열 viewer/test/VNC는 `[사람 수 N] [환경 수] [Object 토큰 수 M] [반복 수]`에서 N≥1·M≥N을 지원한다. 예를 들어 기존 명령 뒤를 `8 1 12 10`으로 지정할 수 있다. Alias까지 포함한 필요 토큰은 `N+ON_TOP 수`이며 예산을 초과한 과제 조합만 다시 뽑는다. M=N이면 ON_TOP이 제외되고 M<2N이면 행동·BEFORE 쌍 분포가 예산에 조건화된다. 전원 ON_TOP은 M≥2N, 전원 BEFORE ON_TOP 쌍은 M≥N+⌊N/2⌋가 필요하며 불가능한 고정 preset은 즉시 거절한다. 학습/resume은 M≥2N을 유지하고 일반 정식 평가는 인원·토큰 변경을 허용하지 않는다.
+
+## 공통 Stage2 PUSH와 coupled
+
+`stage2_before_push`와 `stage2_coupled_push`는 동일한 5과제·4family·4종 사람 relation 모델을 사용한다. 관측은1272차원(4명·8토큰), AMP1330차원이며 두 Stage2의 제한 시간은1200step이다. 기존 BEFORE PUSH의5N suffix 저장본은 새 모델과 호환되지 않는다. Stage1 PUSH21k에서 각각 새 전이를 시작한다. 전이 원본은 `STAGE1_CHECKPOINT`, 같은 실험 resume은 `RESUME_CHECKPOINT`로 지정한다. 두 Stage2의 학습/추론/평가 명령은 [config](config.md)에 있다.
+
+coupled viewer의 `TASK_GRAPH=all_coupled`는4명 공동 PUSH, `all_solo`는 독립5행동 혼합, `push`는 독립 PUSH4명이다. 본학습은 random_scenario 고정이며 새 학습은 자동으로 시작하지 않는다. [공통 구조·coupled 상세](reference/stage2_coupled_push.md).
+
+`stage2_coupled_push_goal5`는 공동 PUSH의 사람→상자2–10m·상자→목표2–5m를 사용한다. 독립 PUSH는 두 거리 모두2–10m이며 기본26k 전이 원본은 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 기본 coupled와 별도 학습·출력·저장본을 사용한다. 실행 명령은 [config](config.md), 상세는 [공동 PUSH](reference/stage2_coupled_push.md)를 따른다.
+
+`stage2_coupled_push_individual_goal`은 goal5의 공동 거리·26k 전이를 유지하고 개인 분할 목표/AT 보상과 그룹 공통 4면 CONTACT를 사용한다. 단독 거리 설정은 기존 범위를 사용한다. 이전 거리/확률 설정 및 다른 coupled 저장본과 계약이 달라 resume/추론을 혼용하지 않는다. 각 실험의 전용 wrapper를 사용한다. 새 평가의 `result.json`·`summary.json`에는 2/3/4명별 개인 ever/final 및 전원 동시 도착 ever/final `coupled_scores`를 추가한다. [설계](reference/stage2_coupled_push.md), [명령](config.md).
+
+`stage2_coupled_push_individual_goal_solo5`는 위 개인 목표 설정에서 단독 접근과 단독 PUSH 이동의 최대 거리만5m로 제한한다. 공동 확률0.5·공동 접근2–10m/이동2–5m·26k 전이를 유지한다. 원본과 전용 YAML·학습 이름·출력·train/test/VNC/eval wrapper를 분리한다. [거리 설정](reference/stage2_coupled_push.md), [명령](config.md).
+
+### Coupled 제로샷 viewer
+
+Stage1 PUSH21k의 기존165 tensor를 그대로 복사하고 공통 Stage2 coordination을 identity로 붙인 관찰용 저장본이다. 추가 optimizer step은0이며, 학습 재개용 optimizer는 포함하지 않는다. 기본1200step이고 아래 명령은4명 모두 같은 상자를 미는 장면을 표시한다.
+
+```bash
+# stage2_coupled_push
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=all_coupled bash tokenhsi/scripts/multi_agent/stage2_coupled_push_test.sh output_etc/check/coupled_zeroshot/Stage2CoupledPush_ZeroShot_Stage1_21000.pth 4 1 8 10
+```
+
+독립 행동과2~4명 공동 그룹이 섞인 학습 분포를 보려면 `TASK_GRAPH=random_scenario`로 바꾼다. 전이 기록은 `output_etc/check/coupled_zeroshot/transfer.json`에 있다.
+
+### BEFORE PUSH near50
+
+`stage2_before_push_near50`은 `stage2_before_push`의 거리 변형이며 기본4명·1024환경·8토큰·1200step·loco다. `STAGE1_CHECKPOINT`로 Stage1 PUSH 전이 원본을 지정할 수 있고 viewer/평가는 near50 실험의 저장본을 사용한다. mix226 저장본과 혼용하지 않는다. near50의 정확한 거리 부등식은 [BEFORE PUSH](reference/stage2_before_push.md#near50-거리-변형), 실행 명령은 [config](config.md)를 따른다.
+
+`stage2_before_push_near50_pair50_source5`은 near50의 쌍 생성 확률0.5·사람→상자 최대5m 변형이다. 단독 PUSH 접근은2–5m이며 이동은2–10m를 유지한다. AT/ON_TOP 목표 배치와 near50 조건은 유지한다. 기본21k 전이 경로가 없으면 `STAGE1_CHECKPOINT`를 지정한다. 현재 config의 학습 명령은 존재하는26k 파일을 명시하며, resume/viewer/평가는 이 실험의 저장본을 사용한다. [거리 상세](reference/stage2_before_push.md#쌍-선택50접근-최대5m-변형), [명령](config.md).
+
+`stage2_before_push_near50_pair50_source5_virtual`은 source5의 배치·보상을 유지하고 후행 Alias의 GTA XYZ만 선행 AT Goal XYZ로 바꾼다. 기본 전이는 연결된26k이며, 비교 원본도 같은26k를 지정한다. 학습·resume·viewer·평가는 전용 wrapper와 해당 실험 저장본을 사용한다. [가상 상자 상세](reference/stage2_before_push.md#goal-aligned-virtual-object), [명령](config.md).
+
+`stage2_before_push_near50_pair50_source5_virtual_asym`은 virtual의 관측·물리·보상을 유지하고 후행 수행 Edge의 progress에만 안쪽 감쇠를 적용한다. `before.asymmetric_progress.lambda_inner: 10.0`이며 같은 스텝의 현재 AT 성공 시 기존 progress로 복원한다. 기존 virtual과 저장본 계약을 구분하고 별도 wrapper를 사용한다. [비대칭 progress 상세](reference/stage2_before_push.md#asymmetric-progress), [명령](config.md).
+
+source5·virtual·virtual_asym은 재실행부터 초기 PUSH 후보를16개씩 검사하는 공통 최적화를 사용한다. 기존 명령·checkpoint 계약·거리/충돌 조건·후보128개·순차 fallback은 유지하며 난수 소비 순서가 달라져 동일 seed의 배치는 바뀔 수 있다. 실행 중인 Python에는 자동 반영되지 않는다. [상세](reference/stage2_before_push.md#쌍-선택50접근-최대5m-변형).
+
+### 26k PUSH 평가와 Stage2 제로샷 관찰
+
+사용자가 제공한 가중치는 `pth/Stage1V2Fixed_00078000.pth`(기존4과제), `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`(PUSH 포함)다.26k의 일반 Stage1 평가는 저장된 PUSH50% 분포를 복원하고900step을 사용한다. 현재 YAML의 새 학습 PUSH30%와 구분한다.
+
+```bash
+# stage1_push 일반 평가
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_eval.sh pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth --output output_etc/check/push_26k/general
+
+# stage1_push 1명 행동별 단독 평가
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_single_eval.sh pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth --output output_etc/check/push_26k/single
+
+# stage2_before_push_near50 제로샷 viewer
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=random_scenario bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_test.sh output_etc/check/push_26k/zeroshot/stage2_before_push_near50/ZeroShot_Stage1Push_26000.pth 4 1 8 10
+
+# stage2_coupled_push 제로샷 viewer
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=all_coupled bash tokenhsi/scripts/multi_agent/stage2_coupled_push_test.sh output_etc/check/push_26k/zeroshot/stage2_coupled_push/ZeroShot_Stage1Push_26000.pth 4 1 8 10
+```
+
+두 Stage2 저장본은26k의 기존165 tensor를 그대로 복사하고 coordination을 identity로 초기화했다. 추가 학습0회이며 전이 원본·계약·1200step 장면 설정을 각각 저장한다. near50에서 BEFORE ON_TOP 쌍만 보려면 `TASK_GRAPH=before_stack`, coupled에서 독립/2~4명 그룹 혼합을 보려면 `TASK_GRAPH=random_scenario`를 사용한다. 관찰용 저장본에는 optimizer가 없다. 이 문서의26k 검증/관찰 명령은 기존 YAML의 기본21k 전이 경로를 변경하지 않는다.
+
+모든 설정의 PUSH·CARRY AT 목표구는 viewer/VNC/영상에서 반지름20cm(지름40cm)로 표시한다. 크기는 actor 생성 시 지정한다. 목표 좌표와 성공 거리 판정은 그대로이며 기존 실행 명령을 다시 실행하면 적용된다.
+
+PUSH AT의 viewer/VNC에는 바닥 링(반지름35cm)·세로선·와이어 구(반지름20cm)를 선으로 덧그린다. 공동 PUSH 선은 노란색, 독립 PUSH 선은 담당자 색이다. 선 표시 함수는 actor scale·물리 상태·reset을 수정하지 않는다.
+
+### BEFORE source5 계열 goal5
+
+`stage2_before_push_near50_pair50_source5_goal5`·`stage2_before_push_near50_pair50_source5_virtual_goal5`·`stage2_before_push_near50_pair50_source5_virtual_asym_goal5`는 각 원본 실험에서 AT/독립 ON_TOP의 상자→목표를1–5m, 독립 PUSH 이동을2–5m로 바꾼다. 기본26k 전이로 새 학습하며 전용 wrapper와 출력·checkpoint 계약을 사용한다. 기존 세 실험의 저장본은 기존 wrapper에서 계속 사용하고 새 실험과 resume/viewer를 혼용하지 않는다. BEFORE 후행의 최종 수행 거리는 별도로 제한하지 않는다. [거리·수치 여유 상세](reference/stage2_before_push.md#상자목표-최대5m-변형), [명령](config.md).
+
+### goal5 기반 BEFORE 목표 중심 후행 배치
+
+세 `stage2_before_push_near50_pair50_source5*_goal5_goalroute`는 각각 기존 goal5의 단독 거리·모델·보상·Virtual/비대칭 설정을 유지하고 BEFORE 후행 배치와 near50 거리 정의만 바꾼다. 기본 Stage1 26k 전이로 새 학습하며, 기존 goal5 저장본과 resume/추론을 혼용하지 않는다. 실행 명령은 [config](config.md), 상세 거리·샘플링 순서는 [BEFORE PUSH](reference/stage2_before_push.md#goal5-기반-목표-중심-후행-배치)를 따른다.
+
+### Virtual 후행 대기 종료
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait`는 기존 virtual_goal5_goalroute에서 대기 중 연속 이동 종료만 추가한 별도 실험이다. 기본 Stage1 26k 전이를 사용하며 기존 virtual 저장본과 resume/추론을 혼용하지 않는다. 설정·해제 조건·정식 평가 적용 범위는 [BEFORE PUSH 상세](reference/stage2_before_push.md#virtual-후행-대기-종료), 실행은 [config](config.md)를 따른다.
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v2`는 대기 반경+1m·유예0초·XYZ 속력의 누적1초 위반 종료와 AT3D20cm 성공 기준을 사용한다. 기본 Stage1 26k 전이로 시작하며 기존 wait 저장본을 resume하지 않는다. [wait_v2 상세](reference/stage2_before_push.md#wait_v2-유예-없는-누적-xyz-이동-종료), [GPU4 실행 명령](config.md)을 따른다.
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3`는 wait_v2와 동일하며 대기 진입 반경만 r_box+2m다. 전용 설정/출력으로 Stage1 26k부터 새 학습하며 wait_v2 checkpoint의 직접 resume은 계약이 달라 허용하지 않는다. [실행 명령](config.md).
+
+`stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty`는 virtual_goal5_goalroute 기반으로 AT 추가1mm 높이 제한을 해제하고, 대기 반경 진입 후 개인 XYZ 속도 페널티를 적용한다. 대기 위반으로 조기 종료하지 않는다. 별도 Stage1 26k 전이로 새 학습하며 기존 virtual/wait checkpoint와 resume을 혼용하지 않는다. [페널티 상세](reference/stage2_before_push.md#virtual-대기-속도-페널티), [실행 명령](config.md).
+
+
+<a id="before-chain3-viewer"></a>
+### 3명 BEFORE 연쇄 viewer
+
+A가 O0를 목표로 운반하고, B가 O1을 O0 위에, C가 O2를 O1 위에 올리는 고정 장면이다. 기존 2명 모델의 조합 확인용이며 새 학습 설정이나 정식 평가가 아니다. 전용 프로세스에서만 ON_TOP 선행 관계와 가상 받침 높이를 확장한다. 기존 학습·체크포인트는 변경하지 않는다.
+
+```bash
+# before_chain3 (기본 checkpoint: total 22k)
+SEED=9 TOKENHSI_GPU=7 PORT=6080 bash tokenhsi/scripts/multi_agent/before_chain3_vnc.sh
+```
+
+VS Code에서6080 포트를 포워딩하고 `http://localhost:6080/vnc.html`을 연다. 다른 checkpoint와 반복 횟수는 `before_chain3_vnc.sh <checkpoint.pth> <repeats>`로 지정한다. 기본10회·회당1800step(시뮬레이션60초)이며 `EPISODE_LENGTH=900`으로 길이를 바꿀 수 있다. 로컬 viewer는 같은 인자로 `before_chain3_test.sh`, 화면 없는 확인은 `HEADLESS=1`을 사용한다.
+
+3명·1환경·6물체 토큰으로 고정한다. 과제용 실제 상자3개·alias2개·distractor1개다. O0/O1/O2 크기는 각각 `(0.40,0.40,0.25)`, `(0.40,0.40,0.25)`, `(0.30,0.30,0.25)`m. 사람XY는 `(-4,0)/(0,-5)/(5,0)`, 상자XY는 `(-2,0)/(0,-3)/(3,0)`, 최종 목표XY는 `(0,0)`이다. 반복마다 이 배치를 재사용하며 near50·교집합·거리 지정 옵션은 사용하지 않는다.
+
+선으로 표시한 두 가상 받침은 목표 위치에 고정되며 실제 받침 회전을 따른다. C의 받침 중심Z는 A 목표Z에 O0/O1 반높이를 더한0.375m다. B 대기 해제는 A 성공Ever, C 대기 해제는 A 조건이 충족된 B ON_TOP 성공Ever다. 현재 보상gate는 연쇄 선행조건을 검사한다. 3명 연쇄로 학습한 모델이 아니므로 정상 실행과 탑 완성 여부는 구분해서 확인한다. 진단은 `output_etc/check/` 아래 `chain_viewer.json`에 저장한다.
+
+### BEFORE viewer 대기 종료 끄기
+
+`BEFORE_WAIT_TERMINATION=0`을 wait/wait_v2/wait_v3의 `_test.sh` 또는 `_vnc.sh` 앞에 붙이면 해당 실행에서 대기 위반 조기 종료만 끈다. 기본값1은 기존 동작이다. 낙상/시간 종료·보상·성공 gate·checkpoint 설정은 유지하며 penalty 모델의 속도 감점도 바꾸지 않는다. 직접 run.py 추론에서는 `--disable_before_wait_termination`을 사용한다. 학습에는 이 CLI 옵션을 허용하지 않는다. 정식 평가는 기존 규약대로 이미 대기 종료를 제외한다.
+
+```bash
+# stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3
+BEFORE_WAIT_TERMINATION=0 TOKENHSI_GPU=4 PORT=6080 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_v3_vnc.sh "$CKPT" 4 1 8 10
+```
+
+<a id="before-stop-evaluation"></a>
+### 정식 평가와 정지 거리 함께 집계
+
+대기 페널티 모델의 정지는 성공률과 같은512환경×3seed 기록을 사용한다. 별도64환경 실행은 하지 않는다. `*_eval.sh`의 seed 집계에서 `stops.json`·`stop_pairs.csv`가 자동 생성된다. 평가 전용 driver의 기존 `waiting_trace.pt`도 다음 CPU 명령으로 집계할 수 있다. GPU 환경변수는 필요 없다.
+
+```bash
+python tokenhsi/summarize_before_stops.py \
+  output_etc/check/<평가>/seed0 \
+  output_etc/check/<평가>/seed1 \
+  output_etc/check/<평가>/seed2 \
+  --output output_etc/check/<평가>/stops512
+```
+
+평가 전용 runner도512환경 seed만 실행한 후 이 집계를 호출한다. [512 전용 runner 템플릿](../output_etc/check/before_stop512_integration_20261108/run512_template.py)은 새 평가 폴더에 해당driver/plan과 함께 복사해 사용한다. 완료된 과거runner는 재현용으로 보존하며 새작업에서64환경 job을 복사하지 않는다. 정지 기준·분모·낙상 처리는 [평가 규약](reference/evaluation.md#대기-페널티-평가의-정지-거리-진단)을 따른다.
