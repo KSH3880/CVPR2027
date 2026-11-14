@@ -20,8 +20,12 @@ def main():
                         help='Overrides SCT_LLM_REASONING_EFFORT; missing/blank defaults to medium')
     parser.add_argument('--output', type=Path, help='New directory under output_etc/check/')
     parser.add_argument('--messages-only', action='store_true')
+    parser.add_argument('--fewshot', action='store_true', help='Attach the ten recorded Stage1 references')
     args = parser.parse_args()
     request = loads(args.request.read_text())
+    if args.fewshot:
+        from .fewshot import attach_references
+        request = attach_references(request)
     if args.messages_only:
         print(json.dumps(build_messages(request), ensure_ascii=False, indent=2))
         return

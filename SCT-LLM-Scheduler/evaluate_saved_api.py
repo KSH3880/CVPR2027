@@ -21,7 +21,7 @@ def main():
     rows=jobs();os.environ['SCT_FREEZE_IMPL']=a.freeze
     paths=[ROOT/'sct_scheduler/isaac_adapter.py',ROOT/'sct_scheduler/snapshot_freeze.py',RT/'batch_eval_entry.py',ROOT/'verify_full_suite_job.py']
     hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
-    save(base/'manifest.json',dict(jobs=rows,envs=64,horizon=900,total_scenes=1920,api_source=str(api),initial_source=str(ref),freeze_impl=a.freeze,stage1=json.loads((ROOT/'stage1_policy.json').read_text()),code_hashes=hashes,new_api_calls=0))
+    save(base/'manifest.json',dict(jobs=rows,envs=64,horizon=900,total_scenes=1920,api_source=str(api),initial_source=str(ref),freeze_impl=a.freeze,stage1=json.loads((ROOT/'stage1_policy.json').read_text()),code_hashes=hashes,new_api_calls=0,protocol=os.environ.get('SCT_PROTOCOL_VERSION'),exploratory_64_envs=True))
     state=dict(stage='eval',completed=False,freeze_impl=a.freeze,gpu_output=str(gpu),total_evaluations=30,total_scenes=1920,api_done=1920,api_failed=s['api_failed'],api_nonexecutable=s['api_nonexecutable'],evaluated=[],verified=[],running={},failures=[])
     lock=threading.Lock()
     def update():save(base/'status.json',state)
@@ -40,12 +40,16 @@ def main():
                     assert 'implementation' not in audit and 'restore_initial_velocities' not in audit
                     assert audit['runtime_gate'] is False and audit['box_state_projected'] is False
                 save(path/'freeze_selection.json',dict(requested=a.freeze,audit_verified=True))
+                if os.environ.get('SCT_PROTOCOL_VERSION'):
+                    assert json.loads((path/'first_policy_input.json').read_text())['passed']
                 with lock:state['evaluated'].append(job['key']);update()
                 cmd=[PYTHON,str(ROOT/'verify_full_suite_job.py'),str(path),str(ref/job['key']),'--schedules',str(api/'api'/job['key']),'--envs','64','--steps','900']
                 with (path/'verification.log').open('w') as log:subprocess.run(cmd,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
                 with lock:state['verified'].append(job['key']);update();print('VERIFIED '+job['key'],flush=True)
             except Exception as e:
                 with lock:state['failures'].append({'job':job['key'],'error':str(e)});update()
+                if os.environ.get('SCT_PROTOCOL_VERSION'):
+                    break
             finally:
                 with lock:state['running'].pop(str(device),None);update()
     with ThreadPoolExecutor(max_workers=2) as pool:

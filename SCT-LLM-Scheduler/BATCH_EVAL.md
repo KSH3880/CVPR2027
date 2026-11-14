@@ -59,3 +59,7 @@ agent별 출발 시각이 누락·중복되거나 유효한 시간이 아니면 
 ### 독립 snapshot freeze 대조 옵션
 
 `SCT_FREEZE_IMPL=snapshot_resume`을 batch evaluator 실행 환경에 지정하면 초기 snapshot의 자세와 속도를 release 시 한 번 복원합니다. 기본값 `legacy`는 기존 실행을 보존합니다. 이 옵션은 FSM 성공/접촉 gate를 사용하지 않으며, 대기 중 상태 고정과 물리 충돌은 유지합니다. 16인 1장면 대조는 완료됐지만 전체 평가로 검증한 기본 방식은 아닙니다.
+
+### 공용 프로토콜 v1 재평가
+
+`run_protocol_v1_eval.py`는 저장된 no-unnecessary-wait API 응답과 초기 장면으로 legacy freeze 평가30회를 실행하고 `protocol_v1_rescore.py`로 최신 지표를 집계합니다. 결과의 `protocol_v1_report.md`, `protocol_v1_summary.json`, `protocol_v1_verification.json`을 사용합니다. 기존 `report.md`/`table2.json`의 구간 내6cm 비율은 과거 지표이며 최신 t_coop으로 인용하지 않습니다. 64환경 탐색이며 Independent전용 장면은 제외되어 Table1 Ind. 공식 열을 제공하지 않습니다. Enable 완료 시간은 행동동일가중→seed평균, Coupled t_coop/Jerk는 공용20cm counter/NaN/0제외 및 합산trial 인원동일가중 규칙을 적용합니다.

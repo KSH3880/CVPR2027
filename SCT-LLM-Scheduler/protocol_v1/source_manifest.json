@@ -1,0 +1,10 @@
+{
+  "implementations.md": "a43a36f4dc46348dd10b90a798a2d10a9da332c56243421f572a3a22de3e0917",
+  "README.md": "48ce2057904bfff74f24ca53b66173e056aba1dcdc650b00c3eb47e70a836895",
+  "checks/teamhoi_reference.py": "d6b2dfee4b107f256ec8d6a2c37e92eb665a486a7b57285810570b3ef78d8166",
+  "checks/reference_metrics.py": "917893b2aa8e46b220ddea624c7e4aadaf8b0dfc2c51e765ca4fbfe35c72fb99",
+  "checks/cases.json": "dbfd1562d29a4fc6ef37752ded8ccecc1d8868982945b7852738239f98ad3ceb",
+  "checks/README.md": "395b8e73bff0e8eca3fee4499c09968e35ffdf6cf539ce4266ff8648e305cfff",
+  "checks/source.json": "c8afd9dbf38b404a87b26659016efbc984c03605793be0561439cab6ced02219",
+  "checks/verify.py": "08ba8fd27516fdc70d28977f02bfa18ac8ab2182760184ec383d2160d3d774ca"
+}

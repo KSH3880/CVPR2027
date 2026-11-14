@@ -16,14 +16,22 @@ def save(path,value):
     temporary.replace(path)
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--workers',type=int,default=16)
+    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--settings',nargs='+',choices=['mixed_2h','mixed_4h','mixed_8h','mixed_16h','enable_sit','enable_climb','enable_ontop','coupled_2','coupled_3','coupled_4']);parser.add_argument('--additional-source',type=Path,action='append',default=[]);parser.add_argument('--workers',type=int,default=16)
     args=parser.parse_args();source=args.source.resolve();out=args.output.resolve()
     assert (ROOT/'output_etc/check').resolve() in out.parents and 1<=args.workers<=16
-    paths=sorted((source/'api').rglob('request.json'));assert len(paths)==1920
+    sources=[source]+[p.resolve() for p in args.additional_source]
+    selected={}
+    for root in sources:
+        for p in sorted((root/'api').rglob('request.json')):
+            rel=p.relative_to(root/'api')
+            if args.settings is None or rel.parts[1] in args.settings:selected[rel]=p
+    paths=[selected[k] for k in sorted(selected)]
+    expected=1920 if args.settings is None else len(set(args.settings))*192
+    assert len(paths)==expected,(len(paths),expected)
     work=[]
     for p in paths:
         req=loads(p.read_text());validate_request(req)
-        work.append((p.relative_to(source/'api').parent,req,hashlib.sha256(p.read_bytes()).hexdigest()))
+        work.append((next(p.relative_to(r/'api').parent for r in reversed(sources) if r/'api' in p.parents),req,hashlib.sha256(p.read_bytes()).hexdigest()))
     prompt=(ROOT/'prompts/system.txt').read_text();settings=read_settings()
     effort=settings.get('SCT_LLM_REASONING_EFFORT','').strip() or DEFAULT_REASONING_EFFORT
     model=settings['SCT_LLM_MODEL'];url=settings.get('SCT_LLM_BASE_URL') or DEFAULT_BASE_URL
@@ -33,8 +41,8 @@ def main():
         return raw_transport(messages)
     out.mkdir(parents=True,exist_ok=False)
     (out/'system_prompt.txt').write_text(prompt)
-    save(out/'manifest.json',dict(source=str(source),scene_count=len(work),workers=args.workers,model=model,base_url=url,reasoning_effort=effort,api_only=True,gpu_jobs=0,retries=0,source_requests_unchanged=True,prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),requests=[dict(scene=str(rel),sha256=sha) for rel,_,sha in work]))
-    state=dict(stage='api',completed=False,total=len(work),api_done=0,api_validated=0,api_failed=0,api_nonexecutable=0,started_at=time.strftime('%Y-%m-%d %H:%M:%S'))
+    save(out/'manifest.json',dict(source=str(source),additional_sources=[str(r) for r in sources[1:]],selected_settings=args.settings,scene_count=len(work),workers=args.workers,model=model,base_url=url,reasoning_effort=effort,api_only=True,gpu_jobs=0,retries=0,source_requests_unchanged=True,prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),requests=[dict(scene=str(rel),sha256=sha) for rel,_,sha in work]))
+    state=dict(stage='api',completed=False,total=len(work),api_done=0,api_validated=0,api_failed=0,api_nonexecutable=0,api_progress_percent=0.,started_at=time.strftime('%Y-%m-%d %H:%M:%S'))
     save(out/'status.json',state);rows=[]
     def call(item):
         rel,req,_=item;dest=out/'api'/rel;error=None
@@ -48,6 +56,7 @@ def main():
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         for future in as_completed([pool.submit(call,item) for item in work]):
             row=future.result();rows.append(row);state['api_done']+=1;state['api_validated']+=int(row['validation_error'] is None);state['api_failed']+=int(row['validation_error'] is not None);state['api_nonexecutable']+=int(not row['executable'])
+            state['api_progress_percent']=round(100*state['api_done']/state['total'],2)
             save(out/'status.json',state)
             if row['validation_error']:save(out/'api_failures.json',[r for r in rows if r['validation_error']])
             if state['api_done']%64==0:print(json.dumps(state),flush=True)

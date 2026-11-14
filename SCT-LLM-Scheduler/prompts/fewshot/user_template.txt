@@ -1,0 +1,51 @@
+Predict event durations and generate an initial release schedule for CURRENT_SCENE.
+
+The ten demonstrations are separate single-agent SCT Stage1 recordings:
+five AT executions through completion and five PUSH executions through first
+measured two-hand contact. Each agent executes from t = 0 with no scheduler
+waiting or freezing. They are behavioral timing references, not release
+schedule examples. CURRENT_SCENE has not been executed.
+Estimate each agent's elapsed time from release to the specified event
+using the supplied scene information and the ten recorded demonstrations.
+Exclude initial frozen waiting from these estimates.
+State any necessary timing assumptions, and mark estimates with low
+confidence when timing evidence is insufficient.
+Produce numeric best-effort estimates even when the demonstrations
+do not directly cover a requested event or scene configuration.
+State unsupported assumptions and use low confidence where appropriate.
+For each two-agent enabling unit, fix the predecessor's release to 0 and
+choose only the follower's freeze release time. For each two-to-four-agent coupled
+PUSH group, choose every member's release time and thereby who starts first.
+Read each group's actual membership from the scene; do not assume four members
+or equate total scene population with a single PUSH group's size.
+Return all agents in schedule, including enabling predecessors fixed at 0.
+Agents outside enabling and coupled constraints start at time 0.
+These are initial policy release times; there is no separate PUSH start gate.
+For enabling, the follower's predicted dependency-sensitive event must occur
+strictly after the predecessor's predicted enabling event. Only for enabling
+followers, waiting time is not minimized and the earliest release is not required.
+Justify additional delay by predicted timing uncertainty or explicitly supplied
+settling requirements; explain it in the follower's prediction basis. Identify
+heuristic allowances as assumptions and do not invent settling requirements.
+For coupled groups only, avoid unnecessarily long initial waiting: use
+T = max_i(a_i) and release_i = T - a_i, without a common group delay or extra
+per-member uncertainty waiting. Do not apply the enabling waiting policy to
+coupled groups. Independent agents start at 0. Respect any supplied validity
+window for the enabling condition.
+
+UNITS AND REPRESENTATION
+{{UNITS_COORDINATE_FRAME_AND_FIELD_DEFINITIONS}}
+
+TASK GLOSSARY
+{{PLAIN_LANGUAGE_TASK_DEFINITIONS}}
+
+EVENT DEFINITIONS
+{{EXACT_READINESS_ENABLING_AND_COMPLETION_CONDITIONS}}
+
+DEMONSTRATIONS
+{{TEN_RECORDED_DEMONSTRATIONS_JSON_ARRAY}}
+
+CURRENT_SCENE
+{{CURRENT_INITIAL_OBSERVATION_TASKS_TARGETS_AND_DEPENDENCIES_JSON}}
+
+Return only the JSON object specified in the system prompt.

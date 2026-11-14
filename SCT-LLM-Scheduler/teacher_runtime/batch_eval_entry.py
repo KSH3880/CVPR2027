@@ -21,6 +21,7 @@ elif os.environ.get('SCT_FREEZE_IMPL', 'legacy') != 'legacy':
     raise ValueError('Unknown SCT_FREEZE_IMPL')
 from sct_scheduler.core import earliest_schedule,validate_response
 from sct_scheduler.executable import validate_executable
+from sct_scheduler.fewshot import matching_initial_request
 from export_initial_scene import export
 
 base_capture=stage2_protocol_eval.capture_initial
@@ -68,7 +69,7 @@ def evaluate(player):
                 predicted_episode_events=[dict(agent_id=p['agent_id'],event_id=p['event_id'],episode_time_s=round(releases[p['agent_id']]+p['estimated_elapsed_time_s'],2)) for p in preds])
         else:
             folder=Path(os.environ['SCT_SCHEDULE_ROOT'])/('general_seed'+str(seed))/('env_%04d'%i)
-            assert json.loads((folder/'request.json').read_text())==req,'API request does not match captured scene'
+            assert matching_initial_request(json.loads((folder/'request.json').read_text()),req),'API request does not match captured scene'
             try:
                 answer=json.loads((folder/('response.raw.txt' if execution_only else 'response.validated.json')).read_text())
                 if not isinstance(answer,dict):raise ValueError('Response is not an object')
@@ -120,6 +121,27 @@ def evaluate(player):
         adapter.before_action(frame)
         task._compute_observations()
         obs=player.obs_to_torch(player.env._policy_observation())
+        if frame==0 and os.environ.get('SCT_PROTOCOL_VERSION'):
+            actual=obs['obs'].clone()
+            kin=task._kinematic_humanoid_rigid_body_states
+            velocities=kin[...,7:13].clone()
+            buffer=task.obs_buf.clone()
+            try:
+                kin[...,7:13][adapter.frozen]=0
+                ids=torch.arange(task.num_envs,device=task.device)
+                task.obs_buf.copy_(task._compute_clean_scene_obs(ids))
+                expected_input=player.obs_to_torch(player.env._policy_observation())['obs'].clone()
+            finally:
+                kin[...,7:13].copy_(velocities)
+                task.obs_buf.copy_(buffer)
+            torch.save(dict(actual=actual.cpu(),expected_reset_with_freeze=expected_input.cpu(),
+                            frozen=adapter.frozen.cpu()),out/'first_policy_input.pt')
+            exact=torch.equal(actual,expected_input)
+            (out/'first_policy_input.json').write_text(json.dumps(dict(
+                passed=exact,comparison='indexed reset kinematics with frozen velocities zero',
+                max_abs_error=float((actual-expected_input).abs().max()),
+                protocol=os.environ['SCT_PROTOCOL_VERSION'])))
+            assert exact,'First policy input differs from reset state with initial freeze'
         return adapter.mask_actions(action(obs,is_determenistic))
     def checked_step(*args,**kwargs):
         nonlocal frame,frozen_error

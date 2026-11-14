@@ -240,3 +240,7 @@ Chair 예약은 `runs/<예약>/code`를 checkout으로 사용했지만 preflight
 ## 2026-10-28 — 원본 IsaacGym 에셋 로더에 절대경로를 넘겨 actor가 누락됨
 
 원본carry환경은 `gym.load_asset(sim,"./",urdf,options)`를 사용한다. object root를 절대경로로 바꾸면 Gym이 `.///home/...`처럼붙여URDF로드에실패하고object actor가-1이될수있다. 그상태에서GPUroot indexed reset을하면CUDA illegal memory access가발생한다. 데이터는기존심링크로연결하고원본상대objectroot `dataset_dynamic_objects`를유지한다. 실제평가전actorID의int32/비음수/전체root범위를검사해누락을막는다. 이번실패및복구로그는 `runs/table_residual_10k_tokenhsi_native_20261028/output_etc/check/`에보존했다. 원인은tensor수명문제가아니었고별도수명/동기화변경은최종평가에쓰지않았다.
+
+## Blender compositor uses physical GPU0 independently of Cycles allowlist (2026-11-12)
+
+CUDA_VISIBLE_DEVICES set to GPU7 UUID and Cycles CUDA device selection did not constrain the saved GPU compositor. Blender PID appeared on GPU7 for rendering and physicalGPU0 (~631MiB) for composition. Force scene.render.compositor_device=CPU and scene.cycles.denoising_use_gpu=False after loading the blend, keep Cycles GPU device on allowed6/7, and verify process UUIDs with nvidia-smi during both render and composition. Do not infer physical placement from environment variables alone. User-authorized correction stopped only the exact Blender client, never MPS/training.

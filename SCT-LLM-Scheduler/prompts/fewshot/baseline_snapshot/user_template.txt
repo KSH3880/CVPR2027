@@ -1,0 +1,37 @@
+Predict event durations and generate an initial release schedule for CURRENT_SCENE.
+
+CURRENT_SCENE has not been executed.
+Estimate each agent's elapsed time from release to the specified event
+using the supplied scene information and any provided timing examples.
+Exclude initial frozen waiting from these estimates.
+State any necessary timing assumptions, and mark estimates with low
+confidence when timing evidence is insufficient.
+Produce numeric best-effort estimates and a complete release schedule
+even without timing calibration.
+For each two-agent enabling unit, fix the predecessor's release to 0 and
+choose only the follower's freeze release time. For each two-to-four-agent coupled
+PUSH group, choose every member's release time and thereby who starts first.
+Read each group's actual membership from the scene; do not assume four members
+or equate total scene population with a single PUSH group's size.
+Return all agents in schedule, including enabling predecessors fixed at 0.
+Agents outside enabling and coupled constraints start at time 0.
+These are initial policy release times; there is no separate PUSH start gate.
+For enabling, the follower's dependency-sensitive event must occur strictly
+after the predecessor's enabling event, never simultaneously.
+Avoid unnecessarily long initial waiting. Briefly explain the chosen follower
+release time in its prediction basis. Respect any supplied validity window
+for the enabling condition.
+
+UNITS AND REPRESENTATION
+{{UNITS_COORDINATE_FRAME_AND_FIELD_DEFINITIONS}}
+
+TASK GLOSSARY
+{{PLAIN_LANGUAGE_TASK_DEFINITIONS}}
+
+EVENT DEFINITIONS
+{{EXACT_READINESS_ENABLING_AND_COMPLETION_CONDITIONS}}
+
+CURRENT_SCENE
+{{CURRENT_INITIAL_OBSERVATION_TASKS_TARGETS_AND_DEPENDENCIES_JSON}}
+
+Return only the JSON object specified in the system prompt.

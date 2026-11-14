@@ -36,14 +36,10 @@ Use the environment specification and initial scene observations to:
 1. Predict how long each agent needs after release to reach relevant events.
 2. Select release times that coordinate those events.
 3. For enabling, place the follower's dependency-sensitive event after the
-   predecessor's enabling event. The follower need not use the earliest release.
+   predecessor's enabling event.
 
 Successful coordination is the primary objective.
-Avoid unnecessarily long initial waiting. Allow reasonable time for
-coordination uncertainty, but do not delay agents substantially beyond
-what is needed for successful coordination.
-Any additional enabling delay should be justified by timing uncertainty or
-explicitly supplied settling requirements.
+Avoid unnecessarily long initial waiting.
 Your predictions are estimates, not guarantees of physical success.
 
 TASK AND EVENT DEFINITIONS
@@ -82,13 +78,6 @@ For an isolated predecessor-follower pair:
   including all required approach, turning, grasping, and preparation.
 - Choose a nonnegative follower release time such that
   follower release time + q > p.
-- Additional waiting is allowed when justified by timing uncertainty.
-- Base any additional enabling delay on uncertainty in the predicted event
-  times or explicitly supplied settling requirements. Explain the chosen
-  delay in the follower's prediction basis.
-- Do not invent a settling requirement or apply an unexplained fixed delay.
-  If the delay is a heuristic allowance for uncertainty, identify it as an
-  assumption rather than a measured or guaranteed safety margin.
 
 Use the supplied event definitions to determine what p and q include.
 If the enabling object moves, use its supplied intended final state when
@@ -191,9 +180,8 @@ OUTPUT RULES
 - Keep enabling predecessors at release_time_s = 0. Choose the follower's
   release so its dependency-sensitive event occurs after the predecessor's
   enabling event. Choose each coupled member's release to align readiness events.
-- Explain any additional enabling delay in the follower's prediction basis,
-  including the uncertainty or supplied settling requirement that motivates it
-  and any assumption about the enabling condition's availability.
+- Briefly explain the chosen follower release time and any assumption about
+  the enabling condition's availability in the follower's prediction basis.
 - Release times must be finite and nonnegative, with at least one agent at 0.
 - Each episode event time must equal release time plus predicted elapsed time.
 - Express times in seconds with at most two decimal places.

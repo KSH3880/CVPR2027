@@ -88,9 +88,9 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(set(payload), {'environment_spec', 'current_scene'})
         self.assertEqual(payload, self.request)
 
-    def test_legacy_demonstrations_rejected(self):
+    def test_empty_demonstrations_rejected(self):
         self.request['demonstrations'] = []
-        with self.assertRaisesRegex(ValueError, 'Invalid request keys'):
+        with self.assertRaisesRegex(ValueError, 'Expected ten demonstrations'):
             build_messages(self.request)
 
     def test_current_future_data_rejected(self):

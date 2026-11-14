@@ -17,11 +17,10 @@ Return all agents in schedule, including enabling predecessors fixed at 0.
 Agents outside enabling and coupled constraints start at time 0.
 These are initial policy release times; there is no separate PUSH start gate.
 For enabling, the follower's dependency-sensitive event must occur strictly
-after the predecessor's enabling event, never simultaneously. Additional initial
-waiting is allowed; the follower need not start at the earliest feasible time.
-No fixed timing gap is specified. Base any additional enabling delay on timing uncertainty or explicitly
-supplied settling requirements, and briefly explain it in the follower's
-prediction basis. Respect any supplied validity window for the enabling condition.
+after the predecessor's enabling event, never simultaneously.
+Avoid unnecessarily long initial waiting. Briefly explain the chosen follower
+release time in its prediction basis. Respect any supplied validity window
+for the enabling condition.
 
 UNITS AND REPRESENTATION
 {{UNITS_COORDINATE_FRAME_AND_FIELD_DEFINITIONS}}

@@ -60,7 +60,16 @@ def scene_index(scene):
 
 
 def validate_request(request):
-    require(set(request) == {'environment_spec', 'current_scene'}, 'Invalid request keys')
+    require(set(request) in ({'environment_spec', 'current_scene'},
+                             {'environment_spec', 'current_scene', 'demonstrations'}), 'Invalid request keys')
+    if 'demonstrations' in request:
+        demos = request['demonstrations']
+        require(isinstance(demos, list) and len(demos) == 10, 'Expected ten demonstrations')
+        unique(demos, 'example_id')
+        require(sum(d.get('task_type') == 'AT' for d in demos) == 5 and
+                sum(d.get('task_type') == 'PUSH' for d in demos) == 5, 'Expected five AT and five PUSH records')
+        require(all(d.get('execution', {}).get('agents') == 1 and d.get('measured_events')
+                    for d in demos), 'Expected single-agent annotated recordings')
     # Reject NaN/Infinity anywhere, including initial observations.
     json.dumps(request, allow_nan=False)
     env = request['environment_spec']
@@ -88,7 +97,8 @@ def validate_request(request):
 
 def build_messages(request):
     validate_request(request)
-    prompt = (Path(__file__).resolve().parents[1] / 'prompts/system.txt').read_text()
+    variant = 'prompts/fewshot/system.txt' if 'demonstrations' in request else 'prompts/system.txt'
+    prompt = (Path(__file__).resolve().parents[1] / variant).read_text()
     return [{'role': 'system', 'content': prompt},
             {'role': 'user', 'content': json.dumps(request, ensure_ascii=False, allow_nan=False)}]
 

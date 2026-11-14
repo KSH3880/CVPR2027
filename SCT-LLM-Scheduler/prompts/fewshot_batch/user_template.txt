@@ -1,0 +1,1 @@
+{"batch_id":"{{BATCH_ID}}","environment_specs":{{SHARED_ENVIRONMENT_SPECS_BY_ID}},"demonstrations":{{TEN_RECORDED_DEMONSTRATIONS_JSON_ARRAY}},"scenes":[{"record_id":"{{TABLE_SETTING_SEED_ENV_KEY}}","environment_spec_id":"{{SPEC_ID}}","current_scene":{{CURRENT_SCENE_JSON}}}]}

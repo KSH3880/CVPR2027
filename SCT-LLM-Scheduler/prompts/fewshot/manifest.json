@@ -1,0 +1,20 @@
+{
+  "variant": "fewshot_10_single_stage1_behavior",
+  "baseline_system_sha256": "049fa6412cbae73c8085c9cf517601572109e89da81f92580d04b8e7c68f5236",
+  "demonstration_count": 10,
+  "output_schema_changed": false,
+  "api_integration": true,
+  "reference_composition": {
+    "AT_completion": 5,
+    "PUSH_first_contact": 5
+  },
+  "agents_per_reference_episode": 1,
+  "scheduling_examples": false,
+  "demonstrations_path": "output_etc/check/fewshot_examples_single_stage1_eval_geometry_20261112_154050/demonstrations.json",
+  "collection_source": "teacher_runtime/output_etc/check/single_stage1_eval_geometry_20261112_154050",
+  "previous_demonstrations_path": "output_etc/check/fewshot_examples_single_stage1_fewshot_20261112_153316/demonstrations.json",
+  "geometry_variant": "eval_distance_single_agent_v1",
+  "enabling_min_predicted_event_gap_s": null,
+  "enabling_waiting_policy": "Only enabling followers: waiting time is not minimized; additional delay justified by predicted timing uncertainty or supplied settling requirements, with heuristic assumptions labeled.",
+  "coupled_waiting_policy": "For isolated groups T=max(a_i), release_i=T-a_i; avoid unnecessary waiting; no common group delay or extra per-member uncertainty waiting; enabling allowances do not apply."
+}

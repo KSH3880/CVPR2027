@@ -1,0 +1,16 @@
+{
+  "protocol_id": "cvpr2027-evaluation-v1.0.0",
+  "origin": "TeamHOI source snapshot preserved by the existing cooperation reaggregation",
+  "functions": {
+    "quat_rotate_dimflex": {
+      "source_file": "torch_utils.py",
+      "source_sha256": "1ac4e23894cf28b6a033192e539d928c7d4aa17e57df1c4b473644a288c8899f",
+      "function_sha256": "39a3c6c0dbf890d1387282d2dee7ce82318627163c31f52a34e7533e8debc59d"
+    },
+    "compute_rim_velocity_variance_norm": {
+      "source_file": "task_util.py",
+      "source_sha256": "945ccc66469a1fb7c3b6c0ff6f7617467ea8dfc3e6dac5df32bb2c488c65a72e",
+      "function_sha256": "6f628d84abeab95713d75b0713ed7379794795ea1bfbf07024d693ede2c5f560"
+    }
+  }
+}

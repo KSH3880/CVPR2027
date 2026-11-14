@@ -1,0 +1,28 @@
+{
+  "protocol_id": "cvpr2027-evaluation-v1.0.0",
+  "region": [
+    {"name": "xy_boundary_z_boundary", "point": [0.5, 0, 0.2], "target": [0, 0, 0], "size": [1, 1, 1], "success": true, "region_error": 0.2, "point_error": 0.5385164807134504},
+    {"name": "outside_xy", "point": [0.6, 0, 0], "target": [0, 0, 0], "size": [1, 1, 1], "success": false, "region_error": 0.1, "point_error": 0.6},
+    {"name": "outside_z", "point": [0, 0, 0.201], "target": [0, 0, 0], "size": [1, 1, 1], "success": false, "region_error": 0.201, "point_error": 0.201},
+    {"name": "region_success_point_failure", "point": [0.5, 0.5, 0], "target": [0, 0, 0], "size": [1, 1, 1], "success": true, "region_error": 0, "point_error": 0.7071067811865476}
+  ],
+  "enabling": [
+    {"name": "each_ever_only", "success": [[true, false], [false, true]], "valid": [[true, true], [true, true]], "first": -1},
+    {"name": "simultaneous", "success": [[true, false], [true, true]], "valid": [[true, true], [true, true]], "first": 2},
+    {"name": "fallen_partner", "success": [[false, false], [true, true]], "valid": [[true, true], [false, true]], "first": -1}
+  ],
+  "counter": [
+    {"name": "initial_not_first_action", "x": [0.3, 0.4, 0.5], "initial_x": 0, "first_success": -1, "expected": [1, 0, 3]},
+    {"name": "success_same_as_start", "x": [0.1, 0.2, 0.3], "initial_x": 0, "first_success": 2, "expected": [2, 1, 1]},
+    {"name": "ignore_start_after_success", "x": [0, 0.1, 0.5], "initial_x": 0, "first_success": 2, "expected": [-1, 3, 1]},
+    {"name": "no_start_failure", "x": [0, 0.1, 0.19], "initial_x": 0, "first_success": -1, "expected": [-1, 3, 3]},
+    {"name": "latch_after_reversal", "x": [0, 0.3, 0], "initial_x": 0, "first_success": -1, "expected": [2, 1, 3]}
+  ],
+  "ratio": [
+    {"name": "zero_over_zero", "count": 0, "a": 3, "b": 3, "expected": "NaN"},
+    {"name": "positive_over_zero", "count": 2, "a": 3, "b": 3, "expected": 1},
+    {"name": "negative_duration", "count": 2, "a": 3, "b": 1, "expected": 0},
+    {"name": "upper_clip", "count": 7, "a": 1, "b": 4, "expected": 1},
+    {"name": "ordinary", "count": 2, "a": 1, "b": 5, "expected": 0.5}
+  ]
+}
