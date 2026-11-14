@@ -146,6 +146,12 @@ def load_cfg(args):
     if getattr(args, "transfer_checkpoint", ""):
         cfg.setdefault("experiment", {}).setdefault("transfer", {})["checkpoint"] = args.transfer_checkpoint
     pickup_carry_mode = getattr(args, 'before_pickup_carry_rsi', 'loco')
+    box_size_mode = getattr(args, 'before_box_size', 'original')
+    if box_size_mode not in ('original', 'family', 'common'):
+        raise ValueError('--before_box_size must be original, family or common')
+    if box_size_mode != 'original':
+        if not is_eval or args.task != 'HumanoidMABeforePush' or getattr(args, 'eval_protocol', ''):
+            raise ValueError('--before_box_size requires BEFORE PUSH viewer inference')
     if pickup_carry_mode != 'loco' and (not is_eval or not cfg['env'].get('before', {}).get('follower_pickup_carry_rsi')):
         raise ValueError('--before_pickup_carry_rsi requires the follower pickup/carry RSI evaluation config')
     goal_distance = getattr(args, 'before_at_goal_distance', None)
@@ -381,6 +387,8 @@ def get_args():
          "help": "Three-mode BEFORE evaluation: force the saved config's shortest distance mode"},
         {"name": "--before_at_goal_distance", "type": float, "default": None,
          "help": "Goalroute BEFORE inference: fixed leader box-to-AT-goal XY distance in meters"},
+        {"name": "--before_box_size", "type": str, "choices": ["original", "family", "common"], "default": "original",
+         "help": "BEFORE PUSH viewer shared-box sizes; intersections keep sampled pairs and tasks fixed"},
         {"name": "--before_follower_goal_distance", "type": float, "default": None,
          "help": "Goalroute BEFORE inference: fixed AT-goal-to-follower human XY distance in meters"},
         {"name": "--eval_protocol", "type": str, "choices": ["", "general", "stage1_single"], "default": ""},

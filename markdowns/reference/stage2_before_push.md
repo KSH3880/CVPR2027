@@ -157,3 +157,14 @@ Progress 반경·보상 가중치·Virtual 입력·샘플링·네트워크·AMP/
 `stage2_before_push_near50_pair50_source5_virtual_goal5_goalroute_wait_penalty_v2_relfusion_zerobg_v2`는 기존 fusion을 보존하고 `waiting_penalty.radius_buffer: 2.5`, `ontop_distance_source: human`을 사용한다. coefficient는1.0이다. SIT/CLIMB/ON_TOP 모두 후행 사람 root와 선행 AT 목표의 XY 거리가 받침 상자 XY 반대각선+2.5m 이내이면 대기 페널티를 활성화한다. ON_TOP payload 위치나 집기 여부로 진입을 판정하지 않는다. 이후 반경 이탈에도 유지하고 선행 AT의 raw 성공 Ever로 영구 해제하며, 사람 root XYZ 속력으로 감점한다.
 
 `ontop_distance_source`를 생략한 기존 설정은 payload 기준을 유지한다. ON_TOP Progress는 기존 payload 기준이며, 가상 상자 XYZ·회전·fusion/단방향 bias·State/Success current Gate·AT 높이 조건·AMP/PPO·샘플링은 기존 fusion과 같다. 같은 Stage1 26k에서 새로 전이 학습하며 기존 fusion checkpoint와 새 설정의 resume/추론 계약을 분리한다. 실행 명령은 [config](../config.md)를 따른다.
+
+## AT 1mm attention bias 어블레이션
+
+`stage2_before_total_at1mm_nobias`는 `stage2_before_total_at1mm`에서 `human_relation_fusion: before_zerobg_nobias`만 변경한 새 학습 설정이다. actor·critic의 사람 attention에서 BEFORE bias projection 파라미터와 bias 텐서 생성을 제거하고 `attn_mask=None`으로 실행한다. 모든 사람 사이 attention은 허용하며, 후행 사람에 적용하는 BEFORE embedding/잔차 MLP fusion과 Stage1 task bias는 유지한다. 실제 padding이 전달되는 경우에는 padding 마스크를 보존한다.
+
+기존과 동일한 Stage1 26k 전이·4명·1024환경·8토큰·900step·보상·샘플링을 사용한다. 기본 출력은 `output/stage2_before_total_at1mm_nobias`이며, 기존 bias 모델과 checkpoint 계약을 분리하므로 기존 Stage2 checkpoint를 그대로 resume하지 않는다. 새 실험의 저장본으로 resume/추론한다. 학습·로컬·VNC 명령은 [config](../config.md)에 있다. 정식 평가는 다음과 같다.
+
+```bash
+# stage2_before_total_at1mm_nobias
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_before_total_at1mm_nobias_eval.sh "$CKPT" --output output_etc/check/stage2_before_total_at1mm_nobias_eval
+```

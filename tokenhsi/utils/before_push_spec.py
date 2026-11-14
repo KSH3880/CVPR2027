@@ -16,7 +16,7 @@ def validate_env(env, evaluation=False):
     from utils.experiments import native_config
     from utils.task_role_spec import TASK_PROBS
     from utils.before_object_alias import MODE, VIRTUAL_MODE
-    if env['relationGraph'].get('human_relation_fusion', 'none') not in ('none', 'before_zerobg'):
+    if env['relationGraph'].get('human_relation_fusion', 'none') not in ('none', 'before_zerobg', 'before_zerobg_nobias'):
         raise ValueError('Invalid BEFORE human relation fusion mode')
     virtual = env['relationGraph'].get('before_virtual_object')
     if virtual is not None and (virtual != VIRTUAL_MODE or env['relationGraph'].get('before_object_alias') != MODE):
@@ -49,13 +49,24 @@ def validate_env(env, evaluation=False):
     limited=deepcopy(near);limited.update(pairing_probability=.5,source_max_distance=5.)
     before=deepcopy(env['before'])
     goal_distance=before.pop('goal_distance',None)
+    radius=before.pop('progress_radius',None)
     asymmetric=before.pop('asymmetric_progress',None)
     waiting=before.pop('waiting_termination',None)
     penalty=before.pop('waiting_penalty',None)
+    reward_z=before.pop('reward_at_z_tolerance',None)
+    if 'reward_at_z_tolerance' in env['before']:
+        if (type(reward_z) not in (int,float) or reward_z != .001
+                or env['relationReward']['success']['at_z_tolerance'] != .2
+                or env['relationReward']['at'].get('success_distance') != .2):
+            raise ValueError('AT reward height requires 1mm rewards and the unchanged 20cm gate')
     if before.get('distance_mixture') == GOAL_DISTANCE_MIXTURE:
         if goal_distance != [1.,5.] or before.get('source_max_distance') != 5.:
             raise ValueError('Goal-centered BEFORE requires source5 and goal5')
         before['distance_mixture']=deepcopy(DISTANCE_MIXTURE)
+    if 'progress_radius' in env['before']:
+        if (type(radius) not in (int,float) or not math.isfinite(radius) or radius < 0
+                or before!=limited or virtual!=VIRTUAL_MODE or asymmetric is not None):
+            raise ValueError('Progress radius requires source5 virtual, a finite nonnegative radius and no asymmetric progress')
     if 'asymmetric_progress' in env['before']:
         if (not isinstance(asymmetric,dict) or set(asymmetric)!={'lambda_inner'}
                 or type(asymmetric['lambda_inner']) not in (int,float)
@@ -79,8 +90,11 @@ def validate_env(env, evaluation=False):
     if 'waiting_penalty' in env['before']:
         keys={'radius_buffer','coefficient'}
         if (not isinstance(penalty,dict) or not keys <= set(penalty)
-                or set(penalty)-keys-{'ontop_distance_source'}
+                or set(penalty)-keys-{'ontop_distance_source','climb_radius_buffer'}
                 or any(type(penalty[k]) not in (int,float) or not math.isfinite(penalty[k]) or penalty[k]<=0 for k in keys)
+                or ('climb_radius_buffer' in penalty and
+                    (type(penalty['climb_radius_buffer']) not in (int,float)
+                     or not math.isfinite(penalty['climb_radius_buffer']) or penalty['climb_radius_buffer']<=0))
                 or penalty.get('ontop_distance_source','payload') not in ('payload','human')
                 or 'waiting_termination' in env['before'] or asymmetric is not None
                 or before!=limited or virtual!=VIRTUAL_MODE):

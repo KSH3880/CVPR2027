@@ -114,9 +114,13 @@ class MAAgent(amp_agent.AMPAgent):
         if args.resume <= 0 and not (args.test or args.eval):
             path = task.cfg["experiment"]["transfer"]["checkpoint"]
             checkpoint = torch.load(path, map_location=self.ppo_device, weights_only=False)
-            report = transfer_stage1(self.model, checkpoint)
-            self.running_mean_std.load_state_dict(checkpoint["running_mean_std"], strict=True)
-            self._amp_input_mean_std.load_state_dict(checkpoint["amp_input_mean_std"], strict=True)
+            if task.cfg["experiment"]["transfer"].get("mode") == "stage2_weights":
+                from utils.before_total_finetune import initialize
+                report = initialize(self, checkpoint, task.cfg)
+            else:
+                report = transfer_stage1(self.model, checkpoint)
+                self.running_mean_std.load_state_dict(checkpoint["running_mean_std"], strict=True)
+                self._amp_input_mean_std.load_state_dict(checkpoint["amp_input_mean_std"], strict=True)
             with open(os.path.join(self.experiment_dir, "before_transfer_report.json"), "w") as stream:
                 json.dump(dict(report, checkpoint=path), stream, indent=2)
         freeze_actor(self.model)

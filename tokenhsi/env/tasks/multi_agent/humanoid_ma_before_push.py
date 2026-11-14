@@ -6,6 +6,7 @@ from env.tasks.multi_agent.humanoid_ma_push import HumanoidMAPush
 from env.tasks.multi_agent.before_push_reward import BeforePushRuntime
 from env.tasks.multi_agent.jointpush_reward import contact_state
 from utils.before_push_spec import sample_graph
+from utils.edge_ontop_spec import select_graph
 from utils.before_goal_sampling import DISTANCE_MIXTURE as GOAL_DISTANCE_MIXTURE
 from env.tasks.multi_agent.before_goal_sampling import static_infeasible
 from utils.before_push_layout import sample_layout, sample_batched_layout, sample_sequential_layout, paths_valid, PushLayoutError
@@ -42,6 +43,14 @@ class HumanoidMABeforePush(HumanoidMABefore):
                 bounds=[[max(lo,a),min(hi,b)] for (lo,hi),(a,b) in zip(bounds,ranges[family])]
             for axis,(lo,hi) in enumerate(bounds):
                 self._box_size[:,bank*m:(bank+1)*m,axis]=torch.randint(round(lo*20),round(hi*20)+1,(n,m),device=self.device)/20
+        mode=getattr(self.cfg['args'],'before_box_size','original')
+        if mode!='original':
+            from utils.before_box_size import sample_intersection
+            sizes,graph,pre,templates=sample_intersection(self._box_size[:,:m],ranges,
+                self._relation_graph_spec['template_probabilities'],self._task_graph_preset,
+                self.num_objects,self.cfg['env']['before']['pairing_probability'],mode)
+            self._box_size[:,:m]=sizes
+            self._before_box_size_graph=(graph,pre,templates)
         profiles=torch.tensor(self._joint['box']['profiles'],device=self.device)
         self._box_size[:,4*m:5*m]=profiles[torch.randint(len(profiles),(n,m),device=self.device)]
         for axis,(lo,hi) in enumerate(ranges['SUPPORT']):
@@ -75,9 +84,14 @@ class HumanoidMABeforePush(HumanoidMABefore):
         self._solo_counts=torch.zeros(6,device=self.device)
 
     def _draw_episode_graph(self,ids):
-        graph,pre,templates=sample_graph(self._box_size[ids,:self.num_agents],
-            self.cfg['env']['box']['build']['taskSizeRanges'],self._relation_graph_spec['template_probabilities'],self._task_graph_preset,self.num_objects,
-            pairing_probability=self.cfg['env']['before']['pairing_probability'])
+        fixed=getattr(self,'_before_box_size_graph',None)
+        if fixed is not None:
+            graph,pre,templates=fixed
+            graph,pre,templates=select_graph(graph,ids),pre[ids].clone(),templates[ids].clone()
+        else:
+            graph,pre,templates=sample_graph(self._box_size[ids,:self.num_agents],
+                self.cfg['env']['box']['build']['taskSizeRanges'],self._relation_graph_spec['template_probabilities'],self._task_graph_preset,self.num_objects,
+                pairing_probability=self.cfg['env']['before']['pairing_probability'])
         paired=pre>=0
         rows,followers=paired.nonzero(as_tuple=True)
         paired[rows,pre[rows,followers]]=True
@@ -91,7 +105,9 @@ class HumanoidMABeforePush(HumanoidMABefore):
 
     def _init_ontop_context_runtime(self):
         super()._init_ontop_context_runtime()
-        self.relation_runtime=BeforePushRuntime(self.num_envs,self.relation_runtime.graph,self._relation_cfg,self.device,contact_weights=self._joint["contact_weights"])
+        self.relation_runtime=BeforePushRuntime(self.num_envs,self.relation_runtime.graph,self._relation_cfg,self.device,
+            contact_weights=self._joint["contact_weights"],
+            reward_at_z_tolerance=self.cfg['env']['before'].get('reward_at_z_tolerance'))
 
     def _reset_ref_state_init(self,env,owner):
         push=self._templates[env,owner]==5

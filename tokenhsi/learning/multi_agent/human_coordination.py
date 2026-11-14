@@ -75,14 +75,16 @@ class HumanCoordination(nn.Module):
         super().__init__()
         self.shuffle_human_order = shuffle_human_order
         self.relation_fusion = None
-        if relation_fusion not in ('none', 'before_zerobg'):
+        self.use_relation_bias = relation_fusion != 'before_zerobg_nobias'
+        if relation_fusion not in ('none', 'before_zerobg', 'before_zerobg_nobias'):
             raise ValueError('Unknown human relation fusion mode')
-        if relation_fusion == 'before_zerobg':
+        if relation_fusion in ('before_zerobg', 'before_zerobg_nobias'):
             if relations != 4 or bias_mode != 'all':
                 raise ValueError('BEFORE fusion requires four relations and unmasked attention')
             from learning.multi_agent.before_relation_fusion import BeforeRelationFusion, BeforeFusionCoordinationBlock
             self.blocks = nn.ModuleList([
-                BeforeFusionCoordinationBlock(width, heads, feedforward_dim)
+                BeforeFusionCoordinationBlock(width, heads, feedforward_dim,
+                                             relation_bias=self.use_relation_bias)
                 for _ in range(num_layers)
             ])
             self.relation_fusion = BeforeRelationFusion(width)
@@ -112,7 +114,7 @@ class HumanCoordination(nn.Module):
             order = torch.randperm(humans.shape[1], device=humans.device)
             context = context[:, order]
             relations = relations[:, order][:, :, order]
-        padding = torch.zeros((), device=humans.device, dtype=torch.bool)
+        padding = torch.zeros((), device=humans.device, dtype=torch.bool) if self.use_relation_bias else None
         for block in self.blocks:
             if self.relation_fusion is None:
                 context = block(context, None, relations, padding)

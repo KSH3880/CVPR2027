@@ -120,7 +120,8 @@ class HumanoidMABefore(SceneLayoutMixin, HumanoidMACarry):
             diag['progress'] = predecessor_at_progress(diag['progress'], bodies[..., 0, :],
                 self._logical_box_values(self._box_states, env_ids),
                 self._logical_box_values(self._box_size, env_ids), goals, graph, self._relation_cfg,
-                raw_success=raw_success, lambda_inner=lambda_inner)
+                raw_success=raw_success, lambda_inner=lambda_inner,
+                radius_override=self.cfg['env']['before'].get('progress_radius'))
         return phi, diag
 
     def _draw_episode_graph(self, ids):

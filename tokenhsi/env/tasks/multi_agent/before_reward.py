@@ -4,15 +4,16 @@ from env.tasks.multi_agent.edge_stage1_reward import Stage1ContextRuntime
 from env.tasks.multi_agent.edge_interaction_reward import interaction_own_success
 from env.tasks.multi_agent.edge_context_reward import owner_sum, goal_success
 from utils.edge_ontop_spec import select_graph, batched, ON_TOP
+from utils.edge_context_spec import AT
 from utils.edge_interaction_spec import SIT, CLIMB
 from utils.edge_scenario_spec import paired_placement_success
 
 
 def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, config,
-                            raw_success=None, lambda_inner=0.):
+                            raw_success=None, lambda_inner=0., radius_override=None):
     """Retarget only dependent SIT/CLIMB/ON_TOP proximity, in either gate state.
 
-    Keep the actual support's size/buffer and every non-dependent edge intact.
+    Keep non-dependent edges intact; optionally override the proximity radius.
     Geometry for state/success remains object-relative in the ordinary evaluator.
     """
     n, m, o = len(roots), graph.num_agents, graph.num_objects
@@ -38,6 +39,8 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
         radius = sizes[rows, dst[rows, edges]-m, :2].norm(dim=-1)/2
         radius += torch.where(top, float(buffers['ON_TOP']),
             torch.where(relation[rows, edges] == SIT, float(buffers['SIT']), float(buffers['CLIMB'])))
+    if radius_override is not None:
+        radius = torch.full_like(distance, radius_override)
     error = (distance-radius).clamp_min(0)
     if lambda_inner:
         predecessor_success = raw_success[rows, predecessor_edge]
@@ -48,6 +51,10 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
 
 
 class BeforeRuntime(Stage1ContextRuntime):
+    def __init__(self, *args, reward_at_z_tolerance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reward_at_z_tolerance = reward_at_z_tolerance
+
     def _raw_success(self, phi, z_error, feet_error, region_error, graph):
         return interaction_own_success(phi, z_error, feet_error, graph, self.config, region_error)
 
@@ -55,8 +62,12 @@ class BeforeRuntime(Stage1ContextRuntime):
         raw = self._raw_success(phi, z_error, feet_error, region_error, graph)
         gate = (raw[:, None] | ~graph.prereq_mask).all(-1)
         success = raw & gate
-        paired = paired_placement_success(success, graph)
-        saturated = (success | paired) & graph.edge_valid
+        reward_success = success
+        if self.reward_at_z_tolerance is not None:
+            at = batched(graph.edge_relation, len(phi)) == AT
+            reward_success = success & (~at | (z_error.abs() <= self.reward_at_z_tolerance))
+        paired = paired_placement_success(reward_success, graph)
+        saturated = (reward_success | paired) & graph.edge_valid
         state = torch.where(saturated, 1., phi)*gate*graph.edge_valid*self.config['state_reward_weight']
         prog = torch.where(saturated, 1., progress)*graph.edge_valid*self.config['progress_reward_weight']
         bonus = saturated.float()*self.config['success_reward_weight']

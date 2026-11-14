@@ -14,6 +14,7 @@ class BeforeWait:
         self.age = torch.zeros(shape, dtype=torch.long, device=device)
         self.moving_steps = torch.zeros_like(self.age)
         self.margin = config['radius_buffer']
+        self.climb_margin = config.get('climb_radius_buffer')
         self.coefficient = config.get('coefficient', 0.)
         self.ontop_distance_source = config.get('ontop_distance_source', 'payload')
         self.speed_threshold = config.get('speed_threshold', 0.)
@@ -40,6 +41,10 @@ class BeforeWait:
         self.owners = owner[rows, edges]
         self.source = src[rows, edges]
         self.top = relation[rows, edges] == ON_TOP
+        self.radius_buffer = self.margin
+        if self.climb_margin is not None:
+            self.radius_buffer = torch.where(relation[rows, edges] == CLIMB,
+                self.climb_margin, self.margin)
         self.support = dst[rows, edges] - self.num_agents
         self.goal = dst[rows, self.predecessor] - self.num_agents - self.num_objects
         self.released[rows, edges] |= raw_success[rows, self.predecessor]
@@ -52,7 +57,7 @@ class BeforeWait:
             xy = torch.where(self.top[:, None],
                 objects[rows, (self.source-m).clamp(0, o-1), :2], xy)
         distance = (xy-goals[rows, self.goal, :2]).norm(dim=-1)
-        radius = sizes[rows, self.support, :2].norm(dim=-1)/2 + self.margin
+        radius = sizes[rows, self.support, :2].norm(dim=-1)/2 + self.radius_buffer
         released = self.released[rows, edges] | raw_success[rows, self.predecessor]
         armed = (self.armed[rows, edges] | (distance <= radius)) & ~released
         self.released[rows, edges] = released

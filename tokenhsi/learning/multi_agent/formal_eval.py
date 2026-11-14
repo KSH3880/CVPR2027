@@ -51,6 +51,10 @@ def run_formal_eval(player):
                    logical_box_order=task._logical_box_order.cpu().clone())
     torch.save(initial, path/'initial.pt')
     roots_trace, boxes_trace, valid_trace = [], [], []
+    wait = getattr(task, '_before_wait', None)
+    waiting_trace = []
+    if wait is not None:
+        wait_rows, wait_owners, wait_edges = wait.rows.clone(), wait.owners.clone(), wait.edges.clone()
     for step in range(1, horizon+1):
         action = player.get_action(obs, True)
         action = action.reshape(n, m, -1) * alive[..., None]
@@ -68,6 +72,11 @@ def run_formal_eval(player):
         roots_trace.append(roots.cpu().numpy().copy())
         boxes_trace.append(boxes.cpu().numpy().copy())
         valid_trace.append(alive.cpu().numpy().copy())
+        if wait is not None:
+            waiting_trace.append(torch.stack((
+                task._humanoid_root_states[wait_rows, wait_owners, 7:10].norm(dim=-1),
+                wait.armed[wait_rows, wait_edges].float(),
+                wait.released[wait_rows, wait_edges].float()), -1).cpu().numpy())
         fallen = task._terminate_buf.reshape(n, m).bool() & alive
         fall_step[fallen] = step
         freeze_fallen(task, fallen)
@@ -101,11 +110,13 @@ def run_formal_eval(player):
         data['push_goal_mode'] = 'individual'
         data['coupled_scores'] = coupled_scores(groups, ever, current, coupled_ever, coupled_current)
     (path/'result.json').write_text(json.dumps(data, indent=2))
+    waiting = {} if wait is None else dict(waiting=np.stack(waiting_trace),
+        waiting_rows=wait_rows.cpu().numpy(), waiting_owners=wait_owners.cpu().numpy())
     np.savez_compressed(path/'trace.pending.npz', roots=np.stack(roots_trace), boxes=np.stack(boxes_trace),
                         valid=np.stack(valid_trace), packet=packet.cpu().numpy(), sizes=sizes.cpu().numpy(),
                         goals=goals.cpu().numpy(), predecessor=parent.cpu().numpy(),groups=groups.cpu().numpy(),
                         fall_step=fall_step.cpu().numpy(), ever=ever.cpu().numpy(),
-                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy())
+                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(), **waiting)
     (path/'trace.pending.npz').replace(path/'trace.npz')
     print('[formal eval result]', json.dumps(data), flush=True)
     return data

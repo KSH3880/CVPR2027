@@ -24,10 +24,10 @@ class BeforeRelationFusion(nn.Module):
 
 
 class BeforeFusionCoordinationBlock(CoordinationBlock):
-    def __init__(self, width, heads, feedforward_dim):
+    def __init__(self, width, heads, feedforward_dim, relation_bias=True):
         super().__init__(width, heads, feedforward_dim, relations=4)
         del self.relation_bias
-        self.bias_projection = nn.Parameter(torch.zeros(heads, width))
+        self.bias_projection = nn.Parameter(torch.zeros(heads, width)) if relation_bias else None
 
     def effective_relation_bias(self, embedding):
         before = self.bias_projection @ embedding
@@ -41,11 +41,16 @@ class BeforeFusionCoordinationBlock(CoordinationBlock):
         depth = width // heads
         qkv = F.linear(query, self.attention.in_proj_weight, self.attention.in_proj_bias)
         q, k, v = qkv.reshape(batch, people, 3, heads, depth).permute(2, 0, 3, 1, 4).unbind(0)
-        bias = self.effective_relation_bias(fusion.embedding)[:, relations].permute(1, 0, 2, 3)
-        bias = bias.masked_fill(padding, float('-inf'))
+        bias = None
+        if self.bias_projection is not None:
+            bias = self.effective_relation_bias(fusion.embedding)[:, relations].permute(1, 0, 2, 3)
+        if padding is not None:
+            if bias is None:
+                bias = torch.zeros_like(padding, dtype=q.dtype)
+            bias = bias.masked_fill(padding, float('-inf'))
         context = F.scaled_dot_product_attention(q, k, v, attn_mask=bias, dropout_p=0.0)
         context = context.transpose(1, 2).reshape(batch, people, width)
-        active = ((relations[:, None] == 2) & ~padding).any(-1).any(1)
+        active = (relations == 2).any(-1) if padding is None else ((relations[:, None] == 2) & ~padding).any(-1).any(1)
         context = fusion(context, active)
         humans = humans + self.attention.out_proj(context)
         return humans + self.ffn(self.ffn_norm(humans))

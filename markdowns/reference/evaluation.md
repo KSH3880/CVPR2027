@@ -72,8 +72,8 @@ Stage1 PUSH 일반 평가는 checkpoint 저장 분포·2명·4물체·배치를 
 
 ## 대기 페널티 평가의 정지 거리 진단
 
-penalty_v2·fusion v1/v2의 성공률을 평가할 때 같은 고정 checkpoint로 정지 거리 진단도 함께 실행한다. 기본 규모는64환경·seed0·4명·8토큰·최대1200step이며, 사용자 지정 규모/GPU를 우선한다. 학습 random_scenario/near50 배치를 유지하고 일반 장면 낙상 종료를 사용하는 별도 진단이므로 개인 낙상 freeze를 쓰는 정식 성공률과 합산하지 않는다.
+대기 페널티 계열은 같은 고정 checkpoint의 **정식512환경×3seed rollout에서 성공률과 정지 거리를 함께 집계**한다. 별도64환경 시뮬레이션은 실행하지 않는다. 크기·거리·near50·물리 조건과 horizon은 해당 성공률 평가와 같고 개인 낙상 freeze를 그대로 따른다. 과거64환경·seed0·장면 낙상 종료 진단은 별도 프로토콜의 과거 결과로 보존한다.
 
-선행 AT가 아직 성공하지 않았고 페널티가 활성화된 동안 root XYZ 속력≤0.3m/s가30step 연속 유지된 첫 확인 시점의 목표까지 XY 거리를 집계한다. 행동별 중앙값·정지 건수·활성화 미해제 상태를1초 이상 관찰한 분모를 보고한다. ON_TOP은 사람/payload 거리를 따로 기록하고, 기존payload 진입과fusion_v2의human 진입을 구분한다. 이0.3m/s·1초는 진단 기준이며 학습 페널티에 유예나 속력 임계값을 추가하지 않는다. 정지 root만으로 손발까지 완전히 정지했거나 집기 완료 후 대기했다고 해석하지 않는다.
+선행 AT가 아직 성공하지 않았고 페널티가 활성화된 동안 root XYZ 속력≤0.3m/s가1초 연속 유지된 첫 확인 시점의 목표까지 XY 거리를 집계한다(30Hz에서는30step). runtime의armed/released와 정식 평가의alive mask를 사용한다. 행동별 정지 건수·활성화 미해제 상태를 합계1초 이상 관찰한 분모·3seed 정지 표본을 합친 거리 중앙값/IQR 및 seed별 결과를 보고한다. ON_TOP은 사람/payload 거리를 따로 기록하고, 기존payload 진입과fusion_v2의human 진입을 구분한다. 이0.3m/s·1초는 진단 기준이며 학습 페널티에 유예나 속력 임계값을 추가하지 않는다. 정지 root만으로 손발까지 완전히 정지했거나 집기 완료 후 대기했다고 해석하지 않는다.
 
-최신 재사용 진입점과 runtime 진입/해제 검사는 [진단 실행](../../output_etc/check/latest_three_stop64_20261104/run.py)·[진단 기록](../../output_etc/check/latest_three_stop64_20261104/probe.py)에 있다. 모든 산출물은 `output_etc/check/`에 둔다.
+정식 rollout은 `trace.npz`에속력/armed/released와 후행 매핑을 추가하고 `evaluate.py`가 `stops.json`·`stop_pairs.csv` 및 `summary.json.before_stops`를 자동 생성한다. [CPU 집계](../../tokenhsi/summarize_before_stops.py)는 기존 평가 전용driver의 `waiting_trace.pt`도 읽는다. `stop_pairs.csv`에는 같은 쌍의 최종 후행 동시 성공/선행AT Ever를 함께 저장한다. 추가 시뮬레이션 없이 CPU 저장·집계만 수행한다. 기록이 없는 과거평가는 정지미측정으로 남기며 자동으로64환경을 추가 실행하지 않는다. 모든 산출물은 `output_etc/check/`에 둔다.
