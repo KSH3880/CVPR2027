@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+output/
+output_etc/
+pth/
+tokenhsi/data/jointpush_motions/

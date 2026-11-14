@@ -16,6 +16,10 @@ TokenHSI 기반 multi-agent HOI 연구. 아래 3개는 모두 **원본 TokenHSI�
 
 ## 결과 저장 위치
 
+`stage2_900_v4_reward/`는 V4 teacher reward PPO/AMP의 로컬 확인용 독립 복사본이다.
+코드·두 학습 run·실행 방법과 검증 범위는 [README](stage2_900_v4_reward/README.md),
+출처와 파일 SHA256은 해당 폴더의 `IMPORT_MANIFEST.json`을 따른다. `ksh` 원본은 읽기 전용이다.
+
 본학습 checkpoint·TensorBoard·진단은 각 프로젝트의 `output/`에 둔다. `ksh_jointpush/`는 최상위 독립 프로젝트이며 실행 안내는 [EXECUTION](ksh_jointpush/EXECUTION.md)을 따른다. 기존 `runs/` 참조는 호환 링크로 유지하고, 실행 중인 결과는 물리적으로 옮기지 않는다. 공통 큐·캐시·생성 설정·상태는 `runs/`에 남긴다. 이동 내역과 확인 방법은 [결과 경로](docs/OUTPUT_LAYOUT.md)를 따른다.
 
 ## 멀티 GPU
