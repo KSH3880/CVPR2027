@@ -4,8 +4,10 @@ import torch
 
 from utils.stage2_spec import before_members
 
+EVAL_RADII = {8: 3., 16: 7.5}
 
-def translate_people(task, ids):
+
+def translate_people(task, ids, radius=None):
     groups = task._groups[ids]
     same = groups[:, :, None] == groups[:, None, :]
     centers = torch.bmm(same.float(), task._humanoid_root_states[ids, :, :2])/same.sum(-1, keepdim=True)
@@ -14,10 +16,35 @@ def translate_people(task, ids):
     order = torch.rand(groups.shape, device=task.device).masked_fill(~leader, float('inf'))
     rank = order.argsort(-1).argsort(-1).gather(1, groups)
     angle = torch.rand(len(ids), 1, device=task.device)*2*math.pi+2*math.pi*rank/count[:, None]
-    radius = torch.where(count > 1, 5./(2*torch.sin(math.pi/count)), 0.)
-    targets = task._env_origins[ids, None, :2]+radius[:, None, None]*torch.stack((angle.cos(), angle.sin()), -1)
+    ring_radius = torch.where(count > 1, 5./(2*torch.sin(math.pi/count)), 0.)
+    origin = task._env_origins[ids, None, :2]
+    targets = origin+ring_radius[:, None, None]*torch.stack((angle.cos(), angle.sin()), -1)
+    if radius is not None:
+        direction = targets-origin
+        targets = origin+radius*direction/direction.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+    task._group_spawn_radius = radius
+    task._group_spawn_gap = 5. if radius is None else None
     task._group_spawn_targets[ids] = targets
     move_people(task, ids, targets-centers)
+
+
+def layout_metadata(task):
+    groups = task._groups
+    same = groups[:, :, None] == groups[:, None, :]
+    centers = torch.bmm(same.float(), task._humanoid_root_states[..., :2])/same.sum(-1, keepdim=True)
+    minimum = float((centers[:, :, None]-centers[:, None]).norm(dim=-1).masked_fill(same, float('inf')).min())
+    radius = getattr(task, '_group_spawn_radius', None)
+    gap = getattr(task, '_group_spawn_gap', 5.)
+    if radius is not None:
+        error = ((centers-task._env_origins[:, None, :2]).norm(dim=-1)-radius).abs().max()
+        if error > .002:
+            raise ValueError('Initial group centers differ from the configured radius')
+    elif gap is not None and minimum < gap-.01:
+        raise ValueError('Initial group center spacing is below the configured gap')
+    return dict(group_spawn_gap=gap, group_spawn_radius=radius,
+        group_placement=('fixed_radius_group_center_ring' if radius is not None else
+                         'group_center_ring' if gap is not None else 'native_agent_offsets_without_group_translation'),
+        minimum_initial_group_gap=minimum)
 
 
 def move_people(task, ids, delta):

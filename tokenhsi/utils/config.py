@@ -387,7 +387,7 @@ def get_args():
         {"name": "--coupled_assignment", "type": str, "choices": ["random", "ordered", "distance", "optimal"], "default": None,
          "help": "Coupled viewer-only person-to-region assignment"},
         {"name": "--group_spawn_over4", "action": "store_true", "default": False,
-         "help": "Stage2 inference above four people: sequential groups, 5m spacing and no unused distractors"},
+         "help": "Stage2 inference above four people: formal eval uses 8H R=3m / 16H R=7.5m; other layouts keep 5m spacing"},
         {"name": "--design", "action": "store_true", "default": False,
          "help": "Viewer: remove distractor physics, group colors and one shared PUSH goal"},
         {"name": "--enable_size_mode", "type": str, "choices": ["native", "per_action_intersection"], "default": "native",

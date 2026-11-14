@@ -49,7 +49,11 @@ class HumanoidMAStage2(HumanoidMACoupledPush):
     def _reset_actors(self, ids):
         super()._reset_actors(ids)
         if self.num_agents > 4:
-            group_layout.translate_people(self, ids)
+            radius = (group_layout.EVAL_RADII.get(self.num_agents)
+                      if getattr(self.cfg['args'], 'eval_protocol', '') else None)
+            if radius is not None:
+                self.cfg['env']['stage2JointPush']['layout_attempts'] = 1024
+            group_layout.translate_people(self, ids, radius=radius)
 
     def _compute_clean_scene_obs(self, env_ids=None):
         obs = super()._compute_clean_scene_obs(env_ids)
@@ -67,7 +71,8 @@ class HumanoidMAStage2(HumanoidMACoupledPush):
         super()._init_relation_runtime()
         self.relation_runtime = Stage2Runtime(self.num_envs, self.relation_runtime.graph,
             self._relation_cfg, self.device, contact_weights=self._joint['contact_weights'],
-            before_at_z_tolerance=self.cfg['env']['stage2']['before_at_z_tolerance'])
+            before_at_z_tolerance=self.cfg['env']['stage2']['before_at_z_tolerance'],
+            reward_at_z_tolerance=self.cfg['env']['before'].get('reward_at_z_tolerance'))
         self._before_wait = Stage2Wait(self.relation_runtime.graph, self.num_envs,
                                        self.cfg['env']['before']['waiting_penalty'], self.device)
 
@@ -91,6 +96,8 @@ class HumanoidMAStage2(HumanoidMACoupledPush):
         self._stage2_task_slots[ids], self._scene_domains[ids] = slots, domain
         copy_graph_rows(self.relation_runtime.graph, ids, graph)
         self.relation_runtime.before[ids] = spec.before_members(predecessor)
+        if self.cfg['env']['stage2'].get('reward_source') == 'v4_teachers':
+            self.relation_runtime.before[ids] = self._members[ids] == 1
         self._edge_goal_owners[ids] = True
         self._ontop_maintain_steps[ids] = 0
         self._sampling_counts[0] += len(ids)

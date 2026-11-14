@@ -4,6 +4,10 @@
 
 `stage2_distill_900`은 에피소드 제한만900step인 별도 컨피그다. Student 초기화·동결·손실·20+180iteration 전환·replay·업데이트 수는 동일하다. 이900 버전의 teacher는 사용자 지정 enable21k(11월5일22:58 run)·coupled17k이며 기존1200step 학습본을 그대로 사용한다. Teacher 경로는 이 버전의 학습 YAML에서 각각 선택한다. 전용 train/test/VNC/eval wrapper를 사용하며 viewer/eval도 기본900step이다. GPU는2/6/7만 허용하고 기본6이다.
 
+`stage2_distill_900_v4`는 V3의 환경·학습 설정을 유지하고 enable34k(`Stage2BeforeTotalAt1mm`)·coupled30k(`Stage2CoupledContact`) teacher를 사용한다. Student는 Stage1 PUSH26k에서 새로 전이하며 두 경로는 전용 학습 YAML에 지정한다. 출력과 train/test/VNC/eval wrapper는 V4 이름으로 분리한다. V4의 학습·test·VNC·eval은 GPU2/5/6/7을 허용하며 기본6이다.
+
+`stage2_distill_900_v5`는 V4를 복사하고 **coupled teacher만 같은 run의38k**(`Stage2CoupledContact_00038000.pth`)로 변경한다. Enable/solo는 기존34k를 유지한다. Student는 V4를 이어 학습하는 것이 아니라 Stage1 PUSH26k에서 새로 전이하며 환경·900step·학습 설정·GPU 허용 범위는 V4와 같다. 전용 train/test/VNC/eval wrapper와 `output/stage2_distill_900_v5/`를 사용한다.
+
 ## 초기화와 정답
 
 - Student는 Stage1 PUSH26k에서 전이하고 actor encoder와 입력 RMS를 고정한다. Actor의 coordination(관계 임베딩·fusion 포함)과 action head만 학습한다. Critic·AMP discriminator·sigma도 고정하며 PPO/AMP 손실은 사용하지 않는다.

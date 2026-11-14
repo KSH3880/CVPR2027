@@ -115,6 +115,8 @@ class EdgeContextTaskMixin:
                 self._box_vel_pen_thre,
             )
         reward = result["agent_task_reward"] + power + collision + speed
+        if getattr(self, '_premature_cfg', None) is not None:
+            reward = reward + self._premature_penalty
         waiting = None
         if self.cfg['env'].get('before', {}).get('waiting_penalty') is not None:
             waiting = self._before_wait.penalty(self._rigid_body_pos[..., 0, :],

@@ -8,6 +8,7 @@ from utils.task_role_spec import task_graph_packet
 from utils.evaluation_protocol import shared_center_success, shared_center_scores, shared_centers_from_tokens
 from utils.evaluation_protocol import ENABLING_SUCCESS, interaction_group_scores
 from utils.evaluation_errors import error_scores, update_error_minima
+from env.tasks.multi_agent.stage2_group_layout import layout_metadata
 
 
 def freeze_fallen(task, newly_fallen):
@@ -32,6 +33,7 @@ def run_formal_eval(player):
     horizon=task.cfg['env']['episodeLength']
     box_values=getattr(task,'_evaluation_box_values',task._logical_box_values)
     obs = player.env_reset()
+    spawn_layout = layout_metadata(task) if getattr(args, 'group_spawn_over4', False) else None
     player.get_batch_size(obs['obs'], 1)
     packet = task_graph_packet(task.relation_runtime.graph, n).reshape(n, m, 5).long().clone()
     types = packet[..., 1]
@@ -139,7 +141,10 @@ def run_formal_eval(player):
         data['policy'] = 'two_teachers'
         data['teachers'] = json.loads((path/'teachers.json').read_text())
     if getattr(args, 'group_spawn_over4', False):
-        data['group_spawn_over4'] = dict(min_center_gap=5., coupled_cap=4,
+        data.update(spawn_layout)
+        data['group_spawn_over4'] = dict(min_center_gap=spawn_layout['group_spawn_gap'],
+            center_radius=spawn_layout['group_spawn_radius'], placement=spawn_layout['group_placement'],
+            minimum_initial_group_gap=spawn_layout['minimum_initial_group_gap'], coupled_cap=4,
             sampler='sequential_solo_before_coupled', unused_distractors=False,
             coupled_assignment=args.coupled_assignment)
     if individual_goals:

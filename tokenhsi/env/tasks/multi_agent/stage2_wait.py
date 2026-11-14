@@ -9,6 +9,8 @@ class Stage2Wait:
         self.released = torch.zeros_like(self.armed)
         self.margin = option['radius_buffer']
         self.coefficient = option['coefficient']
+        self.ontop_distance_source = option.get('ontop_distance_source', 'human')
+        self.num_agents, self.num_objects = graph.num_agents, graph.num_objects
 
     def reset(self, ids, graph, raw_success):
         self.armed[ids] = False
@@ -22,13 +24,19 @@ class Stage2Wait:
         rows, edges = self.rows, self.edges
         self.predecessor = graph.prereq_mask[rows, edges].long().argmax(-1)
         self.owners = owner[rows, edges]
+        self.source = batched(graph.edge_src, n)[rows, edges]
+        self.top = relation[rows, edges] == 8
         self.support = dst[rows, edges] - graph.num_agents
         self.goal = dst[rows, self.predecessor] - graph.num_agents - graph.num_objects
         self.released[rows, edges] |= raw_success[rows, self.predecessor]
 
     def penalty(self, roots, velocity, objects, sizes, goals, raw_success):
         rows, edges = self.rows, self.edges
-        distance = (roots[rows, self.owners, :2]-goals[rows, self.goal, :2]).norm(dim=-1)
+        xy = roots[rows, self.owners, :2]
+        if self.ontop_distance_source == 'payload':
+            xy = torch.where(self.top[:, None],
+                objects[rows, (self.source-self.num_agents).clamp(0, self.num_objects-1), :2], xy)
+        distance = (xy-goals[rows, self.goal, :2]).norm(dim=-1)
         radius = sizes[rows, self.support, :2].norm(dim=-1)/2 + self.margin
         released = self.released[rows, edges] | raw_success[rows, self.predecessor]
         armed = (self.armed[rows, edges] | (distance <= radius)) & ~released

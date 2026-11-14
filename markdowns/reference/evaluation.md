@@ -1,10 +1,12 @@
 # 정식 평가 규약 (2026-10-29)
 
-논문용 새 벤치마크의 확정 조건·미정 항목·테이블별 구성은 [CVPR2027 평가 프로토콜](../../cvpr2027_evaluation_protocol.md)에 정리했다. 아래는 현재 실행 경로의 규약이며 새 설계가 모두 구현된 상태는 아니다.
+논문 평가의 기준은 [공용 평가 프로토콜](../../../evaluation_protocol/README.md)이다. 공동 PUSH 주 시작 변위는20cm이며 최신 t_coop/Jerk를 포함한다. 아래는 기존 일반 실행 경로의 설명이다. 논문 보조 경로와 다른 기본값은 [구현 안내](../../../evaluation_protocol/implementations.md)에서 구분한다.
 
 프로토콜은 `general`과 `stage1_single` 두 개다. **일반 평가는 학습 인원**, **1명 단독 평가는 Stage1 전용**이다. BEFORE의 solo는 다인 장면 안에서 선행 관계가 없는 역할을 뜻하며 1명 단독 평가와 다르다. viewer용 `*_test.sh`/`*_vnc.sh`의 진단값도 정식 평가표와 구분한다.
 
 평가 seed 기본값은 0/1/2다. `--seeds`에 중복 없는 비음수 정수를 지정할 수 있으며 모든 과제 macro·interaction SR·Error 통계는 실제 실행된 seed를 사용한다. 새 프로토콜의 기준 snapshot 생성은 [보조 실행 안내](../../eval/README.md)를 따른다.
+
+8H/16H 정식 평가에서는 `--group_spawn_over4`로 **그룹 중심 고정 반경3m/7.5m**를 기본 적용한다. Independent/Mixed 공통이며 그룹 내부 배치와 과제 샘플링을 유지한다. 반경은 최소 그룹 간격이 아니다. 배치 재시도는 검증한 반경 경로와 같은1024회이고, 기존5m 평가 결과는 새 반경 결과로 재사용하지 않는다. [상세](../../eval/group_radius_handoff.md).
 
 ## 장면·초기화
 
@@ -95,14 +97,14 @@ Point와 region을 각각 계산하며 공동 상자 중심 기준은 둘이 같
 
 ## 공통 Point Error·Region Error
 
-메인 eval의 `result.json`·`summary.json`은 `errors`에 행동별 Point Error·Region Error(cm)와 성공 표본 수, Coupled 인원별 결과를 함께 저장한다. 정의는 [논문 프로토콜 1.8절](../../cvpr2027_evaluation_protocol.md#18-공통-error--메인-eval)을 따른다.
+메인 eval의 `result.json`·`summary.json`은 `errors`에 행동별 Point Error·Region Error(cm)와 성공 표본 수, Coupled 인원별 결과를 함께 저장한다. 정의는 [논문 프로토콜 1.8절](../../../evaluation_protocol/README.md#18-공통-error--메인-eval)을 따른다.
 
 - 두 Error 모두 **Region 성공 trial만** 사용한다. Independent는 개인 성공, Enable은 동시 성공한 쌍의 선행·후행, Coupled는 공유 상자 중심 성공을 기준으로 그룹당 한 번 집계한다.
 - Point는 기존 목표 중심점까지, Region은 중앙 80%의 목표 높이 평면까지 유효 frame 최소 3D 거리다. 높이 ±20cm 성공 허용오차를 거리에서 빼지 않는다. AT/PUSH는 두 Error가 같다.
 - 성공 전·후를 포함한 유효 frame에서 최솟값을 취한다. 개인 낙상 이후는 제외하고, 공동 상자는 최소 한 명이 유효한 frame까지 측정한다.
 - 성공 표본별 평균 → seed별 평균±표본표준편차. 표본 없는 seed는 null이며 해당 지표의 전체 평균·표준편차도 null이다. 행동 간 전체 macro는 추가하지 않는다.
 - `errors.protocol=region_success_min_distance_v1`로 구분한다. Error가 없는 과거 결과는 새 평가에서 재사용하지 않으며 저장 trace의 CPU 재채점으로 추가 산출할 수 있다. CPU/GPU Error 비교 허용오차는 0.000001cm다.
-- Time·t_coop는 `eval/run_table2.py`의 Table 2 보조 평가에서 산출한다. Time은 성공한 Enable 쌍의 최초 동시 성공, t_coop는 전원 양손과 실제 공유 상자 표면의3D 거리6cm 미만 비율이다. 상자 수평 변위20cm부터 최초 성공(실패는 종료)까지30Hz·양끝 포함으로 측정하고 원시 좌표를 저장해8/12cm도 재집계한다. 메인 eval의 기본 기준은 유지한다.
+- 다음은 기존 원시 기록기의 출력 정의다. 최신 t_coop/Jerk는 [공용 규약 3.4–3.7절](../../../evaluation_protocol/README.md#34-두-지표의-공통-시작종료--table-2-전용)의 별도 CPU 재집계를 사용한다. Time·기존 t_coop는 `eval/run_table2.py`의 Table 2 보조 평가에서 산출한다. Time은 성공한 Enable 쌍의 최초 동시 성공, t_coop는 전원 양손과 실제 공유 상자 표면의3D 거리6cm 미만 비율이다. 상자 수평 변위20cm부터 최초 성공(실패는 종료)까지30Hz·양끝 포함으로 측정하고 원시 좌표를 저장해8/12cm도 재집계한다. 메인 eval의 기본 기준은 유지한다.
 
 
 ## Enable 행동별 크기 교집합 평가

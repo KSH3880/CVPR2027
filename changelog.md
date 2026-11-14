@@ -2,7 +2,253 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-14
+
+### Coordination Behavior · 기존 Enabling rollout CPU 재집계
+
+- 사용자 승인으로 TokenHSI40.5k/SCT·FSM26k/Coop. FT4k/Ours V4 2k의45개 기록·23,040 episode를 분석했다. 초기 snapshot부터 AT 직전까지의 준비율·root 원 반경0.35m/초기 상자 yaw·margin0.10m의 사전 점유율·성공 조건부 Post-AT 지연을 계산하고 AT/Group SR·실패 건수·공통 AT/Group 성공 장면·반경/margin 민감도를 저장했다. 전신 footprint/실제 방해 판정이 아님을 명시했다.
+- Coop. FT→Ours의 준비율12.17→19.26%, 점유율0.20→0.18%, Post-AT5.46→5.05s, Group SR56.77→84.70%다. 공통 Group 성공2298개에서도 준비율15.27→22.19%·지연5.34→4.62s이나 점유율은0.06→0.11%여서 모든 지표/비교군 우위를 주장하지 않는다.
+- CPU4개 경계/회전/실패/집계 테스트,45회 원시 재채점의 최초 AT/후행/Group 시점·SR/Time 일치,302 episode의 독립 다각형 기하 대조, 초기 기하 일치·민감도 단조성·원본 SHA 보존을 통과했다. GPU 실행0회. [결과](output_etc/check/coordination_behavior_v4_2000_20261114/report.md) · [해석](output_etc/check/coordination_behavior_v4_2000_20261114/interpretation.md) · [검증](output_etc/check/coordination_behavior_v4_2000_20261114/verification.json) · [실행](markdowns/USAGE.md#coordination-behavior-cpu-재집계).
+
+### V4 dependency bias OFF/고정 셔플 · 4/16H Mixed
+
+- 사용자 승인으로 V4 2k·512환경·seed1/6/7·900step·XY100%의 OFF/Shuffled12회 큐를 GPU6/7에 각1작업씩 시작했다. Original6회는 공통 초기 snapshot/첫 입력·가중치 보존 기록·16H R7.5m·CPU SR/Error 재채점을 통과했고 기존89.09±0.97/71.41±0.27을 재사용한다.
+- 평가 전용으로 actor/critic DCT bias만 제거하거나 SELF/padding을 보존하며 NONE 포함 타인 bias를 행별로 섞는다. 정책의 내부 사람 순열을 역매핑해 장면별 셔플을 사람 ID 기준으로 episode 동안 고정하고 모든 head/layer/branch에 공유한다. 관계·feature fusion·SCT·관측·가중치·정규화는 유지한다.
+- 신규12회·Original6회 CPU 재채점과 CPU6개 테스트(원본 복원·난수 소비·fusion 활성 유지·사람 순열 불변·padding/대각/행별 값 분포·기존 OFF 출력 exact)를 통과했다. 매900frame 개입·첫 입력·가중치/정규화·16H 반경·checkpoint/reference/원본 결과 SHA 보존을 확인했다. Mixed SR은4H Original89.09±0.97/OFF84.73±0.05/Shuffled81.57±0.63%,16H71.41±0.27/65.17±0.43/63.78±0.98%다. 추론 시 bias와 올바른 상대 배치의 기여를 지지하며 재학습 ablation과 구분한다. [실행](markdowns/USAGE.md#dependency-bias-offshuffled) · [보고서](output_etc/check/depbias_v4_2000_4h16h_seeds167_20261114/report.md) · [완료 검증](output_etc/check/depbias_v4_2000_4h16h_seeds167_20261114/completion_verification.json).
+
+### IND DCT 추론 ablation · 64환경 파일럿
+
+- 사용자 승인으로 V4 2k·2인 IND·64환경·seed1·900step 원본/self-only/DCT bypass3회 평가를 GPU6/7에서 완료했다. 평가 전용 actor 개입이며 SCT·현재 action head·critic·checkpoint·정규화를 유지했다. 실제 DCT 가중치의 타인 특징 차단·bypass 입력 exact 반환·해제 후 원본 복원, 공통 snapshot/첫 입력·행동 재현·가중치 보존·900회 개입·CPU SR/Error 재채점을 통과했다.
+- 전체 SR은 원본124/128·self-only123/128·bypass87/128, 뒤쪽 AT/ON_TOP은20/21·20/21·16/21이다. Self-only는 뒤쪽 성공 사례가 원본과 동일하다. Bypass에서 새로 접근 전 실패가 된3건은 모두 뒤쪽 대상이며 낙상 없이24–30m까지 멀어졌다. 다만 bypass의 전체 낙상1→20·CLIMB/PUSH 하락도 있어 뒤돌기 전용 인과나 재학습 ablation으로 해석하지 않는다. [실행](markdowns/USAGE.md#ind-dct-추론-ablation-파일럿) · [보고서](output_etc/check/ind_dct_ablation_v4_2000_env64_seed1/report.md) · [검증](output_etc/check/ind_dct_ablation_v4_2000_env64_seed1/verification.json).
+
+### 2인 SIT 분리/교차 · 64환경 파일럿
+
+- 사용자 승인으로64환경·seed1·900step의 SCT26k/Ours V4 2k × 분리/90도 교차4회를GPU6/7에서 완료했다. 사람→자기 SIT 물체 거리3–5m를 장면별로 뽑아 두 사람에게 같게 주고 중점에서 교차시킨다. 분리는 평행 경로8m 간격이며 초기 자세·SIT 물체 크기/질량을 공통으로 유지했다. 새 평가 실행·CPU 집계 코드만 추가하고 기존 학습·CARRY 기록은 보존했다.
+- 거리/중점/겹침·개인 좌표 기하 검사, 모델 간 초기 상태/첫 입력 exact,4회900step·CPU SR/Error 재채점·checkpoint 보존을 통과했다. GPU7의 첫 MPS 연결은 시뮬레이션 전에 차단되어 실패 로그를 보존하고 GPU별 연결 재탐색으로 복구했다. GPU 사용량은 두 작업 실행 중 약63.5GB였다.
+- 분리 SR은 두 모델127/128=99.22%, 교차는 SCT120/128=93.75%·Ours115/128=89.84%다. 하락폭5.47/9.38%p로 이번 파일럿은 Ours의 간섭 대응 우위를 지지하지 않는다. 몸체 중심 근접은 실제 충돌률이 아니며, 단일 평가seed로 일반화하지 않는다. [설계](markdowns/reference/ind_mechanisms.md#2인-sit-교차-파일럿) · [보고서](output_etc/check/sit_crossing_v4_2000_env64_seed1/report.md) · [검증](output_etc/check/sit_crossing_v4_2000_env64_seed1/verification.json).
+
+### SCT/V4 IND 차이 · 단독/교차 경로 평가
+
+- 사용자 승인으로 SCT26k/Ours V4 2k의 원본2H→1H 추출12회, CARRY_AT 분리/교차12회, 단독 목표 정밀도 CPU 분석을 추가했다. GPU6/7·512환경·seed1/6/7·900step이며 사용자 추가 지시에 따라 전체70,000MiB 시작 제한/최대3작업을 사용한다. 기존 학습·정책·원본 평가 기록은 보존한다.
+- 본 평가24회·개발900step4회·30step4회·CPU4개 테스트 완료. 원본3seed의 initial/observed exact 재현, 두 모델의 모든 초기 상태/첫 입력 exact, CPU SR/Error 재채점·별도 NumPy AT/PUSH 거리 계산·checkpoint/원본 보존을 통과했다. 근접 지표는 실제 접촉 쌍 충돌률과 구분하며 단독 토큰 수 변화·협력 학습 인과 추론 한계를 기록했다.
+- 단독 SR은 SCT89.94/Ours96.26%(차이6.32%p, scene bootstrap95% CI5.08–7.55)다. 단독 AT73.38→95.25/ON_TOP80.96→98.34와 달리 PUSH96.51→92.12로, 모든 동작의 정밀도 향상을 주장하지 않는다. 분리→교차 SR 감소는1.69/1.72%p(차이−0.03%p, CI−1.30–1.20)이고 ours의 몸체 근접 빈도가 높아 충돌 회피 개선을 지지하지 않았다. [설계](markdowns/reference/ind_mechanisms.md) · [보고서](output_etc/check/ind_mechanisms_v4_2000/report.md) · [최종 검증](output_etc/check/ind_mechanisms_v4_2000/completion_verification.json).
+
+## 2026-11-13
+
+### V5 2k · Table 1/2/3 정식 평가 시작
+
+- 사용자 요청으로 GPU6/7에512환경·seed1/6/7·900step·XY100%의42회 큐를 시작했다. Table1 24회, Enabling9회, Coupled9회이며8H/16H R3m/7.5m·기존 공통 초기 snapshot을 유지한다. 기존 V4 adapter/CPU 검증을 재사용하고 checkpoint/config/출력만 V5로 분리했다. 실행기는 GPU별 최대3개·12GB 여유 및 작업별 시작 예약을 적용한다.
+- checkpoint 실제epoch2000/finite·42개 reference 준비·구문 검사를 통과했다. V5 집계기를 기존 V4 기록으로 검사해 SR/Time Succ-All/seed t_coop 일치(pooled 부동소수점 오차<1e-12)를 확인했다. 정식 평가는 진행 중이며 결과 완료를 의미하지 않는다. [상태](output_etc/check/v5_2000_tables123_radius_seeds167_20261113/status.json) · [집계 검증](output_etc/check/v5_formal_setup_validation_20261113/verification.json).
+
+### Stage2 distill900 V5 · Coupled teacher38k
+
+- 사용자 요청으로 `stage2_distill_900_v4`를 복사해 `stage2_distill_900_v5` 환경/학습 YAML과 train/test/VNC/eval 진입점을 추가했다. Enable/solo34k는 유지하고 Coupled만 같은 `Stage2CoupledContact_10-00-20-39` run의30k→38k로 변경했다. Stage1 PUSH26k 새 전이·4명·1024환경·8토큰·900step·나머지 학습 설정은 동일하며 출력은V5로 분리한다.
+- 실험 등록·공통 launcher의 task/horizon/ordered/motion 경로와 config 명령 목록을 연결했다.29개 설정 계약·기존 CPU58개 테스트·shell 구문·V4 대비 허용된 차이만 존재함·teacher38k 실제epoch/모델/RMS shape 호환을 확인했다. 학습·GPU 시뮬레이션은 실행하지 않았다. [검증](output_etc/check/stage2_distill_900_v5_setup_20261113/verification.json) · [CPU 로그](output_etc/check/stage2_distill_900_v5_setup_20261113/pytest.log).
+
+## 2026-11-12
+
+### 대규모 평가의 전원 낙상 조기 종료 검증
+
+- 64H Independent가467step에서4096명 전원 낙상으로 정상 조기 종료했으나 보조 검증의900step 고정 조건에 걸렸다. `run_stage2_scalability.verify`·반경 검증의 frame/attention 횟수를 실제 기록 길이에 맞추되 조기 종료는 전원 낙상일 때만 허용했다. 평가/성공 조건은 바꾸지 않았다.
+- 기존32H900step과64H467step의 초기 상태·정책 보존·반경·CPU SR/Error 재채점을 통과했고,4095명만 낙상한 조기 종료 fixture는 거부했다.64H Independent SR은3/4096=0.07324%다. `finalize_v4_large_radius.py`가 진행 중인 Mixed 종료 후 이전 보고서를 보존하고 CPU 재검증 결과를 합치도록 실행했다. [재검증](output_etc/check/v4_2000_32h64h_radius_env64_seed1_20261112/revalidation.json).
+
+### Ours V4 2k ·32H/64H 반경 탐색 평가 시작
+
+- 최종:32H Independent R20/SR38.77%, Mixed R15/Mixed SR25.10%,64H Independent R70/SR0.07324%의3회 CPU 검증 완료. 사용자 요청으로 미완료64H Mixed를R35 배치 검사 중 취소하고 전용 자식·supervisor·CPU 감시 프로세스만 종료했다. 다른 작업/원본 로그는 보존했고 보고서에3완료·1취소를 반영했다.
+
+- 사용자 요청으로64환경·seed1·Independent/Mixed4조건을GPU6/7에서 실행했다. R10m부터5m씩 증가하며 준비 포함180초 배치 제한·최대R100m, 최초 배치 통과 반경에서900step 평가한다. 기존 평가 adapter/CPU 채점/첫 입력/정책 보존/반경 검증을 재사용하며 기본 프로토콜·기존 결과는 변경하지 않는다.
+- `eval/run_v4_large_radius.py` 구문 확인 후 별도 supervisor를 시작했다. 배치/평가 결과는 진행 중이며 [상태](output_etc/check/v4_2000_32h64h_radius_env64_seed1_20261112/status.json)·[보고서](output_etc/check/v4_2000_32h64h_radius_env64_seed1_20261112/report.md)에 기록한다.
+
+### 최신 논문 Table 1·2·3 평가 인수인계
+
+- 사용자 요청으로 공용 규약의 Table 2=Enabling, Table 3=Coupled 번호와 기존 Time Succ./All·실패30초 처리를 정리했다. 계산 버전v1.1.0·코드·결과는 유지하고 Jerk/ablation은 현재 세 표 필수 평가와 구분했다.
+- 루트 `EVAL_HANDOFF.md`에 전달용 짧은 요약·버전 대조 순서를, `eval/tables123_handoff.md`에42회 구성·Coop. FT Table2 4k/Table3 6k·Ours V4 2k·snapshot·원본 집계 경로·GPU6/7·기존V2/GPU5 고정 큐·FSM 첫 입력 문제를 명시하고 안내 링크를 연결했다.
+- 전달 문서 링크·checkpoint 경로·공통 snapshot42개(필수 파일126개)·Coop4k 집계 key·diff 공백 검사를 통과했다. 문서만 변경했으며 GPU 실행·평가 코드/기존 결과 변경은 없다.
+
+### 논문 §4.3 협력 결과의 실패 단계·목표 정확도 분석
+
+- PDF (15) 본문 전체와 방법/평가 주장을 대조하고 사용자 지정 Enabling Coop. FT4k·Coupled6k·Ours V4 2k를 유지했다. `analyze_cooperative_mechanisms.py`에서 기존90개 기록을 CPU로 분석해 Enabling 실패 분해·공통 성공 시간·공통 AT 성공 후 Group SR·후행 준비 상태, Coupled 공동 근접 형성/진행 구간/목표 거리 민감도를 저장했다. 공식 SR/t_coop·논문 파일은 변경하지 않았다. 원시 기록 없는 LLM Scheduler는 추가 집계에서 제외했다.
+- Enabling의 AT 성공·후행 미성공은 Coop4k33.85→Ours13.37%; 공통 성공2298개 완료 시간은12.06→10.15s다. Coupled 실제 밀기 구간의 전원 유효 양손 근접 비율은 Coop6k63.70/Ours63.44%로 비슷하지만, 목표50cm 이내95.36/96.74% 대비 공식20cm는73.87/91.64%로 정확한 목표 도달에서 차이가 컸다. 관계별 완료 능력과 접촉/대기 지표를 구분하는 해석 근거로 기록했다.
+- Enabling CSV225개 통계·실패 분해 합·공통 초기 기하·Coupled 원시45개 trial의 독립 회전행렬/표면거리/구간 계산·최초 성공/SR/기존t_coop·목표 문턱 단조성·source SHA/구문을 확인했다. FSM 초기 속도 freeze 차이는 기록하고 기존 관측 불일치 한계도 유지했다. GPU 실행0회. [분석](output_etc/check/paper43_analysis_20261112/report.md), [추가 대조](output_etc/check/paper43_analysis_20261112/supplement.md), [그림](output_etc/check/paper43_analysis_20261112/failure_partitions.pdf), [검증](output_etc/check/paper43_analysis_20261112/verification.json).
+
+### Enabling TokenHSI/Ours V4 구간별 실제 이동속력 재집계
+
+- 사용자 요청으로 `eval/analyze_enabling_movement_speed.py`에서 기존18개 trace의 공통 성공402개·각자 성공479/3903개를 CPU 비교했다. 사람 접근(중심거리1m), 물체 운반(초기 수평 변위20cm 이후), 전체·후행 AT 전후의 실제 XY 궤적 길이/시간을 계산하고 접근0.5/1.5m·이동 프레임0.2/0.5m/s 민감도와 제외 건수·행동/seed별 통계를 분리했다. 문턱은 보조 분석용이며 기존 논문 프로토콜/표는 변경하지 않았다.
+- 공통 성공의 선행 접근은 두 모델1.102m/s, 상자 운반은 TokenHSI0.794/Ours1.053m/s, 후행 접근은1.340/0.758m/s다. 후행의 이동 프레임(>0.2m/s)만 봐도1.355/0.867m/s이며 대기만으로 차이를 설명할 수 없음을 기록했다. CSV61,262행·448개 집계·원시90구간 독립 대조·구문·성공 표본/초기 상태·source SHA 보존을 통과했다. GPU 실행0회. [결과](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/movement_speed_tokenhsi_vs_v4/report.md), [검증](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/movement_speed_tokenhsi_vs_v4/verification.json).
+
+### Enabling TokenHSI/Ours V4 성공 표본·초기 거리·공통 성공 시간 분석
+
+- 사용자 요청으로 `analyze_enabling_success_selection.py`에서512환경·seed1/6/7·세 후행 행동의4608개 초기 장면을 CPU 비교했다. 두 모델의 초기 root/과제/목표/크기·저장 거리 exact 일치와 초기 상태에서 선행/후행 거리 재구성을 확인했다. 각자 성공 표본·공통 성공402개의 거리/시간과 거리 구간별 SR·상자 크기·회전각·장면별CSV를 별도 저장했다.
+- TokenHSI479개 성공의 선행/후행 경로는5.51/6.83m,Ours3903개는6.00/6.02m다. 공통 성공에서 AT/완료/Post-AT은 TokenHSI7.34/9.85/2.51s,Ours5.01/10.83/5.82s로, 완료 시간 차이를 전부 성공 표본 선택으로 설명할 수 없음을 기록했다. 시간/거리는 행동별 동일 가중→seed 평균이며 거리 구간 SR은 pooled 성공/전체 비율로 구분했다. CSV 건수·기존 Post-AT SR/시간·source SHA·구문 검증을 통과했고 GPU 실행/기존 표 변경0회다. [결과](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/success_selection_tokenhsi_vs_v4/report.md), [검증](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/success_selection_tokenhsi_vs_v4/verification.json).
+
+### 현재 V4/Coop. FT6k Enabling Post-AT Time 재집계
+
+- 사용자 요청으로 `reaggregate_v4_enabling_post_at_time.py`에서 현재 다섯 모델의512환경·seed1/6/7·세 후행 행동45개 기록을 집계했다. 기존 Post-AT 표가 V3 2k/Coop. FT4k임을 확인하고 TokenHSI/SCT/FSM27개는 같은 원시 경로/SHA 확인 후 재사용, V4 2k/Coop. FT6k18개는 최초 AT·최초 유효 그룹 동시 성공부터 CPU 재계산했다.
+- 성공 그룹만의 Post-AT은 TokenHSI2.58±0.25/SCT4.39±0.32/FSM7.32±0.18/Coop. FT6k5.71±0.15/Ours V4 5.05±0.16s다. 행동별 평균→세 행동 동일 가중→seed 평균/표본std이며 원래 최초 성공·SR·현재 Table2 Time·비음수/조건부 시간 합·원본 SHA 보존을 검증했다. 결과는 기존 suite의 `post_at_time/`에 분리했고 Table1/2·Time Succ./All·이전 Post-AT 표는 변경하지 않았다. GPU 실행0회. [현재 결과](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/post_at_time/report.md), [검증](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/post_at_time/verification.json).
+
+### 정책 추론 속도·메모리1/2/4/8/16H 간단 측정
+
+- 사용자 요청으로 `eval/benchmark_policy.py`에서 TokenHSI40.5k/SCT26k/Ours V4 2k를 GPU6에서 순차 비교했다. 실제 reference의 장면1개·M=2N·정규화+actor+평균 행동이며 각 모델은 전원 행동을 한 배치로 출력한다. 관측 변환/시뮬레이션은 제외하고 전체 로드 네트워크(actor/critic/AMP)의 PyTorch 상주/피크 할당량을 기록했다. 공유 GPU 참고 측정이며 전용 GPU latency가 아니다.
+- 첫 CUDA/JIT 캐시가 메모리에 포함된 초기15개 결과를 보존하고 세 모델 공통 캐시 워밍업 후15조건을 다시 측정했다.20회 워밍업·3구간×50회이며 모든 action 차원/finite·메모리/통계·strict 가중치 로드/원본checkpoint SHA 불변을 확인했다.16H의 TokenHSI/SCT/Ours는1.409/2.482/5.964ms·피크28.26/18.20/19.36MiB다. CUDA context·다른 프로세스 메모리는 포함하지 않는다. [최종 측정](output_etc/check/policy_benchmark_n1_2_4_8_16_20261112/warm_cache/report.md), [원시 수치](output_etc/check/policy_benchmark_n1_2_4_8_16_20261112/warm_cache/summary.json), [검증](output_etc/check/policy_benchmark_n1_2_4_8_16_20261112/warm_cache/verification.json).
+
+### 일반 정식 평가의8H/16H 기본 배치를 고정 반경으로 통일
+
+- 사용자 요청으로 정식 평가(`--eval_protocol`·`--group_spawn_over4`)의8H/16H 기본 배치를 그룹 중심 원 반경3m/7.5m로 변경했다. Independent/Mixed 공통이며 그룹 내부 기하·순서/회전 RNG·과제/성공 기준은 유지한다. 검증된 반경 경로와 같은1024회 배치 재시도를 적용한다. 2H/4H·일반 viewer/그 외 인원·학습 동작은 유지한다.
+- 일반 formal/scalability/FSM의5m 고정 검사·메타데이터를 실제 반경/간격 검사·기록으로 맞췄다. 기존 간격 비교용 adapter는 명시한 조건을 유지하고, 일반 평가/확장 실행기는 이전5m 결과를 새 반경 결과로 재사용하지 않도록 검사한다. 루트 프로토콜 안내의 버전을 공용v1.1.0과 맞추고 config·실행/인수인계·공용 구현 안내를 갱신했다.
+- CPU31개와9개 실행 파일 구문을 통과했다. GPU5/6/7에서64환경·8/16H Independent/Mixed4개 초기 상태/전체 관측이 기존 고정 반경 reference와 exact 일치했다. 일반 경로8/16H 및FSM8H의2step 실행3개·CPU SR/건수/Error 재채점, 명시적 반경/이전5m 간격 보존도 확인했다. 장기 학습/900step 정식 평가는 새로 실행하지 않았고 기존 결과/프로세스는 보존했다. [검증](output_etc/check/eval_default_group_radius_20261112/final_verification.json), [초기 상태 비교](output_etc/check/eval_default_group_radius_20261112/verification.json), [CPU 로그](output_etc/check/eval_default_group_radius_20261112/cpu_tests.log).
+
+### V4 teacher 원본 보상 · Stage1 26k PPO 컨피그
+
+- 사용자 요청·보상 코드 수정 승인으로 `stage2_900_v4_reward` 환경/학습 YAML과 train/test/VNC/eval 진입점을 추가했다. Stage1 PUSH26k 새 전이·PPO/AMP·4명·1024환경·8토큰·900step·학습률2e-5이며 기본 GPU5다. V4 student나 teacher 정책을 불러오는 distillation/resume은 하지 않는다.
+- Enable34k의 AT 성공/gate Z20cm와 보상 포화/보너스 Z1mm 분리·대기 반경 여유1.5m·ON_TOP payload 기준을 Enable/solo에 적용했다. 공동 PUSH는 Coupled30k의 CONTACT/AT 보상과 접촉 준비 전 이동 감점(weight0.5·속도0.05m/s·epsilon1e-6)을 사용한다. 이전 컨피그는 옵션 미지정 동작을 유지한다. 실행 명령은 config 각 목록 맨 아래, 원본 경로/보상 의미는 [상세](markdowns/reference/stage2_v4_reward.md)에 기록했다.
+- CPU70개·전체28개 컨피그·shell 구문을 통과했다. 원본 teacher와6종 장면×256환경×4step의 관계 보상8항목, 대기30step, 조기 밀기100회 수치 exact를 확인했다. GPU5의1024환경 `CHECK=1`/`MAX_ITERATIONS=1` 실행은 저장 epoch2·262,144frame으로 정상 종료했고 Stage1 원본 epoch26k·finite 가중치·checkpoint 계약을 확인했다. 첫 검증에서 손별 `near` 반환 누락을 발견해 원본과 동일하게 보완했고 실패 로그도 보존했다. 본학습은 시작하지 않았으며 기존 프로세스는 보존했다. [검증](output_etc/check/stage2_900_v4_reward_setup/train_verification.json), [원본 비교](output_etc/check/stage2_900_v4_reward_setup/teacher_comparison.json), [CPU 로그](output_etc/check/stage2_900_v4_reward_setup/cpu_tests.log).
+
+### V4 정식 Table2 Time을 Succ. / All로 재집계
+
+- 사용자 요청으로 `reaggregate_v4_enabling_time.py`에서 현재다섯 모델(TokenHSI40.5k/SCT26k/FSM/Coop. FT6k/V4 2k)의 기존Enable45개 기록을 CPU 재집계했다. 성공은 최초 유효 그룹 동시 성공 시간, 실패는900×기록된control_dt(약30초)를 사용하며 행동별 평균→세 행동 동일 가중→seed 평균을 유지한다. 현재 통합 Table2(a)의 시간 열만 `Time (Succ. / All) (s) ↓`로 바꾸고 각 std/seed별 값은 JSON에 보존했다. V4는10.64 /13.60s다.
+- 45회 성공 건수·기존Succ. 시간/seed 집계 일치·실패 패널티 항등식·원본 SHA 불변을 검증했다. Table1·Table2(b)·Enabling SR/기존 지표 보존을 확인했고 GPU 실행0회다. 이전 통합 report/summary/검증은 `time_succ_all/before/`에 보존했다. [다섯 모델 시간표](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/time_succ_all/report.md), [검증](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/time_succ_all/verification.json), [갱신한 Table1/2](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/report.md).
+
+### V4 2k 정식 채택 ·Table1/2 42회 완료
+
+- 사용자 승인으로 V4 2k를 Ours로 고정하고 공용 프로토콜v1.1.0에8H R=3m/16H R=7.5m를 모든 비교군의 Table1 Independent/Mixed 정식 배치로 반영했다. v1.0.0 문서/계산 예제를 공용 `legacy/v1.0.0/`에 보존했다. 2H/4H·Table2 배치·SR/Time/Error·최신20cm t_coop/Jerk 정의는 유지한다.
+- `run_v4_formal.py`·`v4_formal_eval.py`·`summarize_v4_formal.py`의512환경·seed1/6/7·900step·XY100%·M=2N 신규42회(Table1 24·Table2 18)가 전부 완료됐다. Ours의 Table1 Mixed2/4/8/16H는92.54±0.95/89.09±0.97/85.45±1.06/71.41±0.27%다. Table2 Enable/Coupled Avg. SR은84.70±0.79/91.64±0.60%, Enable Time은10.64±0.11s이며 최신20cm t_coop/Jerk pooled 값은84.05%/14.11m/s³다.
+- GPU5/6/7의 기존 학습·다른 평가를 보존하며 사전 확인2회 후 본 큐를 실행했다. 사용자 요청으로 동시 배정을 늘리는 첫 인계에서 exec 세션 정리로 미완료8회가 중단됐다. 해당 시도/로그를 `acceleration_v2/`에 보존하고 같은 조건으로 재실행했으며, 두 번째 인계는 이전 supervisor를 정지한 채 독립 세션으로 살아 있던10개를 유지했다. 이후 신규 작업은 GPU5/6에 최대10개·실측 PID/시작 예약·최소10,000MiB 여유로 배정했고 GPU7 기존 작업은 유지했다. 남은22회 동시 실행·최종42회 검증 완료를 확인했으며 이전 supervisor는 인계 자식 전부 종료 후 정리했다.
+- 신규42회 모두 실제 첫 입력·공통 초기 상태·정책/RMS 보존·CPU SR/건수/Error·반경/원형 간격·Table2 replay·최신20cm 지표 검증을 통과했다. 비교군168회는 공통 초기 상태/관측 exact와 원본 result SHA 불변, 통합210개 seed 결과의SR 집계280개·pooled/seed 통계를 추가 검산했다. TokenHSI397D/FSM 첫 관측 차이는 참고 한계로 표시하며 기존 결과는 수정하지 않았다. CPU 계산34개·문서 링크139개도 통과했다. [최종 Table1/2](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/report.md), [완료 검증](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/completion_verification.json), [비교군 검증](output_etc/check/v4_2000_tables12_radius_seeds167_20261112/comparison_verification.json).
+
+### 그룹 중심 고정 반경 ·512환경 baseline 정식 평가 완료
+
+- 사용자 요청으로8H R=3m/16H R=7.5m·512환경·seed1/6/7·900step·XY100%의 TokenHSI40.5k/SCT26k/FSM/Coop. FT6k42회와 공통 장면12개를 GPU5/6/7에 시작했다. Ours 제외·FSM Independent는 SCT 공유다. `run_group_radius_formal.py`는 기존 정식 메모리 예약/준비된 작업 배정·CPU 검증을 재사용하며 실제 반경/원형 간격도 확인한다. 공용 정식 실행기의 표 제목만 고정 반경을 지원하도록 확장했고 기존 간격 경로는 유지했다.
+- 구문·42개 고유 작업·실제 자식10개의512환경/반경3·7.5m/토큰2N/GPU5·6·7을 확인했다. import/직접 실행 간 소스 경로 표기 차이로 첫 준비가 중단돼 경로를 절대경로로 통일하고 준비 기록을 보존한 뒤 시작했다. 기존 학습/다른 프로세스는 보존했다. 약29.5분에42회·공통 장면12개 모두 완료했고 실패0, 실제 반경/원형 간격·공통 초기 상태·CPU SR/Error·소스/checkpoint SHA 검증을 통과했다.54개 proof와 seed별 평균/표본std도 재확인했다. [결과](output_etc/check/table1_group_radius_8r3_16r7p5_env512_seeds167_baselines_20261112/report.md), [완료 검증](output_etc/check/table1_group_radius_8r3_16r7p5_env512_seeds167_baselines_20261112/completion_verification.json), [최종 확인](output_etc/check/table1_group_radius_8r3_16r7p5_env512_seeds167_baselines_20261112/final_audit.json).
+
+### V4 1.5k/2k ·64환경 고정 반경 비교 완료
+
+- 사용자 요청으로 `run_v4_group_radius_eval.py`에서8H R=3m/16H R=7.5m·Independent/Mixed·64환경·seed1의 V4 1.5k/2k8회를 GPU5/6/7에서 완료했다. 기존 반경 평가의 초기 장면4개를 읽기 전용으로 재사용했으며900step·XY100%·M=2N·ordered·distractor 조건과 기존 학습/다른 프로세스를 보존했다.
+- 1.5k의8H Independent/Mixed·16H Independent/Mixed는94.34/83.46/91.41/68.55%,2k는94.53/85.00/92.29/70.10%다. 같은 장면의2k가 네 조건 모두 높으며 Mixed는+1.54/+1.55pp다. 단일 seed·64환경 탐색 결과이며512환경·3seed 결과는 아니다.
+- 8회 모두900step·초기 상태/전체 관측·실제 첫 입력 exact·정책/RMS 보존·실제 그룹 반경/원형 간격·CPU SR/건수/Error 검증을 통과했고 실패0이다. 두 checkpoint/공용 코드/기존 reference SHA 불변을 확인했다. GPU별 최대3개·시작 예약8,000MiB/worker·최소10,000MiB 여유를 적용했다. [비교표](output_etc/check/v4_1500_2000_group_radius_env64_seed1_20261112/report.md), [완료 검증](output_etc/check/v4_1500_2000_group_radius_env64_seed1_20261112/completion_verification.json).
+
+### 그룹 중심 고정 반경 인수인계 문서
+
+- 사용자 요청으로 `eval/group_radius_handoff.md`에8H R=3m/16H R=7.5m의 그룹 정의·간격과 반경 구분·유지 조건·실행 코드/checkpoint·완료 결과를 정리했다.64환경 정책 SR과512환경 배치 검사만 완료된 범위를 구분하고 실행기 고정 설정/기존 결과 보존을 명시했다. 코드·평가 조건은 변경하지 않았고 문서 경로·diff를 확인했다.
+
+### 고정 그룹 반경 ·64환경 SCT/TokenHSI/Ours 평가 완료
+
+- 사용자 요청으로8H R=3m/16H R=7.5m·64환경·seed1·900step·XY100%의 Independent/Mixed12회와 공통 장면4개를 GPU6/7에 시작했다. SCT26k/TokenHSI40.5k/Ours V3 2k만 사용하며 기존 학습/다른 프로세스는 보존했다. `run_group_radius_eval.py`는 기존 준비된 작업 배정/채점 경로를 재사용하고 실제 그룹 반경/원형 간격·공통 상태/첫 입력·CPU SR/Error·가중치/RMS를 검증한다.
+- 공용 실행기의 checkpoint 준비는 선택한 모델에만 적용하도록 수정하고 작업별 `GROUP_SPAWN_RADIUS` 전달을 추가했다. 기본 간격 경로는 유지한다. Python 구문·실제64환경/seed1/반경3·7.5m/GPU6·7·모델3종/총12회 구성을 확인했다. 약9.3분에 평가12회·공통 장면4개 전부 완료했고 실패0, 실제 반경·공통 초기 상태/첫 입력·CPU SR/Error·checkpoint SHA 검증을 통과했다. Ours Independent/Mixed는8H98.05/82.80%,16H91.60/72.38%다. [결과](output_etc/check/table1_group_radius_8r3_16r7p5_env64_seed1_20261112/report.md), [완료 검증](output_etc/check/table1_group_radius_8r3_16r7p5_env64_seed1_20261112/completion_verification.json).
+
+## 2026-11-11
+
+### 그룹 중심 고정 반경 ·빠른 배치 검사 완료
+
+- 사용자 선택에 따라 사람 기본 반경2.5m/그룹 내부 배치·Enable 후행 재배치·과제/거리/크기/distractor 규칙을 유지하고 그룹 중심만 고정 반경 원 둘레에 놓는 보조 옵션 `GROUP_SPAWN_RADIUS`를 추가했다. 기본 옵션 off의 기존 간격 경로는 유지한다. `group_radius_probe.py`·`run_group_radius_screen.py`에서 GPU5/6/7 배치 생성만 실행하며 정책 행동/SR은 측정하지 않았다.
+- 64환경28회·512환경36회, 총64회 검사를 완료했다. 원래1024회 시도 한도와 준비 포함240초 제한을 적용한512환경·seed1/6/7·Independent/Mixed6조건에서 최소 전체 통과0.5m 후보는8H3m/16H7.5m(최장193/198초), 더 빠른 후보는8H3.5m/16H8m(최장75/127초)다. 8H2.5m는Independent seed1/7,16H7m는Independent seed7이 시간 제한을 넘었다. 이는 수학적 불가능의 증명이 아니다.
+- 성공한53개 snapshot의 실제 반경·CPU 중심 간격/해석식·차원/유한성·원본 상태/결과 SHA를 확인했고 비교 가능한 관계/행동/크기/토큰 배정의 exact 보존도 확인했다. 실행 당시 소스를 보존한 뒤 Enable 쌍을 병합한 반경 진단 메타데이터로 정정하고 실제 코드로53개 CPU 재생을 통과했다. 메인 프로토콜/기존 결과/학습은 변경하지 않았다. [결과](output_etc/check/group_radius_feasibility_20261111/report.md), [검증](output_etc/check/group_radius_feasibility_20261111/verification.json).
+
+### 3m16H 중단·4m16H 정식 평가 시작
+
+- 사용자 요청으로3m16H의 실행/대기 작업과 해당 supervisor만 중단했다. PID별 명령·출력 경로를 확인해 살아 있던 자식7개를 종료했고 대상이 모두 종료됐음을 확인했다. 종료 시점에 추가 완료된 proof까지 회수해3m8H21회·16H11회, 총32회를 보존하고 미완료16H10회를 취소했다. 원본/중단 전 상태·실행기를 보존하고 중간 표를 갱신했다.
+- `run_group_spacing_4m_16h.py`에서16H만4m·512환경·seed1/6/7로 새로 시작했다. TokenHSI40.5k/SCT26k/FSM/Coop. FT6k의21회와 공통 초기 장면6개이며 FSM Independent 공유·Ours 제외다. 기존 정식 실행기의 인원/간격과 집계 열을 인자로 분리하고 GPU5/6/7 배정·메모리 예약·검증은 유지했다. 기존3m 큐는 재실행하지 않는다.
+- Python 구문·21개 고유 작업·실제 자식의512환경/16명/4m·Coop. FT6k·Ours 제외를 확인했다. Independent 기준3개가 검증됐고 실제 최소 그룹 간격3.99985m 이상을 확인했다. GPU5/6/7에서5/4/2개, 총11개가 실행 중이며 실패0이다. 아직21회 완료 결과는 아니다. [상태](output_etc/check/table1_4m_16h_env512_seeds167_baselines_20261111/status.json), [실행 검증](output_etc/check/table1_4m_16h_env512_seeds167_baselines_20261111/launch_verification.json), [중간 표](output_etc/check/table1_4m_16h_env512_seeds167_baselines_20261111/partial_report.md).
+
+### Enabling Time ·Succ./All CPU 재집계
+
+- 사용자 요청으로 기존 최초 그룹 동시 성공 기록54회(TokenHSI/SCT/FSM/Ours/Coop. FT4k·6k, 각512환경·seed1/6/7·세 후행 행동)를 CPU 재집계했다. Succ.는 성공 trial만, All은 실패에900×기록된control dt(약30초)를 부여한다. 행동별 평균→세 행동 동일 가중→seed 평균/표본std이며 외부 LLM Scheduler는 제외했다. 기존표의Coop. FT는4k임을 확인하고6k를 별도로 제공했다.
+- 원래 성공 건수·성공 Time·실패 패널티 평균 항등식·원본 SHA 불변을54회 모두 확인했다. Ours의Succ./All은11.24±0.23 /15.45±0.37s다. GPU 실행/기존 평가 조건 변경0회이며 진행 중3m Table1 큐는 유지했다. [결과](output_etc/check/enabling_completion_time_succ_all_seeds167_20261111/report.md), [검증](output_etc/check/enabling_completion_time_succ_all_seeds167_20261111/verification.json).
+
+### Table1 ·3m 정식 평가 병렬 배정 확대
+
+- 사용자 요청으로 실측5~7GiB 대비 보수적이던 시작 예약량을8H14,000→10,000MiB·16H26,000→14,000MiB로 낮추고 GPU별 최대6→8개로 늘렸다. GPU6/7은12,000MiB·GPU5는16,000MiB 여유를 유지한다. 평가 조건/성공 판정/정책 코드는 변경하지 않았다.
+- 우리 supervisor만 교체하고 실행 중 자식7개를 종료·재시작 없이 인계했다. 변경 전 실행기/상태/manifest/SHA와 실행기만 바뀐 SHA 전환을 별도로 보존했다. 기존8회·공통 장면11개 검증을 재사용한 뒤 GPU5/6/7에5/5/3개, 총13개로 병렬 실행이 늘었고 실패0을 확인했다. [인계](output_etc/check/table1_3m_env512_seeds167_baselines_20261111/concurrency_adoption.json), [소스 전환](output_etc/check/table1_3m_env512_seeds167_baselines_20261111/concurrency_source_transition.json).
+
+### Table1 ·3m·512환경 baseline 정식 평가 시작
+
+- 사용자 요청으로 TokenHSI40.5k/SCT26k/FSM/Coop. FT6k의8/16H Independent/Mixed·512환경·seed1/6/7·900step·XY100% 신규42회와 공통 초기 장면12개를 GPU5/6/7에 시작했다. Ours는 제외하고 FSM Independent는 SCT와 공유한다. 기존64환경 경로에 환경 수/모델 선택/entry 인자를 추가했으며 기본값은 유지했다. 전용 `run_group_spacing_formal.py`는 기존 GPU 어댑터/간격 보정/CPU 검증을 재사용하고 별도 결과 폴더에 저장한다.
+- Python 구문·42개 고유 작업/모델별 건수·실제 자식의512환경/3m·checkpoint6k·Ours 제외를 확인했고 공통 장면5개가 검증됐다. GPU5/6/7에서 최초7개를 병렬 시작한 뒤 준비된8H 장면의 모델 평가를 배정했다. GPU별 최대6개·시작 예약량을 확인하며 GPU6/7은16,000MiB·GPU5는24,000MiB 여유를 남긴다. 기존 학습·다른 프로세스는 보존했다. 아직42회 완료 결과는 아니다.
+- [실행 검증](output_etc/check/table1_3m_env512_seeds167_baselines_20261111/launch_verification.json), [상태](output_etc/check/table1_3m_env512_seeds167_baselines_20261111/status.json), [중간 표](output_etc/check/table1_3m_env512_seeds167_baselines_20261111/partial_report.md). TokenHSI397D 차이와 FSM 기존 첫 관측 차이는 유지·명시한다.
+
+### 그룹 간격1m·2m 평가 중단
+
+- 사용자 요청으로1m·2m supervisor2개와 해당 경로의 실행 자식7개만 종료했다. PID별 명령/출력 경로를 확인했고 대상 프로세스가 모두 종료됐음을 확인했다. 다른 학습·프로세스는 종료하지 않았다.
+- 각 조건의8H 평가9회씩을 보존하고 미완료16H 평가9회씩을 취소했다. status/manifest에 사용자 중단을 기록하고 중단 전 파일과 중간 표를 보존했다. 미완료 평가를 실패 SR로 집계하지 않는다. [1m 상태](output_etc/check/table1_group_spacing_env64_seed1_20261111/1m/status.json), [2m 상태](output_etc/check/table1_group_spacing_env64_seed1_20261111/2m/status.json).
+
+### Distill 900 V4 GPU5 허용
+
+- 사용자 요청으로 V4의 공용 train/test/VNC GPU 검사와 전용 eval wrapper에 GPU5를 추가했다. V4는 GPU2/5/6/7(기본6)을 허용하고 config의 V4 학습/로컬/VNC 예시는 GPU5로 갱신했다. 기존 버전의 제한은 유지한다.
+- 실제 `nvidia-smi` 조회를 포함한 허용/거절 분기11개(V4 GPU5 허용·V3 GPU5 거절 포함)와 셸 구문5개·diff 검사를 통과했다. GPU 연산/학습은 실행하지 않았다. [검증](output_etc/check/stage2_distill_900_v4_gpu5_20261111/verification.json).
+
+### Distill 900 V4 · Enable34k/Coupled30k 교체
+
+- 사용자 요청으로 V3를 복사한 `stage2_distill_900_v4`를 추가했다. Enable은 `Stage2BeforeTotalAt1mm_00034000.pth`, coupled는 `Stage2CoupledContact_00030000.pth`를 사용하고 student는 Stage1 PUSH26k에서 새로 전이한다. 4명·1024환경·8토큰·900step과 나머지 학습/환경 설정은 V3와 같다. 전용 train/test/VNC/eval·실험 등록·실행 문서를 추가하고 본학습 출력은 `output/stage2_distill_900_v4/`로 분리했다.
+- CPU69개·학습/평가 설정 계약·셸/Python 구문·config 링크·출력 경로를 확인했다. GPU2의 `CHECK=1` 1024환경1iteration이 exit0으로 수집/업데이트/저장을 마쳤다. 두 teacher epoch/SHA·전이 원본26k·동결 복사159tensor/입력 RMS exact·student finite·V3 원본6파일 SHA 불변을 확인했다. [검증](output_etc/check/stage2_distill_900_v4_setup_20261111/verification.json), [로그](output_etc/check/stage2_distill_900_v4_setup_20261111/train.log). 본학습·viewer·정식 평가는 실행하지 않았다.
+
+### 0m16H 중단·2m GPU5/6/7 평가 시작
+
+- 사용자 지시로0m의16H 기준 생성2개와0m 진단만 종료하고 대기 평가9회를 취소했다. 완료된0m8H9회·3m18회와 기존 산출물은 보존했으며1m GPU5 큐는 유지했다. root status/manifest에 사용자 중단과 취소 대상을 기록했다.
+- 같은64환경·seed1·900step·XY100%·M=2N·Coop. FT6k 포함18회의2m 평가를 `run_group_spacing_2m.py`·`group_spacing_2m_eval.py`로 추가했다. GPU5/6/7에 기준 장면4개를 분산 실행하며 GPU별 최대10개·최소10,000MiB 여유와 GPU5의 기존1m 시작 예약량을 반영한다. 공용/기존 실행기는 변경하지 않았고 구문과 GPU별 분산 시작을 확인했다. [상태](output_etc/check/table1_group_spacing_env64_seed1_20261111/2m/status.json), [중간 표](output_etc/check/table1_group_spacing_env64_seed1_20261111/2m/partial_report.md).
+- 2m의8H Independent/Mixed 기준2개가 초기 상태/간격 검증을 통과했고 Mixed 최소 그룹 간격1.99996m를 확인했다. 모델 평가9개와16H 기준2개를 병렬 실행하기 시작했으며 아직18회 완료 결과는 아니다.
+- 별도 `group_spacing_sampling_probe.py`의1m16H Mixed 진단은 원래 수용 조건/RNG를 유지한 첫4회에서 매번64개 모두 전체 장면 검사에 거절됨을 확인했다. 사람0.7m 미만 장면은54/59/58/56개, PUSH 후보 거절은15/22/23/23개였다. 이 진단은 SR 평가가 아니며 설정/성공 기준은 완화하지 않았다. [진단 기록](output_etc/check/group_spacing_sampling_diagnosis_20261111/1m/sampling_probe.json).
+
+### Table1 그룹 간격1m ·GPU5 추가 평가 시작
+
+- 사용자 요청으로 기존 GPU6/7 작업은 유지하고 GPU5 전용 `run_group_spacing_1m.py`를 추가했다. 같은64환경·seed1·900step·XY100%·M=2N·Coop. FT6k 포함 다섯 모델의8/16H Independent/Mixed18회이며 FSM Independent는 SCT 공유다. 배치 재시도 한도1024회·관계/거리/크기/ordered/distractor/성공 기준을 유지한다.
+- GPU5 비점유를 확인하고 기준 장면4개를 병렬 생성하기 시작했다. CPU8/16H·Independent/Mixed4개 경우에서 최소 그룹 간격0.999998m 이상·그룹 내부 상대 위치·원본 ring RNG 소비 보존과 Python 구문을 확인했다. 준비된 장면의 모델 평가를 최대10개씩 배정하며 실제 메모리/시작 중 예약량을 확인해10,000MiB를 남긴다. 메인/공용 실행기·기존 GPU6/7 큐·다른 프로세스는 변경하지 않았다. [상태](output_etc/check/table1_group_spacing_env64_seed1_20261111/1m/status.json), [중간 표](output_etc/check/table1_group_spacing_env64_seed1_20261111/1m/partial_report.md), 실행은 `eval/README.md`를 따른다. 아직18회 완료 결과는 아니다.
+- 8H Mixed 기준 생성 후 Coop. FT의 원본 GPU6/7 제한으로 최초 실행이 차단됐다. 사용자GPU5 허용에 따라 `group_spacing_1m_eval.py`가 해당 평가 프로세스에서만 실제GPU5 검사를 적용하도록 했고, 외부 파일은 보존했다. 진행 중 우리 작업7개를 종료 없이 인계하고 Coop. FT를 재실행하며 최초 오류/인계 상태·추가 실행기/원본 config SHA를 보존했다.
+- MPS UUID가 가리키는 실제GPU5 검사를 포함해 Coop. FT의 최초 실제 정책 입력 exact를 확인했다. GPU5에서 최초 정책 평가2회가900step·CPU SR/Error·공통 초기 상태 검증을 통과했고 현재 실패0 상태로 후속 작업을 실행 중이다.
+
+### Table1 그룹 간격 확인을 seed1 하나·이격 해제/3m 비교로 변경
+
+- 사용자 정정에 따라 우리 seed6/7 작업만 중단하고 seed1의 실행 중 기준/정책 평가를 유지·인계했다. 같은64환경·900step·XY100%·M=2N·다섯 모델(Coop. FT6k)에서 이격 해제와3m를 각각18회, 총36회 비교한다. FSM Independent는 SCT 공유다. 두 조건 모두 원래 ring RNG 소비와 거리/크기/관계/ordered/distractor/성공 기준을 유지하며 배치 재시도 한도는1024회다.
+- `run_group_spacing_comparison.py`가 기존 실행기를 조합하고 준비된 장면을 GPU6/7에 배정한다. 이격 해제8H Mixed 다섯 모델의 CPU SR/Error·초기 상태/관측 검증을 통과했다. 3m 간격 진단에서 Enabling 쌍을 별개로 세던 보조 계산을 선행/후행 병합으로 수정했고,8H Mixed의 실제 최소 그룹 간격2.99996m를 확인했다. 기존 SR 계산은 영향을 받지 않는다. [상태](output_etc/check/table1_group_spacing_env64_seed1_20261111/status.json), [manifest](output_etc/check/table1_group_spacing_env64_seed1_20261111/manifest.json). 전체36회 완료 수치는 아직 아니다.
+
+### Table1 그룹 간5m 강제 이격 제거64환경 평가 시작
+
+- 사용자 요청으로 TokenHSI40.5k/SCT26k/FSM/Coop. FT6k/Ours V3 2k의8/16H Independent/Mixed·seed1/6/7·64환경·900step·XY100% 신규54회를 준비했다. FSM Independent는 SCT와 공유한다. `group_spacing_eval.py`·`run_group_spacing.py`에서 기존 사람별 원형 spawn과 ring RNG 소비를 보존하고 그룹 중심 재배치만 제거하며, 나머지 관계/거리/크기/ordered/토큰/distractor 규칙은 유지한다. 메인/외부 원본 코드는 변경하지 않았다.
+- CPU8/16H의 RNG·root/body 초기 상태 exact·목표가 원래 그룹 중심인지 확인하고 Python 구문을 검사했다. 기존64회 배치 재시도 한도가8H 일부 장면에서 소진돼 해당 시도와 entry 원본을 보존하고, 우리 기준 생성 프로세스만 종료한 뒤 수용 조건은 그대로1024회로 재시작했다. GPU6/7에서 기준 장면12개를 병렬 생성하며 모델별16H Mixed 확인 후 본 평가를 실행한다. GPU별 최대10개 worker·최소10,000MiB 여유 메모리/시작 중 예약량을 확인하고 기존 타 프로세스는 보존한다. FSM의 알려진 reset 관측 차이는 이번에도 보존·명시하고 기존512환경 결과와의 직접 인과 비교는 하지 않는다. [상태](output_etc/check/table1_no_group_spacing_env64_seeds167_20261111_retry1024/status.json), [manifest](output_etc/check/table1_no_group_spacing_env64_seeds167_20261111_retry1024/manifest.json), 실행은 `eval/README.md`를 따른다.
+- 8H 기준6개가 먼저 완료돼 `run_group_spacing_ready.py`로 우리 supervisor만 교체하고 진행 중16H 기준 생성6개는 종료 없이 인계했다. 준비된 장면의 모델 평가를 동시에 배정하며 최초14개 작업(기준6·평가8)이 실행됐다. 인계 상태·추가 실행기 SHA를 저장하며, 완료 전 수치는 확정하지 않는다.
+
+### Coop. FT3k/6k Table1/2 평가 완료
+
+- 신규84회 모두 완료·실패0이며 기존4k42회와 비교했다. 512환경·seed1/6/7·900step·XY100%에서 실제 첫 정책 입력 exact·가중치/정규화 보존·CPU SR/Error·그룹 수·Table2 replay·최신20cm 공동 지표·원본 checkpoint SHA 불변 검증을 통과했다.
+- [3k/4k/6k 비교·seed별 결과](output_etc/check/coopft_3000_6000_tables12_seeds167_20261111/report.md), [완료 검증](output_etc/check/coopft_3000_6000_tables12_seeds167_20261111/completion_verification.json). 4k는 모든 인원수의 Mixed와 Enable 평균 SR이 가장 높았고, Coupled 평균 SR은3k가 가장 높았다. 기존 학습은 보존했다.
+
+### Coop. FT3k/6k Table1/2 평가 시작
+
+- 사용자 요청으로 기존4k와 같은512환경·seed1/6/7·900step·XY100%·M=2N·공통 snapshot의 신규84회 큐를 GPU6/7에 시작했다. `run_coopft_tables.py`·`coopft_checkpoint_eval.py`·`summarize_coopft_tables.py`를 추가해 외부 Coop. FT 원본 환경/모델을 읽기 전용으로 재사용하고 새 산출물은 이 checkout의 `output_etc/check/`에 저장한다. 기존4k42회는 재사용하고 Table2는 최신20cm t_coop/Jerk까지 포함한다. Post-AT·Collision은 제외했다.
+- 3k/6k의 epoch·가중치 finite·모델 schema/저장 설정 동일·checkpoint SHA와 staged copy exact·Python 구문·4k 최신 접촉/Jerk 조회를 확인했다. 두 checkpoint의16H Mixed/Coupled3H 확인4회 모두 실제 첫 정책 입력 exact·900step·원본 가중치/RMS 보존·CPU SR/건수/Error·동일 그룹 수·Table2 replay/최신 접촉/Jerk 검증을 통과했다. 본 큐는4/84회 검증 완료·5개 동시 실행·실패0 상태로 넘어갔다. 아직84회 완료 결과는 아니다.
+- GPU별 최대8개 worker, 실제 여유 메모리와 로드 중 예약량을 확인하며 최소10,000MiB를 남긴다. checkpoint별16H Mixed/Coupled3H 확인 후 본 큐가 자동 실행된다. 기존 학습·다른 사람 프로세스·원본 코드/결과는 건드리지 않았다. [진행 상태](output_etc/check/coopft_3000_6000_tables12_seeds167_20261111/status.json), [manifest](output_etc/check/coopft_3000_6000_tables12_seeds167_20261111/manifest.json). 실행/재개 명령은 `eval/README.md`에 기록했다.
+
+### Enabling Post-AT Time 재집계·충돌 지표 문헌 검토
+
+- 사용자 요청으로 `eval/reaggregate_enabling_post_at_time.py`를 추가해 TokenHSI/SCT/FSM/Coop. FT/Ours의 기존45개 Enable 기록(512환경·seed1/6/7·900step·XY100%)을 CPU 재집계했다. 정의는 최초 유효 그룹 동시 성공−최초 유효 AT 성공이며 성공 trial만 포함한다. 행동별 평균→seed별 세 행동 동일 가중→seed 평균/표본std를 사용하고 같은 성공 trial의 AT Time·전체 Completion Time·SR를 함께 보존했다. 기존 SR/Time 정의는 유지한다.
+- Post-AT 평균±표본std는 TokenHSI2.58±0.25/SCT4.39±0.32/FSM7.32±0.18/Coop. FT5.46±0.11/Ours5.62±0.19s다. 원래 최초 동시 성공/SR exact·별도 NumPy AT 최초 성공45회 exact·비음수/실패 제외·조건부 시간 합·seed 통계·입력 SHA·timeline 예제·구문/링크81개를 확인했다. GPU0회. [행동/seed별 결과](output_etc/check/enabling_post_at_time_seeds167_20261111/report.md), [검증](output_etc/check/enabling_post_at_time_seeds167_20261111/verification.json).
+- HandoverSim 논문/원본 contact-pair 코드·SIGGRAPH2025 다인 관통 지표·IMPACT 허용 접촉·social navigation 평가 지침을 확인해 [충돌 검토안](output_etc/check/enabling_post_at_time_seeds167_20261111/collision_metric_review.md)을 저장했다. 사람 간 충돌 trial 비율과 AT 전 공유 물체 접촉 진단을 분리하는 안이며 문턱/낙상/시간 경계는 미확정이다. 충돌 코드·새 GPU 평가는 하지 않았다. 결과 목록·구현 안내·eval/structure에 추가 분석으로 연결했다.
+
+### TokenHSI 포함 통합 결과 관리 등록
+
+- 사용자 요청으로 공용 폴더의 `results.md`에 TokenHSI/SCT/FSM/Coop. FT/Ours와 bias ablation의 원본 report·summary·manifest·검증 위치를 등록했다. 공용 README·구현 안내·eval/structure에서 연결하고 TokenHSI40.5k·고정397D 입력 차이, FSM 기존 첫 관측 문제, 최신20cm t_coop/Jerk 원본과 SR0–1/% 변환·pooled/seed 통계 필드를 명시했다. 기존 결과를 복제·수정하거나 통합 수치표를 새로 생성하지 않았다.
+- TokenHSI42회 완료와 기존 초기 상태/첫 입력/CPU SR·Error 증거42개, 다섯 모델의 통계 필드15종·평균/표본std, 로컬 링크79개를 확인했다. GPU 실행0회. [관리 목록](../evaluation_protocol/results.md), [검증](output_etc/check/evaluation_results_registry_20261111/verification.json).
+
+### 공용 평가 프로토콜 패키지·출발 변위20cm 확정
+
+- 사용자 승인으로 checkout 옆 `/home/hwanhee/ksh/evaluation_protocol/`에 레포 독립 전체 규약 `README.md`, 레포별 진입점·checkpoint·알려진 차이 `implementations.md`, 이식 가능한 계산 예제 `checks/`를 만들었다. 기존 공통/관계별 크기·거리·SR·두 Error·Time·Table1/2·추론 bias 제거와 최신 전체 누적 t_coop/원본64점 Jerk를 통합했다. 공동 PUSH 주 시작은20cm로 확정했고50cm는 과거 민감도 결과로만 구분했다. 현재 seed1/6/7은 실행 이력이며 최종 seed로 고정하지 않았다.
+- 루트 프로토콜은 공용 문서 안내로 바꾸고 원문을 `markdowns/legacy/cvpr2027_evaluation_protocol_20261111_before_shared.md`에 보존했다. README·eval 안내·config·structure·기존 평가 규약의 링크/최신 지표 경로를 갱신했다. 학습·메인 평가 코드·다른 레포의 기존 파일·기존 결과는 변경하지 않았다.
+- CPU 계산34개·폴더 복사 후 동일34개·후보 구현 CLI34개·Python 구문·문서 링크/anchor155개를 확인했다. SCT/FSM/Coop. FT/Ours 각 기존2H seed1 trial0에서 최초 성공·20cm counter·전체 접촉 frame 수·t_coop·Jerk가 재집계 저장값과 exact였다. GPU 실행0회. [검증](output_etc/check/evaluation_protocol_package_20261111/verification.json). 계산 예제만으로 sampler/정책 입력까지 검증된 것으로 간주하지 않으며 FSM 기존 첫 관측 문제도 구현 안내에 명시했다.
+
+### SCT/FSM/Coop. FT/Ours 공동 PUSH 지표 CPU 재집계
+
+- 사용자 요청으로 기존36개 궤적(SCT26k·FSM·Coop. FT PPO4k·Ours V3 2k, 2/3/4명·512환경·seed1/6/7·900step)을 재집계했다. `eval/reaggregate_coupled_cooperation.py`·`coupled_cooperation_metrics.py`는 전체 기록의 전원 양손–실제 상자 표면<12cm t_coop과 보존한 TeamHOI 원본64점 Jerk를 계산한다. 시작20/50cm·합산 trial 평균·seed 평균/표본std·유효/clip 건수를 구분했다. 메인 코드·원본 기록·학습·GPU 프로세스는 변경하지 않았다.
+- 36회 최초 성공/SR exact·입력 SHA 불변·모델 간 초기 tensor exact·단일 원래 PUSH 그룹·원본 둘레점/회전 exact·별도 Jerk 마스크 식·counter/NaN/Inf/음수 clip 경계를 검증했다. 20cm 인원 동일 가중 요약의 SR/t_coop/Jerk는 SCT74.52/53.31/23.05, FSM75.13/62.87/31.56, Coop. FT78.21/84.67/12.07, Ours91.41/76.42/15.21이다(앞 두 값%, Jerk m/s³). FSM은 앞서 확인한 첫 정책 입력의 reset 관측 불일치가 있는 기존 궤적의 참고값이며 이 후처리로 수정되지 않는다. [20/50cm·인원/seed별 표](output_etc/check/coupled_cooperation_four_models_20261111/report.md), [검증](output_etc/check/coupled_cooperation_four_models_20261111/verification.json).
+
 ## 2026-11-10
+
+### SCT/DCT bias 추론 제거 평가 완료
+
+- GPU6/7 각 최대5개 worker로 bias 제거27회와 같은 프로토콜의 Stage1 1H baseline3회, 총30회를 완료했다. seed1/6/7·512환경·900step·XY100%·M=2N을 유지했고 기존 baseline24회는 재사용했다. 실패0·큐 종료,30회 실제 첫 정책 입력 exact·옵션 off 행동 exact·매900frame bias0·CPU SR/건수/Error·가중치/정규화 보존을 검증했다. 1H baseline/제거 초기 상태와 실제 첫 입력 exact·seed 평균/표본표준편차·원본/checkpoint SHA 불변도 확인했다. 기존 학습·메인 코드는 변경하지 않았다.
+- Stage1의 Task-Relation Bias 제거 Independent SR1/2/4/8/16H는0.00±0.00/0.00±0.00/0.00±0.00/0.02±0.01/0.04±0.01%다. 새1H baseline은91.21±0.39%다. V3 2k의 Dependency-Relation Bias 제거 Mixed2/4/8/16H는85.80±1.38/83.33±0.91/81.92±0.40/68.44±0.62%다. 추론 시 bias 출력만 제거한 의존성 실험이며 공유 임베딩·feature fusion은 유지했다. [최종 표·seed별 결과](output_etc/check/bias_ablation_20261110/report.md), [완료 검증](output_etc/check/bias_ablation_20261110/completion_verification.json).
+
+### SCT/DCT bias 추론 제거 평가 시작
+
+- 사용자 요청으로 `eval/`에 원본 pth를 수정하지 않는 bias 제거 entry/병렬 runner/집계·CPU 검증을 추가했다. Stage1 26k는 SCT task bias 출력만, V3 2k는 DCT dependency bias 출력만0으로 만들며 공유 임베딩·feature fusion·관계 할당·성공 판정은 유지한다. Stage1 native 검증 후 제거를 적용하고 실제 첫 정책 입력 exact·옵션 off 행동 exact·진단 전후 RNG 복원·가중치/정규화 불변·매 frame bias 제거를 검사한다. FSM 경로나 관측 재계산은 사용하지 않는다.
+- CPU2 passed·구문 검사·Stage1 2H/V3 4H의512환경 첫 입력 probe를 통과했다. 기존 reference와 실제 첫 입력 exact·off 행동 exact·on bias0과 행동 차이를 확인했고, 보조 entry의1H Independent512환경 canonical 생성도 통과했다. GPU6/7 각5개, 총10개 worker로 seed1/6/7·512환경·900step·XY100%의 bias 제거27회와 Stage1 1H baseline3회 큐를 시작했다. 기존 학습·checkpoint·기존 결과·프로토콜 MD seed는 유지했다. 아직 전체 성능 완료 결과는 아니다. [진행 상태](output_etc/check/bias_ablation_20261110/status.json), [probe](output_etc/check/bias_ablation_20261110/probes/), 실행 안내는 `eval/README.md`를 따른다.
 
 ### V3 2k ·seed1/6/7 Table1/2 평가 완료
 

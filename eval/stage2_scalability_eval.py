@@ -9,6 +9,7 @@ from learning.multi_agent import formal_eval
 import stage2_scalability_layout
 import stage2_xy100
 import stage2_full_observation
+from env.tasks.multi_agent.stage2_group_layout import layout_metadata
 
 
 stage2_scalability_layout.install()
@@ -47,10 +48,7 @@ def checked_eval(player):
         centers = torch.bmm(same.float(), task._humanoid_root_states[..., :2])/same.sum(-1, keepdim=True)
         minimum_gap = None
         if task.num_agents > 4:
-            gaps = (centers[:, :, None]-centers[:, None]).norm(dim=-1).masked_fill(same, float('inf'))
-            minimum_gap = float(gaps.min())
-            if minimum_gap < 4.99:
-                raise ValueError('Initial group center gap below five meters')
+            minimum_gap = layout_metadata(task)['minimum_initial_group_gap']
             mapping = task._protocol_token_groups
             logical = (task._ghost_state if hasattr(task, '_ghost_state')
                        else task._logical_box_values(task._box_states))
@@ -74,7 +72,8 @@ def checked_eval(player):
     player.env_reset = original_reset
     path = Path(task.cfg['args'].output_path)
     metadata = dict(scene_mode=os.environ.get('STAGE2_SCENE_MODE', 'mixed'), xy_extent_percent=100,
-        group_spawn_gap=5. if task.num_agents > 4 else None,
+        group_spawn_gap=getattr(task, '_group_spawn_gap', None) if task.num_agents > 4 else None,
+        group_spawn_radius=getattr(task, '_group_spawn_radius', None) if task.num_agents > 4 else None,
         minimum_initial_group_gap=task._protocol_minimum_gap,
         distractor_group_budget='2k minus required tokens' if task.num_agents > 4 else None)
     metadata['shared_box_initialization'] = 'group_leader_only' if task.num_agents > 4 else 'native'

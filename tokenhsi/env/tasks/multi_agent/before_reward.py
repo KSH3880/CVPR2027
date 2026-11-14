@@ -43,6 +43,10 @@ def predecessor_at_progress(progress, roots, objects, sizes, goals, graph, confi
 
 
 class BeforeRuntime(Stage1ContextRuntime):
+    def __init__(self, *args, reward_at_z_tolerance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reward_at_z_tolerance = reward_at_z_tolerance
+
     def _raw_success(self, phi, z_error, feet_error, region_error, graph):
         return interaction_own_success(phi, z_error, feet_error, graph, self.config, region_error)
 
@@ -50,8 +54,12 @@ class BeforeRuntime(Stage1ContextRuntime):
         raw = self._raw_success(phi, z_error, feet_error, region_error, graph)
         gate = (raw[:, None] | ~graph.prereq_mask).all(-1)
         success = raw & gate
-        paired = paired_placement_success(success, graph)
-        saturated = (success | paired) & graph.edge_valid
+        reward_success = success
+        if self.reward_at_z_tolerance is not None:
+            at = batched(graph.edge_relation, len(phi)) == 7
+            reward_success = success & (~at | (z_error.abs() <= self.reward_at_z_tolerance))
+        paired = paired_placement_success(reward_success, graph)
+        saturated = (reward_success | paired) & graph.edge_valid
         state = torch.where(saturated, 1., phi)*gate*graph.edge_valid*self.config['state_reward_weight']
         prog = torch.where(saturated, 1., progress)*graph.edge_valid*self.config['progress_reward_weight']
         bonus = saturated.float()*self.config['success_reward_weight']

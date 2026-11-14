@@ -21,6 +21,7 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def __init__(self, cfg, *args, **kwargs):
         self._amp_num_families = 4
         self._joint = cfg['env']['jointPush']
+        self._premature_cfg = cfg['env']['stage2JointPush'].get('premature_motion_penalty')
         self._individual_push_goals = cfg['env']['stage2JointPush'].get('goal_mode') == 'individual'
         self._coupled_assignment = getattr(cfg.get('args'), 'coupled_assignment', 'random')
         self._coupled_peer_mode = cfg['env']['relationGraph'].get('coupled_peer_selection', 'all')
@@ -97,6 +98,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
         self.relation_runtime = CoupledPushRuntime(self.num_envs,self.relation_runtime.graph,
             self._relation_cfg,self.device,contact_weights=self._joint['contact_weights'])
         self._push_hits = torch.zeros(self.num_envs,self.num_agents,device=self.device,dtype=torch.bool)
+        if self._premature_cfg is not None:
+            self._premature_penalty = torch.zeros_like(self._push_hits, dtype=torch.float)
 
     def _sample_episode_graph(self, ids):
         preset = self._task_graph_preset
@@ -269,6 +272,8 @@ class HumanoidMACoupledPush(HumanoidMACarry):
     def pre_physics_step(self, actions):
         super().pre_physics_step(actions)
         self._push_hits.zero_()
+        if self._premature_cfg is not None:
+            self._premature_penalty.zero_()
 
     def _physics_step(self):
         ids = torch.arange(self.num_envs,device=self.device)
@@ -277,12 +282,19 @@ class HumanoidMACoupledPush(HumanoidMACarry):
             self.gym.simulate(self.sim)
             self.gym.fetch_results(self.sim,True)
             self._refresh_sim_tensors()
-            distance,normal,_,_,_,_ = self._contact_geometry(ids,self._rigid_body_pos)
+            distance,normal,_,boxes,_,face = self._contact_geometry(ids,self._rigid_body_pos)
             reaction = -(self._contact_forces[:,:,self._key_body_ids[:2],:2]*normal[:,:,None]).sum(-1)
             force = (self._assigned_box_values(self._ontop_box_contact)[...,:2]*normal).sum(-1)
             cfg = self._joint['contact']
             hit = (torch.exp(-cfg['near_distance_scale']*distance.square()) > cfg['satisfaction_threshold'])
             self._push_hits |= hit & (reaction >= cfg['min_hand_force']).all(-1) & (force >= cfg['min_box_force'])
+            if self._premature_cfg is not None:
+                from utils.premature_push import motion_penalty
+                eligible = (self._members > 1) & (self._templates_by_owner == 5)
+                penalty, _, _ = motion_penalty(
+                    boxes[..., 7:9], self._contact_forces[:, :, self._key_body_ids[:2], :2],
+                    face['near'], self._groups, eligible, self._premature_cfg)
+                self._premature_penalty += penalty / self.control_freq_inv
 
     def _compute_reward(self, actions):
         self.relation_runtime.contact.copy_(self._push_hits)

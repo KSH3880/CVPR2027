@@ -11,14 +11,18 @@ sys.path.insert(0, str(ROOT/'tokenhsi'))
 import torch
 from evaluate import summarize
 from rescore import rescore
+from env.tasks.multi_agent.stage2_group_layout import EVAL_RADII
 import stage2_xy100
 
 
 def verify(path, reference, agents, envs):
     data = json.loads((path/'result.json').read_text())
+    steps = data['simulated_steps']
     if (data['num_agents'], data['num_objects'], data['num_envs'], data['horizon'],
-            data['simulated_steps'], data['xy_extent_percent']) != (agents, 2*agents, envs, 900, 900, 100):
+            data['xy_extent_percent']) != (agents, 2*agents, envs, 900, 100):
         raise ValueError('Unexpected configuration')
+    if not 1 <= steps <= 900 or (steps < 900 and data['falls'] != agents*envs):
+        raise ValueError('Early termination without all participants fallen')
     before = torch.load(reference/'initial.pt', map_location='cpu')
     after = torch.load(path/'initial.pt', map_location='cpu')
     for key in before:
@@ -35,13 +39,15 @@ def verify(path, reference, agents, envs):
         raise ValueError('Initial full observation mismatch')
     physics = json.loads((path/'physics_only_verification.json').read_text())
     conditions = json.loads((path/'new_conditions.json').read_text())
-    if physics['checked_frames'] != 901 or not conditions['conditions_verified'] or conditions['near50']:
+    if physics['checked_frames'] != steps+1 or not conditions['conditions_verified'] or conditions['near50']:
         raise ValueError('Runtime condition check failed')
     score = rescore(path)
     if not all(score[key] for key in ('finite', 'cpu_gpu_exact', 'json_counts_exact', 'errors_match_recorded')):
         raise ValueError('CPU/GPU score validation failed')
     return dict(seed=data['seed'], initial_states_exact=True, initial_observation_exact=True,
-                physical_removal_checks=901, cpu_gpu_sr_exact=True, cpu_gpu_errors_match=True)
+                physical_removal_checks=steps+1, simulated_steps=steps,
+                all_fallen_early_termination=steps < 900,
+                cpu_gpu_sr_exact=True, cpu_gpu_errors_match=True)
 
 
 def run(args):
@@ -60,6 +66,11 @@ def run(args):
             raise ValueError('Unknown job: '+job)
         folder = output/(mode+'_'+str(people)+'h')
         reference = output/(mode+'_'+str(people)+'h_reference'+('_unique' if people > 4 else ''))
+        for seed in args.seeds:
+            saved = folder/f'general_seed{seed}'/'result.json'
+            if saved.exists() and people in EVAL_RADII:
+                if json.loads(saved.read_text()).get('group_spawn_radius') != EVAL_RADII[people]:
+                    raise ValueError('Saved group placement differs; use a new output folder')
         folder.mkdir(parents=True, exist_ok=True)
         if args.reference_evaluations:
             source_root = args.reference_evaluations.resolve()
@@ -79,6 +90,7 @@ def run(args):
         manifest = dict(checkpoint=str(policy_checkpoint), checkpoint_sha256=digest, gpu=args.gpu,
             agents=people, objects=2*people, envs=args.envs, horizon=900, seeds=args.seeds,
             scene_mode=mode, xy_extent_percent=100, reference=str(reference), completed=False,
+            group_spawn_radius=EVAL_RADII.get(people),
             scene_carrier_checkpoint=str(checkpoint), distractor_attention='all_observed_tokens')
         (folder/'manifest.json').write_text(json.dumps(manifest, indent=2))
         checks = []

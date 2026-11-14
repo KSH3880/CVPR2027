@@ -340,7 +340,7 @@ TOKENHSI_GPU=5 SEED=0 OUTPUT_PATH=output_etc/check/stage2_teachers_eval8_seed0 b
 
 인자는 `<enable.pth> <coupled.pth> [agents=4] [envs=1] [objects=2N] [repeats=10]`다. eval wrapper는 envs 기본512·반복1이며 `SEED=0/1/2`와 출력 폴더를 바꿔 독립 실행한다. GPU는5/6만 허용하고 생략하면5다. VNC는 실행 로그에 나온 포트를 VS Code에서 포워딩하여 접속한다. 출력은 `output_etc/check/` 아래이며 `teachers.json`에 두 원본 경로/epoch/frame/해시와 담당 규칙을 저장한다. 단일 통합 모델의 성능과 구분한다.
 
-5명 이상은 `GROUP_SPAWN_OVER4=1`을 자동 선택한다. `random_scenario`는 solo/enable/coupled 순차 선택, `mixed`는 두 관계 포함을 보장한다. 공동 최대4명·초기 그룹 중심 간격5m·불필요한 distractor 물리/관측 제외·ordered 구역 배정을 viewer와 eval에서 공통 사용한다. 4명은 원래 장면 샘플링/배치를 유지하고 viewer/eval 구역 배정은 ordered다. N≥4·M≥N을 지원하며 토큰이 부족한 장면만 다시 뽑는다. M=N에서는 ON_TOP 포함 구성이 제외된다. 고정 프리셋의 예산/크기 조건은 [명세](reference/stage2.md#물체와-관측)를 따른다. `EPISODE_LENGTH`는 viewer의 재생 길이만 바꾸며 공간 채점은1200step을 유지한다.
+5명 이상은 `GROUP_SPAWN_OVER4=1`을 자동 선택한다. `random_scenario`는 solo/enable/coupled 순차 선택, `mixed`는 두 관계 포함을 보장한다. 공동 최대4명·불필요한 distractor 물리/관측 제외·ordered 구역 배정을 viewer와 eval에서 공통 사용한다. 일반 viewer는 초기 그룹 중심 간격5m를 유지하며,8H/16H 정식 평가는 그룹 중심 고정 반경3m/7.5m를 적용한다. 4명은 원래 장면 샘플링/배치를 유지하고 viewer/eval 구역 배정은 ordered다. N≥4·M≥N을 지원하며 토큰이 부족한 장면만 다시 뽑는다. M=N에서는 ON_TOP 포함 구성이 제외된다. 고정 프리셋의 예산/크기 조건은 [명세](reference/stage2.md#물체와-관측)를 따른다. `EPISODE_LENGTH`는 viewer의 재생 길이만 바꾸며 공간 채점은1200step을 유지한다.
 
 단일 통합 PTH의5명 이상 viewer도 `GROUP_SPAWN_OVER4=1`을 붙인다. 직접 `run.py` 실행은 `--group_spawn_over4 --coupled_assignment ordered --num_agents N --num_objects 2N`을 사용한다. 두 teacher 직접 실행은 여기에 `--teacher_before <enable.pth> --teacher_coupled <coupled.pth>`를 지정하고 `--checkpoint`는 생략한다.
 
@@ -359,6 +359,10 @@ Distill teacher PTH는 `tokenhsi/data/cfg/train/rlg/stage2_distill_900.yaml`의 
 
 `stage2_distill_900_v3`는 V2를 복사하고 enable teacher만 같은 run의 `Stage2BeforeTotal_00027000.pth`로 교체했다. Coupled17k·Stage1 26k 초기화·solo의 enable 담당·나머지 설정은 같으며 출력은 `output/stage2_distill_900_v3/Stage2Distill900V3_*`다. 전체 teacher 경로는 `tokenhsi/data/cfg/train/rlg/stage2_distill_900_v3.yaml`에서 지정한다.
 
+`stage2_distill_900_v4`는 V3를 복사하고 enable teacher를 `Stage2BeforeTotalAt1mm_00034000.pth`, coupled teacher를 `Stage2CoupledContact_00030000.pth`로 교체했다. Student는 Stage1 PUSH26k에서 새로 시작하며 나머지 학습·환경 설정은 V3와 같다. 전체 teacher 경로는 `tokenhsi/data/cfg/train/rlg/stage2_distill_900_v4.yaml`, 출력은 `output/stage2_distill_900_v4/Stage2Distill900V4_*`다. V4의 학습·test·VNC·eval은 GPU2/5/6/7을 허용하며 기본6이다.
+
+`stage2_900_v4_reward`는 Stage1 PUSH26k에서 새로 전이하는 PPO/AMP 실험이다. V4의 Enable34k·Coupled30k 원본 보상을 관계별로 적용하며 distillation이나 teacher 정책 로드는 없다. 기본 GPU5·4명·1024환경·8토큰·900step이고 출력은 `output/stage2_900_v4_reward/Stage2_900V4Reward_*`다. 전용 train/test/VNC 명령은 [config](config.md), 보상 기준과 원본 경로는 [상세 문서](reference/stage2_v4_reward.md)를 따른다. 정식 평가는 `TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_900_v4_reward_eval.sh "$CKPT" --output output_etc/check/stage2_900_v4_reward_eval`을 사용한다.
+
 ```bash
 # stage2_900: checkpoint 공간 평가
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_900_eval.sh "$CKPT" --output output_etc/check/stage2_900_eval
@@ -371,6 +375,9 @@ TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v2_eval.sh "
 
 # stage2_distill_900_v3: student PTH 하나로 공간 평가
 TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v3_eval.sh "$CKPT" --output output_etc/check/stage2_distill_900_v3_eval
+
+# stage2_distill_900_v4: student PTH 하나로 공간 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v4_eval.sh "$CKPT" --output output_etc/check/stage2_distill_900_v4_eval
 ```
 
 같은512환경 rollout에서 기존 지표와 네 가지 interaction group 성공률을 함께 기록한다. Enable은선행/후행 각각 한 번 이상 성공, coupled는 실제 공유 상자 중심 도달 기준이다. `summary.json`의 `interaction_group_scores`에 풀네임별 seed 평균/표본std와 건수를 저장한다. [정의](reference/evaluation.md#통합-stage2의-interaction-group-성공률).
@@ -399,7 +406,7 @@ TOKENHSI_GPU=6 RESUME_CHECKPOINT="$CKPT" bash tokenhsi/scripts/multi_agent/stage
 # stage2_distill: student PTH 하나로4명 기본 ordered 공간 평가
 TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_distill_eval.sh "$CKPT" --output output_etc/check/stage2_distill_eval4
 
-# stage2_distill: student PTH 하나로8명·8토큰·5m·ordered 확장 평가
+# stage2_distill: student PTH 하나로8명·8토큰·그룹 중심 반경3m·ordered 확장 평가
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_eval.sh "$CKPT" --agents 8 --objects 8 --group_spawn_over4 --output output_etc/check/stage2_distill_eval8_m8
 
 # stage2: 같은 확장 평가 인자 지원
@@ -407,3 +414,73 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_eval.sh "$CKPT" --agents
 ```
 
 본학습 전 `CHECK`·`MAX_ITERATIONS`·`RESUME_CHECKPOINT`·`OUTPUT_PATH` 잔여 설정을 해제한다. `stage2_distill` wrapper는 GPU5/6만 허용하며 생략 시6이다. `--coupled_assignment random|ordered|distance|optimal`로 eval 배정 방식을 지정할 수 있고 기본은 ordered다. `--agents`/`--objects`는 통합 `stage2`·`stage2_distill` eval에서만 받으며 N>4는 `--group_spawn_over4`가 필요하다. 평가 seed 기본0/1/2·환경 수512·1200step이며 인원/물체 수를 바꾼 결과는 기본 학습 분포 평가와 구분한다.
+
+### IND 성능 차이 보조 평가
+
+SCT26k/Ours V4 2k의 단독 추출·교차 경로24회 평가다. [설계와 지표](reference/ind_mechanisms.md). 새 학습 config가 아닌 평가 전용 adapter이며, 준비된 snapshot과 A/B 검증 완료 표시를 사용한다. 동일 큐가 실행 중이면 중복 실행하지 않는다. GPU는 자식 실행마다6/7 중 하나를 지정하며, 아래 부모의 GPU6 설정이 작업 전체를6에 고정하지 않는다.
+
+```bash
+# IND: 준비된 장면의 평가 실행 또는 검증 완료 작업을 제외한 재개
+TOKENHSI_GPU=6 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python eval/run_ind_mechanisms.py --phase all --cap-mib 70000 --workers 3'
+
+# IND: 현재 검증 완료 기록의 CPU 집계
+CUDA_VISIBLE_DEVICES='' /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/summarize_ind_mechanisms.py
+```
+
+결과·상태·실패 시도는 `output_etc/check/ind_mechanisms_v4_2000/`에 보존한다. A/B 검증 표시는 실제 검증 결과가 있을 때만 생성한다. 다른 checkpoint나 seed에 이 큐를 그대로 재사용하지 않는다.
+
+### IND DCT 추론 ablation 파일럿
+
+Ours V4 2k·2인 IND·64환경·seed1·900step에서 원본/self-only/DCT bypass를 같은 새 snapshot으로 비교한다. Self-only는 actor DCT의 다른 사람 attention만 차단하며, bypass는 SCT 특징을 현재 Ours action head에 직접 전달한다. SCT·action head·critic·가중치·정규화는 유지한다. Bypass도 원래 DCT 계산을 수행한 후 출력만 대체하여 난수 소비를 유지한다. 재학습 ablation과 구분하며 bypass 하락만으로 특정 동작의 학습 원인을 확정하지 않는다.
+
+```bash
+# IND DCT 파일럿: GPU6/7, 기존 출력이 있으면 덮어쓰기 거부
+TOKENHSI_GPU=6 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python eval/run_ind_dct_ablation_pilot.py'
+
+# IND DCT 파일럿: 완료한3회 CPU 재채점·실패 단계 집계
+CUDA_VISIBLE_DEVICES='' /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/summarize_ind_dct_ablation_pilot.py
+```
+
+출력은 `output_etc/check/ind_dct_ablation_v4_2000_env64_seed1/`이다. 실패 단계는 기존 `output_etc/check/ind_approach_diagnosis_v4_2000/analyze.py`를 재사용한다. GPU별1작업, 시작 전 현재 점유+6144MiB가70,000MiB 이하인지 확인한다.
+
+### 2인 SIT 교차 파일럿
+
+64환경·seed1·900step, SCT/Ours × 분리/교차4회의 평가 전용 진입점이다. [설계](reference/ind_mechanisms.md#2인-sit-교차-파일럿). 출력은 `output_etc/check/sit_crossing_v4_2000_env64_seed1/`이며 `capture/extended.pt`는 `ind_mechanisms_capture.py`의64환경·REFERENCE_ONLY=1로 준비한 loco 초기 상태다. GPU6/7에 각1작업씩 배치한다. 기존 장면/실행 폴더는 덮어쓰지 않으므로 이미 실행한 큐를 중복 실행하지 않는다.
+
+```bash
+# SIT 파일럿: 준비된64환경 capture에서 장면 생성 및4회 평가
+TOKENHSI_GPU=6 bash -c 'source tokenhsi/scripts/multi_agent/runtime_env.sh
+python eval/run_sit_crossing_pilot.py'
+
+# SIT 파일럿: 완료한4회 CPU 검증 및 집계
+CUDA_VISIBLE_DEVICES='' /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/summarize_sit_crossing_pilot.py
+```
+
+### Coordination Behavior CPU 재집계
+
+기존 Enabling45개 기록(TokenHSI40.5k/SCT·FSM26k/Coop. FT4k/Ours V4 2k)의 Preparation Progress, Premature Occupancy, Post-AT Completion Delay를 계산한다.512환경·seed1/6/7·900step이며 새 학습/시뮬레이션은 없다. A·B는 AT 성공 episode, C는 Group 성공 episode를 사용하고 각각 성공률·표본 수를 병기한다.
+
+B는 root 원 반경0.35m와 AT 목표로 이동한 초기 yaw의 상자 footprint·margin0.10m를 사용한 근사치다. 전신 자세가 없어 실제 몸체 겹침/물리 방해로 해석하지 않는다. 반경0.25/0.35/0.45m·margin0/0.10/0.20m 및 회전 외접원 민감도를 함께 저장한다. 초기 snapshot t=0을 포함해 최초 AT 성공 step k의 직전 k−1까지 계산한다.
+
+```bash
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/analyze_coordination_behavior.py \
+  --output output_etc/check/coordination_behavior_v4_2000_20261114
+```
+
+기존 출력 폴더를 덮어쓰지 않는다. 재실행 시 새로운 `output_etc/check/<분석명>`을 지정한다. [결과](../output_etc/check/coordination_behavior_v4_2000_20261114/report.md)·[해석](../output_etc/check/coordination_behavior_v4_2000_20261114/interpretation.md)·[검증](../output_etc/check/coordination_behavior_v4_2000_20261114/verification.json)에 전체/행동/seed별 결과·공통 AT/Group 성공 장면 비교·원시 SHA를 저장한다. 기존 공식 Table2 결과와 성공 기준은 유지한다.
+
+### Dependency bias OFF/Shuffled
+
+V4 2k·4/16H Mixed·512환경·seed1/6/7·900step에서 OFF/Shuffled12회를 GPU6/7에 각1개씩 실행한다. Original6회는 현재 정식 결과를 CPU 재채점하고 checkpoint SHA·초기 snapshot·첫 입력·배치 조건을 확인해 재사용한다. 16H는 반경7.5m다.
+
+OFF는 actor/critic의 DCT attention bias만0으로 만든다. Shuffled는 각 사람의 타인 bias(NONE 포함)를 섞고 SELF/padding을 유지한다. 별도 CPU RNG `100000+평가seed`의 장면별 순열을 모든 head/layer/actor/critic에 공유하며, 내부 사람 토큰 셔플을 역매핑해 episode 동안 사람 ID 기준으로 고정한다. 실제 관계·feature fusion·SCT·관측·가중치·정규화는 보존한다. 같은 값만 있는 행이나 우연히 같은 배치는 그대로이며 셔플 seed를 별도 반복하지 않는다.
+
+```bash
+# Dependency bias: CPU supervisor, 각 자식은 runtime_env.sh에서 GPU6/7 설정
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_depbias_ablation.py
+```
+
+출력은 `output_etc/check/depbias_v4_2000_4h16h_seeds167_20261114/`다. 기존 실행 폴더는 덮어쓰지 않으므로 큐를 중복 실행하지 않는다. GPU 시작 여유는4H8GB/16H14GB 예약에12GB를 추가한다. `status.json`·`report.md`·`summary.json`에 진행 상황과 Mixed/I/E/C·seed 평균±표본std를 저장하며, 최종 성공은 `completion_verification.json`으로 확인한다. 추론 개입 결과를 재학습 ablation으로 해석하지 않는다.

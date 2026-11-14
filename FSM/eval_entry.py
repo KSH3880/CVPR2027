@@ -13,6 +13,7 @@ from learning.multi_agent import formal_eval
 from utils.evaluation_protocol import predecessors
 from utils.task_role_spec import task_graph_packet
 from utils.stage2_spec import evaluation_groups
+from env.tasks.multi_agent.stage2_group_layout import layout_metadata
 from controller import StateFreeze
 from stage1_protocol_policy import Stage1Policy
 
@@ -89,9 +90,7 @@ def evaluate(player):
         centers = torch.bmm(same.float(),task._humanoid_root_states[...,:2])/same.sum(-1,keepdim=True)
         gap = None
         if task.num_agents>4:
-            gap = float((centers[:,:,None]-centers[:,None]).norm(dim=-1).masked_fill(same,float('inf')).min())
-            if gap<4.99:
-                raise ValueError('FSM group center gap below five meters')
+            gap = layout_metadata(task)['minimum_initial_group_gap']
             mapping = task._protocol_token_groups
             logical = physics.observed_boxes(task,task._logical_box_values(task._box_states),None)
             target = task._group_spawn_targets.gather(1,mapping[...,None].expand(-1,-1,2))
@@ -101,7 +100,8 @@ def evaluate(player):
             if (initial['predecessor']>=0).any() or (same.sum(-1)!=1).any():
                 raise ValueError('Independent scene contains a relation')
         (path/'layout.json').write_text(json.dumps(dict(minimum_initial_group_gap=gap,
-            group_spawn_gap=5. if task.num_agents>4 else None)))
+            group_spawn_gap=getattr(task,'_group_spawn_gap',None) if task.num_agents>4 else None,
+            group_spawn_radius=getattr(task,'_group_spawn_radius',None) if task.num_agents>4 else None)))
         physics.check_step(task)
         controller = StateFreeze(task)
         return fresh_observation()

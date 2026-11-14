@@ -15,7 +15,8 @@ PRESETS = (*coupled.PRESETS, 'before', 'coupled', 'mixed',
 
 def validate_env(env):
     from utils.experiments import native_config
-    native = native_config('stage2')['env']
+    teacher_rewards = env['stage2'].get('reward_source') == 'v4_teachers'
+    native = native_config('stage2_900_v4_reward' if teacher_rewards else 'stage2')['env']
     if env['numAgents'] < 4 or env['numObjects'] < env['numAgents']:
         raise ValueError('stage2 requires at least four people and one object token per person')
     for key in ('stage2', 'before', 'relationGraph', 'relationReward'):
@@ -24,6 +25,10 @@ def validate_env(env):
     base = deepcopy(env)
     base.pop('stage2')
     base.pop('before')
+    if teacher_rewards:
+        penalty = base['stage2JointPush'].pop('premature_motion_penalty', None)
+        if penalty != native['stage2JointPush']['premature_motion_penalty']:
+            raise ValueError('stage2 teacher contact penalty differs')
     base['relationGraph'] = deepcopy(native_config(
         'stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg')['env']['relationGraph'])
     coupled.validate_env(base)
