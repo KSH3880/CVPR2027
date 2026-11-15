@@ -13,7 +13,11 @@ PUSH = "stage1_push"
 BEFORE_PUSH = "stage2_before_push"
 COUPLED = "stage2_coupled_push"
 BEFORE_PUSH_NEAR50="stage2_before_push_near50"
-NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50)
+PUSH_SCHEDULE = 'stage1_push_schedule'
+PUSH_ADAPTIVE = 'stage1_push_adaptive'
+PUSH_NO_BIAS = 'stage1_push_no_bias'
+STAGE1_PUSH_NAMES = (PUSH, PUSH_SCHEDULE, PUSH_ADAPTIVE, PUSH_NO_BIAS)
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, PUSH_SCHEDULE, PUSH_ADAPTIVE, PUSH_NO_BIAS)
 
 
 def experiment_horizon(name):
@@ -53,7 +57,7 @@ def load_environment(name, config_path, checkpoint=None, saved=False):
         path = Path(checkpoint).resolve()
     from utils.checkpoint_compat import environment
     source['env'] = environment(source['env'])
-    if name in (FIXED, PUSH):
+    if name in (FIXED,) + STAGE1_PUSH_NAMES:
         from utils.stage1_config import resolve_config
         cfg = resolve_config(source, native)
         cfg["experiment"] = deepcopy(source.get("experiment", {}))
@@ -68,6 +72,19 @@ def load_environment(name, config_path, checkpoint=None, saved=False):
         transfer = cfg['experiment'].get('transfer', {})
         if 'checkpoint' in transfer:
             transfer['checkpoint'] = checkpoint_path(transfer['checkpoint'])
+    if name == PUSH_ADAPTIVE and saved:
+        import torch
+        from utils.stage1_push_adaptive import STATE_KEY, validate_state
+        if 'adaptiveSampling' not in cfg['env']:
+            raise ValueError('Adaptive PUSH resume/evaluation requires its own saved experiment')
+        weights = torch.load(checkpoint, map_location='cpu', weights_only=False)
+        state = validate_state(weights.get(STATE_KEY), cfg['env']['adaptiveSampling'], weights.get('epoch'))
+        cfg['env']['_adaptiveSamplingState'] = deepcopy(state)
+    if name == PUSH_ADAPTIVE:
+        from utils.stage1_jointpush import contract
+        # Viewer/single-task setup subsequently adjusts spacing, spawn radius
+        # and horizon. Compatibility concerns the saved training configuration.
+        cfg['_adaptiveTrainingContract'] = deepcopy(contract(cfg['env']))
     return cfg, path
 
 
@@ -84,9 +101,21 @@ def validate_experiment(name, env, train, evaluation=False):
             raise ValueError('Ordinary Stage1 cannot load PUSH checkpoints')
         if env.get('before') is not None:
             raise ValueError('Fixed Stage1 cannot use a BEFORE environment')
-    elif name == PUSH:
+    elif name in STAGE1_PUSH_NAMES:
+        expected_bias = name != PUSH_NO_BIAS
+        if params['network']['transformer'].get('relation_bias') is not expected_bias:
+            raise ValueError('PUSH task attention bias does not match experiment')
         if env.get('jointPush') is None or env.get('before') is not None:
             raise ValueError('PUSH policy requires its own saved environment')
+        if ('samplingSchedule' in env) != (name == PUSH_SCHEDULE):
+            raise ValueError('Scheduled and ordinary PUSH experiments cannot be mixed')
+        if ('adaptiveSampling' in env) != (name == PUSH_ADAPTIVE):
+            raise ValueError('Adaptive PUSH requires its own experiment')
+        if name == PUSH_ADAPTIVE and not evaluation:
+            if env['numAgents'] != 2:
+                raise ValueError('Adaptive training preserves the two-agent Stage1 RSI path')
+            if env['numObjects'] != 4:
+                raise ValueError('Adaptive training preserves two agents and four objects with distinct ON_TOP supports')
         from utils.stage1_jointpush import validate_env
         validate_env(env)
     elif name == COUPLED:
@@ -106,6 +135,14 @@ def validate_experiment(name, env, train, evaluation=False):
         if not evaluation and env['episodeLength'] != experiment_horizon(name):
             raise ValueError('Stage2 training requires 1200 steps')
         params['config']['minibatch_size'] = params['config'].get('scene_minibatch_size', 4096) * env['numAgents']
+
+
+def check_push_bias_checkpoint(weights, relation_bias):
+    """Keep bias/no-bias runs separate; historical PUSH checkpoints use bias."""
+    saved = weights.get('relation_experiment_config', {}).get('train', {})
+    transformer = saved.get('params', {}).get('network', {}).get('transformer', {})
+    if transformer.get('relation_bias', True) is not relation_bias:
+        raise ValueError('PUSH checkpoint task attention bias differs from selected experiment')
 
 
 def check_before_checkpoint(weights, env):

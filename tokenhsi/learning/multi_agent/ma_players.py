@@ -42,12 +42,24 @@ class MAPlayerContinuous(amp_players.AMPPlayerContinuous):
                 checkpoint, checkpoint_metadata(self.env.task._relation_cfg)
             )
             check_agent_collision_checkpoint(checkpoint, self.env.task.cfg["env"])
+            if self.env.task.cfg['env'].get('jointPush') is not None and not getattr(self.env.task, '_before', False) and not getattr(self.env.task, '_coupled', False):
+                from utils.experiments import check_push_bias_checkpoint
+                check_push_bias_checkpoint(checkpoint, self.model.a2c_network.actor_encoder.use_relation_bias)
             if getattr(self.env.task,"_coupled",False):
                 from utils.coupled_push_spec import check_checkpoint
                 check_checkpoint(checkpoint,self.env.task.cfg["env"])
             if getattr(self.env.task, "_before", False):
                 from utils.before_spec import check_checkpoint
                 check_checkpoint(checkpoint, self.env.task.cfg["env"])
+            if 'samplingSchedule' in self.env.task.cfg['env']:
+                from utils.stage1_push_schedule import check_schedule_checkpoint
+                check_schedule_checkpoint(checkpoint, self.env.task.cfg['env'])
+                self.env.task.set_sampling_epoch(checkpoint['epoch'])
+            from utils.stage1_push_adaptive import check_checkpoint
+            check_checkpoint(checkpoint, self.env.task.cfg['env'])
+            if 'adaptiveSampling' in self.env.task.cfg['env']:
+                if checkpoint.get('stage1_jointpush_contract') != self.env.task.cfg.get('_adaptiveTrainingContract'):
+                    raise ValueError('Adaptive PUSH evaluation contract differs')
         return super().restore(fn)
 
     def _build_net(self, config):

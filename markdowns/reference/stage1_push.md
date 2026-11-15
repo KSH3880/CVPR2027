@@ -18,7 +18,9 @@
 
 ## 일반·단독 평가
 
-일반은 저장된 학습 인원·물체·분포·배치를 유지한다. 단독은 Stage1 계열 전용 진입점에서 실제1명으로 AT/ON_TOP/SIT/CLIMB/PUSH를 각각 독립 평가한다. AT만9종 크기 override이며 PUSH는 학습167종을 사용한다. 단독 AT/SIT/CLIMB/PUSH는 물체1개, ON_TOP은2개, distractor는 없다. 원격2명 고정 sampler를1/2명으로 일반화했다.
+viewer/test/VNC는 사람 N≥1·물체 M≥N을 지원한다. ON_TOP 수가 남는 물체 M−N보다 많으면 초과 과제를 크기 호환 가능한 다른 행동으로 재샘플링하고 서로 다른 받침을 배정한다. `holding_ontop` preset도 같은 규칙이다. PUSH의 여러 사람 경로·모든 외부 사람/물체를 검사하며 추가 물체는 실제 ON_TOP 받침을 제외한 distractor로 배치한다. 학습2명·4물체와 정식 단독1명은 유지한다.
+
+일반은 저장된 학습 인원·물체·분포·배치를 유지한다. 단독은 Stage1 계열 전용 진입점에서 실제1명으로 AT/ON_TOP/SIT/CLIMB/PUSH를 각각 독립 평가한다. AT만9종 크기 override이며 PUSH는 학습167종을 사용한다. 단독 AT/SIT/CLIMB/PUSH는 물체1개, ON_TOP은2개, distractor는 없다. 정식 단독 평가는 viewer의 다인 설정과 구분한다.
 
 정식 평가는900step·512환경×독립 seed0/1/2·loco100%다. PUSH의 loco는 전용 push_loco 모션에서 뽑는다. 같은 궤적의 점/영역을 계산하며 PUSH는 payload 중심→고정 AT 목표의3D거리20cm로 두 기준이 같다. CONTACT·힘·유지시간은 평가 성공 조건에 추가하지 않는다. 개인 낙상 frame까지 채점하고 그 사람의 drive만 해제하며 다른 사람은 계속 수행한다.
 
@@ -26,7 +28,7 @@
 
 ## 코드·데이터
 
-- `humanoid_ma_push.py`: 자산/물성·접촉 RSI·1/2명 reset·physics contact 수집.
+- `humanoid_ma_push.py`: 자산/물성·접촉 RSI·다인 viewer reset·physics contact 수집.
 - `utils/stage1_jointpush.py`, `jointpush_scene.py`: sampler/물성/저장 계약, 경로·cone·distractor.
 - `jointpush_geometry.py`, `jointpush_rsi.py`, `jointpush_rsi_geometry.py`: 손 목표·bank 해시·pose 정렬/기하 검사.
 - `stage1_push_network.py`:5과제 모델 및 선택적인78k 초기화 도우미. 기존4과제/3family 모델은 기본값을 유지한다.

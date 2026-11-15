@@ -4,7 +4,7 @@ from isaacgym import gymapi
 from env.tasks.multi_agent.humanoid_ma_carry import HumanoidMACarry
 from env.tasks.multi_agent.size_rsi_cache import SizeRsiCache
 from env.tasks.multi_agent.jointpush_reward import Stage1PushRuntime, contact_state, gate_push_at_progress
-from utils.stage1_jointpush import PUSH, compose_graph, sample_assets, box_densities
+from utils.stage1_jointpush import PUSH, compose_graph, sample_assets, sample_templates, box_densities
 from utils.edge_scenario_spec import classify_templates
 from utils.edge_ontop_spec import copy_graph_rows
 from utils.jointpush_geometry import push_rsi_hand_targets, rotate, multiply
@@ -49,6 +49,11 @@ class HumanoidMAPush(HumanoidMACarry):
     def __init__(self, cfg, *args, **kwargs):
         self._amp_num_families = 4
         self._joint = cfg['env']['jointPush']
+        self._task_sampling_schedule = None
+        self._sampling_epoch = 0
+        if 'adaptiveSampling' in cfg['env']:
+            from utils.stage1_push_adaptive import state_for_env
+            self._adaptive_sampling_state = state_for_env(cfg['env'])
         super().__init__(cfg, *args, **kwargs)
 
     def _motion_skills_to_load(self, available):
@@ -57,6 +62,11 @@ class HumanoidMAPush(HumanoidMACarry):
     def _load_box_asset(self):
         self._box_size, self._joint_probabilities = sample_assets(
             self.num_envs, self.cfg['env'], self.device, self._task_graph_preset)
+        if 'samplingSchedule' in self.cfg['env'] and self._task_graph_preset == 'random_scenario':
+            from utils.stage1_push_schedule import TaskSamplingSchedule
+            self._task_sampling_schedule = TaskSamplingSchedule(
+                self.cfg['env'], self._joint_probabilities, strict=not self.cfg['args'].eval)
+            self._joint_probabilities = self._task_sampling_schedule.update(0)
         if (getattr(self.cfg['args'], 'eval_protocol', '') == 'stage1_single'
                 and self.cfg['args'].eval_single_task == 'AT'):
             from utils.evaluation_protocol import single_at_sizes
@@ -111,9 +121,18 @@ class HumanoidMAPush(HumanoidMACarry):
         env, agent = self._expand_slots(ids)
         return classify_templates(self.relation_runtime.graph, env, agent).reshape(len(ids), self.num_agents)
 
+    def set_sampling_epoch(self, epoch):
+        if 'samplingSchedule' not in self.cfg['env']:
+            return
+        self._sampling_epoch = int(epoch)
+        if self._task_sampling_schedule is not None:
+            self._joint_probabilities = self._task_sampling_schedule.update(int(epoch))
+            self._size_template_probabilities = self._joint_probabilities
+
     def _sample_episode_graph(self, ids):
         weights = self._joint_probabilities[ids]
-        templates = torch.multinomial(weights.flatten(0, 1), 1).reshape(len(ids), self.num_agents)
+        templates = sample_templates(weights, self.num_objects,
+                                     prefer_ontop=self._task_graph_preset == 'holding_ontop')
         graph = compose_graph(templates, self._relation_graph_spec['shuffle_edge_order'], self.num_objects)
         copy_graph_rows(self.relation_runtime.graph, ids, graph)
         self._edge_goal_owners[ids] = True
@@ -134,6 +153,24 @@ class HumanoidMAPush(HumanoidMACarry):
         result['sampling/shared_primary_object'] = counts.new_zeros(())
         for index, name in enumerate(('holding','at','ontop','sit','climb','push'), 8):
             result['sampling/relation_'+name] = counts[index]/denominator
+        if 'samplingSchedule' in self.cfg['env']:
+            from utils.stage1_push_schedule import schedule_state
+            state = schedule_state(self.cfg['env'], self._sampling_epoch)
+            result['sampling/schedule_epoch'] = counts.new_tensor(self._sampling_epoch)
+            result['sampling/schedule_fraction'] = counts.new_tensor(state['fraction'])
+            expected = self._joint_probabilities.mean((0, 1))
+            for index, name in enumerate(('holding','sit','climb','holding_at','holding_ontop','push')):
+                result['sampling/target_'+name] = counts.new_tensor(state['probabilities'][index])
+                result['sampling/asset_expected_'+name] = expected[index]
+        if 'adaptiveSampling' in self.cfg['env']:
+            from utils.stage1_push_adaptive import template_probabilities
+            probabilities = template_probabilities(self._adaptive_sampling_state)
+            expected = self._joint_probabilities.mean((0, 1))
+            templates = ('HOLDING', 'SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP', 'PUSH_AT')
+            names = ('holding', 'sit', 'climb', 'holding_at', 'holding_ontop', 'push')
+            for index, (template, name) in enumerate(zip(templates, names)):
+                result['sampling/target_'+name] = counts.new_tensor(probabilities[template])
+                result['sampling/asset_expected_'+name] = expected[index]
         if push_rsi is not None:
             for index, name in enumerate(self._skill):
                 result['sampling/rsi_push_actual_'+name] = push_rsi[index]/push_rsi.sum().clamp_min(1)
@@ -285,6 +322,12 @@ class HumanoidMAPush(HumanoidMACarry):
     def _fetch_conditioned_amp_demo(self, count):
         from utils.unified_training import append_family
         p = self._relation_graph_spec['template_probabilities']
+        if 'adaptiveSampling' in self.cfg['env']:
+            from utils.stage1_push_adaptive import template_probabilities
+            p = template_probabilities(self._adaptive_sampling_state)
+        if 'samplingSchedule' in self.cfg['env']:
+            from utils.stage1_push_schedule import TASKS, schedule_state
+            p = dict(zip(TASKS, schedule_state(self.cfg['env'], self._sampling_epoch)['probabilities']))
         weights = torch.tensor([p['HOLDING_AT']+p['HOLDING_ON_TOP'], p['SIT'], p['CLIMB'], p['PUSH_AT']], device=self.device)
         family = torch.multinomial(weights, count, replacement=True)
         result = torch.empty(count, self.get_num_amp_obs(), device=self.device)

@@ -82,8 +82,16 @@ def load_cfg(args):
     with open(args.cfg_train) as stream:
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
+    if name == 'stage1_push_adaptive':
+        if not is_eval and not (os.environ.get('TOKENHSI_ADAPTIVE_RESTART_FILE')
+                                and os.environ.get('TOKENHSI_ADAPTIVE_RUN_NAME')):
+            raise ValueError('Use stage1_push_adaptive_train.sh to manage physical-asset rebuilds')
+        if not is_eval:
+            cfg_train['params']['config']['full_experiment_name'] = os.environ['TOKENHSI_ADAPTIVE_RUN_NAME']
     cfg, source_path = load_environment(name, args.cfg_env, args.checkpoint,
                                          saved=is_eval or args.resume > 0)
+    if name == 'stage1_push_adaptive':
+        cfg['env']['_adaptiveEvaluation'] = bool(is_eval)
     from utils.experiments import experiment_horizon
     cfg["env"]["episodeLength"] = experiment_horizon(name)
     from utils.evaluation_protocol import configure

@@ -3,11 +3,10 @@
 import csv
 import os
 import torch
-from utils.edge_context_spec import HOLDING, AT
 from env.tasks.multi_agent.edge_context_reward import scene_success, owner_sum
 from env.tasks.multi_agent.relation_reward import box_speed_penalty
-from utils.edge_ontop_spec import batched, select_graph, ON_TOP
-from utils.edge_interaction_spec import SIT, CLIMB
+from env.tasks.multi_agent.relation_diagnostics import edge_metric_masks
+from utils.edge_ontop_spec import batched, select_graph
 from utils.edge_scenario_spec import agent_object_indices
 
 
@@ -176,13 +175,8 @@ class EdgeContextTaskMixin:
             z_error=diag["z_error"],
         )
         packed = torch.stack([values[k].float() for k in fields], -1)
-        relations = [(HOLDING, "holding"), (AT, "at")]
-        relations.append((ON_TOP, "ontop"))
-        relations.extend([(SIT, "sit"), (CLIMB, "climb")])
-        for rel, name in relations:
-            mask = batched(
-                graph.edge_valid & (graph.edge_relation == rel), self.num_envs
-            )
+        masks = edge_metric_masks(graph, self.num_envs, include_push=hasattr(self, "_joint"))
+        for name, mask in masks.items():
             numerator = (packed * mask[..., None]).sum((0, 1))
             key = "edge/" + name
             if key not in self._edge_metric_sums:

@@ -49,10 +49,13 @@ def test_wrappers_route_arguments_through_the_same_launcher(tmp_path, name, mode
     subprocess.run(['bash', str(ROOT/f'tokenhsi/scripts/multi_agent/{name}_{mode}.sh'), *args],
                    cwd=ROOT, env=env, text=True, capture_output=True, check=True)
     argv=json.loads(capture.read_text())
+    if name == 'stage1_push_adaptive' and mode == 'train':
+        assert argv == ['tokenhsi/adaptive_train.py']
+        return
     assert argv[0]=='tokenhsi/run.py'
     assert argv[argv.index('--cfg_train')+1].endswith('/'+name+'.yaml')
     assert argv[argv.index('--seed')+1]=='42'
     assert '--headless' in argv
-    assert argv[argv.index('--num_envs')+1]==('1' if mode=='test' else '2048' if name in (NAMES[0], 'stage1_push') else '1024')
+    assert argv[argv.index('--num_envs')+1]==('1' if mode=='test' else '2048' if name in (NAMES[0], 'stage1_push', 'stage1_push_schedule','stage1_push_adaptive','stage1_push_no_bias') else '1024')
     if mode=='train':
         assert argv[argv.index('--max_iterations')+1]=='1'

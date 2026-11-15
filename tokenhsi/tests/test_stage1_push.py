@@ -16,6 +16,52 @@ from utils.unified_training import append_family, preserve_amp_labels, sample_fa
 def env():return native_config('stage1_push')['env']
 
 
+@pytest.mark.parametrize('agents,objects', [(2,2),(3,3),(4,5),(4,12),(8,8)])
+@pytest.mark.parametrize('preset', ['random_scenario','holding_ontop','push'])
+def test_viewer_entity_counts_redraw_excess_ontop(agents, objects, preset):
+    from utils.stage1_jointpush import sample_templates, validate_env
+    cfg=env();cfg.update(numAgents=agents,numObjects=objects)
+    validate_env(cfg)
+    sizes,weights=sample_assets(64,cfg,'cpu',preset)
+    for _ in range(3):
+        templates=sample_templates(weights,objects,preset=='holding_ontop')
+        assert ((templates==4).sum(-1)<=objects-agents).all()
+        packet=task_graph_packet(compose_graph(templates,True,objects),64).reshape(64,agents,5).long()
+        payload=packet[...,3][packet[...,1]>=2]
+        assert ((payload>=agents)&(payload<agents+objects)).all()
+        for row in packet:
+            supports=row[row[:,1]==3,4]
+            assert len(supports.unique())==len(supports)
+            assert ((supports>=2*agents)&(supports<agents+objects)).all()
+    assert sizes.shape==(64,objects,3)
+    if preset=='holding_ontop':
+        assert ((templates==4).sum(-1)==min(agents,objects-agents)).all()
+
+
+@pytest.mark.parametrize('agents,objects,task', [(1,1,3),(1,2,4),(2,4,5)])
+def test_legacy_eval_template_draw_preserves_rng(agents, objects, task):
+    from utils.stage1_jointpush import sample_templates
+    weights=torch.zeros(16,agents,6);weights[...,task]=1
+    torch.manual_seed(315)
+    expected=torch.multinomial(weights.flatten(0,1),1).reshape(16,agents)
+    state=torch.random.get_rng_state()
+    torch.manual_seed(315)
+    assert torch.equal(sample_templates(weights,objects),expected)
+    assert torch.equal(torch.random.get_rng_state(),state)
+
+
+def test_multi_person_push_checks_all_foreign_paths():
+    cfg=env()['jointPush']['scene']
+    boxes=torch.zeros(1,4,13);boxes[...,6]=1;boxes[0,:,0]=torch.arange(4)*5.
+    sizes=torch.full((1,4,3),1.8)
+    roots=boxes[...,:3].clone();roots[...,1]=-4
+    goals=boxes[...,:3].clone();goals[...,1]=5
+    push=torch.ones(1,4,dtype=torch.bool)
+    assert paths_clear(boxes,sizes,goals,roots,push,cfg).all()
+    goals[0,2,:2]=torch.tensor([-2.,2.])
+    assert not paths_clear(boxes,sizes,goals,roots,push,cfg).any()
+
+
 @pytest.mark.parametrize('agents,objects',[(1,1),(1,2),(2,4)])
 def test_push_packet_binding_and_required_goal(agents,objects):
     templates=torch.full((3,agents),5)
@@ -127,6 +173,74 @@ def test_timeout_boundary_is_exactly_nine_hundred_steps():
         torch.zeros(3,dtype=torch.long),torch.tensor([898,899,900]),torch.zeros(3,2,3),
         torch.tensor([0]),torch.ones(3,2,3),900.,True,torch.full((2,),.15))
     assert reset.tolist()==[0,0,1] and terminated.tolist()==[0,0,0]
+
+
+@pytest.mark.parametrize('shuffle', [False, True])
+def test_push_diagnostics_separate_contact_goal_and_carry_without_changing_reward(shuffle):
+    from types import SimpleNamespace
+    from env.tasks.multi_agent.edge_context_task import EdgeContextTaskMixin
+    from env.tasks.multi_agent.jointpush_reward import Stage1PushRuntime
+    from env.tasks.multi_agent.relation_diagnostics import relation_tensorboard_tag
+
+    graph = compose_graph(torch.tensor([[5, 3], [5, 5], [3, 3]]), shuffle, 4)
+    owner = graph.edge_owner
+    at = (graph.edge_relation == 7) & graph.edge_valid
+    contact = (graph.edge_relation == 12) & graph.edge_valid
+    phi = torch.ones_like(owner, dtype=torch.float)
+    phi[1, at[1]] = 0.0
+    phi[contact] = 0.1
+    diag = {key: torch.zeros_like(phi) for key in (
+        'progress', 'z_error', 'feet_height_error', 'region_error', 'distance', 'distance_xy')}
+    diag['progress'].fill_(0.3)
+
+    def make_task(enabled):
+        cfg = deepcopy(env()['relationReward'])
+        cfg['diagnostics'].update(enabled=enabled, sample_envs=0)
+        runtime = Stage1PushRuntime(3, graph, cfg, 'cpu', contact_weights=[.2, .2, .2])
+        runtime.contact[1, 0] = True
+        return SimpleNamespace(
+            num_envs=3, num_agents=2, _joint={}, _relation_cfg=cfg,
+            relation_runtime=runtime, _humanoid_root_states=torch.zeros(3, 2, 13),
+            _box_states=torch.zeros(3, 4, 13), _reward_box_values=lambda value: value,
+            _evaluate_relations=lambda: (phi, diag),
+            _power_reward=False, _agent_collision_penalty=False, _box_vel_penalty=False,
+            extras={}, rew_buf=torch.zeros(6), _reward_term_sums=torch.zeros(7),
+            _reward_term_count=0, _edge_ever_goal=torch.zeros(3, 2, dtype=torch.bool),
+            _edge_ever_scene=torch.zeros(3, dtype=torch.bool),
+            _edge_goal_owners=torch.ones(3, 2, dtype=torch.bool), _edge_steps=0,
+            _edge_metric_sums={}, _edge_metric_denominators={}, _edge_metric_steps=0,
+            _edge_episode_sums=torch.zeros(6), _record_ontop_diagnostics=lambda *args: None,
+            _consume_sampling_diagnostics=lambda: {})
+
+    enabled, disabled = make_task(True), make_task(False)
+    for task in (enabled, disabled):
+        EdgeContextTaskMixin._compute_relation_reward(task, None)
+    assert torch.equal(enabled.rew_buf, disabled.rew_buf)
+    for key in enabled.relation_runtime.last_result:
+        assert torch.equal(enabled.relation_runtime.last_result[key], disabled.relation_runtime.last_result[key])
+    metrics = EdgeContextTaskMixin.consume_relation_diagnostics(enabled)
+    # Raw contact succeeds once, while reaching the goal saturates another contact reward.
+    assert metrics['edge/contact/own_success'] == pytest.approx(1 / 3)
+    assert metrics['edge/contact/reward_saturated'] == pytest.approx(2 / 3)
+    assert metrics['edge/push_at/own_success'] == pytest.approx(1 / 3)
+    assert metrics['edge/at/own_success'] == 1
+    assert relation_tensorboard_tag('edge/push_at/own_success') == 'relation/edge/push_at/own_success'
+    assert not enabled._edge_metric_sums
+
+
+@pytest.mark.parametrize('agents', [1, 2, 4])
+def test_push_metric_masks_ignore_invalid_contact_and_support_unbatched_graph(agents):
+    from dataclasses import replace
+    from env.tasks.multi_agent.relation_diagnostics import edge_metric_masks
+    from utils.edge_ontop_spec import select_graph
+
+    graph = compose_graph(torch.full((2, agents), 5), True, 2 * agents)
+    graph = replace(graph, edge_valid=graph.edge_valid & (graph.edge_relation != 12))
+    for candidate in (graph, select_graph(graph, 0)):
+        masks = edge_metric_masks(candidate, 2, include_push=True)
+        assert not masks['contact'].any() and not masks['push_at'].any()
+        assert masks['at'].sum() == 2 * agents
+        assert torch.equal(masks['at'], edge_metric_masks(candidate, 2)['at'])
 
 
 def test_real_78k_warm_start_preserves_four_task_policy_outputs():

@@ -133,9 +133,11 @@ def validate_stage1_network(env, train):
 
 def validate_transformer(network):
     tp = network.get("transformer", {})
+    no_bias_push = (network.get("name") == "amp_multi_agent_push"
+                    and tp.get("relation_bias") is False)
     if (
         tp.get("relation_bias_mode") != "task_shared_embedding_action"
-        or tp.get("relation_bias") is not True
+        or (tp.get("relation_bias") is not True and not no_bias_push)
         or tp.get("relation_message", {}).get("enable", False)
         or tp.get("share_edge_encoder", False)
         or (network.get("separate") is not True)

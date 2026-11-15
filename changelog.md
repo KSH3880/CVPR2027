@@ -2,6 +2,189 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-15
+
+### Stage1 PUSH task attention bias 어블레이션
+
+- `stage1_push_no_bias` 환경/학습 YAML과 전용 train/test/VNC·일반/단독 eval wrapper를 추가했다. `output/stage1_push`의 고정 비율 scratch 설정에서 actor/critic의 task attention bias 계산만 생략하고 GTA·task embedding·Action MLP·보상·RSI·물리·PPO를 유지한다. 본학습 출력은 `output/stage1_push_no_bias/`이며 기존 bias 활성 PTH와의 재개·viewer·평가 혼용을 거부한다. [설정 상세](markdowns/reference/stage1_push_no_bias.md), [명령](markdowns/config.md), USAGE·structure를 갱신했다.
+- CPU250개 통과·외부 PTH6개 skip. bias 계산 미호출·초기0-bias 기준 출력 일치·task embedding/Action MLP gradient·padding/순열·5행동 eval 명령 경로를 확인했다. 실제2명·2048환경·4물체의 짧은 PPO 저장(epoch2)과 재개(epoch3), 모델/optimizer/RMS finite·Action MLP 갱신·bias projection0 유지,2환경·16step headless 추론을 확인했다. [CPU](output_etc/check/stage1_push_no_bias/cpu_tests.log), [PUSH 회귀](output_etc/check/stage1_push_no_bias/push_regression.log), [저장 검증](output_etc/check/stage1_push_no_bias/training_verification.json), [재개·추론](output_etc/check/stage1_push_no_bias/resume_verification.json). 본학습·정식 성능/FPS 비교·GUI/VNC는 실행하지 않았으며 기존 학습 PID54094를 유지했다.
+
+## 2026-11-14
+
+### Adaptive 재개 후 콘솔 FPS 표시
+
+- 영역 기준 재개 스크립트의 tee 파이프로 Python stdout이 버퍼링되어 adaptive 초기 로그 뒤 FPS 출력이 지연됨을 확인했다. TensorBoard에서는 학습이 계속 진행 중이었다. 향후 학습의 원래 FPS print에 flush=True를 추가하고 재개 스크립트에 PYTHONUNBUFFERED=1을 지정했다. 실행 중인 PID54094는 재시작하지 않고 실제 TensorBoard FPS를 읽어 base_2의 TTY에 `[TB]` 표시로 전달했다. epoch2603의 FPS가 pane에 보이는 것을 확인했고 변경 Python 구문·diff 검사를 통과했다. [표시 상태](output_etc/check/stage1_push_adaptive_console/status.json).
+
+### Stage1 PUSH adaptive 영역 성공률 전환
+
+- 영역(region) 성공률로 adaptive의 집중 선택·90% 숙련·80% 망각을 변경했다. 점/영역이 다른 모의 평가에서 영역 점수를 읽고 숙련을 판정하는 회귀 검증을 포함해 CPU 검증을 통과했다. 2k의 전체 controller 상태가 영역 기준 재계산과 동일함을 확인하고2500 저장본에서 재개했다. 새 run `Stage1PushAdaptive_14-16-54-58`의 학습 PID54094에서 region 로드 로그·MPS 서버 client 등록·epoch2501 PPO 진행·CLIMB50% 슬롯을 확인했다. 일반 저장본 재개라 AMP replay는 새로 채운다. [테스트](output_etc/check/stage1_push_adaptive_region/tests_full.log), [2k 이력 검증](output_etc/check/stage1_push_adaptive_region/history_equivalence.json), [적용 검증](output_etc/check/stage1_push_adaptive_region/activation_verification.json).
+
+### GPU0 MPS 준비 및 adaptive 자동 전환 감시
+
+- GPU0 전용 MPS 서버를 시작하고 runtime 자동 연결·작은 CUDA 연산·서버 client PID 일치를 확인했다. 기존 adaptive를 강제 종료하지 않고2000 epoch 평가 뒤 원래 supervisor의 재개로 전환했으며, 새 학습 PID4190730가 MPS 서버 client 목록에 실제 등록된 것을 확인했다. 기존 schedule PID22685는 점검 당시 이미 종료된 상태였고 이 작업에서 종료하지 않았다. [초기 접속 검증](output_etc/check/mps_recovery_20261114/probe.json), [학습 연결 검증](output_etc/check/mps_recovery_20261114/connected.json).
+
+### Stage1 PUSH schedule109000 정식 단독 평가
+
+- 사용자 요청으로 최신109000 저장본을5행동·각1명·512환경×seed0/1/2·900step·loco로 순차 평가했다. 점/영역 평균은 AT62.11/62.11%, ON_TOP66.28/67.51%, SIT76.17/89.00%, CLIMB87.83/95.70%, PUSH91.54/91.54%다. macro5 점76.78%·영역81.17%. CPU float64/GPU·JSON 건수·finite·checkpoint 해시 보존을 검증했고 float32/64 ever 차이는0건이다. 자원 guard 발동 없이 종료했고 기존 두 학습 PID가 평가 종료 시 유지됨을 확인했다. [리포트](output_etc/check/stage1_push_schedule_109000_single512_seeds012/report.md), [검증](output_etc/check/stage1_push_schedule_109000_single512_seeds012/verification.json), [자원 요약](output_etc/check/stage1_push_schedule_109000_single512_seeds012/resource_summary.json).
+
+### Stage1 PUSH 성공률 기반 집중 샘플링 실험
+
+- 별도 scratch용 `stage1_push_adaptive` 환경/학습 YAML과 train/test/VNC·일반/단독 eval wrapper를 추가했다. 최초2k epoch는5행동 각20%, 이후2k마다 행동별512환경·seed0·loco 단독 점 성공률로 판단한다. 한 행동50%·각 행동 최소5%·집중6k~12k,90% 이상2회 숙련·80% 미만2회 망각, 전체 숙련 시 균등20%로 계속 학습한다. epoch/성공 종료 조건은 없고 기존 보상·RSI·물리·PPO 설정은 유지한다. [설정 상세](markdowns/reference/stage1_push_adaptive.md), [실행 명령](markdowns/config.md).
+- 새 실험은 행동별 물리 슬롯을 배분하고 확률이 변할 때만 supervisor가 같은 run을 재개한다. 정책/optimizer/RMS·전역 epoch/frame·controller 상태·AMP replay를 이어받고 expert demo는 새 family 비율로 생성한다. 수동 resume은 원본 보존을 위해 새 run에 저장한다. 단독 평가/viewer는 배치 간격·인원 조정 전의 학습 계약으로 호환성을 확인한다. config/USAGE/structure를 갱신했다.
+- CPU191개 통과·외부 PTH 관련5개 skip. 실제2명·2048환경·4물체의 reset·슬롯/AMP 비율·PPO2회, 합성 성공률로 유도한 전환 저장, native train wrapper 재개 epoch2001의 가중치 갱신·optimizer/RMS finite·replay20만 복원과 CLIMB50%/나머지12.5%를 확인했다. epoch2000 경계는 검증용 counter 주입이며2k epoch 학습 성능 검증이 아니다. 실제 자동 evaluator 경로도5행동×16환경·seed0·loco로 확인했고 낙상 종료 trace의 CPU float64/GPU/JSON 일치·finite·float32/64 ever 차이0을 확인했다. [검증 보고](output_etc/check/stage1_push_adaptive_build/report.md), [검증 JSON](output_etc/check/stage1_push_adaptive_build/verification.json).
+- 균등·CLIMB 집중 조합의 RSI 캐시3182개를 검증 후 로컬 공용 캐시에 추가해7681→10863개로 보강했다. 기존 모든 mask/phase를 보존하고 원본을 검증 폴더에 백업했다. 다른 분포의 미등록 조합은 추후 추가 screening이 필요할 수 있다. 기존 본학습 PID22685는 유지했고 새 본학습은 시작하지 않았다. [캐시 보존 검증](output_etc/check/stage1_push_adaptive_build/shared_cache_update.json).
+
+## 2026-11-13
+
+### Stage1 PUSH schedule102500 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00102500.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT63.93/63.93%, ON_TOP69.01/70.44%, SIT66.21/88.35%, CLIMB92.51/99.67%, PUSH86.39/86.39%다. macro5는 점75.61±1.59%·영역81.76±1.15%(표본std)로99000보다 점1.93%p·영역1.03%p 높으며86500의 전체 평균보다 낮다. [리포트·명령](output_etc/check/stage1_push_schedule_102500_single512_seeds012/report.md).
+- 공식 evaluator의15개 명령을 최대3개씩 병렬 실행했다. 초기 장면10개 tensor가15회 모두99000과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_102500_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_102500_single512_seeds012/climb_diagnostics.json).
+
+### Stage1 PUSH schedule99000 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00099000.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT59.44/59.44%, ON_TOP68.68/70.18%, SIT64.45/89.97%, CLIMB91.60/99.80%, PUSH84.24/84.24%다. macro5는 점73.68±1.11%·영역80.73±0.91%(표본std)로86500보다 점8.36%p·영역5.14%p 낮다. 다섯 행동 모두 점 성공률이 하락했고 특히 AT·SIT의 하락이 크다. [리포트·명령](output_etc/check/stage1_push_schedule_99000_single512_seeds012/report.md).
+- 공식 evaluator의15개 명령을 최대3개씩 병렬 실행했다. 초기 장면10개 tensor가15회 모두86500과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_99000_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_99000_single512_seeds012/climb_diagnostics.json).
+
+## 2026-11-12
+
+### Stage1 PUSH schedule86500 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00086500.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT70.05/70.05%, ON_TOP76.89/77.86%, SIT80.79/95.70%, CLIMB96.35/99.61%, PUSH86.13/86.13%다. macro5는 점82.04±0.49%·영역85.87±0.28%(표본std)로82000보다 점7.64%p·영역6.48%p 높다. CLIMB 점은1.17%p 낮아졌고 나머지 네 행동 점 성공률은 회복했다. [리포트·명령](output_etc/check/stage1_push_schedule_86500_single512_seeds012/report.md).
+- 공식 evaluator의15개 명령을 최대3개씩 병렬 실행했다. 초기 장면10개 tensor가15회 모두82000과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_86500_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_86500_single512_seeds012/climb_diagnostics.json).
+
+## 2026-11-11
+
+### Stage1 PUSH schedule82000 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00082000.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT64.71/64.71%, ON_TOP64.91/65.76%, SIT67.90/90.56%, CLIMB97.53/98.96%, PUSH76.95/76.95%다. macro5는 점74.40±1.20%·영역79.39±0.84%(표본std)이며76500보다 점7.47%p·영역5.61%p 낮다. 다섯 행동 모두 점 성공률이 하락했고 원인을 단정하거나 학습 설정을 바꾸지 않았다. [리포트·명령](output_etc/check/stage1_push_schedule_82000_single512_seeds012/report.md).
+- 공식 evaluator의15개 명령을 최대3개씩 병렬 실행했다. 초기 장면10개 tensor가15회 모두76500과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_82000_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_82000_single512_seeds012/climb_diagnostics.json).
+
+### Stage1 PUSH schedule76500 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00076500.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT72.53/72.53%, ON_TOP76.24/78.06%, SIT79.49/92.19%, CLIMB98.57/99.67%, PUSH82.55/82.55%다. macro5는 점81.88±0.70%·영역85.00±0.10%(표본std)로64500보다 상승했다. 점 성공률은 다섯 행동 모두 상승했고 PUSH도77.60→82.55%로 회복했다. [리포트·명령](output_etc/check/stage1_push_schedule_76500_single512_seeds012/report.md).
+- 공식 evaluator의15개 명령을 최대3개씩 병렬 실행했다. 초기 장면10개 tensor가15회 모두64500과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_76500_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_76500_single512_seeds012/climb_diagnostics.json).
+
+## 2026-11-10
+
+### Stage1 PUSH schedule64500 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00064500.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT63.02/63.02%, ON_TOP68.36/70.05%, SIT78.45/92.90%, CLIMB95.90/99.93%, PUSH77.60/77.60%다. macro5는 점76.67±1.29%·영역80.70±0.34%(표본std)로59000보다 상승했다. AT·ON_TOP·SIT은 개선됐으며 CLIMB 점은97.01→95.90%, PUSH는80.40→77.60%로 낮아졌다. [리포트·명령](output_etc/check/stage1_push_schedule_64500_single512_seeds012/report.md).
+- 공식 evaluator의15개 명령을 최대3개씩 병렬 실행했다. 초기 장면10개 tensor가15회 모두59000과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_64500_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_64500_single512_seeds012/climb_diagnostics.json).
+
+## 2026-11-09
+
+### Stage1 PUSH schedule59000 정식 단독 재평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00059000.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 평균은 AT57.55/57.55%, ON_TOP64.78/66.73%, SIT70.12/92.32%, CLIMB97.01/99.87%, PUSH80.40/80.40%다. macro5는 점73.97±0.24%·영역79.38±0.40%(표본std)로53500보다 상승했다. CLIMB는 높은 수준을 유지했고 PUSH는82.88→80.40%로 낮아졌다. [리포트·명령](output_etc/check/stage1_push_schedule_59000_single512_seeds012/report.md).
+- 공식 evaluator가 생성한15개 명령을 최대3개씩 병렬 실행했다. 15개 초기 장면10개 tensor가53500과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_59000_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_59000_single512_seeds012/climb_diagnostics.json).
+
+### Stage1 PUSH schedule53500 정식 단독 평가
+
+- 사용자 요청으로 평가 시작 시 최신 `Stage1PushSchedule_00053500.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 seed 평균은 AT56.45/56.45%, ON_TOP59.24/61.13%, SIT58.07/79.49%, CLIMB97.14/99.67%, PUSH82.88/82.88%다. macro5는 점70.75±0.74%·영역75.92±0.37%(표본std)다. 기존 고정 비율75000과 다른 학습 run·epoch임을 구분했다. [리포트·명령](output_etc/check/stage1_push_schedule_53500_single512_seeds012/report.md).
+- CLIMB1536시도 중1492회 점 성공·1531회 내부 XY와 목표 높이 동시 만족을 확인했다. 15개 초기 장면10개 tensor가 기존75000과 bitwise 동일하며 전체900frame·CPU float64/GPU·JSON 건수 일치·finite·PTH 해시 보존·float32/64 ever 차이0을 확인했다. 본학습 PID22685와 코드·설정은 유지했다. [검증](output_etc/check/stage1_push_schedule_53500_single512_seeds012/verification.json), [CLIMB 진단](output_etc/check/stage1_push_schedule_53500_single512_seeds012/climb_report.md).
+
+## 2026-11-05
+
+### Stage1 PUSH 고정 epoch 스케줄 컨피그 추가
+
+- 새 scratch용 `stage1_push_schedule` 환경/학습 YAML과 train/test/VNC·수동 일반/단독 eval wrapper를 추가했다. 초반 AT20/ON_TOP15/SIT10/CLIMB30/PUSH25%,30k~40k 선형 전환 후 AT25/ON_TOP20/SIT5/CLIMB25/PUSH25%로 유지한다. 본학습 epoch 제한은 해제했고 자동 eval·성공률 전환/종료 조건은 없다. 보상·RSI·물리·PPO는 유지한다.
+- 고정 자산의 크기 호환성을 보존하면서 자산 집단의 평균 과제 확률을 목표 비율에 맞췄고 AMP family 비율도 같은 epoch를 따른다. 스케줄 명세와 전역 epoch 상태를 PTH에 저장해 resume/viewer가 저장 시점 분포를 복원하며 기존 고정 분포 PTH와 혼용을 거부한다. config/USAGE/structure·[상세](markdowns/reference/stage1_push_schedule.md)를 갱신했다.
+- CPU117개 통과·외부 PTH 관련5개 skip. 실제2명·2048환경·4물체의0/30k/35k/40k/100만 epoch reset·finite·크기/PUSH 불변·AMP 비율·35k 상태 복원을 확인했다. 짧은 학습 epoch2와 전용 wrapper 재개 epoch3에서 모델/RMS/optimizer finite·가중치 변경을 확인했다. 공용 RSI 캐시는 기존5360개 항목을 보존하고 검증된2321개만 추가했다. 본학습 PID1908198은 유지했으며 새 본학습·정책 eval·GUI/VNC는 실행하지 않았다. [검증 보고](output_etc/check/stage1_push_schedule/report.md), [검증 JSON](output_etc/check/stage1_push_schedule/verification.json).
+
+### Stage1 PUSH scratch75000 정식 단독 재평가
+
+- 평가 시작 시 최신 `Stage1Push_00075000.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 seed 평균은 AT80.53/80.53%, ON_TOP89.45/92.06%, SIT87.57/96.68%, CLIMB0/0%, PUSH88.80/88.80%다. macro5는 점69.27±0.59%·영역71.61±0.25%(표본std)로63500보다 개선됐으며 CLIMB는 회복되지 않았다.
+- CLIMB1536시도의 상자 외곽20cm 이내 접근은384회(25%)로63500의70.18%보다 낮아졌다. 골반25cm 이상 상승과 내부 XY·목표 높이 동시 만족은 모두0회다. 샘플링 변경 제안은 적용하지 않았고 본학습·보상·YAML은 유지했다. [CLIMB 진단](output_etc/check/stage1_push_75000_single512_seeds012/climb_report.md).
+- 15개 초기 장면10개 tensor 필드가63500과 bitwise 동일하며900frame·CPU float64/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했다. [리포트·명령](output_etc/check/stage1_push_75000_single512_seeds012/report.md), [검증](output_etc/check/stage1_push_75000_single512_seeds012/verification.json).
+
+## 2026-11-04
+
+### Stage1 PUSH scratch63500 정식 단독 평가·CLIMB 진단
+
+- 평가 시작 시 최신 `Stage1Push_00063500.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 평가했다. 점/영역 seed 평균은 AT65.36/65.36%, ON_TOP76.95/80.86%, SIT84.96/94.14%, CLIMB0/0%, PUSH83.01/83.01%다. macro5는 점62.06±0.37%·영역64.67±0.24%(표본std)다.52500 대비 AT·SIT 점·PUSH는 개선됐고 ON_TOP은 낮아졌다.
+- CLIMB1536시도 중1078회(70.18%)는 상자 외곽20cm 이내 접근했지만 골반25cm 이상 상승은0회, 내부 XY·목표 높이 동시 만족도0회였다. 학습과 평가의 root 목표 높이는 모두 상자 윗면+0.94m이며 평가는 발 조건을 요구하지 않는다. RSI 혼합 학습 프레임 지표와 loco 단독 성공률을 구분해 기록했다. 원인을 단정하거나 본학습·보상·YAML을 변경하지 않았다. [CLIMB 진단](output_etc/check/stage1_push_63500_single512_seeds012/climb_report.md).
+- 15개 초기 장면10개 tensor 필드가52500과 bitwise 동일하며900frame·CPU float64/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했다. 본학습 PID1908198은 유지했다. [리포트·명령](output_etc/check/stage1_push_63500_single512_seeds012/report.md), [검증](output_etc/check/stage1_push_63500_single512_seeds012/verification.json).
+
+## 2026-11-03
+
+### Stage1 PUSH viewer 인원·물체 수 제한 해제
+
+- viewer/test/VNC의1/2명·M≤2N 제한을 제거해 N≥1·M≥N으로 확장했다. ON_TOP은 남는 M−N개 받침을 서로 다르게 배정하고 초과 과제만 크기 호환 대체 과제로 재샘플링한다. `holding_ontop` 고정 요청도 부족하면 재샘플링한다. 다인 PUSH의 모든 사람·경로·상자 검사와 실제 받침을 제외한 distractor 재배치를 연결했다. 기존 학습2명·4물체·2048환경과 정식 단독1명 경로·RNG는 유지한다.
+- CPU57개 통과·외부 PTH 관련3개 skip. 실제52500 PTH로3/3·4/4·4/5·4/12·4/8·8/8 등7개 구성의4환경·32step·부분 reset·유효 과제/받침·PUSH 경로·finite·가중치 불변을 확인했다. test wrapper4명/4물체의 headless와 실제 GUI32step도 정상 종료했다. config/USAGE/structure/PUSH 상세와 전용 simulator checker를 갱신했다. 본학습은 재시작하지 않았다. [검증 보고](output_etc/check/push_viewer_counts/report.md), [검증](output_etc/check/push_viewer_counts/verification.json).
+
+### Stage1 PUSH scratch52500 정식 단독 재평가
+
+- `Stage1Push_00052500.pth`의5행동·각1명·512환경×seed0/1/2·900step·loco100% 평가를 완료했다. 점/영역 seed 평균은 AT62.30/62.30%, ON_TOP82.10/86.26%, SIT78.39/94.21%, CLIMB0/0%, PUSH77.86/77.86%다. macro5는 점60.13±0.13%·영역64.13±0.23%(표본std)다.47000 대비 ON_TOP은 개선됐고 전체 평균은 소폭 낮아졌다.
+- 코드 수정 중 시작된 CLIMB seed1의 초기 상태 차이를 발견해 해당 실행을 `pre_fix_cases/`에 보존하고 완료된 코드로 다시 평가했다. 최종15개 초기 장면의10개 tensor 필드는47000과 모두 bitwise 동일하다. CPU float64/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했다. [리포트·명령](output_etc/check/stage1_push_52500_single512_seeds012/report.md), [검증](output_etc/check/stage1_push_52500_single512_seeds012/verification.json).
+
+### Stage1 PUSH scratch47000 정식 단독 재평가
+
+- 최신 `Stage1Push_00047000.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 총15회 평가했다. 점/영역 seed 평균은 AT66.80/66.80%, ON_TOP77.99/83.59%, SIT79.23/94.27%, CLIMB0/0%, PUSH79.04/79.04%다. macro5는 점60.61±0.86%·영역64.74±0.75%(표본std)다.38000 대비 운반 두 과제·SIT가 개선됐고 PUSH는80.79→79.04%로 소폭 낮아졌다.
+- 15개 초기 장면의10개 tensor 필드가38000과 모두 bitwise 동일하다.15개 trace의900frame·CPU float64/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존과 seed별 서로 다른 초기 상태를 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_47000_single512_seeds012/report.md), [집계](output_etc/check/stage1_push_47000_single512_seeds012/summary.json), [검증](output_etc/check/stage1_push_47000_single512_seeds012/verification.json).
+
+## 2026-11-02
+
+### Stage1 PUSH scratch38000 정식 단독 평가
+
+- 사용자 요청대로 최신 `Stage1Push_00038000.pth`를5행동·각1명·512환경×seed0/1/2·900step·loco100%로 총15회 평가했다. 행동당1536시도이며 점/영역 seed 평균은 AT30.86/30.86%, ON_TOP47.07/51.69%, SIT71.22/88.48%, CLIMB0/0%, PUSH80.79/80.79%다. macro5는 점45.99±0.89%·영역50.36±0.55%(표본std)다. 이전32환경 평가와는 PTH·표본 구성이 달라 동일 장면 비교가 아니다.
+- 15개 trace 모두900frame·CPU float64/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했다. 각 행동의 세 seed 초기 상태가 서로 다름을 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_38000_single512_seeds012/report.md), [집계](output_etc/check/stage1_push_38000_single512_seeds012/summary.json), [검증](output_etc/check/stage1_push_38000_single512_seeds012/verification.json).
+
+### Stage1 PUSH scratch33000 소규모 단독 재평가
+
+- 최신 `Stage1Push_00033000.pth`를 이전과 같은5행동·각1명·32환경·seed0·900step·loco100%로 평가했다. 점/영역 성공은 AT3/3, ON_TOP9/10, SIT27/32, CLIMB0/0, PUSH25/25(각32시도), macro5는40/43.75%다.26500 대비 AT +3/+3, ON_TOP +8/+7, SIT -1/+2, PUSH +2/+2다. 낙상은 AT/ON_TOP/SIT 각1명이며512환경×3seed 정식 평가가 아니다.
+- 5행동의 초기 장면10개 tensor 필드가26500과 모두 bitwise 동일하다.5개 trace의900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_33000_single32_seed0/report.md), [검증](output_etc/check/stage1_push_33000_single32_seed0/verification.json).
+
+## 2026-11-01
+
+### Stage1 PUSH scratch26500 소규모 단독 재평가
+
+- 최신 `Stage1Push_00026500.pth`를 이전과 같은5행동·각1명·32환경·seed0·900step·loco100%로 평가했다. 점/영역 성공은 AT0/0, ON_TOP1/3, SIT28/30, CLIMB0/0, PUSH23/23(각32시도), macro5는32.5/35%다.24500 대비 ON_TOP 0/+2, SIT +11/+10, PUSH +1/+1이다. 낙상은 ON_TOP1명·SIT2명이며512환경×3seed 정식 평가가 아니다.
+- 5행동의 초기 장면10개 tensor 필드가24500과 모두 bitwise 동일하다.5개 trace의900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_26500_single32_seed0/report.md), [검증](output_etc/check/stage1_push_26500_single32_seed0/verification.json).
+
+### Stage1 PUSH scratch24500 소규모 단독 재평가
+
+- 최신 `Stage1Push_00024500.pth`를 이전과 같은5행동·각1명·32환경·seed0·900step·loco100%로 평가했다. 점/영역 성공은 AT0/0, ON_TOP1/1, SIT17/20, CLIMB0/0, PUSH22/22(각32시도), macro5는25/26.875%다.21000 대비 ON_TOP +1/+1, SIT +1/0, PUSH +5/+5다. 낙상은 ON_TOP3명·SIT2명·PUSH1명이며512환경×3seed 정식 평가가 아니다.
+- 5행동의 초기 장면10개 tensor 필드가21000과 모두 bitwise 동일하다.5개 trace의900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_24500_single32_seed0/report.md), [검증](output_etc/check/stage1_push_24500_single32_seed0/verification.json).
+
+### Stage1 PUSH viewer 고정 과제 옵션 문서화
+
+- 기본1환경 viewer에서 PUSH가 보이지 않는 경우를 확인했다. PUSH용 물체 슬롯은 생성 때 고정되므로 해당 슬롯이 없으면 reset으로 PUSH가 새로 생기지 않는다. 기존 `TASK_GRAPH=push` 옵션과 viewer 명령을 config/USAGE에 보완했다. 실행 중인 viewer의 최근 CSV에서 ON_TOP/운반 AT 관계를 확인했고 코드·실행 프로세스는 변경하지 않았다. 문서 diff·경로를 확인했다.
+
+### Stage1 PUSH scratch21000 소규모 단독 평가
+
+- 현재 scratch 학습의 최신 `Stage1Push_00021000.pth`를 이전과 같은5행동·각1명·32환경·seed0·900step·loco100%로 평가했다. 점/영역 성공은 AT0/0, ON_TOP0/0, SIT16/20, CLIMB0/0, PUSH17/17(각32시도)이며 macro5는20.625/23.125%다. 낙상은 SIT4명, 나머지0명이다. 이전12000의 전 행동0/32 대비 SIT·PUSH가 개선됐다. 외부21k finetune과 다른 PTH이며512환경×3seed 정식 평가가 아니다.
+- 5행동의 초기 장면10개 tensor 필드가12000과 모두 bitwise 동일하다.5개 trace의900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_21000_single32_seed0/report.md), [검증](output_etc/check/stage1_push_21000_single32_seed0/verification.json).
+
+## 2026-10-31
+
+### Stage1 PUSH12000 소규모 단독 재평가
+
+- 평가 시작 시 최신 `Stage1Push_00012000.pth`를 이전과 같은5행동·각1명·32환경·seed0·900step·loco100%로 평가했다. 점·영역 모두 각0/32·macro5 0%로9000 대비 성공수 개선은 없었다. 낙상은 AT/ON_TOP 각1명, 나머지0명이다.512환경×3seed 정식 평가가 아니다.
+- 5행동의 초기 장면10개 tensor 필드가9000과 모두 bitwise 동일하다.5개 trace의900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했고 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_12000_single32_seed0/report.md), [검증](output_etc/check/stage1_push_12000_single32_seed0/verification.json).
+
+### Stage1 PUSH9000 소규모 단독 재평가
+
+- 최신 저장본 `Stage1Push_00009000.pth`를 이전과 같은5행동·각1명·32환경·seed0·900step·loco100%로 평가했다. 점·영역 모두 각0/32·macro5 0%로7000 대비 성공수 개선은 없었다. 낙상은 ON_TOP1명, 나머지0명이다.512환경×3seed 정식 평가가 아니다.
+- 5개 초기 장면의10개 tensor 필드가7000과 모두 bitwise 동일하다.5개 trace의900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했다. 본학습은 유지했다. [리포트·명령](output_etc/check/stage1_push_9000_single32_seed0/report.md), [검증](output_etc/check/stage1_push_9000_single32_seed0/verification.json).
+
+### Stage1 PUSH7000 소규모 단독 평가
+
+- 사용자 요청대로 최신 저장본 `Stage1Push_00007000.pth`의5행동을 각각1명·32환경·seed0 한 번·900step·loco100%로 평가했다. AT/ON_TOP/SIT/CLIMB/PUSH 점·영역은 모두0/32이며 macro5도0%다. 낙상은 ON_TOP/PUSH 각1명, 나머지0명이다. 학습 중 frame 성공률과 다른 loco 단독 결과이며512환경×3seed 정식 평가가 아니다.
+- 5개 trace 모두900frame·CPU/GPU·JSON 건수 일치·float32/64 ever 차이0·finite·PTH 해시 보존을 확인했다. 기존 본학습은 유지했다. 실행 명령·결과는 [리포트](output_etc/check/stage1_push_7000_single32_seed0/report.md), [검증](output_etc/check/stage1_push_7000_single32_seed0/verification.json)에 기록했다. 코드·YAML·기본 평가 명령은 변경하지 않았다.
+
+## 2026-10-30
+
+### PUSH 접촉과 목표 도달 지표 분리
+
+- PUSH 포함 설정의 TensorBoard 관계 지표를 `edge/contact/*`와 `edge/push_at/*`로 추가하고 `edge/at/*`를 운반 AT 전용으로 바꿨다. 유효 PUSH 관계의 소유자로 AT를 구분해 edge 순서·alias와 무관하게 집계한다. `own_success`는 현재 성공 비율이며 접촉 보상 포화와 실제 접촉 성공은 구분한다. 보상·성공 조건·모델·실행 명령은 유지하며 기존 프로세스는 재시작하지 않았다. 변경은 다음 시작·재개부터 적용된다.
+- CPU65개 통과·외부 파일 관련3개 skip. 혼합 과제/edge shuffle에서 contact·PUSH AT·운반 AT의 서로 다른 성공률,1/2/4명·비활성 관계·단일 그래프 배치, 진단 on/off 보상과 runtime 결과 bitwise 동일을 확인했다. Stage2 전이 검사1개는 로컬21k PTH 부재로 실패해 후속 실행에서 제외했다. GPU 학습과 속도 비교는 실행하지 않았다. [전체 검사](output_etc/check/push_metrics/tests.log), [사용 가능한 검사](output_etc/check/push_metrics/tests_available.log). 지표 상세·structure를 갱신했다.
+
+### 새 checkout의 Stage1 PUSH 데이터 연결 복구
+
+- tmux `base`의 `stage1_push`가 SIT `ref_motion.npy`의 `FileNotFoundError`로 종료된 원인은 Git에서 제외된 외부 데이터 링크 누락이었다. 이 checkout에 공유 `TokenHSI`의 기본 네 데이터셋 `motions` 링크와 Downloads의 PUSH 모션21개 링크를 복구했다. PUSH는 manifest 경로마다 bank SHA256과 일치하는 원본 파일을 연결했으며 외부 원본과 기존 학습 프로세스는 변경하지 않았다. USAGE에 실제 공유 경로와 새 checkout의 링크 복구 주의점을 기록했다.
+- 두 manifest의 고유 참조 파일121개 존재·PUSH21개 해시 일치를 확인했다.2048환경 CHECK에서 모션 로딩·첫 물리 step을 통과하고 RSI5360 profile screening 진행을 확인했다. 전체 캐시 생성/PPO 완료 전 이번 CHECK만 SIGINT로 종료했으므로 학습 완료 검증은 아니다. [파일 검증](output_etc/check/stage1_push_data_links/verification.json), [확인 로그](output_etc/check/stage1_push_data_links/train.log).
+
 ## 2026-10-29
 
 ### PUSH viewer 목표구 확대

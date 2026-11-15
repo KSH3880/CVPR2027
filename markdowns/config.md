@@ -4,10 +4,11 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 여덟 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 유지하는 실험은 아래 열한 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
 - 학습 인자: `[agents] [envs] [objects]`. Stage1·Stage1 PUSH는 **2명·2048환경·4물체**, BEFORE·coupled는 **4명·1024환경·8토큰**이다. BEFORE의 인원 N≥1, 토큰 M≥2N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
+- Stage1 PUSH viewer는 사람 N≥1·물체 M≥N을 지원한다. ON_TOP 받침이 부족하면 초과 과제를 재샘플링한다. 학습과 정식 평가의 인원 규약은 유지한다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
 - 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이다.
@@ -25,6 +26,9 @@
 | [stage2_before_push.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push.yaml) | [stage2_before_push.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push.yaml) |
 | [stage2_coupled_push.yaml](../tokenhsi/data/cfg/multi_agent/stage2_coupled_push.yaml) | [stage2_coupled_push.yaml](../tokenhsi/data/cfg/train/rlg/stage2_coupled_push.yaml) |
 | [stage2_before_push_near50.yaml](../tokenhsi/data/cfg/multi_agent/stage2_before_push_near50.yaml) | [stage2_before_push_near50.yaml](../tokenhsi/data/cfg/train/rlg/stage2_before_push_near50.yaml) |
+| [stage1_push_schedule.yaml](../tokenhsi/data/cfg/multi_agent/stage1_push_schedule.yaml) | [stage1_push_schedule.yaml](../tokenhsi/data/cfg/train/rlg/stage1_push_schedule.yaml) |
+| [stage1_push_adaptive.yaml](../tokenhsi/data/cfg/multi_agent/stage1_push_adaptive.yaml) | [stage1_push_adaptive.yaml](../tokenhsi/data/cfg/train/rlg/stage1_push_adaptive.yaml) |
+| [stage1_push_no_bias.yaml](../tokenhsi/data/cfg/multi_agent/stage1_push_no_bias.yaml) | [stage1_push_no_bias.yaml](../tokenhsi/data/cfg/train/rlg/stage1_push_no_bias.yaml) |
 
 ## 학습
 
@@ -52,6 +56,15 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_train.sh 4 
 
 # stage2_before_push_near50
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_train.sh 4 1024 8
+
+# stage1_push_schedule
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_schedule_train.sh 2 2048 4
+
+# stage1_push_adaptive
+TOKENHSI_GPU=0 SEED=42 bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_train.sh 2 2048 4
+
+# stage1_push_no_bias
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_no_bias_train.sh 2 2048 4
 ```
 
 ## 로컬 추론
@@ -82,6 +95,15 @@ TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_
 
 # stage2_before_push_near50
 TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_test.sh "$CKPT" 4 1 8 10
+
+# stage1_push_schedule
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_push_schedule_test.sh "$CKPT" 2 1 4 10
+
+# stage1_push_adaptive
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_test.sh "$CKPT" 2 1 4 10
+
+# stage1_push_no_bias
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_push_no_bias_test.sh "$CKPT" 2 1 4 10
 ```
 
 ## 서버 VNC 추론
@@ -112,11 +134,20 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_vnc.sh "$CK
 
 # stage2_before_push_near50
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_vnc.sh "$CKPT" 4 1 8 10
+
+# stage1_push_schedule
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_schedule_vnc.sh "$CKPT" 2 1 4 10
+
+# stage1_push_adaptive
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_vnc.sh "$CKPT" 2 1 4 10
+
+# stage1_push_no_bias
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_no_bias_vnc.sh "$CKPT" 2 1 4 10
 ```
 
 ## 추론 옵션
 
-- `TASK_GRAPH=random_scenario`가 기본이다. Stage1: `sit`, `climb`, `holding_at`, `holding_ontop`, `sit_climb`. BEFORE: `before_sit`, `before_climb`, `before_stack`, `one_pair_sit`, `one_pair_climb`, `one_pair_stack`, `all_solo`, `sit`, `climb`, `holding_at`, `holding_ontop`.
+- `TASK_GRAPH=random_scenario`가 기본이다. Stage1: `sit`, `climb`, `holding_at`, `holding_ontop`, `sit_climb`. Stage1 PUSH는 `push`도 지원하며 전원을 독립 PUSH로 고정한다. BEFORE: `before_sit`, `before_climb`, `before_stack`, `one_pair_sit`, `one_pair_climb`, `one_pair_stack`, `all_solo`, `sit`, `climb`, `holding_at`, `holding_ontop`.
 - `EVAL_SKILLS`와 `EVAL_SKILL_PROBS`는 함께 지정한다. 예: `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`. BEFORE의 기본 초기화는 loco이며 후행 RSI는 별도 옵션으로 선택한다.
 - `TASK_CAMERA=stack` 또는 `agent`로 viewer 카메라를 선택한다. 그 외 초기화·거리·resume·실행 환경 옵션은 [USAGE](USAGE.md)를 따른다.
 
@@ -168,4 +199,33 @@ TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_eval.sh "$C
 ```bash
 # stage2_before_push_near50
 TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_before_push_near50_eval.sh "$CKPT" --output output_etc/check/stage2_before_push_near50_general
+```
+
+- `stage1_push_schedule`의 일반·단독 평가는 사용자가 수동 실행하며 저장 PTH의 epoch에 해당하는 분포를 복원한다. 학습 중 자동 평가는 없다. [스케줄 상세](reference/stage1_push_schedule.md).
+
+```bash
+# stage1_push_schedule
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_schedule_eval.sh "$CKPT" --output output_etc/check/stage1_push_schedule_general
+
+# stage1_push_schedule 전용 1명 단독 비교
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_schedule_single_eval.sh "$CKPT" --output output_etc/check/stage1_push_schedule_single
+```
+
+
+- `stage1_push_adaptive`는 별도 scratch 실험이며 학습 중 자동 평가·집중 비율 전환을 수행한다. 수동 평가는 아래 명령을 사용한다. [적응형 설정 상세](reference/stage1_push_adaptive.md).
+
+```bash
+# stage1_push_adaptive
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_eval.sh "$CKPT" --output output_etc/check/stage1_push_adaptive_general
+
+# stage1_push_adaptive 전용 1명 단독 비교
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_single_eval.sh "$CKPT" --output output_etc/check/stage1_push_adaptive_single
+```
+
+```bash
+# stage1_push_no_bias
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_no_bias_eval.sh "$CKPT" --output output_etc/check/stage1_push_no_bias_general
+
+# stage1_push_no_bias 전용 1명 단독 비교
+TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_no_bias_single_eval.sh "$CKPT" --output output_etc/check/stage1_push_no_bias_single
 ```

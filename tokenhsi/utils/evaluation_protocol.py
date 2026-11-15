@@ -24,7 +24,7 @@ def configure(args, cfg, name):
     if args.eval_skills not in ('', 'loco') or args.eval_skill_probs not in ('', '1.0'):
         raise ValueError('Formal evaluation requires loco')
     if profile == 'stage1_single':
-        if name not in ('stage1', 'stage1_push') or args.eval_single_task not in SINGLE_PRESETS or (name == 'stage1' and args.eval_single_task == 'PUSH'):
+        if name not in ('stage1', 'stage1_push', 'stage1_push_schedule','stage1_push_adaptive','stage1_push_no_bias') or args.eval_single_task not in SINGLE_PRESETS or (name == 'stage1' and args.eval_single_task == 'PUSH'):
             raise ValueError('Single-task evaluation is exclusive to Stage1')
         preset, objects = SINGLE_PRESETS[args.eval_single_task]
         cfg['env'].update(numAgents=1, numObjects=objects)

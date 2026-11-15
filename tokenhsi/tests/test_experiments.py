@@ -22,7 +22,7 @@ def test_profiles_validate_and_native_sources_are_not_mutated(name):
     validate_unified_env(cfg['env'])
     validate_experiment(name, cfg['env'], train)
     assert cfg == before
-    assert cfg['env']['numEnvs'] == (2048 if name in (FIXED, 'stage1_push') else 1024)
+    assert cfg['env']['numEnvs'] == (2048 if name in (FIXED, 'stage1_push', 'stage1_push_schedule','stage1_push_adaptive','stage1_push_no_bias') else 1024)
 
 
 @pytest.mark.parametrize('source', BEFORE_NAMES)
@@ -49,6 +49,9 @@ def test_saved_env_and_sim_are_authoritative_and_explicit_yaml_wins(tmp_path, na
     saved = native_config(name)
     saved['env']['episodeLength'] = 777
     saved['sim']['physx']['num_position_iterations'] = 9
+    if name == 'stage1_push_adaptive':
+        from utils.stage1_push_adaptive import initial_state, STATE_KEY
+        torch.save(dict(epoch=0, **{STATE_KEY: initial_state(saved['env']['adaptiveSampling'])}), checkpoint)
     (run/'relation_config.yaml').write_text(yaml.safe_dump(saved))
     loaded, path = load_environment(name, '', str(checkpoint), saved=True)
     assert loaded['env']['episodeLength'] == 777

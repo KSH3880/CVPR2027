@@ -121,6 +121,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
 
         self._init_train()
 
+        if self._after_training_epoch():
+            return self.last_mean_rewards, self.epoch_num
+
         while True:
             epoch_num = self.update_epoch()
             self._update_training_curriculum()
@@ -140,7 +143,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                 if self.print_stats:
                     fps_step = curr_frames / scaled_play_time
                     fps_total = curr_frames / scaled_time
-                    print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}')
+                    print(f'fps step: {fps_step:.1f} fps total: {fps_total:.1f}', flush=True)
 
                 self.writer.add_scalar('performance/total_fps', curr_frames / scaled_time, frame)
                 self.writer.add_scalar('performance/step_fps', curr_frames / scaled_play_time, frame)
@@ -172,6 +175,9 @@ class CommonAgent(a2c_continuous.A2CAgent):
                     if self.has_self_play_config:
                         self.self_play_manager.update(self)
 
+                if self._after_training_epoch():
+                    return self.last_mean_rewards, epoch_num
+
                 if self.save_freq > 0:
                     if (epoch_num % self.save_freq == 0):
                         self.save(model_output_file)
@@ -180,7 +186,7 @@ class CommonAgent(a2c_continuous.A2CAgent):
                             int_model_output_file = model_output_file + '_' + str(epoch_num).zfill(8)
                             self.save(int_model_output_file)
 
-                if epoch_num > self.max_epochs:
+                if self.max_epochs >= 0 and epoch_num > self.max_epochs:
                     self.save(model_output_file)
                     print('MAX EPOCHS NUM!')
                     return self.last_mean_rewards, epoch_num
@@ -191,6 +197,10 @@ class CommonAgent(a2c_continuous.A2CAgent):
     def _update_training_curriculum(self):
         """Apply epoch-dependent settings before resets/rollouts, if configured."""
         return
+
+    def _after_training_epoch(self):
+        """Optional managed curriculum boundary, after a complete PPO update."""
+        return False
 
     def set_full_state_weights(self, weights):
         self.set_weights(weights)

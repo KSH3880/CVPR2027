@@ -14,6 +14,8 @@ PyTorch는 서버 GPU/CUDA 호환 설치본을 사용하며 Isaac Gym은 torch�
 
 `tokenhsi/data/dataset_loco_sit_carry_climb.yaml`이 참조하는 `dataset_{amass_loco,amass_climb,sit,carry}/motions`를 공유 데이터에 심링크로 연결한다. 외부 데이터와 원본 checkout은 읽기 전용이다.
 
+이 머신의 공유 데이터는 `/home/cvlab/Desktop/CVPR2027/TokenHSI/tokenhsi/data/`에 있다. 네 `motions` 링크는 Git 관리 대상이 아니므로 새 checkout에서는 다시 연결해야 한다. `FileNotFoundError`가 모션 로딩 중 발생하면 YAML 변경 전에 해당 링크와 원본 파일의 존재를 확인한다.
+
 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`다. 현재 링크 대상은 `/home/cvlab/Desktop/CVPR2027/stage1_message/output/stage1_v2_fixed/Stage1V2Fixed_15-11-38-22/nn/Stage1V2Fixed_00078000.pth`다. 다른 머신은 링크를 연결하거나 `STAGE1_CHECKPOINT=<절대경로>`로 BEFORE 새 학습의 source를 지정한다.
 
 BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는 기존 run의 `relation_config.yaml`도 필요하다. 확인 학습 저장본은 장기 성능 검증을 의미하지 않는다.
@@ -58,7 +60,28 @@ BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는
 
 `stage1_push_single_eval.sh`는 실제1명·행동별 평가이며 PUSH도 포함한다. AT만9종 크기를 쓰고 PUSH는 학습167종 크기를 쓴다. 기존4과제 macro와 전체5과제 macro를 별도로 보존한다. [실행 명령](config.md), [구현 상세](reference/stage1_push.md)를 따른다.
 
+`stage1_push_no_bias`는 같은 고정 비율 scratch 설정에서 actor/critic의 task attention bias만 제거한다. 전용 train/test/VNC·일반/단독 eval wrapper를 사용하고 기본 명령은 [config](config.md), 제거 범위는 [상세](reference/stage1_push_no_bias.md)를 따른다. 재개는 `RESUME_CHECKPOINT`에 같은 no-bias 학습의 PTH를 지정한다. 기존 bias 활성 PTH와의 재개·viewer·평가 혼용은 거부한다.
+
+Stage1 PUSH의 기본 `random_scenario` viewer는 환경 생성 때 PUSH용 상자 슬롯 여부를 고정한다. 적은 환경에서 PUSH 슬롯이 뽑히지 않으면 reset을 반복해도 PUSH가 나타나지 않는다. PUSH만 보려면 기존 test/VNC 명령에 `TASK_GRAPH=push`를 붙인다. 예:
+
+```bash
+CKPT=output/stage1_push/Stage1Push_30-23-30-00/nn/Stage1Push.pth
+
+# stage1_push: 4명·4물체, 가능한 행동으로 샘플링
+TOKENHSI_GPU=0 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage1_push_test.sh "$CKPT" 4 1 4 10
+
+# stage1_push: 4명·5물체, ON_TOP 1명과 재샘플링된 나머지 과제
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=holding_ontop bash tokenhsi/scripts/multi_agent/stage1_push_test.sh "$CKPT" 4 1 5 10
+
+# stage1_push: 8명 모두 독립 PUSH
+TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=push bash tokenhsi/scripts/multi_agent/stage1_push_test.sh "$CKPT" 8 1 8 10
+```
+
+Stage1 PUSH viewer/test/VNC는 사람 N≥1·물체 M≥N을 지원하며 물체 수 상한은 두지 않는다. 각 사람의 주 물체 N개를 먼저 확보하고, ON_TOP은 남은 M−N개에서 서로 다른 받침을 배정한다. 부족하면 초과 ON_TOP 과제만 크기에 맞는 다른 과제로 다시 뽑는다. `holding_ontop` 고정 요청에도 이 규칙을 적용하므로 M=N이면 전원이 대체 과제를 수행한다. 추가 물체는 distractor로 배치한다. 새 학습은 기존2명·4물체·2048환경, 정식 단독 평가는1명 규약을 유지한다.
+
 PUSH 모션21개는 `tokenhsi/data/jointpush_motions/` 아래 읽기 전용 원본으로 연결한다. 기본 원본은 `/home/cvlab/Downloads/push_amp_raw_rsi_environment_final_20261024/data/motions/`이고 bank의 파일 해시를 검증한다. `checkpoints/Stage1PushFinetune_00021000.pth`는 Downloads의 원본 PTH를 가리킨다. 원격 파일 이름의 jointpush는 여기서는 독립 과제 통합이며 Stage2 공동 PUSH를 포함하지 않는다.
+
+PUSH manifest의 `jointpush_motions/dataset_*/motions/.../ref_motion.npy` 경로마다 원본 패키지의 `push_001`–`push_021` 안에 있는 동일 SHA256 파일을 심링크로 연결한다. 원본 패키지는 디렉터리 구조가 다르므로 `jointpush_motions` 전체를 원본 `data/motions`에 연결하는 것만으로는 해결되지 않는다. 새 scratch 학습에도 기본 네 데이터셋과 PUSH 모션 링크가 모두 필요하다.
 
 ## BEFORE PUSH
 
@@ -110,3 +133,29 @@ TOKENHSI_GPU=0 HEADLESS=0 TASK_GRAPH=all_coupled bash tokenhsi/scripts/multi_age
 두 Stage2 저장본은26k의 기존165 tensor를 그대로 복사하고 coordination을 identity로 초기화했다. 추가 학습0회이며 전이 원본·계약·1200step 장면 설정을 각각 저장한다. near50에서 BEFORE ON_TOP 쌍만 보려면 `TASK_GRAPH=before_stack`, coupled에서 독립/2~4명 그룹 혼합을 보려면 `TASK_GRAPH=random_scenario`를 사용한다. 관찰용 저장본에는 optimizer가 없다. 이 문서의26k 검증/관찰 명령은 기존 YAML의 기본21k 전이 경로를 변경하지 않는다.
 
 PUSH가 포함된 설정의 viewer/VNC/영상 목표구는 반지름20cm로 표시한다(기존3cm). 목표 좌표와 성공 거리 판정은 그대로이며 기존 실행 명령을 다시 실행하면 적용된다.
+
+## Stage1 PUSH 스케줄 실행 옵션
+
+새 스케줄 실험은 `stage1_push_schedule` 전용 wrapper를 사용한다. 스케줄·체크포인트 분포는 [상세](reference/stage1_push_schedule.md), 기본 train/test/VNC 명령은 [config](config.md)를 따른다. 기존 `stage1_push` PTH를 스케줄 실험으로 resume하지 않는다.
+
+```bash
+RESUME_CHECKPOINT=/absolute/path/to/Stage1PushSchedule_00035000.pth TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage1_push_schedule_train.sh 2 2048 4
+```
+
+
+## Stage1 PUSH adaptive 실행·재개
+
+기본 seed42의 스크래치 실행은 이전 실행 옵션을 해제한 뒤 전용 wrapper를 사용한다.
+
+```bash
+unset CHECK MAX_ITERATIONS OUTPUT_PATH RESUME_CHECKPOINT ENV_CONFIG
+TOKENHSI_GPU=0 SEED=42 bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_train.sh 2 2048 4
+```
+
+`stage1_push_adaptive_train.sh`는 전용 supervisor를 거쳐 자동 자산 재생성 때 동일 run의 체크포인트와 TensorBoard epoch/frame을 이어 간다. 수동 resume은 원본 run의 이후 PTH를 보존하도록 새 run 디렉터리를 만들며 전역 epoch/frame과 curriculum 상태를 복원한다. 직접 `run.py` 학습은 물리 자산 재생성 supervisor가 없으므로 거부한다. 본학습에는 `CHECK`·`MAX_ITERATIONS`를 설정하지 않는다. 중단 후 가장 최근 `Stage1PushAdaptive_adaptive_*.pth` 또는 일반 저장 PTH를 선택한다.
+
+```bash
+TOKENHSI_GPU=0 RESUME_CHECKPOINT=/absolute/path/to/Stage1PushAdaptive_adaptive_00002000.pth bash tokenhsi/scripts/multi_agent/stage1_push_adaptive_train.sh 2 2048 4
+```
+
+자동 평가는 영역(region) ever 성공률로 집중 대상·숙련·망각을 판단하며 `adaptive/eval_region_*`에 기록한다. 로그·trace·전환 판단은 `output_etc/check/stage1_push_adaptive/<run>/epoch_<epoch>/attempt_*/`에 저장한다. 평가 실패 시 해당 새 학습 실행은 오류를 드러내고 종료하며, 확률·성공 카운터를 임의 갱신하지 않는다. 중단된 평가의 `evaluation_snapshot.pth`로도 재개할 수 있다. 평가 지표와 수동 정식 평가의 구분·집중 구간 규칙은 [상세](reference/stage1_push_adaptive.md)를 따른다.

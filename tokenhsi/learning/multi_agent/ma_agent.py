@@ -32,6 +32,9 @@ class MAAgent(amp_agent.AMPAgent):
     def __init__(self, base_name, config):
         super().__init__(base_name, config)
         task = self.vec_env.env.task
+        if 'adaptiveSampling' in task.cfg['env']:
+            from utils.stage1_push_adaptive import state_for_env
+            self._adaptive_sampling_state = copy.deepcopy(state_for_env(task.cfg['env']))
         task._relation_output_directory = self.experiment_dir
         with open(task.cfg["args"].cfg_train) as f:
             resolved = yaml.safe_load(f)
@@ -158,6 +161,16 @@ class MAAgent(amp_agent.AMPAgent):
         if task.cfg["env"].get("jointPush") is not None and not getattr(task, "_before", False) and not getattr(task, "_coupled", False):
             from utils.stage1_jointpush import contract
             weights["stage1_jointpush_contract"] = contract(task.cfg["env"])
+            if 'samplingSchedule' in task.cfg['env']:
+                from utils.stage1_push_schedule import schedule_state
+                weights['stage1_push_sampling_state'] = schedule_state(task.cfg['env'], self.epoch_num)
+            if 'adaptiveSampling' in task.cfg['env']:
+                weights['stage1_push_adaptive_state'] = copy.deepcopy(self._adaptive_sampling_state)
+                from utils.stage1_push_adaptive import EVAL_CRITERION
+                weights['stage1_push_adaptive_eval_criterion'] = EVAL_CRITERION
+                if getattr(self, '_adaptive_save_replay', False):
+                    from learning.multi_agent.adaptive_sampling import replay_state
+                    weights['stage1_push_adaptive_replay'] = replay_state(self._amp_replay_buffer)
         if getattr(task,"_coupled",False):
             from utils.coupled_push_spec import checkpoint_contract
             weights["coupled_push_contract"]=checkpoint_contract(task.cfg["env"])
@@ -166,9 +179,15 @@ class MAAgent(amp_agent.AMPAgent):
     def set_weights(self, weights):
         task = self.vec_env.env.task
         if task.cfg['env'].get('jointPush') is not None and not getattr(task, '_before', False) and not getattr(task, '_coupled', False):
+            from utils.experiments import check_push_bias_checkpoint
+            check_push_bias_checkpoint(weights, self.model.a2c_network.actor_encoder.use_relation_bias)
             from utils.stage1_jointpush import contract
             if weights.get('stage1_jointpush_contract') != contract(task.cfg['env']):
                 raise ValueError('PUSH resume requires identical training configuration')
+            from utils.stage1_push_schedule import check_schedule_checkpoint
+            check_schedule_checkpoint(weights, task.cfg['env'])
+            from utils.stage1_push_adaptive import check_checkpoint
+            check_checkpoint(weights, task.cfg['env'])
         if getattr(task,"_coupled",False):
             from utils.coupled_push_spec import check_checkpoint
             check_checkpoint(weights,task.cfg["env"])
@@ -190,7 +209,11 @@ class MAAgent(amp_agent.AMPAgent):
             weights, checkpoint_metadata(self.vec_env.env.task._relation_cfg)
         )
         check_agent_collision_checkpoint(weights, task.cfg["env"])
-        return super().set_weights(weights)
+        result = super().set_weights(weights)
+        if 'adaptiveSampling' in task.cfg['env']:
+            self._adaptive_sampling_state = copy.deepcopy(weights['stage1_push_adaptive_state'])
+            self._adaptive_pending_replay = weights.get('stage1_push_adaptive_replay')
+        return result
 
     def _build_net_config(self):
         config = super()._build_net_config()
@@ -362,6 +385,25 @@ class MAAgent(amp_agent.AMPAgent):
         }
         self.dataset.update_values_dict(dataset_dict)
         return
+
+    def _update_training_curriculum(self):
+        super()._update_training_curriculum()
+        task = self.vec_env.env.task
+        if hasattr(task, 'set_sampling_epoch'):
+            task.set_sampling_epoch(self.epoch_num)
+
+    def _init_train(self):
+        super()._init_train()
+        pending = getattr(self, '_adaptive_pending_replay', None)
+        if pending is not None:
+            from learning.multi_agent.adaptive_sampling import restore_replay
+            restore_replay(self._amp_replay_buffer, pending)
+            self._adaptive_pending_replay = None
+            print('[adaptive] AMP replay restored: '+str(self._amp_replay_buffer.get_total_count())+' recorded samples', flush=True)
+
+    def _after_training_epoch(self):
+        from learning.multi_agent.adaptive_sampling import after_epoch
+        return after_epoch(self)
 
     def train_epoch(self):
         task = self.vec_env.env.task

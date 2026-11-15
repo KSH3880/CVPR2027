@@ -234,8 +234,8 @@ class RelationEncoder(nn.Module):
             or relation_reward_mode != STAGE1_CONTEXT_MODE
         ):
             raise ValueError("Stage1 requires clean_scene and the Stage1 reward mode")
-        if relation_bias_mode != "task_shared_embedding_action" or not relation_bias:
-            raise ValueError("Stage1 requires shared task bias")
+        if relation_bias_mode != "task_shared_embedding_action":
+            raise ValueError("Stage1 requires shared task embeddings and Action MLP")
         compile_stage1_graph(relation_graph_spec, num_agents, num_objects)
         self.relation_graph_spec = relation_graph_spec
         self.diagnostics_interval = max(1, int(diagnostics_interval))
@@ -254,6 +254,7 @@ class RelationEncoder(nn.Module):
         self.type_embed = nn.Parameter(torch.zeros(len(self.entity_sizes), d_model))
         nn.init.trunc_normal_(self.type_embed, std=0.02)
         self.edge_encoder = TaskTypeEmbeddingBias(num_layers, num_heads)
+        self.edge_encoder.bias_projection.requires_grad_(relation_bias)
         self.register_buffer(
             "rel_matrix",
             build_relation_matrix(num_agents, num_objects),
@@ -377,20 +378,17 @@ class RelationEncoder(nn.Module):
         gta_g, gta_ginv = build_gta_transforms(
             entity_kinematics, self.gta_translation_scale
         )
-        relation_bias = (
-            self.build_relation_bias()
-            if self.use_relation_bias and (not False)
-            else None
-        )
+        relation_bias = None
+        if self.use_relation_bias:
+            relation_bias, _ = self.context_fusion(
+                obs[:, -self.suffix_width :],
+                self.edge_encoder,
+                self.entity_types,
+                self.build_relation_bias(),
+            )
         collect = (
             self.forward_calls == 1
             or self.forward_calls % self.diagnostics_interval == 0
-        )
-        relation_bias, relation_message = self.context_fusion(
-            obs[:, -self.suffix_width :],
-            self.edge_encoder,
-            self.entity_types,
-            relation_bias,
         )
         if collect:
             self.last_diagnostics = {}
@@ -404,6 +402,9 @@ class RelationEncoder(nn.Module):
         if object_valid is not None:
             valid = torch.ones(B, L, device=obs.device, dtype=torch.bool)
             valid[:, self.num_agents:self.num_agents+self.num_objects] = object_valid
+            if relation_bias is None:
+                # Padding remains a hard attention mask in the no-bias ablation.
+                relation_bias = x.new_zeros(len(self.layers), B, self.layers[0].num_heads, L, L)
             relation_bias = relation_bias.masked_fill(~valid[None, :, None, None, :], float("-inf"))
         inverse_order = None
         if (
@@ -460,6 +461,7 @@ class RelationEncoder(nn.Module):
             "gta_ginv": None if gta_ginv is None else tuple(gta_ginv.shape),
             "gta_translation_scale": self.gta_translation_scale,
             "relation_bias_mode": "task_shared_embedding_action",
+            "relation_bias": self.use_relation_bias,
             "humans": (B, self.num_agents, x.shape[-1]),
         }
         return (x[:, : self.num_agents], x) if return_all else x[:, : self.num_agents]
@@ -519,8 +521,8 @@ class AMPMultiAgentBuilder(AMPBuilder):
                 )
 
             print(
-                "[MA] Stage1: {} agents, {} objects, shared task bias + Action MLP + GTA".format(
-                    self.num_agents, self.num_objects
+                "[MA] Stage1: {} agents, {} objects, task bias={} + Action MLP + GTA".format(
+                    self.num_agents, self.num_objects, tp["relation_bias"]
                 )
             )
 
@@ -535,6 +537,8 @@ class AMPMultiAgentBuilder(AMPBuilder):
                     dim_ff,
                     tokenizer,
                     kinematic_size=self.scene_kinematic_size,
+                    relation_bias=tp["relation_bias"],
+                    relation_bias_mode=tp["relation_bias_mode"],
                     gta_cfg=gta_cfg,
                     relation_graph_spec=self.relation_graph_spec,
                     diagnostics_interval=tp.get("relation_diagnostics_interval", 100),
