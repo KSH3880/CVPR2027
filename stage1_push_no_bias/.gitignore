@@ -1,0 +1,9 @@
+output/
+output_etc/
+pth/
+checkpoints/
+tokenhsi/data/jointpush_motions/
+tokenhsi/data/dataset_*/motions
+!tokenhsi/data/dataset_*.yaml
+__pycache__/
+*.pyc

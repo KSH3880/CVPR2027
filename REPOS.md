@@ -16,6 +16,11 @@ TokenHSI 기반 multi-agent HOI 연구. 아래 3개는 모두 **원본 TokenHSI�
 
 ## 결과 저장 위치
 
+`stage1_push_no_bias/`는 원격 `sct_nobias` 브랜치의 독립 학습 프로젝트다.
+Stage1 PUSH의 task attention bias를 제거하고 초기 가중치 없이 학습한다.
+데이터 준비·학습·일반/단독 평가 명령은 [README](stage1_push_no_bias/README.md),
+출처와 SHA256은 해당 폴더의 `IMPORT_MANIFEST.json`을 따른다.
+
 `stage2_before_total_at1mm_nobias/`는 `ksh/stage_1_2_base_1031`의 `enable_nobias`
 브랜치에서 가져온 독립 학습 프로젝트다. 설정·모델·실행기와 로컬 자산 준비·CPU 검증은
 [README](stage2_before_total_at1mm_nobias/README.md), 출처와 SHA256은 해당 폴더의
