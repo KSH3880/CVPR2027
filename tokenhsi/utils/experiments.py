@@ -1,0 +1,166 @@
+"""The supported experiments and one configuration loading path."""
+from copy import deepcopy
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXED = 'stage1'
+NEAR = 'stage2_before_nonemask_rsi433_near50'
+MIX = 'stage2_before'
+MIX_RSI = 'stage2_before_rsi433'
+PUSH = "stage1_push"
+BEFORE_PUSH = "stage2_before_push"
+COUPLED = "stage2_coupled_push"
+BEFORE_PUSH_NEAR50="stage2_before_push_near50"
+COUPLED_GOAL5="stage2_coupled_push_goal5"
+COUPLED_INDIVIDUAL="stage2_coupled_push_individual_goal"
+BEFORE_PUSH_SOURCE5="stage2_before_push_near50_pair50_source5"
+COUPLED_INDIVIDUAL_SOLO5="stage2_coupled_push_individual_goal_solo5"
+COUPLED_INDIVIDUAL_CARRY5="stage2_coupled_push_individual_goal_solo5_carry5"
+COUPLED_COUNTNORM="stage2_coupled_push_individual_goal_solo5_countnorm_coupled"
+COUPLED_COUNTNORM_NONE="stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none"
+COUPLED_KEEP1="stage2_coupled_push_individual_goal_solo5_keep1"
+COUPLED_SHRINK1="stage2_coupled_push_individual_goal_solo5_shrink1"
+COUPLED_CARRY5_GROUND="stage2_coupled_push_individual_goal_solo5_carry5_ground"
+COUPLED_RELFUSION_A="stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg"
+COUPLED_RELFUSION_B="stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg"
+STAGE2 = 'stage2'
+DISTILL = 'stage2_distill'
+STAGE2_900 = 'stage2_900'
+DISTILL_900 = 'stage2_distill_900'
+SENSOR_900 = 'stage2_sensor_900'
+SENSOR_WAREHOUSE = 'stage2_sensor_900_warehouse'
+SENSOR_WAREHOUSE_BRIDGE = 'stage2_sensor_900_warehouse_bridge_init'
+SENSOR_WAREHOUSE_RSI = 'stage2_sensor_900_warehouse_bridge_init_rsi'
+SENSOR_SAFETY = 'stage2_sensor_900_warehouse_safety'
+SENSOR_COOP = 'stage2_sensor_900_warehouse_coop'
+SENSOR_COOP_CLIFFROOM = 'stage2_sensor_900_warehouse_coop_cliffroom'
+SENSOR_ROOM_WAREHOUSE = 'stage2_sensor_900_room_warehouse'
+SENSOR_ROOM_WAREHOUSE_WALLTERM = 'stage2_sensor_900_room_warehouse_wallterm'
+SENSOR_ROOM_WAREHOUSE_BOXTERM = 'stage2_sensor_900_room_warehouse_wallterm_boxterm'
+SENSOR_ROOM_WAREHOUSE_V4 = 'stage2_sensor_900_room_warehouse_wallterm_boxterm_v4_reward'
+SENSOR_WAREHOUSE_FIXED_V4 = 'stage2_sensor_900_warehouse_fixedroles_v4'
+SENSOR_WAREHOUSE_FIXED_V4_PAIRS = 'stage2_sensor_900_warehouse_fixedroles_v4_beforepairs'
+SENSOR_WAREHOUSE_FIXED_V4_DONE = 'stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox'
+SENSOR_WAREHOUSE_FIXED_V4_DOOR = 'stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress'
+STAGE2_NAMES = (STAGE2, DISTILL, STAGE2_900, DISTILL_900, SENSOR_900, SENSOR_WAREHOUSE, SENSOR_WAREHOUSE_BRIDGE, SENSOR_WAREHOUSE_RSI, SENSOR_SAFETY, SENSOR_COOP, SENSOR_COOP_CLIFFROOM, SENSOR_ROOM_WAREHOUSE, SENSOR_ROOM_WAREHOUSE_WALLTERM, SENSOR_ROOM_WAREHOUSE_BOXTERM, SENSOR_ROOM_WAREHOUSE_V4, SENSOR_WAREHOUSE_FIXED_V4, SENSOR_WAREHOUSE_FIXED_V4_PAIRS, SENSOR_WAREHOUSE_FIXED_V4_DONE, SENSOR_WAREHOUSE_FIXED_V4_DOOR)
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B, STAGE2, DISTILL, STAGE2_900, DISTILL_900, SENSOR_900, SENSOR_WAREHOUSE, SENSOR_WAREHOUSE_BRIDGE, SENSOR_WAREHOUSE_RSI, SENSOR_SAFETY, SENSOR_COOP, SENSOR_COOP_CLIFFROOM, SENSOR_ROOM_WAREHOUSE, SENSOR_ROOM_WAREHOUSE_WALLTERM, SENSOR_ROOM_WAREHOUSE_BOXTERM, SENSOR_ROOM_WAREHOUSE_V4, SENSOR_WAREHOUSE_FIXED_V4, SENSOR_WAREHOUSE_FIXED_V4_PAIRS, SENSOR_WAREHOUSE_FIXED_V4_DONE, SENSOR_WAREHOUSE_FIXED_V4_DOOR)
+
+
+def experiment_horizon(name):
+    if name in (STAGE2_900, DISTILL_900, SENSOR_900, SENSOR_WAREHOUSE, SENSOR_WAREHOUSE_BRIDGE, SENSOR_WAREHOUSE_RSI, SENSOR_SAFETY, SENSOR_COOP, SENSOR_COOP_CLIFFROOM, SENSOR_ROOM_WAREHOUSE, SENSOR_ROOM_WAREHOUSE_WALLTERM, SENSOR_ROOM_WAREHOUSE_BOXTERM, SENSOR_ROOM_WAREHOUSE_V4, SENSOR_WAREHOUSE_FIXED_V4, SENSOR_WAREHOUSE_FIXED_V4_PAIRS, SENSOR_WAREHOUSE_FIXED_V4_DONE, SENSOR_WAREHOUSE_FIXED_V4_DOOR):
+        return 900
+    return 1200 if name == STAGE2 or name.startswith("stage2_") else 900
+BEFORE_NAMES = (NEAR, MIX, MIX_RSI)
+
+
+def native_config(name, training=False):
+    if name not in NAMES:
+        raise ValueError('Unsupported experiment: ' + name)
+    folder = 'train/rlg' if training else 'multi_agent'
+    return yaml.safe_load((ROOT / f'tokenhsi/data/cfg/{folder}/{name}.yaml').read_text())
+
+
+def load_environment(name, config_path, checkpoint=None, saved=False):
+    """Saved env/sim is authoritative for resume/evaluation; explicit input wins."""
+    native = native_config(name)
+    if config_path:
+        path = Path(config_path)
+    elif saved:
+        if not checkpoint or checkpoint == 'Base':
+            raise ValueError('Evaluation/resume requires a checkpoint')
+        parent = Path(checkpoint).resolve().parent
+        path = (parent.parent if parent.name == 'nn' else parent) / 'relation_config.yaml'
+    else:
+        path = ROOT / f'tokenhsi/data/cfg/multi_agent/{name}.yaml'
+    embedded = None
+    if saved and not config_path and not path.is_file() and Path(checkpoint).is_file():
+        import torch
+        embedded = torch.load(checkpoint, map_location='cpu', weights_only=False).get('relation_experiment_config')
+        if not embedded:
+            raise ValueError('Checkpoint has neither sidecar nor embedded environment')
+    if not path.is_file() and embedded is None:
+        raise ValueError(f'Environment config missing: {path}; set ENV_CONFIG explicitly')
+    source = deepcopy(embedded) if embedded is not None else yaml.safe_load(path.read_text())
+    if embedded is not None:
+        path = Path(checkpoint).resolve()
+    from utils.checkpoint_compat import environment
+    source['env'] = environment(source['env'])
+    if name in (FIXED, PUSH):
+        from utils.stage1_config import resolve_config
+        cfg = resolve_config(source, native)
+        cfg["experiment"] = deepcopy(source.get("experiment", {}))
+        cfg["experiment"]["name"] = name
+    else:
+        if 'sim' not in source:
+            raise ValueError('BEFORE snapshots require saved sim settings')
+        cfg = {'env': deepcopy(source['env']), 'sim': deepcopy(source['sim'])}
+        cfg['experiment'] = deepcopy(source.get('experiment', native['experiment']))
+        cfg['experiment']['name'] = name
+        from utils.checkpoint_compat import checkpoint_path
+        transfer = cfg['experiment'].get('transfer', {})
+        if 'checkpoint' in transfer:
+            transfer['checkpoint'] = checkpoint_path(transfer['checkpoint'])
+    return cfg, path
+
+
+def validate_experiment(name, env, train, evaluation=False):
+    native = native_config(name)
+    expected = native_config(name, training=True)['params']
+    params = train['params']
+    if params['config']['name'] != expected['config']['name']:
+        raise ValueError('Training experiment name does not match config filename')
+    if params['network']['name'] != expected['network']['name']:
+        raise ValueError('Policy builder does not match experiment')
+    if name == FIXED:
+        if env.get('jointPush') is not None:
+            raise ValueError('Ordinary Stage1 cannot load PUSH checkpoints')
+        if env.get('before') is not None:
+            raise ValueError('Fixed Stage1 cannot use a BEFORE environment')
+    elif name == PUSH:
+        if env.get('jointPush') is None or env.get('before') is not None:
+            raise ValueError('PUSH policy requires its own saved environment')
+        from utils.stage1_jointpush import validate_env
+        validate_env(env)
+    elif name in STAGE2_NAMES:
+        from utils.stage2_spec import validate_env
+        from utils.coupled_push_spec import checkpoint_contract
+        validate_env(env)
+        if name in (SENSOR_900, SENSOR_WAREHOUSE, SENSOR_WAREHOUSE_BRIDGE, SENSOR_WAREHOUSE_RSI, SENSOR_SAFETY, SENSOR_COOP, SENSOR_COOP_CLIFFROOM, SENSOR_ROOM_WAREHOUSE, SENSOR_ROOM_WAREHOUSE_WALLTERM, SENSOR_ROOM_WAREHOUSE_BOXTERM, SENSOR_ROOM_WAREHOUSE_V4, SENSOR_WAREHOUSE_FIXED_V4, SENSOR_WAREHOUSE_FIXED_V4_PAIRS, SENSOR_WAREHOUSE_FIXED_V4_DONE, SENSOR_WAREHOUSE_FIXED_V4_DOOR):
+            from utils.sensor_stage2_spec import validate_sensor
+            validate_sensor(env)
+        if not evaluation and env['numAgents'] != 4:
+            raise ValueError('stage2 training uses four people; larger scenes are inference-only')
+        if checkpoint_contract(env, inference=True) != checkpoint_contract(native['env']):
+            raise ValueError('stage2 environment differs from selected experiment')
+        if not evaluation and env['episodeLength'] != experiment_horizon(name):
+            raise ValueError(f'{name} training requires {experiment_horizon(name)} steps')
+        params['config']['minibatch_size'] = params['config'].get('scene_minibatch_size', 4096)*env['numAgents']
+        if name in (DISTILL, DISTILL_900):
+            from utils.stage2_distill_spec import validate_config
+            validate_config(params)
+    elif name in (COUPLED, COUPLED_GOAL5, COUPLED_INDIVIDUAL, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B):
+        from utils.coupled_push_spec import checkpoint_contract,validate_env
+        validate_env(env)
+        if checkpoint_contract(env, inference=True)!=checkpoint_contract(native['env']):
+            raise ValueError('Coupled PUSH environment differs from selected experiment')
+        if not evaluation and env['episodeLength']!=1200:
+            raise ValueError('Stage2 training requires 1200 steps')
+        params['config']['minibatch_size']=params['config'].get('scene_minibatch_size',4096)*env['numAgents']
+    else:
+        from utils.before_spec import checkpoint_contract
+        if env.get('before') is None or checkpoint_contract(env) != checkpoint_contract(native['env']):
+            raise ValueError('BEFORE environment does not match the selected experiment')
+        if env['relationGraph'] != native['env']['relationGraph']:
+            raise ValueError('BEFORE graph does not match the selected experiment')
+        if not evaluation and env['episodeLength'] != experiment_horizon(name):
+            raise ValueError('Stage2 training requires 1200 steps')
+        params['config']['minibatch_size'] = params['config'].get('scene_minibatch_size', 4096) * env['numAgents']
+
+
+def check_before_checkpoint(weights, env):
+    from utils.before_spec import checkpoint_contract
+    from utils.checkpoint_compat import before_contract
+    if before_contract(weights.get('before_contract')) != checkpoint_contract(env):
+        raise ValueError('BEFORE checkpoint contract differs')

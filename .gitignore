@@ -1,0 +1,39 @@
+# Python and local tooling
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+/.venv/
+/venv/
+/.conda/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Training, verification, caches and external checkpoints
+/output/
+/output_etc/
+/checkpoints/*.pth
+*.pth
+*.pt
+*.ckpt
+*.log
+*.mp4
+*.avi
+*.zip
+*.tar.gz
+
+# External motion links and arrays
+/tokenhsi/data/dataset_amass_loco/motions
+/tokenhsi/data/dataset_amass_climb/motions
+/tokenhsi/data/dataset_sit/motions
+/tokenhsi/data/dataset_carry/motions
+*.npy
+*.npz
+*.pkl
+*.pkl.gz

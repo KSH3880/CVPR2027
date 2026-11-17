@@ -1,0 +1,10 @@
+# Install the server-compatible PyTorch/CUDA build and Isaac Gym separately.
+rl-games==1.1.4
+gym==0.26.2
+numpy==1.21.6
+PyYAML
+scipy
+termcolor
+tensorboardX
+opencv-python==4.10.0.84
+pytest
