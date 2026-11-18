@@ -1,0 +1,4 @@
+#!/bin/bash
+set -eu
+export ENV_CONFIG=${ENV_CONFIG:-tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_coop.yaml}
+exec bash "$(dirname "$0")/launch.sh" stage2_sensor_900_warehouse_coop train_vnc "$@"
