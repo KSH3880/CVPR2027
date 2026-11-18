@@ -489,6 +489,8 @@ class MAAgent(amp_agent.AMPAgent):
             "amp_obs_replay": amp_obs_replay,
             "amp_obs_demo": amp_obs_demo,
         }
+        if "frozen_actor_features" in input_dict:
+            model_input["frozen_actor_features"] = input_dict["frozen_actor_features"]
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
             res_dict = self.model(model_input)
             action_log_probs = res_dict["prev_neglogp"]

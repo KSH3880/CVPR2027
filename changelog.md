@@ -2,7 +2,89 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-18
+
+### Box-only PUSH 영역을 최종 스폰에 매칭
+
+- Box-only 학습의 2인 PUSH에 최종 배치·캐시 복원 후 상자 로컬 X축으로 영역을 확정하는 경로를 추가했다. 개인 목표·GTA 토큰·접촉 판정이 이 ID를 사용한다.
+- CPU 테스트 53개 통과. 500epoch·65,536,000프레임 저장본의 optimizer와 재개 설정을 확인했다. 기존 GPU6 MPS client4061923은 실행 상태로 두었다. [재개 명령](markdowns/USAGE.md#500epoch-재개)·[설정 검증](output_etc/check/warehouse_boxonly_ordered_spawn/resume_config.log).
+
+### DistillV4 2000 가상상자 전용 제로샷 녹화
+
+- 제로샷 viewer의 `--box-only`를 가상상자 전용 환경에 연결했다. 원본 DistillV4 2000 모델과 RMS로 행동을 계산하고, 학습 환경의 1.2m 가상상자 전환 상태와 실제 출구 통과 측정을 재사용한다.
+- CPU 테스트 59개 통과. GPU6 MPS에서 PUSH 2명 + BEFORE 1쌍의 ON_TOP 후행을 고정하고 seed47·49·51을 녹화했다. Seed49는 선행과 후행 모두 출구를 통과했고 후행은 694step에 ON_TOP을 완료했다. MP4 세 편의 1600×900·30fps와 전체 디코딩을 확인했다. [영상과 검증 결과](output_etc/check/warehouse_boxonly_distillv4_2000/verification.json).
+
+### Warehouse 가상상자 전용 변형
+
+- `stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly`을 추가했다. DistillV4 2000에서 전이하며 선행과 ON_TOP 후행의 1.2m 가상상자 접근과 원래 목표를 사용한다. BEFORE 2쌍 비율은 20%다. 선행 입구 보상은 문 통과 또는 첫 HOLDING에 포화하고 집기 포화 상태는 부분 리셋에서 초기화한다.
+- GPU 6·7번 전용 실행 명령과 역할별 집기·실제 출구 통과·목표 성공 평가를 추가했다. CPU 테스트 75개 통과. GPU6 MPS에서 동일한 1024환경·seed42로 확인 학습을 실행했다. `fps total`은 새 변형 14.5k–16.2k, 기존 1.2m 구성 14.5k–15.9k였다. 고정 조건 캐시 리셋 중앙값은 각각 27.01ms·27.03ms였다.
+- 새 저장본을 16환경·seed0에서 재로딩해 900step을 완료했다. 선행 14명 중 9명이 집었고 1명이 출구 통과 및 목표에 성공했다. ON_TOP 후행 4명 중 1명이 집었고 출구 통과는 0건이었다. [검증 결과](output_etc/check/warehouse_waypoint_boxonly/verification.json).
+
+### Warehouse 1.2m 선행·ON_TOP 후행 waypoint 센서 학습
+
+- 기존 선행 전용 실험에서 분리한 `stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop`을 추가했다. DistillV4 2000에서 새로 전이하며 선행·ON_TOP 후행이 공유 입구 좌표와 독립 전환 상태를 사용한다. 진입·목표 복귀 반경은 1.2m다. BEFORE 2쌍 20%에는 양쪽 입구 유도를 끈다.
+- 후행 ID·단계를 PPO 관측에 저장하고 활성 역할 장면을 한 배치에서 인코딩한다. 초기 배치·AMP 이력 캐시와 PPO 동결 actor 특징 재사용을 이어 쓴다. 제로샷 ON_TOP viewer를 1.2m로 맞추고 새 학습·테스트·VNC·평가 명령을 추가했다.
+- CPU 테스트 64개 통과. GPU6 MPS의 4명·1024환경·8토큰·seed42 확인 학습에서 BEFORE 2쌍 초기 샘플은 614/3072였고, `fps total`은 새 구성 14.9k–15.9k, 선행 전용 재실행 14.2k–14.9k였다. 1024환경 고정 조건에서 상태·AMP 및 비리셋 행 보존을 확인했고 리셋 중앙값은 캐시 복원 27ms, 새 배치 563ms였다.
+- 새 체크포인트를 8환경 평가에서 재로딩해 900step을 마쳤다. DistillV4 2000 별도 추론에서는 1.2m로 ON_TOP 후행 목표 전환 및 복귀가 각각 3건이었다. [검증 결과](output_etc/check/warehouse_waypoint_ontop/verification.json).
+
+### ON_TOP 후행 출구 정체 추론 진단
+
+- GPU6 MPS에서 DistillV4 2000의 새 단일 환경 seed44–51을 검증했다. 방 진입 5건, 후행 집기 3건, 입구 목표 복귀 및 쌓기 성공 2건이었다. [추론과 좌표 진단](output_etc/check/warehouse_ontop_exit_samples/summary.json).
+- Seed43은 문 옆 정면 벽, seed49는 방 측벽에 상자가 접근해 정체했다. 집기 이후 입구까지의 최소 상자 거리는 각각 2.623m, 3.393m였다. Seed47은 479step에 원래 목표로 복귀하고 537step에 출구를 통과해 619step에 쌓기에 성공했다. Seed47·49의 추론과 녹화 이벤트 일치, 900프레임 MP4 전체 디코딩을 확인했다. [궤적 비교](output_etc/check/warehouse_ontop_exit_samples/exit_paths.png).
+
+### ON_TOP 후행 운반 목표를 입구로 유도
+
+- DistillV4 2000 추론에서 ON_TOP 후행이 실제 상자를 들면 GTA의 쌓기 목표 alias를 선행과 같은 입구 좌표로 옮긴다. 상자가 입구 1.3m 이내에 도달하면 원래 쌓기 목표로 복귀한다. USAGE·structure에 전환 조건과 영상 표시를 기록했다.
+- CPU 45 passed. GPU6 MPS 16환경 추론에서 후행 입구 목표 전환 5건, 원래 목표 복귀 3건, ON_TOP 성공 2건을 확인했다. [16환경 결과](output_etc/check/warehouse_ontop_door_goal/screen/results.json).
+- 단일 환경 seed43은 420step에 후행 목표가 입구로 전환됐으며 900step까지 복귀하지 않았다. seed42는 후행이 입구 도달 전에 낙상했다. 두 MP4의 1600×900·30fps와 전체 디코딩을 확인했다. [seed43](output_etc/check/warehouse_ontop_door_goal/seed43/warehouse.mp4)·[seed42](output_etc/check/warehouse_ontop_door_goal/seed42/warehouse.mp4).
+
+### GPU6 학습 중단 및 ON_TOP 후행 입구 유도 제로샷 추론
+
+- 사용자 요청으로 GPU6 waypoint(2518467)와 doorprogress(2506636)를 MPS에서 각각 분리해 중단했다. 두 서비스 inactive, 저장본 waypoint4000·doorprogress5000 SHA 일치, GPU6 MPS 서버와 다른 GPU 학습 PID 유지 확인. [중단 기록](output_etc/check/warehouse_ontop_waypoint/stopped_training.json).
+- DistillV4 2000 viewer에 ON_TOP 후행 전용 입구 유도를 추가했다. 선행과 같은 입구 좌표를 후행 payload GTA에 넣고 1.3m 진입 시 실제 상자로 전환한다. 목표는 기존 쌓기 위치 alias이며, 선행과 후행의 장면을 분리해 역할별 출력을 선택한다. 시각 확인용 ON_TOP 고정과 MP4 저장 옵션을 추가했다. config·USAGE·structure를 갱신했다.
+- CPU 44 passed. GPU6 MPS·seed42·16환경 추론에서 후행 실제 상자 전환14, 방 진입6, HOLDING4, ON_TOP 성공0이었다. 단일 환경 녹화 seed43은 전환72·방 진입159·HOLDING420step 후 900step을 마쳤다. seed42는 진입 전 361step에 낙상했다. MP4 2개의 1600×900·30fps 및 전체 디코딩을 확인했다. [16환경 결과](output_etc/check/warehouse_ontop_waypoint/screen/results.json)·[seed43](output_etc/check/warehouse_ontop_waypoint/seed43/warehouse.mp4)·[seed42](output_etc/check/warehouse_ontop_waypoint/seed42/warehouse.mp4).
+
+### GPU6 MPS waypoint 백그라운드 본학습 시작
+
+- 사용자 지정 waypoint train4/1024/8 명령을 `tokenhsi-warehouse-waypoint-mps-gpu6-20261118-020124.service`·learner2518467로 시작했다. user systemd app.slice·Restart=no·Linger=yes로 대화/터미널 종료와 독립적으로 실행한다. GPU6 MPS·conda tokenhsi·900step/seed42·DistillV4 2000 fresh 전이, 역할별 GTA·고정1.3m·BEFORE 2쌍20%를 유지하며 CHECK/MAX_ITERATIONS/resume/평가 override는 해제했다. 기존 doorprogress MPS client2506636의 시작 tick은 보존했다. config·USAGE에 현재 본학습과 운영 경로를 갱신했다.
+- 실제 argv·GPU6 MPS client 연결·Linger·저장 config/코드 hash·전이 source SHA를 확인했다. epoch1–2/frame0→131072의 scalar778종 finite, 초기 fps total11572–12173를 확인했다. 초기2회이며 장기 평균/성공률 검증은 아니다. [실행 정보](output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint/launch_mps_gpu6_20261118-020124/launch.json)·[시작 검증](output_etc/check/waypoint_background_launch/verification.json).
+
+### GPU6 기존 doorprogress 직접 CUDA 학습을 MPS로 재개
+
+- 사용자 요청으로 기존 서비스 `tokenhsi-warehouse-doorprogress-gatefix-gpu6-20261117-201917.service`·learner1717136만 중지하고, 마지막 정기 저장1500epoch/frame196608000에서 모델·optimizer·통계를 복원했다. 종료 시점 약1636epoch 이후의 미저장 진행은 포함하지 않는다. 코드/config hash6개와 checkpoint SHA 보존을 확인했다. 기존 cwd `TokenHSI_stage12_warehouse_fix_reward`·conda `tokenhsi_jhh`·4명/1024환경/8토큰/900step/seed42와 보상·배치 설정은 유지한다.
+- 서비스 `tokenhsi-warehouse-doorprogress-resume-mps-gpu6-20261118-015507.service`·learner2506636을 app.slice·Restart=no·Linger=yes로 시작했다. GPU6 MPS server2420795의 실제 client 연결·argv resume/원본 checkpoint·저장 환경의 일치를 확인했다. 첫 관측 epoch1501–1505의 frame 증가와 scalar772종 finite를 확인했다. 초기 FPS는 약16607–18077이며 속도 개선 대조가 아니다. config·USAGE 운영 경로를 갱신했다. [실행 정보](output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_resume_mps_gpu6_20261118-015507/launch.json)·[전환 검증](output_etc/check/gpu6_mps_resume/verification.json).
+
+### Warehouse waypoint 역할별 GTA 분리·PPO 동결 특징 재사용
+
+- 사용자 확인에 따라 공통 가상 장면 제안을 제거하고 실제/선행용 GTA를 독립 batch 행으로 묶었다. PUSH 두 명·후행은 기존 장면 출력, 활성 선행만 입구 가상 장면 출력을 선택한다. 후행의 최종 목표 alias와 선행의 입구 payload/Target은 별도 토큰이며 원래 최종 목표 기준 alias 선처리를 유지한다. encoder/coordination 호출은 각 branch당1회지만 장면별 계산은 유지한다. 기존 실행 명령·checkpoint 형식·반경1.3m·BEFORE 2쌍20%·보상·동결 범위는 같다.
+- 동결 actor 특징을 PPO dataset에 저장해 6회 mini-epoch에서 재사용한다. 학습 가능한 센서/head/critic/AMP는 계속 갱신한다. 배치 캐시 키에서 역할 목록의 내부 나열 순서만 제외하고 실제 actor/predecessor/near/region·물체 크기·기하 조건은 유지했다. 실행 중인 프로세스에는 자동 적용되지 않는다. USAGE·명세·structure를 갱신했다.
+- CPU 관련75 passed. GPU6/MPS·1024환경 입력·동일 저장 가중치의 actor+critic forward를3회 측정해 중앙값40.19→31.43ms(약21.8% 단축), 최대 actor 차이5.7e-7·critic 차이2.5e-6, 캐시 특징으로6회 역전파 finite를 확인했다. 이는 전체 학습 FPS 비교가 아니다. [측정](output_etc/check/warehouse_waypoint_roles/benchmark.json)·[CPU](output_etc/check/warehouse_waypoint_roles/cpu.log).
+- GPU6/MPS·4명/1024환경/8토큰 확인 학습2회 업데이트·저장이 exit0이었다. scalar780종 finite, 원본 actor encoder/coordination/sigma·입력 RMS의 exact 보존과 head/critic/AMP 갱신을 확인했다. 짧은 구간 fps total은8932/8223이며 장기 또는 동일 조건 전체 FPS 개선율로 해석하지 않는다. 초기 PUSH+BEFORE 캐시 적중은16.0%였다(이전 본학습 로그의 초기3.7% 대비, 동일 난수 대조는 아님). 확인 프로세스는 종료했고 본학습은 시작하지 않았다. [학습 검증](output_etc/check/warehouse_waypoint_roles/training_verification.json).
+
+### Warehouse waypoint 센서 학습·GPU 배치 캐시 추가
+
+- 별도 `stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint` YAML·train/train_vnc/test/vnc/eval을 추가했다. 80% PUSH2+BEFORE 선행에 고정1.3m의 진입/집기/입구 운반/최종 목표 전환을 적용하고, 20% BEFORE 2쌍은 기존 입력/배치를 유지한다. 기존 보상·gate·동결 범위를 유지하고 전환 상태를 PPO 관측에 저장한다. GPU 배치 캐시를 두 변형으로 분리하고 중복 작업자 배치·사후 벽 간격 탈락·전체 상태 복사를 줄였다. config·USAGE·structure·명세를 갱신했다.
+- CPU 관련90 passed. GPU6 직접 CUDA·1024환경에서4회 업데이트·저장 checkpoint의 scalar780종 finite, actor encoder/coordination/sigma·입력 RMS의 원본 일치를 확인했다. GPU7 최초 확인은 사용자 GPU6 한정 지시 전에 시작했으며 이후 확인 실행을 종료했다. GPU6 속도 대조는 사용자가 직접 실행하기로 하여 중단했다. 리셋 속도 향상 수치·장기 성능·실제 resume/VNC·별도 전체 기하 검증은 아직 확정하지 않았다. 마지막 캐시 준비 관측 생략 최적화는 별도 GPU 검증 전이다. [검증](output_etc/check/warehouse_waypoint_training/training_verification.json).
+- 사용자 요청으로 GPU6의 종료 PID111986·활성 소켓 부재를 확인하고 오래된 pipe/log를 `/tmp/mps-test-1003/gpu6/stale.bH32zI7Z`에 보관한 뒤 MPS 서버2420795를 시작했다. 기존 학습은 유지했다. 새 wrapper는 GPU6만 허용하며 기본은 MPS 자동 연결이다. 이번 작업의 확인 학습/속도 대조는 종료했고 본학습은 시작하지 않았다.
+
+### Warehouse 제로샷 탑뷰·선행 상자 벽 간격 확대
+
+- 사용자 요청으로 전용 viewer 기본 카메라를 탑뷰로 바꾸고, 선행 상자 외곽과 앞·뒤·측벽의 최소 간격이 1.2m인 초기 배치만 허용했다. 부족하면 기존 배치 전체를 재샘플링해 다른 물체·사람 여유와 near 조건을 함께 유지한다. 학습 YAML과 정책·목표 전환 반경은 그대로다. 처음 확인한 0.7m 조건은 seed42 배치를 바꾸지 못해 1.2m로 확정했다. USAGE·structure를 갱신했다.
+- GPU7·32환경×3 reset에서 최소 벽 간격 1.2026m 이상, 기존 사람/상자/near 조건, 원본 가중치/RMS·비선행 행동 보존과 물리 step finite를 확인했다. [검증](output_etc/check/warehouse_waypoint/wall_clearance12/geometry/verification.json).
+- GPU7·6082·seed42·switch-margin1.0·1환경900step을 탑뷰 1600×900·30fps·30초 MP4로 녹화했다. 진입 전환54·집기 목표 활성166·최종 목표 복귀716step, 마지막 선행 AT 성공·낙상 종료0을 확인했다. 이는 한 장면 결과이며 성공률 비교가 아니다. 900프레임 전체 디코딩과 화면을 확인했다. [영상](output_etc/check/warehouse_waypoint/topview_clearance12_seed42/warehouse_seed42.mp4)·[결과](output_etc/check/warehouse_waypoint/topview_clearance12_seed42/results.json).
+
 ## 2026-11-17
+
+### Warehouse 제로샷 집기 후 입구 가상 목표 추가
+
+- 사용자 승인으로 기존 진입 가상 상자 다음에 운반 가상 목표 단계를 추가했다. 선행의 기존 HOLDING 성공 시 GTA Target XYZ만 입구로 교체하고, 운반 상자 중심 XY가 기존 `payload XY 반대각 + --switch-margin` 안에 도달하면 원래 최종 Target으로 복귀한다. 전환은 reset 전까지 유지한다. 원래 목표 기준 후행 alias 선처리·선행만 행동 교체·실제 목표/보상 보존은 동일하다. 입구 목표 활성은 주황색이며 집기/복귀 step을 결과에 기록한다. USAGE·config·structure를 갱신했다.
+- CPU 19 passed. GPU7·32환경×3 reset에서 가상 상자/목표 혼합 입력의 비선행 행동·비활성 선행 행동 보존, HOLDING 선택, 원본 가중치/RMS·실제 목표 보존과 물리 step finite를 확인했다. GPU7 VNC·seed42·900step은 exit0, 진입 전환118·집기 목표 활성184·반경1.407m였다. 이 에피소드에서는 상자가 입구 반경에 도달하지 않아 최종 목표 복귀와 최종 AT 성공은 발생하지 않았다(낙상 종료0). 거리 경계·복귀 래치·reset은 CPU 검사로 확인했으며 운반 성공률 개선은 검증하지 않았다. 기존6081·학습 프로세스는 유지하고 검증은6082에서 종료했다. [검증](output_etc/check/warehouse_waypoint/outbound/geometry/verification.json)·[VNC 결과](output_etc/check/warehouse_waypoint/outbound/render/results.json).
+
+### DistillV4 Warehouse 입구 가상 상자 제로샷 viewer
+
+- 사용자 승인으로 추론 전용 `qualitative/warehouse_waypoint{,_policy,_task,_viewer}.py`·test/VNC wrapper를 추가했다. 원본 Distill900V4 2000의 가중치·입력 RMS를 로드하고 센서는 입력하지 않는다. 원래 목표의 후행 alias 처리 후 선행 payload GTA XYZ만 문 입구로 교체하며 선행 행동만 선택한다. 선행 root가 payload XY 반대각+`--switch-margin` 안으로 들어오면 실제 상자로 복귀하고 reset 전까지 유지한다. 실제 물체·목표·보상·성공 판정과 학습 코드는 유지했다.
+- 장면은 Default/closed·PUSH2+BEFORE1쌍으로 고정했다. 선행은 앞벽 기준 x=[-3.5,-2.5]m·|y|=[2.4,3.2]m의 실제 상자 쪽, 후행은 기존 영역에서 다시 배치한다. 기존 사람/상자 여유·접근 거리·near 경로 조건을 검사한다. GPU5/6/7 선택, 검증된 MPS 또는 직접 CUDA, 기존 프로세스 보존을 지원한다. 누락된 모션 데이터 4개 디렉터리를 공유 원본의 읽기 전용 사용을 위한 심링크로 연결했다. config·USAGE·structure에 실행법과 파일 위치를 기록했다.
+- 검증: CPU 15 passed. GPU7·32환경×3 reset에서 원본 가중치/RMS·비선행 및 비활성 선행 행동 일치, 센서 미사용, 실제 물체·목표 보존, 스폰/near 조건과 세 후행 종류, 물리 3step finite를 확인했다. GPU7 VNC 120step에서 선행은 118step에 전환했고 네 사람의 종료는 없었다. GPU5 VNC 3step과 GPU6 직접 CUDA headless 3step도 exit0이었다. GPU5/7 화면 저장과 GPU6의 기존 MPS 기록 보존 경로를 확인했다. 정식 진입·운반 성공률은 측정하지 않았다. [GPU 검증](output_etc/check/warehouse_waypoint/geometry/verification.json)·[VNC 결과](output_etc/check/warehouse_waypoint/render/results.json)·[로그](output_etc/check/warehouse_waypoint/implementation/).
 
 ### GPU6 일반 hidebox 중단·AT 높이 수정본 새 백그라운드 학습
 

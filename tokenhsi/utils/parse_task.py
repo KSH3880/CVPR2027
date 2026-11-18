@@ -14,6 +14,9 @@ def parse_task(args, cfg, cfg_train, sim_params):
         if cfg['env'].get('sensorScene') is not None:
             from env.tasks.multi_agent.humanoid_ma_sensor_stage2 import HumanoidMASensorStage2
             task_class = HumanoidMASensorStage2
+            if cfg['env']['sensorScene'].get('warehouse', {}).get('waypoint'):
+                from env.tasks.multi_agent.warehouse_waypoint_task import WarehouseWaypointTrainingTask
+                task_class = WarehouseWaypointTrainingTask
         elif cfg['env'].get('stage2') is not None:
             from env.tasks.multi_agent.humanoid_ma_stage2 import HumanoidMAStage2
             task_class = HumanoidMAStage2

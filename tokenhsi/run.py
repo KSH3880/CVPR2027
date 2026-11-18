@@ -170,6 +170,8 @@ def build_alg_runner(algo_observer):
     from learning.multi_agent.sensor_stage2_network import SensorStage2Builder
     from learning.multi_agent.sensor_stage2_agent import SensorStage2Agent
     runner.model_builder.network_factory.register_builder('amp_multi_agent_stage2_sensor_frozen', lambda **kwargs: SensorStage2Builder())
+    from learning.multi_agent.warehouse_waypoint_network import WarehouseWaypointBuilder
+    runner.model_builder.network_factory.register_builder('amp_multi_agent_stage2_sensor_waypoint_frozen', lambda **kwargs: WarehouseWaypointBuilder())
     runner.algo_factory.register_builder('ma_sensor', lambda **kwargs: SensorStage2Agent(**kwargs))
     runner.player_factory.register_builder('ma_sensor', lambda **kwargs: ma_players.MAPlayerContinuous(**kwargs))
     return runner

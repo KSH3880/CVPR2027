@@ -54,3 +54,15 @@ class SensorStage2Agent(MAAgent):
         self.sensor_curriculum_start_epoch = weights.get('sensor_curriculum_start_epoch',
             0 if previous.get('curriculum') else weights['epoch'])
         self.running_mean_std.eval()
+
+    def prepare_dataset(self, batch_dict):
+        super().prepare_dataset(batch_dict)
+        net = self.model.a2c_network
+        if hasattr(net, 'encode_actor_features'):
+            # Reuse frozen GTA/coordination outputs across the six PPO epochs.
+            # Sensor branches and heads remain live and receive all their gradients.
+            with torch.no_grad():
+                obs = batch_dict['obses']
+                features = [net.encode_actor_features(self._preproc_obs(obs[start:start+4096]))
+                            for start in range(0, len(obs), 4096)]
+                self.dataset.values_dict['frozen_actor_features'] = torch.cat(features, 0)

@@ -50,17 +50,17 @@ def replace_distractors(mapping, packet, num_agents):
     return result, total
 
 
-def encoder_packet(packet, num_agents, num_objects):
+def encoder_packet(packet, num_agents, num_objects, *, layout=None):
     """Redirect follower targets only; retain actor task conditioning exactly once."""
-    dependent, target, alias, _ = alias_layout(packet, num_agents, num_objects)
+    dependent, target, alias, _ = alias_layout(packet, num_agents, num_objects) if layout is None else layout
     result = packet.reshape(len(packet), -1, 5).clone()
     result[..., 4] = torch.where(dependent, alias, target).to(result.dtype)
     return result.reshape_as(packet)
 
 
-def goal_aligned_scene(scene, num_agents, num_objects):
+def goal_aligned_scene(scene, num_agents, num_objects, *, layout=None):
     packet = scene[:, -5*num_agents:]
-    dependent, target, alias, _ = alias_layout(packet, num_agents, num_objects)
+    dependent, target, alias, _ = alias_layout(packet, num_agents, num_objects) if layout is None else layout
     valid, task, actor, payload, goal = packet.reshape(len(scene), -1, 5).long().unbind(-1)
     leading = (valid.bool()[:, :, None] & (task[:, :, None] == 2)
         & dependent[:, None, :] & (payload[:, :, None] == target[:, None, :])

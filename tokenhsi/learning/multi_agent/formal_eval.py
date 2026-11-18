@@ -32,6 +32,10 @@ def run_formal_eval(player):
     box_values=getattr(task,'_evaluation_box_values',task._logical_box_values)
     obs = player.env_reset()
     player.get_batch_size(obs['obs'], 1)
+    carry_eval = None
+    if getattr(task, '_waypoint_box_only', False):
+        from learning.multi_agent.warehouse_carry_eval import WarehouseCarryEval
+        carry_eval = WarehouseCarryEval(task)
     packet = task_graph_packet(task.relation_runtime.graph, n).reshape(n, m, 5).long().clone()
     types = packet[..., 1]
     parent = predecessors(task.relation_runtime.graph, n, task.device)
@@ -44,7 +48,7 @@ def run_formal_eval(player):
     sizes = box_values(task._box_size).clone()
     goals = task._tar_pos.clone()
     sensor_width = getattr(task, "_sensor_obs_width", 0)
-    groups=(obs["obs"][:, -(m+sensor_width):][:,:m].long().clone() if getattr(task,"_stage2_push",False)
+    groups=(obs["obs"][:, -(m+sensor_width+getattr(task, "_waypoint_obs_width", 0)):][:,:m].long().clone() if getattr(task,"_stage2_push",False)
             else torch.arange(m,device=task.device)[None].expand(n,-1))
     if task.cfg['env'].get('stage2') is not None:
         from utils.stage2_spec import evaluation_groups
@@ -92,6 +96,8 @@ def run_formal_eval(player):
         boxes_trace.append(boxes.cpu().numpy().copy())
         valid_trace.append(alive.cpu().numpy().copy())
         fallen = task._terminate_buf.reshape(n, m).bool() & alive
+        if carry_eval is not None:
+            carry_eval.record(task, alive & ~fallen, step)
         fall_step[fallen] = step
         freeze_fallen(task, fallen)
         alive &= ~fallen
@@ -145,6 +151,9 @@ def run_formal_eval(player):
         data['sensor_scenes'] = {name: int((task._scene_ids == index).sum())
                                 for index, name in enumerate(task._scene_names)}
         data['sensor_mask'] = player.model.a2c_network.mask_sensor
+    carry_trace = {}
+    if carry_eval is not None:
+        data['warehouse_carry'], carry_trace = carry_eval.finish(scored, ever)
     (path/'result.json').write_text(json.dumps(data, indent=2))
     center_trace = dict(shared_centers=np.stack(centers_trace), shared_center_goals=center_goals.cpu().numpy(),
                         shared_center_ever=center_ever.cpu().numpy(), shared_center_final=center_current.cpu().numpy()) if individual_goals else {}
@@ -152,7 +161,8 @@ def run_formal_eval(player):
                         valid=np.stack(valid_trace), packet=packet.cpu().numpy(), sizes=sizes.cpu().numpy(),
                         goals=goals.cpu().numpy(), predecessor=parent.cpu().numpy(),groups=groups.cpu().numpy(),
                         fall_step=fall_step.cpu().numpy(), ever=ever.cpu().numpy(), unreachable=unreachable.cpu().numpy(),
-                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(), **center_trace)
+                        both_ever=both_ever.cpu().numpy(), simultaneous=simultaneous.cpu().numpy(),
+                        **center_trace, **carry_trace)
     (path/'trace.pending.npz').replace(path/'trace.npz')
     print('[formal eval result]', json.dumps(data), flush=True)
     return data

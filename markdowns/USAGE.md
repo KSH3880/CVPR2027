@@ -806,23 +806,167 @@ tail -f output/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox/laun
 
 ### doorprogress 좌표 수정본 새 본학습
 
-현재 최신 수정본은 GPU6에서 원래 `Stage2Distill900V4_00002000.pth`부터 프레임0의 새 학습을 시작한다. 4명·1024환경·8토큰·900step·seed42·headless, reset RSI 없는 Default/closed·BEFORE 2팀20%·초기 캐시 준비32회다. 좌표·공유 상자 수정과 AT 후행 해제 높이 마스크 갱신을 포함하며 정밀 보상 1mm는 유지한다.
+2026-11-18 GPU6 MPS doorprogress 서비스는 중단했다. 재개에 쓸 마지막 정기 저장본은 **5000epoch**다. 아래는 기존 실행 기록이다. [중단·저장본 확인](../output_etc/check/warehouse_ontop_waypoint/stopped_training.json).
 
-GPU6 서비스는 `tokenhsi-warehouse-doorprogress-gatefix-gpu6-20261117-201917.service`, learner PID는1717136, run은 `Stage2Sensor900WarehouseFixedRolesV4BeforePairsDoorProgress_17-20-20-21`이다. 사용자 systemd app.slice·Restart=no·Linger=yes로 터미널/로그아웃과 독립적으로 실행한다. 기존 GPU6의 일반 hidebox는 6500epoch 저장본을 보존해 중지했고, `2only` 운반 집중 학습은 유지한다.
+GPU6의 좌표·공유 상자·AT 높이 마스크 수정본은 기존 fresh 학습의 **1500epoch/frame196608000 저장본에서 MPS로 재개**한다. 4명·1024환경·8토큰·900step·seed42·headless, Default/closed·BEFORE 2팀20%·캐시 준비32회·정밀 보상1mm를 유지한다. 기존 doorprogress 실험을 유지한다.
 
-GPU6은 기존 운반 집중 학습과 같이 직접 CUDA를 사용한다. 시작 스크립트는 공통 `launch.sh`를 사용하고 `CUDA_MPS_PIPE_DIRECTORY`를 빈 값, `MPS_GPU_ROOT`를 실행 폴더 아래의 미생성 전용 경로로 설정한다. 기존 GPU6의 오래된 MPS PID 파일·데몬은 변경하지 않는다. MPS를 요구하는 전용 train wrapper 대신 아래 실행 폴더의 `start.sh`를 사용한다. CHECK/MAX_ITERATIONS/resume/평가 override를 해제하고 conda 초기화 전에 `LD_LIBRARY_PATH`를 정의한다.
+사용자 요청으로 이전 직접 CUDA 서비스 `tokenhsi-warehouse-doorprogress-gatefix-gpu6-20261117-201917.service`·learner1717136을 중지했다. 종료 시점 약1636epoch의 미저장 진행은 복원되지 않으며, 마지막 정기 저장본1500의 모델·optimizer·정규화 통계·epoch/frame을 복원한다. 원본 checkpoint와 이전 실행 결과는 보존한다.
+
+재개에 사용한 서비스는 `tokenhsi-warehouse-doorprogress-resume-mps-gpu6-20261118-015507.service`다. 실제 학습 cwd는 `/home/hwanhee/jhh/TokenHSI_stage12_warehouse_fix_reward`, conda는 기존 실행과 같은 `tokenhsi_jhh`다. GPU6의 검증된 MPS pipe `/tmp/mps-test-1003/gpu6/pipe`에 연결한다. 운영 스크립트·로그는 이 checkout에 두고, 학습 결과는 기존 cwd의 동일 output 루트 아래 새 run에 저장한다. 기존 코드·config hash6개는 원래 시작 기록과 일치한다.
 
 ```bash
 # 서비스 상태
-systemctl --user status tokenhsi-warehouse-doorprogress-gatefix-gpu6-20261117-201917.service
+systemctl --user status tokenhsi-warehouse-doorprogress-resume-mps-gpu6-20261118-015507.service
 
-# 학습 로그
-tail -f output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_fresh_gatefix_gpu6_20261117-201917/train.log
-
-# GPU6 직접 CUDA 서비스 종료
-systemctl --user stop tokenhsi-warehouse-doorprogress-gatefix-gpu6-20261117-201917.service
+# 학습 로그 (이 checkout의 저장소 루트)
+tail -f output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_resume_mps_gpu6_20261118-015507/train.log
 ```
 
-현재 PID·시작 시각·cwd·cgroup을 [GPU6 실행 정보](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_fresh_gatefix_gpu6_20261117-201917/launch.json)와 확인한 뒤 해당 서비스만 종료한다. 초기화 명령은 같은 폴더의 `start.sh`, 전이 체크포인트/수정 코드 hash와 실제 argv는 `launch.json`에 보관한다. [GPU6 시작 검증](../output_etc/check/doorprogress_gpu6_launch_20261117-201917/startup_verification.json).
+[실행 정보](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_resume_mps_gpu6_20261118-015507/launch.json)·[재개 스크립트](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_resume_mps_gpu6_20261118-015507/start.sh)·[전환 검증](../output_etc/check/gpu6_mps_resume/verification.json). 재실행은 현재 서비스가 종료된 뒤 같은 `start.sh`를 사용한다. 안전 종료는 PID·cwd·cgroup과 MPS client를 확인한 후 대상 client만 `terminate_client`로 분리하고 해당 서비스만 중지한다. MPS 서버나 다른 client를 종료하지 않는다.
 
 GPU7의 이전 좌표 수정본은 `tokenhsi-warehouse-doorprogress-fresh-targetfix-20261117-131057.service`·PID824377·run `Stage2Sensor900WarehouseFixedRolesV4BeforePairsDoorProgress_17-13-12-17`으로 유지한다. 실행 중인 이 프로세스에는 이후 AT 높이 마스크 수정이 자동 반영되지 않는다. [GPU7 실행 정보](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress/launch_fresh_targetfix_20261117-131057/launch.json)·[시작 검증](../output_etc/check/doorprogress_relaunch_20261117/startup_verification.json). GPU7의 종료는 해당 PID·cwd·cgroup을 확인한 뒤 [공통 MPS 절차](#warehouse-역할-고정-v4-본학습)를 따른다. GPU5 Bridge 학습과 이전 저장본·결과는 보존한다.
+
+## DistillV4 Warehouse 가상 상자 제로샷 viewer
+
+추론 전용 실험이며 새 학습 config는 만들지 않는다. 기반 환경은 `stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress.yaml`이고 전용 viewer에서 `WAREHOUSE_VARIANT=push_before`, `WAREHOUSE_START=closed`를 고정한다. 4명·8토큰·Default 자세·공동 PUSH 2명+BEFORE 1쌍이며 평가 경로라 배치 캐시는 준비하지 않는다. 기존 보상·성공 판정·실제 물체·최종 목표는 유지한다.
+
+원본 `/home/hwanhee/jhh/TokenHSI_stage12_bridge_fix_reward/output/stage2/Stage2Distill900V4_00002000.pth`의 네트워크·가중치·입력 RMS를 그대로 로드한다. `--checkpoint`로 다른 위치의 원본 Distill900V4를 지정할 수 있다. 센서는 환경에서 계산하지만 정책에는 기존 1272차원만 입력한다. 후행 alias를 원래 최종 목표로 처리한 뒤 선행 payload의 GTA XYZ만 문 입구 중앙으로 옮긴다. 높이는 apron 바닥+실제 payload 반높이이며 크기·회전은 유지한다. 원래 관측과 수정 관측으로 각각 행동을 계산하고 선행 행동만 수정 출력으로 교체한다. 후행과 PUSH 두 명은 원래 관측의 출력을 사용한다.
+
+진입 단계에서는 선행 root XY와 입구 중심의 거리가 `실제 payload XY 반대각 + --switch-margin` 이하가 되면 실제 상자 관측으로 복귀한다. 이후 기존 HOLDING 성공 판정이 성립하면 선행의 GTA Target XYZ만 같은 입구 좌표로 바꾼다. 복귀 단계에서는 **운반 상자 중심 XY**가 같은 반경 안에 들어오면 원래 최종 Target으로 복귀한다. HOLDING은 기존 관계 성공 기준이며 별도 상자 상승 높이 조건을 추가하지 않는다. 두 전환은 각각 에피소드 동안 유지하며, 놓치더라도 목표 단계를 되돌리지 않고 reset 때 모두 초기화한다. 집는 순간 이미 반경 안이면 즉시 최종 Target을 사용한다. 두 단계 모두 원래 최종 목표 기준 후행 alias를 먼저 처리하고 선행 행동만 교체한다. `--switch-margin` 기본 1m, 0 이상 0.5m 단위이며 상한은 없다. 큰 값에서는 초기부터 전환될 수 있고, 문 통과보다 먼저 전환될 수도 있다. 후행 waiting penalty의 1.5m와 별개다.
+
+스폰은 앞벽 안쪽 면을 x=0, 실내를 +x로 한 방 좌표 기준이다. PUSH 두 명은 기존 x=-1.85m·y=±0.9m를 유지한다. 선행은 x=[-3.5,-2.5]m·|y|=[2.4,3.2]m에서 실제 payload가 있는 쪽을 택한다. 후행은 기존 x=[-3.5,-0.9]m·y=[-3.6,3.6]m에서 다시 샘플링한다. 사람 사이 0.85m·상자 외곽 0.5m 여유와 기존 접근 거리·near 경로 조건을 검사하며, 실패하면 배치를 재시도한다. 선행 상자는 외곽과 방의 앞·뒤·측벽 사이에 최소 1.2m 여유가 있는 배치만 사용하며, 부족하면 전체 배치를 다시 샘플링한다(기반 YAML의 측벽 최소 여유는 0.2m). 최종 분포는 이 조건들에 의해 제한된다. 후행 과제는 크기가 허용하는 SIT/CLIMB/ON_TOP 중 균등 샘플링한다.
+
+저장소 루트에서 실행하며 기본 conda는 `tokenhsi`, 1환경·900step·100episode·seed42다. 실행 전 `nvidia-smi`로 점유를 확인한다. 사용자 지정으로 이 viewer는 GPU5/6/7을 허용하며 다른 GPU는 거부한다.
+
+```bash
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress: 원본 V4 가상 상자 VNC
+TOKENHSI_GPU=7 PORT=6081 bash tokenhsi/scripts/multi_agent/warehouse_waypoint_vnc.sh --switch-margin 1.0
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress: 로컬 viewer
+TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_waypoint_test.sh --switch-margin 0.5
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress: 짧은 headless 확인
+TOKENHSI_GPU=7 HEADLESS=1 bash tokenhsi/scripts/multi_agent/warehouse_waypoint_test.sh --envs 8 --episodes 1 --steps 120 --switch-margin 1.0
+```
+
+`TOKENHSI_GPU=7`을 5 또는 6으로 바꾸면 CUDA와 VNC 렌더링 모두 같은 GPU를 선택한다. 기본 `WAYPOINT_CUDA=auto`는 기존 MPS 연결을 검증하고, 연결할 수 없으면 전용 미생성 MPS 경로로 직접 CUDA를 사용한다. MPS 서버나 기존 프로세스는 시작·중단·수정하지 않는다. `WAYPOINT_CUDA=mps`는 검증 실패 시 종료하고 `WAYPOINT_CUDA=direct`는 직접 CUDA를 지정한다. GPU6의 오래된 MPS 기록이 있는 현재 머신에서도 직접 CUDA로 실행할 수 있다.
+
+VS Code에서 6081 포트를 전달하고 `http://localhost:6081/vnc.html?autoconnect=1&resize=remote`를 연다. 기본 카메라는 입구와 실내를 위에서 내려다보는 탑뷰다. 입구 윤곽·원은 진입 가상 상자 단계에서 자홍색, 집은 뒤 입구 가상 목표 단계에서 주황색, 원래 관측 사용 중에는 회색이다. 청록색 십자는 실제 payload, 초록색 십자는 최종 목표다. 닫힌 상태에서는 큰 문 상자가 가상 상자를 가릴 수 있다. Ctrl+C 또는 viewer 창 종료로 멈춘다.
+
+`--seed`, `--envs`, `--episodes`, `--steps`로 실행 크기를 바꾸고 `--capture`로 시작·전환 화면을 저장한다. `--out`은 `output_etc/check/` 아래만 허용한다. 기본 저장 위치는 `output_etc/check/warehouse_waypoint/<실행시각>/`이며 `results.json`에 진입 전환 `switch_step`·집기 `pickup_step`·최종 목표 복귀 `return_step`(미발생 -1)·반경·종료·마지막 AT 상태, `resolved_env.yaml`에 기반 환경 설정을 저장한다. 강제 장면 선택은 결과의 `variant=push_before`, `start=closed`에 기록한다. 이 viewer 결과는 정식 성공률 평가가 아니다.
+
+## Warehouse waypoint 센서 학습
+
+[학습·관측·캐시 명세](reference/warehouse_waypoint_training.md).
+
+`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint`는 기존 doorprogress의 보상과 센서 학습 범위를 유지하면서, 80% PUSH 2명+BEFORE 1쌍의 선행에 입구 가상 상자→실제 상자→입구 가상 목표→최종 목표를 적용한다. 20% BEFORE 2쌍은 기존 apron 배치·실제 입력을 사용한다. 반경은 진입(root XY)·복귀(상자 중심 XY) 모두 **고정 1.3m**이며 상자 크기를 더하지 않는다. HOLDING 성공 뒤 목표가 바뀌고, 전환은 부분 reset 대상에 대해서만 초기화한다. 최종 목표 기준 후행 alias를 먼저 처리하며 실제 목표·보상·게이트는 그대로다.
+
+전이는 `checkpoints/Stage2Distill900V4_00002000.pth`(원본을 읽는 심링크)에서 시작한다. 4명/1024환경/8토큰/900step·seed42·Default/closed다. Actor encoder/coordination/sigma·입력 RMS는 동결하며 head·critic·센서·AMP discriminator를 학습한다. 관측10493차원은 기존10488차원 뒤에 선행ID·단계·입구 로컬XYZ를 붙인다. 추가5차원은 정규화하지 않으며 PPO 수집·재계산·평가 모두 저장된 값을 사용한다. 4명 모두 정책 업데이트의 영향을 받는다.
+
+새 실험 wrapper는 **GPU6만 허용**하고 기본 conda는 `tokenhsi`다. 기존 MPS가 검증되면 연결하고, 없으면 직접 CUDA로 실행한다. 명시적 `WAYPOINT_CUDA=direct`도 지원한다. MPS 서버·기존 학습은 변경하지 않는다. 기본 학습/추론/VNC 명령은 [config](config.md) 맨 아래를 따른다. 확인 학습 예:
+
+```bash
+TOKENHSI_GPU=6 CHECK=1 MAX_ITERATIONS=3 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_train.sh
+```
+
+새 checkpoint로 resume하려면 같은 train wrapper에 `RESUME_CHECKPOINT="$CKPT"`를 설정한다. 학습·평가 환경은 checkpoint의 저장 계약을 사용하며 기존 센서 checkpoint는 새 실험 resume/test에 혼용하지 않는다. 정식 평가는 전용 `*_eval.sh`를 사용한다. `WAREHOUSE_VARIANT=mixed|push_before|before_pairs`는 평가 전용이며 기본 mixed다. 가상 유도는 before_pairs에서 항상 꺼진다.
+
+학습 배치 캐시는 두 변형별 환경당32개 조건·조건당2개 배치를 저장하고, 적중 시25% 확률로 새 배치를 만든다. 과제/역할·near·상자 크기·기하·시작 조건을 확인하고 물리 상태·그래프·AMP 초기 이력을 함께 복원한다. 배치 재사용에 따라 초기 장면 반복은 늘어난다. 첫 학습 전에 두 변형 각각32회 준비하며 RNG·샘플링 계수를 복원한다. 평가에서는 캐시를 사용하지 않는다. `warehouse/layout_cache/{push_before,before_pairs}/`에 요청·적중·갱신, 공통 bytes·warmup_seconds와 `warehouse/waypoint/` 단계 비율을 기록한다.
+
+역할별 GTA 입력은 분리된다. PUSH 두 명과 후행은 기존 장면의 출력, 선행만 입구 가상 좌표를 적용한 장면의 출력을 사용한다. 후행용 alias는 원래 최종 목표에 있고 선행의 가상 상자/목표와 별도 토큰이다. 실제/선행용 장면을 별도 batch 행으로 묶어 encoder 호출을 한 번으로 합치므로, 선행의 가상 좌표가 PUSH 출력에 들어가지 않는다. 두 장면의 연산량 자체가 사라지는 것은 아니다. 동결 actor 특징은 PPO mini-epoch 간 재사용하여 반복 transformer 계산을 줄인다. 기존 명령·checkpoint를 그대로 사용하며 적용은 새 프로세스부터다. 실행 중 학습은 자동으로 바뀌지 않는다.
+
+`WAYPOINT_RESET_BASELINE=1`은 성능 진단 전용이다. 같은 가상 입력 학습을 기존 viewer의 중복 배치·기존 BEFORE 전용 캐시·전체 상태 복사로 실행해 비교한다. 정상 학습에서는 해제한다. 검증은 `output_etc/check/warehouse_waypoint_training/`에 저장한다. 기존 제로샷 viewer의 `--switch-margin` 공식과 CLI는 변경하지 않았다.
+
+### Waypoint GPU6 백그라운드 본학습
+
+2026-11-18 GPU6 MPS waypoint 서비스는 중단했다. 재개에 쓸 마지막 정기 저장본은 **4000epoch**다. 아래는 기존 실행 기록이다. [중단·저장본 확인](../output_etc/check/warehouse_ontop_waypoint/stopped_training.json).
+
+사용자 요청으로 `tokenhsi-warehouse-waypoint-mps-gpu6-20261118-020124.service`를 user systemd `app.slice`·`Restart=no`·`Linger=yes`에서 실행한다. 대화·터미널·로그아웃과 독립적으로 계속 실행한다. GPU6 MPS·conda `tokenhsi`·4명/1024환경/8토큰/900step/seed42·headless, Distill900V4 2000 fresh 전이다. CHECK/MAX_ITERATIONS/RESUME_CHECKPOINT·전이/환경 override와 평가용 환경변수는 해제했다. 기존 GPU6 doorprogress MPS 서비스는 유지한다.
+
+```bash
+# 서비스 상태
+systemctl --user status tokenhsi-warehouse-waypoint-mps-gpu6-20261118-020124.service
+
+# 학습 로그
+tail -f output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint/launch_mps_gpu6_20261118-020124/train.log
+```
+
+시작 확인 당시 learner PID는2518467이었다. 운영 스크립트는 [start.sh](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint/launch_mps_gpu6_20261118-020124/start.sh), 실제 argv·PID·코드 hash는 [실행 정보](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint/launch_mps_gpu6_20261118-020124/launch.json)에 기록한다. 학습 결과·checkpoint는 같은 output 루트 아래 시간별 새 run에 저장한다. 상태 검증은 `output_etc/check/waypoint_background_launch/`다.
+
+안전 종료는 서비스의 learner PID·cwd·cgroup과 GPU6 MPS client를 확인한 뒤 대상 client만 `terminate_client`로 분리하고 해당 서비스만 중지한다. 기존 doorprogress client와 MPS 서버는 유지한다. 이 `start.sh`는 fresh 학습 명령이므로 중단된 학습의 이어하기에는 저장 checkpoint를 지정한 별도 resume 실행을 사용한다.
+
+## Warehouse ONTOP 후행 waypoint 센서 학습
+
+`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop`은 GPU6에서 DistillV4 2000으로 새로 전이한다. PUSH 2명 + BEFORE 1쌍의 선행과 ON_TOP 후행이 각자의 GTA 장면에서 같은 입구 좌표를 사용한다. 진입과 운반 목표 복귀 반경은 모두 **1.2m**다. Warehouse의 BEFORE 2쌍 샘플링은 20%이며 두 역할의 입구 유도를 끈다. 기본 학습·로컬 테스트·VNC 명령은 [config](config.md)를, 관측 및 캐시 계약은 [학습 명세](reference/warehouse_waypoint_training.md#12m-선행on_top-후행)를 따른다.
+
+짧은 확인 학습 및 정식 평가 명령은 저장소 루트에서 실행한다.
+
+```bash
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps CHECK=1 MAX_ITERATIONS=3 \
+  bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_train.sh 4 1024 8
+
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps \
+  bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_eval.sh "$CKPT" \
+    --output output_etc/check/warehouse_waypoint_ontop_eval
+```
+
+`RESUME_CHECKPOINT`에는 이 실험에서 저장한 체크포인트를 지정한다. 역할별 단계 비율은 `warehouse/waypoint/{leader,follower}/`, 초기 배치 캐시는 `warehouse/layout_cache/` 아래에 기록한다. 평가의 `WAREHOUSE_VARIANT` 기본값은 `mixed`이며 `push_before` 또는 `before_pairs`로 고정할 수 있다.
+
+### ONTOP 후행 입구 유도 추론
+
+DistillV4 2000의 PUSH 2명 + BEFORE 1쌍 장면에서 `--follower-ontop-waypoint`를 켜면 ON_TOP 후행의 GTA 상자 위치가 선행과 같은 입구 좌표에서 시작한다. 후행 root가 입구 중심의 XY 반경 1.2m에 닿으면 실제 상자로 전환한다. 후행이 실제 상자를 들면 GTA의 ON_TOP 목표 alias를 입구로 옮기고, 들고 가는 상자가 입구 1.2m 이내에 닿으면 원래 쌓기 목표로 복귀한다. 이 모드에서 선행과 후행은 별도 GTA 장면 행과 같은 전환 반경을 사용한다. `--ontop-only`는 시각 확인용으로 후행 과제만 ON_TOP으로 고정한다.
+
+`--record`는 viewer에서 단일 환경의 한 에피소드를 MP4로 저장한다. 다음은 저장소 루트의 Xvfb 렌더 예시다.
+
+```bash
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps HEADLESS=0 xvfb-run -a -s '-screen 0 1600x900x24 -nolisten tcp' \
+  bash -c 'source tokenhsi/scripts/multi_agent/gui_gpu_env.sh && exec bash tokenhsi/scripts/multi_agent/warehouse_waypoint_test.sh "$@"' render \
+  --follower-ontop-waypoint --ontop-only --seed 42 --envs 1 \
+  --episodes 1 --steps 900 --record --out output_etc/check/warehouse_waypoint_ontop/zeroshot/seed42
+```
+
+`results.json`에서 후행의 실제 상자 전환, 방 진입, HOLDING, 가상 목표 전환과 복귀, ON_TOP 성공의 첫 step을 확인할 수 있다. 영상의 자홍 원은 선행, 파란 원은 ON_TOP 후행, 노란 입구 원은 후행의 가상 목표, 초록 십자는 원래 쌓기 목표다.
+
+## Warehouse 가상상자 전용 학습
+
+`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly`는 DistillV4 2000에서 새로 전이한다. 선행과 ON_TOP 후행은 1.2m 입구 가상상자로 접근하고 각자의 원래 목표를 계속 사용한다. 선행 입구 보상은 문 통과 또는 첫 HOLDING에 포화한다. BEFORE 2쌍은 20%이며 입구 가상상자와 입구 보상 모두 비활성이다. [변형 명세](reference/warehouse_waypoint_training.md#가상상자-전용-변형).
+
+전용 wrapper는 GPU 6·7번을 허용하며 기본값은 GPU 6번 MPS와 `tokenhsi`다. 학습·로컬 테스트·VNC 실행은 [설정 문서](config.md)의 명령을 따른다. 새 실험의 저장본으로 재개하려면 해당 train wrapper에 `RESUME_CHECKPOINT`를 지정한다.
+
+### 500epoch 재개
+
+Box-only 학습의 두 PUSH 영역은 리셋 때 스폰과 캐시 복원이 끝난 뒤 실제 공유 상자의 로컬 X축 순서로 정한다. 이 배정은 개인 목표, GTA 토큰, 접촉 판정에 공통으로 쓰이며 해당 에피소드 동안 고정된다. 500epoch 저장본에서 재개하는 명령은 다음과 같다.
+
+```bash
+exp=stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly
+run=Stage2Sensor900WarehouseFixedRolesV4BeforePairsWaypointOntopBoxOnly
+ckpt="output/$exp/${run}_18-14-47-23/nn/${run}_00000500.pth"
+env -u CHECK -u MAX_ITERATIONS -u ENV_CONFIG -u WAYPOINT_RESET_BASELINE \
+  TOKENHSI_GPU=6 WAYPOINT_CUDA=mps HEADLESS=1 SEED=42 \
+  OUTPUT_PATH="output/$exp" RESUME_CHECKPOINT="$ckpt" \
+  bash "tokenhsi/scripts/multi_agent/${exp}_train.sh" 4 1024 8
+```
+
+### 출구 통과 평가
+
+```bash
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps \
+  bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly_eval.sh "$CKPT" \
+  --output output_etc/check/warehouse_waypoint_boxonly_eval
+```
+
+평가의 `warehouse_carry`는 선행·ON_TOP 후행별 유효 인원, 집기, 출구 통과, point·region 목표 성공을 집계한다. `trace.npz`에는 첫 집기와 root·운반 상자의 출구 통과 step이 기록된다. `WAREHOUSE_VARIANT`로 PUSH + BEFORE와 BEFORE 2쌍 평가를 골라 실행할 수 있다.
+
+### 가상상자 전용 제로샷 녹화
+
+`--box-only`는 가상상자 전용 환경을 평가 모드로 로드하고 원본 DistillV4 가중치와 정규화 통계로 행동을 계산한다. 실제 학습 환경과 같은 1.2m 전환 상태로 GTA의 가상상자 활성 여부를 결정한다. 아래 명령은 닫힌 PUSH 2명 + BEFORE 1쌍의 ON_TOP 후행 샘플을 녹화한다.
+
+```bash
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps xvfb-run -a -s '-screen 0 1600x900x24 -nolisten tcp' \
+  bash -c 'source tokenhsi/scripts/multi_agent/gui_gpu_env.sh && source tokenhsi/scripts/multi_agent/warehouse_waypoint_boxonly_env.sh && exec python tokenhsi/qualitative/warehouse_waypoint_viewer.py "$@"' render \
+  --box-only --ontop-only --envs 1 --episodes 1 --steps 900 --seed 47 --record \
+  --checkpoint checkpoints/Stage2Distill900V4_00002000.pth \
+  --out output_etc/check/warehouse_boxonly_zeroshot/seed47
+```
+
+`results.json`의 `leader_hold_step`, `follower_hold_step`과 역할별 `*_exit_step`에서 집기와 출구 통과를 확인한다. 출구 통과는 첫 집기 이후 에이전트와 상자 중심이 모두 입구를 지나 바깥으로 나온 시점이다.

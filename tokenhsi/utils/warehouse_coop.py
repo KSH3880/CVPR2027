@@ -158,6 +158,13 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
         radius[:, :m]+block_radius[:, None]+.252)).all(-1)
     goal_clear = ((goal-sweep_center[:,None]).abs() >= sizes[...,:2]/2+sweep_half[:,None]+.15).any(-1)
     good &= (~(tasks == 3) | goal_clear).all(-1)
+    waypoint = cfg.get('waypoint')
+    if waypoint:
+        leaders = (pre[:, :, None] == torch.arange(m, device=tasks.device)).any(1)
+        gap = torch.stack((source[..., 0]-sizes[..., 0]/2,
+            spec['room_size'][0]-source[..., 0]-sizes[..., 0]/2,
+            spec['room_size'][1]/2-source[..., 1].abs()-sizes[..., 1]/2), -1)
+        good &= (~leaders | (gap >= waypoint['wall_clearance']).all(-1)).all(-1)
     roots = sizes.new_zeros(n, m, 2)
     assigned = push.clone()
     region = (push.long().cumsum(-1)-1).clamp_min(0)
@@ -177,6 +184,14 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
         points = outside()[selected, person, None].expand(-1, cfg['human_candidates'], -1).clone()
         points[..., 0] = -.9-random(len(selected), cfg['human_candidates'])*2.6
         points[..., 1] = (2*random(len(selected), cfg['human_candidates'])-1)*(spec['room_size'][1]/2-.4)
+        if waypoint:
+            # Draw each worker once, with the viewer's leader distribution.
+            is_leader = ~follower
+            points[..., 0] = torch.where(is_leader[:, None],
+                -3.5+random(len(selected), cfg['human_candidates']), points[..., 0])
+            side = torch.where(source[selected, person, 1] >= 0, 1., -1.)
+            points[..., 1] = torch.where(is_leader[:, None],
+                side[:, None]*(2.4+.8*random(len(selected), cfg['human_candidates'])), points[..., 1])
         target = torch.where((follower & (task < 3))[:, None], goal[selected, leading], source[selected, person])
         approach = (points-target[:, None]).norm(dim=-1)
         limit = torch.where(follower & (task < 3), 10., 5.)

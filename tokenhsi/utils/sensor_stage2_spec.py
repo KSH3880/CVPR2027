@@ -37,6 +37,19 @@ def validate_sensor(env):
     if 'warehouse' in scene:
         from utils.warehouse_sensor import validate_config
         validate_config(scene['warehouse'], env['jointPush']['box']['profiles'])
+    waypoint = scene.get('warehouse', {}).get('waypoint')
+    if waypoint:
+        from qualitative.warehouse_waypoint import ONTOP_WAYPOINT_RADIUS
+        from utils.warehouse_waypoint import BOX_ONLY_VERSION
+        contract = {1: ('leader_only', 1.3), 2: ('leader_ontop_follower', ONTOP_WAYPOINT_RADIUS),
+                    BOX_ONLY_VERSION: ('leader_ontop_follower_box_only', ONTOP_WAYPOINT_RADIUS)}
+        actual = (waypoint.get('view_mode', 'leader_only'), waypoint['switch_radius'])
+        if (contract.get(waypoint['version']) != actual or waypoint['wall_clearance'] != 1.2
+                or env['stateInit'] != 'Default'):
+            raise ValueError('Waypoint version, GTA view, radius or placement settings differ')
+        cache = waypoint['cache']
+        if (cache['capacity'], cache['samples'], cache['refresh_probability'], cache['warmup_resets']) != (32, 2, .25, 32):
+            raise ValueError('Waypoint cache contract differs')
     if scene['before_leader_size'] != [[.4,.6],[.4,.6],[.35,.5]]:
         raise ValueError('BEFORE leaders require the shared size intersection')
     if scene['bridge']['pusher_counts'] != [1,2,3]:

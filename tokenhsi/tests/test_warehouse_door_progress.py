@@ -104,3 +104,70 @@ def test_leader_selection_follows_the_predecessor_binding():
     task._before_predecessor[0] = torch.tensor([1, -1, -1, -1])
     move(task, -5.2)
     torch.testing.assert_close(reward(task), torch.tensor([[0., .1, 0., 0.]]))
+
+
+def test_box_only_leader_reward_latches_on_pickup_before_crossing():
+    from utils.edge_context_spec import HOLDING
+
+    task = make_task(2)
+    task._warehouse_before_pairs[1] = True
+    task._waypoint_box_only = True
+    task._waypoint_door_pickup = torch.zeros_like(task._warehouse_door_passed)
+    graph = SimpleNamespace(edge_valid=torch.ones(2, 2, dtype=torch.bool),
+                            edge_relation=torch.full((2, 2), HOLDING),
+                            edge_owner=torch.tensor([[2, 3], [2, 3]]))
+    task.relation_runtime = SimpleNamespace(graph=graph, own_success=torch.tensor([[False, True], [True, True]]))
+    move(task, -5.2)
+    torch.testing.assert_close(reward(task)[:, 2], torch.tensor([.1, 0.]))
+    task.relation_runtime.own_success[0, 0] = True
+    torch.testing.assert_close(reward(task)[:, 2], torch.tensor([.2, 0.]))
+    assert not task._warehouse_door_passed.any()
+    assert task._waypoint_door_pickup[0, 2]
+    task.relation_runtime.own_success.zero_()
+    move(task, -9.)
+    torch.testing.assert_close(reward(task)[:, 2], torch.tensor([.2, 0.]))
+    task._waypoint_box_only = False
+    torch.testing.assert_close(reward(task)[:, 2], torch.tensor([.2/(1+4.8), 0.]))
+
+
+def test_box_only_evaluation_tracks_post_pickup_root_and_payload_crossings():
+    from learning.multi_agent.warehouse_carry_eval import WarehouseCarryEval
+    from utils.edge_context_spec import HOLDING
+
+    task = make_task(2, yaw=1.3)
+    task._templates[:, 3] = 4
+    task._warehouse_before_pairs[1] = True
+    task._agent_box_assignment = torch.arange(4).expand(2, -1)
+    task._box_states = torch.zeros_like(task._humanoid_root_states)
+    graph = SimpleNamespace(edge_valid=torch.ones(2, 2, dtype=torch.bool),
+                            edge_relation=torch.full((2, 2), HOLDING),
+                            edge_owner=torch.tensor([[2, 3], [2, 3]]))
+    task.relation_runtime = SimpleNamespace(graph=graph, own_success=torch.zeros(2, 2, dtype=torch.bool))
+    valid = torch.ones(2, 4, dtype=torch.bool)
+
+    def position(root_x, box_x):
+        lateral = torch.tensor([[0., 0., 0., 3.]]).expand(2, -1)
+        move(task, root_x, lateral)
+        boxes = torch.stack((torch.full_like(lateral, box_x), lateral), -1)
+        task._box_states[..., :2] = scene.to_world(boxes, task._structure_yaw[:, WAREHOUSE],
+            task._structure_shift[:, WAREHOUSE], task._env_origins)
+
+    position(-4., -4.)
+    tracker = WarehouseCarryEval(task)
+    position(-4.6, -4.6)
+    tracker.record(task, valid, 1)
+    position(-4., -4.)
+    task.relation_runtime.own_success[:] = True
+    tracker.record(task, valid, 2)
+    position(-4.6, -4.)
+    tracker.record(task, valid, 3)
+    position(-4.6, -4.6)
+    tracker.record(task, valid, 4)
+    ever = torch.zeros(2, 4, 2, dtype=torch.bool)
+    ever[0, 3, 0] = True
+    totals, trace = tracker.finish(valid, ever)
+    assert trace['warehouse_pickup_step'].tolist() == [[2, 2], [-1, -1]]
+    assert trace['warehouse_root_exit_step'].tolist() == [[3, -1], [-1, -1]]
+    assert trace['warehouse_exit_step'].tolist() == [[4, -1], [-1, -1]]
+    assert totals['leader']['exited'] == 1 and totals['leader']['point_goal_success'] == 0
+    assert totals['follower']['exited'] == 0 and totals['follower']['point_goal_success'] == 1

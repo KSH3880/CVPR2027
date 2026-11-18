@@ -230,12 +230,22 @@ def spare_assignment(templates, objects):
     return assignment
 
 
-def assign_regions(groups):
-    people = groups.shape[1]
-    order = torch.rand_like(groups, dtype=torch.float).argsort(-1)
+def _rank_regions(groups, order):
     same = groups[:, :, None] == groups[:, None, :]
     earlier = order[:, None, :] < order[:, :, None]
     return (same & earlier).sum(-1)
+
+
+def assign_regions(groups):
+    order = torch.rand_like(groups, dtype=torch.float).argsort(-1)
+    return _rank_regions(groups, order)
+
+
+def ordered_regions(groups, roots, boxes):
+    """Rank final pusher positions along each shared box's local X axis."""
+    local_x = inverse_rotate(boxes[..., 3:7], roots[..., :3] - boxes[..., :3])[..., 0]
+    order = local_x.argsort(dim=-1, stable=True).argsort(dim=-1)
+    return _rank_regions(groups, order)
 
 
 def compose_graph(templates, groups, shuffle=True, individual_goals=False, num_objects=None):

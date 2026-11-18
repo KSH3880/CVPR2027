@@ -6,7 +6,7 @@ import torch
 
 from utils.coupled_push_assignment import assign_regions, best_assignment, crossing_counts, scores, validate_mode
 from utils.coupled_push_contact import group_face_geometry
-from utils.coupled_push_spec import region_states
+from utils.coupled_push_spec import ordered_regions, region_states
 from utils.jointpush_geometry import rotate
 
 
@@ -65,6 +65,8 @@ def test_rotated_multiple_groups_regions_goals_and_rng(mode):
     rotated[..., :3] = shift
     actual = assign_regions(groups, rotate(quaternion, roots)+shift, rotated, sizes, regions, mode, .6)
     assert torch.equal(actual, expected)
+    if mode == 'ordered':
+        torch.testing.assert_close(ordered_regions(groups, rotate(quaternion, roots)+shift, rotated), actual)
     members = (groups[:, :, None] == groups[:, None]).sum(-1)
     tokens, _ = region_states(rotated, sizes, members, actual)
     centers = rotated[..., :3]+torch.tensor([0., 5., 0.])
@@ -79,6 +81,23 @@ def test_rotated_multiple_groups_regions_goals_and_rng(mode):
     order = torch.tensor([1, 0])
     partial = assign_regions(groups[order], (rotate(quaternion, roots)+shift)[order], rotated[order], sizes[order], regions[order], mode, .6)
     assert torch.equal(partial, actual[order])
+
+
+def test_ordered_regions_match_final_spawns_when_their_sides_change():
+    groups = torch.tensor([[0, 1, 2, 0], [0, 1, 2, 0]])
+    boxes = torch.zeros(2, 4, 13)
+    boxes[..., :3] = torch.tensor([12., -5., .75])
+    boxes[..., 6] = 1.
+    roots = boxes[..., :3].clone()
+    roots[0, [0, 3], 0] += torch.tensor([.9, -.9])
+    roots[1, [0, 3], 0] += torch.tensor([-.9, .9])
+    roots[..., 1] -= 1.7
+    regions = ordered_regions(groups, roots, boxes)
+    assert regions.tolist() == [[1, 0, 0, 0], [0, 0, 0, 1]]
+    sizes = torch.tensor([3.6, 2., 1.5]).expand(2, 4, 3)
+    members = torch.tensor([[2, 1, 1, 2]]).expand_as(groups)
+    tokens, _ = region_states(boxes, sizes, members, regions)
+    torch.testing.assert_close(tokens[:, [0, 3], 0], roots[:, [0, 3], 0])
 
 
 def test_crossing_score_counts_intersection_and_collinear_overlap():

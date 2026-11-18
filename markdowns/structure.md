@@ -65,6 +65,11 @@
 - `tokenhsi/env/tasks/multi_agent/warehouse_before_cache.py`: 학습 전용 BEFORE apron 검증 배치·역할/그래프·자세/AMP 이력 캐시와 Default 초기화의 첫 rollout 전 캐시 준비. `tests/test_warehouse_before_cache.py`·`tests/check_warehouse_before_cache.py`에서 조건 일치·복원·충돌·reset 시간을 검사한다.
 - `tokenhsi/env/tasks/multi_agent/square_sensor_scene.py`의 `place_rigid_batched`: apron 강체 배치 후보의 일괄 검사·불가능한 기하 조기 탈락. `tests/test_warehouse_reset_speedup.py`에서 경계·충돌 조건과 불가능한 그룹을 검사한다.
 - `tokenhsi/env/tasks/multi_agent/warehouse_door_progress.py`: 2 PUSH + BEFORE 1쌍에서 선행 root의 문 입구 XY progress와 통과 후 포화. `tests/test_warehouse_door_progress.py`에서 적용 대상·좌표계·포화를 검사한다.
+- `tokenhsi/qualitative/warehouse_waypoint{,_policy,_task,_viewer}.py`: 원본 DistillV4 추론 전용 입구 가상 상자/root 거리 전환·집기 후 입구 가상 목표/payload 거리 복귀·선행 행동 교체·뒤쪽 좌우 스폰·선행 상자 벽 여유 1.2m·탑뷰 viewer. `scripts/multi_agent/warehouse_waypoint_{env,test,vnc}.sh`가 GPU5/6/7·MPS/직접 CUDA와 실행을 담당한다. `tests/test_warehouse_waypoint.py`·`check_warehouse_waypoint.py`에서 관측 보존·스폰·실제 정책 출력을 검증한다.
+- 같은 추론 viewer의 `--follower-ontop-waypoint`는 ON_TOP 후행의 진입용 상자와 운반용 목표를 입구에 두는 GTA 장면을 추가한다. `--record`로 한 에피소드를 MP4로 저장한다.
+- `warehouse_waypoint_task.py`와 `warehouse_waypoint_network.py`는 1.2m 선행·ON_TOP 후행의 단계 저장, 역할별 GTA 배치 인코딩과 기존 1.3m 선행 전용 관측을 지원한다. 실행 계약은 [waypoint 학습 명세](reference/warehouse_waypoint_training.md#12m-선행on_top-후행)를 따른다.
+- 같은 학습 경로의 가상상자 전용 분기는 집기 후 원래 목표와 선행 입구 보상 포화를 사용한다. `warehouse_carry_eval.py`는 평가 중 첫 집기와 출구 통과를 기록한다. [변형 명세](reference/warehouse_waypoint_training.md#가상상자-전용-변형).
+- 제로샷 viewer의 `--box-only`는 가상상자 전용 학습 태스크의 배치·전환 상태와 원본 DistillV4 정책을 연결한다. [녹화 명령](USAGE.md#가상상자-전용-제로샷-녹화).
 - `tokenhsi/utils/sensor_stage2_spec.py`: 4명·8토큰 센서 계약, bridge 1/2/3명 PUSH·crosser·나머지 사람 샘플링.
 - `tokenhsi/tests/{test_sensor_stage2,check_sensor_stage2}.py`: CPU 전이/동결/샘플링·실제 1024환경 배치/센서 검사.
 
@@ -122,3 +127,6 @@
 - `tokenhsi/tests/{test_warehouse_coop,test_warehouse_room_geometry,check_warehouse_coop}.py`: CPU 계약·36조합·Room 기하 참조 일치 및 실제 1024환경 reset·센서·화면 검사.
 - `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_sensor_900_warehouse_coop.yaml`, `scripts/multi_agent/stage2_sensor_900_warehouse_coop_{train,train_vnc,test,vnc,eval}.sh`: Safety를 기반으로 한 별도 실행 설정.
 - `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_sensor_900_warehouse_coop_cliffroom.yaml`, `scripts/multi_agent/stage2_sensor_900_warehouse_coop_cliffroom_{train,train_vnc,test,vnc,eval}.sh`: coop 기반 Cliff·Room 샘플링 변경 실행 설정. 코드 변경은 실험 이름 등록뿐이다.
+
+- `tokenhsi/env/tasks/multi_agent/warehouse_waypoint_task.py`·`warehouse_waypoint_cache.py`: 80% PUSH+BEFORE 선행의 고정 1.3m 단계 전환·PPO 관측 suffix, 두 변형의 GPU 배치 캐시·초기 준비. `warehouse_waypoint_placement.py`는 최적화 전 배치의 성능 대조용이다.
+- `tokenhsi/learning/multi_agent/warehouse_waypoint_network.py`·`utils/warehouse_waypoint.py`: 저장 관측으로 실제/선행용 GTA를 독립 batch 행에 묶고 출력 담당을 분리한다. 동결 actor 특징을 PPO mini-epoch 간 재사용하며 센서 분기는 공유한다. `tests/test_warehouse_waypoint_training.py`·`check_warehouse_waypoint_training.py`가 정책·캐시·1024환경을 검증한다.

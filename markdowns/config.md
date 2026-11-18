@@ -6,14 +6,14 @@
 
 - 유지하는 실험은 아래 컨피그 표를 따른다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi_jhh`을 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
-- 이 checkout의 현재 본학습은 `stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress`이며 Run 이름은 `Stage2Sensor900WarehouseFixedRolesV4BeforePairsDoorProgress`다. GPU6에서 AT 높이 마스크 수정본을 Distill900V4 2000부터 새로 전이하며 GPU7의 기존 학습도 유지한다. GPU6은 [직접 CUDA 실행·백그라운드 서비스·안전 종료](USAGE.md#doorprogress-좌표-수정본-새-본학습)를 따른다. 이전 실험 결과·체크포인트는 보존한다. 학습 시각화 noVNC는 기본6080, 테스트 시각화는6081이다. 전이·동결·센서 옵션은 [USAGE](USAGE.md#warehouse-공동-push)를 따른다.
+- GPU6의 waypoint·doorprogress 본학습은 중단 상태다. 재개용 체크포인트는 [waypoint 운영 기록](USAGE.md#waypoint-gpu6-백그라운드-본학습)과 [doorprogress 운영 기록](USAGE.md#doorprogress-좌표-수정본-새-본학습)을 따른다. 학습 시각화 noVNC는 기본6080, 테스트 시각화는6081이다.
 - 학습 인자: `[agents] [envs] [objects]`. 기본값은 Stage1·Stage1 PUSH **2명·2048환경·4물체**, BEFORE·coupled **4명·1024환경·8토큰**이다. BEFORE는 인원 N≥1·토큰 M≥2N, coupled는 인원 N≥1·토큰 M≥N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - BEFORE apron 배치 캐시의 학습 옵션·진단은 [USAGE](USAGE.md#warehouse-역할-고정-v4--before-2팀-본학습)를 따른다.
 - 실험별 RSI 초기화 조건은 환경 YAML과 [센서 실험 명세](reference/stage2_sensor_900.md)를 확인한다.
 - 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_coupled_push_individual_goal_solo5_carry5`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`·`stage2_coupled_push_individual_goal_solo5_keep1`·`stage2_coupled_push_individual_goal_solo5_shrink1`·`stage2_coupled_push_individual_goal_solo5_carry5_ground`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`은 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
-- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_sensor_900`·`stage2_sensor_900_warehouse`·`stage2_sensor_900_warehouse_bridge_init`·`stage2_sensor_900_warehouse_bridge_init_rsi`·`stage2_sensor_900_warehouse_safety`·`stage2_sensor_900_warehouse_coop`·`stage2_sensor_900_warehouse_coop_cliffroom`·`stage2_sensor_900_room_warehouse`·`stage2_sensor_900_room_warehouse_wallterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm_v4_reward`·`stage2_sensor_900_warehouse_fixedroles_v4`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs`·`stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress`는 학습·평가·viewer 모두 **900step**이다.
+- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_sensor_900`·`stage2_sensor_900_warehouse`·`stage2_sensor_900_warehouse_bridge_init`·`stage2_sensor_900_warehouse_bridge_init_rsi`·`stage2_sensor_900_warehouse_safety`·`stage2_sensor_900_warehouse_coop`·`stage2_sensor_900_warehouse_coop_cliffroom`·`stage2_sensor_900_room_warehouse`·`stage2_sensor_900_room_warehouse_wallterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm_v4_reward`·`stage2_sensor_900_warehouse_fixedroles_v4`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs`·`stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly`는 학습·평가·viewer 모두 **900step**이다.
 - 정식 평가의 기존 과제/관계 지표와 추가 interaction group 성공률 정의는 [평가 규약](reference/evaluation.md#통합-stage2의-interaction-group-성공률)을 따른다.
 - 모든 test의 기본값은 viewer다. 로컬 추론은 `HEADLESS=0`, 화면 없는 진단은 `HEADLESS=1`이다. **정식 평가는 `*_eval.sh`**, 1명 단독 평가는 **Stage1 계열 전용 `stage1_single_eval.sh`·`stage1_push_single_eval.sh`**로 구분한다. 일반 평가는 저장된 학습 인원·물체 수를 유지한다.
 
@@ -62,6 +62,9 @@
 | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml) |
 | [stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml) |
 | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress.yaml) |
+| [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint.yaml) |
+| [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop.yaml) |
+| [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly.yaml) |
 
 ## 학습
 
@@ -197,6 +200,15 @@ TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fix
 
 # stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress
 TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress_train.sh 4 1024 8
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_train.sh 4 1024 8
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_train.sh 4 1024 8
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -320,6 +332,18 @@ TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_wa
 
 # stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress
 TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress_test.sh "$CKPT" 4 1 8 10
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress (DistillV4 진입 가상 상자·운반 가상 목표 제로샷)
+TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_waypoint_test.sh --switch-margin 1.0
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_test.sh "$CKPT" 4 1 8 10
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_test.sh "$CKPT" 4 1 8 10
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -443,10 +467,31 @@ TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fix
 
 # stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress
 TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_doorprogress (DistillV4 진입 가상 상자·운반 가상 목표 제로샷)
+TOKENHSI_GPU=7 PORT=6081 bash tokenhsi/scripts/multi_agent/warehouse_waypoint_vnc.sh --switch-margin 1.0
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint
+TOKENHSI_GPU=6 PORT=6083 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps PORT=6083 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly
+TOKENHSI_GPU=6 WAYPOINT_CUDA=mps PORT=6083 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_waypoint_ontop_boxonly_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
 
+- DistillV4 2000의 ON_TOP 후행 입구 유도와 녹화는 [추론 옵션](USAGE.md#ontop-후행-입구-유도-추론)을 따른다.
+
+- 가상 상자·목표 센서 학습의 고정 반경·캐시·진단 옵션은 [USAGE](USAGE.md#warehouse-waypoint-센서-학습)를 따른다.
+
+- 1.2m 선행·ON_TOP 후행 센서 학습의 전이·평가 옵션은 [USAGE](USAGE.md#warehouse-ontop-후행-waypoint-센서-학습)를 따른다.
+
+- 가상상자 전용 변형의 [500epoch 재개](USAGE.md#500epoch-재개), [출구 통과 평가](USAGE.md#출구-통과-평가), [DistillV4 제로샷 녹화](USAGE.md#가상상자-전용-제로샷-녹화)는 GPU 6·7번에서 실행한다.
+
+- DistillV4 가상 상자 제로샷 viewer의 GPU5/6/7 선택·진입/운반 전환 거리·스폰·원본 checkpoint는 [USAGE](USAGE.md#distillv4-warehouse-가상-상자-제로샷-viewer)를 따른다.
 - `TASK_GRAPH=random_scenario`가 기본이다. Stage1: `sit`, `climb`, `holding_at`, `holding_ontop`, `sit_climb`. BEFORE: `before_sit`, `before_climb`, `before_stack`, `one_pair_sit`, `one_pair_climb`, `one_pair_stack`, `all_solo`, `sit`, `climb`, `holding_at`, `holding_ontop`.
 - `EVAL_SKILLS`와 `EVAL_SKILL_PROBS`는 함께 지정한다. 예: `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`. BEFORE의 기본 초기화는 loco이며 후행 RSI는 별도 옵션으로 선택한다.
 - `TASK_CAMERA=stack` 또는 `agent`로 viewer 카메라를 선택한다. 그 외 초기화·거리·resume·실행 환경 옵션은 [USAGE](USAGE.md)를 따른다.

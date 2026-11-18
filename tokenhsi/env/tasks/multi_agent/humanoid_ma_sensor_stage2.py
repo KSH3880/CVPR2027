@@ -349,19 +349,23 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
         self._reset_ref_slots,self._reset_ref_motion_ids,self._reset_ref_motion_times = {},{},{}
         self._reset_actors(fresh)
         saved = (self._reset_ref_slots.copy(),self._reset_ref_motion_ids.copy(),self._reset_ref_motion_times.copy())
-        flat_roots = self._humanoid_root_states.clone()
-        flat_bodies = self._kinematic_humanoid_rigid_body_states.clone()
+        compact = hasattr(self, '_waypoint_phase') and not self._waypoint_baseline
+        snapshot = fresh if compact else torch.arange(self.num_envs, device=self.device)
+        flat_roots = self._humanoid_root_states[snapshot].clone()
+        flat_bodies = self._kinematic_humanoid_rigid_body_states[snapshot].clone()
+        snapshot_rows = torch.empty(self.num_envs, dtype=torch.long, device=self.device)
+        snapshot_rows[snapshot] = torch.arange(len(snapshot), device=self.device)
         pending = fresh
         attempts = self.cfg['env']['stage2JointPush']['layout_attempts']
         for attempt in range(4*attempts):
             if not len(pending):
                 break
-            self._humanoid_root_states[pending] = flat_roots[pending]
-            self._kinematic_humanoid_rigid_body_states[pending] = flat_bodies[pending]
+            self._humanoid_root_states[pending] = flat_roots[snapshot_rows[pending]]
+            self._kinematic_humanoid_rigid_body_states[pending] = flat_bodies[snapshot_rows[pending]]
             if attempt and attempt % attempts == 0:
                 saved = self._resample_before_references(pending, saved, include_coupled=True)
-                flat_roots[pending] = self._humanoid_root_states[pending]
-                flat_bodies[pending] = self._kinematic_humanoid_rigid_body_states[pending]
+                flat_roots[snapshot_rows[pending]] = self._humanoid_root_states[pending]
+                flat_bodies[snapshot_rows[pending]] = self._kinematic_humanoid_rigid_body_states[pending]
             elif attempt and self.cfg['env'].get('stage2') is not None:
                 saved = self._resample_before_references(pending, saved)
             self._reset_ref_slots,self._reset_ref_motion_ids,self._reset_ref_motion_times = (v.copy() for v in saved)
@@ -407,6 +411,14 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
                 self._assigned_box_values(self._box_size, ids), self._regions[ids],
                 self._coupled_assignment, self.cfg['env']['stage2JointPush']['human_clearance'])
             self._regions[ids] = torch.where(self._members[ids] > 1, self._regions[ids], 0)
+        elif getattr(self, '_waypoint_box_only', False):
+            # Match the final geometry before computing goal offsets, including on cache hits.
+            warehouse_push = (self._scene_ids[ids] == WAREHOUSE) & ~self._warehouse_before_pairs[ids]
+            pushers = warehouse_push[:, None] & (self._templates[ids] == PUSH) & (self._members[ids] == 2)
+            regions = coupled_push_spec.ordered_regions(
+                self._groups[ids], self._humanoid_root_states[ids],
+                self._assigned_box_values(self._box_states, ids))
+            self._regions[ids] = torch.where(pushers, regions, self._regions[ids])
         if self._individual_push_goals:
             boxes = self._assigned_box_values(self._box_states, ids)
             sizes = self._assigned_box_values(self._box_size, ids)
