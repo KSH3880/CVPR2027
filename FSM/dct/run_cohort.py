@@ -13,14 +13,14 @@ from cohort import jobs, key, command, cpu_command, prepare, read, write
 from run_suite import ExistingProcess
 
 
-def eligible_gpu_caps():
+def eligible_gpu_caps(requested):
     raw = subprocess.check_output(['nvidia-smi', '--query-gpu=index,memory.total',
         '--format=csv,noheader,nounits'], text=True)
     totals = dict(tuple(map(int, line.split(','))) for line in raw.splitlines())
-    caps = {gpu: min(cap, totals[gpu] - 1024) for gpu, cap in GPU_CAPS.items()
+    caps = {gpu: min(cap, totals[gpu] - 1024) for gpu, cap in requested.items()
             if gpu in totals and totals[gpu] > 6524}
     if not caps:
-        raise RuntimeError('Evaluation requires physical GPU 6 or 7 with more than 6524 MiB')
+        raise RuntimeError(f'Evaluation requires an eligible physical GPU from {tuple(requested)} with more than 6524 MiB')
     return caps
 
 
@@ -44,11 +44,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--resume-active', type=Path)
+    parser.add_argument('--local-gpu0', action='store_true', help='Use only physical GPU 0 on the local PC')
     args = parser.parse_args()
     prepare()
     if args.prepare_only:
         return
-    gpu_caps = eligible_gpu_caps()
+    gpu_caps = eligible_gpu_caps({0: 88000} if args.local_gpu0 else GPU_CAPS)
     lock = (OUT/'supervisor.lock').open('a')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     (OUT/'supervisor.pid').write_text(str(os.getpid()))

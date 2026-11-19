@@ -1,6 +1,6 @@
 # Table 8·9 로컬 재현
 
-Ubuntu/Linux에서 Python 3.8, 네이티브 Isaac Gym과 호환되는 PyTorch/CUDA, NVIDIA 드라이버가 필요하다. 서버는 conda `tokenhsi` 환경을 사용한다. Python 의존성은 저장소의 `requirements.txt`와 `psutil`이다. Isaac Gym과 PyTorch/CUDA는 별도로 설치한다. 정식 실행은 물리 GPU 6 또는 7을 사용한다. 해당 슬롯이 없는 컴퓨터에서는 CPU 준비 검증까지 할 수 있다.
+Ubuntu/Linux에서 Python 3.8, 네이티브 Isaac Gym과 호환되는 PyTorch/CUDA, NVIDIA 드라이버가 필요하다. 서버는 conda `tokenhsi` 환경을 사용한다. Python 의존성은 저장소의 `requirements.txt`와 `psutil`이다. Isaac Gym과 PyTorch/CUDA는 별도로 설치한다. 기본 실행은 물리 GPU 6 또는 7을 사용한다. 로컬 PC의 물리 GPU 0은 `--run-local-gpu0`으로 명시한다.
 
 ## 코드와 입력
 
@@ -31,3 +31,18 @@ bash FSM/dct/table89.sh --post-at
 - 진행과 로그는 `runs/table89_delay/cohort/`에서 확인한다. 완료된 결과는 같은 디렉터리의 `report.md`와 `summary.json`에 저장한다. Post-AT 결과는 `runs/table89_delay/post_at/`에 저장한다.
 - GPU 메모리 상한은 감지된 총 메모리에서 1,024 MiB를 뺀 값과 원본 88,000 MiB 중 작은 값이다. 실제 필요한 메모리는 작업 크기와 GPU에 따라 달라진다.
 - `FSM/dct/README.md`의 앞선 파일럿과 달리 Table 8·9의 실행 진입점은 `FSM/dct/run_cohort.py`다.
+
+
+## 후행 에이전트 시간별 행동
+
+로컬 PC에서 새 rollout이 필요한 경우 GPU 0으로 실행한다. 집계에는 GPU가 필요하지 않다.
+
+```bash
+bash FSM/dct/table89.sh --run-local-gpu0
+bash FSM/dct/table89.sh --follower-timeline
+```
+
+이미 완료된 원본 평가가 있으면 `--follower-timeline --suite <평가 폴더> --output <새 CSV 경로>`로 바로 집계한다. CSV는 Enabling 유형·방법·시드·지연 조건별로 시작 기준 및 AT 최초 성공 기준 1초 구간의 유효 프레임 수와 상태별 비율을 담는다. AT 기준 통계에는 AT 성공 에피소드만 포함한다. 후행 에이전트 낙상 이후와 그룹 최초 성공 이후는 집계에서 제외한다.
+
+- 이동은 최근 0.2초 동안의 평면 변위로 추정한 속도가 0.15 m/s 이상인 프레임이다. 그 아래는 대기로 분류한다.
+- ON_TOP에서 후행 에이전트의 양손이 자기 상자의 표면에서 각각 0.12 m 이내이고, 상자가 초기 높이에서 0.05 m 이상 올라간 상태가 5프레임 연속이면 집기·들기로 분류한다. 이 조건은 이동·대기보다 우선한다. SIT·CLIMB에 후행 상자 집기 역할은 없고, 집기·들기는 손 근접과 상자 높이로 추정한 값이다.

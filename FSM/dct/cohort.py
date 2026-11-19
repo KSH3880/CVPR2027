@@ -122,8 +122,14 @@ def prepare():
         aggregation='512 pooled trials per family/seed; also equal-weight setting means; seed mean and sample std')
     p = OUT/'manifest.json'
     if p.exists() and read(p) != manifest:
-        raise ValueError('Manifest changed')
-    if not p.exists():
+        started = ('reference', 'development', 'rollouts', 'analysis', 'supervisor.lock')
+        if any((OUT/name).exists() for name in started):
+            raise ValueError('Manifest changed after evaluation started; use a fresh run directory or the original commit')
+        previous = p.with_name(f'manifest_before_{sha(p)[:12]}.json')
+        if not previous.exists():
+            write(previous, read(p))
+        write(p, manifest)
+    elif not p.exists():
         write(p, manifest)
     write(OUT/'prepare_verification.json', dict(passed=True, commands=360, schedules=36,
         family_trials_per_seed=512, subtype_trials_across_seeds=512, total_trials=30720))
