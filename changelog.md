@@ -2,6 +2,13 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-19
+
+### Table 8·9 로컬 평가 설정
+
+- Table 8·9에 사용한 지연 평가 코드와 공통 물리 환경을 `koo_1119`에 옮겼다. 입력 묶음 설치, 평가, Post-AT 집계 명령을 [로컬 가이드](FSM/dct/TABLE89.md)에 기록했다.
+- 추출한 입력 묶음으로 체크포인트 SHA-256과 모션 경로를 확인했다. 원본 스케줄 36개와 일치하며 정식 GPU 평가는 로컬에서 실행한다.
+
 ## 2026-11-14
 
 ### Coordination Behavior · 기존 Enabling rollout CPU 재집계

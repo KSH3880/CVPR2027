@@ -16,7 +16,10 @@ PRESETS = (*coupled.PRESETS, 'before', 'coupled', 'mixed',
 def validate_env(env):
     from utils.experiments import native_config
     teacher_rewards = env['stage2'].get('reward_source') == 'v4_teachers'
-    native = native_config('stage2_900_v4_reward' if teacher_rewards else 'stage2')['env']
+    name = 'stage2_900_v4_reward' if teacher_rewards else 'stage2'
+    if env['relationGraph'].get('human_relation_bias') is False:
+        name = 'stage2_distill_900_v4_nobias'
+    native = native_config(name)['env']
     if env['numAgents'] < 4 or env['numObjects'] < env['numAgents']:
         raise ValueError('stage2 requires at least four people and one object token per person')
     for key in ('stage2', 'before', 'relationGraph', 'relationReward'):

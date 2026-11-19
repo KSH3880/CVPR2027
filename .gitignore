@@ -37,3 +37,8 @@ __pycache__/
 *.npz
 *.pkl
 *.pkl.gz
+
+# Local Table 8/9 evaluation inputs and outputs
+/table89_assets/
+/runs/table89_delay/
+/tokenhsi/data/jointpush_motions

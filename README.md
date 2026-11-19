@@ -13,3 +13,7 @@ SIT/CLIMB/AT/ON_TOP 및 PUSH를 학습한다. Stage1·Stage1 PUSH와 역할별 o
 ## Acknowledgements
 
 [TokenHSI](https://github.com/liangpan99/TokenHSI) by Liang Pan, Zeshi Yang, Zhiyang Dou, Wenjia Wang, Buzhen Huang, Bo Dai, Taku Komura and Jingbo Wang을 기반으로 한다. 원본은 ASE·PADL·InterScene에 기반한다. 원본 저작권과 [MIT License](LICENSE)를 유지하며 외부 라이브러리·데이터셋은 각 라이선스를 따른다.
+
+## Table 8·9 지연 평가
+
+[로컬 재현 및 입력 파일 설치](FSM/dct/TABLE89.md)

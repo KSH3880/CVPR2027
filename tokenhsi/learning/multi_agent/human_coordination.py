@@ -83,21 +83,23 @@ class HumanCoordination(nn.Module):
         relations=3,
         count_normalization="none",
         relation_fusion="none",
+        relation_bias=True,
     ):
         super().__init__()
         self.shuffle_human_order = shuffle_human_order
         self.coupled_peer_mask = None
-        if relation_fusion not in ('none', 'learnedbg', 'zerobg', 'stage2_zerobg', 'before_zerobg'):
+        if relation_fusion not in ('none', 'learnedbg', 'zerobg', 'stage2_zerobg', 'before_zerobg', 'before_zerobg_nobias'):
             raise ValueError('Unknown coupled relation fusion mode')
         self.relation_fusion = None
         if relation_fusion != 'none':
             if relations != 4 or bias_mode != 'all' or count_normalization != 'none':
                 raise ValueError('Coupled relation fusion requires four relations and no count normalization')
             from learning.multi_agent.coupled_relation_fusion import CoupledRelationFusion, FusionCoordinationBlock
-            if relation_fusion == 'before_zerobg':
+            if relation_fusion in ('before_zerobg', 'before_zerobg_nobias'):
                 from learning.multi_agent.before_relation_fusion import BeforeFusionCoordinationBlock
                 self.blocks = nn.ModuleList([
-                    BeforeFusionCoordinationBlock(width, heads, feedforward_dim)
+                    BeforeFusionCoordinationBlock(width, heads, feedforward_dim,
+                        relation_bias=relation_bias and relation_fusion != 'before_zerobg_nobias')
                     for _ in range(num_layers)
                 ])
                 self.relation_fusion = CoupledRelationFusion(width)
@@ -105,13 +107,14 @@ class HumanCoordination(nn.Module):
             if relation_fusion == 'stage2_zerobg':
                 from learning.multi_agent.stage2_relation_fusion import Stage2RelationFusion, Stage2FusionCoordinationBlock
                 self.blocks = nn.ModuleList([
-                    Stage2FusionCoordinationBlock(width, heads, feedforward_dim)
+                    Stage2FusionCoordinationBlock(width, heads, feedforward_dim, relation_bias=relation_bias)
                     for _ in range(num_layers)
                 ])
                 self.relation_fusion = Stage2RelationFusion(width)
                 return
             self.blocks = nn.ModuleList([
-                FusionCoordinationBlock(width, heads, feedforward_dim, relations, relation_fusion)
+                FusionCoordinationBlock(width, heads, feedforward_dim, relations, relation_fusion,
+                                        relation_bias=relation_bias)
                 for _ in range(num_layers)
             ])
             self.relation_fusion = CoupledRelationFusion(width)

@@ -4,8 +4,10 @@ from learning.multi_agent.coupled_relation_fusion import FusionCoordinationBlock
 
 
 class BeforeFusionCoordinationBlock(FusionCoordinationBlock):
-    def __init__(self, width, heads, feedforward_dim):
-        super().__init__(width, heads, feedforward_dim, 4, 'zerobg')
+    def __init__(self, width, heads, feedforward_dim, relation_bias=True):
+        super().__init__(width, heads, feedforward_dim, 4, 'zerobg', relation_bias=relation_bias)
+        if not relation_bias:
+            self.bias_projection = None
 
     def effective_relation_bias(self, embedding):
         before = self.bias_projection @ embedding
