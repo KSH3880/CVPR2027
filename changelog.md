@@ -2,7 +2,278 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-20
+
+### random15k 밀기4명 + Enable2세트 평가
+
+- 승인된 8명 구성을 512환경×seed0/1/2로 GPU5/6/7에 각각 실행한다. insert/횡단100%·폭1.6~2.2m 랜덤·다리 길이6.4m/간격6.5m·follow_cap5cm·가상목표 없음·배치 후 좌우 정렬이다. 동일 실행의900/1500step 결과를 기록한다. 공동밀기와 Enable2개를 각 동시 성공으로 집계하고, 세 과제 평균을 Subtask SR·8명 동시 성공을 Full-scenario SR로 정의한다. 후행 자체 행동 분석을 위해 BEFORE gate 제외 native 성공도 저장한다. 학습 프로세스를 보존하며 GPU당85000MiB 상한을 감시한다. [실행법](markdowns/USAGE.md#follow-cap-5cm-학습-비교)·[평가 폴더](output_etc/check/bridge_random15k_push4_enable2_eval_20261120/).
+- 8환경×20step smoke 및 CPU trace 재집계 검증 통과. 인원·쌍별 실제 상자/AT 연결·정렬·기하·삽입 깊이·유한 궤적·무reset·group/scene/후행 raw-gated 일치 확인. Python 구문·shell 문법 검사 통과.
+- 본평가3seed×512환경×1500step 및 저장 trace 재집계/검증 완료. checkpoint epoch/SHA·각900/1500 시점의 모든 성공 건수·낙상 생존 마스크·native group/scene/raw-gated 일치 검증 통과. 900→1500step의 공동밀기 SR78.91→79.36%, Enable1 33.79→44.14%, Enable2 35.35→44.40%, Subtask49.35→55.97%, Full-scenario14.32→21.88%(220→336/1536)다. 최대 GPU5/6/7 총점유72228/72336/39244MiB, 기존 학습 보존. [결과표](output_etc/check/bridge_random15k_push4_enable2_eval_20261120/summary.md)·[전체 지표/검증](output_etc/check/bridge_random15k_push4_enable2_eval_20261120/summary.json). 기존4명 평가와는 다른 인원/초기장면이며 이번900/1500 결과끼리는 동일 실행이다.
+
+### 그룹 viewer random checkpoint의 배치 후 좌우 정렬
+
+- `bridge_push3_follow_cap_view_20261119/view.py`가 저장된 pusher sampling 설정에 따라 rear90/rear90_random 실행 config를 자동 선택하도록 수정했다. 두 모델 모두 `--coupled_assignment ordered`와 `--pusher_assignment ordered`를 전달해 reset 마지막에 random 배정이 덮어쓰지 않도록 했다. 기존 인원·폭 인자를 유지하며 모델의 학습 설정은 변경하지 않는다.
+- 사용자 random15k·밀기4명·2쌍·폭2.2m·insert·seed42 조건으로 GPU7 headless 1환경×2회×30step 검증 완료. checkpoint 호환·각 reset의 상자 좌표계 좌우 정렬/개인 목표·쌍별 상자/AT 연결·유한 관측/행동 검사 통과. [검증](output_etc/check/bridge_push3_follow_cap_view_20261119/run_20261120_134933_195809/verification.json). Python 구문·diff 검사 통과, VNC 실행·기존 프로세스 종료 없음.
+
+### Follow-cap viewer 인원·선행/후행 쌍 수·보행로 폭 인자
+
+- 기존 `bridge_push3_follow_cap_view_20261119/view.sh`에 `--pushers 2|3|4`·`--before-pairs N`·`--bridge-width <m>`를 추가했다. 기본은 밀기3명·1쌍·기존 폭 샘플링이다. 모든 선행은 같은 방향으로 건너며 각 후행의 실제 받침 상자/AT prerequisite를 자기 선행에 연결한다. 쌍별 선행 사람·상자·목표를 기존 횡단 sampler와 점유 검사로 배치한다. 밀기4명의 횡단 길이/플랫폼 간격은 6.4/6.5m, 지정 폭은 실제 본체·캡·센서 크기에 반영한다. 변경은 viewer 프로세스 안에 한정하며 학습 코드/config를 수정하지 않았다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- GPU6 headless에서 밀기4/2쌍/insert, 밀기3/3쌍/near, 밀기2/1쌍/present/폭2.5m 각각 4환경×2회×30step 완료. 최종 코드의 밀기4/2쌍/insert/폭1.8m는 1환경×900step 완료했다. 인원·정렬·개인 목표·쌍별 받침/AT 연결·같은 방향·기하·캡·유한 관측/행동 검사 통과. [900step 검증](output_etc/check/bridge_push3_follow_cap_view_20261119/run_20261120_133129_581182/verification.json). 3쌍의 4환경 두 번째 reset은 16.66초였으며 플랫폼 크기 상한을 유지해 다수 쌍에서 배치 재시도가 증가할 수 있다. Python 구문·shell 문법·diff 검사 통과. GUI 실행·기존 프로세스 종료 없음.
+
+### random 10k~18k 선행 AT 실패와 후행 성공 관계
+
+- 기존 27개 저장 궤적을 CPU 재분석했다. 선행 AT는 운반 상자 중심–원래 목표의 3D 거리 0.2m 이내와 선행 생존의 교집합으로 전체 프레임에서 원 평가와 exact임을 확인했다. 10k~18k 모두 AT-ever 실패 장면의 후행 활성/성공은 0개다. 15k AT 실패 115개는 미횡단/낙상 57, 미횡단/생존 32, 횡단/낙상 2, 횡단/생존 24이며 마지막 24개 중 18개는 횡단 후 최소 목표 오차 20~30cm였다. 이는 관측된 결과 분류이며 낙상 원인 판정은 아니다.
+- 마지막 프레임 AT 실패는 별도다. 15k의 최종 AT 실패 192개 중 후행-ever 성공 19개, 최종 후행 성공 8개였다. 전 checkpoint에서 후행 성공·선행 실패가 동시 기록된 예외는 모두 선행 낙상 후 상자가 AT 범위에 남은 경우다. BEFORE gate는 현재 raw AT를 보고 평가의 선행 생존 마스크를 직접 보지 않으며, 과거 성공 고정 방식은 아니다. 코드 변경·GPU 재실행 없음. [분석](output_etc/check/bridge_random_at_failure_20261120/summary.json)·[장면 목록](output_etc/check/bridge_random_at_failure_20261120/scenes.csv).
+
+### random 13000~18000 정렬 평가
+
+- 미평가 random 13k~18k를 GPU7에서 각각 512환경×3seed·900step·insert/횡단 100%·cap 5cm·가상목표 없음·배치 후 좌우 정렬로 평가한다. 기존 4명 evaluator·초기 fixture를 재사용하며 총 18개 평가를 최대 8개 병렬·GPU 전체 85000MiB 상한으로 실행한다. checkpoint CPU epoch 확인 후 실행하며 학습·viewer는 보존한다. 완료 후 초기 상태/성공 집계 검증 및 7k~18k의 1k 간격 표를 자동 생성한다. [평가 폴더](output_etc/check/bridge_random_13000_18000_ordered_20261120/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 18개 평가·집계 완료. 이전 초기 75 tensor·전체 관측 exact, checkpoint epoch/SHA·배치/개인 목표·기하·900step 유한 궤적·성공 건수 검증 통과. GPU7 최대 총점유 73628MiB. random 13k~18k 씬 ever는 77.54/79.75/80.27/76.82/75.07/74.48%, 최고 15k(1233/1536)다. 15k final 씬 SR 76.69%, 사람+상자 횡단 94.21%. 기존 학습 프로세스는 보존했다. [전체 지표](output_etc/check/bridge_random_13000_18000_ordered_20261120/index.html)·[1k 단위 표](output_etc/check/bridge_random_13000_18000_ordered_20261120/history_7k_18k.md)·[검증](output_etc/check/bridge_random_13000_18000_ordered_20261120/previous_initial_verification.json). Python 구문·diff 검사 통과.
+
+## 2026-11-19
+
+### rear90 13000 정렬 평가
+
+- rear90 13k의 seed0/2는 GPU5, seed1은 GPU6에서 기존 4명·512환경×3seed·900step·insert/횡단 100%·cap 5cm·가상목표 없음·배치 후 좌우 정렬로 평가한다. 기존 evaluator·초기 fixture를 재사용하며 GPU 총점유 85000MiB 상한을 감시한다. 12k 결과는 읽기 전용으로 재사용해 비교하고, 완료 후 이전 초기 상태/성공 집계 검증 및 7k~13k 표를 생성한다. 학습·viewer는 보존한다. [평가 폴더](output_etc/check/bridge_rear90_13000_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 3seed 평가·집계 완료. 12k 대비 초기 75 tensor·전체 관측 exact, checkpoint epoch/SHA·담당/개인 목표·기하·900step 유한 궤적·성공 건수 검증 통과. 최대 GPU5/6 총점유 74409/71260MiB. 씬 ever 1217/1536(79.23%, 12k 대비 −0.78%p), final 74.41%, 동시 횡단 93.03%. [12k 비교](output_etc/check/bridge_rear90_13000_ordered_20261119/index.html)·[1k 단위 표](output_etc/check/bridge_rear90_13000_ordered_20261119/history_7k_13k.md). Python 구문·diff 검사 통과.
+
+### rear90 / random 동일 12000 정렬 평가
+
+- rear90 12k는 GPU5, random 12k는 저장 완료·CPU epoch 확인 후 GPU6에서 자동 평가하도록 분리 실행기를 시작했다. 기존 4명·512환경×3seed·900step·insert/횡단 100%·cap 5cm·가상목표 없음·배치 후 좌우 정렬이며 GPU별 최대 3개 병렬·총점유 85000MiB 상한을 유지한다. evaluator·초기 fixture를 재사용하고 학습·viewer는 보존한다. 완료 후 초기 상태/성공 건수 검증 및 7k~12k의 1k 간격 Markdown/CSV 표를 자동 생성한다. [평가 폴더](output_etc/check/bridge_rear90_random_12000_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- rear90 3seed·900step 완료, 씬 ever 1229/1536(80.01%). 이전 초기 75 tensor·전체 관측 exact 확인, 최대 GPU5 총점유 79787MiB. random 12k는 아직 미저장이므로 서버 실행기가 대기 중이며, 완료 후 전체 검증·집계·표 갱신을 자동 실행한다. [현재 1k 간격 표](output_etc/check/bridge_rear90_random_12000_ordered_20261119/history_7k_12k.md)는 미완료 항목을 대기로 표시한다. Python 구문·diff 검사 통과.
+- random 12k가 한국시간 21:39 저장된 후 자동 평가까지 완료됐다. 두 모델 총 6개 평가의 이전 초기 상태·관측 exact, checkpoint epoch/SHA 및 성공 집계 검증 통과. 씬 ever rear90/random 80.01/76.04%, 최대 GPU5/6 총점유 79787/76639MiB. [7k~12k 표](output_etc/check/bridge_rear90_random_12000_ordered_20261119/history_7k_12k.md)와 [전체 지표](output_etc/check/bridge_rear90_random_12000_ordered_20261119/index.html) 자동 갱신 완료.
+
+### 미평가 rear90 8000·9000 / random 11000 보충 평가
+
+- 기존 4명 구성·512환경×3seed·900step·insert/횡단 100%·cap 5cm·가상목표 없음·배치 후 좌우 정렬로 9개 평가를 GPU5/6에 배정했다. 기존 evaluator·초기 fixture를 재사용하며 GPU당 최대 3개 병렬·총점유 85000MiB 상한을 감시한다. checkpoint epoch CPU 확인 후 실행하며 학습·viewer 프로세스는 보존한다. 새 실행/집계 Python 구문 검사 통과. [평가 폴더](output_etc/check/bridge_missing_8k9k11k_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 9개 평가·집계 완료. 이전 초기 75 tensor·전체 관측 exact, checkpoint epoch/SHA·배치/개인 목표·기하·900step 유한 궤적·성공 건수 검증 통과. 최대 GPU5/6 점유 74409/76301MiB, 실제 GPU당 2개씩 실행했다. rear90 8k/9k·random 11k 씬 ever 74.93/79.75/78.26%, final 70.51/73.83/74.22%. 7k~11k 정수 간격 평가를 모두 채웠다. [전체 지표](output_etc/check/bridge_missing_8k9k11k_ordered_20261119/index.html)·[과거 결과 포함 CSV](output_etc/check/bridge_missing_8k9k11k_ordered_20261119/history_7k_11k.csv)·[검증](output_etc/check/bridge_missing_8k9k11k_ordered_20261119/previous_initial_verification.json). Python 구문·diff 검사 통과.
+
+### 공동밀기 3명 + 선행·후행 5명 viewer
+
+- [추론 전용 wrapper](output_etc/check/bridge_push3_follow_cap_view_20261119/view.sh)를 추가했다. rear90 10000을 기본으로 1환경·밀기 3명·선행/후행 2명을 구성하고 다리 횡단 길이 4.8m·플랫폼 간격 4.9m로 확장한다. 기존 폭/높이 분포·rear90 거리 0.5–5m·배치 후 담당 정렬·follow_cap 5cm를 유지하며 횡단 100%·가상목표 없음이다. `present/near/insert`, checkpoint, seed를 선택할 수 있다. 학습 코드·프로세스는 변경하지 않았다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- GPU7 headless에서 insert 1환경 2×60step 및 900step, present/near 각각 16환경 2×60step 완료. 5명 checkpoint 로드·유한 관측/행동·배치/담당 목표·역할·기하 검사 통과. insert seed42의 900step 마지막 상태에서 5명 모두 성공했으며 성공률 평가는 아니다. 초기 관측 tensor/dict 처리 오류를 수정했고 실패 로그도 보존했다. 실제 GUI는 실행하지 않았다.
+
+### rear90 11000 / random 10000 정렬 평가
+
+- 지정 checkpoint를 이전과 같은 512환경×3seed·900step·insert/횡단 100%·cap 5cm·가상목표 없음·최종 좌우 정렬로 평가 시작했다. 두 모델의 seed0/1/2를 GPU5/6/7에 각각 배정해 GPU당 2개 병렬, 총점유 85000MiB 상한을 감시한다. 기존 evaluator·fixture를 재사용하고 학습·viewer는 보존한다. 실행·집계 Python 구문 검사 통과. [평가 폴더](output_etc/check/bridge_rear90_11000_random10000_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 6개 평가·집계 완료. CPU epoch 확인, 모델별 checkpoint SHA 일치, 직전 대비 초기 75 tensor·전체 관측 exact, 담당 정렬·개인 목표·물리 크기·900step 유한 궤적·성공 집계 검사 통과. 최대 GPU5/6/7 점유 74409/76301/53088MiB. 씬 ever rear90/random 78.52/76.11%(직전 10k/9k 대비 −0.98/+2.15%p), final 74.09/71.94%, 횡단 92.38/91.21%. rear90 ONTOP 75.29→71.21%, random은 후행 활성 86.39→89.06%. [전체 결과](output_etc/check/bridge_rear90_11000_random10000_ordered_20261119/index.html)·[직전 비교](output_etc/check/bridge_rear90_11000_random10000_ordered_20261119/comparison_to_previous.json).
+
+### rear90 10000 / random 9000 정렬 평가
+
+- 지정 checkpoint를 이전과 동일한 512환경×3seed·900step·insert/횡단 100%·cap 5cm·가상목표 없음·최종 좌우 정렬로 평가한다. 두 모델의 seed0/1/2를 GPU5/6/7에 각각 배정해 GPU당 2개 병렬, 총점유 85000MiB 상한을 감시한다. 이전 evaluator와 fixture를 재사용하고 기존 학습·viewer는 보존한다. 실행·집계 Python 구문 검사 통과. [평가 폴더](output_etc/check/bridge_rear90_10000_random9000_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 6개 평가·집계 완료. CPU epoch 확인, 모델별 checkpoint SHA 일치, 이전 평가 대비 초기 75 tensor·전체 관측 exact, 담당 정렬·개인 목표·물리 크기·900step 유한 궤적·성공 집계 검사 통과. 최대 GPU5/6/7 점유 74409/75635/41355MiB. 씬 ever rear90/random 79.49/73.96%(직전 9.5k/8k 대비 +2.47/−0.39%p), final 76.11/70.90%, 횡단 92.32/90.69%. rear90 SIT는 76.02→83.56%로 회복했다. [전체 결과](output_etc/check/bridge_rear90_10000_random9000_ordered_20261119/index.html)·[직전 비교](output_etc/check/bridge_rear90_10000_random9000_ordered_20261119/comparison_to_previous.json).
+
+### rear90 9500 / random 8000 최신 정렬 평가
+
+- 최신 번호 checkpoint를 CPU epoch 확인 후 rear90=GPU6·random=GPU7에서 각각 512환경×3seed·900step으로 평가 시작했다. 이전 7k와 같은 fixture·insert/횡단 100%·cap 5cm·가상목표 없음·최종 배치 후 좌우 정렬이며 GPU별 최대 3개 병렬, 총점유 85000MiB 상한을 감시한다. 기존 학습·viewer는 보존한다. 실행·집계 Python 구문 검사 통과. [평가 폴더](output_etc/check/bridge_rear90_9500_random8000_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 6개 평가·집계 완료. 이전 7k 대비 초기 75 tensor·전체 관측 exact, 모델별 세 seed checkpoint SHA 일치, 최종 담당 영역·개인 목표·물리 크기·900step·유한 궤적·성공 집계 검사 통과. 최대 GPU6/7 점유 48965/46734MiB. 씬 ever rear90/random 77.02/74.35%(7k 대비 +1.24/+3.52%p), final 71.61/71.35%, 횡단 92.90/89.58%. rear90은 SIT 82.98→76.02%로 하락했으며 학습 횟수가 달라 배정 방식만의 효과로 해석하지 않는다. [전체 결과](output_etc/check/bridge_rear90_9500_random8000_ordered_20261119/index.html)·[7k 비교](output_etc/check/bridge_rear90_9500_random8000_ordered_20261119/comparison_to_7000.json).
+
+### 후행 실패 장면 선택 VNC
+
+- 화면이 보이지 않는다는 사용자 보고 후 `--num_envs 1`로 수정했다. `single_scene.py`가 선택한 장면의 상자·플랫폼 크기와 초기 상태 한 행을 복원하고 월드 좌표를 원점 근처로 옮긴다. 마지막 인자는 원 평가 장면 번호이며 실행 환경 수가 아니다. 기존 512환경 검사 기록은 보존한다.
+- GPU5에서 rear90 env109·random env58을 각각 1환경·900step headless로 검증했다. 물리 크기·정렬 검사 통과, 이동 후 초기 활성 actor 오차 최대 0.031mm·관측 오차 0.000013 이내·유한 궤적 확인. 둘 다 횡단/후행 활성화됐으며 rear90은 후행 실패, random은 성공으로 달라져 단일 환경 재시뮬레이션의 결과 차이를 명시했다. GUI 실행·기존 프로세스 종료 없음. [1환경 검증](output_etc/check/bridge_follower_diagnostics_7000_20261119/single_view_verification.json).
+- `output_etc/check/bridge_follower_diagnostics_7000_20261119/view_failure.{sh,py}`를 추가했다. 모델·seed·환경 번호로 7k의 512환경 fixture 중 화면을 선택하고 후행을 밝은 초록색으로 표시한다. insert/횡단 100%·좌우 정렬·900step을 유지하며 종료 후 마지막 화면에서 대기한다. 대표 사례는 rear90 seed0 env109/95/191, random seed0 env58이다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- GPU5 headless로 rear90 seed0 env109 선택·16step 완료. 원 진단과 초기 75 tensor exact·후행 번호 3·유한 궤적·카메라 좌표 계산 확인. shell/Python 구문·diff 검사 통과. 실제 GUI는 실행하지 않았고 학습은 보존했다. [검증](output_etc/check/bridge_follower_diagnostics_7000_20261119/view_check_verification.json).
+
+### 7k 후행 동작·목표 오차 진단
+
+- 같은 7k·512환경×3seed·insert/횡단 100% fixture를 GPU5/7에서 재생하고 후행 root/손/발/운반 상자·받침·native 목표 오차/집기/활성화를 추가 기록했다. 기존 evaluator를 감싸 기록만 추가하며 학습 코드·프로세스는 유지했다. 6개 완료, 최대 GPU5/7 74409/79634MiB. [진단 폴더](output_etc/check/bridge_follower_diagnostics_7000_20261119/).
+- 초기 75 tensor·전체 관측은 원 평가와 exact, 후행 기하·활성·성공 재계산도 native 판정과 일치했다. 궤적은 rear90 seed0만 exact였으며 씬 성공 여부가 rear90/random 각각 23/16장면 달라졌다. 따라서 기존 실패 185/215를 그대로 사용하지 않고 재생에서 같은 단계에 해당하는 175/217개를 분석했다.
+- 활성 중 최선의 순간에도 native 성공 경계까지 추가 오차가 20cm 초과인 실패는 120/175·167/217, 5cm 이내는 20/175·24/217이다. 활성 이후 root/손/발 변위가 모두 30cm 미만(ONTOP 상자 변위 10cm 미만)인 후보는 19/40개. ONTOP 실패 96/111개 중 75/70개는 20cm 이상 지속 상승 기록이 있어 대부분의 실패를 무동작이나 마지막 수 cm 정밀도만으로 설명하지 않는다. 상승은 접촉 기반 집기 확정이 아니며, 5cm는 진단용 추가 허용 오차다. [전체 정의·결과](output_etc/check/bridge_follower_diagnostics_7000_20261119/follower_analysis.json)·[장면별 CSV](output_etc/check/bridge_follower_diagnostics_7000_20261119/follower_episodes.csv). Python 구문·diff 검사 통과.
+
+### rear90 담당별 viewer 거리와 7k 실패 분석
+
+- rear90 두 test/VNC에 `--pusher-gaps <m1> <m2>`/`PUSHER_GAPS`를 추가했다. 담당 에이전트 번호 순서의 상자 뒷면–root 삽입축 거리이며 매 reset의 상태 전송 전 위치만 이동하고 이후 배정한다. 생략 시 기존 샘플링, 학습/resume 사용 거부. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 두 7k checkpoint를 GPU5 headless 32환경·4reset·16step으로 확인했다. present/near/insert 모두 생성, 거리 최대 오차 0.147mm, 정렬 반대 배정 0, 개인 목표·유한값·원본 cfg 보존 통과. parser가 nargs를 지원하지 않는 문제를 문자열 전달로 수정했고 세계 좌표 float32 오차를 반영해 검증 허용 오차를 1mm로 정했다. 초기 실패 로그도 보존. shell/Python 구문·학습 옵션 거부 확인. GUI·본학습 변경 없음. [검증](output_etc/check/bridge_rear90_view_gaps_20261119/).
+- 기존 7k 궤적을 CPU 재분석했다. rear90/random 씬 실패 372/448개 중 후행 활성 후 과제 미완료가 185/215개로 가장 크다. ONTOP 활성 조건부 성공 345/450·333/444. 플랫폼 안쪽 경계를 선행 골반이 처음 넘을 때 다리 미준비인 경우 횡단 전 틈 낙상 49/74·37/51, 준비된 경우 36/1399·80/1436. 준비는 기존 중심 0.2m·각도 판정이며 접촉/안정성이나 회전의 의도를 입증하지 않는다. [실패 분석](output_etc/check/bridge_rear90_eval_7000_ordered_20261119/failure_analysis/summary.json). 성공 횡단의 직선/우회 경로 예시는 [그림](output_etc/check/bridge_rear90_eval_7000_ordered_20261119/approach_analysis/examples.png).
+
+### rear90/random 동일 7000 정렬 평가
+
+- rear90 7000=GPU5, random 7000=GPU7로 모델당 512환경×3seed·900step 평가 시작. 이전 fixture·insert/횡단 100%·cap 5cm·가상목표 없음·최종 배치 후 좌우 정렬을 유지한다. GPU별 최대 3개 병렬·총점유 85000MiB 감시와 초기화 메모리 예약을 적용하며 기존 학습은 보존한다.
+- 6개 평가 완료. 실제 7k epoch/SHA·세 시드 초기 75개 tensor/전체 관측 exact·원본 fixture 일치·정렬/개인 목표·기하·유한값·900step/성공 집계 검증 통과. rear90/random 씬 ever 75.78/70.83%, final 72.53/66.41%, 사람+상자 횡단 90.30/89.06%, 공동밀기 개인 94.82/97.46%, 선행 낙상 7.49/10.74%. 최대 GPU5/7 점유 74409/79634MiB, 학습 보존. Python 구문·문서 diff 검사 통과. [결과표](output_etc/check/bridge_rear90_eval_7000_ordered_20261119/index.html)·[JSON](output_etc/check/bridge_rear90_eval_7000_ordered_20261119/summary.json)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+
+### rear90 4500 / random 3500 정렬 평가
+
+- GPU5 전용 최대 6개 병렬·총점유 85000MiB 상한으로 평가 시작. rear90 최신 4500은 즉시 실행하고 random 3500은 파일 안정화·CPU 로드/epoch 검증 후 자동 실행한다. 이전 fixture 재사용·512환경×3seed·insert/횡단 100%·cap 5cm·가상목표 없음·배치 후 좌우 정렬·900step을 유지한다. 학습은 변경/종료하지 않는다.
+- rear90 완료 후 사용자 지시로 random seed 0/1/2를 GPU5/6/7에 하나씩 배정하도록 대기 실행기를 변경했다. 완료 결과를 재사용하며 GPU별 85000MiB 감시를 적용한다. 대기 실행기만 교체했고 학습 프로세스는 보존했다.
+- 평가 본체는 이전 검증본과 동일하며 실행/집계 Python 구문 검사 통과. rear90 4500의 세 시드는 완료: 씬 ever/final 71.68/69.14%, 횡단 87.96%, 선행 낙상 8.66%. 이전 3500 대비 씬 +2.99/+7.23%p. 초기 상태 75개 exact·900step/유한값/성공 집계 검증 통과. random 3500은 사용자 요청으로 평가 시작 전에 취소했다. 대기 실행기를 종료했고 random 평가 프로세스는 실행되지 않았다. `cancelled.json`에 기록했으며 rear90 결과와 학습은 보존했다. [rear90 비교](output_etc/check/bridge_rear90_eval_4500_random3500_ordered_20261119/rear90_3500_vs_4500.html)·[실행 폴더](output_etc/check/bridge_rear90_eval_4500_random3500_ordered_20261119/)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+
+## 2026-11-18
+
+### rear90 3500 / random 2500의 GPU5 정렬 평가
+
+- 사용자 지정 최신 checkpoint를 GPU5에서만 모델당 512환경×3seed·900step 평가했다. 최대 4개 병렬·GPU 총점유 최대 52111MiB, 기존 학습 프로세스 보존. 1k 평가 fixture를 재사용하고 insert·횡단 100%, cap 5cm, 가상목표 없음, 두 모델 모두 최종 배치 후 좌우 정렬을 적용했다.
+- checkpoint 실제 epoch·세 시드 SHA, 초기 상태 75개/전체 관측 exact, 담당 영역/개인 목표·rear90 기하·유한값·900step 및 성공 집계 검증 통과. 전체 씬 ever rear90/random 68.68/67.58%, 사람+상자 횡단 88.41/86.20%, 선행 낙상 10.42/12.63%. 학습 횟수가 달라 배정 방식만의 효과로 해석하지 않는다. [결과표](output_etc/check/bridge_rear90_eval_3500_random2500_ordered_20261118/index.html)·[원자료](output_etc/check/bridge_rear90_eval_3500_random2500_ordered_20261118/summary.json)·[명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+
+### rear90 시각화의 담당 배정 선택
+
+- `PUSHER_ASSIGNMENT=ordered|random`을 rear90 두 test/VNC 실행기에 추가했다. 직접 실행은 `--pusher_assignment`. 생략 시 기존 cfg를 따르며 runtime 사본만 바꾸어 checkpoint 계약을 보존한다. 학습/resume·다른 실험에서 사용을 거부한다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 두 checkpoint×두 배정의 4조건을 headless 32환경·4회 reset·16step으로 검증했다. ordered는 전 reset 반대 배정 0/32, random은 16/17/13/14개였다. 영역 중복 없음·개인 목표 일치·관측/행동 유한값·저장 cfg 보존 및 checkpoint 로드 통과. 검증 harness의 관측 dict/tensor 처리 오류를 수정 후 재실행했으며 실패 로그도 보존했다. shell/Python 구문·훈련 옵션 거부·diff 검사 통과. GUI·학습 종료 없음. [검증 폴더](output_etc/check/bridge_rear90_view_assignment_20261118/).
+
+### rear90 정렬/랜덤 학습 1k의 동일 정렬 평가
+
+- `output_etc/check/bridge_rear90_eval_1000_ordered_20261118/`에서 GPU5/7·각 512환경×3seed·900step 완료. 두 모델 모두 1k, 후방 ±45°·외곽 0.5~5m의 새 공통 fixture, insert·횡단 100%, cap 5cm, 가상목표 없음, 최종 좌우 정렬을 사용했다. 학습 프로세스는 변경/종료하지 않았다.
+- 세 시드의 초기 tensor 75개와 전체 관측 exact, 최종 담당 순서·개인 목표·후방 각도·외곽 거리·장애물/사람 여유 검사 통과. 삽입 깊이 1.5cm의 월드 좌표 변환 오차 최대 약0.364mm를 확인해 검증 허용 오차는1mm로 두었다. checkpoint 계약 검사 후 첫 reset 전에만 배정을 override한다. 초기 계약/수치 허용 오차 검사 실패 로그는 별도 폴더로 보존했다.
+- rear90/random의 전체 씬 ever 61.33/61.00%, final 56.84/55.99%, 사람+상자 횡단 78.91/80.08%, 공동밀기 개인 96.22/97.23%, 선행 낙상 21.22/19.08%. 900step 궤적·유한값·성공 건수 검증과 집계 완료. [결과표](output_etc/check/bridge_rear90_eval_1000_ordered_20261118/index.html)·[실행법](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+
+### 가상목표 없는 6k의 기존 학습 담당 배정 재평가
+
+- `output_etc/check/bridge_crossing_eval_6000_training_assignment_20261118/`에서 GPU5·512환경×3seed·900step을 완료했다. insert·횡단 100%, cap 5cm·원래 사람 거리를 유지하며 기존 반대편 담당 배정을 복원했다. 접촉 probe 없이 행동/씬 지표를 수집했다. 학습 프로세스는 종료하지 않았다.
+- 동일 6k ordered 평가와 checkpoint SHA 일치, 세 시드의 초기 상태 75개 중 담당 영역·개인 목표만 변경되고 나머지 73개는 exact임을 검증했다. 전체 씬 ever/final 75.46/70.77%(ordered 60.16/55.73%), 사람+상자 횡단 91.60%, 공동밀기 개인 99.48%, 선행 낙상 9.51%. 유한값·900step 궤적·씬 성공 건수 재검증 통과. [결과표](output_etc/check/bridge_crossing_eval_6000_training_assignment_20261118/index.html)·[실행법](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+
+### 기존 학습 viewer의 밀기 거리·시작 모드 인자
+
+- `view_training.sh baseline 42 --bridge-start insert --pusher-gap 3.0`을 추가했다. mixed/present/near/insert 선택과 상자 뒷면–사람 root 삽입축 거리(m)를 지원한다. 기본은 기존 혼합·거리이며 5k checkpoint·같은 플랫폼 20%·확률적 행동·기존 반대편 담당 배정을 유지한다. 매 캐시 복원 직전에 밀기 사람의 root/kinematic body XY만 이동한다. [명령](markdowns/USAGE.md#학습-규칙-그대로-보는-viewer).
+- CPU 1000장면 기하 검증에서 거리 최대 오차 0.0017mm, 좌우 위치·자세·비대상 사람·다른 물체 보존 확인. GPU7 headless로 각 모드 16환경×60step 완료, gap 3m 및 모드별 확률 설정 확인. 초기 16장면 모두 기존 반대편 배정 유지. shell/Python 구문 검사 통과. [검증](output_etc/check/bridge_training_view_gap_20261118/runtime_verification.json). GUI는 실행하지 않았다.
+
+### 6k 최종 배치 후 좌우 정렬 평가
+
+- `output_etc/check/bridge_crossing_eval_6000_ordered_20261118/`에 별도 실행·집계 경로를 만들었다. 두 기존 follow-cap 6k를 GPU5/7에서 512환경×3seed로 평가하며, 저장된 동일 물리 배치 복원 후 실제 상자 좌표계로 담당 영역·개인 목표를 정렬한다. reset/관측 초기화 이후 순서·목표 검증을 추가했다. 원본 fixture·기존 평가 결과·학습 프로세스는 유지한다.
+- 담당 배정 CPU 17개 테스트와 Python 구문 검사 통과. GPU 전체 메모리 85000MiB 상한을 감시하며 준비된 checkpoint부터 실행한다. 6개 평가 모두 900step 완료. 세 시드에서 두 모델의 초기 상태 75개·공통 관측 exact 및 3072장면의 최종 담당 정렬/개인 목표 검증 통과. 없음/단계별 모델의 전체 씬 ever SR 60.16/61.46%, final SR 55.73/58.66%, 사람+운반 상자 횡단 74.22/75.20%. 최대 GPU 점유 76491/79520MiB. 초기 검증의 PyTorch 정렬 API 호환 오류를 수정 후 재실행했으며 실패 로그는 `startup_failed_sort/`에 보존했다. [결과표](output_etc/check/bridge_crossing_eval_6000_ordered_20261118/index.html). 접촉 분석도 완료: 내딛기 때 다리 미완료였던 장면의 횡단 전 틈 낙상은 없음/단계별 261/298·292/376, 완료 장면은 49/1158·68/1148. 1초 안정 조건은 27/941·22/913. 정의된 대기 후보는 두 모델 모두 0. [타이밍 분석](output_etc/check/bridge_crossing_eval_6000_ordered_20261118/contact_report.html). [실행법](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+
+### rear90 담당 영역 랜덤 비교 config
+
+- `stage2_sensor_900_bridge_follow_cap_rear90_random` 환경/학습 YAML과 train/test/VNC 실행기를 추가했다. 기존 `_rear90`에서 `pusher_sampling.assignment`만 `random`으로 바꾸고 run/output 이름을 분리했다. 원본 V4 2k 전이·가상목표 없음·cap 5cm·90도/외곽 0.5~5m·모드 혼합·같은 플랫폼 20%·보상은 동일하다. [명령](markdowns/config.md)·[규칙](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 최종 배치 후 공동밀기 두 사람에게 영역 0/1을 중복 없이 무작위 배정하고 가상 분할 상자/개인 목표를 갱신한다. 캐시 복원에서도 새 에피소드마다 다시 추첨하며, 비대상 사람과 다른 환경의 배정·목표는 유지한다. 기존 `_rear90`의 ordered 경로와 기존 실행 프로세스는 유지한다.
+- CPU config 차이·기하·ordered/random 담당 배정 21개 테스트 통과. GPU5의 4명·1024환경에서 36개/환경 캐시 준비 후 같은 물리 배치를 4회 복원해 순서 대비 반대 배정 비율 50.49/51.37/49.12/50.20% 확인. 세 시작 모드와 같은/다른 플랫폼을 포함해 영역 중복 없음·개인 목표 일치·물리 배치 불변·부분 reset 격리·16step 동안 배정/목표 고정 및 관측/보상 유한값을 확인했다. [검증](output_etc/check/bridge_rear90_random_20261118/verification.json). 캐시 준비 약147초. shell 구문·diff 검사 통과. PPO 업데이트·본학습·GUI는 실행하지 않았다.
+
+### rear90 학습 배치의 원본 V4 제로샷 실행기
+
+- `qualitative/bridge_rear90_zeroshot.py`와 `_rear90_zeroshot_{test,vnc}.sh`를 추가했다. 원본 DistillV4 정책/RMS를 strict 복원하고 `_rear90` 학습 배치 캐시·같은 플랫폼 20%·담당 정렬에서 평균 행동으로 실행한다. 학습 업데이트와 센서 정책 checkpoint 변환은 없다. 기본 mixed와 개별 present/near/insert 선택, seed·환경 수·에피소드·step 인자를 제공한다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 공유 V4 정책 어댑터의 정규화 통과 영역 폭은 원본 checkpoint 관측 폭으로 계산하게 했다. 새 환경 끝의 센서·waypoint 메타데이터를 원본 RMS 입력에 포함하지 않는다.
+- GPU5 headless 16환경×2에피소드×60step 완료. 원본 경로·epoch2000, 학습 업데이트0, 새 학습 캐시 사용을 manifest에 기록했고 관측·행동 유한값 확인 통과. 36개/환경 캐시 준비 36.9초. [결과](output_etc/check/bridge_rear90_zeroshot_check_20261118/runtime/manifest.json). Python/shell 구문·diff 검사 통과. GUI는 실행하지 않았다.
+
+### 가상목표 없는 후방 90도 랜덤 배치·최종 담당 정렬 config
+
+- `stage2_sensor_900_bridge_follow_cap_rear90` 환경/학습 YAML과 전용 train/test/VNC 실행기를 추가했다. 기존 가상목표 없는 설정에서 사람 샘플링만 분리했으며 원본 V4 2k 전이, cap 5cm, present/near/insert 20/40/40%, 같은 플랫폼 20%, 기존 보상을 유지한다. [명령](markdowns/config.md)·[배치 규칙](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- `utils/bridge_pusher_sampling.py`는 다리·선행·후행 배치 후 실제 상자 기준 후방 ±45도, root XY–직사각형 외곽 최단 거리 0.5~5m의 독립 후보를 생성한다. 플랫폼/상자 외곽 0.5m와 사람 root 간 1m 여유로 후보를 거른다. 세 시작 모드와 같은 플랫폼 샘플 모두 적용한다. 최종 배치 후 공동밀기 담당 영역·개인 목표를 정렬하고 캐시 복원에서도 관측·보상 이력 초기화 전에 정렬한다. 기존 config에는 이 분기를 적용하지 않는다.
+- CPU 기하·config·담당 배정 19개 테스트 통과. GPU5에서 4명·1024환경·36개/환경 캐시와 `--max_iterations 1` 확인 학습 완료, 원본 V4 2k 로드·새 checkpoint 저장 확인. 세 모드별 캐시 12288개씩 및 캐시 복원 5회에서 범위·간격·담당 좌우 순서·개인 목표를 검증했다. 신규 샘플러 후보 탐색 실패 0, 모두 사람당 첫 32개 후보 묶음에서 성공했다. 검증을 포함한 캐시 준비 102.2초 중 신규 샘플러 6.2초여서 모드별 각도 변경은 하지 않았다. [검증](output_etc/check/bridge_rear90_20261118/verification.json).
+- 새 저장 checkpoint로 headless 64환경·60step 추론 완료. present/near/insert 모두 생성했고 reset 65개에서 밀기 담당 관절 중심의 장애물 내부 침투 0을 확인했다(충돌체 전체 접촉 검사는 아님). [추론 검사](output_etc/check/bridge_rear90_20261118/eval_verification.json). shell 구문·diff 검사 통과. 본학습과 GUI는 실행하지 않았고 기존 학습 프로세스는 유지했다.
+
+### eval VNC 최종 배치 후 담당 영역 정렬 수정
+
+- `view_eval.sh`는 `ordered`를 명시하고, `eval_crossing.py`에서 거리·삽입 깊이를 적용한 뒤 실제 상자 좌표계의 사람 좌우 순서로 담당 영역과 개인 목표를 계산한다. 기존 학습 배정을 복원해 다시 반대편을 맡기던 경로를 제거했다. manifest는 `final_box_ordered`로 구분한다. headless 실행기의 `random` 학습 재현 조건과 현재 학습 코드는 유지한다.
+- 현재 학습 배치에는 플랫폼 좌표계로 사람을 배치하고 180도 회전한 상자 좌표계로 영역을 해석하는 불일치가 있다. 기존 성공률 상승은 학습 배정 재현 결과이며, 올바른 좌우 배정의 검증으로 해석하면 안 된다.
+- 회전·삽입 방향·배정 모드 CPU 16조건 통과. 실제 거리 배치 코드를 저장된 512환경×3seed에 `--pusher-gaps 1.5 3.0`으로 적용한 뒤, 3072명 전원 자기 쪽 영역 배정·물리 상태 보존·비대상 목표 보존·재적용 불변성을 확인했다. 최대 거리 오차 0.098mm. [검증](output_etc/check/bridge_final_ordered_20261118/verification.json). Python/shell 구문 및 diff 검사 통과. 새 GPU 시뮬레이션·뷰어·성공률 재평가는 실행하지 않았다.
+
+### eval VNC 밀기 담당별 초기 거리
+
+- `view_eval.sh`에 `--pusher-gaps <m1> <m2>`를 추가했다. 각 장면의 밀기 담당 에이전트 번호 오름차순으로 상자 뒷면–root 삽입축 거리를 지정한다. 환경 0의 번호/거리 대응을 로그와 manifest에 기록한다. 기존 공통 `--pusher-gap`과는 동시 사용을 거부하고 `--insert-depth`와는 함께 사용할 수 있다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- 실제 배치 코드 블록을 CPU에서 seed0·512개 저장 장면에 적용해 (0.5, 1.0), (1.5, 0.25), 기존 공통 0.75m를 검증했다. 최대 거리 오차 0.098mm, 비대상 actor와 root의 Z/회전/속도 유지, 횡방향 변화 <0.0001mm, kinematic body 이동은 root 이동과 일치했다. [검증](output_etc/check/bridge_individual_gap_20261118/verification.json). shell/Python 구문·상충 인자 거부·diff 검사 통과. 뷰어와 새 시뮬레이션은 실행하지 않았다.
+
+### Follow-cap eval/VNC 담당 영역을 학습과 일치
+
+- `utils/config.py`와 공통 `launch.sh`에서 follow-cap 계열의 test/eval/VNC 기본 담당 영역을 `random`으로 변경했다. 다른 Stage2 실험의 기본값과 학습 배치는 유지한다. 위치 지정 `bridge_wait` viewer도 같은 기본 설정을 사용한다.
+- `utils/bridge_eval_assignment.py`를 추가해 기존 Bridge 초기 fixture의 구조 좌표계 좌우 배치로 담당 영역과 개별 목표를 복원한다. 3500·4500·5000 `eval_crossing.py`와 5000 eval VNC가 공유한다. 기존 거리/삽입 깊이 인자 적용 후에도 복원하며 물리 상태는 유지한다. manifest에 담당 영역 규칙·복원 장면 수를 기록하고 기존 fixture/평가 출력 덮어쓰기를 거부한다.
+- 세 평가 실행기와 집계·5000 접촉 분석은 각각 `training_assignment/` 하위 폴더를 사용한다. 기존 결과·fixture를 보존하고 3500도 기존 fixture를 재사용한다. 기본 실행 명령은 동일하며 전체 3seed 재평가는 사용자가 실행할 수 있도록 준비했다.
+- CPU 회전/삽입 방향 8조건 테스트 통과, 기본 test wrapper 두 모델의 최종 `--coupled_assignment random` 전달 확인, shell/Python 구문·diff 검사 통과. 실제 수정 평가 실행기로 GPU5/7 각각 5000·seed0·512환경·900step 완료. 기존 초기 75개 필드 중 `_regions`, `_tar_pos`만 변경, 나머지 73개와 물리 actor 상태 exact. 담당 영역은 앞선 원인 분석 결과와 일치한다. 목표 계산은 학습과 같은 괄호 순서를 사용하며 기존 진단 코드와 최대 0.244mm 부동소수점 차이가 있다. PUSH pair ever 506/512·511/512, 씬 ever 391/512·374/512. [검증](output_etc/check/bridge_eval_assignment_fix_20261118/verification.json). 뷰어는 실행하지 않았고 기존 학습 프로세스는 유지했다.
+
+### 학습/eval 공동밀기 담당 영역 불일치 진단
+
+- 학습은 `coupled_assignment=random`, 기존 eval 기본값은 `ordered`였다. Bridge의 사람 좌우 배치는 구조 좌표계의 region 번호를 사용하지만, eval은 배치 후 yaw π인 본체 좌표계로 다시 정렬해 두 밀기 담당의 영역과 개별 목표를 교환했다. 새 학습 배치 128/128, 기존 평가 seed0 512/512에서 차이를 확인했다.
+- 5000 두 모델의 기존 seed0·512환경·insert·횡단·900step·평균 행동을 유지하고 담당 영역/개별 목표만 학습 방식으로 복원했다. 초기 75개 필드 중 `_regions`, `_tar_pos`만 다르고 73개와 물리 actor 상태는 완전 동일하다. 공동밀기 동시 성공 ever는 baseline 278→509/512(54.3→99.4%), waypoint 434→510/512(84.8→99.6%). 사람+운반 상자 횡단은 244→472, 381→451; 씬 동시 성공 ever는 195→388, 313→381. 근거는 `output_etc/check/bridge_training_view_20261118/assignment_comparison.json`, `assignment_initial_verification.json`이다. 1seed 원인 분석이며 기존 3seed 결과와 학습 코드는 보존했다. 학습 실패로 해석하기 전에 담당 영역을 맞춘 재평가가 필요하다.
+- 실제 학습 TensorBoard 최근 baseline 5177–5351, waypoint 5124–5297 update를 종료 에피소드 수로 가중 집계했다. 횡단 필요 장면에서 선행 사람 횡단 기록 91.9/91.4%, 다리 도달 기록 98.5/98.5%. present/near/insert 혼합이며 payload 횡단이나 insert 전용 SR과 다르다. 같은 진단 폴더의 `training_metrics_{tail,summary}.json`에 근거를 저장했다.
+- `view_training.{sh,py}`는 학습 환경 경로·새 36개/env 캐시·확률적 행동·native reset을 사용하는 추론 전용이다. 5000 checkpoint, 기본 128환경이며 본학습 캐시 복사나 optimizer 실행은 하지 않는다. GUI 초기 렌더 확인 후 사용자 요청에 따라 직접 띄운 두 뷰어는 종료했고 이후에는 명령만 제공한다. 본학습과 사용자 eval 뷰어는 유지했다. Python/shell 구문 검사와 두 모델 headless 1800step 완료·낙상/시간제한 리셋을 확인했다. `viewer_verification.json`에 실행 설정과 완료 기록을 저장했다.
+
+### 평가 VNC의 다리 초기 삽입 깊이 인자
+
+- `view_eval.sh`에 `--insert-depth <m>`를 추가했다. 입구 끝선에서 다리 앞쪽 면이 들어간 깊이이며 0 이상의 실수를 받는다. 생략하면 기존 0.015m fixture를 유지한다. 다리와 두 밀기 담당을 함께 이동한 뒤 선택적 `--pusher-gap`을 적용하며, cap은 본체를 추종한다. 플랫폼·선행·후행·최종 목표는 유지한다. 기존 플랫폼 입구 끝선 정렬을 확인해 별도 정렬 변경은 하지 않았다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- GPU7 5000·seed0·512환경 GUI에서 삽입 0.10m와 사람 간격 1m 조합을 검증했다. 실제 깊이 0.099638~0.100350m, 간격 0.999414~1.000586m이며 입구 끝선 오차는 0이다. 나머지 초기 필드 73개와 비대상 actor 상태는 exact이고 환경별 이동 actor는 다리·cap·사람 2명뿐이다. [검증](output_etc/check/bridge_crossing_eval_5000_contact_20261118/insert_depth_verification.json). shell/Python 문법·diff 검사 통과. 짧은 확인 실행이며 성공률은 재평가하지 않았다.
+
+### 평가 VNC의 공동밀기 시작 거리 인자
+
+- `view_eval.sh`에 `--pusher-gap <m>`를 추가했다. 상자 뒷면에서 두 밀기 담당 root 중심까지의 거리를 지정하며 양의 실수를 받는다. 좌우 간격·방향·다른 사람·다리·목표는 유지한다. 생략 시 원래 fixture를 복원하고, 지정 시 GUI에서만 적용해 manifest에 `viewer_modified_pusher_gap`과 거리를 기록한다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- GPU7 5000·seed0·512환경 GUI에서 1m 배치를 검증했다. 실제 거리는 0.999658~1.000342m, 최대 횡방향 변화 4.38e-8m이며 나머지 초기 필드 73개와 이동한 사람 XY를 제외한 actor 상태는 exact다. [검증](output_etc/check/bridge_crossing_eval_5000_contact_20261118/pusher_gap_verification.json). shell/Python 문법·diff 검사 통과. 짧은 확인 실행이며 성공률은 재평가하지 않았다.
+
+### 5000 평가 초기 장면의 VNC 실행
+
+- 평가 폴더에 `view_eval.sh [baseline|waypoint] [0|1|2]`를 추가했다. 기존 5000 평가 루프와 512환경 fixture를 사용해 insert·횡단·낙상 처리를 유지하며, 실행별 산출물은 `output_etc/check/bridge_eval_viewer/`에 분리한다. [명령](markdowns/USAGE.md#follow-cap-5cm-학습-비교).
+- GUI에서는 목표 marker 4개가 추가되므로 `eval_crossing.py`의 GUI 분기에만 marker를 제외한 actor 복원을 추가하고 환경 0 전체를 보는 카메라를 설정했다. headless 전용 `eval_protocol` 플래그 대신 동일한 loco·900step 체크포인트 설정과 기존 평가 함수를 사용한다. 학습 코드는 수정하지 않았다.
+- GPU7 5000·seed0으로 noVNC 6081 실행과 렌더링 화면을 확인했다. headless 평가와 초기 필드 75개(시각 marker 제외 actor 포함)·전체 관측 exact 검증 통과. [검증](output_etc/check/bridge_crossing_eval_5000_contact_20261118/viewer_verification.json)·[화면](output_etc/check/bridge_crossing_eval_5000_contact_20261118/viewer_check.png). shell/Python 문법·diff 검사 통과. GUI 전체 900step 종료 및 궤적 exact를 검증한 결과는 아니다.
+
+### Follow-cap 5000 밀기·발 내딛기·낙상 타이밍 평가
+
+- 두 모델의 5000으로 동일 초기 512환경×3seed, insert·횡단 100%, cap 5cm·900step 평가를 완료했다. GPU5/7 각각 세 seed 병렬이며 관측 최대 전체 메모리 46775/47214MiB였다. [행동/씬 SR](output_etc/check/bridge_crossing_eval_5000_contact_20261118/index.html)·[타이밍 분석](output_etc/check/bridge_crossing_eval_5000_contact_20261118/contact_report.html). 가상목표 없음/단계별 모델의 전체 씬 ever는 581/917개(37.83/59.70%), 사람·상자 동시 횡단은 741/1146개(48.24/74.61%)다.
+- 물리 step별 발·캡 자세와 발 순접촉력, control별 native HOLDING을 평가 프로세스에서만 기록했다. 발 내딛을 때 밀기 미완료인 장면의 횡단 전 틈 낙상은 없음 563/600(93.8%), 단계별 299/387(77.3%); 완료 장면에서는 28/747(3.7%), 65/1133(5.7%)다. 완료·속도<0.1m/s·기울기<5°를 직전 0.5초 유지한 경우는 11/628(1.8%), 29/899(3.2%)다. 내딛을 때 미완료였다가 낙상 때 완료된 사례도 11/81개 있다. 낙상 순간만으로 밀기 준비 여부를 판정하지 않는다.
+- 상자를 들고 플랫폼 끝 1m 안쪽에서 다리 미완료·발 내딛기 전 1초 동안 작은 이동 범위를 유지한 대기 후보는 두 모델 모두 0개다. 짧은 감속·의도를 판정한 결과는 아니다. 기하+발 순접촉력으로 캡 접촉을 추정하며 물체 쌍 접촉은 확정하지 못한다. 자세한 기준은 [명세](markdowns/reference/bridge_follow_cap_training.md#5000-발-접촉대기-진단), 장면별 값·완료 이후 낙상 식별자는 결과 폴더에 보존했다.
+- 6개 정상 종료·900control/1801physics 프레임·유한성·씬/native goal 일치·물리/control root와 bridge 자세 exact 검증 통과. 두 모델 간 초기 75tensor·공유 관측 exact, 각 실행의 4500 대비 초기 75tensor·전체 관측 exact, checkpoint/fixture seed 간 일치 확인. 분석 중 속도 차분의 prepend shape 오류를 수정하고 전체 분석을 완료했다. 기존 학습 PID 2415266/2474351 생존 확인. 문법·diff 검사 통과.
+
+### Follow-cap 최신 4500 동일 장면 병렬 평가
+
+- 가상목표 없음(GPU5)과 가상목표+단계별 progress single-pass(GPU7)의 최신 4500을 각각 512환경×seed 0·1·2, 모델당 1536회 평가했다. GPU당 세 seed를 동시에 실행하고 전체 메모리 85000MiB를 감시했다. 3500 때의 초기 fixture를 재사용하며 insert·횡단 100%, cap 5cm·900step·native BEFORE/낙상 규약을 유지했다. [결과](output_etc/check/bridge_crossing_eval_4500_20261118/index.html)·[3500 대비 CSV](output_etc/check/bridge_crossing_eval_4500_20261118/versus_3500.csv).
+- 없음→단계별 순서로 동시 횡단 928→1111/1536(60.4→72.3%), enabling 쌍 785→937(51.1→61.0%), 전체 씬 ever 779→895(50.7→58.3%), final 735→837(47.9→54.5%)다. 전체 씬 ever는 각 모델의 3500 대비 −6.77/−7.81%p 하락했다. PUSH ever도 80.3→65.8%, 92.7→81.9%로 하락했다. 원인에 대한 추가 검증은 하지 않았다.
+- 6개 실행 정상 종료, 900step 궤적 유한성·first-arrival·씬/전원 성공 판정 검증 통과. 모델 간 초기 tensor 75개·공유 관측 exact이고, 3500 대비 6개 실행 각각 초기 tensor 75개·전체 관측 exact도 확인했다. fixture SHA256 3개 일치. 최대 전체 메모리 GPU5 46775MiB/GPU7 47214MiB, 기존 학습 PID 2415266/2474351 생존 확인. 문법·diff 검사 통과.
+
+### 학습 모델의 다리 대기 관찰용 위치 지정 viewer
+
+- `bridge_wait_{test,vnc}.sh`와 전용 viewer/배치를 추가했다. 출발 플랫폼에서 건너편을 보는 기준으로 선행·상자를 왼쪽, 다리·공동밀기팀을 오른쪽 삽입통로에 배치하며 좌우 위치·절벽 안쪽 거리·집기 거리·다리 삽입 거리를 인자로 조절한다. 학습 체크포인트의 가상목표·캡 설정을 유지하고, 배치 변경은 해당 viewer 프로세스에만 적용한다. [실행법](markdowns/USAGE.md#학습-모델의-위치-지정-viewer).
+- GPU5 가상목표 없음과 GPU7 단계별 progress 모델 각각 8환경×2회 reset×40step 추론 통과. 좌우 반전·6/7m 다리 거리·플랫폼 여유·원래 목표 유지·관측/행동 유한성을 확인했다. GPU7 VNC 40step와 시작 화면의 좌우 배치도 확인했다. Python/shell 문법 검사 통과. 결과는 `output_etc/check/bridge_wait_viewer_20261118/`이며, 대기 전략이나 성공률을 검증한 결과는 아니다.
+
+### Follow-cap 3500 동일 장면 insert 횡단 평가
+
+- 가상목표 없음(GPU5)과 가상목표+단계별 progress single-pass(GPU7)를 각각 512환경×seed 0·1·2, 총 모델당 1536회 평가했다. insert·횡단 필요 100%, cap 5cm, 기존 제약 샘플링, 결정론적 행동, 첫 에피소드 900step이다. 원본 학습은 유지하고 평가 전용 프로세스에서만 조건을 적용했다. [평가 규약](markdowns/reference/bridge_follow_cap_training.md#insert-횡단-평가)·[결과표](output_etc/check/bridge_crossing_eval_3500_20261118/index.html)·[CSV](output_etc/check/bridge_crossing_eval_3500_20261118/comparison.csv).
+- 가상목표 없음→단계별 버전 순서로 사람·상자 동시 횡단 1103→1225/1536(71.8→79.8%), enabling 쌍 성공 888→1033/1536(57.8→67.3%), 전체 씬 ever SR 883→1015/1536(57.5→66.1%), final SR 839→930/1536(54.6→60.5%)였다. 선행 낙상은 406→324/1536이다. native BEFORE 판정과 생존 조건을 사용하며, 쓰러진 사람의 모터를 끄고 다른 사람은 계속 평가한다. present/near 혼합 학습 지표와 구분한다.
+- 각 seed 초기 상태 tensor 75개와 가상목표 메타데이터를 제외한 관측 exact, asset 크기 동일, 총 6개 900step 궤적 유한성·first-arrival 집계·씬 SR과 네 사람 필수 목표의 일치를 검증했다. 스크립트 문법·diff 검사 통과. 관측 최대 GPU 전체 메모리는 5번 66460MiB, 7번 71577MiB로 80000MiB 제한 이하였다. 초기 상태·trajectory·각 행동 SR·point/region 보조 채점·재현 스크립트는 위 결과 폴더에 보존한다.
+
+### 선행 GTA 목표를 한 번의 공유 계산에 적용
+
+- 가상목표 입력을 수정한 scene으로 네 사람의 actor·critic을 각각 한 번 계산하는 `_waypoint_single_pass`, `_waypoint_progress_single_pass` 환경·학습 config와 전용 train/test/VNC 실행기를 추가했다. 가상목표 없음 `follow_cap`과 함께 새 비교 세트를 구성한다. 기존 두 번 계산한 설정·실행 결과는 재현용으로 보존한다.
+- 후행 가상 받침 상자를 원래 최종 목표에 먼저 배치한 뒤 활성 선행 GTA Target XYZ만 바꾼다. 네 사람 모두 동일한 scene 계산의 출력을 사용하며, 별도의 원래 장면 계산과 선행 출력 교체를 제거했다. 캡 5cm·반대각+1m 전환·same-platform 20%·샘플러·보상식은 유지한다. `policy_input: shared_gta_single_pass_v1` 계약으로 이전 모델과 resume/test 혼용을 막는다. [명세](markdowns/reference/bridge_follow_cap_training.md).
+- CPU 144개 통과·3개 skip. 세 후행 과제와 활성/비활성 혼합·전원 활성·전원 비활성에서 encoder·coordination 호출이 각 1회임을 확인했다. 입력 GTA 좌표·후행 alias·기존 BEFORE 경로와의 출력 일치·PPO minibatch 순열·동결/gradient·이전 체크포인트 거부를 검증했다. 단기 검증 자료는 `output_etc/check/bridge_single_pass_20261118/`에 저장한다.
+- GPU5·7에서 수정본 두 설정 각각 1024환경 `CHECK=1` 학습(epoch 2 저장)과 8환경×최대40step 저장 모델 추론을 통과했다. 단계별 보상 수정본의 VNC 15step 실행도 통과했다. 원본 V4 2k의 SHA·동결 tensor 131개·입력 RMS 유지, 학습 파라미터 갱신·유한성·이전 계약 거부를 확인했다. [가중치 검증](output_etc/check/bridge_single_pass_20261118/checkpoint_verification.json). 기존 본학습 프로세스는 종료·재시작하지 않았으며 새 본학습도 시작하지 않았다.
+
+### Follow-cap 5cm 학습 설정 3종
+
+- `stage2_sensor_900_bridge_follow_cap`, `_waypoint`, `_waypoint_progress` 환경·학습 YAML 및 전용 train/test/VNC 실행기를 추가했다. 원본 DistillV4 2000에서 전이하며, 기존 무작위 배치·same-platform 20%·present/near/insert 20/40/40%·36개 layout cache·1024환경·900step을 유지한다. [설계·보상식](markdowns/reference/bridge_follow_cap_training.md).
+- 공통 동적 본체+follow_cap 5cm를 사용한다. 선행 중간 목표 두 설정은 payload 중심 XY 반경(반대각+1m)에서 최종 목표로 단방향 전환한다. 후행 alias와 실제 최종 목표는 유지하며, 같은 플랫폼에서는 중간 목표와 새 보상을 적용하지 않는다. PPO에 목표·활성 여부를 저장해 minibatch에서도 동일한 선행 입력을 계산한다.
+- 단계별 보상은 선행 AT progress와 기존 다리 중앙 보조 항만 교체한다. 중간 progress 최대 0.2를 전환 시 포화하고, 당시 최종 progress를 기준으로 새 최종 항 0→0.2를 계산한다. HOLDING/state/success/다른 사람 보상·성공 조건을 보존한다. 추론용 캡·GTA 함수는 공통 모듈로 공유하며 기존 토이 옵션은 유지했다.
+- CPU 182개 통과·3개 skip. 기존 Stage2 전이 검사 1개는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth` 부재로 실행 불가다. 새/기존 waypoint 검사 19개는 모두 통과했다. GPU 32환경·36개 캐시/환경 진단에서 보상 전환·same-platform 예외·부분 리셋·원래 목표 유지·캐시 root 복원·캡 추종을 확인했다. 캡 전달 자세와 실제 자세의 최대 차이 6.10e-5m는 큰 world 좌표의 float32 정밀도 범위다. [진단](output_etc/check/bridge_follow_cap_training_20261118/runtime/verification.json).
+- GPU5·7에서 세 설정 각각 1024환경 `CHECK=1` 학습·저장 및 저장 모델의 headless 추론을 통과했다. 기존 공통 루프의 종료 조건으로 저장 epoch는 2다. 원본 2k 대비 동결 tensor 131개·입력 RMS exact, 학습 대상 갱신·유한성·서로 다른 실험 체크포인트 거부를 확인했다. 단계별 보상 VNC 15step 실행과 1024환경 resume(epoch 2→3)도 통과했다. [가중치 검증](output_etc/check/bridge_follow_cap_training_20261118/checkpoint_verification.json). 기존 프로세스는 보존했고 본학습은 시작하지 않았다.
+
+### 가상목표 없이 follow_cap 높이 0·1·2·5cm 비교
+
+- 원본 DistillV4 2000·가상목표 끔·seed 42에서 present/near/insert 각각 8환경×4높이, 총 96회를 최대 900step 평가했다. GPU5·7의 기존 학습은 유지했다. 각 시작 모드 내 사람·본체·DOF·목표·역할·크기·관측·CUDA RNG가 높이 간 exact이며 캡 높이만 달라지는 것을 확인했다. 학습 코드·설정과 캡 외형은 변경하지 않았다.
+- 선행 목표 도착(0/1/2/5cm 순서)은 present 2/1/1/7, near 2/2/2/1, insert 2/2/3/2회(각 8회)였다. present 5cm에서 도착한 7회 중 6회는 이후 선행이 낙상했다. 도착·횡단 개선을 도착 후 안정성이나 학습 최적 높이로 해석하지 않는다. seed 하나의 8개 장면씩이며 독립적인 다중 seed 통계는 아니다.
+- 물리 step별 발 순접촉력·다리 근처 발 상대 속도·본체 이동·캡 추종 지연을 측정했다. 발 힘은 접촉 물체별 분리가 아니며 빠른 발 움직임은 정상 보행도 포함하는 보조 지표다. [새 영상·수치](video/bridge_cap_height_compare_20261118/index.html)에 개별 MP4 12개·4분할 비교 3개·장면별/조건별 CSV·결과 그림·JSON을 저장했다. 15개 MP4의 스트림/프레임 정보를 확인했다. 원본 및 재현 스크립트는 `output_etc/check/bridge_cap_height_compare_20261118/`에 있다. ZIP은 만들지 않았다.
+
+### 상자 이동·회전에 대한 고정 캡 추종 영상
+
+- 사용자 요청으로 GPU7/6082에서 동적 본체에 이동·회전 속도를 지정하고 기존 follow_cap 물리 경로의 추종을 촬영했다. 캡 추가 높이는 현재 사용자 조건인 5cm다. 본체 최대 이동 1.52m·yaw 약 49도에서 실제 캡 자세는 직전 물리 스텝의 전달 목표와 exact였다. 현재 본체 자세와의 한 스텝 지연으로 위치 차이는 최대 9.4mm였다. 정책 횡단 영상이 아닌 제어된 이동 진단이며 학습 코드·설정은 변경하지 않았다.
+- 새 폴더 [video/bridge_cap_tracking_20261118/](video/bridge_cap_tracking_20261118/index.html)에 이동·정역회전 13초 MP4와 결과를 저장했다. 원본 510프레임·추종 trace는 `output_etc/check/bridge_cap_tracking_20261118/`에 둔다. MP4 1600×900·390프레임·30fps와 자막·화면을 확인했으며 ZIP은 만들지 않았다.
+
+### Bridge 가상목표 비활성화 인자
+
+- 추론 viewer에 `--no-waypoint`를 추가했다. 다리 중앙 가상목표·반경 전환을 건너뛰고 처음부터 네 사람 모두 원래 V4 정책의 목표를 사용한다. 중심선 배치·다리 물성·캡 높이·시작 모드는 유지하며 기본값은 기존 가상목표 사용이다. 비활성화 시 초록색 실제 목표만 표시하고 `switch_step=-1`, `radius=null`로 기록한다. [실행법](markdowns/USAGE.md#distillv4-bridge-중간-목표-제로샷-viewer).
+- GPU7·follow_cap·캡 5cm·near에서 4환경×2회×60step 검증 통과. 가상목표 생성·반경 전환·GTA 목표 수정 호출을 금지한 상태로 120회 추론 모두 네 사람의 행동이 동일 CUDA RNG의 원래 정책 출력과 exact이며 실제 목표가 유지됐다. CPU 15개 통과. 별도 GPU7/6082 VNC 8step 실행과 초록색 목표만 표시된 캡처를 확인했다. 기존 사용자 GPU5 viewer는 유지했다. [검증](output_etc/check/bridge_no_waypoint_20261118/verification.json)·[화면](output_etc/check/bridge_no_waypoint_20261118/viewer/episode_000_step_0000.png).
+
 ## 2026-11-17
+
+### 추종 캡 높이·다리 시작 배치 인자
+
+- `--cap-lift`(m, 기본 0)로 follow_cap만 높이고 `--bridge-start present|near|insert`(기본 present)로 기존 cooperative 배치를 선택한다. 원래 follow_cap 높이는 유지한다. 본체·관측용 상자 크기·GTA 목표는 바꾸지 않으며 near/insert에서도 선행 사람·payload·원래 목표는 최종 횡단 중심선에 둔다.
+- GPU7에서 캡 2cm 상승의 세 시작 모드 각각 4환경×3reset×20step의 시작 모드·캡 위치·지지 검사가 통과했다. 이동·회전 4환경×20자세에서도 실제 캡 위치 오차≤1.53e-5였다. present의 기존 actor/DOF/목표 초기 상태는 높이 0과 exact, 캡만 2cm 상승했다. CPU waypoint 15개·문법 검사 통과.
+- 원본 V4 2000·seed 42·margin 1.0·최대 300step 녹화에서 2cm/present는 174step 낙상, 2cm/near와 2cm/insert는 횡단·원래 목표 도착했다. 기존 0cm/present는 도착했으므로 2cm 상승이 미끄러짐을 해결한다고 결론내리지 않는다. 단일 seed 결과다.
+- 새 영상은 사용자 요청대로 별도 [video/bridge_follow_cap_lift2cm_20261117/](video/bridge_follow_cap_lift2cm_20261117/index.html)에 개별 MP4로 저장했다. 기존 0cm 비교용 복사본·새 3조건·높이 비교·시작 배치 비교의 6개이며 ZIP은 만들지 않았다. [검증·결과](output_etc/check/bridge_cap_lift_20261117/report.json).
+
+### 동적 다리를 따라가는 고정 상면 캡·영상 폴더 정리
+
+- 승인한 추론 전용 `--bridge-physics follow_cap`을 추가했다. 기존 본체의 최상단 5mm 충돌 형상을 별도 고정 강체로 분리하고 매 물리 step 위치·회전을 추종한다. 본체는 밀도 3의 동적 강체이며 캡↔본체 충돌을 제외한다. 캡에 가해진 힘은 본체에 전달되지 않는 인위적 지지면 실험이다. 캡을 청록색으로 표시하며 학습 코드·YAML은 변경하지 않았다.
+- GPU7·원본 DistillV4 2000·seed 42·margin 1.0에서 headless/녹화 모두 131step 목표 전환, 300step 낙상 없이 횡단·원래 목표 도착했다. GPU 4환경×3reset의 초기 지지·물성 검사가 통과했고 기존 actor/DOF/목표/슬롯은 baseline과 exact다. 4환경×20개 이동·회전 자세에서 실제 rigid-body tensor의 캡 추종 오차 최대 1.53e-5, 캡 속도 0·본체 자유낙하·충돌 필터를 확인했다. CPU 15개 통과.
+- 초기 프로토타입에서 캡만 마지막 root setter로 전달해 다른 actor의 리셋이 누락되는 경로를 발견했다. 리셋 대상 전체를 함께 반영하도록 수정했고 수정 전 14step 실패는 비교에서 제외했다. 특정 물성이나 PhysX 버그를 원인으로 확정하지 않는다.
+- 사용자 요청 경로 [video/index.html](video/index.html)에 영상 목록을 만들었다. `video/bridge_ablation_20261117/`에 개별 8개·비교 4개·초기 진단 1개를 분류하고 조건·결과를 표시했다. 원본 로그와 검증 자료는 `output_etc/check/bridge_contact_20261117/`에 유지한다. [캡 이동 검증](output_etc/check/bridge_contact_20261117/cap_motion/checks.json).
+
+### Bridge 제로샷 물성·고정·상면 캡 ablation과 비교 영상
+
+- 추론 전용 `--bridge-physics`에 `baseline`, `fixed`, `carry`, `fixed_carry`, `platform`, `baseline_nocap`, `carry_nocap`을 추가했다. carry는 운반 상자의 밀도·마찰을 사용하며 총질량은 다리 부피에 비례한다. nocap은 전체 다리 크기의 단일 충돌 상자를 사용한다. `baseline_nocap`은 상면 마찰도 1.0→0.4로 바뀌며, carry↔carry_nocap은 밀도·마찰이 동일하다. [실행법](markdowns/USAGE.md#distillv4-bridge-중간-목표-제로샷-viewer).
+- 사용자가 지정한 ksh 원본 DistillV4 2000과 기존 jhh 경로 checkpoint의 SHA-256이 동일했다. 동일 초기 상태·seed 42·margin 1.0·최대 300step에서 baseline/carry는 각각 173/168step 낙상, fixed/fixed_carry/platform은 횡단·원래 목표 도착했다. baseline_nocap은 300step 낙상 없이 횡단 미완료, carry_nocap은 191step 낙상했다. 단일 장면 결과이며 캡 제거만으로 해결되거나 특정 PhysX 버그라고 단정하지 않는다.
+- GPU7에서 7조건 각각 4환경×3reset×20step의 물성·초기 지지·고정체 자세 검사가 통과했다. 조건별 영상 초기 상태와 반복 reset의 root/DOF/목표/슬롯은 baseline과 exact다. 기존 CPU waypoint 15개 통과. 기존 학습·사용자 viewer는 유지했다.
+- 7개 개별 영상, 기존 5조건 동시 비교·접촉 0.25배속, 캡 유무 4분할 비교를 저장했다. [영상 갤러리](output_etc/check/bridge_contact_20261117/index.html)·[결과](output_etc/check/bridge_contact_20261117/report.json)·[검증](output_etc/check/bridge_contact_20261117/validation.json).
+
+### DistillV4 원본 Bridge 중간 목표 제로샷 viewer
+
+- 추론 전용 실행기를 추가했다. layout-cache 물리 설정에서 crossing 100%·present·선행/운반 상자/원래 목표 중심선 정렬을 사용한다. 원본 DistillV4 2000의 가중치·입력 RMS를 직접 로드하고, 선행 GTA 목표만 다리 상면 위로 옮긴다. 운반 상자 중심 XY가 `상자 XY 반대각 + --switch-margin` 안으로 들어오면 원래 목표로 복귀한다. 인자는 0 이상 0.5m 단위이며 후행 alias·실제 목표·나머지 세 명의 정책 출력은 원래 경로를 유지한다.
+- test/VNC wrapper와 [실행법](markdowns/USAGE.md#distillv4-bridge-중간-목표-제로샷-viewer)을 추가했다. 누락된 모션 데이터 네 폴더는 공유 원본을 수정하지 않는 심링크로 연결했다. 기존 학습 코드·YAML은 변경하지 않았다.
+- CPU 15개 통과. GPU 8환경 검사에서 중심선 오차 최대 1.54e-5m, 나머지 세 명의 행동·전환 후 전체 행동·실제 목표가 원래 경로와 exact임을 확인했다. GPU5 VNC의 CUDA/렌더링 GPU 일치·화면 표시·실제 전환을 확인했다. margin 3m 실행은 69step에 전환, 184step에 다른 에이전트 낙상으로 종료했으며 선행 횡단 완료는 아니었다. [결과](output_etc/check/bridge_waypoint/vnc_gpu5/results.json)·[전환 화면](output_etc/check/bridge_waypoint/vnc_gpu5/episode_000_step_0069.png).
 
 ### 도킹 진단: 고정 충돌체 이관·초기화 순서 대조
 

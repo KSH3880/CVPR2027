@@ -1,0 +1,500 @@
+{
+  "checkpoint": "DistillV4 original epoch 2000",
+  "seed": 42,
+  "margin": 1.0,
+  "max_steps": 300,
+  "cases": {
+    "present_0cm": {
+      "options": {
+        "checkpoint": "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth",
+        "switch_margin": 1.0,
+        "bridge_physics": "follow_cap",
+        "seed": 42,
+        "envs": 1,
+        "episodes": 1,
+        "steps": 300,
+        "headless": false,
+        "capture": false,
+        "out": "output_etc/check/bridge_contact_20261117/videos/follow_cap"
+      },
+      "source_epoch": 2000,
+      "physics": [
+        {
+          "env": 0,
+          "mode": "follow_cap",
+          "fixed_base": false,
+          "size": [
+            3.200000047683716,
+            2.200000047683716,
+            1.649999976158142
+          ],
+          "mass": 34.847999572753906,
+          "density": 2.9999996715997854,
+          "shapes": [
+            {
+              "friction": 0.4000000059604645,
+              "restitution": 0.0,
+              "contact_offset": 0.019999999552965164,
+              "rest_offset": 0.0
+            }
+          ],
+          "carry_density": 100.00000110378961,
+          "carry_friction": 1.0,
+          "cap": {
+            "fixed_base": true,
+            "follows": "position_and_rotation",
+            "thickness": 0.005,
+            "friction": 1.0,
+            "restitution": 0.0,
+            "filter": 536870912
+          }
+        }
+      ],
+      "episodes": [
+        {
+          "episode": 0,
+          "env": 0,
+          "steps": 300,
+          "switch_step": 131,
+          "radius": 1.3605551719665527,
+          "entered": true,
+          "crossed": true,
+          "leader_at": true,
+          "falls": [
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      ]
+    },
+    "present_2cm": {
+      "options": {
+        "checkpoint": "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth",
+        "switch_margin": 1.0,
+        "bridge_physics": "follow_cap",
+        "bridge_start": "present",
+        "cap_lift": 0.02,
+        "seed": 42,
+        "envs": 1,
+        "episodes": 1,
+        "steps": 300,
+        "headless": false,
+        "capture": false,
+        "out": "output_etc/check/bridge_cap_lift_20261117/present/run"
+      },
+      "source_epoch": 2000,
+      "physics": [
+        {
+          "env": 0,
+          "mode": "follow_cap",
+          "fixed_base": false,
+          "size": [
+            3.200000047683716,
+            2.200000047683716,
+            1.649999976158142
+          ],
+          "mass": 34.847999572753906,
+          "density": 2.9999996715997854,
+          "shapes": [
+            {
+              "friction": 0.4000000059604645,
+              "restitution": 0.0,
+              "contact_offset": 0.019999999552965164,
+              "rest_offset": 0.0
+            }
+          ],
+          "carry_density": 100.00000110378961,
+          "carry_friction": 1.0,
+          "cap": {
+            "fixed_base": true,
+            "follows": "position_and_rotation",
+            "thickness": 0.005,
+            "lift": 0.02,
+            "friction": 1.0,
+            "restitution": 0.0,
+            "filter": 536870912
+          }
+        }
+      ],
+      "episodes": [
+        {
+          "episode": 0,
+          "env": 0,
+          "steps": 174,
+          "switch_step": 131,
+          "radius": 1.3605551719665527,
+          "entered": true,
+          "crossed": false,
+          "leader_at": false,
+          "falls": [
+            false,
+            false,
+            false,
+            true
+          ]
+        }
+      ]
+    },
+    "near_2cm": {
+      "options": {
+        "checkpoint": "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth",
+        "switch_margin": 1.0,
+        "bridge_physics": "follow_cap",
+        "bridge_start": "near",
+        "cap_lift": 0.02,
+        "seed": 42,
+        "envs": 1,
+        "episodes": 1,
+        "steps": 300,
+        "headless": false,
+        "capture": false,
+        "out": "output_etc/check/bridge_cap_lift_20261117/near/run"
+      },
+      "source_epoch": 2000,
+      "physics": [
+        {
+          "env": 0,
+          "mode": "follow_cap",
+          "fixed_base": false,
+          "size": [
+            3.200000047683716,
+            2.200000047683716,
+            1.649999976158142
+          ],
+          "mass": 34.847999572753906,
+          "density": 2.9999996715997854,
+          "shapes": [
+            {
+              "friction": 0.4000000059604645,
+              "restitution": 0.0,
+              "contact_offset": 0.019999999552965164,
+              "rest_offset": 0.0
+            }
+          ],
+          "carry_density": 100.00000110378961,
+          "carry_friction": 1.0,
+          "cap": {
+            "fixed_base": true,
+            "follows": "position_and_rotation",
+            "thickness": 0.005,
+            "lift": 0.02,
+            "friction": 1.0,
+            "restitution": 0.0,
+            "filter": 536870912
+          }
+        }
+      ],
+      "episodes": [
+        {
+          "episode": 0,
+          "env": 0,
+          "steps": 300,
+          "switch_step": 131,
+          "radius": 1.3605551719665527,
+          "entered": true,
+          "crossed": true,
+          "leader_at": true,
+          "falls": [
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      ]
+    },
+    "insert_2cm": {
+      "options": {
+        "checkpoint": "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth",
+        "switch_margin": 1.0,
+        "bridge_physics": "follow_cap",
+        "bridge_start": "insert",
+        "cap_lift": 0.02,
+        "seed": 42,
+        "envs": 1,
+        "episodes": 1,
+        "steps": 300,
+        "headless": false,
+        "capture": false,
+        "out": "output_etc/check/bridge_cap_lift_20261117/insert/run"
+      },
+      "source_epoch": 2000,
+      "physics": [
+        {
+          "env": 0,
+          "mode": "follow_cap",
+          "fixed_base": false,
+          "size": [
+            3.200000047683716,
+            2.200000047683716,
+            1.649999976158142
+          ],
+          "mass": 34.847999572753906,
+          "density": 2.9999996715997854,
+          "shapes": [
+            {
+              "friction": 0.4000000059604645,
+              "restitution": 0.0,
+              "contact_offset": 0.019999999552965164,
+              "rest_offset": 0.0
+            }
+          ],
+          "carry_density": 100.00000110378961,
+          "carry_friction": 1.0,
+          "cap": {
+            "fixed_base": true,
+            "follows": "position_and_rotation",
+            "thickness": 0.005,
+            "lift": 0.02,
+            "friction": 1.0,
+            "restitution": 0.0,
+            "filter": 536870912
+          }
+        }
+      ],
+      "episodes": [
+        {
+          "episode": 0,
+          "env": 0,
+          "steps": 300,
+          "switch_step": 147,
+          "radius": 1.3605551719665527,
+          "entered": true,
+          "crossed": true,
+          "leader_at": true,
+          "falls": [
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      ]
+    }
+  },
+  "validation": {
+    "reset_tests": {
+      "present": 3,
+      "near": 3,
+      "insert": 3
+    },
+    "environments_per_reset": 4,
+    "steps_per_reset": 20,
+    "cap_motion": {
+      "environments": 4,
+      "moving_poses": 20,
+      "position_rotation_max_error": 1.52587890625e-05,
+      "cap_velocity_zero": true,
+      "body_remains_dynamic": true,
+      "only_bridge_cap_filter_shared": true,
+      "body_vertical_velocities": [
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ],
+        [
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787,
+          -0.16347958147525787
+        ]
+      ]
+    },
+    "initial_comparison": [
+      {
+        "original_actors_exact": true,
+        "dof_exact": true,
+        "goals_exact": true,
+        "caps_lift_z": [
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ]
+        ]
+      },
+      {
+        "original_actors_exact": true,
+        "dof_exact": true,
+        "goals_exact": true,
+        "caps_lift_z": [
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.01999986171722412,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ]
+        ]
+      },
+      {
+        "original_actors_exact": true,
+        "dof_exact": true,
+        "goals_exact": true,
+        "caps_lift_z": [
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.01999986171722412,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ],
+          [
+            0.019999980926513672,
+            0.019999980926513672,
+            0.019999980926513672
+          ]
+        ]
+      }
+    ]
+  },
+  "note": "Single seed comparison, not a success rate. The original follow_cap default remains 0 m. Only the physical cap is lifted; body size, observation geometry and GTA goal height are unchanged."
+}

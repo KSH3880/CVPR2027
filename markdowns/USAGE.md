@@ -730,3 +730,283 @@ TOKENHSI_GPU=0 bash -c '. tokenhsi/scripts/multi_agent/runtime_env.sh && python 
 # 다른 캐시 폴더를 쓸 때
 CARRY_RSI_CACHE_DIR=output_etc/check/<검사명>/carry_rsi_cache TOKENHSI_GPU=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_bridge_before_fixed_carry_rsi_train.sh 4 1024 8
 ```
+
+## DistillV4 Bridge 중간 목표 제로샷 viewer
+
+추론 전용 토이 실험이다. 원본 `Stage2Distill900V4_00002000.pth`의 네트워크·가중치·입력 RMS를 직접 사용하며 센서 입력과 학습은 사용하지 않는다. 장면은 layout-cache YAML의 물리 설정을 기반으로 4명·8토큰·Default 자세·crossing 100%·다리 present로 만든다. 평가 reset이므로 배치 캐시는 준비하지 않는다. 선행 사람·운반 상자·건너편 실제 목표는 다리 횡단 중심선에 정렬한다. pusher 두 명과 후행 SIT/CLIMB/ON_TOP 균등 과제는 유지한다. 다리는 기존처럼 동적 물체다.
+
+선행에게만 GTA Target을 현재 다리 중앙의 상면 높이+운반 상자 반높이로 보여준다. 후행 alias를 원래 목표로 변환한 뒤 선행 Target pose만 수정한다. 나머지 세 명의 행동은 원래 관측으로 계산한 출력을 사용한다. 실제 목표·보상·성공 판정은 건너편 목표를 유지한다.
+
+운반 상자 중심의 XY 거리가 `상자 XY 반대각 + --switch-margin` 이하가 되면 원래 목표로 한 번 전환하고 에피소드 끝까지 유지한다. `--switch-margin` 기본 1m, 0 이상 0.5m 단위이며 상한은 없다. 예: `0.5`, `1`, `1.5`, `2`, `3`, `5`. 큰 반경에서는 reset 직후 전환될 수 있으며 로그의 `switch step=0`으로 확인한다. 기존 후행 waiting penalty의 1.5m 값은 바꾸지 않는다.
+
+`--no-waypoint`를 추가하면 다리 중앙 가상목표와 반경 전환을 끄고 처음부터 네 사람 모두 원래 목표의 V4 정책 출력을 사용한다. 이때 `--switch-margin`은 동작에 영향을 주지 않고, 자홍색 가상목표·반경 표시도 숨긴다. 원래 목표의 초록색 십자만 표시하며 `results.json`은 `no_waypoint: true`, `switch_step: -1`, `radius: null`로 기록한다. 선행/상자/원래 목표의 중심선 배치·다리 물성·캡 높이·시작 모드는 그대로 유지한다. 인자를 생략하면 기존 가상목표 경로다.
+
+저장소 루트에서 실행한다. 기본 conda는 `tokenhsi`, 기본 viewer는 1환경·900step·100episode이며 Ctrl+C 또는 viewer 종료로 멈춘다. 실행 전 `nvidia-smi`로 GPU 점유를 확인한다.
+
+```bash
+CKPT=/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: DistillV4 중간 목표 VNC
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: DistillV4 중간 목표 로컬 viewer
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/bridge_waypoint_test.sh --checkpoint "$CKPT" --switch-margin 2.5
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 화면 없는 짧은 확인
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/bridge_waypoint_test.sh --checkpoint "$CKPT" --switch-margin 3.0 --headless --envs 8 --episodes 1 --steps 120
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 가상목표 없이 원래 목표·추종 캡 5cm·near
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --bridge-physics follow_cap --cap-lift 0.05 --bridge-start near --no-waypoint
+```
+
+`TOKENHSI_GPU=5`를 6 또는 7로 바꾸면 시뮬레이션과 VNC 렌더링이 함께 해당 GPU를 사용한다. VS Code에서 6081 포트를 전달하고 `http://localhost:6081/vnc.html?autoconnect=1&resize=remote`를 연다. 자홍색 십자·원은 다리 중간 목표·전환 반경, 초록색 십자는 원래 목표이며 전환 후 중간 목표 표시는 회색이다. `--seed 42`, `--episodes 10` 등으로 장면·반복을 지정한다. `--capture`는 viewer의 시작·전환 화면을 저장한다. 결과와 resolved 환경 설정은 기본 `output_etc/check/bridge_waypoint/<실행시각>/`에 저장하며 `--out output_etc/check/<검사명>`으로 변경할 수 있다.
+
+`--bridge-physics`로 다리 접촉 어블레이션을 선택한다. 다리 크기·중심선 배치·V4 checkpoint·목표 전환 규칙은 유지하며, 시작 배치는 `--bridge-start`로 별도 선택한다(기본 present).
+
+| 값 | 고정 여부 | 물성 | 충돌 형상 |
+| --- | --- | --- | --- |
+| `baseline` (기본) | 동적 | 기존 밀도 3, 본체 마찰 0.4·상면 1.0 | 본체+5mm 상면 캡 |
+| `fixed` | 고정 | 기존 물성 | 본체+5mm 상면 캡 |
+| `carry` | 동적 | 운반 상자 밀도 100·마찰 1.0 | 본체+5mm 상면 캡 |
+| `fixed_carry` | 고정 | 운반 상자 밀도 100·마찰 1.0 | 본체+5mm 상면 캡 |
+| `platform` | 고정 | 현재 지형 무대와 같은 생성 옵션·마찰 | 다리 크기의 단일 box |
+| `baseline_nocap` | 동적 | 기존 본체 밀도 3·마찰 0.4 | 다리 크기의 단일 box, 캡 제거 |
+| `carry_nocap` | 동적 | 운반 상자 밀도 100·마찰 1.0 | 다리 크기의 단일 box, 캡 제거 |
+| `follow_cap` | 본체 동적·캡 고정 | 기존 본체 밀도 3·마찰 0.4, 캡 마찰 1.0 | 본체와 상면 5mm 캡을 별도 강체로 분리, 캡이 위치·회전 추종 |
+
+carry 계열은 운반 상자와 **밀도·마찰을 일치**시킨다. 총질량은 다리 부피에 비례한다. 예를 들어 3.2×2.2×1.65m 다리는 기존 34.848kg에서 1161.6kg이 된다. fixed 계열은 `fix_base_link=True`로 만든 강체를 사용하며 매 프레임 자세를 덮어써 고정하는 방식이 아니다. 첫 reset 전 기존 물리 초기화를 거친 뒤 배치하고, 에피소드마다 바뀌는 다리 위치에도 적용한다. platform 조건은 고정·물성·충돌 형상을 함께 바꾸므로 순수한 고정 효과는 baseline↔fixed로 비교한다. 실제 질량·밀도·각 충돌 형상의 접촉 속성은 시작 로그와 `results.json`의 `physics`에 저장한다.
+
+```bash
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 고정 다리 제로샷 VNC
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics fixed
+```
+
+마지막 `fixed`를 표의 값으로 바꿔 실행한다. 같은 `--seed`·`--envs`·`--switch-margin`을 사용한다. 같은 VNC 포트에서 조건을 바꿀 때는 기존 viewer를 Ctrl+C로 종료하고 다시 실행한다. 기존 `jhh/TokenHSI_stage12_bridge_fix_reward/output/stage2/Stage2Distill900V4_00002000.pth`와 위 원본 checkpoint는 SHA-256이 동일함을 확인했다. [개별·동시 비교 영상](../output_etc/check/bridge_contact_20261117/index.html)·[접촉 진단과 비교 결과](../output_etc/check/bridge_contact_20261117/report.json).
+
+캡 제거는 다리 크기·질량을 줄이지 않고 전체 크기의 단일 충돌 상자로 교체한다. `baseline_nocap`은 기존 본체 마찰 0.4를 모든 면에 사용하므로 상면 마찰도 1.0→0.4로 바뀐다. 밀도·마찰을 유지하면서 충돌 형상만 비교하려면 `carry`↔`carry_nocap`을 사용한다.
+
+```bash
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 캡 제거·기존 본체 물성
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics baseline_nocap
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 캡 제거·carry 물성
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics carry_nocap
+```
+
+`follow_cap`은 상면 캡을 별도 `fix_base_link=True` 강체로 만들고, 매 물리 step 후 본체의 최신 위치·회전으로 갱신해 다음 step의 접촉에 사용한다. 본체의 질량·관성·하단 충돌 형상은 유지한다. 캡↔본체 충돌을 제외하며 캡에 가해진 힘은 본체로 전달되지 않는다. 본체에 직접 닿는 접촉은 계속 동적으로 처리한다. 물성만 바꾸는 실험이 아니라 인위적인 지지면 분리 실험이며, 실제 관절로 연결하거나 PhysX kinematic actor를 사용하는 방식은 아니다. 캡은 상자 아래가 아니라 원래 상자 내부의 최상단 5mm이며, 이 조건에서는 청록색으로 표시한다.
+
+```bash
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 동적 본체를 따라가는 고정 상면 캡
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics follow_cap
+```
+
+`--cap-lift`는 follow_cap의 캡만 상자 로컬 상방으로 올리는 거리(m)다. 기본 `0`은 원래 높이, `0.01`은 1cm, `0.02`는 2cm다. 본체·관측용 상자 크기·GTA 목표는 유지한다. 다른 물성 조건에서 0이 아닌 값을 지정하면 오류로 처리한다.
+
+`--bridge-start present|near|insert`는 기존 cooperative 시작 배치를 선택한다. present는 다리가 landing에 있는 상태, near는 landing에서 삽입 방향으로 0.1–1.5m 떨어진 상태, insert는 채널 입구에 다리 앞부분이 1.5cm 들어간 상태다. 선행 사람·운반 상자·원래 목표는 계속 최종 횡단 중심선에 배치하며, 선행의 중간 GTA 목표는 실제 다리 위치를 따라간다. 시작 모드는 모든 `--bridge-physics` 조건에 적용되지만 고정 다리는 near/insert에서 밀려 들어가지 않는다.
+
+```bash
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 고정 캡 2cm 상승·present
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics follow_cap --cap-lift 0.02 --bridge-start present
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 고정 캡 2cm 상승·near
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics follow_cap --cap-lift 0.02 --bridge-start near
+
+# stage2_sensor_900_bridge_before_fixed_layout_cache: 고정 캡 2cm 상승·insert
+TOKENHSI_GPU=5 PORT=6081 bash tokenhsi/scripts/multi_agent/bridge_waypoint_vnc.sh --checkpoint "$CKPT" --switch-margin 1.0 --bridge-physics follow_cap --cap-lift 0.02 --bridge-start insert
+```
+
+사용자 확인용 영상은 [video/bridge_ablation_20261117/index.html](../video/bridge_ablation_20261117/index.html)에 모았다. `비교영상/`, `개별영상/`, `진단용/`으로 분류하며 원본 로그·프레임·검증 자료는 `output_etc/check/bridge_contact_20261117/`에 둔다.
+
+새 실험 영상은 기존 영상 폴더에 추가하지 않고 `video/` 아래 새 폴더에 개별 MP4로 저장한다. ZIP은 만들지 않는다. 전체 목록은 [video/index.html](../video/index.html)을 따른다.
+
+가상목표를 끈 0·1·2·5cm의 동일 장면 96회 비교는 [높이 비교 영상·CSV](../video/bridge_cap_height_compare_20261118/index.html)에 있다. present/near/insert 각각 8환경을 비교하며, 영상은 해당 batch의 scene 0이다. 재현은 `TOKENHSI_GPU=7 PORT=6082 bash output_etc/check/bridge_cap_height_compare_20261118/worker.sh 0.00 0.02` 및 `TOKENHSI_GPU=5 PORT=6084 bash output_etc/check/bridge_cap_height_compare_20261118/worker.sh 0.01 0.05`로 실행했다. 이 명령은 같은 진단 폴더에 기록하므로 새 비교에는 별도 출력 폴더를 사용한다.
+
+## Follow-cap 5cm 학습 비교
+
+random15k의 밀기4명+Enable2세트(총8명) 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_random15k_push4_enable2_eval_20261120/launch.py`로 실행한다. GPU5/6/7에 seed0/1/2를 각각 배정하며 512환경×3seed·insert/횡단100%·폭1.6~2.2m 프로파일 샘플링·follow_cap5cm·가상목표 없음·최종 배치 후 좌우 정렬이다. 같은 실행의 900/1500step 누적 SR을 저장한다. 공동밀기4명 동시 성공·각 Enable의 선행/후행 동시 성공을 세 subtask로 집계하고 평균을 Subtask SR, 8명 동시 성공을 Full-scenario SR로 정의한다. launcher는 GPU별 총점유85000MiB 상한을 감시하며 기존 학습은 보존한다. `summarize.py`는 저장 trace와 집계를 대조한 후 `summary.{json,csv,md}`를 생성한다. 완료 결과는 재사용하며 새 평가에는 별도 폴더를 쓴다. [평가 폴더](../output_etc/check/bridge_random15k_push4_enable2_eval_20261120/).
+
+random 13k~18k 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_random_13000_18000_ordered_20261120/launch_eval.py`로 실행한다. GPU7만 사용하며 checkpoint당 512환경×3seed·900step·insert/횡단 100%·배치 후 좌우 정렬·동일 초기 fixture를 유지한다. 총 18개를 최대 8개 병렬·GPU 전체 85000MiB 상한으로 실행하고 검증 후 1k 간격 표를 생성한다. 완료 결과는 재사용하며 새 평가에는 별도 폴더를 쓴다. [결과 폴더](../output_etc/check/bridge_random_13000_18000_ordered_20261120/).
+
+rear90 13k 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_rear90_13000_ordered_20261119/launch_eval.py`로 실행한다. seed0/2=GPU5, seed1=GPU6이며 512환경×3seed·900step·insert/횡단 100%·배치 후 좌우 정렬·동일 초기 fixture를 유지한다. GPU 총점유 85000MiB 상한을 감시하고 12k는 기존 결과를 재사용해 비교한다. 완료 결과는 재사용하며 새 평가에는 별도 폴더를 사용한다. [결과 폴더](../output_etc/check/bridge_rear90_13000_ordered_20261119/).
+
+동일 12k 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_rear90_random_12000_ordered_20261119/launch_eval.py`로 실행한다. rear90=GPU5, random=GPU6이며 지정 checkpoint가 없으면 저장 완료·epoch 확인까지 기다린다. 기존 4명·512환경×3seed·900step·insert/횡단 100%·최종 좌우 정렬·동일 fixture를 유지하고 총점유 85000MiB 상한을 감시한다. 완료 결과는 재사용하며 새 평가에는 별도 폴더를 쓴다. 완료 시 [1k 단위 표](../output_etc/check/bridge_rear90_random_12000_ordered_20261119/history_7k_12k.md)·[전체 지표](../output_etc/check/bridge_rear90_random_12000_ordered_20261119/index.html)를 자동 생성한다.
+
+미평가 rear90 8000·9000 / random 11000 보충 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_missing_8k9k11k_ordered_20261119/launch_eval.py`로 실행한다. 기존 4명 구성·512환경×3seed·900step·insert/횡단 100%·최종 좌우 정렬·동일 초기 fixture이며 GPU5/6에 분산한다. GPU당 최대 3개 병렬·총점유 85000MiB 상한을 적용하며 완료 결과는 재사용한다. [결과 폴더](../output_etc/check/bridge_missing_8k9k11k_ordered_20261119/).
+
+공동밀기 인원·선행/후행 쌍 수·보행로 폭을 조절하는 추론 전용 viewer:
+
+```bash
+TOKENHSI_GPU=6 PORT=6082 \
+bash output_etc/check/bridge_push3_follow_cap_view_20261119/view.sh \
+  --pushers 4 --before-pairs 2 --bridge-width 2.0 \
+  --bridge-start insert --seed 42
+```
+
+`--pushers`는 2/3/4명(기본 3), `--before-pairs`는 선행·후행 쌍 수(양의 정수, 기본 1)다. 총인원은 `pushers + 2*before_pairs`다. 모든 선행은 같은 출발 플랫폼에서 같은 방향으로 건너며, 각 후행은 건너편에서 자기 선행의 상자를 사용한다. 쌍마다 상자·목표·AT 선행 조건을 따로 배정한다. `--bridge-width <m>`는 실제 보행로 폭을 양의 실수로 지정하며 본체·follow_cap·충돌 및 센서 크기에 함께 적용한다. 생략하면 환경 생성 시 기존 프로파일의 1.6~2.2m 폭을 샘플링하고 해당 환경의 reset 간에는 유지한다.
+
+다리 횡단 길이는 밀기 인원×1.6m, 플랫폼 간격은 그 길이+0.1m다. 플랫폼은 기존 인원별 크기 샘플링과 4인 이상 구간의 7~8m 상한을 유지하므로 쌍 수가 많으면 초기 배치 재시도가 늘거나 배치가 불가능할 수 있다. 밀기 담당은 후방90°·외곽0.5~5m로 샘플링하고 최종 배치 후 담당 영역을 좌우 정렬한다. 후행 과제는 SIT/CLIMB/ONTOP이다.
+
+기본 rear90 10000 checkpoint를 추가 학습 없이 사용한다. `--checkpoint`는 rear90/rear90_random을 모두 지원하며 저장된 샘플링 설정으로 실행 config를 자동 선택한다. 두 모델 모두 `--coupled_assignment ordered`와 `--pusher_assignment ordered`를 내부에 지정해 최종 배치 후 좌우 정렬을 유지한다. **1환경**, 10에피소드×900step, crossing 100%, 가상목표 없음, follow_cap 5cm다. 기존 명령은 기본값인 밀기3명·1쌍으로 동작한다. `--bridge-start present|near|insert`, `--checkpoint <rear90.pth>`, `--seed`, `--episodes`, `--steps`, `--envs`를 지원한다. 화면 없는 검사는 `HEADLESS=1`. 학습 코드/config는 변경하지 않고 viewer 프로세스에서만 인원·기하를 확장한다. 결과는 같은 폴더의 `run_<시각>/verification.json`에 저장한다.
+
+rear90 11000·random 10000 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_rear90_11000_random10000_ordered_20261119/launch_eval.py`로 실행한다. 두 모델의 seed0/1/2를 각각 GPU5/6/7에 배정하며 GPU당 2개 병렬·총점유 85000MiB 상한이다. 이전과 같은 512환경×3seed·900step·insert/횡단 100%·최종 좌우 정렬·초기 fixture를 사용한다. 완료 결과는 재사용하며 새 평가에는 별도 출력 폴더를 사용한다. [결과 폴더](../output_etc/check/bridge_rear90_11000_random10000_ordered_20261119/).
+
+rear90 10000·random 9000 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_rear90_10000_random9000_ordered_20261119/launch_eval.py`로 실행한다. 두 모델의 seed0/1/2를 각각 GPU5/6/7에 배정하며 GPU당 2개 병렬·총점유 85000MiB 상한이다. 이전과 같은 512환경×3seed·900step·insert/횡단 100%·최종 좌우 정렬·초기 fixture를 사용한다. 완료 결과는 재사용하며 새 평가에는 별도 출력 폴더를 사용한다. [결과 폴더](../output_etc/check/bridge_rear90_10000_random9000_ordered_20261119/).
+
+최신 rear90 9500(GPU6)·random 8000(GPU7)의 동일 초기 장면 평가는 `tokenhsi` 환경에서 `python output_etc/check/bridge_rear90_9500_random8000_ordered_20261119/launch_eval.py`로 실행한다. 모델당 512환경×3seed·900step·insert/횡단 100%·최종 좌우 정렬이며 GPU별 3개 병렬·총점유 85000MiB 상한을 적용한다. 완료 결과는 재사용하며 새로운 평가에는 별도 출력 폴더를 사용한다. [결과 폴더](../output_etc/check/bridge_rear90_9500_random8000_ordered_20261119/).
+
+동일 7k의 후행 동작 진단은 `python output_etc/check/bridge_follower_diagnostics_7000_20261119/launch_eval.py`로 GPU5/7·각 512환경×3seed를 재생했다. 기존 fixture·정렬·insert/횡단 100% 조건이며 후행 궤적과 native 오차를 추가 기록한다. `tokenhsi` 환경에서 `python output_etc/check/bridge_follower_diagnostics_7000_20261119/analyze_followers.py`로 활성 이후 동작·성공 경계까지의 추가 오차를 집계한다. 재생 편차가 있으므로 원 평가 실패 건수와 구분하며, 완료 폴더는 보존하고 새 실행에는 별도 진단 폴더를 사용한다. [진단 결과](../output_etc/check/bridge_follower_diagnostics_7000_20261119/follower_analysis.json).
+
+후행 실패 장면 VNC는 `view_failure.sh <rear90|random> <seed 0..2> <env 0..511>`을 사용한다. 7k checkpoint·insert/횡단 100%·최종 좌우 정렬을 유지한다. 마지막 번호는 원 평가의 장면 번호이며, 해당 장면의 상자·플랫폼 크기와 초기 상태만 가져와 **환경 1개**로 실행한다. 월드 좌표를 원점 근처로 옮기고 도착 플랫폼에 카메라를 맞춘다. 후행은 밝은 초록색으로 표시한다. 900step 종료 후 마지막 화면을 유지하며 창 닫기 또는 Ctrl+C로 끝낸다. 저장된 동영상 재생이 아니라 1환경 재시뮬레이션이므로 성공/실패도 달라질 수 있다. headless 900step 확인에서는 rear90 109는 후행 실패를 유지했으나 random 58은 성공으로 바뀌었다. 실행별 출력은 `output_etc/check/bridge_failure_viewer/`에 분리한다.
+
+```bash
+# rear90: 상자를 들어도 수평 정렬까지 못 간 ONTOP 실패
+TOKENHSI_GPU=6 PORT=6082 bash output_etc/check/bridge_follower_diagnostics_7000_20261119/view_failure.sh rear90 0 109
+
+# rear90: 높이 오차가 크게 남은 ONTOP 실패
+TOKENHSI_GPU=6 PORT=6082 bash output_etc/check/bridge_follower_diagnostics_7000_20261119/view_failure.sh rear90 0 95
+
+# rear90: 활성화 뒤 움직임이 작은 CLIMB 실패
+TOKENHSI_GPU=6 PORT=6082 bash output_etc/check/bridge_follower_diagnostics_7000_20261119/view_failure.sh rear90 0 191
+
+# random: 상자를 들어도 수평 정렬까지 못 간 ONTOP 실패
+TOKENHSI_GPU=6 PORT=6082 bash output_etc/check/bridge_follower_diagnostics_7000_20261119/view_failure.sh random 0 58
+```
+
+`stage2_sensor_900_bridge_follow_cap_rear90_random`은 `_rear90`과 같은 사람·상자 샘플링에서 **담당 영역만 무작위 배정**하는 별도 설정이다. 최종 배치 후 공동밀기 두 사람에게 영역 0/1을 중복 없이 균등 추첨하고, 가상 분할 상자와 개인 목표에 함께 적용한다. 캐시 배치 재사용 시에도 에피소드마다 새로 추첨하며 에피소드 중에는 고정한다. 따라서 좌우 정렬과 일치/반대일 확률이 각각 50%이며, seed가 같아도 랜덤 추첨이 추가되어 두 설정의 전체 초기 배치가 동일하다는 뜻은 아니다. 가상목표 없음·cap 5cm·후방 90도·외곽 거리 0.5~5m·모드 혼합·같은 플랫폼 20%·보상은 `_rear90`과 같다. 원본 V4 2k에서 새로 학습하고 test/VNC는 이 설정으로 저장된 checkpoint를 사용한다. [실행 명령](config.md).
+
+새 `_rear90` 학습 배치에서 **원본 DistillV4 2k 정책**을 제로샷으로 보려면 전용 실행기를 사용한다. 새 config의 배치 캐시·모드 혼합·같은 플랫폼 20%·cap 5cm·담당 정렬을 그대로 사용하며, V4 원본 정책/RMS를 strict 로드해 기본 장면 관측으로 평균 행동을 계산한다. 센서 정책으로의 추가 학습이나 확인 학습 checkpoint는 사용하지 않는다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6082 \
+bash tokenhsi/scripts/multi_agent/stage2_sensor_900_bridge_follow_cap_rear90_zeroshot_vnc.sh \
+  --checkpoint "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth" \
+  --seed 42
+```
+
+기본 1환경·100에피소드·에피소드당 최대 900step이며 `--envs`, `--episodes`, `--steps`로 조절한다. `--bridge-start mixed`(기본)는 학습처럼 present/near/insert 20/40/40%를 사용한다. 한 모드만 보려면 `--bridge-start insert`(또는 `present`, `near`)를 붙인다. 모드를 고정해도 같은 플랫폼 20%는 유지한다. 초기 로그에 모드와 같은 플랫폼 여부가 표시된다. 화면 없는 확인은 `HEADLESS=1`과 `_zeroshot_test.sh`를 사용한다. 실행별 초기 배치·해결된 config·원본 경로/epoch는 `output_etc/check/bridge_rear90_zeroshot/`에 저장한다.
+
+`stage2_sensor_900_bridge_follow_cap_rear90`은 가상목표 없는 별도 학습 설정이다. 다리 위치 확정 후 상자 정후방 ±45°·root XY에서 직사각형 외곽까지의 최단 거리 0.5~5m로 밀기 담당을 각각 샘플링한다. 각도·거리는 균등 후보를 뽑고 플랫폼/상자 외곽 0.5m, 다른 사람 root와 1m 여유를 만족하는 후보를 채택한다. 따라서 충돌 제외 후 분포는 균등하지 않을 수 있다. 같은 쪽에 두 사람이 뽑히는 것은 허용한다. 최종 상자 좌표계의 X 순서로 담당 영역을 정하고 에피소드 중 유지한다. 캐시 복원도 관측·보상 이력 초기화 전에 같은 배정을 적용한다.
+
+present/near/insert 모두 이 규칙을 사용하며 비율 20/40/40%, 선행·후행 같은 플랫폼 20%, cap 5cm, 가상목표 없음과 기존 보상은 유지한다. 원본 DistillV4 2k에서 새로 시작한다. 기존 5k 학습의 resume 설정이 아니며 새 실행/출력 이름을 사용한다. [학습·test·VNC 명령](config.md). test/VNC의 `$CKPT`는 새 `_rear90` 학습이 저장한 체크포인트로 지정한다. 기존 5000 `view_eval.sh`는 저장된 옛 배치 재생용이므로 새 샘플링을 재현하지 않는다.
+
+현재 비교 세트는 `follow_cap`(가상목표 없음), `follow_cap_waypoint_single_pass`(가상목표·기존 보상), `follow_cap_waypoint_progress_single_pass`(가상목표·단계별 보상)다. 접두사는 `stage2_sensor_900_bridge_`이며 새 두 설정은 GTA 위치를 수정한 scene으로 actor·critic 각각 한 번 계산한다. `_single_pass` 없는 가상목표 설정은 기존 두 번 계산한 학습 재현용이다. 새 설정은 원본 V4 2k에서 시작하며 기존 두 번 계산한 체크포인트의 resume을 받지 않는다.
+
+세 설정의 차이·보상식·초기화·전이 계약은 [학습 명세](reference/bridge_follow_cap_training.md), 기본 학습/test/VNC 명령은 [config](config.md)를 따른다. `stage2_sensor_900_bridge_follow_cap*` 전용 실행기는 기본 conda `tokenhsi`를 사용한다. 추론 전용 `bridge_waypoint_vnc.sh`의 중심선 토이 배치와 별개이며, 학습은 원래 무작위 배치·같은 플랫폼 20%를 유지한다.
+
+3500 checkpoint의 insert·횡단 전용 512환경×3seed 비교는 [평가 규약](reference/bridge_follow_cap_training.md#insert-횡단-평가)을 따른다. 실행한 명령은 `python output_etc/check/bridge_crossing_eval_3500_20261118/launch_eval.py`이며, GPU5·7을 내부에서 각각 지정하고 전체 GPU 메모리 80000MiB 초과 시 평가 프로세스만 종료한다. 집계는 `TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi bash -c '. tokenhsi/scripts/multi_agent/runtime_env.sh; python output_etc/check/bridge_crossing_eval_3500_20261118/summarize_eval.py'`다. 실행기는 해당 폴더를 사용하므로 새 평가에는 스크립트를 새 진단 폴더에 복사하고 비교 checkpoint를 지정한다.
+
+최신 4500 비교 평가는 `python output_etc/check/bridge_crossing_eval_4500_20261118/launch_eval.py`로 실행한다. GPU당 512환경×3seed를 동시에 실행하고 전체 메모리 85000MiB를 상한으로 감시한다. 3500 평가의 초기 상태를 재사용한다. 집계는 `TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi bash -c '. tokenhsi/scripts/multi_agent/runtime_env.sh; python output_etc/check/bridge_crossing_eval_4500_20261118/summarize_eval.py'`다. 기존 결과 보호를 위해 실행 폴더가 있으면 재실행을 거부하므로, 추가 실행은 새 폴더에 복사해 경로·checkpoint를 지정한다.
+
+5000 접촉·대기 진단은 `python output_etc/check/bridge_crossing_eval_5000_contact_20261118/launch_eval.py`로 실행했다. 같은 초기 상태·GPU당 3seed 병렬·85000MiB 상한을 사용한다. runtime 적용 후 해당 폴더의 `summarize_eval.py`, `analyze_contact.py`를 차례로 실행하면 행동/씬 SR과 발 내딛기·접촉 추정·낙상 시점별 밀기 상태 및 대기 후보가 집계된다. 기존 실행 폴더는 재사용하지 않는다. [판정 규약](reference/bridge_follow_cap_training.md#5000-발-접촉대기-진단).
+
+rear90와 rear90_random의 test/VNC는 `PUSHER_ASSIGNMENT=ordered|random`으로 최종 배치 후 담당 영역을 선택한다. 생략하면 checkpoint config를 따른다. 저장된 cfg는 바꾸지 않고 runtime 샘플러의 배정 설정만 복사해 덮어쓰므로 checkpoint 계약 검증은 유지된다. 직접 Python 실행은 `--pusher_assignment ordered|random`을 사용한다. 이 옵션은 학습/resume에서 허용하지 않는다. 기존 `COUPLED_ASSIGNMENT` 대신 rear90의 최종 reset 배정을 제어하는 옵션이다.
+
+두 실행기의 다섯 위치 인자 뒤에 `--pusher-gaps 1.5 3.0`을 붙이면 밀기 담당 에이전트 번호 오름차순으로 초기 거리를 따로 지정한다. 단위는 m, 기준은 **상자 뒷면–사람 root의 삽입축 거리**다. 상자 중심 거리나 외곽까지의 최단 거리가 아니다. 매 reset마다 기존 횡방향 위치·자세를 유지하고 앞뒤 위치만 이동한 뒤 담당 영역을 배정한다. 환경 0의 에이전트 번호와 거리 대응은 로그에 출력한다. present/near/insert 모두 적용되며 생략하면 원래 rear90 샘플링이다. 고정 거리 이동 후 원래 후보의 각도·장애물 여유를 재샘플링하지 않으므로, 이 옵션을 지정한 장면은 학습 샘플링과 구분한다. 양의 실수를 받으며 `PUSHER_GAPS="1.5 3.0"`도 지원한다. 직접 Python은 `--pusher_gaps "1.5 3.0"`, 학습/resume에서는 거부한다.
+
+```bash
+# stage2_sensor_900_bridge_follow_cap_rear90: 밀기 담당별 1.5m / 3m, 최종 좌우 정렬
+TOKENHSI_GPU=6 PORT=6082 PUSHER_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stage2_sensor_900_bridge_follow_cap_rear90_vnc.sh "output/stage2_sensor_900_bridge_follow_cap_rear90/Stage2Sensor900BridgeFollowCapRear90_18-15-42-35/nn/Stage2Sensor900BridgeFollowCapRear90.pth" 4 1 8 10 --pusher-gaps 1.5 3.0
+
+# stage2_sensor_900_bridge_follow_cap_rear90_random: 동일 거리·최종 좌우 정렬
+TOKENHSI_GPU=6 PORT=6082 PUSHER_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stage2_sensor_900_bridge_follow_cap_rear90_random_vnc.sh "output/stage2_sensor_900_bridge_follow_cap_rear90_random/Stage2Sensor900BridgeFollowCapRear90Random_18-16-39-21/nn/Stage2Sensor900BridgeFollowCapRear90Random.pth" 4 1 8 10 --pusher-gaps 1.5 3.0
+```
+
+```bash
+# rear90: 최종 좌우 정렬
+TOKENHSI_GPU=6 PORT=6082 PUSHER_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stage2_sensor_900_bridge_follow_cap_rear90_vnc.sh "output/stage2_sensor_900_bridge_follow_cap_rear90/Stage2Sensor900BridgeFollowCapRear90_18-15-42-35/nn/Stage2Sensor900BridgeFollowCapRear90.pth" 4 1 8 10
+
+# rear90_random: 평가/시각화에서 최종 좌우 정렬
+TOKENHSI_GPU=6 PORT=6082 PUSHER_ASSIGNMENT=ordered bash tokenhsi/scripts/multi_agent/stage2_sensor_900_bridge_follow_cap_rear90_random_vnc.sh "output/stage2_sensor_900_bridge_follow_cap_rear90_random/Stage2Sensor900BridgeFollowCapRear90Random_18-16-39-21/nn/Stage2Sensor900BridgeFollowCapRear90Random.pth" 4 1 8 10
+```
+
+rear90 정렬 학습과 random 학습의 **동일 1k·정렬 평가**는 `python output_etc/check/bridge_rear90_eval_1000_ordered_20261118/launch_eval.py`다. GPU5/7에서 모델당 512환경×seed 0·1·2, insert·횡단 100%, cap 5cm, 900step으로 실행한다. rear90의 후방 ±45°·상자 외곽 0.5~5m 샘플러로 새 fixture를 만들고 두 모델이 공유한다. random checkpoint의 배정 설정은 평가 프로세스에서만 ordered로 덮어써 초기 배치·캐시 복원 후에도 정렬을 유지한다. 기하/담당 배정은 각 seed의 `sampling_verification.json`, `assignment_verification.json`에 검증 기록을 남긴다. runtime에서 같은 폴더의 `summarize_eval.py`로 행동/씬 SR을 집계한다. 기존 학습은 변경하거나 종료하지 않는다.
+
+rear90 **3500**과 random **2500**의 최신 비교는 `python output_etc/check/bridge_rear90_eval_3500_random2500_ordered_20261118/launch_eval.py`다. GPU5만 사용하며 기존 학습 포함 85000MiB 상한, 평가 최대 4개 병렬로 512환경×3seed를 실행한다. 위 1k 평가의 초기 fixture를 재사용하고 두 모델 모두 배치 후 최종 좌우 정렬을 적용한다. insert·횡단 100%, cap 5cm, 가상목표 없음, 900step이며 완료 후 자동 집계한다. 두 모델의 학습 횟수는 서로 다르다. 기존 결과 폴더 재사용은 거부한다.
+
+rear90 **4500** / random **3500** 평가는 `python output_etc/check/bridge_rear90_eval_4500_random3500_ordered_20261119/launch_eval.py`다. rear90은 GPU5에서 완료했고, 사용자 변경 지시에 따라 random seed 0/1/2는 GPU5/6/7에 하나씩 실행한다. GPU별 총점유 85000MiB 상한이며, 아직 없는 checkpoint는 저장 크기/수정시각 안정화와 CPU 로드/epoch 검증 후 자동 실행한다. 완료 결과는 재사용한다. 위와 같은 512환경×3seed fixture·최종 좌우 정렬·900step 조건이며 두 모델 완료 후 자동 집계한다. **현재 상태: 사용자 요청으로 random 평가 대기는 취소됐고 자동 실행되지 않는다. rear90 4500 결과만 완료됐다.**
+
+rear90/random **동일 7000** 평가는 `python output_etc/check/bridge_rear90_eval_7000_ordered_20261119/launch_eval.py`다. rear90=GPU5, random=GPU7로 모델당 512환경×3seed를 실행한다. 이전 fixture·insert/횡단 100%·cap 5cm·가상목표 없음·최종 배치 후 좌우 정렬·900step을 유지한다. GPU별 최대 3개 병렬이며 초기화 중인 평가의 미할당 메모리도 예약해 실행을 조절하고 총점유 85000MiB를 감시한다. 완료 후 자동 집계하며 학습 프로세스는 보존한다.
+
+가상목표 없는 follow-cap 6k의 **기존 학습 담당 배정** 재평가는 `python output_etc/check/bridge_crossing_eval_6000_training_assignment_20261118/launch_eval.py`다. GPU5에서 동일 fixture·512환경×3seed·900step, insert·횡단 100%, cap 5cm·원래 사람 거리를 사용한다. 좌우 정렬 평가와 담당 영역·개인 목표만 바꾸며, 새 rear90 학습 평가는 아니다. 완료 후 runtime 환경에서 같은 폴더의 `summarize_eval.py`를 실행하면 두 배정의 행동/씬 SR 비교와 초기 상태 검증을 저장한다. 결과 폴더 재사용은 거부한다. 학습 프로세스는 종료하지 않는다.
+
+6000의 **최종 배치 후 좌우 정렬** 평가는 `python output_etc/check/bridge_crossing_eval_6000_ordered_20261118/launch_eval.py`로 실행한다. GPU5는 가상목표 없음, GPU7은 가상목표+단계별 progress이며, 6k checkpoint 저장이 안정된 뒤 각각 512환경×3seed를 병렬 평가한다. 기존 fixture의 사람·상자를 복원한 다음 실제 상자 좌표계에서 담당 영역과 개인 목표를 정렬하고, 관측 초기화 후 다시 검증한다. insert·횡단 100%, cap 5cm, 900step이다. GPU 전체 메모리 상한은 85000MiB이며 초과 시 이 실행기의 평가 자식만 종료한다. 결과 폴더를 재사용하지 않는다. runtime 적용 후 같은 폴더의 `summarize_eval.py`, `analyze_contact.py`로 집계한다. 기존 `training_assignment` 결과와 배정 조건이 다르다.
+
+5000 평가 초기 장면을 VNC에서 다시 실행하려면 아래 명령을 사용한다. 첫 인자는 `baseline`(가상목표 없음) 또는 `waypoint`(가상목표+단계별 progress), 두 번째는 평가 seed `0|1|2`다. 같은 seed의 512환경·asset 크기·초기 물리 상태를 복원하고, 거리·삽입 깊이를 적용한 최종 배치에서 상자 좌표계의 사람 좌우 순서로 담당 영역·개별 목표를 정렬한다(`ordered`). 기존 학습의 반대편 배정과 다르므로 학습 조건 재현용 결과와 구분한다. 기본 카메라는 환경 0을 보여주며 900step 후 종료한다. 실행마다 별도 `output_etc/check/bridge_eval_viewer/` 하위 폴더를 만들고 기존 평가 결과는 보존한다. 초기 장면은 동일하지만 GPU 시뮬레이션 궤적의 비트 단위 재현을 보장하지 않는다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6081 bash output_etc/check/bridge_crossing_eval_5000_contact_20261118/view_eval.sh waypoint 0
+TOKENHSI_GPU=5 PORT=6082 bash output_etc/check/bridge_crossing_eval_5000_contact_20261118/view_eval.sh baseline 0
+```
+
+시각화에서 두 밀기 담당의 초기 거리는 `--pusher-gap 1.0`으로 조절한다. 단위는 m이며 **상자 뒷면에서 사람 root 중심까지**의 삽입축 거리다. 두 사람 모두 같은 거리로 배치하며 좌우 간격 1.6m·자세·다리·목표는 유지한다. 양의 실수(예: `0.5`, `0.75`, `1.0`, `2.0`)를 받는다. 생략하면 기존 eval의 0.5~0.8m 배치를 그대로 복원한다. 지정한 실행은 원래 평가 배치와 다르며 manifest에 별도 표시한다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6081 bash output_etc/check/bridge_crossing_eval_5000_contact_20261118/view_eval.sh waypoint 0 --pusher-gap 1.0
+```
+
+두 사람을 서로 다른 거리로 배치하려면 `--pusher-gaps 0.5 1.0`을 사용한다. 각 장면에서 **밀기 담당 에이전트 번호가 작은 사람, 큰 사람 순서**이며 화면상의 좌우나 담당 영역 번호 기준이 아니다. 환경 0의 실제 에이전트 번호와 적용 거리는 시작 로그와 manifest에 표시한다. 거리 기준은 동일하게 상자 뒷면에서 사람 root 중심까지의 삽입축 거리(m)다. `--pusher-gap`과 동시에 지정할 수 없으며 `--insert-depth`와 함께 사용할 수 있다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6081 bash output_etc/check/bridge_crossing_eval_5000_contact_20261118/view_eval.sh waypoint 0 --pusher-gaps 0.5 1.0
+```
+
+다리의 초기 삽입 깊이는 `--insert-depth 0.10`처럼 m 단위로 지정한다. 기준은 **플랫폼 입구 끝선에서 다리 앞쪽 면까지 들어간 거리**이며, `0`은 입구에 맞닿음, `0.015`는 기존 1.5cm, `0.10`은 10cm다. 0 이상의 실수를 받는다. 다리와 두 밀기 담당을 함께 옮겨 기존 사람–상자 간격을 유지하며, `--pusher-gap`을 함께 지정하면 해당 간격으로 다시 맞춘다. 다리 최종 목표와 플랫폼·선행·후행 배치는 유지한다. 두 플랫폼은 기존과 같이 삽입 입구 끝선이 정렬되어 있다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6081 bash output_etc/check/bridge_crossing_eval_5000_contact_20261118/view_eval.sh waypoint 0 --insert-depth 0.10 --pusher-gap 1.0
+```
+
+현재 follow-cap test/VNC·직접 추론의 기본 담당 영역은 학습과 같은 `coupled_assignment=random`이다. 3500·4500·5000 headless 평가 실행기는 기존 fixture의 물리 배치를 복원한 다음 담당 영역·개별 목표를 학습 방식으로 맞춘다. 이는 현재 학습의 반대편 배정을 재현하는 조건이다. `manifest.json`에 `fixture_assignment=training_placement`와 변경된 장면 수를 기록한다. `view_eval.sh`는 이와 달리 `ordered`를 명시하고 모든 위치 조절 이후 실제 상자 좌표계에서 담당 영역을 정렬한다. 이 실행은 `fixture_assignment=final_box_ordered`로 기록한다. 실행 중인 학습의 배정 방식은 변경하지 않는다.
+
+세 평가 실행기의 새 결과와 집계·접촉 분석은 각각의 `training_assignment/` 하위 폴더를 사용한다. 해당 폴더가 이미 있으면 실행을 거부한다. 기존 `baseline/`, `waypoint/`, fixture와 보고서는 변경하지 않으며 이전 `ordered` 결과로 남는다. 원인 분석 근거는 `output_etc/check/bridge_training_view_20261118/assignment_comparison.json`이다. 위 5000 평가 명령을 실행하면 GPU5·7에서 수정된 담당 영역으로 512환경×3seed를 평가한다.
+
+### 학습 규칙 그대로 보는 viewer
+
+`output_etc/check/bridge_training_view_20261118/view_training.sh`는 5000 checkpoint로 학습 환경 경로를 실행한다. `--test`만 사용하고 `--eval`은 사용하지 않는다. present/near/insert 20/40/40%, 같은 플랫폼 20%, 환경별 36개 배치 캐시, `coupled_assignment=random`, 확률적 행동, 한 사람이라도 낙상하면 장면 리셋하는 학습 규칙을 사용한다. optimizer는 실행하지 않는다. 실행 중인 학습 캐시를 복사하는 것이 아니라 새 캐시를 만들므로 동일한 학습 장면 재생은 아니다.
+
+```bash
+# 가상목표 없음
+TOKENHSI_GPU=5 PORT=6084 bash output_etc/check/bridge_training_view_20261118/view_training.sh baseline 42
+
+# 가상목표 + 단계별 progress
+TOKENHSI_GPU=7 PORT=6083 bash output_etc/check/bridge_training_view_20261118/view_training.sh waypoint 42
+```
+
+seed 뒤에 `--bridge-start present|near|insert|mixed`(기본 mixed)와 `--pusher-gap 3.0`을 붙일 수 있다. gap은 두 밀기 사람 root와 상자 뒷면 사이의 삽입축 거리(m)이며 추가 이동량이 아니다. 매 캐시 복원에서 공동밀기 사람만 앞뒤로 이동하고 좌우 위치·자세·담당 영역·상자·목표는 유지한다. 옵션이 없으면 기존 거리를 쓴다. 모드를 고정해도 선행·후행 같은 플랫폼 20%는 유지한다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6082 bash output_etc/check/bridge_training_view_20261118/view_training.sh baseline 42 --bridge-start insert --pusher-gap 3.0
+```
+
+마지막 위치 인자는 seed다. `VIEW_ENVS=128`, `VIEW_STEPS=18000`이 기본이며 환경 0을 보여준다. 초기 캐시 준비 시간이 필요하다. 화면 없는 확인은 `HEADLESS=1`을 앞에 붙인다. 실행별 설정·로그용 지표는 `output_etc/check/bridge_training_viewer/`의 새 폴더에 저장한다. `native_rollout.json`은 종료된 에피소드만의 진단 집계이며 고정 512환경×3seed 평가 SR과 구분한다. 뷰어는 사용자가 명령으로 직접 실행한다.
+
+### 학습 모델의 위치 지정 viewer
+
+`bridge_wait_vnc.sh`는 출발 플랫폼 A에서 건너편 B를 정면으로 바라보는 카메라를 사용한다. 기본 배치는 선행·운반 상자가 왼쪽, 다리·공동밀기 두 사람이 오른쪽 삽입통로에서 들어오는 형태다. 선행은 서 있는 상태에서 바로 앞의 상자를 직접 집는다. 횡단 필요 100%이며 대기 행동을 강제하지 않는다. 후행 사람은 기존 샘플러로 배치하고 후행 과제·장면 크기는 기존 설정을 따른다.
+
+학습된 `stage2_sensor_900_bridge_follow_cap*` 체크포인트와 같은 실행 폴더의 `relation_config.yaml`이 필요하다. 캡 높이·가상목표·보상은 체크포인트의 실험 설정을 사용한다. 아래 모델은 캡 5cm·가상목표+단계별 progress single-pass 3500이다.
+
+```bash
+TOKENHSI_GPU=7 PORT=6081 \
+bash tokenhsi/scripts/multi_agent/bridge_wait_vnc.sh \
+  --checkpoint "/home/hwanhee/ksh/bridge_fixed/output/stage2_sensor_900_bridge_follow_cap_waypoint_progress_single_pass/Stage2Sensor900BridgeFollowCapWaypointProgressSinglePass_18-01-42-56/nn/Stage2Sensor900BridgeFollowCapWaypointProgressSinglePass_00003500.pth" \
+  --leader-lateral -1 --leader-depth 2.2 --pickup-distance 1.1 \
+  --bridge-entry-side right --bridge-distance 6 \
+  --goal-lateral 0 --goal-depth 2 --seed 42
+```
+
+| 인자 | 의미·기본값 |
+|---|---|
+| `--leader-lateral` | 선행·상자의 좌우 위치. `-1` 왼쪽 안전 경계, `0` 중앙, `1` 오른쪽 안전 경계. 기본 `-1`, 중간 실수 가능 |
+| `--leader-depth` | 출발 플랫폼의 절벽 가장자리에서 선행까지 안쪽 거리(m). 기본 `2.2` |
+| `--pickup-distance` | 선행 바로 앞, 건너편 방향으로 상자 중심까지 거리(m). 기본 `1.1` |
+| `--bridge-entry-side` | 공동밀기 삽입 방향 `left/right`. 기본 `right` |
+| `--bridge-distance` | 삽입 방향을 따라 다리 중심에서 최종 다리 중심까지 거리(m). 생략하면 기존 insert 시작 위치 |
+| `--goal-lateral` | 건너편 원래 목표의 좌우 위치 `[-1,1]`. 기본 `0` |
+| `--goal-depth` | 건너편 플랫폼 절벽 가장자리에서 목표까지 안쪽 거리(m). 기본 `2` |
+
+위치는 사람·상자 크기와 플랫폼 여유를 포함한다. 조합이 플랫폼을 벗어나거나 사람과 상자가 겹치면 오류로 알린다. 좌우 반전은 `--leader-lateral 1 --bridge-entry-side left`다. 가상목표 없는 모델은 checkpoint를 `output/stage2_sensor_900_bridge_follow_cap/Stage2Sensor900BridgeFollowCap_18-01-22-41/nn/Stage2Sensor900BridgeFollowCap_00003500.pth`로 바꾸면 된다.
+
+로컬 화면은 같은 인자로 `bridge_wait_test.sh`, 화면 없는 확인은 여기에 `--headless --envs 8 --episodes 1 --steps 40`을 추가한다. 기본 1환경·100에피소드·최대 900step이며 종료/낙상 시 다음 배치로 넘어간다. VS Code에서 6081 포트를 전달하고 `http://localhost:6081/vnc.html?autoconnect=1&resize=remote`로 접속한다. 초기 배치 JSON/PT·결과는 `output_etc/check/bridge_wait_viewer/<시각>/`에 저장한다. `--capture`는 viewer의 지정 step 화면을 PNG로 저장하며 `--out output_etc/check/<검사명>`으로 경로를 바꾼다.
+
+`CHECK=1`은 1024환경을 유지한 최소 반복 확인 학습이고(기존 공통 루프는 epoch 2에서 저장), 새 학습은 원본 DistillV4 2000에서 시작한다. 이어 학습할 때는 동일한 실험의 `RESUME_CHECKPOINT=/경로/해당모델.pth`를 지정한다. test/VNC에는 **해당 설정으로 저장된 센서 모델 checkpoint**를 전달한다. 원본 DistillV4 2000을 이 test/VNC에 직접 넣는 것은 전이가 아니므로 호환되지 않는다.

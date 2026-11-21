@@ -81,6 +81,9 @@ class EdgeContextTaskMixin:
             select_graph(self.relation_runtime.graph, env_ids),
         )
 
+    def _adjust_relation_reward(self, result):
+        pass
+
     @torch.no_grad()
     def _compute_relation_reward(self, collision_fn):
         runtime = self.relation_runtime
@@ -93,6 +96,7 @@ class EdgeContextTaskMixin:
             diag["feet_height_error"],
             **{"region_error": diag["region_error"]}
         )
+        self._adjust_relation_reward(result)
         roots = self._humanoid_root_states[..., :3]
         objects = self._reward_box_values(self._box_states)[..., :3]
         power = torch.zeros_like(result["agent_task_reward"])

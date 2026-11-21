@@ -1,0 +1,16 @@
+{
+  "cap_lift": 0.05,
+  "frames": 510,
+  "fps": 30,
+  "body_motion": "prescribed linear/angular velocities; dynamic simulation",
+  "cap_motion": "unmodified FollowCapMixin._physics_step / _sync_follow_cap",
+  "max_committed_pose_error": 0.0,
+  "max_same_time_position_gap": 0.009407046250998974,
+  "max_translation": 1.5209178924560547,
+  "yaw_range": [
+    -0.042019688949102726,
+    49.19198812156284
+  ],
+  "max_tilt": 0.13122123336572936,
+  "note": "The physical cap uses the body pose sampled at the preceding simulation step; same-time separation includes this update delay. This is a controlled motion diagnostic, not a policy rollout."
+}

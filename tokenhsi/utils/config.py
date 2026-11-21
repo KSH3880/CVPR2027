@@ -83,7 +83,8 @@ def load_cfg(args):
         cfg_train = yaml.safe_load(stream)
     is_eval = args.test or args.eval or getattr(args, 'play', False)
     if args.coupled_assignment is None:
-        args.coupled_assignment = 'ordered' if name in STAGE2_NAMES and is_eval else 'random'
+        args.coupled_assignment = ('ordered' if name in STAGE2_NAMES and is_eval
+            and not name.startswith('stage2_sensor_900_bridge_follow_cap') else 'random')
     teachers = bool(args.teacher_before or args.teacher_coupled)
     if teachers and (not (args.teacher_before and args.teacher_coupled) or name != 'stage2'
                      or not is_eval or args.resume or args.checkpoint != 'Base'):
@@ -96,6 +97,18 @@ def load_cfg(args):
                    getattr(args, 'eval_protocol', ''), args.resume)
     cfg, source_path = load_environment(name, args.cfg_env, args.checkpoint,
                                          saved=(is_eval or args.resume > 0) and not teachers)
+    if getattr(args, 'pusher_assignment', None) is not None:
+        sampling = cfg['env'].get('sensorScene', {}).get('bridge', {}).get('pusher_sampling')
+        if not is_eval or args.resume or sampling is None:
+            raise ValueError('--pusher_assignment requires rear90 test/VNC inference without resume')
+    if getattr(args, 'pusher_gaps', None) is not None:
+        import math
+        args.pusher_gaps = [float(v) for v in args.pusher_gaps.split()]
+        sampling = cfg['env'].get('sensorScene', {}).get('bridge', {}).get('pusher_sampling')
+        if not is_eval or args.resume or sampling is None:
+            raise ValueError('--pusher_gaps requires rear90 test/VNC inference without resume')
+        if len(args.pusher_gaps) != 2 or not all(math.isfinite(v) and v > 0 for v in args.pusher_gaps):
+            raise ValueError('--pusher_gaps requires two positive finite distances in meters')
     if (getattr(args, 'coupled_peers', 'all') != 'all'
             and cfg['env']['stage2JointPush'].get('goal_mode') != 'individual'):
         raise ValueError('--coupled_peers requires individual coupled PUSH goals')
@@ -381,6 +394,10 @@ def get_args():
         },
         {"name": "--coupled_assignment", "type": str, "choices": ["random", "ordered", "distance", "optimal"], "default": None,
          "help": "Coupled viewer-only person-to-region assignment"},
+        {"name": "--pusher_assignment", "type": str, "choices": ["random", "ordered"], "default": None,
+         "help": "Rear90 inference override after placement; default follows checkpoint config"},
+        {"name": "--pusher_gaps", "type": str, "default": None,
+         "help": "Rear90 inference rear-face axial gaps in meters, ascending pusher agent IDs"},
         {"name": "--group_spawn_over4", "action": "store_true", "default": False,
          "help": "Stage2 inference above four people: sequential groups, 5m spacing and no unused distractors"},
         {"name": "--teacher_before", "type": str, "default": "",

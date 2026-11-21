@@ -29,6 +29,9 @@ def parse_task(args, cfg, cfg_train, sim_params):
                 if cfg['env']['sensorScene']['bridge'].get('layout_cache') is not None:
                     from env.tasks.multi_agent.humanoid_ma_sensor_bridge_layout_cache import HumanoidMASensorBridgeLayoutCache
                     task_class = HumanoidMASensorBridgeLayoutCache
+                if cfg['env']['sensorScene']['bridge'].get('follow_cap') is not None:
+                    from env.tasks.multi_agent.humanoid_ma_bridge_follow_cap import HumanoidMABridgeFollowCap
+                    task_class = HumanoidMABridgeFollowCap
         elif cfg['env'].get('stage2') is not None:
             from env.tasks.multi_agent.humanoid_ma_stage2 import HumanoidMAStage2
             task_class = HumanoidMAStage2

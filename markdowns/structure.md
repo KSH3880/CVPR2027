@@ -62,6 +62,11 @@
 
 ## 정책과 과제 정의
 
+- `utils/config.py`의 `--pusher_assignment`와 `launch.sh`의 `PUSHER_ASSIGNMENT`는 rear90 추론 전용 담당 배정 override다. `humanoid_ma_bridge_follow_cap.py`에서 저장 cfg와 분리한 runtime 사본에 적용한다.
+- 같은 실행기의 `--pusher-gaps`/`PUSHER_GAPS`는 `utils/bridge_pusher_sampling.py:set_pusher_gaps`로 연결된다. reset의 simulator 상태 전송 전 밀기 사람의 root/kinematic body XY를 이동하고 이후 담당 배정을 수행한다. 검증은 `output_etc/check/bridge_rear90_view_gaps_20261119/`에 있다.
+- `utils/bridge_pusher_sampling.py`: `_rear90` 전용 상자 기준 후방 90°·외곽 거리 0.5~5m 후보 생성과 플랫폼/상자/사람 여유 검사. `humanoid_ma_bridge_follow_cap.py`에서 배치 후 호출하며 relation history 초기화 전 담당 영역을 정렬한다. CPU 검증은 `tests/test_bridge_pusher_sampling.py`.
+- `humanoid_ma_bridge_follow_cap.py`, `bridge_follow_cap.py`: 기존 layout-cache 샘플러의 학습용 추종 캡·선행 waypoint·단계별 progress. `learning/multi_agent/bridge_waypoint_single_pass_network.py`는 후행 alias를 원래 목표에 둔 뒤 선행 GTA 위치만 바꾸어 actor/critic 각각 한 번 계산한다. `bridge_waypoint_network.py`는 이전 두 번 계산한 실행 재현용이다. [세 설정 명세](reference/bridge_follow_cap_training.md).
+
 - `tokenhsi/env/tasks/multi_agent/humanoid_ma_sensor_cliff_bridge.py`, `cliff_bridge_{controller,placement,metrics}.py`, `tokenhsi/utils/cliff_bridge_{spec,layout}.py`: Cliff/Bridge 전용 variant·외력 다리·BEFORE 횡단 배치와 분기별 진단. [설정](reference/stage2_sensor_900_cliff_bridge.md).
 - `tokenhsi/tests/{test,check}_cliff_bridge.py`: 샘플링·토큰·경로·외력 CPU 검사와 실제 추론/센서/부분 reset/초기 렌더 검사.
 
@@ -101,6 +106,71 @@
 - `lpanlib/poselib/`: 기존 모션 배열 로딩 라이브러리.
 
 ## 검증과 문서
+
+`tokenhsi/qualitative/bridge_rear90_zeroshot.py`는 `_rear90`의 학습 배치 캐시를 사용해 원본 V4 정책을 추가 학습 없이 실행한다. `stage2_sensor_900_bridge_follow_cap_rear90_zeroshot_{test,vnc}.sh`가 진입점이며, 정책 strict 로드와 관측 정규화는 `bridge_waypoint_policy.py`를 공유한다. [명령](USAGE.md#follow-cap-5cm-학습-비교).
+
+`tokenhsi/qualitative/bridge_wait_{viewer,layout}.py`는 학습된 follow-cap 모델의 선행·상자·목표 좌우 위치와 공동밀기 삽입 방향/거리를 지정하는 추론 전용 viewer다. 실행은 `scripts/multi_agent/bridge_wait_{test,vnc}.sh`이며 [위치 지정 인자](USAGE.md#학습-모델의-위치-지정-viewer)를 따른다.
+
+`output_etc/check/bridge_training_view_20261118/view_training.{sh,py}`는 기존 학습 배정 viewer다. 시작 모드 선택과 캐시 복원 직후 밀기 사람의 삽입축 거리 변경을 지원하며 담당 영역·개인 목표는 보존한다.
+
+`output_etc/check/bridge_rear90_eval_1000_ordered_20261118/`는 rear90 정렬/랜덤 학습 1k checkpoint를 새 rear90 insert fixture와 동일한 최종 좌우 정렬로 비교한다. checkpoint 검증 후 첫 평가 reset 전 배정 override와 배치/담당 영역 검증을 포함한다.
+
+`output_etc/check/bridge_rear90_eval_3500_random2500_ordered_20261118/`는 위 fixture·평가 판정을 재사용하여 rear90 3500/random 2500을 비교한다. `launch_eval.py`는 GPU5 전용 최대 4개 동시 실행·85000MiB 감시·완료 후 자동 집계를 담당한다.
+
+`output_etc/check/bridge_rear90_eval_4500_random3500_ordered_20261119/`는 rear90 4500을 GPU5에서 평가하고 random 3500 seed 0/1/2는 GPU5/6/7로 분산한다. 지정 checkpoint가 없으면 저장 완료·epoch 검증까지 기다린 뒤 자동 실행하며 완료 결과는 재사용한다.
+
+`output_etc/check/bridge_rear90_eval_7000_ordered_20261119/`는 동일 7k의 GPU5 rear90/GPU7 random 평가다. 기존 fixture와 평가 판정을 유지하고 GPU별 메모리 예약·상한 감시·checkpoint epoch 확인·완료 후 집계를 수행한다.
+
+위 폴더의 `approach_analysis/`는 선행 pickup 추정–다리 진입 XY 경로, `failure_analysis/`는 씬 실패 단계·후행 활성 후 성공·선행 낙상 위치와 다리 준비 타이밍의 CPU 분석이다. 각각 `analyze.py`, `summary.json`, `episodes.csv`를 보관한다. 준비 판정은 기존 중심 거리/각도 기준이며 발 접촉 분석과 구분한다.
+
+`output_etc/check/bridge_follower_diagnostics_7000_20261119/`는 같은 7k/fixture의 후행 진단 재생이다. `eval_crossing.py`가 원 evaluator를 감싸 후행 root/손/발·상자·native 오차를 기록하고, `analyze_followers.py`가 원 평가와 초기 상태/관측·재생 편차를 검사하며 정체·목표 오차·상자 상승을 분석한다. `follower_analysis.json`과 `follower_episodes.csv`가 결과다.
+
+같은 폴더의 `view_failure.sh`/`view_failure.py`는 7k 실패 장면을 모델·seed·환경 번호로 선택하는 VNC다. `single_scene.py`가 512환경 fixture 중 선택한 한 행의 물리 크기·초기 상태를 추출하고 월드 좌표를 이동해 **1환경**으로 복원한다. 카메라는 도착 플랫폼을 향하고 후행은 초록색이다. `HEADLESS=1 VIEW_CHECK_STEPS=16`은 GUI 없는 짧은 경로 검사이며 원 평가 파일을 덮어쓰지 않는다.
+
+`output_etc/check/bridge_push3_follow_cap_view_20261119/{view.sh,view.py,scene.py,pair_layout.py}`는 기존 rear90 checkpoint의 1환경 추론 전용 경로다. `--pushers 2|3|4`, `--before-pairs N`, `--bridge-width <m>`로 밀기 인원·같은 방향의 선행/후행 쌍 수·보행로 폭을 조절한다. `scene.py`는 프로세스 내 역할·물리 크기를 확장하고 `pair_layout.py`는 기존 횡단 sampler와 점유 검사를 이용해 각 선행의 사람·상자·목표를 배치한다. 배치 후 담당 정렬·follow_cap과 쌍별 상자/AT 연결을 검증한다.
+
+`output_etc/check/bridge_random15k_push4_enable2_eval_20261120/`는 random15k·밀기4명/Enable2세트의 8명 평가다. viewer adapter를 복사해 고정하고 `evaluate.py`가 900/1500step의 세 협업 과제·전체 씬 성공과 gate 제외 native 행동 성공을 기록한다. `launch.py`는 GPU5/6/7의 3seed를 관리하고 `summarize.py`는 프레임 재집계/검증 및 결과표를 생성한다.
+
+
+`output_etc/check/bridge_missing_8k9k11k_ordered_20261119/`는 미평가 rear90 8000·9000 및 random 11000의 보충 평가·집계다. 기존 4명 evaluator·fixture로 각각 3seed를 GPU5/6에 분산한다.
+
+`output_etc/check/bridge_rear90_random_12000_ordered_20261119/`는 rear90/random 동일 12k 평가다. GPU5/6에서 각각 3seed를 실행하며 미저장 checkpoint는 기다린다. `verify.py`로 이전 초기 상태·성공 집계를 확인하고 `history.py`로 7k~12k의 1k 단위 표를 만든다.
+
+`output_etc/check/bridge_rear90_13000_ordered_20261119/`는 GPU5/6의 rear90 13k 평가와 기존 12k 결과 비교다. 이전 평가 결과를 읽기 전용으로 연결하고 동일 초기 상태 검증·전체 지표·7k~13k 표를 생성한다.
+
+`output_etc/check/bridge_random_13000_18000_ordered_20261120/`는 GPU7의 random 13k~18k 평가다. 6개 checkpoint×3seed를 메모리 한도 내 병렬 실행하고 기존 fixture 대비 검증·전체 지표·7k~18k 표를 생성한다.
+
+`output_etc/check/bridge_random_at_failure_20261120/analyze.py`는 random 10k~18k 저장 궤적에서 AT-ever/최종 실패, 횡단·낙상 분류와 후행 성공을 CPU 분석한다. `summary.json`에 정의·집계, `scenes.csv`에 해당 장면을 저장한다.
+
+`output_etc/check/bridge_rear90_11000_random10000_ordered_20261119/`는 rear90 11000·random 10000의 평가·집계다. 두 모델의 seed0/1/2를 GPU5/6/7에 나누고 이전 evaluator·fixture를 재사용한다.
+
+`output_etc/check/bridge_rear90_10000_random9000_ordered_20261119/`는 rear90 10000·random 9000의 평가·집계다. 두 모델의 seed0/1/2를 GPU5/6/7로 나누고 이전 evaluator·fixture를 재사용한다.
+
+`output_etc/check/bridge_rear90_9500_random8000_ordered_20261119/`는 rear90 9500·random 8000을 GPU6/7에서 평가한다. 기존 7k evaluator와 초기 fixture를 재사용하고, 실행기·집계·로그·결과는 분리한다.
+
+`output_etc/check/bridge_crossing_eval_6000_training_assignment_20261118/`는 가상목표 없는 6k의 기존 학습 담당 배정 평가와 동일 checkpoint·물리 배치의 ordered 결과 비교를 보관한다. 접촉 probe 없이 행동/씬 지표·제어 스텝 궤적을 저장한다.
+
+`output_etc/check/bridge_crossing_eval_6000_ordered_20261118/`는 두 6k 모델의 최종 배치 후 좌우 정렬 평가 실행·행동/씬 SR 집계·접촉 진단을 보관한다. `assignment_verification.json`은 실제 reset 완료 후 담당 순서와 개인 목표 검증이다.
+
+`output_etc/check/bridge_crossing_eval_3500_20261118/{eval_crossing.py,launch_eval.py,summarize_eval.py}`는 follow-cap 두 모델의 동일 초기 상태 insert 횡단 평가·GPU5/7 실행·집계를 담당한다. 모델별 seed 폴더에 초기 상태·trajectory·행동/씬 SR을 저장하며 [평가 규약](reference/bridge_follow_cap_training.md#insert-횡단-평가)을 따른다.
+
+`output_etc/check/bridge_crossing_eval_4500_20261118/`은 같은 초기 상태의 4500 평가다. 동일한 평가·집계 스크립트를 사용하고 `launch_eval.py`는 GPU당 세 seed를 병렬 실행하며 전체 메모리 85000MiB를 감시한다.
+
+`output_etc/check/bridge_crossing_eval_5000_contact_20261118/`은 같은 초기 상태의 5000 평가다. `contact_probe.py`는 물리 step별 발·캡 자세와 발 순접촉력을 기록하고, `analyze_contact.py`는 플랫폼 끝 접근·발 내딛기·캡 접촉 추정·낙상 시점의 밀기 진행도와 대기 후보를 집계한다. 학습 코드에는 적용하지 않는다.
+
+같은 폴더의 `view_eval.sh`는 모델·seed를 받아 기존 5000 평가 실행기를 GUI로 호출한다. 저장된 512환경 초기 fixture를 복원하며 별도 viewer 결과 폴더를 사용한다. [VNC 실행법](USAGE.md#follow-cap-5cm-학습-비교).
+
+`tokenhsi/utils/bridge_eval_assignment.py`는 저장된 Bridge 초기 배치에서 구조 좌표계의 좌우 위치로 학습 담당 영역과 개별 목표를 복원한다. 3500·4500·5000 headless 평가가 학습 복원을 사용한다. 같은 파일의 `restore_ordered_assignment`는 5000 eval VNC에서 최종 배치 후 실제 상자 좌표계의 사람 좌우 순서로 담당 영역·개별 목표를 정렬한다. `randomize_pusher_assignment`는 `_rear90_random` 학습·평가에서 새 배치 및 캐시 복원 후 담당 영역을 무작위 배정한다. 세 함수 모두 물리 상태는 변경하지 않는다. 평가 실행·집계·접촉 분석의 수정 후 결과는 각 평가 폴더의 `training_assignment/`에 저장한다.
+
+`output_etc/check/bridge_training_view_20261118/`의 `view_training.{sh,py}`는 새 학습 배치 캐시·확률적 행동·native reset으로 5000 모델을 재생한다. `compare_assignment.py`와 `launch_assignment.py`는 기존 seed0 평가의 물리 상태를 보존하고 공동밀기 담당 영역·개별 목표만 학습 방식으로 복원하는 원인 분석용 실행기다. [학습 규칙 viewer](USAGE.md#학습-규칙-그대로-보는-viewer).
+
+`tokenhsi/qualitative/bridge_waypoint{,_task,_policy,_viewer}.py`는 DistillV4 원본 제로샷의 Bridge present·직선 배치·선행 GTA 중간 목표 전환을 담당한다. `--no-waypoint`는 가상목표 없이 처음부터 원래 목표를 사용한다. 실행은 `scripts/multi_agent/bridge_waypoint_{test,vnc}.sh`, CPU/GPU 검사는 `tests/{test,check}_bridge_waypoint.py`이며 [실행법](USAGE.md#distillv4-bridge-중간-목표-제로샷-viewer)을 따른다.
+
+`tokenhsi/qualitative/bridge_waypoint_physics.py`는 추론 전용 다리의 baseline/fixed/carry/fixed_carry/platform/baseline_nocap/carry_nocap/follow_cap 비교를 담당한다. `bridge_waypoint_cap.py`는 동적 본체를 따라가는 별도 고정 상면 캡을 생성·갱신한다. 반복 reset의 고정 자세·무대 지지·물성 검사는 `tests/check_bridge_waypoint_physics.py`, 캡의 물리적 이동·회전 추종과 본체 동역학 검사는 `tests/check_bridge_follow_cap.py`다. 사용자 확인용 영상은 `video/bridge_ablation_20261117/`, 원본 진단은 `output_etc/check/bridge_contact_20261117/`에 둔다.
+
+캡 높이(`--cap-lift`)와 시작 배치(`--bridge-start`)의 새 영상은 `video/bridge_follow_cap_lift2cm_20261117/`, 검증 원본은 `output_etc/check/bridge_cap_lift_20261117/`에 둔다. 새 영상은 별도 폴더·개별 MP4로 제공하며 전체 목록은 `video/index.html`이다.
+
+`video/bridge_cap_height_compare_20261118/`에는 가상목표 없이 0·1·2·5cm를 동일 장면 96회 비교한 MP4·CSV·결과 그림·JSON이 있다. 원본 trace·초기 상태와 측정/실행/집계 스크립트는 `output_etc/check/bridge_cap_height_compare_20261118/{measure.py,worker.sh,summarize.py}`에 있다.
 
 `tokenhsi/tests/`는 보상·배치·GTA·mask·RSI·전이·재로드·출력 경로를 검사한다. `before_test_utils.py`, `stage1_test_utils.py`는 CPU fixture다. `check_before_object_alias.py`·`check_before_push.py`·`check_coupled_push.py`는 실제 물리·부분 reset·추론 검사 진입점이다.
 

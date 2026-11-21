@@ -5,6 +5,28 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 EXPERIMENT=$1
 MODE=$2
 shift 2
+if { [ "$MODE" = eval ] || [ "$MODE" = vnc ]; } && [ "$#" -gt 5 ]; then
+  viewer_positions=("${@:1:5}")
+  shift 5
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --pusher-gaps)
+        [ "$#" -ge 3 ] || { echo '--pusher-gaps requires two distances in meters.' >&2; exit 1; }
+        export PUSHER_GAPS="$2 $3"
+        shift 3 ;;
+      *) echo "Unknown viewer option: $1" >&2; exit 1 ;;
+    esac
+  done
+  set -- "${viewer_positions[@]}"
+fi
+if [ -n "${PUSHER_GAPS:-}" ]; then
+  case "$EXPERIMENT/$MODE" in
+    stage2_sensor_900_bridge_follow_cap_rear90/eval|stage2_sensor_900_bridge_follow_cap_rear90/vnc|stage2_sensor_900_bridge_follow_cap_rear90_random/eval|stage2_sensor_900_bridge_follow_cap_rear90_random/vnc) ;;
+    *) echo 'PUSHER_GAPS requires rear90 test/VNC inference.' >&2; exit 1 ;;
+  esac
+  read -r -a viewer_gaps <<< "$PUSHER_GAPS"
+  [ "${#viewer_gaps[@]}" -eq 2 ] || { echo 'PUSHER_GAPS requires two distances.' >&2; exit 1; }
+fi
 if [ "$EXPERIMENT" = stage2_distill ]; then
   export TOKENHSI_GPU=${TOKENHSI_GPU:-6}
   case "$TOKENHSI_GPU" in 5|6) ;; *) echo 'Use TOKENHSI_GPU=5 or 6.' >&2; exit 1 ;; esac
@@ -17,7 +39,7 @@ case "$EXPERIMENT" in
     ;;
 esac
 case "$EXPERIMENT" in
-  stage2_sensor_900_cliff_bridge|stage2_sensor_900_cliff_bridge_compact|stage2_sensor_900_bridge_before_fixed|stage2_sensor_900_bridge_before_fixed_carry_rsi|stage2_sensor_900_bridge_before_fixed_layout_cache|stage2_sensor_900_cliff_bridge_surface|stage2_sensor_900_room_before|stage2_sensor_900_bridge_curriculum|stage2_sensor_900_bridge_init|stage2_sensor_900|stage2|stage2_distill|stage2_900|stage2_distill_900|stage2_coupled_push|stage2_coupled_push_goal5|stage2_coupled_push_individual_goal|stage2_coupled_push_individual_goal_solo5|stage2_coupled_push_individual_goal_solo5_carry5|stage2_coupled_push_individual_goal_solo5_carry5_ground|stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg|stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg|stage2_coupled_push_individual_goal_solo5_countnorm_coupled|stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none|stage2_coupled_push_individual_goal_solo5_keep1|stage2_coupled_push_individual_goal_solo5_shrink1) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
+  stage2_sensor_900_cliff_bridge|stage2_sensor_900_cliff_bridge_compact|stage2_sensor_900_bridge_before_fixed|stage2_sensor_900_bridge_before_fixed_carry_rsi|stage2_sensor_900_bridge_before_fixed_layout_cache|stage2_sensor_900_bridge_follow_cap_rear90|stage2_sensor_900_bridge_follow_cap_rear90_random|stage2_sensor_900_bridge_follow_cap|stage2_sensor_900_bridge_follow_cap_waypoint|stage2_sensor_900_bridge_follow_cap_waypoint_progress|stage2_sensor_900_bridge_follow_cap_waypoint_single_pass|stage2_sensor_900_bridge_follow_cap_waypoint_progress_single_pass|stage2_sensor_900_cliff_bridge_surface|stage2_sensor_900_room_before|stage2_sensor_900_bridge_curriculum|stage2_sensor_900_bridge_init|stage2_sensor_900|stage2|stage2_distill|stage2_900|stage2_distill_900|stage2_coupled_push|stage2_coupled_push_goal5|stage2_coupled_push_individual_goal|stage2_coupled_push_individual_goal_solo5|stage2_coupled_push_individual_goal_solo5_carry5|stage2_coupled_push_individual_goal_solo5_carry5_ground|stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg|stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg|stage2_coupled_push_individual_goal_solo5_countnorm_coupled|stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none|stage2_coupled_push_individual_goal_solo5_keep1|stage2_coupled_push_individual_goal_solo5_shrink1) TASK=HumanoidMACoupledPush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage2_before_push|stage2_before_push_near50|stage2_before_push_near50_pair50_source5) TASK=HumanoidMABeforePush; AGENTS=4; ENVS=1024; OBJECTS=8 ;;
   stage1_push) TASK=HumanoidMAPush; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
   stage1) TASK=HumanoidMACarry; AGENTS=2; ENVS=2048; OBJECTS=4 ;;
@@ -29,6 +51,20 @@ if [ "${COUPLED_ASSIGNMENT:-random}" != random ] && { [ "$MODE" = train ] || [ "
   echo 'COUPLED_ASSIGNMENT requires a coupled test/VNC wrapper.' >&2
   exit 1
 fi
+if [ -n "${PUSHER_ASSIGNMENT:-}" ]; then
+  case "$PUSHER_ASSIGNMENT" in
+    ordered|random) ;;
+    *) echo 'PUSHER_ASSIGNMENT must be ordered or random.' >&2; exit 1 ;;
+  esac
+  case "$EXPERIMENT" in
+    stage2_sensor_900_bridge_follow_cap_rear90|stage2_sensor_900_bridge_follow_cap_rear90_random) ;;
+    *) echo 'PUSHER_ASSIGNMENT requires a rear90 experiment.' >&2; exit 1 ;;
+  esac
+  case "$MODE" in
+    eval|vnc) ;;
+    *) echo 'PUSHER_ASSIGNMENT is test/VNC only.' >&2; exit 1 ;;
+  esac
+fi
 case "${COUPLED_PEERS:-all}" in
   all|keep3|shrink3) ;;
   *) echo 'COUPLED_PEERS must be all, keep3 or shrink3.' >&2; exit 1 ;;
@@ -39,7 +75,7 @@ if [ "${COUPLED_PEERS:-all}" != all ] && { [ "$MODE" = train ] || [ "$TASK" != H
 fi
 HORIZON=900
 case "$EXPERIMENT" in stage2|stage2_*) HORIZON=1200 ;; esac
-case "$EXPERIMENT" in stage2_sensor_900_cliff_bridge|stage2_sensor_900_cliff_bridge_compact|stage2_sensor_900_bridge_before_fixed|stage2_sensor_900_bridge_before_fixed_carry_rsi|stage2_sensor_900_bridge_before_fixed_layout_cache|stage2_sensor_900_cliff_bridge_surface|stage2_sensor_900_room_before|stage2_sensor_900_bridge_curriculum|stage2_sensor_900_bridge_init|stage2_sensor_900|stage2_900|stage2_distill_900) HORIZON=900 ;; esac
+case "$EXPERIMENT" in stage2_sensor_900_cliff_bridge|stage2_sensor_900_cliff_bridge_compact|stage2_sensor_900_bridge_before_fixed|stage2_sensor_900_bridge_before_fixed_carry_rsi|stage2_sensor_900_bridge_before_fixed_layout_cache|stage2_sensor_900_bridge_follow_cap_rear90|stage2_sensor_900_bridge_follow_cap_rear90_random|stage2_sensor_900_bridge_follow_cap|stage2_sensor_900_bridge_follow_cap_waypoint|stage2_sensor_900_bridge_follow_cap_waypoint_progress|stage2_sensor_900_bridge_follow_cap_waypoint_single_pass|stage2_sensor_900_bridge_follow_cap_waypoint_progress_single_pass|stage2_sensor_900_cliff_bridge_surface|stage2_sensor_900_room_before|stage2_sensor_900_bridge_curriculum|stage2_sensor_900_bridge_init|stage2_sensor_900|stage2_900|stage2_distill_900) HORIZON=900 ;; esac
 . "$SCRIPT_DIR/runtime_env.sh"
 
 if [ "$MODE" = vnc ] || [ "$MODE" = train_vnc ]; then
@@ -49,7 +85,7 @@ if [ "$MODE" = vnc ] || [ "$MODE" = train_vnc ]; then
   if [ "$MODE" = train_vnc ]; then
     INNER=train
     export PORT=${PORT:-6080}
-  elif [ "$EXPERIMENT" = stage2_distill_900 ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_surface ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_compact ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_carry_rsi ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_layout_cache ] || [ "$EXPERIMENT" = stage2_sensor_900_room_before ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_curriculum ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_init ] || [ "$EXPERIMENT" = stage2_sensor_900 ]; then
+  elif [ "$EXPERIMENT" = stage2_distill_900 ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_surface ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_compact ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_carry_rsi ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_layout_cache ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_rear90 ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_rear90_random ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint_progress ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint_single_pass ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint_progress_single_pass ] || [ "$EXPERIMENT" = stage2_sensor_900_room_before ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_curriculum ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_init ] || [ "$EXPERIMENT" = stage2_sensor_900 ]; then
     export PORT=${PORT:-6081}
   fi
   bash "$SCRIPT_DIR/run-gui.sh" bash "$SCRIPT_DIR/launch.sh" "$EXPERIMENT" "$INNER" "$@"
@@ -68,7 +104,8 @@ if [ "$MODE" = train ]; then
   set -- "$@" --task_graph random_scenario
   if [ "${HEADLESS:-1}" != 0 ]; then set -- "$@" --headless; fi
 elif [ "$MODE" = eval ]; then
-  case "$EXPERIMENT" in stage2_sensor_900_cliff_bridge|stage2_sensor_900_cliff_bridge_compact|stage2_sensor_900_bridge_before_fixed|stage2_sensor_900_bridge_before_fixed_carry_rsi|stage2_sensor_900_bridge_before_fixed_layout_cache|stage2_sensor_900_cliff_bridge_surface|stage2_sensor_900_room_before|stage2_sensor_900_bridge_curriculum|stage2_sensor_900_bridge_init|stage2_sensor_900|stage2|stage2_distill|stage2_900|stage2_distill_900) COUPLED_ASSIGNMENT=${COUPLED_ASSIGNMENT:-ordered} ;; esac
+  case "$EXPERIMENT" in stage2_sensor_900_bridge_follow_cap*) COUPLED_ASSIGNMENT=${COUPLED_ASSIGNMENT:-random} ;; esac
+  case "$EXPERIMENT" in stage2_sensor_900_cliff_bridge|stage2_sensor_900_cliff_bridge_compact|stage2_sensor_900_bridge_before_fixed|stage2_sensor_900_bridge_before_fixed_carry_rsi|stage2_sensor_900_bridge_before_fixed_layout_cache|stage2_sensor_900_bridge_follow_cap_rear90|stage2_sensor_900_bridge_follow_cap_rear90_random|stage2_sensor_900_bridge_follow_cap|stage2_sensor_900_bridge_follow_cap_waypoint|stage2_sensor_900_bridge_follow_cap_waypoint_progress|stage2_sensor_900_bridge_follow_cap_waypoint_single_pass|stage2_sensor_900_bridge_follow_cap_waypoint_progress_single_pass|stage2_sensor_900_cliff_bridge_surface|stage2_sensor_900_room_before|stage2_sensor_900_bridge_curriculum|stage2_sensor_900_bridge_init|stage2_sensor_900|stage2|stage2_distill|stage2_900|stage2_distill_900) COUPLED_ASSIGNMENT=${COUPLED_ASSIGNMENT:-ordered} ;; esac
   if [ $# -lt 1 ] || { [ ! -f "$1" ] && [ -z "${TEACHER_BEFORE:-}" ]; }; then
     echo 'Provide an existing checkpoint.pth; paths are relative to the repository root.' >&2
     exit 1
@@ -85,6 +122,8 @@ elif [ "$MODE" = eval ]; then
   if [ -n "${TEACHER_BEFORE:-}" ] || [ -n "${TEACHER_COUPLED:-}" ]; then
     set -- "$@" --teacher_before "${TEACHER_BEFORE:-}" --teacher_coupled "${TEACHER_COUPLED:-}"
   fi
+  if [ -n "${PUSHER_ASSIGNMENT:-}" ]; then set -- "$@" --pusher_assignment "$PUSHER_ASSIGNMENT"; fi
+  if [ -n "${PUSHER_GAPS:-}" ]; then set -- "$@" --pusher_gaps "$PUSHER_GAPS"; fi
   if [ -n "${EVAL_PROTOCOL:-}" ]; then set -- "$@" --eval_protocol "$EVAL_PROTOCOL"; fi
   if [ "${HEADLESS:-0}" != 0 ]; then set -- "$@" --headless; fi
   if [ "${TASK_ROLE_SWAP:-0}" = 1 ]; then set -- "$@" --task_role_swap; fi
@@ -107,7 +146,7 @@ else
   exit 1
 fi
 MOTION=tokenhsi/data/dataset_loco_sit_carry_climb.yaml
-if [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_surface ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_compact ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_carry_rsi ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_layout_cache ] || [ "$EXPERIMENT" = stage2_sensor_900_room_before ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_curriculum ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_init ] || [ "$EXPERIMENT" = stage2_sensor_900 ] || [ "$EXPERIMENT" = stage2 ] || [ "$EXPERIMENT" = stage2_distill ] || [ "$EXPERIMENT" = stage2_900 ] || [ "$EXPERIMENT" = stage2_distill_900 ] || [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_countnorm_coupled ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_keep1 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_shrink1 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
+if [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_surface ] || [ "$EXPERIMENT" = stage2_sensor_900_cliff_bridge_compact ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_carry_rsi ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_before_fixed_layout_cache ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_rear90 ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_rear90_random ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint_progress ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint_single_pass ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_follow_cap_waypoint_progress_single_pass ] || [ "$EXPERIMENT" = stage2_sensor_900_room_before ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_curriculum ] || [ "$EXPERIMENT" = stage2_sensor_900_bridge_init ] || [ "$EXPERIMENT" = stage2_sensor_900 ] || [ "$EXPERIMENT" = stage2 ] || [ "$EXPERIMENT" = stage2_distill ] || [ "$EXPERIMENT" = stage2_900 ] || [ "$EXPERIMENT" = stage2_distill_900 ] || [ "$EXPERIMENT" = stage1_push ] || [ "$EXPERIMENT" = stage2_before_push ] || [ "$EXPERIMENT" = stage2_before_push_near50 ] || [ "$EXPERIMENT" = stage2_before_push_near50_pair50_source5 ] || [ "$EXPERIMENT" = stage2_coupled_push ] || [ "$EXPERIMENT" = stage2_coupled_push_goal5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_countnorm_coupled ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_keep1 ] || [ "$EXPERIMENT" = stage2_coupled_push_individual_goal_solo5_shrink1 ]; then MOTION=tokenhsi/data/dataset_stage1_jointpush.yaml; fi
 python tokenhsi/run.py --task "$TASK" \
   --cfg_train "tokenhsi/data/cfg/train/rlg/$EXPERIMENT.yaml" \
   --cfg_env "${ENV_CONFIG:-}" \

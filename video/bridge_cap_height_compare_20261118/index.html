@@ -1,0 +1,37 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>캡 높이 0·1·2·5cm 비교</title>
+<style>body{font:16px sans-serif;max-width:1500px;margin:32px auto;background:#14171b;color:#eee}a{color:#9bd5ff}video{width:100%}table{border-collapse:collapse}td,th{border:1px solid #666;padding:9px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}section{background:#222831;padding:16px;border-radius:10px}</style>
+<h1>추종 캡 높이 0·1·2·5cm · 가상목표 끔</h1>
+<p>원본 DistillV4 2000 · seed 42 · present/near/insert 각각 8개 장면 × 높이 4종 = 96회. 최대 900step(30초). 같은 시작 모드 안에서 캡 높이 외 초기 상태·관측·난수가 exact인지 검사했습니다. 학습은 실행하지 않았습니다.</p>
+<p>영상은 실제 수치를 측정한 8환경 batch의 scene 0입니다. 전체 성공률과 대표 영상의 결과를 구분해서 보세요. 다른 사람이 넘어져도 해당 장면은 종료됩니다. 도착은 선행의 목표 도착이며 전체 협동 과제 성공과 다릅니다. 비교 영상은 각 조건 종료 뒤 마지막 프레임을 유지합니다.</p>
+<p><a href="조건별_요약.csv">조건별 CSV</a> · <a href="장면별_수치.csv">96회 개별 CSV</a> · <a href="결과.json">상세 수치·초기 상태 검증</a></p>
+<p><a href="장면별_결과.png"><img src="장면별_결과.png" style="max-width:850px;width:100%" alt="장면별 높이 비교 결과"></a></p>
+<table><tr><th>시작</th><th>캡 cm</th><th>도착 / 8</th><th>횡단 / 8</th><th>선행 낙상 / 8</th><th>누군가 낙상 / 8</th><th>접촉 장면 수</th><th>다리 근처 최대 발 힘 중앙값 N</th></tr>
+<tr><td>present</td><td>0</td><td>2</td><td>2</td><td>7</td><td>7</td><td>7</td><td>1663</td></tr>
+<tr><td>present</td><td>1</td><td>1</td><td>1</td><td>8</td><td>8</td><td>7</td><td>1812</td></tr>
+<tr><td>present</td><td>2</td><td>1</td><td>1</td><td>8</td><td>8</td><td>7</td><td>2116</td></tr>
+<tr><td>present</td><td>5</td><td>7</td><td>7</td><td>7</td><td>7</td><td>7</td><td>1682</td></tr>
+<tr><td>near</td><td>0</td><td>2</td><td>2</td><td>7</td><td>7</td><td>6</td><td>1853</td></tr>
+<tr><td>near</td><td>1</td><td>2</td><td>2</td><td>7</td><td>7</td><td>6</td><td>2632</td></tr>
+<tr><td>near</td><td>2</td><td>2</td><td>2</td><td>7</td><td>7</td><td>6</td><td>2058</td></tr>
+<tr><td>near</td><td>5</td><td>1</td><td>1</td><td>8</td><td>8</td><td>6</td><td>1300</td></tr>
+<tr><td>insert</td><td>0</td><td>2</td><td>2</td><td>8</td><td>8</td><td>4</td><td>2293</td></tr>
+<tr><td>insert</td><td>1</td><td>2</td><td>2</td><td>7</td><td>7</td><td>4</td><td>2036</td></tr>
+<tr><td>insert</td><td>2</td><td>3</td><td>3</td><td>8</td><td>8</td><td>4</td><td>2184</td></tr>
+<tr><td>insert</td><td>5</td><td>2</td><td>2</td><td>7</td><td>7</td><td>4</td><td>1645</td></tr>
+</table><p>발 힘은 물리 step마다 기록한 발 강체의 순접촉력입니다. 캡과 본체 중 어느 물체와 접촉했는지는 구분하지 않습니다. 다리 근처 빠른 발 움직임 시간은 정상 보행·발 회전도 포함하는 보조 지표이며 확정적인 미끄럼 시간이 아닙니다. 장면 8개씩의 탐색 비교이므로 학습 최적값을 확정하는 통계는 아닙니다.</p><div class="grid">
+<section><h2>13_present_높이4종_동시비교</h2><video controls preload="metadata" src="13_present_높이4종_동시비교.mp4"></video><a href="13_present_높이4종_동시비교.mp4" download>MP4 다운로드</a></section>
+<section><h2>14_near_높이4종_동시비교</h2><video controls preload="metadata" src="14_near_높이4종_동시비교.mp4"></video><a href="14_near_높이4종_동시비교.mp4" download>MP4 다운로드</a></section>
+<section><h2>15_insert_높이4종_동시비교</h2><video controls preload="metadata" src="15_insert_높이4종_동시비교.mp4"></video><a href="15_insert_높이4종_동시비교.mp4" download>MP4 다운로드</a></section>
+<section><h2>01_present_캡0cm_scene0</h2><video controls preload="metadata" src="01_present_캡0cm_scene0.mp4"></video><a href="01_present_캡0cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>02_present_캡1cm_scene0</h2><video controls preload="metadata" src="02_present_캡1cm_scene0.mp4"></video><a href="02_present_캡1cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>03_present_캡2cm_scene0</h2><video controls preload="metadata" src="03_present_캡2cm_scene0.mp4"></video><a href="03_present_캡2cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>04_present_캡5cm_scene0</h2><video controls preload="metadata" src="04_present_캡5cm_scene0.mp4"></video><a href="04_present_캡5cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>05_near_캡0cm_scene0</h2><video controls preload="metadata" src="05_near_캡0cm_scene0.mp4"></video><a href="05_near_캡0cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>06_near_캡1cm_scene0</h2><video controls preload="metadata" src="06_near_캡1cm_scene0.mp4"></video><a href="06_near_캡1cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>07_near_캡2cm_scene0</h2><video controls preload="metadata" src="07_near_캡2cm_scene0.mp4"></video><a href="07_near_캡2cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>08_near_캡5cm_scene0</h2><video controls preload="metadata" src="08_near_캡5cm_scene0.mp4"></video><a href="08_near_캡5cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>09_insert_캡0cm_scene0</h2><video controls preload="metadata" src="09_insert_캡0cm_scene0.mp4"></video><a href="09_insert_캡0cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>10_insert_캡1cm_scene0</h2><video controls preload="metadata" src="10_insert_캡1cm_scene0.mp4"></video><a href="10_insert_캡1cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>11_insert_캡2cm_scene0</h2><video controls preload="metadata" src="11_insert_캡2cm_scene0.mp4"></video><a href="11_insert_캡2cm_scene0.mp4" download>MP4 다운로드</a></section>
+<section><h2>12_insert_캡5cm_scene0</h2><video controls preload="metadata" src="12_insert_캡5cm_scene0.mp4"></video><a href="12_insert_캡5cm_scene0.mp4" download>MP4 다운로드</a></section>
+</div></html>

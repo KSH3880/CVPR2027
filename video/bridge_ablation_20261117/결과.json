@@ -1,0 +1,383 @@
+{
+  "checkpoint": {
+    "epoch": 2000,
+    "experiment": "stage2_distill_900_v4",
+    "sha256": "a1be127ad7118ca137f9de6079a9d4bb123a9d34a3c2c9c9aef24b15290f055a",
+    "paths_identical": true
+  },
+  "conditions": {
+    "seed": 42,
+    "margin": 1.0,
+    "envs": 1,
+    "steps": 300,
+    "gpu": 7
+  },
+  "comparisons": {
+    "baseline": {
+      "physics": {
+        "env": 0,
+        "mode": "baseline",
+        "fixed_base": false,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 34.847999572753906,
+        "density": 2.9999996715997854,
+        "shapes": [
+          {
+            "friction": 0.4000000059604645,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          },
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 173,
+        "switch_step": -1,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": false,
+        "leader_at": false,
+        "falls": [
+          false,
+          false,
+          false,
+          true
+        ]
+      }
+    },
+    "carry": {
+      "physics": {
+        "env": 0,
+        "mode": "carry",
+        "fixed_base": false,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 1161.5999755859375,
+        "density": 99.99998817759227,
+        "shapes": [
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          },
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 168,
+        "switch_step": -1,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": false,
+        "leader_at": false,
+        "falls": [
+          false,
+          false,
+          false,
+          true
+        ]
+      }
+    },
+    "fixed": {
+      "physics": {
+        "env": 0,
+        "mode": "fixed",
+        "fixed_base": true,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 34.847999572753906,
+        "density": 2.9999996715997854,
+        "shapes": [
+          {
+            "friction": 0.4000000059604645,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          },
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 300,
+        "switch_step": 125,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": true,
+        "leader_at": true,
+        "falls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    "fixed_carry": {
+      "physics": {
+        "env": 0,
+        "mode": "fixed_carry",
+        "fixed_base": true,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 1161.5999755859375,
+        "density": 99.99998817759227,
+        "shapes": [
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          },
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 300,
+        "switch_step": 125,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": true,
+        "leader_at": true,
+        "falls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    "platform": {
+      "physics": {
+        "env": 0,
+        "mode": "platform",
+        "fixed_base": true,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 11616.0,
+        "density": 999.9999027935364,
+        "shapes": [
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 300,
+        "switch_step": 125,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": true,
+        "leader_at": true,
+        "falls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    "baseline_nocap": {
+      "physics": {
+        "env": 0,
+        "mode": "baseline_nocap",
+        "fixed_base": false,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 34.847999572753906,
+        "density": 2.9999996715997854,
+        "shapes": [
+          {
+            "friction": 0.4000000059604645,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 300,
+        "switch_step": 124,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": false,
+        "leader_at": false,
+        "falls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    "carry_nocap": {
+      "physics": {
+        "env": 0,
+        "mode": "carry_nocap",
+        "fixed_base": false,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 1161.5999755859375,
+        "density": 99.99998817759227,
+        "shapes": [
+          {
+            "friction": 1.0,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 191,
+        "switch_step": 124,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": false,
+        "leader_at": false,
+        "falls": [
+          false,
+          false,
+          false,
+          true
+        ]
+      }
+    },
+    "follow_cap": {
+      "physics": {
+        "env": 0,
+        "mode": "follow_cap",
+        "fixed_base": false,
+        "size": [
+          3.200000047683716,
+          2.200000047683716,
+          1.649999976158142
+        ],
+        "mass": 34.847999572753906,
+        "density": 2.9999996715997854,
+        "shapes": [
+          {
+            "friction": 0.4000000059604645,
+            "restitution": 0.0,
+            "contact_offset": 0.019999999552965164,
+            "rest_offset": 0.0
+          }
+        ],
+        "carry_density": 100.00000110378961,
+        "carry_friction": 1.0,
+        "cap": {
+          "fixed_base": true,
+          "follows": "position_and_rotation",
+          "thickness": 0.005,
+          "friction": 1.0,
+          "restitution": 0.0,
+          "filter": 536870912
+        }
+      },
+      "outcome": {
+        "episode": 0,
+        "env": 0,
+        "steps": 300,
+        "switch_step": 131,
+        "radius": 1.3605551719665527,
+        "entered": true,
+        "crossed": true,
+        "leader_at": true,
+        "falls": [
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    }
+  },
+  "interpretation": "In the original five-condition comparison, baseline and carry fell; fixed, fixed_carry and platform crossed and reached the original goal. See the added nocap outcomes separately. These are single-scene observations, not success rates or proof of a specific PhysX bug.",
+  "excluded": "Exploratory runs that changed shape properties after reset or restored partial simulator state lost initial support and were excluded. Only native viewer and matching recorded runs are compared.",
+  "recordings": {
+    "baseline": "videos/baseline.mp4",
+    "carry": "videos/carry.mp4",
+    "fixed": "videos/fixed.mp4",
+    "fixed_carry": "videos/fixed_carry.mp4",
+    "platform": "videos/platform.mp4",
+    "baseline_nocap": "videos/baseline_nocap.mp4",
+    "carry_nocap": "videos/carry_nocap.mp4",
+    "follow_cap": "videos/follow_cap.mp4"
+  },
+  "nocap_comparison_note": "baseline_nocap also changes top friction from 1.0 to 0.4. carry versus carry_nocap keeps density and friction identical and changes collision geometry only.",
+  "follow_cap_note": "Separate fixed cap follows the dynamic body pose at each simulation step. Cap/body collisions are filtered. Loads on the cap are not transferred to the body. Same original actors, DOFs and goals at reset; crossed and reached original goal in seed 42 / margin 1.0 / 300 steps."
+}

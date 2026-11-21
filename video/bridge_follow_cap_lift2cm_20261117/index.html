@@ -1,0 +1,10 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>추종 고정 캡 2cm 상승</title><style>body{font:16px sans-serif;max-width:1500px;margin:32px auto;background:#14171b;color:#eee}a{color:#9bd5ff}video{width:100%}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}section{background:#222831;padding:16px;border-radius:10px}pre{white-space:pre-wrap}</style><h1>추종 고정 캡 2cm 상승 · 시작 배치 비교</h1><p>원본 DistillV4 2000 · seed 42 · margin 1.0m · 최대 300step(10초). 01번은 높이를 올리지 않은 기존 영상의 비교용 복사본입니다. 나머지 개별 영상은 캡 2cm 상승 조건입니다.</p><p>고정 캡은 상자 위치·회전을 따라가지만 캡의 하중은 본체로 전달되지 않습니다. 캡 높이만 변경하며 본체·관측용 상자 크기·GTA 목표는 유지합니다. 낙상으로 일찍 종료된 비교 영상은 마지막 프레임을 유지합니다.</p><pre>--bridge-physics follow_cap --cap-lift 0.02 --bridge-start present
+# present를 near 또는 insert로 변경
+# --cap-lift 0은 기존 높이, 0.01은 1cm, 0.02는 2cm</pre><div class="grid">
+<section><h2>05_present_캡0cm_vs_2cm</h2><video controls preload="metadata" src="05_present_캡0cm_vs_2cm.mp4"></video><a href="05_present_캡0cm_vs_2cm.mp4" download>MP4 다운로드</a></section>
+<section><h2>06_시작배치_3조건_캡2cm</h2><video controls preload="metadata" src="06_시작배치_3조건_캡2cm.mp4"></video><a href="06_시작배치_3조건_캡2cm.mp4" download>MP4 다운로드</a></section>
+<section><h2>01_present_캡0cm_기존비교용</h2><p>횡단·원래 목표 도착</p><video controls preload="metadata" src="01_present_캡0cm_기존비교용.mp4"></video><a href="01_present_캡0cm_기존비교용.mp4" download>MP4 다운로드</a></section>
+<section><h2>02_present_캡2cm</h2><p>174step 낙상</p><video controls preload="metadata" src="02_present_캡2cm.mp4"></video><a href="02_present_캡2cm.mp4" download>MP4 다운로드</a></section>
+<section><h2>03_near_캡2cm</h2><p>횡단·원래 목표 도착</p><video controls preload="metadata" src="03_near_캡2cm.mp4"></video><a href="03_near_캡2cm.mp4" download>MP4 다운로드</a></section>
+<section><h2>04_insert_캡2cm</h2><p>횡단·원래 목표 도착</p><video controls preload="metadata" src="04_insert_캡2cm.mp4"></video><a href="04_insert_캡2cm.mp4" download>MP4 다운로드</a></section>
+</div><p><a href="결과.json">상세 결과·검증</a></p></html>
