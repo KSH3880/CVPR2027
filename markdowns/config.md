@@ -4,25 +4,34 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 스물아홉 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 유지하는 실험은 아래 서른 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
+- 1명 IND·4모델·일반/Enable 공통 크기·512환경·3seed 비교는 GPU5/6 각각85,000MiB 한도의 [전용 평가](USAGE.md#1명-independent--일반enable-공통-크기)를 사용한다. AT/ON_TOP 운반 상자를 원본9종으로 교체하는 [추가 평가](USAGE.md#1명-independent--원본-carry-9종)는 GPU5/6/7을 사용한다.
+- ② 기존 공통 크기를 seed0–9로 확장하는 [추가 평가](USAGE.md#②-기존-공통-크기--seed-09)는 GPU5/6/7 각각85,000MiB 한도에서 기존12회를 재사용하고28회만 추가한다. [seed10–20 확장](USAGE.md#②-기존-공통-크기--seed-1020)은 같은 한도로44회, [seed21–25 확장](USAGE.md#②-기존-공통-크기--seed-2125)은20회를 추가한다.
 - 학습 인자: `[agents] [envs] [objects]`. 기본값은 Stage1·Stage1 PUSH **2명·2048환경·4물체**, BEFORE·coupled **4명·1024환경·8토큰**이다. BEFORE는 인원 N≥1·토큰 M≥2N, coupled는 인원 N≥1·토큰 M≥N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_coupled_push_individual_goal_solo5_carry5`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`·`stage2_coupled_push_individual_goal_solo5_keep1`·`stage2_coupled_push_individual_goal_solo5_shrink1`·`stage2_coupled_push_individual_goal_solo5_carry5_ground`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`은 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
-- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`·`stage2_distill_900_v4`·`stage2_900_v4_reward`·`stage2_distill_900_v5`는 학습·평가·viewer 모두 **900step**이다.
+- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`·`stage2_distill_900_v4`·`stage2_900_v4_reward`·`stage2_distill_900_v5`·`stage2_distill_900_v4_nobias`는 학습·평가·viewer 모두 **900step**이다.
 - 정식 평가의 기존 과제/관계 지표와 추가 interaction group 성공률 정의는 [평가 규약](reference/evaluation.md#통합-stage2의-interaction-group-성공률)을 따른다. Enable 그룹 SR은 같은 스텝의 선행 AT·후행 동시 성공 기준이다.
 - 메인 eval은 Region 성공 trial의 Point Error·Region Error(cm)와 성공 표본 수도 출력한다. 논문 기준은 [공용 프로토콜](../../evaluation_protocol/README.md)이다. Table 2의 단일 관계·Time·원시 기록은 `run_table2.py`, 최신20cm 시작 t_coop/Jerk는 별도 CPU 재집계를 사용하며 [eval 안내](../eval/README.md)를 따른다.
 - Independent/Mixed 분리·2/4/8/16명·XY100% 보조 평가는 [eval 안내](../eval/README.md)의 scalability 진입점을 사용한다. Stage1 비교는 `--stage1-checkpoint`·`--reference-evaluations`를 추가한다. 이 보조 경로는 Stage1/Full 모두 distractor attention을 보존하며 메인 기본 판정은 변경하지 않는다.
 - 8H/16H 정식 평가(`--eval_protocol`·`--group_spawn_over4`)는 Independent/Mixed 모두 그룹 중심 원 반경3m/7.5m를 기본 적용한다. 그룹 간 최소5m 조건을 적용하지 않으며 이전5m 결과와 출력 폴더를 분리한다. [배치 정의](../eval/group_radius_handoff.md).
 - 일반 test/VNC의 장면 생성·성공 진단에는 위 보조 평가 프로토콜이 자동 적용되지 않는다. Viewer 출력은 정식 SR과 구분한다.
+- GPU6·64환경·seed1의35초 지연 대응 파일럿과 TokenHSI40.5k 추가 평가는 [추가 실행 안내](USAGE.md#지연-대응-파일럿)를 따른다.
+- GPU6/7·전체88,000/90,000MiB 한도·13/6병렬·64환경·seed1/6/7·30초·6장면 지연 대응 평가는 [추가 실행 안내](USAGE.md#지연-대응-6장면3seed)를 따른다.
+- GPU6·85,000MiB 한도·64환경·seed1·30초·랜덤1–5초 지연30조건과 기존0초 비교는 [추가 실행 안내](USAGE.md#랜덤-지연-15초64환경)를 따른다.
+- GPU6/7·각88,000MiB 한도·Enabling/Coupled 각각512환경·seed1/6/7·30초·0초/랜덤 신규 평가는 [추가 실행 안내](USAGE.md#랜덤-지연종류별512환경3회)를 따른다.
 - 2인 SIT의64환경·seed1 분리/교차 보조 평가는 [USAGE](USAGE.md#2인-sit-교차-파일럿)를 따른다.
 - 2인 IND의64환경·seed1 DCT 추론 ablation은 [USAGE](USAGE.md#ind-dct-추론-ablation-파일럿)를 따른다.
-- V4 2k의4/16H Mixed dependency bias OFF/고정 셔플 평가는 [USAGE](USAGE.md#dependency-bias-offshuffled)를 따른다.
+- V4 2k의2/4/8/16H Mixed dependency bias OFF/고정 셔플 평가는 [USAGE](USAGE.md#dependency-bias-offshuffled)를 따른다.
+- 재학습 nobias2k의2/4/8/16H Mixed·512환경·seed1/6/7 평가는 GPU6 전체85,000MiB 한도의 [2k 대기 큐](USAGE.md#재학습-wo-dep-bias--2k-mixed-ablation)를 사용한다.
+- Stage1 26k의2/4/8/16H Independent SCT task bias OFF/고정 셔플 평가는 [USAGE](USAGE.md#stage1-task-bias-offshuffled)를 따른다.
+- V4 2k의4/16H Mixed Enabling/Coupled bias 개별 제거·4명 추가 seed8 평가는 [USAGE](USAGE.md#관계별-dependency-bias-off)를 따른다.
 - 평가 seed 기본값은 0/1/2이며 `--seeds 3 4 5`처럼 중복 없는 비음수 seed를 지정할 수 있다. 새 프로토콜의 추가 seed는 [보조 실행 안내](../eval/README.md)에 따라 기준 snapshot을 먼저 생성한다.
 - 모든 test의 기본값은 viewer다. 로컬 추론은 `HEADLESS=0`, 화면 없는 진단은 `HEADLESS=1`이다. **정식 평가는 `*_eval.sh`**, 1명 단독 평가는 **Stage1 계열 전용 `stage1_single_eval.sh`·`stage1_push_single_eval.sh`**로 구분한다. 일반 평가는 저장된 학습 인원·물체 수를 유지한다.
 
-- `stage2`·`stage2_distill`·`stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`·`stage2_distill_900_v4`·`stage2_900_v4_reward`·`stage2_distill_900_v5` 학습은 4명·1024환경·8토큰이 기본이다. N≥4·M≥N을 지원하며 5명 이상은 전용 그룹 스폰 옵션을 사용한다. 두 teacher viewer와 확장 인자는 [USAGE](USAGE.md#두-teacher-제로샷-viewer)를 따른다. 전이는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`를 사용한다.
+- `stage2`·`stage2_distill`·`stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`·`stage2_distill_900_v4`·`stage2_900_v4_reward`·`stage2_distill_900_v5`·`stage2_distill_900_v4_nobias` 학습은 4명·1024환경·8토큰이 기본이다. N≥4·M≥N을 지원하며 5명 이상은 전용 그룹 스폰 옵션을 사용한다. 두 teacher viewer와 확장 인자는 [USAGE](USAGE.md#두-teacher-제로샷-viewer)를 따른다. 전이는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`를 사용한다.
 
 ## 현재 컨피그
 
@@ -57,6 +66,7 @@
 | [stage2_distill_900_v4.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900_v4.yaml) | [stage2_distill_900_v4.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900_v4.yaml) |
 | [stage2_900_v4_reward.yaml](../tokenhsi/data/cfg/multi_agent/stage2_900_v4_reward.yaml) | [stage2_900_v4_reward.yaml](../tokenhsi/data/cfg/train/rlg/stage2_900_v4_reward.yaml) |
 | [stage2_distill_900_v5.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900_v5.yaml) | [stage2_distill_900_v5.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900_v5.yaml) |
+| [stage2_distill_900_v4_nobias.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900_v4_nobias.yaml) | [stage2_distill_900_v4_nobias.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900_v4_nobias.yaml) |
 
 ## 학습
 
@@ -147,6 +157,9 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_900_v4_reward_train.sh 4
 
 # stage2_distill_900_v5
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v5_train.sh 4 1024 8
+
+# stage2_distill_900_v4_nobias
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v4_nobias_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -240,6 +253,9 @@ TOKENHSI_GPU=5 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_900_v4_reward
 
 # stage2_distill_900_v5
 TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v5_test.sh "$CKPT" 4 1 8 10
+
+# stage2_distill_900_v4_nobias
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v4_nobias_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -333,6 +349,9 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_900_v4_reward_vnc.sh "$C
 
 # stage2_distill_900_v5
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v5_vnc.sh "$CKPT" 4 1 8 10
+
+# stage2_distill_900_v4_nobias
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v4_nobias_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션

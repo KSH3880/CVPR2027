@@ -24,10 +24,11 @@ class CoupledRelationFusion(nn.Module):
 
 
 class FusionCoordinationBlock(CoordinationBlock):
-    def __init__(self, width, heads, feedforward_dim, relations, background):
+    def __init__(self, width, heads, feedforward_dim, relations, background, relation_bias=True):
         super().__init__(width, heads, feedforward_dim, relations)
         del self.relation_bias
-        self.bias_projection = nn.Parameter(torch.zeros(heads, width))
+        self.use_relation_bias = relation_bias
+        self.bias_projection = nn.Parameter(torch.zeros(heads, width), requires_grad=relation_bias)
         if background == 'learnedbg':
             self.background_bias = nn.Parameter(torch.zeros(heads, 2))
         else:
@@ -48,8 +49,12 @@ class FusionCoordinationBlock(CoordinationBlock):
         depth = width // heads
         qkv = F.linear(query, self.attention.in_proj_weight, self.attention.in_proj_bias)
         q, k, v = qkv.reshape(batch, people, 3, heads, depth).permute(2, 0, 3, 1, 4).unbind(0)
-        bias = self.effective_relation_bias(fusion.embedding)[:, relations].permute(1, 0, 2, 3)
-        bias = bias.masked_fill(padding, float('-inf'))
+        bias = None
+        if self.use_relation_bias:
+            bias = self.effective_relation_bias(fusion.embedding)[:, relations].permute(1, 0, 2, 3)
+            bias = bias.masked_fill(padding, float('-inf'))
+        elif padding.ndim > 0:
+            bias = ~padding
         context = F.scaled_dot_product_attention(q, k, v, attn_mask=bias, dropout_p=0.0)
         context = context.transpose(1, 2).reshape(batch, people, width)
         active = self.active_relations(relations, padding)

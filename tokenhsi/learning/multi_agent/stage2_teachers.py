@@ -16,7 +16,9 @@ class TeacherPolicy(nn.Module):
         checkpoint = torch.load(path, map_location=task.device, weights_only=False)
         saved = checkpoint['relation_experiment_config']
         graph = saved['env']['relationGraph']
-        if graph.get('human_relation_fusion') != fusion:
+        saved_fusion = graph.get('human_relation_fusion')
+        allowed = ('before_zerobg', 'before_zerobg_nobias') if fusion == 'before_zerobg' else (fusion,)
+        if saved_fusion not in allowed:
             raise ValueError('Wrong teacher relation fusion: ' + str(path))
         builder = Stage2PushBuilder()
         builder.load(saved['train']['params']['network'])
@@ -37,7 +39,9 @@ class TeacherPolicy(nn.Module):
         self.eval().requires_grad_(False)
         self.metadata = dict(path=str(path), epoch=checkpoint.get('epoch'),
             frame=checkpoint.get('frame'), sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-            fusion=fusion, state_tensors=len(checkpoint['model']))
+            fusion=saved_fusion, state_tensors=len(checkpoint['model']))
+        if saved_fusion == 'before_zerobg_nobias' or graph.get('human_relation_bias') is False:
+            self.metadata['human_relation_bias'] = False
 
     def means(self, obs, object_valid=None):
         self.a2c_network.object_valid = object_valid
@@ -49,6 +53,10 @@ class Stage2Teachers(nn.Module):
         super().__init__()
         self.before = TeacherPolicy(task, before_path, 'before_zerobg')
         self.coupled = TeacherPolicy(task, coupled_path, 'zerobg')
+        if task.cfg.get('env', {}).get('relationGraph', {}).get('human_relation_bias') is False:
+            if any(block.use_relation_bias for teacher in (self.before, self.coupled)
+                   for block in teacher.a2c_network.coordination.blocks):
+                raise ValueError('No-bias distillation requires two no-bias teachers')
         self.eval().requires_grad_(False)
         self.metadata = dict(before=self.before.metadata, coupled=self.coupled.metadata,
             solo_teacher='before', routing='shared PUSH members use coupled; all others use before',

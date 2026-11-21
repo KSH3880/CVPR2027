@@ -1,0 +1,3248 @@
+{
+  "pid": 4114680,
+  "gpus": [
+    6,
+    7
+  ],
+  "memory_caps_mib": {
+    "6": 88000,
+    "7": 88000
+  },
+  "completed": true,
+  "started_unix": 1794741487.903702,
+  "total_formal": 180,
+  "logical_evaluations": 60,
+  "verified_formal": 180,
+  "development_passed": true,
+  "updated_unix": 1794746230.275132,
+  "elapsed_s": 4742.3714299201965,
+  "gpu_usage_mib": {
+    "6": 21347,
+    "7": 58586
+  },
+  "pending_reservation_mib": {
+    "6": 0,
+    "7": 0
+  },
+  "running": [],
+  "finished": [
+    {
+      "job": "enable_sit/ours_d0_seed1",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 16.59636950492859,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed1",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.721745491027832,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed1",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.727163076400757,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed1",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.663061380386353,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed1",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.698674201965332,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed1",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.637672185897827,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed6",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.630985975265503,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed6",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.620358228683472,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed6",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.583141565322876,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed6",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.615985870361328,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed6",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.607541799545288,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed6",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.610703706741333,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed7",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.61895489692688,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed7",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.604935646057129,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed7",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 15.638526201248169,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed7",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 16.496909856796265,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed7",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 16.676666975021362,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed7",
+      "kind": "reference",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 16.691922664642334,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 64.0072557926178,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 64.84646964073181,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.8437163829803467,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0087456703186035,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 51.22317552566528,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 51.21371030807495,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 51.254952907562256,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 86.06352877616882,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 86.0525553226471,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 82.88953518867493,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008291244506836,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012376546859741,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008729934692383,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 89.18533897399902,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 89.18492078781128,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0087170600891113,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 86.00682187080383,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008620500564575,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed1",
+      "kind": "development",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 82.95628190040588,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0117204189300537,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0084753036499023,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0117619037628174,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0084025859832764,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed1",
+      "kind": "development",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008350372314453,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 209.93640851974487,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 232.16605353355408,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 229.12300634384155,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0095558166503906,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 280.71960067749023,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.00907301902771,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 274.3173928260803,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 6.1697678565979,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 383.9125487804413,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0104615688323975,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 418.8566162586212,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 428.3169870376587,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0095183849334717,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012364149093628,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009038209915161,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0096397399902344,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 451.5873227119446,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010190010070801,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 448.61743211746216,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 254.3732430934906,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 493.7583110332489,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009722948074341,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0070276260375977,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009376287460327,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 483.51643443107605,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0094003677368164,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 238.30426907539368,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009305000305176,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 266.94881224632263,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008404016494751,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 522.3604502677917,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 516.0504503250122,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.013104200363159,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0094757080078125,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 570.765552520752,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 558.0455524921417,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 548.5055525302887,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0136513710021973,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009617328643799,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010114908218384,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 315.49467611312866,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 302.80688214302063,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.013427257537842,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0102202892303467,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 525.0555698871613,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0089099407196045,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 244.27504014968872,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0098721981048584,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 263.429443359375,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 311.7055296897888,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.840467691421509,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 270.4220860004425,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 482.92627787590027,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009991407394409,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 292.7454192638397,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 566.2627346515656,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 524.0646796226501,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.013774871826172,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0106616020202637,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009469509124756,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 511.0709500312805,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 253.86997509002686,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0096187591552734,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 267.5994689464569,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.9454379081726074,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010502815246582,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 537.3517470359802,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0098259449005127,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 482.57406735420227,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.01005220413208,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0092880725860596,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 581.6656439304352,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 545.9432151317596,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0100433826446533,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.8547215461730957,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 559.4429302215576,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009058713912964,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.00893235206604,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 295.9612715244293,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009876251220703,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 546.8304357528687,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0107789039611816,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 263.4443190097809,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0102386474609375,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 581.7428801059723,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0096654891967773,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 569.051521062851,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0103566646575928,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 305.3721978664398,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009807825088501,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 492.0366003513336,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0093326568603516,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 231.49160361289978,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0101118087768555,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 240.07618165016174,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.9161767959594727,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 472.446573972702,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0113086700439453,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 318.69037079811096,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 308.2351882457733,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 482.02061653137207,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0108280181884766,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 495.4205644130707,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 247.8953297138214,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 263.73718905448914,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.013822555541992,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0100655555725098,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010474681854248,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 298.52839946746826,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011185884475708,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 513.6420736312866,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 485.2128882408142,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0144200325012207,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010667085647583,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0104541778564453,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 530.2650003433228,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011428117752075,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 552.3728382587433,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 575.3801319599152,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0112340450286865,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010793447494507,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0088682174682617,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 475.38263297080994,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0106124877929688,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 523.693941116333,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0111000537872314,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 571.4418637752533,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed1",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0097968578338623,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 311.25116991996765,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0098860263824463,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 253.37353110313416,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 6.144754886627197,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 301.5005078315735,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 269.0893220901489,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0111262798309326,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 590.7292892932892,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 301.47225642204285,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0141706466674805,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0102877616882324,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0115134716033936,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 494.42899203300476,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0104598999023438,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 497.63573956489563,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010457754135132,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 536.3243255615234,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009352922439575,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 272.72880148887634,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 491.41271781921387,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0105690956115723,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010258913040161,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 263.4864411354065,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 302.15782260894775,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0102148056030273,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 289.5760953426361,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0108797550201416,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 545.9263701438904,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0093016624450684,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 327.8082821369171,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 568.3635275363922,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.8970234394073486,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 571.3759636878967,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 591.3306655883789,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.8909223079681396,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009351968765259,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 543.0956468582153,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0111262798309326,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 607.3107299804688,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 552.6398000717163,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009697437286377,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0148348808288574,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010939836502075,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 250.26249647140503,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009845495223999,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 254.59696173667908,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0108230113983154,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 279.3180944919586,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0115904808044434,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 618.2583818435669,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 305.6462321281433,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.013192892074585,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009892463684082,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010852813720703,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 604.881255865097,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0111560821533203,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 572.0345199108124,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009199380874634,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 308.5081558227539,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0106911659240723,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 501.6167242527008,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009432077407837,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 264.558655500412,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010162591934204,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 263.32791686058044,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 556.2625274658203,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0091757774353027,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 527.9918458461761,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0107455253601074,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 322.13599586486816,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 314.7707040309906,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 562.6110849380493,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0108845233917236,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 514.4377751350403,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 6.157485246658325,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0091142654418945,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 537.5155482292175,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 308.72162890434265,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 601.805093050003,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0156373977661133,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011721611022949,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0108680725097656,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 502.6685950756073,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011415481567383,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 272.92435693740845,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 585.0752685070038,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 288.7433981895447,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011345148086548,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0140576362609863,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0108296871185303,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0117862224578857,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 602.1178126335144,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0114593505859375,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 6.171737909317017,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 295.2271132469177,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 600.6269476413727,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 288.8025608062744,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 537.4290447235107,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.921989679336548,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011449098587036,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 510.94834184646606,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0119545459747314,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0086429119110107,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 476.27278757095337,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0115787982940674,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0089707374572754,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 273.67051815986633,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0118026733398438,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 462.42683506011963,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 237.9761142730713,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008863687515259,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.011728286743164,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 257.86757493019104,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 491.80451250076294,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0111773014068604,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 460.0742769241333,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_drandom_1_5_seed6",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008979558944702,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 292.40432500839233,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 297.8195331096649,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.927950143814087,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 543.173939704895,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 523.2495589256287,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0122625827789307,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0088281631469727,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0082523822784424,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 282.09624218940735,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 264.13268852233887,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0125434398651123,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 582.3505334854126,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 260.1028552055359,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.009957790374756,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0125014781951904,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 556.4575119018555,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.9530622959136963,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 565.8813002109528,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0117762088775635,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 534.2614166736603,
+      "returncode": 0
+    },
+    {
+      "job": "enable_sit/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0086052417755127,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 543.103515625,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 520.9409267902374,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0160748958587646,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012284278869629,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.886174440383911,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 492.3224332332611,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 531.235550403595,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0109848976135254,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.015745162963867,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0114994049072266,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 302.93071842193604,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 9.322821140289307,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 306.05646204948425,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.9500062465667725,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 248.03194546699524,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012472629547119,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 531.2223014831543,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012317419052124,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 282.7935428619385,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 279.4687831401825,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.9136264324188232,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 482.98080229759216,
+      "returncode": 0
+    },
+    {
+      "job": "enable_climb/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0113985538482666,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 505.1979675292969,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.01104736328125,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0085408687591553,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 289.6253674030304,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 244.44360852241516,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 305.3630938529968,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 586.3764746189117,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012704849243164,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 585.0674705505371,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008068084716797,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 309.60584020614624,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.012183427810669,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 556.1917514801025,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0076448917388916,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 588.9174468517303,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 523.7497515678406,
+      "returncode": 0
+    },
+    {
+      "job": "enable_ontop/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0121030807495117,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.01145339012146,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 533.8116512298584,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 517.0760633945465,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0086827278137207,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.017045497894287,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0131070613861084,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0083858966827393,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 559.2748591899872,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 4.062130689620972,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 543.4559972286224,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.010877847671509,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0126585960388184,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 533.9592854976654,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0122230052948,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 292.71381425857544,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0084681510925293,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 273.60353660583496,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0128488540649414,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 553.214192867279,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 276.12387204170227,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_2/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0126984119415283,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0128278732299805,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 569.0666074752808,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 6.164442300796509,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 527.8132898807526,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0082499980926514,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 327.93579745292664,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0082311630249023,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 273.2530415058136,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008223295211792,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 213.13783264160156,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008204221725464,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 7,
+      "seconds": 248.19948887825012,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 434.7946026325226,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 412.55332493782043,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0116488933563232,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008087396621704,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 395.7045931816101,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0080690383911133,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 575.7447941303253,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.008131742477417,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 547.3616898059845,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 511.6180398464203,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/coopft_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0081422328948975,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_3/tokenhsi_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.9721837043762207,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 341.8745653629303,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 522.2279577255249,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.007652521133423,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/sct_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.00793194770813,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 477.1914565563202,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_d0_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0079855918884277,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/ours_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.007892608642578,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": false,
+      "gpu": 6,
+      "seconds": 453.8735432624817,
+      "returncode": 0
+    },
+    {
+      "job": "coupled_4/fsm_drandom_1_5_seed7",
+      "kind": "formal",
+      "cpu": true,
+      "gpu": null,
+      "seconds": 3.0077388286590576,
+      "returncode": 0
+    }
+  ],
+  "failed": [],
+  "ended_unix": 1794746230.2766287
+}

@@ -8,6 +8,10 @@
 
 `stage2_distill_900_v5`는 V4를 복사하고 **coupled teacher만 같은 run의38k**(`Stage2CoupledContact_00038000.pth`)로 변경한다. Enable/solo는 기존34k를 유지한다. Student는 V4를 이어 학습하는 것이 아니라 Stage1 PUSH26k에서 새로 전이하며 환경·900step·학습 설정·GPU 허용 범위는 V4와 같다. 전용 train/test/VNC/eval wrapper와 `output/stage2_distill_900_v5/`를 사용한다.
 
+`stage2_distill_900_v4_nobias`는 V4의 환경·Stage1 PUSH26k 초기화·distill 일정을 유지하면서 두 teacher와 최종 student의 사람 간 dependency attention bias를 제거한다. Enable/solo는 `Stage2BeforeTotalAt1mmNoBias_00010000.pth`, 공동 PUSH는 `Stage2CoupledContactNoBias_00010000.pth`를 사용하며 전체 경로는 전용 학습 YAML의 `distillation.teacher_before`·`teacher_coupled`에 둔다. Relation embedding·feature fusion·SCT task bias와 padding mask는 유지한다. Student의 actor/critic coordination에는 `bias_projection` 파라미터를 만들지 않으며 저장/추론/재로드도 같은 구조를 사용한다. 출력은 `output/stage2_distill_900_v4_nobias/`이고 GPU2/5/6/7·기본6이다.
+
+Enable teacher는 `before_zerobg_nobias` 모드의 projection 없는271개 tensor, Coupled teacher는 `human_relation_bias: false`의 projection 보존279개 tensor 형식을 원본대로 strict 복원한다. Coupled의 저장 projection은 고정하고 attention 계산에서 사용하지 않는다. No-bias student를 선택하면 bias가 켜진 teacher를 거절한다. 두 teacher의 입력 정규화는 각 PTH 내부 통계를 사용하므로 Enable의 별도 sidecar는 필요하지 않다. 현재 두 teacher는10k를 사용하며,9k teacher 기반 학습과 별도 새 run으로 시작한다. Teacher 해시가 바뀌면 기존9k teacher 기반 distill checkpoint resume은 계약 검사에서 거절한다.
+
 ## 초기화와 정답
 
 - Student는 Stage1 PUSH26k에서 전이하고 actor encoder와 입력 RMS를 고정한다. Actor의 coordination(관계 임베딩·fusion 포함)과 action head만 학습한다. Critic·AMP discriminator·sigma도 고정하며 PPO/AMP 손실은 사용하지 않는다.

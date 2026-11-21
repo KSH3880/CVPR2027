@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "formal_shards": 180,
+  "family_cohorts": 60,
+  "total_trials": 30720,
+  "each_subtype_across_seeds": 512,
+  "cohort_success_rates_replayed": true
+}

@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "previous_sources_and_checkpoints_unchanged": true,
+  "development_runs": 12,
+  "paired_random_runs": 6,
+  "commands": 360,
+  "total_formal_shards": 180,
+  "total_trials": 30720
+}

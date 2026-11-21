@@ -2,6 +2,16 @@
 
 평가 확인·비교·후처리용 보조 스크립트는 이 폴더에서 만든다.
 
+1명 Independent의 TokenHSI40.5k/SCT26k/CoopFT7k/Ours V4 2k 일반/Enable 공통 크기 비교는 [실행 안내](../markdowns/USAGE.md#1명-independent--일반enable-공통-크기)를 따른다. 512환경·seed1/6/7·900step의24회이며 [현재 결과·상태](../output_etc/check/single_size_native_common_env512_seeds167_20261120/report.md)를 확인하고 실행 중인 큐를 중복 시작하지 않는다.
+
+② 기존 공통 크기의 seed0–9 확장은 [실행 안내](../markdowns/USAGE.md#②-기존-공통-크기--seed-09)를 따른다. 기존12회를 재사용하고28회를 추가하며 [모든 seed의 행동별 표](../output_etc/check/single_common_env512_seeds0to9_20261120/report.md)를 생성한다.
+
+같은 조건의 [seed10–20 추가 실행](../markdowns/USAGE.md#②-기존-공통-크기--seed-1020)은44회를 새로 평가하고 기존0–9를 포함한 [21seed 결과](../output_etc/check/single_common_env512_seeds10to20_20261120/report.md)를 함께 집계한다.
+
+[seed21–25 추가 실행](../markdowns/USAGE.md#②-기존-공통-크기--seed-2125)은 같은 조건의20회를 추가하고 기존84회와 합산한 [26seed 결과](../output_etc/check/single_common_env512_seeds21to25_20261120/report.md)를 생성한다.
+
+30초·64환경×3seed 지연 실험의 [지표 정의와 표본·평균 기준](delay_coordination_metrics.md)은 Enabling SR/준비율/사전점유율과 Coupled SR/t_coop/Jerk를 정리한다.
+
 Enabling의 **Coordination Behavior**는 기존45개 rollout을 CPU로 재집계한다. AT 직전 준비율·root footprint 근사 사전 점유율·Post-AT 지연과 공통 성공 장면/민감도를 제공한다. [실행](../markdowns/USAGE.md#coordination-behavior-cpu-재집계) · [결과](../output_etc/check/coordination_behavior_v4_2000_20261114/report.md) · [해석](../output_etc/check/coordination_behavior_v4_2000_20261114/interpretation.md).
 
 SCT26k/Ours V4 2k의 IND 차이를 분석하는 단독/2H·분리/교차·목표 정밀도 평가는 [설계](../markdowns/reference/ind_mechanisms.md)와 [실행](../markdowns/USAGE.md#ind-성능-차이-보조-평가)을 따른다. GPU6/7·512환경·seed1/6/7·900step의 신규24회이며 기존2H6회는 읽기 전용으로 재사용한다.
@@ -320,3 +330,7 @@ python eval/stage2_protocol_eval.py \
 PYTHONPATH=tokenhsi /home/hwanhee/anaconda3/envs/tokenhsi/bin/python \
   eval/summarize_stage2_protocol.py output_etc/check/<평가명>
 ```
+
+## 재학습 nobias2k Mixed ablation
+
+`run_nobias_ablation.py`는 현재 nobias run의2k 저장을 기다려 GPU6·전체85,000MiB 한도에서 Mixed2/4/8/16H·512환경·seed1/6/7의12회를 실행한다. `nobias_ablation_eval.py`가 최종 student의 dep bias 부재·fusion/SCT 유지와 공통 첫 입력/정책 불변을 검사하고, 기존 reference의 초기 상태/CPU SR/Error·고정 반경을 대조한다. [실행·메모리 규칙](../markdowns/USAGE.md#재학습-wo-dep-bias--2k-mixed-ablation)을 따른다. 기본 상태/보고서는 `output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/`다.

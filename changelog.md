@@ -2,7 +2,163 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-20
+
+### ② 기존 공통 크기 · seed21–25 추가
+
+- 사용자 요청으로 `SINGLE_COMMON_SEEDS=21to25`를 추가했다. 신규5seed×4모델20회와 기존84회를 합산하며 신규5seed/전체26seed 통계를 분리한다. 평가 조건·체크포인트는 유지하고 GPU5/6/7 각각85,000MiB 한도로 실행한다.
+- 공통 장면5개·개발5회·정식20회를 준비 포함8.32분에 완료했다. 실패/재시도0회, GPU5/6/7 최고81,235/81,332/78,881MiB다. 기존84회 포함104회/53,248episode의 원시520개 SR·48개 평균/std·330개 출처/reference/기존 결과 SHA 보존 검증을 통과했다. [실행](markdowns/USAGE.md#②-기존-공통-크기--seed-2125) · [전체26seed 결과](output_etc/check/single_common_env512_seeds21to25_20261120/report.md) · [집계 검증](output_etc/check/single_common_env512_seeds21to25_20261120/final_aggregate_audit.json).
+- TokenHSI와 SCT의 AT·ON_TOP 네 SR 모두75% 이상인 신규seed는22/23이다. 기존 포함11개(1,2,3,7,11,15,16,17,18,22,23)의 원시 성공 수 필터와24개 평균/std를 독립 검증했다. [75% 필터 결과](output_etc/check/single_common_env512_seeds21to25_20261120/filtered_both.md)는 전체 결과와 별도로 보존한다.
+
+### ② 기존 공통 크기 · seed10–20 추가
+
+- 사용자 요청으로 seed10–20 포함11개×4모델의44회를 추가하는 `SINGLE_COMMON_SEEDS=10to20` 실행을 지원한다. 기존0–9의40회는 원본 경로로 재사용하고 신규11seed/전체21seed 통계를 분리한다. 환경·체크포인트·크기·거리·distractor 물리/입력 설정은 유지하며 GPU5/6/7 각각85,000MiB 한도다.
+- 공통 장면11개·개발5회·정식44회를 준비 포함16.95분에 완료했다. 실패/재시도0회, GPU5/6/7 관측 최고81,235/81,338/83,369MiB다. 기존40회 포함84회/43,008episode의 원시 행동별420개 SR·48개 평균/std·188개 출처/reference/기존 결과 SHA 보존 검증을 통과했다. [실행](markdowns/USAGE.md#②-기존-공통-크기--seed-1020) · [전체21seed 결과](output_etc/check/single_common_env512_seeds10to20_20261120/report.md) · [집계 검증](output_etc/check/single_common_env512_seeds10to20_20261120/final_aggregate_audit.json).
+- 사용자 지정 조건인 TokenHSI와 SCT의 AT·ON_TOP 네 SR 모두70% 이상을 반올림 전 성공 수로 적용했다. 통과17seed(1,2,3,4,5,7,8,11–20)에 네 모델을 동일하게 적용하고68행/24개 평균·std를 독립 검증했다. [필터 결과](output_etc/check/single_common_env512_seeds10to20_20261120/filtered_both.md)는 전체 결과와 별도로 보존한다.
+
+### ② 기존 공통 크기 · seed0–9 확장
+
+- 사용자 승인으로4모델×seed0–9의40회 중 기존1/6/7의12회를 보존·재사용하고 나머지28회 전용 큐를 추가했다. 원본9종이 아닌 기존 공통 크기,512환경·900step과 Table1 거리/성공 조건을 유지한다. GPU5/6/7 각각85,000MiB 한도에서 매 시작 전 실제 점유/예약을 갱신해 분산 배정한다.
+- 28개 고유 작업·GPU별84개 명령·기존12회 통계 대조, 공통 장면7개·개발5회(seed0 네 모델/기존seed1 Ours)·정식28회/14,336episode를 완료했다. 초기 장면/입력·정책/정규화·CPU 채점·크기/거리 검사를 통과했으며 실패/재시도0회다. 준비 포함11.35분, 최대15개 병렬·GPU5/6/7 관측 최고81,291/81,334/78,879MiB였다.
+- 기존 결과 포함40회/20,480episode의10seed 전체SR은 TokenHSI90.66±1.32%, SCT89.61±2.03%, CoopFT94.04±0.95%, Ours97.01±0.62%다. 원시 행동별200개 SR·24개 평균/std 독립 집계·79개 출처/reference/기존 결과 SHA 보존을 확인했다. [실행](markdowns/USAGE.md#②-기존-공통-크기--seed-09) · [모든 seed 행동별 표](output_etc/check/single_common_env512_seeds0to9_20261120/report.md) · [최종 검증](output_etc/check/single_common_env512_seeds0to9_20261120/final_aggregate_audit.json).
+
+### 1명 IND · 원본 carry9종 추가 평가
+
+- 사용자 승인으로 `SINGLE_CARRY=original9`를 추가했다. AT와 ON_TOP payload만 원본9종으로 교체하고 일반/공통의 SIT/CLIMB/ON_TOP 받침 차이를 유지한다. 기존 결과와 출력 폴더를 분리하며 GPU5/6/7 각각 기존 점유 포함85,000MiB 한도다.
+- 원본 YAML9종 일치·6개 CPU bank 검사·공통 장면6개·개발5회·정식24회/12,288episode를 완료했다. 초기 상태/정책 입력·가중치/정규화·물리 distractor·CPU SR/Error·크기/거리 검사를 통과했다. MPS 시작 확인 실패1회는 실행 전 로그를 보존하고2초 간격 재배정으로 복구했으며 기존 작업은 보존했다. 준비 포함14.65분, GPU5/6/7 관측 최고81,163/81,400/83,993MiB였다.
+- 원본9종 일반/공통 전체SR은 TokenHSI96.09/96.74%, SCT90.10/90.62%, CoopFT93.16/93.82%, Ours96.16/97.07%다. 기존 두 조건을 포함한96개 평균/std 독립 재집계와91개 출처/reference/이전 결과 SHA 보존을 통과했다. [실행](markdowns/USAGE.md#1명-independent--원본-carry-9종) · [네 조건 행동별 표](output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/four_conditions.md) · [최종 검증](output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/final_aggregate_audit.json).
+
+### 1명 IND · 일반/Enable 공통 크기 비교 완료
+
+- 사용자 요청으로 TokenHSI40.5k/SCT26k/CoopFT7k/Ours V4 2k × 두 크기 × seed1/6/7의24회 전용 평가를 추가했다. 1명·2토큰·512환경·900step, Table1 거리/성공 기준을 유지하며 공통 크기는 SIT/CLIMB/AT/ON_TOP 받침에만 적용한다. ON_TOP payload·PUSH는 유지한다.
+- 대상 상자만 변경·payload/PUSH·난수/밀도 보존 CPU 검사, 공통 장면6개·512환경60step 개발5회, 정식24회/12,288 episode를 모두 통과했다. GPU5/6 각85,000MiB 한도·최대6개 병렬로 준비 포함약15.3분 소요, 관측 최고81,359/81,334MiB였다. 기존 프로세스는 보존했다.
+- 일반/공통 전체SR은 TokenHSI86.59/90.23%, SCT91.21/90.76%, CoopFT92.90/93.95%, Ours97.14/97.14%다.24회 공통 초기 상태/첫 입력·정책/정규화·CPU SR/Error·크기/거리 검사,48개 평균/std 독립 재집계와38개 출처/reference SHA 보존을 통과했다. 일반 SCT는 기존1H3seed의행동별 성공/낙상 수까지 exact다. 크기 조건 간 배치 재시도 차이와 TokenHSI397D 입력 차이를 보고서에 명시했다. [실행](markdowns/USAGE.md#1명-independent--일반enable-공통-크기) · [행동별 결과](output_etc/check/single_size_native_common_env512_seeds167_20261120/report.md) · [최종 집계 검증](output_etc/check/single_size_native_common_env512_seeds167_20261120/final_aggregate_audit.json).
+
+## 2026-11-16
+
+### 재학습 w/o Dep. Bias · 2k Mixed 평가 완료
+
+- GPU6 대기 큐가 nobias2k를 감지해 Mixed2/4/8/16명·512환경·seed1/6/7의12회를 실패 없이 완료했다. SR은 각각87.47±0.89 / 82.09±0.89 / 77.66±1.18 / 63.23±0.23%다. 두 teacher10k이며 기존 Ours의34k/30k와 학습량 차이가 있다.
+- 초기 정책 입력 exact·정책/RMS 불변·dependency bias 부재·CPU SR/count/error·소스/reference/checkpoint SHA 보존을 통과했다. 원시 성공 수→I/E/C 평균→3seed 평균/표본std를 독립 재집계해 일치했다. [결과](output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/report.md) · [완료 검증](output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/completion_verification.json) · [집계 대조](output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/final_aggregate_audit.json).
+
+## 2026-11-15
+
+### 재학습 w/o Dep. Bias · nobias2k 대기 평가 큐
+
+- 사용자 요청에 따라 `run_nobias_ablation.py`·`nobias_ablation_eval.py`를 추가하고 현재 nobias run의2k checkpoint 저장 완료를 기다리는 독립 supervisor를 시작했다. Mixed2/4/8/16명·512환경·seed1/6/7·900step의12회이며 기존 V4 공통 snapshot·XY100%·M=2N·8H R3m/16H R7.5m·I/E/C 동일 가중 SR을 유지한다. Ours 행의92.54/89.09/85.45/71.41% 재현 집계도 확인했다.
+- GPU6 전체 점유를 포함한 시작 판단 한도85,000MiB·시작 중 크기별 예약/실제 PID 사용량·준비 후512MiB/worker와전체1,024MiB 여유를 적용한다. 첫 작업의 실제 입력/dep bias 부재 확인 후 병렬 배정을 확대하고 오류 시 새 배정을 중단한다. 최종 student8층의 dep bias/projection 부재·fusion/SCT 유지·정책/RMS 불변·초기 상태/CPU SR/Error/실제 반경을 검사하며 보고서에 teacher 학습량 차이를 명시한다.
+- CPU2개·12개 고유 명령/36개 reference 파일·차원·shell 인자·구문/diff를 확인했다. 감독 PID321065가 독립 세션에서 `waiting_checkpoint`·pending12·실패0으로 대기 중임을 확인했다. 기존 학습/프로세스는 보존했고 이전 대기 구성은 `queue_preparation_v1/`에 보존했다. 아직2k 정책 GPU 평가 완료를 뜻하지 않는다. [실행](markdowns/USAGE.md#재학습-wo-dep-bias--2k-mixed-ablation) · [상태](output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/status.json) · [중간 표](output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/report.md) · [준비 검사](output_etc/check/nobias_ablation_queue_setup_20261115/tests.log).
+
+### V4 nobias teacher · 두10k checkpoint로 교체
+
+- 사용자 요청으로 `stage2_distill_900_v4_nobias`의 Enable/solo·Coupled teacher를 각각 `Stage2BeforeTotalAt1mmNoBias_00010000.pth`·`Stage2CoupledContactNoBias_00010000.pth`로 교체했다. 두 파일 존재·저장 epoch10000·nobias 설정·271/279tensor를 확인했으며 student 구조/학습 명령은 유지한다. 현재 teacher 설명과 관련 테스트 기대값도10k로 갱신했다.
+- CPU10개가 teacher 모델/정규화 strict 로드·행동 분기·student 전이/학습/재로드·Coupled bias 미사용 검사를 통과했다. 경로 교체만 수행하여 GPU 학습은 실행하지 않았고,9k 기반 distill checkpoint resume 대신 새 run을 사용한다. [검증 로그](output_etc/check/v4_nobias_10k_20261115/cpu_tests.log).
+
+### Supplementary 결과 보관
+
+- 사용자 지정 `supp/coordination_random_delay_512x3_20261115/`에 완료된512환경·3seed 지연 실험을 보관했다. Enabling/Coupled 주요 지표와 AT 직전 거리·Group 성공 조건부Post-AT 시간의 평균±표본std, 유형별/seed별 JSON,430행 지표 CSV,180개 episode NPZ, 보조 episode CSV·schedule·검증·출처 SHA를 포함한다. 주요 표의512개 pooled 평균과 보조 지표의세 유형 동일 가중 평균을 명시했다.
+- 원본/복사 SHA·링크·지표 키 중복 없음·Post-AT15,360행 중 성공6,567개만 시간 포함을 확인했다. 원본 rollout은 이동하지 않았고 GPU 재실행은 없다. [보관본](supp/coordination_random_delay_512x3_20261115/README.md).
+
+### V4 nobias · 두9k teacher와 student dependency bias 제거
+
+- 사용자 요청으로 `stage2_distill_900_v4_nobias` 환경/학습 YAML과 train/test/VNC/eval wrapper를 추가했다. Enable/solo는 사용자 지정 `Stage2BeforeTotalAt1mmNoBias_00009000.pth`, 공동 PUSH는 `Stage2CoupledContactNoBias_00009000.pth`다. Stage1 PUSH26k 전이·4명/1024환경/8토큰·900step·기존 V4 distill 설정을 유지하며 relation fusion/SCT task bias를 보존한다. 최종 student의 actor/critic에는 dependency bias projection을 생성하지 않는다.
+- Teacher 로더는 Enable의 `before_zerobg_nobias`(271tensor·projection 없음)와 Coupled의 `human_relation_bias: false`(279tensor·projection 보존/미사용)를 각각 strict 복원한다. 기존 bias 활성 경로의 state schema/forward exact를 확인했고, nobias student에 bias 활성 teacher를 연결하면 거절한다. 학습·추론·VNC 명령은 config 각 목록 맨 아래에 추가했으며10k 교체는 학습 YAML의 두 경로를 바꿔 새 run으로 시작한다.
+- CPU136개·전체30개 컨피그·shell 구문·새 문서 링크를 통과했다. 원본 두 저장소와6종×4장면의 정규화/actor 평균/critic 출력 차이0을 확인했다. 기존13.5k teacher 외부 경로가 끊긴 테스트1개는 제외하고 초기 실패 로그를 보존했다. Student 전이·MSE 감소·fusion 업데이트·encoder 동결·strict 재로드와 Coupled 저장 projection 교란 시 행동 불변도 통과했다.
+- GPU2 여유 메모리를 확인해 환경 수를 유지한 `CHECK=1` distill1회(131,072frame·replay32,768장면)를 정상 종료했다. 두 teacher9k/bias OFF·student271tensor/dep projection0·가중치 finite·Stage1 actor encoder 보존·저장 계약을 확인했고 MSE는0.006278→0.002188로 감소했다. 본학습은 시작하지 않았고 기존 프로세스는 보존했다. [CPU 검증](output_etc/check/v4_nobias_setup_20261115/cpu_verification.json) · [원본 대조](output_etc/check/v4_nobias_setup_20261115/native_teacher_comparison.json) · [실제 학습/저장 검증](output_etc/check/v4_nobias_setup_20261115/train_verification.json).
+
+### Post-AT Completion Time · Group 성공만 재집계
+
+- 사용자 요청으로64환경 고정0/2/4초·3seed Enabling135조건과0초/랜덤·seed1의30조건에서 최초 동시 Group 성공−최초 AT 성공 시간을 CPU 재집계했다. Group 성공만 포함하며 선행만 성공/미완료는 제외하고 실패시간을 대입하지 않는다. 유형별 성공 평균→세 유형 동일 가중→seed 평균±표본std이며 성공 표본 수·pooled 보조값도 저장한다.
+- 온라인 최초 성공과900step 절단·AT/Group 시간 순서·성공 수·기록dt·입력 SHA 보존을165조건/10,560행에서 검증했다. 랜덤 비교의 DCT는5.30→4.49초(성공163→157/192), FSM7.56→7.44초, CoopFT7k6.35→5.13초다. TokenHSI/SCT의 더 짧은 성공 조건부 시간을 전체 성능 우위로 해석하지 않는다. [랜덤](output_etc/check/post_at_success_only_20261115/random64/report.md) · [고정 지연](output_etc/check/post_at_success_only_20261115/fixed64/report.md).
+
+### AT 완료 직전 거리 재집계
+
+- 사용자 요청으로 완료된64환경 고정0/2/4초·3seed의Enabling135조건과0초/랜덤·seed1의30조건을 CPU 재집계했다. 후행 root XY에서 선행 AT 배치 목표 XY까지 최초 AT 성공step k 직전(k−1)의 거리(m)이며1m offset 없이AT 성공 전체 표본을 포함한다. Group 실패·낙상은 실제 거리로 유지한다.
+- 원시 프레임 인덱스·기존`d_pre_m` 함수·준비율 역산·AT 표본 수·입력 SHA 불변을165조건/10,560행(두 suite의0초 중복 포함)에서 대조했다. 랜덤 비교의 세 유형 평균은 TokenHSI1.23→1.86m, SCT2.97→2.66m, FSM6.03→6.03m, CoopFT7k5.16→4.48m, DCT4.80→3.84m다. 거리만으로 적절한 대기를 뜻하지 않으며 사전점유율과 함께 해석한다. 기존 GPU 평가·코드는 변경하지 않았다. [랜덤](output_etc/check/at_pre_distance_20261115/random64/report.md) · [고정 지연](output_etc/check/at_pre_distance_20261115/fixed64/report.md).
+
+### 랜덤 지연 · 종류별512환경·3seed 준비
+
+- 21:37 KST에 정식180개/합산60조건·30,720 episode를 오류 없이 완료했다(준비 포함 약79분). 최종 초기 상태/정책 입력 pairing·공유 schedule·추적 소스 SHA·각 유형3seed 합계512개·종류별512개와 성공률 재계산을 통과했고 평가 supervisor/worker가 종료됐다. DCT의 Enabling 평균 SR82.55→80.47%, 준비19.57→29.28%, 점유0.03→0.59%; Coupled SR92.45→86.85%, t_coop86.37→75.38%, Jerk13.83→11.71다. [전체 표](output_etc/check/dct_random_delay_family512_seeds167_20261115/report.md) · [완료 검증](output_etc/check/dct_random_delay_family512_seeds167_20261115/completion_verification.json) · [독립 커버리지 검증](output_etc/check/dct_random_delay_family512_seeds167_20261115/final_coverage_audit.json).
+- 추가 요청한AT 직전 거리와Group 성공 조건부Post-AT 시간도 이번Enabling90조건/15,360 episode에서 CPU 재집계·기존 지표/성공 frame/표본/입력 불변 검증을 완료했다. DCT의세 유형 동일 가중 평균은4.49→3.84m,4.95→4.28초다. 이 보조 집계의 동일 가중 평균과 본표의512개 pooled 평균을 구분한다. [거리](output_etc/check/at_pre_distance_20261115/family512/report.md) · [Post-AT](output_etc/check/post_at_success_only_20261115/family512/report.md).
+- 공통 기준18개·210step 개발12개 CPU 채점/0초 대비 초기 상태·입력/정지·해제 검증을 통과하고 정식180개 큐를 시작했다. 작업당 실측5.0–5.2GB에 맞춰 시작 예약을5,500MiB로 보정하고 자체 supervisor만 인계하여 GPU6 13개/GPU7 5개 병렬을 확인했다. 인계한 평가 PID 유지·15개 진행step 증가·오류0을 검증했으며 기존 학습은 건드리지 않았다. 예약 변경 전 manifest·인계/검증 기록은 출력 폴더에 보존했고 평가 소스/조건은 유지했다. 전체 결과는 아직 진행 중이다. [개발 검증](output_etc/check/dct_random_delay_family512_seeds167_20261115/development_verification.json) · [인계 검증](output_etc/check/dct_random_delay_family512_seeds167_20261115/memory_calibration_verification.json).
+- 사용자 승인으로0초/랜덤1–5초를 모두 새로 평가하는 전용 큐를 추가했다.5모델·Enabling/Coupled 각각512환경·seed1/6/7·900step이며 유형별170/171/171개 분할을 순환하여60개 합산 조건/180개 실행/30,720 episode를 구성한다. Coupled2/3/4명과 Enabling2명을 그대로 유지하고 기존 평가 코드는 보존한다.
+- CPU8개 검사·GPU별360개 명령·36개 공유 schedule·회차별512개/유형별3회512개 배정을 확인했다. 초기 manifest의 JSON 정수키/문자열키 비교 오류는 GPU 실행 전에 수정하고 실패 기록을 보존했다. GPU6/7 각각88,000MiB 한도로 기준 생성·개발 검증 큐를 시작했으며 정식 평가 완료를 의미하지 않는다. [실행](markdowns/USAGE.md#랜덤-지연종류별512환경3회) · [상태](output_etc/check/dct_random_delay_family512_seeds167_20261115/status.json).
+- 앞선64환경·seed1 랜덤30조건은 전체 완료·1,920개 신규 episode·기존0초와 초기 상태/입력 및 공유 지연 검증을 확인했다. [완료 검증](output_etc/check/dct_random_delay_env64_seed1_20261115/completion_verification.json).
+
+### 지연 대응 지표 문서
+
+- 사용자 요청에 따라 [eval/delay_coordination_metrics.md](eval/delay_coordination_metrics.md)에 현재30초 실험의 지표 정의·AT 성공 조건부 표본·낙상 처리·Coupled 시간 구간/clip/0 제외·seed/장면 평균과 최종 평균표를 정리했다. 실제 채점 코드와 결과 JSON을 대조하고 상대 링크·diff를 확인했다. 문서만 추가·연결했으며 평가 코드는 변경하거나 재실행하지 않았다.
+
+### 랜덤1–5초 지연 · 64환경·seed1 평가 시작
+
+- 사용자 승인으로 GPU6 전체85,000MiB 한도에서6장면×5모델의 랜덤 지연30조건을 시작했다.64환경·seed1·900step이며 기존0초30조건을 읽기 전용으로 재사용한다. 장면별 Uniform[1,5)초64개를 별도 RNG로 한 번 추출해1/30초 단위로 반올림하고,5모델이 동일 schedule SHA·환경번호·지연 대상을 공유한다.
+- 기존 정책/정지/평가 소스와 완료 결과는 보존하고 랜덤 지연 adapter·전용 큐·CPU 채점·0초→랜덤 비교를 추가했다. 환경별 release/fall·모델 간 schedule 공유·정책 RNG 보존을 포함한CPU6개 검사와210step 개발4회(FSM Enabling/Coupled, TokenHSI, DCT)를 통과했다. 실제 정지 frame·root/DOF 고정·FSM 해제·기존0초 초기 장면/첫 입력·TokenHSI397D 입력 일치를 검증했다.
+- 정식12개가 병렬 실행 중이며 초기100–200step 진행·오류0을 확인했다. 전체 완료를 의미하지 않는다. [실행](markdowns/USAGE.md#랜덤-지연-15초64환경) · [상태](output_etc/check/dct_random_delay_env64_seed1_20261115/status.json) · [개발 검증](output_etc/check/dct_random_delay_env64_seed1_20261115/development_verification.json) · [비교표](output_etc/check/dct_random_delay_env64_seed1_20261115/report.md).
+
+### 지연 대응 · 6장면·64환경·3seed 평가 시작
+
+- 전체270조건(신규240/기존30)·17,280 episode의30초 CPU 검증과 집계를 완료했다. 각 조건192표본·모든seed 완비, 성공 개수/SR·90개 seed별 종류 평균·공통 초기 입력·정책epoch를 독립 대조했고 오류 없이 supervisor 종료를 확인했다. 마지막 CPU 완료 때 status 수가269에 남는 갱신 누락을 수정하고270으로 정정했다. Enabling DCT 평균 SR85.9→84.2→82.3%, 준비20.9→28.2→33.2%, 점유0.0→0.2→1.2%; Coupled SR90.8→88.0→81.9%, t_coop84.8→80.9→70.5%, Jerk13.3→12.6→10.2다. [전체 평균±표준편차](output_etc/check/dct_delay_env64_seeds167_30s_20261115/report.md) · [완료 검증](output_etc/check/dct_delay_env64_seeds167_30s_20261115/completion_verification.json).
+- 추가 승인으로 GPU6 상한을13작업·88,000MiB로 조정하고 GPU7의6작업·90,000MiB는 유지했다. 기존 평가를 인계하여13+6개 동시 실행·GPU6 실측86,040MiB·작업 중복 없음·기존15개 PID step 증가·오류0을 확인했다.540개 명령 계약 재검증과 SHA 갱신을 완료했다.122/270조건 검증 시점의 두 GPU 실측 처리량은 약33.9step/s이며 선형 잔여 추정63분, 안내 범위는60~80분이다. 기록은 suite 출력의 `gpu6_13_handoff.json`, `gpu6_13_verification.json`에 보존한다.
+- 사용자 승인으로 GPU7에6개를 추가해 단일 큐를 GPU6 최대12개/GPU7 최대6개로 확장했다. 시작 판단 한도는 전체85,000/90,000MiB이며 정책·seed·장면·평가시간은 유지한다.540개 GPU별 명령의 장치 선택 외 동일성·GPU7 runtime UUID·18개 실제 GPU 배치·작업 중복 없음·기존10개 PID 진행 유지 검증을 통과했다. 실측 GPU6 81,070MiB/GPU7 88,424MiB, 오류0이며 추가 작업5개는100~200step까지 진행했다. 인계·검증은 suite 출력의 `gpu7_handoff.json`, `gpu7_launch_verification.json`에 저장했다.
+- 후속 요청으로 GPU6 전체 시작 판단 한도를85,000MiB로 높이고 worker 상한16 내에서 메모리에 따라 채우도록 변경했다. 기존 평가 PID를 유지해 인계했으며12개 동시 실행·기존6개 PID의 진행step 증가·실측77,560MiB(일부 시작 중)·오류0을 확인했다. 모두 할당되면 약82,000MiB 예상이며13개는 현재 기존 학습 점유 기준으로 한도를 넘는다.270명령 계약·메모리 gate 검증과 SHA 갱신을 완료했다. 검증 기록은 `memory_queue_85_verification.json`, 인계 기록은 `memory_queue_handoff_85.json`이다.
+- 추가 사용자 요청으로 병렬 상한을10개로 올렸다. 시작 중인 작업만6,000MiB 예약하고 warm 추가 여유를 제거했으며, 예상 전체 사용량 약71,000MiB에 맞춰 시작 판단 상한을74,000MiB로 변경했다. 실행 중 평가 PID를 인계하여 중단 없이 supervisor를 교체했다. 프로세스 생존/완료 판별·예약 계산 검증 및270명령 재검증을 통과했고10개 동시 실행과기존 PID 진행step 증가를 확인했다. 정책·평가 조건은 동일하며 변경 SHA와 인계 기록은 suite 출력에 보존한다.
+- 사용자 승인으로 GPU6·전체 메모리70,000MiB 제한의 자동 큐를 시작했다. AT→SIT/CLIMB/ONTOP2명과 공동 PUSH2/3/4명,5모델·지연0/2/4초·seed1/6/7·900step 총270조건이다. 기존seed1 SIT/3명 PUSH30개는1050step 기록의 앞900step으로 재집계하고240개를 새로 실행한다. CoopFT7k·DCT V4 2k·TokenHSI40.5k·SCT/FSM26k를 유지한다.
+- 기존 정책·정지 구현은 보존하고 전용 큐/CPU 채점/종류별 동일 가중 평균·seed 평균±표본std를 추가했다. 신규4장면×5모델의135step 검증을 해당 정식 평가의 선행 조건으로 둔다.270개 명령 계약·기존CPU4개 정지 검사·기존 DCT SIT 기록의900step 재채점을 통과했다. 새 장면 기준 생성부터 진행 중이며 완료를 의미하지 않는다. [실행](markdowns/USAGE.md#지연-대응-6장면3seed) · [상태](output_etc/check/dct_delay_env64_seeds167_30s_20261115/status.json) · [중간 표](output_etc/check/dct_delay_env64_seeds167_30s_20261115/report.md).
+- 기준18개(신규16/재사용2)·개발20개 검증과 기존30조건의30초 지표 대조를 완료하고 정식 평가를 시작했다. 실측 약5GB/작업에 맞춰 초기 예약을 warm 작업당500MiB 여유로 조정한 뒤, 자체 실행이 없는 시점에 supervisor만 재시작했다. 정책/실행 코드 변경은 없으며 변경 SHA를 manifest에 기록했다. 현재8개 정식 작업 병렬·GPU6 전체 약61GB, 오류 없이 진행 중이다.
+
+### Coupled 지연 · 5모델 Jerk CPU 재집계
+
+- 사용자 요청으로 같은3명·64환경·seed1·35초·지연0/2/4초15조건960 episode를 기존20cm 출발 Jerk 규약으로 재집계했다. 상자 둘레64점·회전 포함XYZ·float32/dt0.0333·원본 차분 mask·0 trial 제외를 유지하고 성공/실패 조건부 평균과 유효 수를 함께 저장했다. 새 GPU 평가 없음.
+- 15조건 최초 성공/상자 중심/초기 위치·목표·크기 대조,960 episode 원본 함수와 명시적 차분식 exact,79개 입력 SHA 보존을 통과했다. CoopFT7k는12.58/14.07/8.58, DCT는13.30/13.14/9.80m/s³다. 두 모델은SCT/FSM보다 낮지만 상호 순위는 조건에 따라 다르며, 낮은 실패 표본 Jerk가 전체 평균을 내릴 수 있어 지연 대응 향상으로 단정하지 않는다. [결과·실행](output_etc/check/coupled_delay_jerk_20261115/report.md) · [검증](output_etc/check/coupled_delay_jerk_20261115/verification.json).
+
+### Coupled 지연 · 운반 경로 효율 CPU 재집계
+
+- 사용자 요청으로 TokenHSI/SCT/FSM/Coop. FT7k/DCT의 기존3명·64환경·seed1·지연0/2/4초15개 기록(960 episode)을 재집계했다. 초기 snapshot부터 최초 성공 frame까지, 실패는35초 기록 끝까지 상자 중심XY 이동거리를 합하고 목표 거리 감소량으로 나눈 episode별 비율을 평균한다. 무이동0·음수 유지·성공/실패 모두 포함하며 GPU 실행은 없다.
+- 15개 최초 성공/물리 상자 중심/공통 초기 상태 대조·960개 독립 scalar 계산·직진/무이동/역주행/성공 후 제외 검사·76개 입력 SHA 보존을 통과했다. DCT 경로 효율은90.55→82.45→73.54%로 감소하며, 성공 조건부 평균은 대부분 모델에서98%대로 비슷하다. 전체 평균 차이는 실패 궤적에 크게 좌우되어 DCT의 경로 효율 우위를 지지하지 않는다. [결과·실행](output_etc/check/coupled_path_efficiency_20261115/report.md) · [검증](output_etc/check/coupled_path_efficiency_20261115/verification.json).
+
+### 지연 대응 · TokenHSI40.5k 추가
+
+- 사용자 요청으로 기존4모델24조건을 보존하고 TokenHSI40.5k의 AT→SIT2명/공동 PUSH3명·지연0/2/4초6조건을 GPU6에서6개 병렬로 완료했다.64환경·seed1·35초·같은 초기 장면/속도0/정지/성공 조건이며 원본397D 자기 상태·담당 과제 입력의 구조 차이를 명시한다.
+- 135step 개발2회와1050step 정식6회의 공통 초기 상태/첫 관측·실제397D 입력/정규화/첫 행동의 지연 간 exact·원본40500epoch 정책 보존·정지/해제·CPU 채점·source SHA 검증을 통과했다. 통합30조건 분모/성공 개수와 기존24조건 원시 SHA도 독립 대조했다. 원본 정책 구현과 checkpoint는 읽기 전용으로 사용한다. [실행](FSM/dct/README.md#tokenhsi405k-추가) · [검증](output_etc/check/dct_delay_tokenhsi_40500_env64_seed1_20261115/final_audit.json).
+- 지연0/2/4초 TokenHSI의 Enabling 성공은11/6/2개(분모64), 준비율72.71/61.20/28.64%·점유율29.93/32.77/22.35%다. Coupled 성공은38/31/27개, 기존t_coop42.43/37.29/23.88%다. 모든 신규 조건의30초/35초 SR이 같았다. 성공 표본 시간·입력 구조 차이와 단일 seed 한계를 명시했다. [5모델 통합 표](output_etc/check/dct_delay_tokenhsi_40500_env64_seed1_20261115/report.md) · [해석](output_etc/check/dct_delay_tokenhsi_40500_env64_seed1_20261115/interpretation.md).
+
+### 지연 대응 · 64환경 파일럿
+
+- 사용자 승인으로 `FSM/dct/`에 SCT26k/SCT+FSM26k/Coop. FT7k/Ours V4 2k의 AT→SIT2명·공동 PUSH3명 평가를 추가했다. GPU6·64환경·seed1·0/2/4초 정지·35초(1050step)24회/1536episode를 완료했다. 최대12작업 설정에서 실제10작업까지 병렬 실행했다. FSM의 substep 상태 투영을 재사용하고 관계·checkpoint·성공 기준을 유지한다.
+- 모든 조건의 초기 속도0·reset 몸체 자세 관측을 통일했다. CPU4개 검사·135step 개발8회·정식24회의 공통 초기 상태/첫 입력 exact·정지/해제 및 고정 root/DOF·CPU SR 대조·정책/정규화/코드 SHA 보존·독립 분모 검증을 통과했다. FSM6조건의 대기/해제를 CPU에서 재현했다. 초기 개발의 Coop. FT device 선택 오류와 FSM 첫 몸체 관측 차이는 수정하고 실패 기록을 별도 보존했다. [실행·규약](FSM/dct/README.md) · [최종 검증](output_etc/check/dct_delay_env64_seed1_20261115/final_audit.json).
+- Ours의0/2/4초 Enabling 성공은58/56/56개(분모64), 준비율24.58/35.98/42.32%·점유율 모두0%다. Coupled 성공은59/55/49개로 감소하며4초 FSM50개보다1개 낮아 기다림/강건성의 전반적 우위를 주장하지 않는다.30초·35초·30+지연초 재집계와 동일 장면 성공 변화도 저장했다. [표](output_etc/check/dct_delay_env64_seed1_20261115/report.md) · [해석](output_etc/check/dct_delay_env64_seed1_20261115/interpretation.md).
+
+### Stage1 SCT task bias OFF/Shuffled
+
+- 사용자 요청으로 Stage1 26k·2/4/8/16명 Independent·512환경·seed1/6/7·900step·XY100%·8명R3m/16명R7.5m 평가를 완료했다. Original12회/기존 동일 배치 OFF6회를 재사용하고, Shuffled12회/8·16명 OFF6회를 GPU6/7에서 새로 실행했다.
+- 평가 전용 adapter는 계산된 SCT attention bias만 제거하거나 SELF를 제외한 H/O/G key 위치를 scene/query별 고정 셔플한다. 실제 packet·공유 embedding·feature fusion·정규화·가중치를 보존한다. 기존 table OFF와 동등성·셔플 불변량·RNG/가중치/fusion 보존·padding/내부 토큰 순열 대응 CPU3개 검사 및 신규18개 launch 설정 검증을 통과했다. 전체36회 CPU 재채점·초기 상태·Stage1 native actor/정규화·DCT 미사용·실제 반경·원본/참조/코드 SHA와 독립 분모/평균/표본std 검증도 통과했다. [실행](markdowns/USAGE.md#stage1-task-bias-offshuffled) · [독립 검증](output_etc/check/taskbias_stage1_26k_2h4h8h16h_seeds167_20261115/final_audit.json).
+- Independent SR(%) Original/OFF/Shuffled는2명90.36±0.75/0.00±0.00/8.46±0.11,4명88.51±0.34/0.00±0.00/3.66±0.47,8명88.48±0.13/0.03±0.04/1.96±0.29,16명81.12±0.26/0.06±0.04/0.77±0.22다. 학습된 Stage1의 추론 시 SCT task bias 민감도를 보여주며 SCT 전체 제거/재학습 ablation으로 해석하지 않는다. [표·seed별 결과](output_etc/check/taskbias_stage1_26k_2h4h8h16h_seeds167_20261115/report.md).
+
+### Dependency bias OFF/Shuffled · 2H/8H Mixed
+
+- 사용자 요청으로 V4 2k·2/8명 Mixed·512환경·seed1/6/7·900step·XY100%의 OFF/Shuffled12회 평가를 GPU6/7에서 완료했다.8명은R3m,2명은기본배치다. 기존 Original6회는 읽기 전용 링크에서 CPU 재채점하고 원본 파일을 보존했다.
+- 기존 셔플 정의에서2명은 타인이1명뿐이므로 항등변환이다. 전용 adapter가 매 attention 호출의 bias 불변을 확인하고, 기존 구현의 무변화 오류를 이 경우에만 허용한다.8명 및 기존4/16명 개입 구현은 유지했다. CPU7개 검사·12개 launch 설정·18회 CPU SR/Error 재채점·초기 상태/첫 입력·가중치/정규화·8명R3m·입력/원본 SHA 검증을 통과했다. 기존4/16명을 합친36개 기록의 분모/평균/표본std도 독립 대조했다. [실행](markdowns/USAGE.md#dependency-bias-offshuffled) · [완료 검증](output_etc/check/depbias_v4_2000_2h8h_seeds167_20261115/completion_verification.json) · [독립 집계](output_etc/check/depbias_v4_2000_2h8h_seeds167_20261115/final_audit.json).
+- Mixed SR(%) Original/OFF/Shuffled는2명92.54±0.95/86.92±1.30/92.66±1.06,8명85.45±1.06/79.95±0.32/76.42±0.62다.8명 OFF/Shuffled 감소는−5.50/−9.04%p다.2명 Shuffled는 bias8블록×900frame 불변·첫 행동 차이0이지만 seed7의 Enabling 성공이154→156/176으로2개 늘어 Mixed 평균+0.13%p다. seed1/6의 SR은 같았고, 기록 궤적은 진행 중 달라졌다. 정확한 수치/시뮬레이션 원인은 분리하지 못했으며 이 대조군 차이를 셔플 효과로 해석하지 않는다. [통합표·seed별 결과](output_etc/check/depbias_v4_2000_2h8h_seeds167_20261115/report.md) · [항등 대조군 비교](output_etc/check/depbias_v4_2000_2h8h_seeds167_20261115/two_person_identity_comparison.json).
+
 ## 2026-11-14
+
+### 관계별 dependency bias OFF · 4H 추가 seed8
+
+- 사용자 추가 seed 요청으로8을 선택하고 공통 초기 snapshot부터 Original/Enabling OFF/Coupled OFF/All OFF4회 평가를 완료했다. V4 2k·512환경·900step·XY100%·기본4명배치/8물체·GPU6/7을 유지하고, 기존1/6/7 결과와 분리해4seed 평균도 저장했다.
+- 전용 실행기 구문 및 기준 생성/네 조건 launch 설정,4회 CPU SR/Error 재채점·공통 초기 상태/첫 입력·가중치/정규화·선택 제거8블록×900frame·16개 기록 분모/평균/표본std 독립 대조를 통과했다. 현재 입력/참조 SHA 및 기존3seed 실험의102개 입력 파일 SHA도 일치했다. [실행](markdowns/USAGE.md#관계별-dependency-bias-off) · [완료 검증](output_etc/check/relation_bias_v4_2000_4h_seed8_20261114/completion_verification.json) · [독립 검증](output_etc/check/relation_bias_v4_2000_4h_seed8_20261114/final_audit.json).
+- seed8 Enabling/Coupled SR(%)은 Original75.40/90.96, Enabling OFF73.14/90.96, Coupled OFF78.96/87.35, All OFF73.79/88.25다. 대상 관계 변화−2.27/−3.61%p에 비해 Mixed 변화는−0.27/−0.14%p로 작다.4seed 평균 대상 변화는−4.35/−5.41%p이며 감소 방향은 모두 같지만 크기는 달라 통계적 유의성·가산성을 단정하지 않는다. [결과](output_etc/check/relation_bias_v4_2000_4h_seed8_20261114/report.md).
+
+### 관계별 dependency bias OFF · 4H Mixed
+
+- 사용자 요청으로 검증된 선택 제거 구현에4명 전용 실행기를 추가했다. V4 2k·512환경·seed1/6/7·900step·XY100%·기본4명배치/8물체의 신규6회 평가를 GPU6/7에서 완료했다. 기존 Original/All OFF6회는 재사용하며16명 실행기·결과는 보존했다.
+- 실행기 구문·launch 명령의4명/8물체/512환경·GPU/조건 전달·16명용 반경/스폰 옵션 미전달, 총12회 CPU 재채점·첫 입력/가중치 보존·8블록×900frame 선택 제거·독립 평균/std/분모 검증을 통과했다. 현재 입력/기존 산출물 SHA 및16명 실험의129개 입력 파일 SHA도 일치했다. [실행](markdowns/USAGE.md#관계별-dependency-bias-off) · [실행 검증](output_etc/check/relation_bias_v4_2000_4h_seeds167_20261114/launch_verification.json) · [최종 검증](output_etc/check/relation_bias_v4_2000_4h_seeds167_20261114/final_audit.json).
+- Enabling/Coupled SR(%)은 Original79.10/91.21, Enabling OFF74.05/92.25, Coupled OFF80.44/85.21, All OFF71.92/86.16다. 대상 관계 하락은 각각−5.05/−6.00%p이며 모두3seed에서 확인했다. Mixed SR은87.59±0.59/87.40±0.93%다. Enabling OFF의 seed별 대상 변화는−8.23/−0.62/−6.29%p로 크기가 다르며, 개별 제거 효과의 가산성이나 통계적 유의성은 주장하지 않는다. [보고서](output_etc/check/relation_bias_v4_2000_4h_seeds167_20261114/report.md).
+
+### 관계별 dependency bias OFF · 16H Mixed
+
+- 사용자 위임으로 V4 2k·16명·512환경·seed1/6/7·900step·XY100%·R7.5m의 Enabling OFF/Coupled OFF6회 평가를 GPU6/7 각1작업으로 완료했다. 기존 Original/All OFF6회는 읽기 전용 링크에서 CPU 재채점하고 원본 산출물의 SHA를 보존했다.
+- 평가 전용으로 actor/critic 전층의 계산된 bias 표에서 relation ID2(Follower→Predecessor) 또는ID3(Coupled 양방향) 열만0으로 만든다. 다른 관계 bias·padding·실제 관계·feature fusion·SCT·action head·checkpoint·정규화는 유지했다. 관련 CPU9개 테스트·12회 CPU 재채점·첫 입력/가중치/반경·8블록×900frame 선택 제거·독립 평균/std/분모·checkpoint/config/code/reference/기존 산출물 SHA 검증을 통과했다.
+- Enabling/Coupled SR(%)은 Original44.19/81.37, Enabling OFF37.47/82.95, Coupled OFF43.53/70.54, All OFF36.46/70.79다. 대상 관계의 하락은 각각−6.73/−10.83%p이며 두 조건 모두3seed에서 확인했다. Mixed SR은69.62±1.02/67.44±0.30%다. 관계별 bias의 추론 시 기여를 지지하며 재학습 필요성이나 비대상 관계 불변을 주장하지 않는다. [실행](markdowns/USAGE.md#관계별-dependency-bias-off) · [보고서](output_etc/check/relation_bias_v4_2000_16h_seeds167_20261114/report.md) · [완료 검증](output_etc/check/relation_bias_v4_2000_16h_seeds167_20261114/completion_verification.json).
 
 ### Coordination Behavior · 기존 Enabling rollout CPU 재집계
 

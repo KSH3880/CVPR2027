@@ -2,6 +2,81 @@
 
 기본 명령은 [config](config.md), 구현 위치는 [structure](structure.md)를 따른다.
 
+## 1명 Independent · 일반/Enable 공통 크기
+
+`eval/run_single_size.py`는 TokenHSI40.5k/SCT26k/CoopFT7k/Ours V4 2k × 일반/공통 크기 × seed1/6/7의24회를 평가한다. 1명·2토큰·512환경·900step·XY100%·행동별20% 무작위 배정이며 Table1의 거리·물성·ever 성공 기준을 유지한다. SCT+FSM은 별도로 실행하지 않는다.
+
+일반은 Table1 행동별 크기다. 공통은 SIT/CLIMB/AT/ON_TOP 받침만 X/Y0.40–0.60m·Z0.35–0.50m·5cm 격자로 변경하고 ON_TOP payload·PUSH는 유지한다. 각 크기/seed의 동일 초기 장면을 네 모델이 공유한다. 두 크기 조건의 행동 배정은 같지만 크기에 따른 배치 재시도가 달라질 수 있다. TokenHSI의 기존397D 입력 차이는 보고서에 명시한다.
+
+GPU5/6의 기존 점유를 포함하여 각각85,000MiB 이내에서 배정한다. 초기 장면6개와512환경·60step 개발5회를 검증한 뒤 정식24회를 시작하고 CPU 재채점·초기 상태/첫 입력·정책/정규화·크기/거리·출처 SHA를 검사한다. 기존 큐가 실행 중이면 중복 실행하지 않는다.
+
+```bash
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_size.py --prepare-only
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_size.py
+```
+
+[진행 상태](../output_etc/check/single_size_native_common_env512_seeds167_20261120/status.json) · [행동별 결과](../output_etc/check/single_size_native_common_env512_seeds167_20261120/report.md) · [실행 구성](../output_etc/check/single_size_native_common_env512_seeds167_20261120/manifest.json).
+
+2026-11-20에24회 모두 완료했다. [완료 검증](../output_etc/check/single_size_native_common_env512_seeds167_20261120/completion_verification.json) · [독립 집계 검증](../output_etc/check/single_size_native_common_env512_seeds167_20261120/final_aggregate_audit.json). 위 실행기는 기존 결과를 덮어쓰는 재실행용이 아니다.
+
+## 1명 Independent · 원본 carry 9종
+
+기존 1명 평가에서 AT 운반 상자와 ON_TOP payload를 TokenHSI `testSizes` 9종으로 교체한다. 정육면체 한 변0.22/0.27/0.32/0.37/0.42/0.47/0.52/0.57m와0.30×0.30×0.40m다. 행동별로 각 종류를 한 번씩 포함하고 나머지를 균등 무작위 배정한다. 별도 난수 생성기를 사용하여 일반/공통의 운반 크기 배정을 맞춘다.
+
+4모델×일반/공통×seed1/6/7의24회,512환경·900step이다. 공통 조건의 SIT/CLIMB/ON_TOP 받침은 기존 공통 크기, PUSH와 거리·물성·성공 기준은 기존 Table1 설정을 유지한다. 이는 원본의 **상자 9종만 적용한** Table1 평가이며 TokenHSI 원본 프로토콜 전체 재현은 아니다. GPU5/6/7 각각 기존 점유 포함85,000MiB 이내에서 실행한다.
+
+```bash
+SINGLE_CARRY=original9 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_size.py --prepare-only
+SINGLE_CARRY=original9 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_size.py
+```
+
+[상태](../output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/status.json) · [행동별 결과](../output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/report.md) · [실행 구성](../output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/manifest.json). 기존 결과가 있는 폴더에는 재실행하지 않는다.
+
+2026-11-20에 추가24회 완료. [기존/9종 × 일반/공통 네 표](../output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/four_conditions.md) · [완료 검증](../output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/completion_verification.json) · [독립 집계 검증](../output_etc/check/single_size_original9_native_common_env512_seeds167_20261120/final_aggregate_audit.json). MPS 시작 실패1회는 원시 로그를 보존하고 동일 조건으로 복구했다.
+
+## ② 기존 공통 크기 · seed 0–9
+
+`eval/run_single_common_seeds.py`는 기존 공통 크기의4모델을 seed0–9로 확장한다. 기존 seed1/6/7의12회는 읽기 전용으로 재사용하고 seed0/2/3/4/5/8/9의28회만 추가한다. 1명·2토큰·512환경·900step, SIT/CLIMB/AT/ON_TOP 받침 공통 크기와 ON_TOP payload/PUSH 기존 크기를 유지한다. 원본 carry9종 조건이 아니다.
+
+GPU5/6/7 각각 기존 점유 포함85,000MiB 이내에서 매 시작 전 점유/예약을 갱신하고 작업을 분산한다. 시작 간격2초, MPS 확인 단계에서 시뮬레이션 시작 전에 종료된 작업만 로그를 보존하고 최대2회 재시도한다. 새 공통 장면7개와 seed0 네 모델/기존seed1 Ours의60step 검증5회 후 정식28회를 실행한다.
+
+```bash
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_common_seeds.py --prepare-only
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_common_seeds.py
+```
+
+[상태](../output_etc/check/single_common_env512_seeds0to9_20261120/status.json) · [모든 seed의 행동별 결과](../output_etc/check/single_common_env512_seeds0to9_20261120/report.md) · [실행 구성](../output_etc/check/single_common_env512_seeds0to9_20261120/manifest.json). 기존 출력이 있는 큐를 중복 실행하지 않는다.
+
+2026-11-20에 추가28회와 기존12회 합산 검증을 완료했다. [완료 검증](../output_etc/check/single_common_env512_seeds0to9_20261120/completion_verification.json) · [독립 집계 검증](../output_etc/check/single_common_env512_seeds0to9_20261120/final_aggregate_audit.json) · [행동별 원시 성공 수 CSV](../output_etc/check/single_common_env512_seeds0to9_20261120/per_seed_tasks.csv).
+
+## ② 기존 공통 크기 · seed 10–20
+
+동일한 평가 설정으로 seed10부터20까지 양 끝을 포함한11개×4모델=44회를 추가한다. 기존0–9의40회는 읽기 전용으로 재사용하여0–20의84회도 함께 집계한다. 신규11개 seed 평균과 전체21개 seed 평균을 구분하며 상자/거리/성공 기준/distractor 물리·입력 처리는 변경하지 않는다.
+
+```bash
+SINGLE_COMMON_SEEDS=10to20 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_common_seeds.py --prepare-only
+SINGLE_COMMON_SEEDS=10to20 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_common_seeds.py
+```
+
+GPU5/6/7 각각 기존 점유 포함85,000MiB 한도다. 새 공통 장면11개와 seed10 네 모델/기존seed1 Ours의60step 개발5회 후 정식44회를 실행한다. [상태](../output_etc/check/single_common_env512_seeds10to20_20261120/status.json) · [모든 seed 행동별 표](../output_etc/check/single_common_env512_seeds10to20_20261120/report.md) · [실행 구성](../output_etc/check/single_common_env512_seeds10to20_20261120/manifest.json). 기존 출력이 있는 큐를 중복 실행하지 않는다.
+
+사용자 지정 표시 필터는 전체seed0–20 중 **TokenHSI와 SCT 모두 AT·ON_TOP 각각70% 이상**인 seed다. 반올림 전 원시 성공 수로 판단하며 네 모델에 같은 seed 집합을 적용한다. 전체 결과와 필터 후 통계는 별도로 보존한다.
+
+추가44회와 기존40회 합산 검증을 완료했다(준비 포함16.95분, 실패/재시도0회). 조건을 통과한17개 seed는1,2,3,4,5,7,8,11–20이다. [필터 후 행동별 표](../output_etc/check/single_common_env512_seeds10to20_20261120/filtered_both.md) · [필터 CSV](../output_etc/check/single_common_env512_seeds10to20_20261120/filtered_both.csv) · [전체 원시 성공 수 CSV](../output_etc/check/single_common_env512_seeds10to20_20261120/per_seed_tasks.csv) · [집계 검증](../output_etc/check/single_common_env512_seeds10to20_20261120/final_aggregate_audit.json).
+
+## ② 기존 공통 크기 · seed 21–25
+
+같은 설정으로 seed21–25의5개×4모델=20회를 추가하고 기존0–20의84회를 읽기 전용으로 재사용한다. 512환경·900step·기존 상자/거리/distractor 처리·체크포인트를 유지한다. GPU5/6/7 각각 기존 점유 포함85,000MiB 한도로 공통 장면5개→seed21 네 모델/seed1 Ours의60step 검증5회→정식20회를 실행한다.
+
+```bash
+SINGLE_COMMON_SEEDS=21to25 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_common_seeds.py --prepare-only
+SINGLE_COMMON_SEEDS=21to25 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_single_common_seeds.py
+```
+
+[상태](../output_etc/check/single_common_env512_seeds21to25_20261120/status.json) · [전체26seed 행동별 결과](../output_etc/check/single_common_env512_seeds21to25_20261120/report.md) · [실행 구성](../output_etc/check/single_common_env512_seeds21to25_20261120/manifest.json). 기존 결과 폴더에는 중복 실행하지 않는다. 신규5seed와 전체26seed 평균/표본std를 구분한다.
+
+추가20회 및 합산104회 검증을 완료했다(준비 포함8.32분, 실패/재시도0회). TokenHSI·SCT의 AT·ON_TOP 모두75% 이상인 신규seed는22/23이며 기존 포함11개다. [75% 필터 표](../output_etc/check/single_common_env512_seeds21to25_20261120/filtered_both.md) · [필터 CSV](../output_etc/check/single_common_env512_seeds21to25_20261120/filtered_both.csv) · [전체 원시 성공 수 CSV](../output_etc/check/single_common_env512_seeds21to25_20261120/per_seed_tasks.csv) · [집계 검증](../output_etc/check/single_common_env512_seeds21to25_20261120/final_aggregate_audit.json).
+
 ## 실행 환경
 
 모든 wrapper는 `runtime_env.sh`로 기본 conda `tokenhsi`를 활성화하고 저장소 루트에서 실행한다. 다른 환경은 `TOKENHSI_CONDA_ENV=<이름>`, conda 설치 위치는 `CONDA_BASE`로 명시한다.
@@ -389,6 +464,8 @@ Enable 공유 상자를 후행 행동별 운반/받침 크기 교집합으로 �
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_eval.sh "$CKPT" --envs 512 --seeds 0 1 2 --enable_size_mode per_action_intersection --output output_etc/check/stage2_distill_900_action_intersection_eval
 ```
 
+`stage2_distill_900_v4_nobias`는 두 nobias teacher를 모두10k로 연결하고 student의 dependency attention bias도 제거한다. Stage1 PUSH26k 초기화·relation fusion·SCT task bias·900step·4명/1024환경/8토큰·학습률3e-4·teacher20+180iteration 전환을 유지한다. Teacher 경로는 `tokenhsi/data/cfg/train/rlg/stage2_distill_900_v4_nobias.yaml`, 실행은 [config](config.md)의 각 목록 맨 아래, 구조/teacher 교체와 resume 조건은 [명세](reference/stage2_distill.md)를 따른다. 정식 평가는 `TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v4_nobias_eval.sh "$CKPT" --output output_etc/check/stage2_distill_900_v4_nobias_eval`이다.
+
 ### Stage2 distillation
 
 학습·로컬 viewer·VNC 기본 명령은 [config](config.md) 맨 아래의 `stage2_distill` 항목을 따른다. 아래 teacher 경로와 실행 전환/replay 설정은 `tokenhsi/data/cfg/train/rlg/stage2_distill.yaml`의 `params.config.distillation`에 있다. 기본 teacher는 enable13.5k/coupled25.5k, solo는 enable 담당이다. [학습/동결/저장 명세](reference/stage2_distill.md).
@@ -472,6 +549,20 @@ CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THRE
 
 기존 출력 폴더를 덮어쓰지 않는다. 재실행 시 새로운 `output_etc/check/<분석명>`을 지정한다. [결과](../output_etc/check/coordination_behavior_v4_2000_20261114/report.md)·[해석](../output_etc/check/coordination_behavior_v4_2000_20261114/interpretation.md)·[검증](../output_etc/check/coordination_behavior_v4_2000_20261114/verification.json)에 전체/행동/seed별 결과·공통 AT/Group 성공 장면 비교·원시 SHA를 저장한다. 기존 공식 Table2 결과와 성공 기준은 유지한다.
 
+### Stage1 task bias OFF/Shuffled
+
+Stage1 26k의 Independent 2/4/8/16명·512환경·seed1/6/7·900step·XY100%·M=2N을 비교한다. 8명 R3m·16명 R7.5m이며 GPU6/7에 각1작업을 실행한다. Original12회와 동일 배치의 기존 OFF 2/4명6회를 CPU 재채점하여 재사용하고, Shuffled12회와 OFF 8/16명6회를 새로 실행한다.
+
+OFF는 SCT task attention bias의 유한 값을0으로 만든다. Shuffled는 사람·물체·목표 토큰 전체에서 각 query의 SELF/padding을 유지하며 NONE 포함 key bias를 섞는다. 별도 CPU RNG `100000+평가seed`의 scene/query별 순열을 모든 layer/head/actor/critic에 공유하고 episode 동안 canonical token ID 기준으로 고정한다. 실제 task packet·embedding·feature fusion·GTA·action head·checkpoint·정규화는 유지한다. Stage1은 DCT를 사용하지 않으며, 2명이어도 물체/목표 토큰이 있어 이 셔플은 항등변환이 아니다.
+
+```bash
+# Stage1 task bias: CPU supervisor, 각 자식은 runtime_env.sh에서 GPU6/7 설정
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_taskbias_ablation.py
+```
+
+출력은 `output_etc/check/taskbias_stage1_26k_2h4h8h16h_seeds167_20261115/`다. 기존 폴더를 덮어쓰지 않으므로 중복 실행하지 않는다. `status.json`·`report.md`·`summary.json`에 진행 상태와 seed별 SR·평균±표본std를 기록하고, 완료 여부는 `completion_verification.json`으로 확인한다. 기존 원본·checkpoint·참조 snapshot·실행 코드 SHA를 보존한다.
+
 ### Dependency bias OFF/Shuffled
 
 V4 2k·4/16H Mixed·512환경·seed1/6/7·900step에서 OFF/Shuffled12회를 GPU6/7에 각1개씩 실행한다. Original6회는 현재 정식 결과를 CPU 재채점하고 checkpoint SHA·초기 snapshot·첫 입력·배치 조건을 확인해 재사용한다. 16H는 반경7.5m다.
@@ -481,6 +572,136 @@ OFF는 actor/critic의 DCT attention bias만0으로 만든다. Shuffled는 각 �
 ```bash
 # Dependency bias: CPU supervisor, 각 자식은 runtime_env.sh에서 GPU6/7 설정
 CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_depbias_ablation.py
+
+# 2/8명 추가 평가: 8명 R3m, 2명 기본 배치
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_depbias_ablation_2h8h.py
 ```
 
 출력은 `output_etc/check/depbias_v4_2000_4h16h_seeds167_20261114/`다. 기존 실행 폴더는 덮어쓰지 않으므로 큐를 중복 실행하지 않는다. GPU 시작 여유는4H8GB/16H14GB 예약에12GB를 추가한다. `status.json`·`report.md`·`summary.json`에 진행 상황과 Mixed/I/E/C·seed 평균±표본std를 저장하며, 최종 성공은 `completion_verification.json`으로 확인한다. 추론 개입 결과를 재학습 ablation으로 해석하지 않는다.
+
+2/8명 추가 출력은 `output_etc/check/depbias_v4_2000_2h8h_seeds167_20261115/`다. 동일512환경·seed1/6/7·900step·XY100%에서 신규 OFF/Shuffled12회와 기존 Original6회 재채점을 수행한다. GPU6/7 각1작업, 시작 시2명17,000MiB/8명22,000MiB 여유를 확인한다. 기존 Original 파일은 읽기 전용 링크로 재사용하며 CPU 재채점은 새 출력에 저장한다. 기존 manifest가 있으면 재실행을 거부한다.
+
+**2명 Shuffled는 항등변환 대조군**이다. SELF를 유지하면 각 행의 타인 후보가1명뿐이어서 bias가 바뀌지 않는다. 전용 adapter는 모든 호출에서 bias 불변·첫 행동 일치를 검증하며,8명에는 기존 셔플을 그대로 적용한다.2명 결과를 잘못된 관계 연결에 대한 강건성으로 해석하지 않는다.
+
+완료 후 `report.md`·`combined_summary.json`에 기존4/16명을 포함한2/4/8/16명 통합표를 저장했다.2명 대조군의 재실행 SR/궤적 차이는 `two_person_identity_comparison.json`에 별도로 기록하며, 전체 궤적의 bitwise 일치나 재실행 차이의 정확한 원인을 보장하지 않는다. 평균/std/동일 seed 분모·개입 검증은 `final_audit.json`을 따른다.
+
+### 관계별 dependency bias OFF
+
+V4 2k·4/16H Mixed·512환경·seed1/6/7·900step·XY100%에서 인원별 Enabling Bias OFF/Coupled Bias OFF6회를 GPU6/7에 각1개씩 실행한다. 4명은 기본 배치·8물체, 16명은 R7.5m를 사용한다. 기존 Original/All OFF는 인원별6회를 별도 읽기 전용 링크를 통해 CPU 재채점하며, 재채점 출력은 새 평가 폴더에 둔다.
+
+계산된 actor/critic DCT bias 표의 relation ID2(Enabling, Follower→Predecessor) 또는ID3(Coupled, 공동 참여자 양방향) 열만0으로 만든다. 다른 관계 bias·SELF/NONE·padding·관계 ID·공유 embedding·feature fusion·SCT·action head·checkpoint·정규화는 유지한다. 새로운 학습은 없다.
+
+```bash
+# 16명 관계별 bias 제거: CPU supervisor, 자식은 runtime_env.sh에서 GPU6/7 설정
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_relation_bias_ablation.py
+
+# 4명 관계별 bias 제거
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_relation_bias_ablation_4h.py
+
+# 4명 추가 seed8: 공통 snapshot 생성 후 Original/Enabling OFF/Coupled OFF/All OFF4회
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_relation_bias_seed8.py
+```
+
+출력은 각각 `output_etc/check/relation_bias_v4_2000_16h_seeds167_20261114/`, `output_etc/check/relation_bias_v4_2000_4h_seeds167_20261114/`이며 기존 manifest가 있으면 덮어쓰지 않는다. GPU별1작업·시작 시16명은26,000MiB, 4명은20,000MiB 이상 여유를 확인하고 기존 프로세스는 유지한다. `report.md`·`summary.json`에 Original/Enabling OFF/Coupled OFF/All OFF의 I/E/C/Mixed SR·seed별 값·평균±표본std·Original 대비 변화를 저장한다. `status.json`은 진행 상황, `completion_verification.json`은 완료 검증이다. Mixed 장면 내 간섭으로 비대상 관계 SR도 변할 수 있으며 재학습 시 구조의 필수성을 입증하는 실험과 구분한다.
+
+추가 seed8 출력은 `output_etc/check/relation_bias_v4_2000_4h_seed8_20261114/`다. 같은4명 설정·GPU6/7·GPU당1작업으로 실행하며, 새 seed의 네 조건을 모두 평가하고 CPU 재채점한다. 기존1/6/7 결과를 덮어쓰지 않고 새 폴더의 보고서에 seed8 결과와1/6/7/8 평균±표본표준편차를 함께 기록한다. 동일 출력의 manifest가 있으면 재실행을 거부한다.
+
+### 지연 대응 파일럿
+
+`FSM/dct/`에서 SCT26k/SCT+FSM26k/Coop. FT7k/Ours V4 2k의 AT→SIT2명·공동 PUSH3명을 비교한다. 사용자 지정 GPU6·64환경·seed1·0/2/4초 지연·35초 기록으로24회다. 같은 초기 장면과 모든 사람의 초기 속도0을 공유하고, 정지 시간/해제 신호는 관측에 추가하지 않는다. 기존 FSM의 물리 상태 투영을 재사용하며 초기 snapshot/첫 입력·정지/해제·가중치·CPU 채점을 검증한다.
+
+Reference 생성→135step 개발 검사→검증→정식 큐→CPU 분석의 명령은 [실행·규약](../FSM/dct/README.md#실행)에 있다. 병렬 수는 `--workers`로 조절하며 작업당6GB 시작 예약과12GB 여유를 유지한다. 출력은 `output_etc/check/dct_delay_env64_seed1_20261115/`이며 `status.json`, `report.md`, `summary.json`, `completion_verification.json`을 확인한다. 기존900step 기본 평가와 구분하고 성공 후 reset 없이 기록한다.
+
+TokenHSI40.5k의 추가6조건은 [TokenHSI 실행](../FSM/dct/README.md#tokenhsi405k-추가)을 따른다. 같은 초기 장면·GPU6·64환경·seed1·35초이며 원본397D 자기 상태/담당 과제 입력 차이를 명시한다. 기존24조건과 별도인 `output_etc/check/dct_delay_tokenhsi_40500_env64_seed1_20261115/`에 신규 기록과5모델 통합 표를 저장한다.
+
+Coupled15조건의 운반 경로 효율은 기존 궤적으로 CPU 재집계한다. 실행: `PYTHONDONTWRITEBYTECODE=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/coupled_path_efficiency_20261115/reaggregate.py`. 최초 성공까지(실패는 기록 종료까지)의 목표XY 거리 감소량/실제 이동거리이며 전체64개 평균과 성공·실패 조건부 평균을 저장한다. [결과·정의](../output_etc/check/coupled_path_efficiency_20261115/report.md) · [검증](../output_etc/check/coupled_path_efficiency_20261115/verification.json).
+
+같은15조건의 Jerk도 CPU 재집계한다. 실행: `PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 /home/hwanhee/anaconda3/envs/tokenhsi/bin/python output_etc/check/coupled_delay_jerk_20261115/reaggregate.py`. 기존20cm 출발·상자 둘레64점·float32/dt0.0333·차분 mask·0 trial 제외 규약을 유지하며 CoopFT7k와 DCT를 포함한다. [결과·정의](../output_etc/check/coupled_delay_jerk_20261115/report.md) · [검증](../output_etc/check/coupled_delay_jerk_20261115/verification.json).
+
+### 지연 대응 6장면·3seed
+
+AT→SIT/CLIMB/ONTOP2명, 공동 PUSH2/3/4명 × SCT/FSM26k·CoopFT7k·DCT V4 2k·TokenHSI40.5k × 지연0/2/4초 × seed1/6/7,64환경·30초(900step)의270조건이다. 기존seed1 SIT/3명 PUSH30개는35초 기록을30초로 재채점하며 신규240개를 실행한다. 초기 속도0·공통 snapshot·정책/관계/정지 방식은 파일럿과 같다. Coupled 지연 대상은 scene ID modulo 인원수로 고른다.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python FSM/dct/run_suite.py --workers 13 --gpu7-workers 6
+```
+
+실행기는 단일 큐에서 GPU6 최대13작업·GPU7 최대6작업을 중복 없이 배정한다. 사용자 요청에 따른 신규 시작 판단 상한은 GPU6 전체88,000MiB·GPU7 전체90,000MiB다. 현재 기존 학습과 작업당 약5,000MiB 기준으로 각각 약87,000/89,000MiB를 예상한다. 시작 중인 작업만 GPU별6,000MiB까지 예약한다.30초 경과·실측4,000MiB 이상이면 추가 예약을 없애고 실측 사용량으로 판단한다. 외부 프로세스의 메모리 증가까지 강제로 통제하지 않는다.16개 신규 기준 snapshot과4장면×5모델의135step 개발 검증을 자동 수행하고, 개발 검증 통과 모델/장면만 정식 실행한다. 기존 학습과 파일럿 코드는 변경하지 않는다.
+
+출력은 `output_etc/check/dct_delay_env64_seeds167_30s_20261115/`다. `status.json`에 작업 GPU·PID·진행step·GPU별 메모리·소요 시간을 기록하고 `report.md`를 갱신한다. Enabling 준비율·점유율·SR, Coupled SR·기존20cm t_coop/Jerk를 CPU 재채점한다. 각seed에서3개 장면을 동일 가중 평균한 뒤 seed 평균±표본std를 산출한다. 미완료seed는 포함하지 않으며 표에 완료seed 수를 표시한다.
+
+일시적으로 신규 GPU 실행만 막으려면 출력 폴더에 `PAUSE_QUEUE` 파일을 만든다. 큐와 자체 자식만 종료하려면 `STOP` 파일을 만들거나 `supervisor.pid`의 PID에SIGTERM을 보낸다. 불완전 출력 폴더는 자동 덮어쓰지 않으므로 재시작 전에 확인한다. [상태](../output_etc/check/dct_delay_env64_seeds167_30s_20261115/status.json) · [중간 표](../output_etc/check/dct_delay_env64_seeds167_30s_20261115/report.md) · [명령 검증](../output_etc/check/dct_delay_env64_seeds167_30s_20261115/launch_verification.json).
+
+### 랜덤 지연 1–5초·64환경
+
+GPU6·64환경·seed1·30초로 Enabling SIT/CLIMB/ONTOP과 Coupled2/3/4명,5모델의 랜덤 지연30조건을 실행한다. 기존6장면 suite의 seed1·0초30조건은 읽기 전용으로 재사용한다. CoopFT7k·DCT V4 2k·SCT/FSM26k·TokenHSI40.5k와 초기 속도0·같은 reference를 유지한다.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python FSM/dct/run_random.py
+```
+
+장면별64개 지연은 별도 NumPy RNG로 Uniform[1,5)초에서 한 번 추출해1/30초 단위로 반올림한다. `schedules/<setting>.json`을 모든 모델이 공유하고 실제 정지 frame·SHA·초기 장면·첫 정책 입력을0초 기록과 대조한다. 지연 대상은 Enabling 선행자, Coupled 환경번호 modulo 인원수이며 관계 구조는 유지한다. GPU6의 다른 프로세스를 포함한85,000MiB 시작 판단 한도·시작 중 작업당6,000MiB 예약으로 큐를 채운다.4개210step 개발 검사와 CPU 채점이 모두 통과한 뒤30개 정식 평가를 시작한다.
+
+출력은 `output_etc/check/dct_random_delay_env64_seed1_20261115/`다. `status.json`·`report.md`·`summary.json`을 확인하고, 전체 완료는 `completion_verification.json`으로 확인한다. 표는0초→랜덤 지연의 단일seed 평균이며 가족별 평균은3유형 동일 가중이다. `PAUSE_QUEUE`는 신규 GPU 실행만 막고, `STOP` 또는 supervisor에SIGTERM은 이 큐의 작업만 종료한다.
+
+### 랜덤 지연·종류별512환경·3회
+
+Enabling과 Coupled 각각512환경·seed1/6/7·30초로5모델의0초/랜덤1–5초를 모두 새로 평가한다. 한 종류의512환경은 세 유형의170/171/171개 실행으로 나누며170개인 유형을 seed마다 순환한다. 각 세부 유형은3회 합계512개, 전체60개 합산 조건·180개 실행·30,720 episode다. Enabling은 항상2명, Coupled는 정확히2/3/4명이며 추가 사람이나 padding을 넣지 않는다. Checkpoint는 SCT/FSM26k·CoopFT7k·DCT V4 2k·TokenHSI40.5k다.
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python FSM/dct/run_cohort.py
+```
+
+GPU6/7의 기존 점유를 포함해각88,000MiB 시작 판단 한도로 채운다. 내부 명령마다 `TOKENHSI_GPU`를 한 번 지정하며 실측 약5.0–5.2GB 기준으로 시작 중 작업당5,500MiB를 예약한다. 공통 초기 기준18개와0초/랜덤210step 개발12개를 생성·검증한 뒤 정식 평가를 실행한다. 환경별 지연 schedule은 별도 NumPy RNG로 만들고 모델 간 공유한다. 모든 조건의 사람 초기 속도는0이며 같은 seed·유형·환경번호의 초기 상태와 첫 정책 입력을 비교한다.
+
+출력은 `output_etc/check/dct_random_delay_family512_seeds167_20261115/`다. `status.json`은180개 내부 실행 진행률, `summary.json`의 `cohorts`는60개512환경 합산 조건을 나타낸다. `report.md`는 유형별 및 종류별0초→랜덤의3seed 평균±표본표준편차다. 종류별 표는 각seed의512개를 합쳐 집계하고, 이전 표와 같은 세 유형 동일 가중 평균도 `equal_type_means`에 별도 저장한다. 준비율·점유율은AT 성공 조건부, t_coop/Jerk는 기존 유효 표본 규약이다. 전체 완료는 `completion_verification.json`으로 확인한다. `PAUSE_QUEUE`·`STOP` 동작은 위와 같다. 불완전 출력은 자동 덮어쓰지 않는다.
+
+### AT 완료 직전 거리 재집계
+
+완료된 지연 suite의 AT 성공 전체 표본에서 최초 성공step k 직전(k−1)의 후행 root XY→AT 배치 목표 XY 거리(m)를 계산한다. Group 실패·낙상을 제외하거나0 처리하지 않으며 AT 실패는N/A다.1m offset은 적용하지 않는다. 준비율 재현·원시 프레임·기존 거리 함수·입력 SHA를 검증하고, 유형별/세 유형 동일 가중 평균과episode CSV를 저장한다.
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python FSM/dct/at_distance.py \
+  --suite output_etc/check/dct_random_delay_env64_seed1_20261115 \
+  --output output_etc/check/at_pre_distance_random_new
+```
+
+`--suite`에 고정 지연 suite 또는 완료된512환경 suite도 지정할 수 있다. `--output`은 새 경로여야 하며 기존 산출물을 덮어쓰지 않는다. [64환경 랜덤 결과](../output_etc/check/at_pre_distance_20261115/random64/report.md) · [64환경 고정 지연 결과](../output_etc/check/at_pre_distance_20261115/fixed64/report.md).
+
+### Post-AT Completion Time·Group 성공만
+
+최초 AT 성공부터 최초 동시 Group 성공까지 걸린 시간(s)을 Group 성공 episode만 평균한다. AT만 성공한 episode와 실패/미완료는 제외하고 성공률·표본 수를 함께 제시한다. 유형별 성공 평균→세 유형 동일 가중→seed 평균±표본std이며 어떤 유형에 성공이0개이면 해당 동일 가중 평균은N/A다. 성공 표본을 합친 pooled 보조값도 JSON에 보존한다.
+
+```bash
+source tokenhsi/scripts/multi_agent/runtime_env.sh
+CUDA_VISIBLE_DEVICES='' PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+  /home/hwanhee/anaconda3/envs/tokenhsi/bin/python FSM/dct/post_at_time.py \
+  --suite output_etc/check/dct_random_delay_env64_seed1_20261115 \
+  --output output_etc/check/post_at_success_only_new
+```
+
+완료된 suite만 입력하며 출력은 새 경로여야 한다. [랜덤 결과](../output_etc/check/post_at_success_only_20261115/random64/report.md) · [고정 지연 결과](../output_etc/check/post_at_success_only_20261115/fixed64/report.md).
+
+## 재학습 w/o Dep. Bias · 2k Mixed ablation
+
+`eval/run_nobias_ablation.py`는 현재 nobias 학습 run의 `Stage2Distill900V4NoBias_00002000.pth` 저장이 완료되기를 기다린 뒤, Mixed2/4/8/16명·512환경·seed1/6/7·900step의12회를 GPU6에 배정한다. Table2/3는 실행하지 않는다. 기존 V4 2k의 공통 snapshot과 XY100%·M=2N·8H R3m/16H R7.5m·distractor 관측 유지/물리 제거·I/E/C 동일 가중 SR을 사용한다. 원본 V4의 추론 bias OFF가 아니라 두 nobias10k teacher로 재학습한 student를 평가한다.
+
+GPU6 전체 사용량(기존 학습/타 프로세스 포함)의 시작 판단 한도는85,000MiB다. 미준비 worker는2/4/8/16명에6,500/8,000/11,000/15,000MiB를 예약하고 실측 PID 사용량을 차감한다. 첫 정책 입력 검증 후에는 worker당512MiB·전체1,024MiB 여유를 남겨 메모리에 맞춰 추가 배정한다. 기존 프로세스는 종료하지 않으며 실패 시 새 배정을 멈추고 진행 중 작업의 결과를 회수한다.
+
+```bash
+CUDA_VISIBLE_DEVICES='' /home/hwanhee/anaconda3/envs/tokenhsi/bin/python eval/run_nobias_ablation.py
+```
+
+기본 출력은 `output_etc/check/depbias_retrained_nobias_2000_mixed_env512_seeds167_20261115/`다. `status.json`·`supervisor.log`·`report.md`로 대기/진행 상태를 확인한다. Manifest가 있는 기존 출력에는 중복 실행하지 않으며 새 평가가 필요하면 `--output output_etc/check/<새 이름>`을 지정한다. `--prepare-only`는 checkpoint 생성 전12명령/공통 reference 계약만 확인한다.
+
+`nobias_ablation_eval.py`는8개 actor/critic 사람 attention 층에서 dep bias/projection 부재·feature fusion/SCT 유지·실제 첫 정책 입력 exact·가중치/RMS 불변을 검사한다. 완료마다 초기 상태·물리/관측 분리·CPU SR/건수/Error·실제 반경을 검증하고 seed 평균±표본std와 기존 Ours 행을 기록한다. 현재 Ours teacher34k/30k와 nobias teacher10k/10k의 학습량 차이는 보고서에 명시한다.

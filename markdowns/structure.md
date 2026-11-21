@@ -1,20 +1,22 @@
 # 레포 구조
 
-유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_coupled_push_individual_goal_solo5_carry5`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`, `stage2_coupled_push_individual_goal_solo5_keep1`, `stage2_coupled_push_individual_goal_solo5_shrink1`, `stage2_coupled_push_individual_goal_solo5_carry5_ground`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`, `stage2`, `stage2_distill`, `stage2_900`, `stage2_distill_900`, `stage2_distill_900_v2`, `stage2_distill_900_v3`, `stage2_distill_900_v4`, `stage2_900_v4_reward`, `stage2_distill_900_v5`이다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
+유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_coupled_push_individual_goal_solo5_carry5`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`, `stage2_coupled_push_individual_goal_solo5_keep1`, `stage2_coupled_push_individual_goal_solo5_shrink1`, `stage2_coupled_push_individual_goal_solo5_carry5_ground`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`, `stage2`, `stage2_distill`, `stage2_900`, `stage2_distill_900`, `stage2_distill_900_v2`, `stage2_distill_900_v3`, `stage2_distill_900_v4`, `stage2_900_v4_reward`, `stage2_distill_900_v5`, `stage2_distill_900_v4_nobias`이다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
 
 ## 실행과 설정
 
 | 경로 | 역할 |
 | --- | --- |
+| `eval/{run_single_size,single_size_eval,single_size_results,single_carry_sizes}.py` | 1명 IND·4모델·일반/Enable 공통 크기·512환경·3seed24회; 원본 carry9종 선택 시 AT/ON_TOP payload 교체·GPU5/6/7, 기본 GPU5/6; 각각85,000MiB 큐·공통 장면·정책/입력/CPU 채점·행동별 집계 |
+| `eval/{run_single_common_seeds,single_common_seed_results}.py` | ② 기존 공통 크기·seed0–9(신규28회)/10–20(신규44회)/21–25(신규20회) 확장·기존 결과 재사용·GPU5/6/7 분산/점유 재확인·행동별 표와신규/전체seed 통계 |
 | `EVAL_HANDOFF.md` | 전달용 평가 요약·버전 대조·실행 및 검증 순서 |
 | `eval/finalize_v4_large_radius.py` | 대규모 평가의 정상 전원 낙상 조기 종료 CPU 재검증·기존 보고서 보존·큐 종료 후 결과 반영 |
 | `eval/run_v4_large_radius.py` | V4 2k·32/64H Ind/Mixed64환경·seed1 탐색, R10부터5m 증가·180초 배치 제한·GPU6/7·SR/정책/반경 검증 |
 | `eval/tables123_handoff.md` | PDF (15) Table 1/2/3 인수인계·현재 checkpoint/결과·공통 snapshot·실행 경로·검증 조건 |
 | `tokenhsi/run.py`, `utils/parse_task.py` | MA 학습/평가·Stage1/BEFORE 모델 등록과 환경 생성 |
-| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 스물아홉 실험 계약, 학습/추론/resume env/sim 로딩 |
-| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 스물아홉 개 |
-| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 87개 |
-| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가28개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
+| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 서른 실험 계약, 학습/추론/resume env/sim 로딩 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 서른 개 |
+| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 90개 |
+| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가30개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
 | `tokenhsi/scripts/multi_agent/stage2_teachers_{test,vnc,eval}.sh` | enable/coupled 두 PTH의 관계별 제로샷 viewer·공간 채점, 5명 이상 그룹 배치 |
 | `tokenhsi/evaluate.py`, `rescore.py` | 독립 seed 실행·통계, 저장 trace CPU 재채점 |
 | `tokenhsi/utils/evaluation_errors.py` | 공통 Point/Region Error의 유효 frame 최솟값·성공 필터·공동 그룹 중복 제거·seed 통계 |
@@ -27,7 +29,12 @@
 | `eval/run_stage2_scalability.py`, `stage2_scalability_eval.py`, `stage2_scalability_layout.py`, `stage2_protocol_sampling.py`, `stage2_xy100.py`, `summarize_stage2_scalability.py` | 보조 경로의 Independent/Mixed 2·4·8·16명 평가·그룹별 distractor 배분·XY100% 채점·CPU 검증·기존4H Mixed 재사용 집계 |
 | `eval/stage2_sampling_audit.py` | 선택적 초기 배치 단계별 RNG/상태 비교; 공유 상자 중복 초기화 진단 |
 | `eval/bias_ablation.py`, `bias_ablation_eval.py`, `run_bias_ablation.py`, `summarize_bias_ablation.py`, `test_bias_ablation.py` | 추론 전용 SCT/DCT bias 출력 제거·첫 정책 입력/옵션 off 행동/가중치 불변 검증·Independent1H 지원·GPU6/7 병렬 평가와 기존 baseline 비교 |
+| `eval/taskbias_ablation.py`, `taskbias_ablation_eval.py`, `run_taskbias_ablation.py`, `test_taskbias_ablation.py` | Stage1 26k·2/4/8/16H Independent SCT bias OFF/고정 셔플·전체 H/O/G 토큰·신규18회/재사용18회·가중치/정규화/초기 상태 보존·CPU 재채점; [실행](USAGE.md#stage1-task-bias-offshuffled) |
+| `eval/run_nobias_ablation.py`, `nobias_ablation_eval.py`, `test_nobias_ablation_queue.py` | 재학습 nobias2k checkpoint 대기·GPU6 전체85,000MiB 메모리 배정·Mixed2/4/8/16H 12회·공통 초기 입력/dep bias 부재/CPU SR 검증 |
 | `eval/depbias_ablation.py`, `depbias_ablation_eval.py`, `run_depbias_ablation.py`, `test_depbias_ablation.py` | V4 2k·4/16H Mixed의 OFF/고정 셔플12회·Original6회 재사용 검증·사람 ID 기준 순열·CPU 재채점; [실행](USAGE.md#dependency-bias-offshuffled) |
+| `eval/run_depbias_ablation_2h8h.py`, `depbias_two_person.py`, `depbias_two_person_eval.py`, `test_depbias_two_person.py` | 2/8H Mixed OFF/Shuffled12회·Original6회 재사용·8H R3m·2H 셔플 항등변환 대조군 검증; [실행](USAGE.md#dependency-bias-offshuffled) |
+| `eval/relation_bias_ablation.py`, `relation_bias_ablation_eval.py`, `run_relation_bias_ablation.py`, `run_relation_bias_ablation_4h.py`, `test_relation_bias_ablation.py` | V4 2k·4/16H Mixed Enabling/Coupled bias 개별 제거 각6회·Original/All OFF 재사용·타 관계/fusion 보존·CPU 재채점; [실행](USAGE.md#관계별-dependency-bias-off) |
+| `eval/run_relation_bias_seed8.py` | 4H Mixed 추가 seed8 공통 snapshot·Original/Enabling OFF/Coupled OFF/All OFF4회·기존3seed 보존 및4seed 집계; [실행](USAGE.md#관계별-dependency-bias-off) |
 | `eval/stage1_protocol_eval.py`, `stage1_protocol_policy.py`, `stage2_full_observation.py`, `compare_stage1_scalability.py` | 동일 초기 장면에서 Stage1 원본 정책 비교·가상 받침/개인 PUSH 입력 변환·native 행동 검증·Stage1/Full distractor attention 보존·읽기 전용 원본 재사용 비교표 |
 | `eval/run_table2.py`, `table2_eval.py`, `table2_sampling.py` | Table 2 전용 단일 Enable 쌍/공동 PUSH 그룹의 Stage1·Stage2 평가·3명 지원·동일 초기 장면 검증 |
 | `eval/table2_metrics.py`, `rescore_table2.py`, `summarize_table2.py`, `test_table2.py` | Time·t_coop 기록·손 원시 좌표 저장·접촉 거리/시작 변위/손 접근 CPU 재집계·표/seed별 집계·경계/실패/낙상 테스트 |
@@ -56,6 +63,15 @@
 | `eval/run_v4_formal.py`, `accelerate_v4_formal.py`, `v4_formal_eval.py`, `summarize_v4_formal.py` | 채택 V4 2k의512환경·seed1/6/7 Table1/2 42회·8H3m/16H7.5m·공통 장면/실제 입력/정책 보존/CPU 채점·최신20cm t_coop/Jerk·기존 비교군 통합 표 |
 | `eval/group_radius_handoff.md` | 다른 Codex용8H3m/16H7.5m 그룹 중심 고정 반경 정의·유지 조건·실행 코드/checkpoint·64환경 결과·512환경 배치 검사와 SR 평가 구분 |
 | `FSM/` | SCT 26k + 관계별 state freeze/일회 해제 viewer·Enable3종/Coupled2/3/4명·공통 formal SR·VNC/로컬 진입점·상태 테스트. 명령은 `FSM/README.md` |
+| `FSM/dct/` | GPU6·64환경·seed1의 AT→SIT2명/공동 PUSH3명 지연 대응24회. SCT/FSM26k·Coop. FT7k·Ours V4 2k,0/2/4초 정지·35초 기록·공통 초기 속도·CPU 채점/행동 분석; [실행·규약](../FSM/dct/README.md) |
+| `FSM/dct/tokenhsi_eval.py`, `run_tokenhsi.py`, `analyze_tokenhsi.py` | 같은 초기 장면의 TokenHSI40.5k 추가6회·원본397D 정책/입력·GPU6 병렬 실행·기존24회 보존·5모델 통합 집계 |
+| `FSM/dct/suite.py`, `run_suite.py`, `analyze_suite.py` | GPU6/7·88,000/90,000MiB 제한·13/6병렬·6장면·64환경·seed1/6/7·30초 지연270조건(기존30재집계/신규240), 기준/개발/정식 큐·CPU 검증·개별/종류별 평균·seed 통계; [실행](USAGE.md#지연-대응-6장면3seed) |
+| `eval/delay_coordination_metrics.md` | 30초 지연 실험의 지표 계산식·성공/실패/낙상 포함 기준·유효 표본·seed/장면 평균·최종 평균표 |
+| `FSM/dct/random_delay.py`, `random_eval.py`, `run_random.py`, `analyze_random.py`, `test_random.py` | GPU6·85,000MiB 제한·64환경·seed1·30초·환경별1–5초 공유 지연30조건; 기존0초30조건 재사용·정지 시점/정책 입력 검증·단일seed 비교 |
+| `FSM/dct/cohort.py`, `cohort_eval.py`, `run_cohort.py`, `analyze_cohort.py`, `test_cohort.py` | GPU6/7·각88,000MiB 제한·종류별512환경·seed1/6/7·30초·0초/랜덤1–5초 신규 평가; 유형별170/171개 분할·60개 합산 조건/180개 실행·동일 초기 입력/지연 검증; [실행](USAGE.md#랜덤-지연종류별512환경3회) |
+| `FSM/dct/at_distance.py` | 완료된 지연 suite의 후행 root XY→AT 배치 목표 XY 거리(m)를 최초 AT 성공 직전 프레임에서 CPU 재집계; 기존 준비율/AT 표본/원시 프레임 대조·유형별/평균·episode CSV; [실행](USAGE.md#at-완료-직전-거리-재집계) |
+| `FSM/dct/post_at_time.py` | 완료된 지연 suite의 최초 동시 Group 성공−최초 AT 성공 시간(s), Group 성공 표본만 CPU 집계·온라인 성공/표본 수/시간 순서 대조·유형/seed 통계·episode CSV; [실행](USAGE.md#post-at-completion-timegroup-성공만) |
+| `supp/coordination_random_delay_512x3_20261115/` | 사용자 요청으로 보관한512환경·3seed·0초/랜덤 지연 최종 결과; 주요 지표·AT 직전 거리·Post-AT 시간의 표/CSV/JSON·episode 배열·schedule·SHA/검증; [요약](../supp/coordination_random_delay_512x3_20261115/README.md) |
 | `FSM/collision_probe.py` | 같은 자세/상자에서 freeze 충돌·해제 충돌·해제 무충돌을 비교하는 물리 확인 viewer. SR 평가와 분리 |
 | `FSM/eval_run.py`, `eval_entry.py`, `eval_verify.py`, `eval_summary.py` | SCT26k+FSM Table1 Independent/Mixed·Table2 단일 관계 평가, 기존 초기 장면 재사용·CPU SR/FSM 재검증·seed별 집계 |
 | `tokenhsi/utils/evaluation_protocol.py`, `learning/multi_agent/formal_eval.py` | 학습 인원/단독 구분·점/영역/BEFORE·개인/공유 중심 공동 PUSH·interaction group 성공률과 seed 통계·개인 낙상 제어 |
@@ -93,8 +109,8 @@
 - `tokenhsi/learning/multi_agent/amp_network_builder_ma.py`, `task_role_encoder.py`: 공통 GTA·task bias·사람 action MLP·actor/critic.
 - 같은 디렉터리의 `before_network.py`, `human_coordination.py`: BEFORE 사람 attention·object packet·Stage1 전이·actor encoder 동결.
 - `stage2_push_network.py`: BEFORE PUSH와 coupled의 동일 5과제/4family 정책·기본6N task/group suffix(keep1/shrink1은 선택 상대 ID N개를 더한7N)·4종 사람 relation·packet 기반 alias 전처리·Stage1 PUSH 전이. `human_coordination.py`는 선택한 관계의 query별 유효 key 수로 log-count 보정하며 `test_human_attention_count_normalization.py`에서 관계 비중·선호 보존·mask·전이/계약을 검증한다. `before_push_network.py`는 같은 builder의 호환 import다.
-- `stage2_relation_fusion.py`, `utils/stage2_spec.py`, `utils/before_goal_sampling.py`: BEFORE/COUPLED 독립 임베딩과 공통 fusion MLP·세 장면 유형 1:1:1·충돌 없는 alias 배정·goalroute 배치. `test_stage2.py`에서 관계·토큰·보상·전이·gradient·재로드를 검사한다.
-- `stage2_teachers.py`, `before_relation_fusion.py`: 원본 teacher별 네트워크·RMS 복원과 사람별 행동 선택. `utils/stage2_group_sampling.py`, `env/tasks/multi_agent/stage2_group_layout.py`는 추론 전용 순차 그룹 선택·8H/16H 정식 평가 기본 반경3m/7.5m(일반 viewer/그 외 인원은 기존5m 간격)·BEFORE 중심 복원·distractor 제외·카메라를 담당한다. `test_stage2_group_radius.py`, `test_stage2_teachers.py`, `tests/check_stage2.py`에서 실제 반경/그룹 내부 기하/RNG·가중치/담당 선택·관측 제외·물리/부분 reset을 검사한다.
+- `stage2_relation_fusion.py`, `utils/stage2_spec.py`, `utils/before_goal_sampling.py`: BEFORE/COUPLED 독립 임베딩과 공통 fusion MLP·선택적 dependency bias 제거·세 장면 유형 1:1:1·충돌 없는 alias 배정·goalroute 배치. `test_stage2.py`에서 관계·토큰·보상·전이·gradient·재로드를 검사한다. `test_stage2_nobias.py`는 10k teacher 정확 로드·행동 선택·bias 미사용·student 전이/학습/재로드를 검사한다.
+- `stage2_teachers.py`, `before_relation_fusion.py`: 원본 teacher별 네트워크·RMS 복원과 사람별 행동 선택. Enable의 `before_zerobg_nobias`와 Coupled의 `human_relation_bias: false` 저장 형식도 지원한다. `utils/stage2_group_sampling.py`, `env/tasks/multi_agent/stage2_group_layout.py`는 추론 전용 순차 그룹 선택·8H/16H 정식 평가 기본 반경3m/7.5m(일반 viewer/그 외 인원은 기존5m 간격)·BEFORE 중심 복원·distractor 제외·카메라를 담당한다. `test_stage2_group_radius.py`, `test_stage2_teachers.py`, `tests/check_stage2.py`에서 실제 반경/그룹 내부 기하/RNG·가중치/담당 선택·관측 제외·물리/부분 reset을 검사한다.
 - `coupled_relation_fusion.py`: ground A/B의 COUPLED 64차원 공유 임베딩·레이어/헤드 bias 투영·output projection 전 residual fusion. SELF/NONE만 A는 lookup 학습, B는 0 고정이다. `test_coupled_relation_fusion.py`에서 계산 동치·단독 생략·인원/셔플·gradient·전이/재로드를 검사한다.
 - `utils/stage2_eval_sizes.py`: general 평가 전용 enable 행동별 크기 교집합·공유 물리 상자/질량 생성·첫 episode 관계/역할 고정. `test_stage2_eval_sizes.py`에서 범위·격자·solo/coupled 보존·native 역할 샘플링을 검사한다.
 - `stage2_distill_agent.py`, `distill_replay.py`, `utils/stage2_distill_spec.py`: 고정 두 teacher의 사람별 평균 행동 모방·scene 단위 teacher/student 실행 전환·누적 replay·actor coordination/action head 업데이트·체크포인트/optimizer/replay 복원. [distillation 명세](reference/stage2_distill.md).

@@ -1,0 +1,15 @@
+{
+  "completed": true,
+  "shards": 180,
+  "cohorts": 60,
+  "trials": 30720,
+  "paired_initial_and_policy_input": true,
+  "shared_schedules": true,
+  "sources_preserved": true,
+  "steps": 900,
+  "seeds": [
+    1,
+    6,
+    7
+  ]
+}

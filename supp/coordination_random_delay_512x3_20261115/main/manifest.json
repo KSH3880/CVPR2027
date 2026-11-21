@@ -1,0 +1,130 @@
+{
+  "family_envs": 512,
+  "seeds": [
+    1,
+    6,
+    7
+  ],
+  "steps": 900,
+  "logical_evaluations": 60,
+  "shard_runs": 180,
+  "total_trials": 30720,
+  "settings": {
+    "enable_sit": 2,
+    "enable_climb": 2,
+    "enable_ontop": 2,
+    "coupled_2": 2,
+    "coupled_3": 3,
+    "coupled_4": 4
+  },
+  "allocation": {
+    "1": {
+      "enable_sit": 170,
+      "enable_climb": 171,
+      "enable_ontop": 171,
+      "coupled_2": 170,
+      "coupled_3": 171,
+      "coupled_4": 171
+    },
+    "6": {
+      "enable_sit": 171,
+      "enable_climb": 170,
+      "enable_ontop": 171,
+      "coupled_2": 171,
+      "coupled_3": 170,
+      "coupled_4": 171
+    },
+    "7": {
+      "enable_sit": 171,
+      "enable_climb": 171,
+      "enable_ontop": 170,
+      "coupled_2": 171,
+      "coupled_3": 171,
+      "coupled_4": 170
+    }
+  },
+  "models": {
+    "sct": "/home/hwanhee/ksh/stage1_2_base_teacher/pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth",
+    "fsm": "/home/hwanhee/ksh/stage1_2_base_teacher/pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth",
+    "coopft": "/home/hwanhee/ksh/sct_coopft/output/sct_coopft/SCTCoopFT_10-22-24-41/nn/SCTCoopFT_00007000.pth",
+    "ours": "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth",
+    "tokenhsi": "/home/hwanhee/ksh/tokenhsi_push/checkpoints/TokenHSIPushKD_00040500.pth"
+  },
+  "conditions": [
+    0,
+    "random_1_5"
+  ],
+  "source_sha256": {
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/common.py": "e448e4934bcbd08e1bbe38373e5e89eab752c53c383c27e95c9456223ec72bf6",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/freeze.py": "d531dd10da931ffe41da1a9b3d08909dd877eea98adcf9d77aa59dd04d71516d",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/policy.py": "afc0b7c1289c8127398963bb974f82bf10e146a09ac2b03048e8c88f86182169",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/evaluate.py": "2359c33967c24c84f560a068933b05c2f06b1d99af2f4d9bc07a26fb1e9dff64",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/tokenhsi_eval.py": "c021799e78da94f69e0ec969ec4e906d3171b1266b173ddb6e73df6c77e35093",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/run.py": "6e41113019946f734a4e19efe51191bd30e32f713194e232eed57fb805a6d85c",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/suite.py": "3b12b46e371a8a35f31164ee3ad593958778e4ef4482288ff032013a91334a0e",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/run_suite.py": "6b064fff5959737ef98bac265c985ea802f2baadb84a596f0bdd911d4e9dbaea",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/analyze_suite.py": "babc73e7aa657be217ca9c310cca42efb63a0190777057efb89b46da2698a896",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth": "ec4215803b529bab1dd1be430154604418392e24faed59bca69b5c61adafe67c",
+    "/home/hwanhee/ksh/sct_coopft/output/sct_coopft/SCTCoopFT_10-22-24-41/nn/SCTCoopFT_00007000.pth": "bd49f3a090b55127321fe5e1fa63471990918830cab5182cb3b1a1ef47cd9995",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output/stage2_distill_900_v4/Stage2Distill900V4_11-21-37-16/nn/Stage2Distill900V4_00002000.pth": "a1be127ad7118ca137f9de6079a9d4bb123a9d34a3c2c9c9aef24b15290f055a",
+    "/home/hwanhee/ksh/tokenhsi_push/checkpoints/TokenHSIPushKD_00040500.pth": "18e474bab417985aacc7a3cf3b381a9062824038854baec6b3bee8484059c8d6",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/eval/table2_sampling.py": "0321fca0a3c0540faac55d091ba18dd0af0f9b570cda52acc7e279f21bf72678",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/eval/stage2_distractor_physics.py": "3a76ed511bc1b0529e2bcfaba64d7a83fc9a2c3150ac44bd1f9eea1da508fe79",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/eval/analyze_coordination_behavior.py": "bd280ea424f3f9b8d74d3c83c685f72c905562b2792cf9e6a7d5d8d6cd73bde8",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/eval/coupled_cooperation_metrics.py": "d3c3ff837e3d42348e57de10d8571aeb7e4fbbeb8b0761edb9f60c6ab0868378",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/coupled_cooperation_four_models_20261111/reference/torch_utils.py": "1ac4e23894cf28b6a033192e539d928c7d4aa17e57df1c4b473644a288c8899f",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/coupled_cooperation_four_models_20261111/reference/log_process.py": "b8517377c61eabe7c864ad22643c983ffcb8d116cb6ff593758f7e5d991de17c",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/coupled_cooperation_four_models_20261111/reference/task_util.py": "945ccc66469a1fb7c3b6c0ff6f7617467ea8dfc3e6dac5df32bb2c488c65a72e",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/cohort.py": "dac9de107ec119f228b4a7ec6d862fd0b84f4a679010e83450b33211737e3097",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/cohort_eval.py": "f49b77337b1b7e1749a2fb2df7069d7c57bccf4a5382e9410ad137f75f132546",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/analyze_cohort.py": "e09b0b63ab35c22ea144171ac4024dbf09ea7b47cc3b02a81c817c59c436bad8",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/dct/run_cohort.py": "4a0b278ee4b5201abb62738740d452d6b67fa131d4703dd332f5e005630d5cca",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/controller.py": "63856db73867044b6b316f3ba66595b8200fbad480aeeb7e8943eaf006faf098",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/FSM/state.py": "f03dd814e4230aae26f6418589d9452df7036205b09e48a94f1e43e1388c71bc"
+  },
+  "schedule_sha256": {
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_sit_seed1_d0.json": "0b7024883602c1a3570f38ef144660775bfc3426979bb36cfd4867d0c9dcf2c9",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_sit_seed1_drandom_1_5.json": "a1240673f0f3af68ac1624c31b9888e773771e104e27f3d2565a508996480540",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_climb_seed1_d0.json": "59ecf961ef678fa3cb720b53022b420675318b3b944adedbca2eb179cee8ab1a",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_climb_seed1_drandom_1_5.json": "ea96fa0b475845c96351d7946057af32fb9beb3ea7b2d17472426bba85a3eded",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_ontop_seed1_d0.json": "62ee423bd249654f98f75b1b10029d25e3ac9e2a8fd1775a35201a925bf12e34",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_ontop_seed1_drandom_1_5.json": "6e60f3e9fd5e5ed7ddfdf76aed56bd1d759ba41edcf82e657128fde8948e88e4",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_2_seed1_d0.json": "544319a11301ff0790bf8920dd022855eae21cf36c8a3e0785ab3d5c22918d64",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_2_seed1_drandom_1_5.json": "fbf428f7c1627f8d1ee4d6f44aa28789b07de8b1c680cf7545c4db5a9e5311df",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_3_seed1_d0.json": "fa1e319474bdbef83291ecb5fc6781dcb68c4a6cb809dddd4aac8c4a81a8d184",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_3_seed1_drandom_1_5.json": "388719155102de9fd36e41ef32063a15389e726944d6b2dc95993c42376725f5",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_4_seed1_d0.json": "57f700751d21790330a602256da7d137e14e02e51bbccfa1a855dac31b598394",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_4_seed1_drandom_1_5.json": "c54b056a6905163beb3344dd232ec1bd22436d01e87f444c9575c97f887dcc64",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_sit_seed6_d0.json": "97541b2e79825197eb1c31da2d19e8397f0585033bd1a6996738739c1d453f8b",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_sit_seed6_drandom_1_5.json": "fb0277fa869ae484af5dcd66fa29eba848f0e21234a2e9d8f9b6a401cbff3e74",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_climb_seed6_d0.json": "42da5348cdf89b79d11a0d5b8dc39bafb73c53bf4e46e25ec92fd896c481ed06",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_climb_seed6_drandom_1_5.json": "eec8a57c1f4ccdc6bc21e8b9ff2f78151e830c619e129be5af9aa43208f6db34",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_ontop_seed6_d0.json": "a615a53b761796cd8a3f50190065fc45336d37e2e35a17e28868bb97e6402264",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_ontop_seed6_drandom_1_5.json": "deab21a81aa3201e3653951f95e2b68164b3e808ac6d102ca5315e675ba5792e",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_2_seed6_d0.json": "334b9ba72abd7812882d0ec505ddde9ae0e91923594f22fc5591296c319a6fd5",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_2_seed6_drandom_1_5.json": "f44d696eb0e2da08905fcf7a2d52f5bfab5320fe1a58957c9874eadc921ad3cf",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_3_seed6_d0.json": "75e9041fef623a023d8c2538dec02c18124fd3f78dcb705feec6cc2b7c213f53",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_3_seed6_drandom_1_5.json": "d2e419725a635ae25f12c097146c9a8056cee853eadf4b4a19a96a06cb02e1ea",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_4_seed6_d0.json": "7b2d0d19e9553d79a20324cd41491166faef6fee5d6014e061bfcfcd3c92ff69",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_4_seed6_drandom_1_5.json": "0681ac940a4cfe20e4928ebff708feb0568eea9e74f5857c530df8567da0386b",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_sit_seed7_d0.json": "620b1aa991182412004280d56f6baf70ba4884b00d473ec16858fdd38b05e835",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_sit_seed7_drandom_1_5.json": "7cbb5a8007079ee6611a59487277b66b98bf813e46f87c9f4013a1557db01fb6",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_climb_seed7_d0.json": "4605864efa834b8bea2a83cb305cc492a4db32e62c894caeae4dc29c60742f1b",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_climb_seed7_drandom_1_5.json": "b8448c1ede45421716e6c386df0b504ec163879a34424b6974dc7b23de4b27f6",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_ontop_seed7_d0.json": "e63c54dbe7093de903365c964e88d370ca3ac75006e6f24e016bad83e85a7423",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/enable_ontop_seed7_drandom_1_5.json": "d590b6ce3e09099581cf7724bc3974f4a4e3b5072ed418da906e92195cbbac25",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_2_seed7_d0.json": "d303679e7c914bd16a2f34e6e276fe129f5ef652f62be44ae06378c248c0a8e9",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_2_seed7_drandom_1_5.json": "853a50c4747e58e72d6c86eb8d27d7964fe5049c21a404ab56037b17c1c0cc82",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_3_seed7_d0.json": "fd79e6dbd74257ef3106ead44c4d2adec1a3b073ebac91d3a9464853306c9d48",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_3_seed7_drandom_1_5.json": "56fcb83a638d0c57bfb5e70fe16aac8c8724b1d6b1d2908fd7d015febb1aab66",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_4_seed7_d0.json": "2eedbc494a33041a963b760137da494cd2cb89a0a2eba7703a756e60b4b51e6b",
+    "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/schedules/coupled_4_seed7_drandom_1_5.json": "669931cb3f9778ad8880d7d8d81da67217ae5ab6d0c5a94e10e61d7f76ba938a"
+  },
+  "memory_caps_mib": {
+    "6": 88000,
+    "7": 88000
+  },
+  "normalized_initial_human_velocities": true,
+  "reference_root": "/home/hwanhee/ksh/stage1_2_base_teacher/output_etc/check/dct_random_delay_family512_seeds167_20261115/reference",
+  "aggregation": "512 pooled trials per family/seed; also equal-weight setting means; seed mean and sample std"
+}
