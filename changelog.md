@@ -2,7 +2,172 @@
 
 현재 실행법은 [config](markdowns/config.md), 코드 위치는 [structure](markdowns/structure.md)를 따른다. 정리 전 문서·변경 기록은 [보관 자료](markdowns/legacy/pre_four_configs/README.md)에 있다.
 
+## 2026-11-21
+
+### 미평가 1k 단위26개: 전체 왼쪽 평가
+
+- 사용자 요청으로 geo_box_only_base18~23k, warehouse_close15~19k, warehouse_close_random_heading11~15k, warehouse_close_no_wall_cpa9~12k, warehouse_close_wall_box_proximity5~10k를 GPU5/6/7에 실행했다. 각512환경×seed0/1/2×900step, 선행 운반 상자 전부 왼쪽·영역 기준·PUSH2+BEFORE1쌍이며 random만 uniform 방향을 유지한다.
+- 중복 없는78회 모두exit0. 각 모델1536개 선행 상자 전부 왼쪽·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA·이전 각 컨피그 왼쪽 평가와 초기 상태 tensor 일치 검증 통과. GPU5/6/7 최대77155/77199/66561MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [완료](output_etc/check/warehouse_all_pending_1k_left1536_region_eval_20261121/completed.json)·[검증 포함 결과](output_etc/check/warehouse_all_pending_1k_left1536_region_eval_20261121/summary_region.json).
+- 최신 대상 only_base23k/close19k/random15k/no_wall_cpa12k/proximity10k의 Full scene SR83.72/63.93/29.75/82.81/75.98%. 이번 묶음의 컨피그별 최고는 각각20k86.00%,16k75.65%,13k36.00%,12k82.81%,9k79.75%다. close의 이전14k77.93%는 이번15~19k보다 높다. [26개 전체 팀 SR](output_etc/check/warehouse_all_pending_1k_left1536_region_eval_20261121/team_comparison.csv)·[최신과 이번 최고](output_etc/check/warehouse_all_pending_1k_left1536_region_eval_20261121/latest_and_best.json)·[평가 조건](output_etc/check/warehouse_all_pending_1k_left1536_region_eval_20261121/protocol.json).
+
+## 2026-11-20
+
+### only_base17k·no_wall_cpa8k·proximity4k 전체 왼쪽 평가
+
+- 사용자 요청으로 미평가 1k 단위 저장본 세 개를 GPU6/7에서 선행 운반 상자 전부 왼쪽·512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·영역 기준으로 평가했다. 저장된 target 방향을 유지했다. only_base의 별도 레포는 수정하지 않고 평가 adapter에서 후보 선택 전에 왼쪽 조건을 적용했다.
+- 순서대로 공동밀기 SR99.80/99.28/99.54%, Enable SR85.22/75.65/69.73%, Subtask SR92.51/87.47/84.64%, Full scene SR85.09/75.39/69.53%. 이전 전체 왼쪽 평가 대비 no_wall_cpa7k→8k Full scene+0.20%p, proximity3k→4k+2.28%p. only_base는 첫 전체 왼쪽 평가다. [팀별 결과](output_etc/check/warehouse_17k_8k_4k_left1536_region_eval_20261120/team_comparison.csv).
+- 9회 모두exit0·각 모델1536개 상자 전부 왼쪽·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA 검증 통과. close 계열 두 모델은 이전 close12k 왼쪽 평가와 초기 상태 tensor 일치. GPU 최대77087MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [완료](output_etc/check/warehouse_17k_8k_4k_left1536_region_eval_20261120/completed.json)·[검증 포함 결과](output_etc/check/warehouse_17k_8k_4k_left1536_region_eval_20261120/summary_region.json).
+
+### close viewer: 독립 AT 인원 옵션
+
+- 사용자 요청으로 `--independent-at N`을 추가했다. PUSH P명+BEFORE K쌍에 관계 없는 AT 운반자N명을 더하고 사람/토큰 수를P+2K+N/2(P+2K+N)으로 자동 계산한다. 독립 AT는 자기 상자·외부 목표를 갖는 단독 그룹이고 BEFORE 선행/후행으로 연결되지 않는다. `--box-side`·`--leader-side`는 독립 AT에도 적용한다. 방·PUSH 크기는 기존P 기준이며 기본N=0 동작을 유지한다. [명령과 옵션](markdowns/USAGE.md#close-계열-viewer의-인원창고-확대).
+- 9명 왼쪽 배치 반복 초기화에서 후보 소진을 발견해 독립 AT viewer의 운반 상자 후보를 PUSH 이동 구간 밖 유효 좌우 구간에서 샘플링하도록 보완했다. 기존 벽 여유·운반1~5m·사람/상자 간섭 검사는 유지한다. 학습 YAML·정식 평가 설정은 변경하지 않았다.
+- CPU100개 통과 및 추가 기하 조건16개 재검증. GPU7/MPS·no_wall_cpa6k로 PUSH4+BEFORE2쌍+AT1명 좌/우, PUSH2+BEFORE1쌍+AT2명 각4환경×3reset×20step 검증 통과: 정확한 역할 수·AT 단독 그룹·상자 좌우·거리·finite 추론·부분 reset 보존. 실제 test wrapper도8/16 인자를9/18로 덮어써1환경20step exit0. 최초 동시 MPS 연결 실패2건은 GPU/MPS 재시작 없이 검증을 순차 재실행해 통과했다. 기존5개 학습 PID·6k checkpoint SHA 보존, Python/shell 구문·diff 검사 통과. VNC 화면은 열지 않았다. [검증](output_etc/check/warehouse_independent_at_viewer/verification.json).
+
+### close14k·random10k·no_wall_cpa7k·proximity3k 전체 왼쪽 평가
+
+- 사용자 요청으로 warehouse_close14000·warehouse_close_random_heading10000·warehouse_close_no_wall_cpa7000·warehouse_close_wall_box_proximity3000을 선행 운반 상자 전부왼쪽·512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·영역 기준으로 평가했다. random만 uniform 초기 방향을 유지했다. 각 모델1536개 장면 전체가 왼쪽이며 기존 좌우 혼합 평가와 구분한다.
+- 순서대로 공동밀기 SR98.76/97.79/99.61/99.87%, Enable SR78.91/33.98/75.39/67.38%, Subtask SR88.83/65.89/87.50/83.63%, Full scene SR77.93/33.14/75.20/67.25%. 동일한 이전 왼쪽 전용 평가와 비교하면 close12k→14k Full scene+5.08%p, no_wall_cpa6k→7k−2.54%p. [팀 SR 비교](output_etc/check/warehouse_four_latest_left1536_region_eval_20261120/team_comparison.csv)·[검증 포함 결과](output_etc/check/warehouse_four_latest_left1536_region_eval_20261120/summary_region.json).
+- GPU5/6/7에서12회exit0·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA 검증 통과. close12k 왼쪽 전용 평가와 초기 상태 일치하며 random은 BEFORE root 방향만 다르고 위치·PUSH 방향·기타 tensor는 동일함을 확인했다. 검증 스크립트의 boolean 인덱싱 오류는 수정 후 검증만 재실행했고 시뮬레이션은 중복 실행하지 않았다. GPU 최대77195MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [초기 상태](output_etc/check/warehouse_four_latest_left1536_region_eval_20261120/initial_matching.json)·[완료](output_etc/check/warehouse_four_latest_left1536_region_eval_20261120/completed.json).
+
+### only_base16k·random-heading9k 일반 평가
+
+- 사용자 요청으로 geo_box_only_base16000·warehouse_close_random_heading9000을 GPU5/6/7에서 기존 좌우 혼합512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·영역 기준으로 평가했다. only_base는 target, random-heading은 uniform 방향을 유지했다. 전체 Full scene SR69.53/20.31%, 왼쪽83.49/40.57%, 오른쪽55.54/0%. 이전15k/8k 대비 전체+0.91/+2.47%p.
+- 공동밀기 팀 SR은 둘 다99.87%, Enable 팀 SR69.66/20.31%, Subtask SR84.77/60.09%. [전체·좌우 팀 비교](output_etc/check/warehouse_onlybase16k_random9k_region_eval_20261120/team_comparison.csv)·[검증 포함 결과](output_etc/check/warehouse_onlybase16k_random9k_region_eval_20261120/summary_region.json).
+- 중복 없는6회exit0·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA·각 모델의 이전 초기 상태 일치 검증 통과. GPU 최대77195MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [완료](output_etc/check/warehouse_onlybase16k_random9k_region_eval_20261120/completed.json).
+
+### warehouse_close_no_wall_cpa6000: 전체 왼쪽1536환경 평가
+
+- 사용자 요청으로 no_wall_cpa6k를 선행 운반 상자 전부왼쪽·512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·영역 기준으로 평가했다. 공동밀기1536/1536(100%), Enable1194/1536(77.73%), Subtask2730/3072(88.87%), Full scene1194/1536(77.73%). 기존 혼합 평가의 왼쪽 Full scene77.63%와 유사하다. [팀 SR 비교](output_etc/check/warehouse_close_no_wall_cpa_6000_left1536_region_eval_20261120/comparison.csv)·[결과](output_etc/check/warehouse_close_no_wall_cpa_6000_left1536_region_eval_20261120/summary_region.json).
+- 앞선 close12k 왼쪽 전용 평가와 초기 상태 tensor 전체 일치. 그 평가의 Subtask86.07%·Full scene72.85% 대비 각각+2.80/+4.88%p다. 학습 epoch가 다른 저장본 간 비교다.
+- GPU5/6/7에서3회exit0·선행 상자1536개 전부왼쪽·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA 검증 통과. GPU 최대71538MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [초기 상태 검증](output_etc/check/warehouse_close_no_wall_cpa_6000_left1536_region_eval_20261120/initial_matching.json)·[완료](output_etc/check/warehouse_close_no_wall_cpa_6000_left1536_region_eval_20261120/completed.json).
+
+### close13k·no_wall_cpa6k·proximity2k 일반 평가와 팀 SR
+
+- 사용자 요청으로 warehouse_close13000·warehouse_close_no_wall_cpa6000·warehouse_close_wall_box_proximity2000을 GPU5/6/7에서 기존 좌우 혼합512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·영역 기준으로 평가했다. 전체 Full scene SR은 순서대로33.14/38.87/30.66%, 왼쪽66.19/77.63/61.25%, 오른쪽은 모두0이다. 이전 저장본12k/5k/1k 대비 전체−3.26/+3.78/+9.77%p.
+- 공동밀기 팀 SR96.42/100/99.87%, 선행·후행 모두 성공한 Enable 팀 SR34.51/38.87/30.73%, 두 팀 SR 평균인 Subtask SR65.46/69.43/65.30%. 전체·좌우 지표를 함께 저장했다. [팀별 비교](output_etc/check/warehouse_close13k_nocpa6k_proximity2k_region_eval_20261120/team_comparison.csv)·[검증 포함 결과](output_etc/check/warehouse_close13k_nocpa6k_proximity2k_region_eval_20261120/summary_region.json).
+- 중복 없는9회exit0·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA·이전 초기 상태 일치 검증 통과. GPU 최대77195MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [완료](output_etc/check/warehouse_close13k_nocpa6k_proximity2k_region_eval_20261120/completed.json).
+
+### warehouse_close12000: 선행 상자 전체 왼쪽1536환경 평가
+
+- 사용자 요청으로 저장본12k·기존512환경×seed0/1/2×900step·영역 기준을 유지하고 선행의 실제 운반 상자를 왼쪽으로 조건부 재샘플링했다. 기존 평가의 왼쪽 subset 집계와 별도 실험이며 사람 방향/위치·보상·종료·PUSH2+BEFORE1쌍은 기존 규칙을 유지했다. 학습 코드/YAML 변경 없이 평가 adapter에만 좌우 필터를 적용했다.
+- 전체1119/1536(72.9%), 선행1440/1536(93.8%), 후행1144/1536(74.5%), 공동 PUSH1501/1536(97.7%). 시드별385/512·367/512·367/512이며 이전 혼합 평가의 왼쪽559/769(72.7%)와 유사했다. [비교](output_etc/check/warehouse_close_12000_left1536_region_eval_20261120/comparison.csv)·[결과](output_etc/check/warehouse_close_12000_left1536_region_eval_20261120/summary_region.json).
+- GPU5/6/7에서3회exit0. 실제 방 좌표 기준 선행 상자1536개 전부왼쪽·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA 검증 통과. GPU 최대71538MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지 확인. [완료 기록](output_etc/check/warehouse_close_12000_left1536_region_eval_20261120/completed.json).
+
+### 1k 단위 추가 평가: only_base15k·close12k·random8k·proximity1k
+
+- 사용자 요청으로 geo_box_only_base15000·warehouse_close12000·warehouse_close_random_heading8000·warehouse_close_wall_box_proximity1000을 기존512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·영역 기준으로 평가했다. 전체 성공률은 순서대로68.6/36.4/17.8/20.9%, 왼쪽82.7/72.7/35.5/41.7%, 오른쪽54.5/0/0.1/0%, 공동 PUSH99.8/97.2/100/99.8%다. 이전 평가 대비 전체+2.41/+3.32/+2.15/+14.65%p. [전체·좌우 비교](output_etc/check/warehouse_next_1k_region_eval_20261120/region_comparison.csv)·[결과와 검증](output_etc/check/warehouse_next_1k_region_eval_20261120/summary_region.json).
+- 다른 평가가 GPU5/6/7을 사용 중이어서 GPU 추가 할당 없이 기다렸다가, 메모리 반환·안정화 후 실행했다. 중복 없는12회 모두exit0, CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA·이전 초기 상태 일치 검증 통과. 이번 평가가 실행 중인 GPU의 총메모리 최대71538MiB로85GB 미만이며 기존5개 학습 프로세스 동일성 유지. 대기 중 다른 작업의 메모리 최고값은 별도로 기록했다. [완료](output_etc/check/warehouse_next_1k_region_eval_20261120/completed.json)·[초기 상태](output_etc/check/warehouse_next_1k_region_eval_20261120/initial_matching.json).
+
+### close viewer: 공동 PUSH2~4명·BEFORE 쌍 수·좌우 선택
+
+- 사용자 요청으로 close 계열 test/VNC에 `--pushers 2|3|4`, `--before-pairs K`, `--box-side`, `--leader-side`, `--view top`을 연결했다. 총인원P+2K·토큰2(P+2K)를 자동 계산하고 인원 옵션 사용 시 공동 PUSH 하나+BEFORE K쌍으로 고정한다. 여러 쌍의 좌우 조건은 모든 선행에 적용하며 후보 선택 전에 검사한다. 기본 옵션 없는 실행과 학습 YAML은 유지했다. [옵션·VNC 명령](markdowns/USAGE.md#close-계열-viewer의-인원창고-확대).
+- viewer 전용 `qualitative/warehouse_expansion.py`가 저장 환경 검증 후 실행 중 배치만 덮어쓴다. 원본 sensorScene으로 checkpoint 계약을 확인하고 정책/RMS는 기존 strict 로딩을 유지한다. 상자 폭은1.8P, 입구는1.8P+0.12m, 방 폭은8+1.8(P−2)m이며 좌우 작업 영역도 이동한다. 방 깊이·상자 깊이/높이·밀도·운반 거리·센서·보상·종료는 유지한다. 쌍 수만 증가하면 방은 추가 확대하지 않는다.
+- 물리 상자/벽 variant 개수와 진단 버퍼를 기존 기본3에서 설정 길이로 처리하고, 창고4명 선택이 bridge3종 인덱스를 넘지 않게 분리했다. CPU96개 통과. GPU7/MPS·no_wall_cpa5000으로 8명4환경20step wrapper 추론 정상 완료; 별도 실제 환경 검사에서 PUSH4+2쌍 좌/우·PUSH3+2쌍 우·PUSH2+1쌍 좌 각각4환경×3reset×20step 통과. 역할 수·물리 상자 크기/질량·벽 입구/방 폭·선행 상자 좌우·관측/action/reward finite·부분 reset 보존을 확인했다. 초기 인덱스/물리 bank 개수 오류는 수정 후 재검증했다. 기존5개 학습 프로세스·PTH SHA 보존, shell/diff 검사 통과. VNC 화면은 열지 않았다. [검증](output_etc/check/warehouse_expanded_viewer/verification.json).
+
+### 최신 저장본 4개 일반 평가: only_base14k·random7k·no_wall_cpa5k·proximity500
+
+- 사용자 요청으로 geo_box_only_base14000·warehouse_close_random_heading7000·warehouse_close_no_wall_cpa5000·warehouse_close_wall_box_proximity500을 GPU5/6/7에서 기존512환경×seed0/1/2×900step·일반 PUSH2+BEFORE1쌍·영역 기준으로 평가했다. random만 저장된 uniform 방향이며 나머지는 target 방향이다. 전체 장면 성공률은 순서대로66.2/15.7/35.1/6.3%, 왼쪽80.5/31.3/70.1/12.5%, 오른쪽51.9/0/0/0%, 공동 PUSH99.9/99.0/100/99.7%다. [전체·좌우 비교](output_etc/check/warehouse_latest_four_region_eval_20261120/region_comparison.csv)·[검증 포함 결과](output_etc/check/warehouse_latest_four_region_eval_20261120/summary_region.json).
+- 중복 없는12회 모두exit0·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA 검증 통과. 이전 각 모델과 초기 상태 tensor 일치, no_wall_cpa/proximity는 close 기준과 일치를 확인했다. proximity의 벽/PUSH CPA0 및 push_box 근접 옵션도 검증했다. GPU 최대77197MiB로85GB 미만, 기존5개 학습 프로세스 동일성 유지. [초기 상태](output_etc/check/warehouse_latest_four_region_eval_20261120/initial_matching.json)·[완료 기록](output_etc/check/warehouse_latest_four_region_eval_20261120/completed.json).
+
+### warehouse_close 11000epoch 일반 평가·PUSH 하락 분석
+
+- 사용자 요청으로 11000epoch를 GPU5/6/7에서 기존 일반 평가와 동일한 512환경×seed0/1/2×900step·저장된 상자 방향·영역 기준으로 평가했다. 전체 장면 508/1536(33.1%), 왼쪽 508/769(66.1%), 오른쪽 0/767, 공동 PUSH 1513/1536(98.5%). [평가 결과](output_etc/check/warehouse_close_11000_region_eval_20261120/summary_region.json).
+- 9k→10k→11k 공동 PUSH는 97.0→72.5→98.5%, 최종 중심 오차 중앙값은 11.6→16.8→12.3cm다. 10k 실패422건 중395건은 담당자 생존 중 최근접 거리가20~30cm였고,421건은 마지막5초 이동5cm 미만, 담당자 종료를 동반한 실패는7건이다. 목표 근처 정밀도 저하와11k 회복을 확인했으며 보상 등 학습 원인은 단정하지 않았다. [궤적 분석](output_etc/check/warehouse_close_11000_region_eval_20261120/push_diagnostic.json).
+- 3회 exit0·CPU 영역 재채점·checkpoint epoch/finite/SHA·이전 초기 상태 tensor 일치 검증 통과. GPU 최대71538MiB, 기존 네 학습 프로세스 동일성 유지. 최초 후처리 프로세스는 manifest 생성 전 시작되어 실패했고 생성 후 재실행해 검증 완료했으며, 시뮬레이션은 중복 실행하지 않았다.
+
+### warehouse_close_wall_box_proximity: 벽·공동밀기 상자 근접 감점 통일
+
+- 사용자 요청으로 일반 close 기반 환경/학습 YAML과 train/train_vnc/test/vnc/eval wrapper를 추가했다. 벽/PUSH 상자 CPA 계수는0, `wall_proximity.push_box: true`로 몸·현재 운반 상자와 공동밀기 상자의 표면 거리에도 기존10cm·0.7 근접 감점을 적용한다. 모든 감점은 기존처럼 최댓값으로 결합한다. PUSH 담당자는 자기 상자에 대한 추가 감점에서 제외하며, PUSH 없는 두 BEFORE팀 장면에도 추가 감점이 없다. 사람 CPA·접촉 종료0.3초·낙상 종료·스폰·target 방향·V4 전이는 유지한다.
+- `warehouse_close.py`에서 현재 물리 상자의 위치·회전을 사용한다. 기존 config는 새 옵션 기본false로 기존 경로를 유지한다. 실험 등록과 config/structure 문서를 갱신했다.
+- CPU27개 통과: 기존 close/랜덤 방향 회귀와 실제 거리·움직임/회전/높이·운반 상태·PUSH 담당자/없는 장면 제외·부분 환경 인덱스·벽/상자 사이 최대 감점 검증. GPU7/MPS·4명1024환경 CHECK 학습 exit0·2epoch/262144프레임 저장, 모델/로그 finite·설정 차이 검증 통과. 저장본4환경20step headless 추론 exit0. shell/Python 구문·diff 검사 통과, 기존 학습/MPS 포함15개 PID 유지 확인. 본학습은 시작하지 않았다. [검증 설명](output_etc/check/warehouse_close_wall_box_proximity/README.md)·[설정/저장본 검증](output_etc/check/warehouse_close_wall_box_proximity/verification.json)·[실행 결과](output_etc/check/warehouse_close_wall_box_proximity/runtime.json).
+
+### 6000epoch 학습 방향 × 평가 방향 교차 비교
+
+- 사용자 요청으로 warehouse_close를 uniform 방향, warehouse_close_random_heading을 target(자기 상자) 방향으로 평가했다. 두 모델 모두6000epoch로 맞추고 기존 512환경×seed0/1/2×900step·좌우 모두·영역 기준을 유지했다. 평가 adapter에서 초기 방향 generator만 전환했으며 학습 코드·원본 설정은 보존했다.
+- 기존 두 기본 평가와 합친 전체 씬 SR은 close target 459/1536(29.9%)·uniform 257/1536(16.7%), random-heading target 365/1536(23.8%)·uniform 262/1536(17.1%)다. 오른쪽 성공은 close uniform에서1건, 나머지 세 조건은0건이다. [2×2 비교 CSV](output_etc/check/warehouse_heading_ablation_6000_20261120/heading_comparison.csv)·[세부 비교](output_etc/check/warehouse_heading_ablation_6000_20261120/heading_comparison.json).
+- GPU5/6/7 교차 평가6회 exit0·CPU 궤적 재채점 통과. 동일 평가 방향에서 두 모델의 초기 상태 tensor 전체 일치, 기존/교차 평가의 모델별 checkpoint SHA 일치를 확인했다. 기존 네 학습 PID 유지, GPU 최대77195MiB로85GB 미만 확인.
+
+### 마지막 정식 평가 이후 1k 단위 저장본 17개 평가
+
+- 사용자 요청으로 geo_box_only_base 9k~13k, warehouse_close 7k~10k, warehouse_close_random_heading 3k~6k, warehouse_close_no_wall_cpa 1k~4k를 복사·SHA 고정해 평가했다. 기존 512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·닫힌 입구·영역 기준이며 각 모델의 저장된 초기 방향 설정을 유지했다. GPU5/6에서 시작했고, 사용자 추가 지시로 실행 중 평가를 보존하면서 GPU7도 추가했다.
+- 전체 씬 영역 성공률은 epoch 오름차순으로 only_base 59.0/65.9/63.5/66.5/61.3%, close 35.4/31.6/33.3/26.5%, random-heading 3.4/8.7/11.0/17.1%, no_wall_cpa 11.8/28.0/33.1/34.2%. close와 no_wall_cpa의 오른쪽 성공은 전부0이며 random-heading은 4k·5k에서 각각1건, 나머지는0이다. [전체·좌우 결과 CSV](output_etc/check/warehouse_post_eval_1k_sweep_20261120/region_comparison.csv)·[세부 지표](output_etc/check/warehouse_post_eval_1k_sweep_20261120/summary_region.json).
+- 중복 없는 51회 모두 exit0, CPU 궤적 영역/공동 중심 재채점·checkpoint epoch/finite/SHA·이전 평가와 초기 상태 일치 검증 통과. no_wall_cpa도 close 기준 초기 상태와 일치한다. GPU5/6/7 최대 사용량 77151/77091/60561MiB로 모두85GB 미만, 기존 네 학습 프로세스 동일성 유지 확인. [실행 감사](output_etc/check/warehouse_post_eval_1k_sweep_20261120/run_audit.json)·[초기 상태 검증](output_etc/check/warehouse_post_eval_1k_sweep_20261120/initial_matching.json).
+
+## 2026-11-19
+
+### close·random-heading 벽 CPA 제거 비교 설정
+
+- 사용자 GPU5 실행 요청을 반영해 두 새 실험의 10개 wrapper 허용 GPU를 5/6/7로 수정했다. 기본값7은 유지하며 GPU5 guard 통과·shell 구문 검사 확인. 학습은 추가 실행하지 않았다.
+
+- 사용자 요청으로 `warehouse_close_no_wall_cpa`·`warehouse_close_random_heading_no_wall_cpa` 환경/학습 YAML과 train/train_vnc/test/vnc/eval wrapper를 추가했다. 각 원본 대비 동작 차이는 `sensorScene.wall_collision_coefficient: 0.7 → 0.0`뿐이다. 사람/PUSH 상자 CPA·몸/운반 상자 벽 근접 감점·접촉 종료·스폰·각 초기 방향 설정·V4 전이는 유지하며 출력 이름을 분리했다. 기존 보상 계산 코드는 수정하지 않았다.
+- 실험 등록·학습/추론/정식 평가 경로와 config/structure 문서를 갱신했다. CPU 기존 테스트18개 및 별도 실제 보상 검증 통과: 벽 접근 CPA 기여0, 표면 여유5cm의 근접 감점 약0.35·운반 상자 근접·사람/PUSH CPA 유지 확인.
+- GPU7/MPS에서 각각 4명·1024환경 CHECK 학습 exit0, 2epoch/262144프레임 저장 및 모델 finite 확인. 두 저장본의 4환경·20step headless 추론도 exit0이며 random-heading 탑뷰 옵션 경로를 포함했다. shell/Python 구문·diff 검사 통과. 기존 학습/MPS 포함 추적15개 PID 유지 확인. 본학습/VNC 화면은 실행하지 않았다. [검증 설명](output_etc/check/warehouse_close_no_wall_cpa/README.md)·[저장본 검증](output_etc/check/warehouse_close_no_wall_cpa/verification_checkpoints.json)·[추론 검증](output_etc/check/warehouse_close_no_wall_cpa/verification_runtime.json).
+
+### close·random-heading 2500epoch: 고정 방향·왼쪽 상자 64환경 1회 평가
+
+- 사용자 요청으로 두 2500epoch 저장본을 GPU5/7에서 각각 seed0·64환경·900step·1회 평가했다. PUSH2+BEFORE1쌍을 유지하고 선행 상자는 왼쪽으로 필터링했다. random-heading은 평가 adapter에서만 초기 랜덤 회전을 꺼 두 모델 모두 선행·후행이 자기 상자를 향하도록 했다. 원본 학습 설정은 보존했다.
+- 전체 씬 영역 성공률은 close 37/64(57.8%), random-heading 10/64(15.6%). 선행은 52/64·38/64, 후행은 37/64·10/64, 공동 PUSH는 62/64·64/64다. 두 모델 초기 상태 tensor 전체 일치·상자 왼쪽 64/64·상자 방향 최대 오차 0.005도 미만, 2회 exit0·CPU 궤적 재채점·checkpoint epoch/finite/SHA 검증 통과. 기존 세 학습 프로세스 동일성 유지 확인. [결과](output_etc/check/warehouse_2500_fixed_heading_left64_20261119/summary_region.json)·[초기 조건 검증](output_etc/check/warehouse_2500_fixed_heading_left64_20261119/initial_verification.json).
+
+### 지정 저장본 4개 영역 평가: only_base 7000·8000, close 6000, random-heading 2000
+
+- 사용자 요청으로 GPU5/6/7에서 각 512환경×seed0/1/2×900step 평가했다. 기존 PUSH2+BEFORE1쌍·닫힌 입구·영역 기준을 유지했고 random-heading 2000은 저장 완료 후 복사·SHA 고정해 평가했다. 전체 씬 성공은 순서대로 1037/1536(67.5%)·916/1536(59.6%)·459/1536(29.9%)·42/1536(2.7%)다. 좌/우 성공 건수는 569/468, 586/330, 459/0, 42/0이며 분모는 769/767이다.
+- 12회 exit0, CPU 궤적 재채점·checkpoint epoch/finite/SHA 검증 통과. 네 저장본 모두 각 컨피그의 이전 평가와 초기 상태 tensor가 동일했다. 최대 GPU 사용량 76753MiB로 GPU별 85GB 미만, 기존 세 학습 프로세스 동일성 유지 확인. [영역 결과·검증](output_etc/check/warehouse_requested_region_eval_20261119/summary_region.json)·[비교 CSV](output_etc/check/warehouse_requested_region_eval_20261119/region_comparison.csv).
+
+### random-heading 1000epoch 영역 평가
+
+- 사용자 요청으로 `warehouse_close_random_heading` 1000epoch를 GPU7에서 기존과 같은 512환경×seed0/1/2×900step·PUSH2+BEFORE1쌍·닫힌 입구·uniform 초기 방향으로 평가했다. 전체 씬 영역 성공은 16/1536(1.0%), 상자 왼쪽 16/769(2.1%), 오른쪽 0/767이다. 500epoch의 3/1536보다 증가했으나 공동 PUSH 성공은 1536/1536에서 1383/1536(90.0%)으로 감소했다.
+- 3회 exit0·CPU 궤적 영역 재채점·checkpoint epoch/finite/SHA 검증 통과. 이전 500epoch 평가와 세 seed의 초기 상태 tensor 모두 일치했다. GPU7 최대 47170MiB, 기존 세 학습 프로세스 동일성 유지 확인. [결과·검증](output_etc/check/warehouse_random_heading_1000_region_eval_20261119/summary_region.json).
+
+### 최신 창고 3모델 영역 성공률 평가
+
+- 사용자 지정 GPU5/6/7에서 geo_box_only_base 6500·warehouse_close 5000·warehouse_close_random_heading 500 저장본을 복사·SHA 고정해 각 512환경×seed0/1/2×900step 평가했다. PUSH2+BEFORE1쌍·기본 beforepairs 위치·닫힌 입구·ordered·deterministic이며 랜덤 방향 모델은 저장된 uniform 방향을 유지했다. 초기 실제 방 좌표와 배정 상자도 저장했다.
+- 이후 창고 결과는 사용자 요청대로 영역(region) 기준만 보고한다. 전체 씬 영역 SR은 각각 993/1536(64.6%)·530/1536(34.5%)·3/1536(0.2%)다. 상자 좌/우는 각각 580/769·413/767, 530/769·0/767, 3/769·0/767이다. [seed별 집계·CPU 재채점 검증](output_etc/check/warehouse_latest_region_eval_20261119/summary_region.json).
+- 9회 exit0, 저장 궤적 전체 CPU float64 영역/공동 중심 재채점 일치, checkpoint/모델 finite·원본/복사본 SHA·실제 설정·분모 검증 통과. 세 seed 모두 모델 간 사람 위치·상자·목표 일치, 랜덤 모델만 초기 방향이 다르다. 최대 GPU 사용량 80405MiB(약84.3GB), 기존 세 학습 PID 유지 및 TensorBoard 증가 확인. 첫 시도의 외부 모듈 import 실패 기록은 별도 보존했고 평가 adapter 경로만 수정해 재실행했다.
+- 기존 4모델 평가도 영역 기준으로 좌우 재집계했다. geo_box_only_base4000 980/1536, close3000 498/1536, beforepairs6500 472/1536, boxonly7500 1053/1536이며 기존 전체 건수와 일치한다. [이전 결과 재집계](output_etc/check/warehouse_scene_sides_20261119/scene_sr_by_side.json).
+
+### random-heading viewer 탑뷰·좌우 선택
+
+- 사용자 요청으로 random-heading test/VNC의 기존 다섯 인자 뒤에 `--view top`, `--box-side`, `--leader-side`를 지원한다. 참고 checkout의 비교 viewer 방식을 이식했으며 좌우는 방 밖에서 입구를 보는 기준이다. 좌우 인자를 지정하면 승인받은 PUSH2+BEFORE1쌍 장면만 선택하고, 사람·상자 위치를 독립적으로 필터링한다. 초기 방향 랜덤은 유지한다. 탑뷰만 지정하면 기존 장면 비율을 유지한다.
+- 기존 config의 기본 VNC 명령에 conda 환경을 명시했다. 선택 인자는 요청대로 config에 넣지 않고 USAGE에 기록했다. 새 `qualitative/warehouse_viewer.py`는 선택 인자가 있는 추론 프로세스에만 적용된다.
+- 검증: 좌우 네 조합·부분 reset·탑뷰 좌표·기존 랜덤 방향 CPU14개 통과. GPU7/MPS·500epoch 저장본·8환경·20step에서 `--view top --box-side left --leader-side right` headless 추론 exit0. shell 구문·diff 검사 통과. VNC 화면은 실행하지 않았다. [검증 로그](output_etc/check/warehouse_random_heading_viewer/).
+
+### warehouse_close_random_heading: BEFORE 초기 방향 균등 샘플링
+
+- 사용자 요청으로 close 원본 checkout에 env/train YAML과 train/train_vnc/test/vnc/eval wrapper를 추가했다. 기존 close와 설정 차이는 `sensorScene.warehouse.before_heading: uniform` 및 실험 이름뿐이다. 기본 자세·배치·80/20 장면 비율·보상·Distill V4 2000 전이는 유지한다.
+- BEFORE 선행·후행 모두 별도 RNG로 매 reset에 독립적인 0~360° 방향을 뽑는다. 배치 승인·캐시 복원 후 최초 관측 전에 몸 전체를 회전하며 공동 PUSH·사람 XY·상자·목표는 유지한다. 기존 설정은 새 분기를 실행하지 않는다.
+- CPU8개 검사와 shell/diff 검사 통과. GPU7/MPS·4명·1024환경 CHECK 학습 exit0, PPO 업데이트·2epoch/262144프레임 저장 및 모델 전체 finite를 확인했다. 양쪽 장면 캐시 hit도 발생했고 저장본의 4환경·20step headless 추론 exit0이다. 본학습은 시작하지 않았다. [검증](output_etc/check/warehouse_close_random_heading/verification.json)·[실행법](markdowns/config.md).
+
+### beforepairs·boxonly 학습 종료
+
+- 사용자 요청으로 beforepairs PID 133689·boxonly PID 54081만 MPS `terminate_client` 성공(반환 0)을 확인한 뒤 종료했다. 최신 저장본은 각각 7000·8500epoch이며 CPU 로드로 확인했다.
+- 대상 프로세스 소멸, GPU5/6/7 MPS 서버 유지, close·geo_box_only_base의 동일 PID 유지 및 종료 후 TensorBoard 로그 증가를 확인했다. [종료 기록](output_etc/check/warehouse_training_stop_20261119/audit.json).
+
+### warehouse_close: 실제 벽 표면 CPA + 사람·운반 상자 근접 감점
+
+- 사용자 승인으로 현재 beforepairs를 복사한 `warehouse_close` env/train YAML과 train/train_vnc/test/vnc/eval wrapper·실험 등록을 추가했다. 새 학습은 기존 Distill V4 2000 전이에서 시작하며 resume하지 않는다. 이번 실험은 사용자 지정 GPU5다. 본학습은 시작하지 않았다.
+- `wall_cpa: box`로 안쪽·바깥쪽·문틀의 실제 벽 표면을 사용한다. `wall_proximity`는 거리 0.1m·계수 0.7·payload=true다. 사람은 기존 벽 검사 11부위(손·발 제외)의 구/캡슐 표면, 운반 상자는 현재 HOLDING 성공한 담당자의 실제 배정 상자 OBB를 사용한다. 근접 감점은 10cm에서 0, 접촉에서 0.7로 선형 증가·포화하며 기존 충돌 감점과 max로 결합한다. HOLDING 해제 시 상자 감점은 꺼진다. 배치·기존 종료·대기 보상은 유지했다.
+- `utils/wall_proximity.py`에 캡슐 선분–OBB/OBB–OBB 거리, `env/tasks/multi_agent/warehouse_close.py`에 현재 HOLDING gate·결합·진단을 분리했다. 옵션 없는 기존 실험은 새 분기를 실행하지 않는다. CPA 표면 변경도 포함하므로 기존 beforepairs와의 직접 비교를 근접 감점만의 어블레이션으로 해석하면 안 된다.
+- 검증: close·wall_box_cpa·beforepairs CPU 20 passed; shell 구문·diff 검사 통과. GPU5/MPS 실제 4명·1024환경에서 5step 관측/보상 finite, 종료 활성·벽 접촉 9frame 유지. HOLDING 판정을 임시 활성화한 1,628명에 대한 실제 상자 기하 계산도 finite였다(시뮬레이션 상태를 바꾸지 않은 진단). 정책 학습·성능 평가는 하지 않았다. [검증 산출물](output_etc/check/warehouse_close_20261119/).
+
 ## 2026-11-18
+
+### 센서 평가/viewer 조기 종료 해제 옵션
+
+- 사용자 요청으로 `EARLY_TERMINATION=0|1`을 추가했다. 센서 환경의 평가/viewer에서 runtime 플래그만 덮어써 낙상·벽·비 PUSH 담당자의 PUSH 상자 접촉 종료를 함께 제어한다. 생략하면 기존 설정을 유지하며 학습 사용은 거부한다. YAML·checkpoint·물리 충돌·보상·시간 제한은 유지한다. 제로샷 실행 명령은 [USAGE](markdowns/USAGE.md#beforepairs-환경에서-distill-v4-2k-제로샷-관찰)에 저장했다.
+- GPU6/MPS 실제 4환경에서 비활성 플래그·원본 config 보존·5step finite·900step 시간 제한 reset을 확인했다. VNC는 실행하지 않았다. [검증](output_etc/check/early_termination_20261118/live/verification.json).
+
+### Warehouse 제로샷 직선 경로 조건 옵션
+
+- 사용자 요청으로 평가/viewer 전용 `WAREHOUSE_STRAIGHT_PATHS=1`을 추가했다. 일반 cooperative Warehouse의 기존 배치 조건에 선행 사람→상자·상자→AT 목표의 XY 직선 중심선과 물리 벽 5개(두께·문틀 포함)의 교차 제외 조건을 추가한다. PUSH 상자는 검사 장애물에서 제외하고 기존 닫힘 시작·PUSH 2명·거리 제한·보상·종료를 유지한다. beforepairs의 apron 두 팀은 기존 배치다. 기본값 0, 학습에서 켜면 오류이며 YAML·checkpoint 계약은 바꾸지 않는다.
+- `utils/warehouse_paths.py`에 옵션·기하 검사를 분리하고 기존 sampler와 환경에 분기를 연결했다. 중심선 조건이며 실제 몸/상자 폭이나 정책 궤적의 무충돌을 보장하지 않는다. 명령은 [USAGE](markdowns/USAGE.md#beforepairs-환경에서-distill-v4-2k-제로샷-관찰)에 추가했다.
+- 검증: 신규 3개·fixedroles 5개·coop 51개 CPU 테스트 총 59 passed. GPU6/MPS 실제 16환경×12 reset에서 192장면(일반 142·apron 50), 선행 242명·직선 484개를 실제 벽 actor 형상과 별도 slab 알고리즘으로 검사해 교차 0건, 배치 실패 0, 5step finite였다. 재샘플링 746회로 초기화 비용은 늘어난다. 제로샷 PTH의 HEADLESS 추론(8환경·8step) exit 0. VNC·학습은 실행하지 않았다. [결과](output_etc/check/warehouse_straight_paths_20261118/live/geometry.json).
+
+### Beforepairs 환경의 Distill V4 2k 제로샷 관찰본
+
+- 사용자 요청으로 `output_etc/check/distill_v4_2k_beforepairs_zeroshot/`에 학습 없는 관찰용 PTH·환경 snapshot·생성 스크립트를 만들었다. 원본은 `output/stage2/Stage2Distill900V4_00002000.pth`이며, 사용자가 지정한 beforepairs `18-16-43-46` run의 env/sim을 복사했다. 기존 가중치·입력/AMP RMS는 보존하고 센서 투영을 0으로 추가했다. 원본 PTH와 실행 코드는 변경하지 않았다.
+- CPU 검증: 저장 후 strict reload·환경/보상/충돌/공동 PUSH 계약 검사 통과. 원본 tensor 279개 모두 동일. BEFORE/COUPLED/mixed 합계 192개 합성 장면과 두 센서 입력(0/무작위)에서 actor·critic·sigma 최대 절대 오차 0. 학습 0회, 시뮬레이션·VNC는 사용자 요청대로 실행하지 않았다. [검증 결과](output_etc/check/distill_v4_2k_beforepairs_zeroshot/verification.json).
+- GPU6·6083 실행 명령은 [USAGE](markdowns/USAGE.md#beforepairs-환경에서-distill-v4-2k-제로샷-관찰)에 저장하고 config에 연결했다. 관찰 전용이며 resume용이 아니다.
 
 ### Warehouse PUSH 영역 ID 배치 후 매칭 (beforepairs·leaderdone)
 

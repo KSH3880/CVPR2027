@@ -11,7 +11,7 @@
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_coupled_push_individual_goal_solo5_carry5`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`·`stage2_coupled_push_individual_goal_solo5_keep1`·`stage2_coupled_push_individual_goal_solo5_shrink1`·`stage2_coupled_push_individual_goal_solo5_carry5_ground`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`은 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
-- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_sensor_900`·`stage2_sensor_900_warehouse`·`stage2_sensor_900_warehouse_bridge_init`·`stage2_sensor_900_warehouse_bridge_init_rsi`·`stage2_sensor_900_warehouse_safety`·`stage2_sensor_900_warehouse_coop`·`stage2_sensor_900_warehouse_coop_cliffroom`·`stage2_sensor_900_room_warehouse`·`stage2_sensor_900_room_warehouse_wallterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm_v4_reward`·`stage2_sensor_900_warehouse_fixedroles_v4`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs`·`stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox`는 학습·평가·viewer 모두 **900step**이다.
+- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_sensor_900`·`stage2_sensor_900_warehouse`·`stage2_sensor_900_warehouse_bridge_init`·`stage2_sensor_900_warehouse_bridge_init_rsi`·`stage2_sensor_900_warehouse_safety`·`stage2_sensor_900_warehouse_coop`·`stage2_sensor_900_warehouse_coop_cliffroom`·`stage2_sensor_900_room_warehouse`·`stage2_sensor_900_room_warehouse_wallterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm`·`stage2_sensor_900_room_warehouse_wallterm_boxterm_v4_reward`·`stage2_sensor_900_warehouse_fixedroles_v4`·`stage2_sensor_900_warehouse_fixedroles_v4_beforepairs`·`stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox`·`warehouse_close`·`warehouse_close_random_heading`·`warehouse_close_no_wall_cpa`·`warehouse_close_random_heading_no_wall_cpa`·`warehouse_close_wall_box_proximity`는 학습·평가·viewer 모두 **900step**이다.
 - 정식 평가의 기존 과제/관계 지표와 추가 interaction group 성공률 정의는 [평가 규약](reference/evaluation.md#통합-stage2의-interaction-group-성공률)을 따른다.
 - 모든 test의 기본값은 viewer다. 로컬 추론은 `HEADLESS=0`, 화면 없는 진단은 `HEADLESS=1`이다. **정식 평가는 `*_eval.sh`**, 1명 단독 평가는 **Stage1 계열 전용 `stage1_single_eval.sh`·`stage1_push_single_eval.sh`**로 구분한다. 일반 평가는 저장된 학습 인원·물체 수를 유지한다.
 
@@ -59,6 +59,11 @@
 | [stage2_sensor_900_warehouse_fixedroles_v4.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4.yaml) |
 | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs.yaml) |
 | [stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml](../tokenhsi/data/cfg/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml) | [stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml](../tokenhsi/data/cfg/train/rlg/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox.yaml) |
+| [warehouse_close.yaml](../tokenhsi/data/cfg/multi_agent/warehouse_close.yaml) | [warehouse_close.yaml](../tokenhsi/data/cfg/train/rlg/warehouse_close.yaml) |
+| [warehouse_close_random_heading.yaml](../tokenhsi/data/cfg/multi_agent/warehouse_close_random_heading.yaml) | [warehouse_close_random_heading.yaml](../tokenhsi/data/cfg/train/rlg/warehouse_close_random_heading.yaml) |
+| [warehouse_close_no_wall_cpa.yaml](../tokenhsi/data/cfg/multi_agent/warehouse_close_no_wall_cpa.yaml) | [warehouse_close_no_wall_cpa.yaml](../tokenhsi/data/cfg/train/rlg/warehouse_close_no_wall_cpa.yaml) |
+| [warehouse_close_random_heading_no_wall_cpa.yaml](../tokenhsi/data/cfg/multi_agent/warehouse_close_random_heading_no_wall_cpa.yaml) | [warehouse_close_random_heading_no_wall_cpa.yaml](../tokenhsi/data/cfg/train/rlg/warehouse_close_random_heading_no_wall_cpa.yaml) |
+| [warehouse_close_wall_box_proximity.yaml](../tokenhsi/data/cfg/multi_agent/warehouse_close_wall_box_proximity.yaml) | [warehouse_close_wall_box_proximity.yaml](../tokenhsi/data/cfg/train/rlg/warehouse_close_wall_box_proximity.yaml) |
 
 ## 학습
 
@@ -191,6 +196,21 @@ TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fix
 
 # stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox
 TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox_train.sh 4 1024 8
+
+# warehouse_close
+TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi bash tokenhsi/scripts/multi_agent/warehouse_close_train.sh 4 1024 8
+
+# warehouse_close_random_heading
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_train.sh 4 1024 8
+
+# warehouse_close_no_wall_cpa
+TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/warehouse_close_no_wall_cpa_train.sh 4 1024 8
+
+# warehouse_close_random_heading_no_wall_cpa
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_no_wall_cpa_train.sh 4 1024 8
+
+# warehouse_close_wall_box_proximity
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/warehouse_close_wall_box_proximity_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -311,6 +331,21 @@ TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_wa
 
 # stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox
 TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox_test.sh "$CKPT" 4 1 8 10
+
+# warehouse_close
+TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_close_test.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_random_heading
+TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_test.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_no_wall_cpa
+TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_close_no_wall_cpa_test.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_random_heading_no_wall_cpa
+TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_no_wall_cpa_test.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_wall_box_proximity
+TOKENHSI_GPU=7 HEADLESS=0 bash tokenhsi/scripts/multi_agent/warehouse_close_wall_box_proximity_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -431,6 +466,21 @@ TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fix
 
 # stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox
 TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox_vnc.sh "$CKPT" 4 1 8 10
+
+# warehouse_close
+TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi bash tokenhsi/scripts/multi_agent/warehouse_close_vnc.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_random_heading
+TOKENHSI_GPU=7 TOKENHSI_CONDA_ENV=tokenhsi PORT=6083 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_vnc.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_no_wall_cpa
+TOKENHSI_GPU=7 PORT=6083 bash tokenhsi/scripts/multi_agent/warehouse_close_no_wall_cpa_vnc.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_random_heading_no_wall_cpa
+TOKENHSI_GPU=7 PORT=6083 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_no_wall_cpa_vnc.sh "$CKPT" 4 1 8 10
+
+# warehouse_close_wall_box_proximity
+TOKENHSI_GPU=7 PORT=6083 bash tokenhsi/scripts/multi_agent/warehouse_close_wall_box_proximity_vnc.sh "$CKPT" 4 1 8 10
 ```
 
 ## 추론 옵션
@@ -438,6 +488,7 @@ TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fix
 - `TASK_GRAPH=random_scenario`가 기본이다. Stage1: `sit`, `climb`, `holding_at`, `holding_ontop`, `sit_climb`. BEFORE: `before_sit`, `before_climb`, `before_stack`, `one_pair_sit`, `one_pair_climb`, `one_pair_stack`, `all_solo`, `sit`, `climb`, `holding_at`, `holding_ontop`.
 - `EVAL_SKILLS`와 `EVAL_SKILL_PROBS`는 함께 지정한다. 예: `EVAL_SKILLS=loco EVAL_SKILL_PROBS=1.0`. BEFORE의 기본 초기화는 loco이며 후행 RSI는 별도 옵션으로 선택한다.
 - `TASK_CAMERA=stack` 또는 `agent`로 viewer 카메라를 선택한다. 그 외 초기화·거리·resume·실행 환경 옵션은 [USAGE](USAGE.md)를 따른다.
+- beforepairs 환경에서 Distill V4 2k를 추가 학습 없이 관찰하는 체크포인트·GPU6/6083 명령·직선 벽 가림 제외·조기 종료 해제 옵션은 [제로샷 관찰](USAGE.md#beforepairs-환경에서-distill-v4-2k-제로샷-관찰)을 따른다.
 - coupled test/VNC의 `COUPLED_ASSIGNMENT=random|ordered|distance|optimal`(기본 random)은 공동 사람↔구역 배정이다. ordered는 좌우 정렬, distance는 총 접근 거리 최소화, optimal은 교차 우선이다. 직접 실행은 `--coupled_assignment`; 학습/resume·기본 정식 평가의 비random 변경은 받지 않는다. 통합 Stage2 네 컨피그의 viewer/eval은 ordered가 기본이며 인원·토큰 확장 평가도 지원한다. [계산 방식·인원별 탐색](USAGE.md#공통-stage2-push와-coupled).
 - 개인 목표 coupled test/VNC의 `COUPLED_PEERS=all|keep3|shrink3`(기본 all)은 5명 이상 공동 그룹의 사람 attention 상대 선택이다. keep3은 미접촉 상대 우선 최대3명을 유지하고, shrink3은 접촉한 상대를 빼 전원 접촉 시0명으로 줄인다. 직접 실행은 `--coupled_peers`; [접촉·갱신 규칙](USAGE.md#공통-stage2-push와-coupled).
 - 이후 사용자 공동 PUSH 평가는 ordered를 사용하며, 현재는 전용 비교 실행기로 채점한다. [ordered 평가 실행법](USAGE.md#공통-stage2-push와-coupled).

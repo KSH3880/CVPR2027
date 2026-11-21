@@ -13,7 +13,7 @@ FIELDS = ('_static_half', '_static_quat', '_static_local', '_surface_center', '_
 def build_geometry(task, original_fields):
     room_half, wall_local = task._room_half, task._wall_local
     variants, walls = [], []
-    for variant in range(6):
+    for variant in range(2*len(task._warehouse_coop['pusher_probabilities'])):
         task._warehouse_geometry_variant = variant
         task._build_scene_geometry()
         variants.append({key: getattr(task, key).clone() for key in FIELDS})
@@ -33,7 +33,7 @@ def select_geometry(task, ids):
     spec = task._warehouse_coop
     direction = torch.multinomial(torch.tensor(spec['direction_probabilities'], device=task.device), len(ids), True)
     count = task._bridge_count[ids]
-    variant = (direction >= 2).long()*3+count-1
+    variant = (direction >= 2).long()*len(spec['pusher_probabilities'])+count-1
     task._warehouse_direction[ids] = direction
     task._bridge_slot[ids] = task._warehouse_bank+count-1
     for key in FIELDS:
@@ -68,7 +68,7 @@ def diagnostics(task, result):
     spec = task._warehouse_coop
     if not spec:
         return
-    for count in range(3):
+    for count in range(len(spec['pusher_probabilities'])):
         for direction, name in enumerate(DIRECTIONS):
             for mode, start in enumerate(('closed', 'partial', 'open')):
                 key = (count*4+direction)*3+mode

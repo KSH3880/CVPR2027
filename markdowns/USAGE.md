@@ -767,6 +767,35 @@ tail -f output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs/resume_2026
 
 [재개 실행 정보](../output/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs/resume_20261116-205455/launch.json).
 
+### Beforepairs 환경에서 Distill V4 2k 제로샷 관찰
+
+관찰용 체크포인트는 Distill900V4 2000의 기존 가중치·입력/AMP 정규화 통계를 보존하고 센서 투영만 0으로 추가한 것이다. 학습 업데이트는 0회이며, beforepairs 학습 모델의 센서를 끄는 방식과 다르다. 환경은 사용자가 지정한 `Stage2Sensor900WarehouseFixedRolesV4BeforePairs_18-16-43-46/relation_config.yaml`의 env/sim을 복사했다. 일반 창고 80%·BEFORE 두 팀 20%, Default 시작을 유지한다.
+
+```bash
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs — Distill V4 2k 제로샷
+TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi PORT=6083 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_vnc.sh "output_etc/check/distill_v4_2k_beforepairs_zeroshot/nn/Distill900V4_00002000_ZeroShot.pth" 4 1 8 10
+```
+
+산출물은 [제로샷 폴더](../output_etc/check/distill_v4_2k_beforepairs_zeroshot/)에 있다. `prepare.py`는 생성·CPU 검증 스크립트이고 `verification.json`에는 원본 SHA256·학습 출처·출력 비교 결과를 기록했다. 관찰 전용 파일이므로 학습 resume에 사용하지 않는다. VNC·시뮬레이션은 실행하지 않았다.
+
+`WAREHOUSE_STRAIGHT_PATHS=1`을 붙이면 기존 일반 창고 배치 조건에 선행 사람→작업 상자, 작업 상자→AT 목표의 **두 XY 직선 중심선이 물리 벽 5개와 교차하지 않는 조건**을 추가한다. 벽 두께·문틀을 포함하며, 큰 PUSH 상자는 경로 검사에서 제외하므로 기존처럼 두 사람이 밀어 열어야 한다. 거리 제한·상자 크기·역할·보상·벽 접촉 종료와 BEFORE 두 팀 20%는 유지한다. apron의 BEFORE 두 팀은 기존 배치를 사용한다. 체크포인트/config는 바꾸지 않으며, 이 옵션은 cooperative Warehouse 평가·viewer 전용이고 기본값은 0이다. 실제 몸·상자 폭이나 정책이 선택하는 이동 경로의 무충돌을 보장하지 않는다. 조건부 재샘플링 때문에 초기화가 더 걸릴 수 있다.
+
+```bash
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs — 직선 벽 가림 없는 제로샷
+TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi PORT=6083 WAREHOUSE_STRAIGHT_PATHS=1 bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_vnc.sh "output_etc/check/distill_v4_2k_beforepairs_zeroshot/nn/Distill900V4_00002000_ZeroShot.pth" 4 1 8 10
+```
+
+센서 환경의 평가/viewer에서 `EARLY_TERMINATION=0`을 붙이면 낙상·벽 접촉·비 PUSH 담당자의 큰 PUSH 상자 접촉에 의한 조기 종료를 모두 끈다. 물리 충돌과 보상, 900step 시간 제한은 유지한다. 생략하면 체크포인트 환경 설정을 따르고 `1`은 조기 종료를 켠다. 학습에서는 사용할 수 없으며 YAML·체크포인트는 변경하지 않는다.
+
+```bash
+# stage2_sensor_900_warehouse_fixedroles_v4_beforepairs — 기존 배치·조기 종료 없는 제로샷
+TOKENHSI_GPU=6 TOKENHSI_CONDA_ENV=tokenhsi PORT=6083 \
+WAREHOUSE_STRAIGHT_PATHS=0 EARLY_TERMINATION=0 \
+bash tokenhsi/scripts/multi_agent/stage2_sensor_900_warehouse_fixedroles_v4_beforepairs_vnc.sh \
+"output_etc/check/distill_v4_2k_beforepairs_zeroshot/nn/Distill900V4_00002000_ZeroShot.pth" \
+4 1 8 10
+```
+
 ### Warehouse 역할 고정 V4 + 선행 완료 시작 + 벽 박스 CPA 본학습
 
 `stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox`는 fixedroles_v4에 키 두 개를 더한 실험이다. 학습 reset의 30%를 선행 AT 완료 상태에서 시작하고, 벽 CPA를 실제 벽 박스 기준으로 계산한다. Distill900V4 2000에서 새로 전이한다. [명세](reference/stage2_sensor_900.md#warehouse-역할-고정-v4--선행-완료-시작--벽-박스-cpa-stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox).
@@ -786,3 +815,59 @@ tail -f output/stage2_sensor_900_warehouse_fixedroles_v4_leaderdone_wallbox/laun
 ### Warehouse 배치 캐시
 
 `layout_cache`가 있는 config(beforepairs·leaderdone)는 학습 시작 시 Warehouse 배치를 변형별로 32회 미리 채우고 GPU 캐시를 사용한다. 1024환경 기준 GPU 메모리를 약 3.6GB 더 쓴다. 끄려면 학습 명령 앞에 `WAREHOUSE_LAYOUT_CACHE=0`을 붙인다. 평가·viewer에서는 항상 꺼진다. [명세](reference/stage2_sensor_900.md#warehouse-default-시작배치-캐시-beforepairsleaderdone).
+
+
+## Warehouse close
+
+창고 모델 비교 결과는 사용자 지정으로 **영역(region) 성공률만 보고**한다. 기본 비교는 PUSH2+BEFORE1쌍·512환경×seed0/1/2·900step이며, 전체 씬 성공은 공동 PUSH 실제 중심·선행·후행이 같은 장면에서 각각 한 번 이상 성공한 경우다. 전체 및 초기 선행 상자 좌/우별 성공 수·실제 분모를 함께 표시한다. 좌우는 방 밖에서 입구를 바라보는 기준(+local Y=왼쪽)이며 seed별 비율의 단순 평균 대신 성공 수/분모를 합산한다. SIT/CLIMB/ON_TOP은 받침 내부80%·높이 오차20cm, AT와 공동 PUSH는 목표 거리20cm 기준이다.
+
+`warehouse_close`는 현재 beforepairs의 배치·보상·900step·조기 종료를 바탕으로, `warehouse.wall_cpa: box`와 `wall_proximity: {distance: 0.1, coefficient: 0.7, payload: true}`를 적용한다. 벽 CPA는 실제 벽 박스 표면을 사용한다. 근접 감점은 실제 표면 여유 10cm에서 0, 5cm에서 0.35, 접촉/겹침에서 0.7이며, 기존 충돌 감점과 합산하지 않고 max로 결합한다. 이 계수는 기존 PPO task reward 가중치 적용 전이다.
+
+사람은 기존 벽 검사 11부위(손·발 제외)의 구·캡슐을 사용하고, 캡슐 선분 전체와 벽 OBB 사이의 거리를 계산한다. 상자는 기존 **현재 HOLDING 성공**에 해당하는 사람의 실제 배정 상자만 검사하며 크기·3D 회전을 반영한다. 상자를 내려놓아 HOLDING이 해제되면 상자 검사는 꺼진다. 공동 PUSH 상자·가상 관측 상자는 운반 상자로 포함하지 않는다. 대기 면제·역할별 계수·정체 타이머는 없다. 사람·상자 위험도는 max로 결합한다.
+
+새 학습의 초기 가중치는 `output/stage2/Stage2Distill900V4_00002000.pth`다. beforepairs 학습본을 resume하지 않는다. 무작위 가중치 scratch 학습은 아니며 센서 전이/동결 규칙은 beforepairs와 같다. 사용자가 이번 실험에 GPU5를 지정했다. 학습 명령은 [config](config.md)에 있으며, 새 학습 전 `RESUME_CHECKPOINT`, `STAGE1_CHECKPOINT`, `CHECK`, `MAX_ITERATIONS`, `EARLY_TERMINATION`, `WAREHOUSE_STRAIGHT_PATHS`의 잔여 override를 해제한다.
+
+TensorBoard `warehouse/proximity/{human_fraction,payload_fraction,human_penalty,payload_penalty,added_penalty}`로 적용 빈도·개별 감점 크기·기존 충돌 감점 대비 실제 추가분을 확인한다. `payload: false`는 사람만 검사하는 비교용 설정이고, `wall_proximity` 항목을 제거하면 근접 감점이 꺼진다. 정식 어블레이션은 설정·출력 이름을 분리하고 **모든 비교군의 CPA 표면 모드도 동일하게** 맞춘다. 기존 beforepairs와 warehouse_close만 비교하면 CPA 표면 변경과 근접 감점의 효과가 함께 포함된다.
+
+```bash
+# warehouse_close: 화면 없는 평가
+TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi HEADLESS=1 bash tokenhsi/scripts/multi_agent/warehouse_close_test.sh "$CKPT" 4 1 8 1
+
+# warehouse_close: 정식 평가 wrapper
+TOKENHSI_GPU=5 TOKENHSI_CONDA_ENV=tokenhsi bash tokenhsi/scripts/multi_agent/warehouse_close_eval.sh "$CKPT" --output output_etc/check/warehouse_close_eval
+```
+
+
+## Warehouse close random heading
+
+`warehouse_close_random_heading`은 `warehouse_close`와 같은 기본 자세·위치 샘플러·장면 비율·보상·Distill V4 2000 전이를 사용한다. `sensorScene.warehouse.before_heading: uniform`으로 BEFORE 선행과 후행 모두 매 reset에 독립적인 0~360° 몸 방향을 선택한다. 기본 PUSH+BEFORE 80%와 BEFORE 두 팀 20% 모두 적용하며 공동 PUSH는 기존 방향을 유지한다. 가상상자는 없다.
+
+방향은 배치 승인 및 캐시 복원 후, 물리 상태와 최초 관측을 갱신하기 전에 적용한다. 별도 난수 생성기로 배치 샘플러의 난수 상태를 보존한다. 캐시 hit에서도 새 방향을 뽑는다. 이 설정으로 학습한 checkpoint의 test/vnc/eval도 저장된 방향 설정을 따른다. 기존 close 저장본을 resume하는 실험이 아니며, 새 학습은 기본 전이 checkpoint에서 시작한다.
+
+```bash
+# warehouse_close_random_heading: 정식 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_eval.sh "$CKPT" --output output_etc/check/warehouse_close_random_heading_eval
+```
+
+test/VNC 명령의 기존 다섯 인자 뒤에 `--view top`, `--box-side left|right|random`, `--leader-side left|right|random`을 붙일 수 있다. 좌우는 방 밖에서 입구를 향해 볼 때 기준이며 상자는 선행의 실제 운반 상자, 사람은 선행이다. 두 위치는 독립적으로 선택한다. 좌우 인자를 하나라도 지정하면 비교 viewer처럼 PUSH2+BEFORE1쌍만 샘플링한다. 초기 방향 랜덤은 유지하며, `--view top`만 지정하면 기존 80/20 장면 비율도 유지한다. 생략한 위치 옵션은 랜덤이다.
+
+```bash
+# 선행 상자 왼쪽, 선행 사람 오른쪽, 탑뷰
+TOKENHSI_GPU=7 TOKENHSI_CONDA_ENV=tokenhsi PORT=6083 bash tokenhsi/scripts/multi_agent/warehouse_close_random_heading_vnc.sh "$CKPT" 4 1 8 10 --view top --box-side left --leader-side right
+```
+
+### close 계열 viewer의 인원·창고 확대
+
+`warehouse_close`, `warehouse_close_no_wall_cpa`, `warehouse_close_wall_box_proximity`와 두 random-heading 컨피그의 test/VNC에서 위 좌우·탑뷰 옵션을 지원한다. `--pushers 2|3|4`, `--before-pairs K`, `--independent-at N`으로 공동 PUSH 하나·BEFORE K쌍·독립 AT N명을 구성한다. 생략한 인원 옵션은 PUSH2명·BEFORE1쌍·독립 AT0명이며 K는 양수, N은0 이상이다. 독립 AT는 다른 사람과 관계 없이 자기 상자를 자기 목표로 운반한다. 총인원 `P+2K+N`, 토큰 `2(P+2K+N)`를 자동 계산하므로 기존 위치 인자의 사람/토큰 수는 덮어쓴다. 옵션을 주지 않은 실행은 저장된 장면 구성을 유지한다. 정식 평가에는 이 viewer 옵션을 사용하지 않는다.
+
+```bash
+# warehouse_close_no_wall_cpa: PUSH4명 + BEFORE2쌍 + 독립 AT1명, 운반 상자 왼쪽
+TOKENHSI_GPU=7 TOKENHSI_CONDA_ENV=tokenhsi PORT=6083 \
+bash tokenhsi/scripts/multi_agent/warehouse_close_no_wall_cpa_vnc.sh \
+"output/warehouse_close_no_wall_cpa/WarehouseCloseNoWallCpa_19-22-08-19/nn/WarehouseCloseNoWallCpa_00006000.pth" \
+9 1 18 10 --view top --pushers 4 --before-pairs 2 --independent-at 1 --box-side left
+```
+
+`--box-side right`는 모든 선행·독립 AT의 운반 상자를 오른쪽으로 제한하고, `random`은 좌우를 제한하지 않는다. 여러 쌍의 좌우는 간섭 검사를 함께 거치므로 통계적으로 독립인 것은 아니다. `--leader-side`는 모든 선행·독립 AT의 사람 위치에 같은 방식으로 적용한다. 랜덤 초기 방향 컨피그의 기존 BEFORE 방향 설정은 유지하며, 독립 AT는 자기 상자를 향해 시작한다.
+
+기본8m 방을 기준으로 PUSH2/3/4명의 상자 폭은3.6/5.4/7.2m, 입구 폭은3.72/5.52/7.32m, 방 폭은8/9.8/11.6m다. 방 깊이8m·상자 깊이2m/높이1.5m·밀기 거리5m·밀도는 유지한다. 좌우 작업 영역은 추가 상자 폭의 절반만큼 바깥으로 이동하며 운반 거리1~5m·충돌 검사를 유지한다. BEFORE 쌍 수나 독립 AT 수만 늘릴 때는 방을 더 키우지 않으므로 혼잡도가 증가하고, 과도한 쌍 수는 유효 배치를 찾지 못할 수 있다. 센서 범위·보상·종료 조건과 체크포인트는 유지하며, 확대 장면의 정책 성능은 기존4명 평가와 구분한다.

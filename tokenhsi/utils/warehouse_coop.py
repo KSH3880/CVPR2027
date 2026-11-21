@@ -25,16 +25,16 @@ def validate(spec, profiles):
         raise ValueError('Warehouse cooperative layout needs clear pushing and pedestrian passages')
 
 
-def sample_roles_graph(sizes, ranges, probabilities, counts, pairing_probability):
+def sample_roles_graph(sizes, ranges, probabilities, counts, pairing_probability, independent_at=0):
     n, m = sizes.shape[:2]
     roles = torch.rand(n, m, device=sizes.device).argsort(-1)
     groups = torch.arange(m, device=sizes.device)[None].repeat(n, 1)
     tasks = torch.full_like(groups, 5)
     pre = torch.full_like(groups, -1)
     weights = [probabilities[key] for key in ('SIT', 'CLIMB', 'HOLDING_AT', 'HOLDING_ON_TOP')]
-    for count in (1, 2, 3):
+    for count in range(1, m+1):
         rows = (counts == count).nonzero().flatten()
-        people = roles[rows, count:]
+        people = roles[rows, count:m-independent_at]
         if not len(rows):
             continue
         local, chosen = sample_roles(sizes[rows[:, None], people], ranges, 'random_scenario',
@@ -44,6 +44,9 @@ def sample_roles_graph(sizes, ranges, probabilities, counts, pairing_probability
         tasks[rows[:, None], people] = chosen
         pushers = roles[rows, :count]
         groups[rows[:, None], pushers] = roles[rows, :1]
+    if independent_at:
+        rows = torch.arange(n, device=sizes.device)[:, None]
+        tasks[rows, roles[:, -independent_at:]] = 3
     groups = torch.where(pre >= 0, pre, groups)
     return groups, pre, tasks, roles
 
@@ -74,7 +77,7 @@ def box_layout(counts, directions, modes, cfg):
         vector=vector, yaw=yaw, sizes=sizes, world_size=world_size, opening=opening)
 
 
-def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, modes, cfg):
+def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, modes, cfg, straight_paths=False):
     k, m = tasks.shape
     candidates = cfg['layout_candidates']
 
@@ -89,15 +92,21 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
     layout = box_layout(counts, directions, modes, cfg)
     spec = cfg['cooperative']
     random = lambda *shape: torch.rand(*shape, device=tasks.device)
+    side_shift = cfg.get('viewer_side_shift', 0.)
+
+    def lateral_samples(extent, *shape):
+        value = (2*random(*shape)-1)*(extent-side_shift)
+        return value+value.sign()*side_shift if side_shift else value
+
     source = sizes.new_empty(n, m, 2)
     source[..., 0] = cfg['source_depth'][0]+random(n, m)*(cfg['source_depth'][1]-cfg['source_depth'][0])
     side = spec['room_size'][1]/2-sizes[..., 1]/2-cfg['source_wall_clearance']
-    source[..., 1] = (2*random(n, m)-1)*side
+    source[..., 1] = lateral_samples(side, n, m)
 
     def outside():
         xy = sizes.new_empty(n, m, 2)
         xy[..., 0] = -.9-random(n, m)*2.6
-        xy[..., 1] = (2*random(n, m)-1)*(spec['room_size'][1]/2-.4)
+        xy[..., 1] = lateral_samples(spec['room_size'][1]/2-.4, n, m)
         narrow = (directions >= 2) & (counts == 3)
         outer = spec['room_size'][1]/2-.4
         inner = (layout['world_size'][:,1]/2+.7).clamp_max(outer-.05)
@@ -126,6 +135,17 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
     bottom = torch.maximum(-side,destination[...,1]-reach)
     top = torch.minimum(side,destination[...,1]+reach)
     source_y = bottom+random(n,m)*(top-bottom).clamp_min(0)
+    if cfg.get('viewer_independent_at', 0):
+        sweep_center = (layout['door']+layout['landing'])/2
+        sweep_half = (layout['world_size']+(layout['landing']-layout['door']).abs())/2
+        crosses = (source_x-sweep_center[:, :1]).abs() < sizes[..., 0]/2+sweep_half[:, :1]+.15
+        clearance = sizes[..., 1]/2+sweep_half[:, 1:2]+.15
+        left_length = (torch.minimum(top, -clearance)-bottom).clamp_min(0)
+        right_start = torch.maximum(bottom, clearance)
+        right_length = (top-right_start).clamp_min(0)
+        offset = random(n,m)*(left_length+right_length)
+        outside_y = torch.where(offset < left_length, bottom+offset, right_start+offset-left_length)
+        source_y = torch.where(crosses & (left_length+right_length > 0), outside_y, source_y)
     source = torch.where(moving[...,None],torch.stack((source_x,source_y),-1),source)
     goal = torch.where(((tasks != 3) & ~push)[...,None],source,goal)
     goal = torch.where(((pre >= 0) & (tasks < 3))[...,None],
@@ -140,6 +160,18 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
     sweep_half = (layout['world_size']+(layout['landing']-layout['door']).abs())/2
     clear = ((positions-sweep_center[:, None]).abs() >= dimensions[..., :2]/2+sweep_half[:, None]+.15).any(-1)
     good = (~valid_objects | clear).all(-1)
+    sides = cfg.get('viewer_sides', {})
+    if sides:
+        leaders = (pre[:, :, None] == torch.arange(m, device=tasks.device)).any(1)
+        if cfg.get('viewer_independent_at', 0):
+            leaders |= (tasks == 3) & (pre < 0)
+        good &= leaders.any(-1)
+        if sides['box'] in ('left', 'right'):
+            chosen = source[..., 1] > 0 if sides['box'] == 'left' else source[..., 1] < 0
+            good &= (~leaders | chosen).all(-1)
+    if side_shift:
+        good &= (~valid_objects | (positions[..., 1].abs() >= side_shift)).all(-1)
+        good &= (push | (goal[..., 1].abs() >= side_shift)).all(-1)
     good &= (~moving | ((cap >= cfg['source_depth'][0]) & (top >= bottom))).all(-1)
     block_radius = layout['sizes'][:, :2].norm(dim=-1)/2
     gap = (positions-layout['source'][:, None]).norm(dim=-1)
@@ -158,6 +190,12 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
         radius[:, :m]+block_radius[:, None]+.252)).all(-1)
     goal_clear = ((goal-sweep_center[:,None]).abs() >= sizes[...,:2]/2+sweep_half[:,None]+.15).any(-1)
     good &= (~(tasks == 3) | goal_clear).all(-1)
+    if straight_paths:
+        from utils.warehouse_paths import clear_segments, wall_rectangles
+        leaders = (pre[:, :, None] == torch.arange(m, device=tasks.device)).any(1)
+        wall_centers, wall_half = wall_rectangles(cfg, layout['opening'])
+        clear = clear_segments(source, goal, wall_centers, wall_half)
+        good &= (~leaders | clear).all(-1)
     roots = sizes.new_zeros(n, m, 2)
     assigned = push.clone()
     region = (push.long().cumsum(-1)-1).clamp_min(0)
@@ -176,11 +214,18 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
         task = tasks[selected, person]
         points = outside()[selected, person, None].expand(-1, cfg['human_candidates'], -1).clone()
         points[..., 0] = -.9-random(len(selected), cfg['human_candidates'])*2.6
-        points[..., 1] = (2*random(len(selected), cfg['human_candidates'])-1)*(spec['room_size'][1]/2-.4)
+        points[..., 1] = lateral_samples(spec['room_size'][1]/2-.4, len(selected), cfg['human_candidates'])
         target = torch.where((follower & (task < 3))[:, None], goal[selected, leading], source[selected, person])
         approach = (points-target[:, None]).norm(dim=-1)
         limit = torch.where(follower & (task < 3), 10., 5.)
         acceptable = (approach >= 1.) & (approach <= limit[:, None])
+        if sides.get('leader') in ('left', 'right'):
+            chosen = points[..., 1] > 0 if sides['leader'] == 'left' else points[..., 1] < 0
+            acceptable &= ~leaders[selected, person, None] | chosen
+        if straight_paths:
+            clear = clear_segments(points, source[selected, person, None],
+                wall_centers[selected], wall_half[selected])
+            acceptable &= ~leaders[selected, person, None] | clear
         first = (roots[selected, leading]-source[selected, leading]).norm(dim=-1)+(source[selected, leading]-goal[selected, leading]).norm(dim=-1)
         route = approach+torch.where(task == 4, transport[selected, person], 0.)[:, None]
         acceptable &= ~(follower & near[selected, person])[:, None] | (route < first[:, None]-.001)
@@ -202,13 +247,13 @@ def _candidates(tasks, pre, roles, sizes, supports, near, counts, directions, mo
     return {key: value[index] for key, value in result.items()}, feasible.any(-1)
 
 
-def sample_layout(tasks, pre, roles, sizes, supports, near, counts, directions, modes, cfg, tries):
+def sample_layout(tasks, pre, roles, sizes, supports, near, counts, directions, modes, cfg, tries, straight_paths=False):
     inputs = (tasks, pre, roles, sizes, supports, near, counts, directions, modes)
     pending = torch.arange(len(tasks), device=tasks.device)
     accepted = torch.zeros(len(tasks), device=tasks.device, dtype=torch.bool)
     result = None
     for _ in range(tries):
-        trial, good = _candidates(*(value[pending] for value in inputs), cfg)
+        trial, good = _candidates(*(value[pending] for value in inputs), cfg, straight_paths)
         if result is None:
             result = {key: value.new_zeros(len(tasks), *value.shape[1:]) for key, value in trial.items()}
         for key, value in trial.items():

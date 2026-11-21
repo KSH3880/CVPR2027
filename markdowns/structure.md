@@ -35,7 +35,7 @@
 | `humanoid_ma_stage2.py`, `stage2_layout.py`, `stage2_reward.py`, `stage2_wait.py` | 통합 Stage2의 관계별 배치·AT/접촉/선후행 gate·대기 속도 감점·V4 AT 완화/정밀 포화 분리 |
 | `humanoid_ma_coupled_push.py`, `coupled_push_reward.py` | 공동 상자·가상 구역·그룹 gate·goal saturation |
 | `humanoid_ma_sensor_stage2.py`, `sensor_stage2_{geometry,placement,observation}.py` | Stage2 센서 시나리오·고정 bridge 자산·BEFORE/COUPLED 배치·관측·진단 |
-| `warehouse_sensor.py` | 창고 RSI 50/25/25·고정 벽/입구·단독/공동 PUSH 배치·열림/진입 진단 |
+| `warehouse_sensor.py` | BEFORE 초기 방향의 독립 균등 샘플링·창고 RSI 50/25/25·고정 벽/입구·단독/공동 PUSH 배치·열림/진입 진단 |
 | `square_sensor.py`, `square_sensor_scene.py` | 기준 repo의 48×48 높이 센서·cliff/bridge/room 기하 |
 | `push_goal_markers.py` | PUSH 목표의 viewer/VNC 선 표시만 추가; actor·reset·scale 수정 없음 |
 | `humanoid_ma_before.py` | BEFORE 역할·공유 물체·AT progress·후행 초기화 |
@@ -51,6 +51,7 @@
 
 - `tokenhsi/learning/multi_agent/sensor_stage2_{network,agent}.py`: actor encoder/coordination·sigma·입력 RMS 동결; 센서·action head·critic 전체·AMP 및 AMP/value RMS 학습, resume 학습 계약 검사. 두 센서 실험의 공통 구현.
 - `tokenhsi/utils/warehouse_sensor.py`: 창고 역할 샘플링·거리/충돌 조건부 GPU 배치·입구 기하.
+- `tokenhsi/utils/warehouse_paths.py`: 평가 전용 `WAREHOUSE_STRAIGHT_PATHS` 검증·물리 벽 직사각형과 선분 교차 검사. `warehouse_coop.py`가 선행 접근/운반 후보에 적용하며 `tests/test_warehouse_straight_paths.py`에서 검사한다.
 - `tokenhsi/tests/{test_warehouse_sensor,check_warehouse_sensor,capture_warehouse_sensor}.py`: 창고 CPU 계약·실제 reset·닫힘/열림 화면 검수.
 - `tokenhsi/tests/test_room_warehouse.py`: Room/Warehouse 50:50·벽 CPA 계수 분리·기존 설정 보존·checkpoint 계약 검사.
 - `tokenhsi/tests/test_room_warehouse_wallterm.py`: 벽 접촉 종료 config 차이·형상 기반 접촉 판정·연속 스텝 종료/초기화 검사.
@@ -58,6 +59,8 @@
 - `tokenhsi/tests/test_room_warehouse_v4_reward.py`: V4 보상 config 차이·AT 성공/정밀 포화 높이 분리·payload 대기·공동 PUSH 조기 이동 감점 검사.
 - `tokenhsi/tests/test_warehouse_fixedroles_v4.py`: 역할 고정 Warehouse config 차이·PUSH 2명+AT 선행/후행 역할·방 안쪽 5m 배치 검사.
 - `tokenhsi/tests/test_warehouse_wall_box_cpa.py`: Warehouse 벽 CPA `wall_cpa: box` 옵션의 방 안 선분 동일성·바깥 면/문틀 대칭·설정 검증.
+- `tokenhsi/utils/wall_proximity.py`: 신체 구·캡슐 및 회전 상자와 실제 벽 박스의 표면 거리, 10cm 선형 근접 위험도.
+- `tokenhsi/env/tasks/multi_agent/warehouse_close.py`: 현재 HOLDING 담당 상자 선택·사람/상자/CPA max 결합·근접 진단. `tests/test_warehouse_close.py`가 거리·문 개방·현재 HOLDING gate·config 차이를 검사한다. 실행 설정은 `warehouse_close.yaml`, 전용 wrapper는 `warehouse_close_{train,train_vnc,test,vnc,eval}.sh`다.
 - `tokenhsi/env/tasks/multi_agent/warehouse_done.py`: 학습 전용 선행 완료 시작(`leader_done_probability`)의 샘플링·선행 상자/선행 재배치·모드별 성공 진단. `tests/test_warehouse_fixedroles_v4_leaderdone_wallbox.py`·`tests/check_warehouse_leaderdone.py`에서 CPU 계약과 실제 1024환경 배치를 검사한다.
 - `tokenhsi/env/tasks/multi_agent/warehouse_before.py`: Warehouse BEFORE 2팀 변형(`before_pairs_probability`)의 역할 샘플링·apron 배치(`_place_group`의 `region`)·남는 상자 치우기·변형별 성공 진단. `tests/test_warehouse_fixedroles_v4_beforepairs.py`·`tests/check_warehouse_beforepairs.py`에서 CPU 계약과 실제 1024환경 배치를 검사한다.
 - `tokenhsi/env/tasks/multi_agent/warehouse_layout_cache.py`: 학습 전용 Warehouse 초기 배치 GPU 캐시(`warehouse.layout_cache`). `humanoid_ma_sensor_stage2._reset_ontop_context_envs`에서 warmup·restore·finish를 호출하며 `WAREHOUSE_LAYOUT_CACHE=0`으로 끈다. [명세](reference/stage2_sensor_900.md#warehouse-default-시작배치-캐시-beforepairsleaderdone).
@@ -89,6 +92,10 @@
 
 ## 검증과 문서
 
+- `tokenhsi/qualitative/warehouse_expansion.py`: close 계열 viewer 전용 PUSH2~4명·BEFORE 쌍 수·독립 AT 인원과 창고 폭 확대. 원본 체크포인트 계약을 검증하고 실행 중 배치만 덮어쓴다. `warehouse_viewer.py`가 좌우·탑뷰 인자를 연결하며 `tests/test_warehouse_expansion.py`가 역할 수·크기·좌우·간섭·운반 거리를 검사한다.
+
+`output_etc/check/distill_v4_2k_beforepairs_zeroshot/`는 Distill V4 2k의 beforepairs 제로샷 관찰 산출물이다. `prepare.py`가 센서 출력 0인 관찰용 체크포인트와 환경 snapshot을 만들고 원본 정책과 CPU 출력을 비교한다. 실행 명령은 [USAGE](USAGE.md#beforepairs-환경에서-distill-v4-2k-제로샷-관찰)를 따른다.
+
 `tokenhsi/tests/`는 보상·배치·GTA·mask·RSI·전이·재로드·출력 경로를 검사한다. `before_test_utils.py`, `stage1_test_utils.py`는 CPU fixture다. `check_before_object_alias.py`·`check_before_push.py`·`check_coupled_push.py`는 실제 물리·부분 reset·추론 검사 진입점이다.
 
 `test_coupled_scene_sampling.py`는 비PUSH 사람의 경로 장애물 유지·공동 상자의 전체 크기·distractor 재시도와 ON_TOP 받침 보존을 검사한다.
@@ -118,3 +125,8 @@
 - `tokenhsi/tests/{test_warehouse_coop,test_warehouse_room_geometry,check_warehouse_coop}.py`: CPU 계약·36조합·Room 기하 참조 일치 및 실제 1024환경 reset·센서·화면 검사.
 - `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_sensor_900_warehouse_coop.yaml`, `scripts/multi_agent/stage2_sensor_900_warehouse_coop_{train,train_vnc,test,vnc,eval}.sh`: Safety를 기반으로 한 별도 실행 설정.
 - `tokenhsi/data/cfg/{multi_agent,train/rlg}/stage2_sensor_900_warehouse_coop_cliffroom.yaml`, `scripts/multi_agent/stage2_sensor_900_warehouse_coop_cliffroom_{train,train_vnc,test,vnc,eval}.sh`: coop 기반 Cliff·Room 샘플링 변경 실행 설정. 코드 변경은 실험 이름 등록뿐이다.
+
+- `warehouse_close_random_heading` 환경·학습 YAML과 train/train_vnc/test/vnc/eval wrapper: close의 배치·보상을 유지하며 BEFORE 선행·후행만 매 reset에 360° 회전한다.
+- `warehouse_close_no_wall_cpa`·`warehouse_close_random_heading_no_wall_cpa` 환경·학습 YAML과 train/train_vnc/test/vnc/eval wrapper: 각 원본에서 벽 CPA 계수만 0으로 설정한다. 벽 근접 감점·다른 CPA·접촉 종료는 유지한다.
+- `warehouse_close_wall_box_proximity` 환경·학습 YAML과 train/train_vnc/test/vnc/eval wrapper: 일반 close에서 벽/PUSH 상자 CPA를 끄고 `wall_proximity.push_box`로 비PUSH 사람·운반 상자의 공동밀기 상자 근접 감점을 추가한다. `warehouse_close.py`에서 현재 상자 위치·회전을 사용하며 PUSH 담당자와 PUSH 없는 장면을 제외한다. `tests/test_warehouse_close_wall_box_proximity.py`가 거리·마스킹·최댓값 결합을 검사한다.
+- `tokenhsi/qualitative/warehouse_viewer.py`: random-heading test/VNC의 선택 인자 처리. 탑뷰 카메라와 PUSH2+BEFORE1쌍의 선행 사람·상자 좌우 필터를 추론 프로세스에만 적용한다.

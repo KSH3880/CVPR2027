@@ -102,7 +102,7 @@ class HumanoidMACarry(SceneObservationMixin, ReferenceMotionMixin, SceneResetMix
             if cfg["env"].get("sensorScene") is not None:
                 self.num_physical_objects += num_agents+3
                 if cfg['env']['sensorScene'].get('warehouse',{}).get('cooperative'):
-                    self.num_physical_objects += 3
+                    self.num_physical_objects += len(cfg['env']['sensorScene']['warehouse']['cooperative']['pusher_probabilities'])
         assert (
             self.num_objects >= num_agents
         ), "numObjects ({}) must be >= numAgents ({})".format(

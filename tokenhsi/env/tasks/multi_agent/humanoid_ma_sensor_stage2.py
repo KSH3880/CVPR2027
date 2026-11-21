@@ -21,6 +21,9 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
 
     def __init__(self, cfg, *args, **kwargs):
         env = cfg['env']
+        early_termination = os.environ.get('EARLY_TERMINATION')
+        if early_termination is not None and (early_termination not in ('0', '1') or not cfg['args'].eval):
+            raise ValueError('EARLY_TERMINATION is evaluation-only: 0 or 1')
         self._scene_cfg = env['sensorScene']
         self._wall_collision_scale = 1.
         if 'wall_collision_coefficient' in self._scene_cfg:
@@ -34,6 +37,9 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
         self._scene_names = tuple(self._scene_cfg['mixture'])
         self._warehouse = self._scene_cfg.get('warehouse')
         self._warehouse_coop = self._warehouse.get('cooperative') if self._warehouse else None
+        from utils.warehouse_paths import enabled
+        self._warehouse_straight_paths = enabled(os.environ.get('WAREHOUSE_STRAIGHT_PATHS', '0'),
+                                                cfg['args'].eval, self._warehouse)
         self._warehouse_before_probability = self._warehouse_coop.get('before_pairs_probability', 0.) if self._warehouse_coop else 0.
         # Like the door start distribution, leader-done starts are training-only.
         self._warehouse_done_probability = 0. if cfg['args'].eval or not self._warehouse_coop else \
@@ -62,6 +68,8 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
         self._scene_probabilities_list = probabilities
         self._terrain_ids = None
         super().__init__(cfg, *args, **kwargs)
+        if early_termination is not None:
+            self._enable_early_termination = early_termination == '1'
         self._arena_scale = float(env['observationArenaScale'])
         self._sensor_grid = sensor.sensor_grid(spec['resolution'], spec['range'], self.device)
         self._foot_vertices = sensor.load_foot_vertices(env['asset'], self.device)
@@ -134,6 +142,9 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
         if self._warehouse:
             from env.tasks.multi_agent.warehouse_sensor import allocate
             allocate(self)
+            if self._warehouse.get('wall_proximity'):
+                from env.tasks.multi_agent import warehouse_close
+                warehouse_close.allocate(self)
             if self._warehouse_before_probability:
                 from env.tasks.multi_agent import warehouse_before
                 warehouse_before.allocate(self)
@@ -149,6 +160,10 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
         if cache and not self.cfg['args'].eval and os.environ.get('WAREHOUSE_LAYOUT_CACHE', '1') != '0':
             from env.tasks.multi_agent.warehouse_layout_cache import WarehouseLayoutCache
             self._warehouse_layout_cache = WarehouseLayoutCache(self, cache)
+        self._before_heading_generator = None
+        if self._warehouse and self._warehouse.get('before_heading') == 'uniform':
+            self._before_heading_generator = torch.Generator(device=self.device)
+            self._before_heading_generator.manual_seed(self.cfg['args'].seed + 104729)
 
     def _reset_envs(self, env_ids):
         if len(env_ids):
@@ -172,6 +187,7 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
             spans = counts
             if self._bridge_curriculum:
                 counts, spans = self._sample_bridge_curriculum(env_ids, counts)
+            spans = spans.clamp(max=3)
             self._bridge_count[env_ids] = counts
             self._bridge_slot[env_ids] = self._bridge_bank+spans-1
             if self._warehouse_coop:
@@ -240,7 +256,8 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
             if self._warehouse_coop:
                 from utils.warehouse_coop import sample_roles_graph
                 g,p,t,roles = sample_roles_graph(sizes[rows],env['box']['build']['taskSizeRanges'],
-                    probabilities,self._bridge_count[ids[rows]],pairing)
+                    probabilities,self._bridge_count[ids[rows]],pairing,
+                    independent_at=env.get('warehouseViewer', {}).get('independent_at', 0))
             else:
                 from utils.warehouse_sensor import sample_roles_graph
                 g,p,t,roles = sample_roles_graph(sizes[rows],env['box']['build']['taskSizeRanges'],
@@ -421,6 +438,9 @@ class HumanoidMASensorStage2(SensorStage2Curriculum, SensorStage2Geometry, Senso
         if not self._is_eval:
             templates = self._templates_by_owner[ids].flatten()
             self._size_rsi_executed[:,0] += torch.bincount(templates,minlength=6)
+        if self._before_heading_generator is not None:
+            from env.tasks.multi_agent.warehouse_sensor import randomize_before_heading
+            randomize_before_heading(self, ids)
         self._reset_env_tensors(ids)
         self._refresh_sim_tensors()
         self._reset_relation_history(ids)

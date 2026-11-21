@@ -15,8 +15,9 @@ def add_geometry(task):
         spec = task._warehouse_coop
         half = half.new_tensor(spec['room_size']).expand(n,2)/2
         variant = getattr(task,'_warehouse_geometry_variant',0)
-        width = spec['box_size'][1] if variant < 3 else spec['box_size'][0]*(variant%3+1)
-        opening = opening.new_full((n,),width+(-2*cfg['opening_overlap'] if variant < 3 else spec['frontal_opening_gap']))
+        count = len(spec['pusher_probabilities'])
+        width = spec['box_size'][1] if variant < count else spec['box_size'][0]*(variant%count+1)
+        opening = opening.new_full((n,),width+(-2*cfg['opening_overlap'] if variant < count else spec['frontal_opening_gap']))
     centers, dimensions, starts, ends = walls(half,cfg['wall_thickness'],cfg['wall_height'],opening)
     centers[...,2] += cfg['floor_height']
     bounds = torch.stack((-half[:,0]-cfg['wall_thickness'],half[:,0]+cfg['wall_thickness'],
@@ -72,8 +73,9 @@ def allocate(task):
     task._warehouse_start_worker_episodes = torch.zeros(3,device=task.device)
     if task._warehouse_coop:
         task._warehouse_direction = torch.zeros(task.num_envs,dtype=torch.long,device=task.device)
-        task._warehouse_coop_samples = torch.zeros(36,device=task.device)
-        task._warehouse_coop_outcomes = torch.zeros(36,5,device=task.device)
+        count = 12*len(task._warehouse_coop['pusher_probabilities'])
+        task._warehouse_coop_samples = torch.zeros(count,device=task.device)
+        task._warehouse_coop_outcomes = torch.zeros(count,5,device=task.device)
 
 
 def sample_starts(task, ids):
@@ -88,7 +90,7 @@ def sample_starts(task, ids):
     task._warehouse_start_samples += torch.bincount(mode,minlength=3)
     if task._warehouse_coop:
         key = ((task._bridge_count[ids]-1)*4+task._warehouse_direction[ids])*3+mode
-        task._warehouse_coop_samples += torch.bincount(key,minlength=36)
+        task._warehouse_coop_samples += torch.bincount(key,minlength=len(task._warehouse_coop_samples))
 
 
 def place(task, ids):
@@ -103,7 +105,8 @@ def place(task, ids):
         from utils.warehouse_coop import sample_layout as cooperative_layout
         result = cooperative_layout(templates,predecessor,roles,task._box_size[ids[:,None],primary],
             task._box_size[ids[:,None],support],task._before_near_pairs[ids],task._bridge_count[ids],
-            task._warehouse_direction[ids],task._warehouse_start_mode[ids],cfg,task._scene_cfg['placement_tries'])
+            task._warehouse_direction[ids],task._warehouse_start_mode[ids],cfg,task._scene_cfg['placement_tries'],
+            straight_paths=getattr(task, '_warehouse_straight_paths', False))
         push = templates == 5
         original = (push.long().cumsum(-1)-1).clamp_min(0)
         tangent = torch.stack((result['box_yaw'].cos(),result['box_yaw'].sin()),-1)
@@ -181,6 +184,20 @@ def place(task, ids):
             task.gym.set_rigid_body_color(task.envs[e],handle,0,gymapi.MESH_VISUAL,gymapi.Vec3(.9,.08,.06))
 
 
+def randomize_before_heading(task, ids):
+    from utils.stage2_spec import before_members
+
+    ids = ids[task._scene_ids[ids] == WAREHOUSE]
+    paired = before_members(task._before_predecessor[ids]) & (task._templates[ids] != PUSH)
+    for person in range(task.num_agents):
+        env = ids[paired[:, person]]
+        if not len(env):
+            continue
+        yaw = torch.rand(len(env), device=task.device, generator=task._before_heading_generator) * (2 * torch.pi)
+        xy = task._humanoid_root_states[env, person, :2].clone()
+        task._place_person(env, person, xy, yaw, torch.zeros_like(yaw))
+
+
 def wall_box_cpa(task, ids, root_pos, min_dist):
     """CPA against the five solid wall boxes (static slots 1-5), so outer faces, corners and door jambs count."""
     centers = task._static_centers[ids,WAREHOUSE,1:]
@@ -208,6 +225,9 @@ def collision(task, agents, root_pos, min_dist):
                 task._warehouse['wall_ttc_discount'],task.dt)
             others = task._templates[ids] != PUSH
             agents[ids] = torch.maximum(agents[ids],risk*others*task._push_box_collision_scale)
+        if task._warehouse.get('wall_proximity'):
+            from env.tasks.multi_agent.warehouse_close import combine
+            agents[ids] = combine(task, ids, agents[ids])
     return agents
 
 

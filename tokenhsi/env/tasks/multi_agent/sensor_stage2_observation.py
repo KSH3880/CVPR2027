@@ -176,6 +176,9 @@ class SensorStage2Observation:
 
     def _consume_sampling_diagnostics(self):
         result = super()._consume_sampling_diagnostics()
+        if self._warehouse and self._warehouse.get('wall_proximity'):
+            from env.tasks.multi_agent.warehouse_close import diagnostics
+            diagnostics(self, result)
         if self._bridge_curriculum:
             result.update(self._consume_crossing_curriculum())
         for index, name in enumerate(self._scene_names):

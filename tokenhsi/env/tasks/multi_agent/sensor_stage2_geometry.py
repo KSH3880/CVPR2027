@@ -26,10 +26,11 @@ class SensorStage2Geometry:
         rho[:,m:] = self._joint['box']['density']
         if self._warehouse_coop:
             self._warehouse_bank = self._bridge_bank+3
-            boxes = extra.new_tensor(self._warehouse_coop['box_size']).expand(n,3,3).clone()
-            boxes[:,:,0] *= torch.arange(1,4,device=self.device)
+            counts = len(self._warehouse_coop['pusher_probabilities'])
+            boxes = extra.new_tensor(self._warehouse_coop['box_size']).expand(n,counts,3).clone()
+            boxes[:,:,0] *= torch.arange(1,counts+1,device=self.device)
             extra = torch.cat((extra,boxes),1)
-            rho = torch.cat((rho,rho.new_full((n,3),self._joint['box']['density'])),1)
+            rho = torch.cat((rho,rho.new_full((n,counts),self._joint['box']['density'])),1)
         density = self._box_density.reshape(n,base)
         self._box_size = torch.cat((self._box_size,extra),1)
         self._box_density = torch.cat((density,rho),1).flatten()
@@ -162,7 +163,7 @@ class SensorStage2Geometry:
         for index in range(len(self._scene_names)):
             warehouse = index == WAREHOUSE and self._warehouse_coop
             geometry = self._warehouse_geometry if warehouse else self._bridge_geometry
-            for variant in range(6 if warehouse else 3 if index == BRIDGE else 1):
+            for variant in range(geometry['_static_half'].shape[1] if warehouse else 3 if index == BRIDGE else 1):
                 for slot in range(ROOM_ACTORS):
                     half = geometry['_static_half'][env_id,variant,index,slot]
                     size = tuple((2*half).cpu().tolist())

@@ -18,6 +18,16 @@ def validate_config(cfg, profiles):
             raise ValueError('Invalid warehouse setting: '+name)
     if cfg.get('wall_cpa', 'segment') not in ('segment', 'box'):
         raise ValueError('Warehouse wall_cpa must be segment or box')
+    proximity = cfg.get('wall_proximity')
+    if proximity is not None:
+        for key in ('distance', 'coefficient'):
+            value = proximity.get(key)
+            if type(value) not in (float, int) or not math.isfinite(value) or value <= 0:
+                raise ValueError('Invalid wall_proximity ' + key)
+        if type(proximity.get('payload')) is not bool:
+            raise ValueError('wall_proximity payload must be boolean')
+        if type(proximity.get('push_box', False)) is not bool:
+            raise ValueError('wall_proximity push_box must be boolean')
     for name in ('layout_candidates', 'human_candidates'):
         if type(cfg[name]) is not int or cfg[name] < 1:
             raise ValueError('Warehouse candidate counts must be positive integers')

@@ -34,6 +34,11 @@ def validate_sensor(env):
     weights = list(scene['mixture'].values())
     if any(not math.isfinite(w) or w < 0 for w in weights) or not math.isclose(sum(weights), 1.):
         raise ValueError('Sensor mixture must sum to one')
+    heading = scene.get('warehouse', {}).get('before_heading', 'target')
+    if heading not in ('target', 'uniform'):
+        raise ValueError('Warehouse before_heading must be target or uniform')
+    if heading == 'uniform' and env['stateInit'] != 'Default':
+        raise ValueError('Uniform BEFORE heading requires Default initialization')
     if 'warehouse' in scene:
         from utils.warehouse_sensor import validate_config
         validate_config(scene['warehouse'], env['jointPush']['box']['profiles'])
