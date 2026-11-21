@@ -4,13 +4,14 @@
 
 ## 공통 규칙
 
-- 유지하는 실험은 아래 스물다섯 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- 유지하는 실험은 아래 스물일곱 개다. 설정과 실험별 train/test/VNC 진입점을 함께 관리한다.
+- `sct_coopft`는 GPU6/7만 허용하며 기본6이다.
 - 모든 실행은 기본 conda `tokenhsi`를 사용한다. 실행 전 `nvidia-smi`로 점유를 확인하고 `TOKENHSI_GPU`를 한 번 지정한다. 기존 프로세스는 보존한다.
 - 학습 인자: `[agents] [envs] [objects]`. 기본값은 Stage1·Stage1 PUSH **2명·2048환경·4물체**, BEFORE·coupled **4명·1024환경·8토큰**이다. BEFORE는 인원 N≥1·토큰 M≥2N, coupled는 인원 N≥1·토큰 M≥N을 지정할 수 있다.
 - viewer/진단 인자: `<checkpoint.pth> [agents] [envs] [objects] [repeats]`. 추론과 resume은 checkpoint 옆 `relation_config.yaml`의 env/sim을 읽는다.
 - 본학습은 `output/`, 확인 학습·평가·viewer는 **`output_etc/check/`**에 저장한다. 짧은 학습은 `CHECK=1`을 붙이며 학습 환경 수를 유지한다. 본학습 전 `CHECK`, `MAX_ITERATIONS`, `OUTPUT_PATH`, `RESUME_CHECKPOINT` 잔여값을 해제한다.
 - 기존 BEFORE의 기본 전이 가중치는 `checkpoints/Stage1_00078000.pth`, PUSH 기반 Stage2 설정은 `checkpoints/Stage1PushFinetune_00021000.pth`, `stage2_coupled_push_goal5`·`stage2_coupled_push_individual_goal`·`stage2_coupled_push_individual_goal_solo5`·`stage2_coupled_push_individual_goal_solo5_carry5`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled`·`stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`·`stage2_coupled_push_individual_goal_solo5_keep1`·`stage2_coupled_push_individual_goal_solo5_shrink1`·`stage2_coupled_push_individual_goal_solo5_carry5_ground`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`·`stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`은 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`다. 데이터·checkpoint 연결과 추가 옵션은 [USAGE](USAGE.md)를 따른다.
-- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`은 학습·평가·viewer 모두 **900step**이다.
+- 학습·평가·viewer 기본 제한 시간은 **Stage1 900step, Stage2 1200step**이며 `stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`·`sct_coopft`는 학습·평가·viewer 모두 **900step**이다.
 - 정식 평가의 기존 과제/관계 지표와 추가 interaction group 성공률 정의는 [평가 규약](reference/evaluation.md#통합-stage2의-interaction-group-성공률)을 따른다. Enable 그룹 SR은 같은 스텝의 선행 AT·후행 동시 성공 기준이다.
 - 메인 eval은 Region 성공 trial의 Point Error·Region Error(cm)와 성공 표본 수도 출력한다. Table 2 전용 Time·t_coop·단일 관계 장면 평가는 [eval 안내](../eval/README.md)의 `run_table2.py`를 사용한다.
 - Independent/Mixed 분리·2/4/8/16명·XY100% 보조 평가는 [eval 안내](../eval/README.md)의 scalability 진입점을 사용한다. Stage1 비교는 `--stage1-checkpoint`·`--reference-evaluations`를 추가한다. 이 보조 경로는 Stage1/Full 모두 distractor attention을 보존하며 메인 기본 판정은 변경하지 않는다.
@@ -18,7 +19,7 @@
 - 평가 seed 기본값은 0/1/2이며 `--seeds 3 4 5`처럼 중복 없는 비음수 seed를 지정할 수 있다. 새 프로토콜의 추가 seed는 [보조 실행 안내](../eval/README.md)에 따라 기준 snapshot을 먼저 생성한다.
 - 모든 test의 기본값은 viewer다. 로컬 추론은 `HEADLESS=0`, 화면 없는 진단은 `HEADLESS=1`이다. **정식 평가는 `*_eval.sh`**, 1명 단독 평가는 **Stage1 계열 전용 `stage1_single_eval.sh`·`stage1_push_single_eval.sh`**로 구분한다. 일반 평가는 저장된 학습 인원·물체 수를 유지한다.
 
-- `stage2`·`stage2_distill`·`stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3` 학습은 4명·1024환경·8토큰이 기본이다. N≥4·M≥N을 지원하며 5명 이상은 전용 그룹 스폰 옵션을 사용한다. 두 teacher viewer와 확장 인자는 [USAGE](USAGE.md#두-teacher-제로샷-viewer)를 따른다. 전이는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`를 사용한다.
+- `stage2`·`stage2_distill`·`stage2_900`·`stage2_distill_900`·`stage2_distill_900_v2`·`stage2_distill_900_v3`·`sct_coopft` 학습은 4명·1024환경·8토큰이 기본이다. N≥4·M≥N을 지원하며 5명 이상은 전용 그룹 스폰 옵션을 사용한다. 두 teacher viewer와 확장 인자는 [USAGE](USAGE.md#두-teacher-제로샷-viewer)를 따른다. 전이는 `pth/Stage1JointPushDensity3Cone90Finetune_00026000.pth`를 사용한다.
 
 ## 현재 컨피그
 
@@ -50,6 +51,7 @@
 | [stage2_distill_900.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900.yaml) | [stage2_distill_900.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900.yaml) |
 | [stage2_distill_900_v2.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900_v2.yaml) | [stage2_distill_900_v2.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900_v2.yaml) |
 | [stage2_distill_900_v3.yaml](../tokenhsi/data/cfg/multi_agent/stage2_distill_900_v3.yaml) | [stage2_distill_900_v3.yaml](../tokenhsi/data/cfg/train/rlg/stage2_distill_900_v3.yaml) |
+| [sct_coopft.yaml](../tokenhsi/data/cfg/multi_agent/sct_coopft.yaml) | [sct_coopft.yaml](../tokenhsi/data/cfg/train/rlg/sct_coopft.yaml) |
 
 ## 학습
 
@@ -131,6 +133,9 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v2_train.sh 
 
 # stage2_distill_900_v3
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v3_train.sh 4 1024 8
+
+# sct_coopft
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/sct_coopft_train.sh 4 1024 8
 ```
 
 ## 로컬 추론
@@ -215,6 +220,9 @@ TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v
 
 # stage2_distill_900_v3
 TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v3_test.sh "$CKPT" 4 1 8 10
+
+# sct_coopft
+TOKENHSI_GPU=6 HEADLESS=0 bash tokenhsi/scripts/multi_agent/sct_coopft_test.sh "$CKPT" 4 1 8 10
 ```
 
 ## 서버 VNC 추론
@@ -299,6 +307,12 @@ TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v2_vnc.sh "$
 
 # stage2_distill_900_v3
 TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/stage2_distill_900_v3_vnc.sh "$CKPT" 4 1 8 10
+
+# sct_coopft
+TOKENHSI_GPU=6 bash tokenhsi/scripts/multi_agent/sct_coopft_vnc.sh "$CKPT" 4 1 8 10
+
+# Ours V4 2k · 16H Mixed 공식 평가 장면
+TOKENHSI_GPU=5 PORT=6085 bash eval/mixed16_formal_vnc.sh --seed 7
 ```
 
 ## 추론 옵션
@@ -433,3 +447,21 @@ TOKENHSI_GPU=2 bash tokenhsi/scripts/multi_agent/stage2_coupled_push_individual_
 
 - `stage2`의 `TASK_GRAPH`는 `random_scenario`, `before`, `coupled`, `mixed`, `all_solo`, `all_coupled`, `before_sit`, `before_climb`, `before_stack` 및 기존 단독 과제 preset을 지원한다.
 - SCT 26k + FSM의 Enable/Coupled viewer·Table1/2 평가는 [FSM 실행 안내](../FSM/README.md)를 사용한다. 예: `TOKENHSI_GPU=7 PORT=6081 bash FSM/vnc.sh enable_sit --seed 1`, `TOKENHSI_GPU=7 PORT=6081 bash FSM/vnc.sh coupled_2 --seed 1`, `TOKENHSI_GPU=6 python FSM/eval_run.py --output output_etc/check/sct_fsm_eval_v2_20261109 --gpu 6 --jobs mixed:4`. 같은 GPU의 병렬 평가에는 `--worker a/b`로 상태 파일을 분리하고, 기존 설정의 seed 분리는 `--seed-worker --seeds 3 --worker <이름>`을 사용한다. 학습 컨피그는 추가하지 않는다.
+- Ours V4 2k의16H Mixed·64환경·seed1·반경7.5/8/9/10m 보조 비교는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed16_radius64_gpu5_seed1_20261116/run.sh`를 사용한다. 완료한 rollout은 재사용한다. [범위·결과](../eval/README.md).
+- Ours V4 2k의16H Mixed·반경7.5m·64환경·seed0~8 평가는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed16_r75_env64_seeds0to8_gpu5_20261116/run.sh`를 사용한다. [범위·결과](../eval/README.md).
+- 같은16H Mixed·반경7.5m의512환경·seed0~8 확장은 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed16_r75_env512_seeds0to8_gpu5_20261116/run.sh`를 사용한다. 기존1/6/7을 재사용한다. [범위·결과](../eval/README.md).
+- 같은512환경 설정의 seed9~15 추가 평가는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed16_r75_env512_seeds9to15_gpu5_20261116/run.sh`를 사용한다. [진행·결과](../eval/README.md).
+- Ours V4 2k의4/8/16H Mixed·각512환경·seed1/6/7 관찰용 attention 계측은 사용자 지정 GPU5에서 `bash output_etc/check/enabling_scale_diagnosis_20261116/run_attention.sh`를 사용한다. 정책 forward·물리 설정은 유지한다. [범위·상태](../eval/README.md).
+- Ours V4 2k의12H Mixed·반경7.5m·64환경·24토큰·seed0~4 평가는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed12_r75_env64_seeds0to4_gpu5_20261116/run.sh`를 사용한다. [범위·진행](../eval/README.md).
+- Ours V4 2k의10H Mixed·반경7.5m·64환경·20토큰·seed0~4 평가는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed10_r75_env64_seeds0to4_gpu5_20261116/run.sh`를 사용한다. [범위·진행](../eval/README.md).
+- Ours V4 2k의12H Mixed·반경7.5m·512환경·24토큰·seed0~15 평가는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed12_r75_env512_seeds0to15_gpu5_20261116/run.sh`를 사용한다. [범위·진행](../eval/README.md).
+- 12H 그룹 중심 원 반경의3m 시작·1m 간격 배치 검사는 사용자 지정 GPU5에서 `bash output_etc/check/group_radius12_env512_seeds167_gpu5_20261116/run.sh`를 사용한다. [범위·결과](../eval/README.md).
+- Ours V4 2k의12H Mixed·반경6m·512환경·24토큰·seed0~15 평가는 사용자 지정 GPU5에서 `bash output_etc/check/ours_mixed12_r6_env512_seeds0to15_gpu5_20261116/run.sh`를 사용한다. [범위·결과](../eval/README.md).
+- 같은12H Mixed·6m·512환경의 seed16~20 추가 평가는 GPU5에서 `bash output_etc/check/ours_mixed12_r6_env512_seeds16to20_gpu5_20261116/run.sh`를 사용한다. [범위·결과](../eval/README.md).
+- 같은12H Mixed·6m·512환경의 seed21~25 추가 평가는 GPU5에서 `bash output_etc/check/ours_mixed12_r6_env512_seeds21to25_gpu5_20261116/run.sh`를 사용한다. [범위·결과](../eval/README.md).
+- 같은12H Mixed·6m·512환경의 seed26~30 추가 평가는 GPU5에서 `bash output_etc/check/ours_mixed12_r6_env512_seeds26to30_gpu5_20261116/run.sh`를 사용한다. [범위·결과](../eval/README.md).
+- Table1 추가12H·반경6m·512환경·seeds13/20/25·모든모델의Independent/Mixed 평가는GPU5에서 `bash output_etc/check/table1_12h_r6_seeds13_20_25_allmodels_gpu5_20261116/run.sh`를사용한다. [범위·진행](../eval/README.md).
+- Table4의12H·6m·seeds13/20/25 재학습 ablation3개는GPU5에서 `bash output_etc/check/component_ablation12_r6_seeds13_20_25_gpu5_20261117/run.sh`를사용한다. TaskFusion은제외하며기존manifest가있으면중복실행을거부한다. [범위·진행](../eval/README.md).
+- SCT+FSM의2/4/8/12H Independent/Mixed 동일관측24회재평가는GPU5/6/7에서 `bash output_etc/check/fsm_aligned_24812_env512_gpu567_20261117/run.sh`를사용한다. 기존manifest가있으면중복시작을거부한다. [범위·진행](../eval/README.md).
+- Table3의5모델45회·TeamHOI 힘 조건 추가 평가는GPU5/6/7에서 `bash output_etc/check/table3_force_teamhoi_gpu567_20261117/run.sh`를사용한다. 기존manifest가있으면중복시작을거부한다. [범위·진행](../eval/README.md).
+- Table3 CoopFT7k 정정9회·타모델36회재사용은GPU5/6/7 각90GB 상한으로 `bash output_etc/check/table3_force_coopft7k_gpu567_20261117/run.sh`를사용한다. 기존manifest가있으면중복시작을거부한다. [범위·진행](../eval/README.md).

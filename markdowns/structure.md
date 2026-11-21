@@ -1,16 +1,16 @@
 # 레포 구조
 
-유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_coupled_push_individual_goal_solo5_carry5`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`, `stage2_coupled_push_individual_goal_solo5_keep1`, `stage2_coupled_push_individual_goal_solo5_shrink1`, `stage2_coupled_push_individual_goal_solo5_carry5_ground`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`, `stage2`, `stage2_distill`, `stage2_900`, `stage2_distill_900`, `stage2_distill_900_v2`, `stage2_distill_900_v3`이다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
+유지하는 컨피그는 `stage1`, `stage2_before_nonemask_rsi433_near50`, `stage2_before`, `stage2_before_rsi433`, `stage1_push`, `stage2_before_push`, `stage2_coupled_push`, `stage2_before_push_near50`, `stage2_coupled_push_goal5`, `stage2_coupled_push_individual_goal`, `stage2_before_push_near50_pair50_source5`, `stage2_coupled_push_individual_goal_solo5`, `stage2_coupled_push_individual_goal_solo5_carry5`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled`, `stage2_coupled_push_individual_goal_solo5_countnorm_coupled_none`, `stage2_coupled_push_individual_goal_solo5_keep1`, `stage2_coupled_push_individual_goal_solo5_shrink1`, `stage2_coupled_push_individual_goal_solo5_carry5_ground`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_learnedbg`, `stage2_coupled_push_individual_goal_solo5_carry5_ground_relfusion_zerobg`, `stage2`, `stage2_distill`, `stage2_900`, `stage2_distill_900`, `stage2_distill_900_v2`, `stage2_distill_900_v3`, `sct_coopft`이다. 실행 명령은 [config](config.md), 설치·추가 옵션은 [USAGE](USAGE.md)에 있다.
 
 ## 실행과 설정
 
 | 경로 | 역할 |
 | --- | --- |
 | `tokenhsi/run.py`, `utils/parse_task.py` | MA 학습/평가·Stage1/BEFORE 모델 등록과 환경 생성 |
-| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 스물여섯 실험 계약, 학습/추론/resume env/sim 로딩 |
-| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 스물여섯 개 |
-| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 78개 |
-| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가26개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
+| `tokenhsi/utils/config.py`, `experiments.py` | CLI, 스물일곱 실험 계약, 학습/추론/resume env/sim 로딩 |
+| `tokenhsi/data/cfg/{multi_agent,train/rlg}/` | 환경·학습 YAML 각 스물일곱 개 |
+| `tokenhsi/scripts/multi_agent/*_{train,test,vnc}.sh` | 실험별 학습·viewer·VNC 진입점 81개 |
+| `tokenhsi/scripts/multi_agent/*_eval.sh`, `evaluate.sh` | 일반 정식 평가27개, Stage1/Stage1 PUSH 전용 1명 단독 평가2개·공통 runtime |
 | `tokenhsi/scripts/multi_agent/stage2_teachers_{test,vnc,eval}.sh` | enable/coupled 두 PTH의 관계별 제로샷 viewer·공간 채점, 5명 이상 그룹 배치 |
 | `tokenhsi/evaluate.py`, `rescore.py` | 독립 seed 실행·통계, 저장 trace CPU 재채점 |
 | `tokenhsi/utils/evaluation_errors.py` | 공통 Point/Region Error의 유효 frame 최솟값·성공 필터·공동 그룹 중복 제거·seed 통계 |
@@ -18,6 +18,7 @@
 | `eval/stage2_protocol_eval.py`, `stage2_distractor_physics.py`, `summarize_stage2_protocol.py` | 새 프로토콜 4명·512환경의 초기 snapshot 생성·관측/물리 분리 실행·초기 상태/CPU 재채점 검증·seed별 비교 |
 | `eval/run_stage2_scalability.py`, `stage2_scalability_eval.py`, `stage2_scalability_layout.py`, `stage2_protocol_sampling.py`, `stage2_xy100.py`, `summarize_stage2_scalability.py` | 보조 경로의 Independent/Mixed 2·4·8·16명 평가·그룹별 distractor 배분·XY100% 채점·CPU 검증·기존4H Mixed 재사용 집계 |
 | `eval/stage2_sampling_audit.py` | 선택적 초기 배치 단계별 RNG/상태 비교; 공유 상자 중복 초기화 진단 |
+| `eval/mixed16_formal_vnc.sh`, `mixed16_formal_viewer.py`, `formal_viewer_display.py` | 외부 Ours V4 2k의 공식16H Mixed 평가 경로를 읽기 전용 재사용하는1환경 VNC; headless 물리 actor 유지·1환경 reference 생성/최초 입력 검사 |
 | `eval/stage1_protocol_eval.py`, `stage1_protocol_policy.py`, `stage2_full_observation.py`, `compare_stage1_scalability.py` | 동일 초기 장면에서 Stage1 원본 정책 비교·가상 받침/개인 PUSH 입력 변환·native 행동 검증·Stage1/Full distractor attention 보존·읽기 전용 원본 재사용 비교표 |
 | `eval/run_table2.py`, `table2_eval.py`, `table2_sampling.py` | Table 2 전용 단일 Enable 쌍/공동 PUSH 그룹의 Stage1·Stage2 평가·3명 지원·동일 초기 장면 검증 |
 | `eval/table2_metrics.py`, `rescore_table2.py`, `summarize_table2.py`, `test_table2.py` | Time·t_coop 기록·손 원시 좌표 저장·접촉 거리/시작 변위/손 접근 CPU 재집계·표/seed별 집계·경계/실패/낙상 테스트 |
@@ -31,6 +32,10 @@
 | `tokenhsi/utils/checkpoint_compat.py` | 기존 checkpoint의 이름·RSI 경로를 현재 표기로 변환 |
 | `checkpoints/` | 외부 checkpoint 심링크 |
 | `output/`, `output_etc/check/` | 본학습·공용 캐시, 확인 학습·평가·viewer |
+| `output_etc/check/component_ablation12_r6_seeds13_20_25_gpu5_20261117/` | Table4의12H 재학습 ablation3개 전용entry·GPU5 우선실행·CPU검증/집계. 외부 원본은 읽기 전용이며 TaskFusion은 제외 |
+| `output_etc/check/fsm_aligned_24812_env512_gpu567_20261117/` | SCT+FSM24회+SCT Independent12회 검증·canonical_entry의Ind SCT공통경로/Mixed FSM분기·공식표와별도무개입진단분리·GPU5/6/7 admission·CPU검증 |
+| `output_etc/check/table3_force_teamhoi_gpu567_20261117/` | Table3 5모델45회·팔/손 순접촉력 기록·TeamHOI 공개 조건 CPU 대조·기존/힘 추가 t_coop 동시 집계·GPU5/6/7 admission |
+| `output_etc/check/table3_force_coopft7k_gpu567_20261117/` | Table3 CoopFT7k 정정9회·타모델36회 읽기 전용 재사용·GPU5/6/7 각90GB 상한·힘 조건/기존값 통합표 |
 
 ## 환경
 
@@ -65,6 +70,7 @@
 - `coupled_relation_fusion.py`: ground A/B의 COUPLED 64차원 공유 임베딩·레이어/헤드 bias 투영·output projection 전 residual fusion. SELF/NONE만 A는 lookup 학습, B는 0 고정이다. `test_coupled_relation_fusion.py`에서 계산 동치·단독 생략·인원/셔플·gradient·전이/재로드를 검사한다.
 - `utils/stage2_eval_sizes.py`: general 평가 전용 enable 행동별 크기 교집합·공유 물리 상자/질량 생성·첫 episode 관계/역할 고정. `test_stage2_eval_sizes.py`에서 범위·격자·solo/coupled 보존·native 역할 샘플링을 검사한다.
 - `stage2_distill_agent.py`, `distill_replay.py`, `utils/stage2_distill_spec.py`: 고정 두 teacher의 사람별 평균 행동 모방·scene 단위 teacher/student 실행 전환·누적 replay·actor coordination/action head 업데이트·체크포인트/optimizer/replay 복원. [distillation 명세](reference/stage2_distill.md).
+- `sct_coopft_network.py`, `mean_cooperation.py`: `stage2_900`과 같은 SCT 전처리·PPO+AMP를 사용하는 4-block·64차원 평균 집계 MLP baseline. [설계·학습 계약](reference/sct_coopft.md), `test_sct_coopft.py`는 집계·관계 방향·인원/셔플·전이·gradient·재로드를 검사한다.
 - `viewer_diagnostics.py`: viewer 전용 native 보상 성공 진단, 정식 평가와 별도.
 - `ma_agent.py`, `ma_players.py`, `scene_normalizer.py`: 장면 단위 PPO/AMP·저장/복원·평가·정규화.
 - `tokenhsi/utils/{edge_*,task_role_spec,before_spec}.py`: 그래프·역할·packet·checkpoint 계약.

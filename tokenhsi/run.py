@@ -165,6 +165,8 @@ def build_alg_runner(algo_observer):
 
     from learning.multi_agent.stage2_push_network import Stage2PushBuilder
     runner.model_builder.network_factory.register_builder('amp_multi_agent_stage2_push', lambda **kwargs: Stage2PushBuilder())
+    from learning.multi_agent.sct_coopft_network import SCTCoopFTBuilder
+    runner.model_builder.network_factory.register_builder('amp_multi_agent_sct_coopft', lambda **kwargs: SCTCoopFTBuilder())
     from learning.multi_agent.stage1_push_network import Stage1PushBuilder
     runner.model_builder.network_factory.register_builder('amp_multi_agent_push', lambda **kwargs: Stage1PushBuilder())
     return runner

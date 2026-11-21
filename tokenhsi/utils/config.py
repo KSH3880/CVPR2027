@@ -77,6 +77,13 @@ def load_cfg(args):
     from pathlib import Path
     from utils.experiments import load_environment, validate_experiment, NAMES, STAGE2_NAMES
     name = Path(args.cfg_train).stem
+    if name == 'sct_coopft':
+        import subprocess
+        gpu = os.environ.get('TOKENHSI_GPU', os.environ.get('CUDA_VISIBLE_DEVICES', ''))
+        index = subprocess.check_output(['nvidia-smi', '-i', gpu, '--query-gpu=index',
+                                         '--format=csv,noheader,nounits'], text=True).strip() if gpu else ''
+        if index not in ('6', '7') or os.environ.get('CUDA_VISIBLE_DEVICES') != gpu:
+            raise ValueError('sct_coopft requires GPU6/7; set TOKENHSI_GPU and source runtime_env.sh')
     if name not in NAMES:
         raise ValueError('Unsupported experiment: ' + name)
     with open(args.cfg_train) as stream:

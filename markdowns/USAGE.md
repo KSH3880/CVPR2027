@@ -45,6 +45,8 @@ BEFORE checkpoint는 해당 실험 학습으로 생성한다. fixed 추론에는
 
 로컬 viewer는 화면 세션이 필요하다. VNC는 Xvfb·x11vnc·noVNC·websockify가 필요하며 `PORT`, `RESOLUTION`, `VNC_DIR`, `X11VNC`, `NOVNC_DIR`, `WEBSOCKIFY`로 위치·화면을 지정한다. GUI 로그는 `output_etc/check/gui/`다. 종료 시 이번 wrapper가 띄운 VNC 서비스만 종료한다.
 
+Ours V4 2k의 공식 평가 규칙을 적용한16H Mixed 장면은 [전용 VNC](../eval/README.md#공식16h-mixed-vnc)를 사용한다. `TOKENHSI_GPU=5 PORT=6085 bash eval/mixed16_formal_vnc.sh --seed 7`로1환경만 본다. GPU5/6/7과0 이상의 임의 seed를 허용하며 기본GPU6·seed1이다. Space로 시작/일시정지, F로 카메라 자동 추적, Esc로 종료한다. 실행당900step 뒤 마지막 화면을 유지한다. 기존512환경의 특정 장면 재현은 아니며, GPU 실행 검증은 아직 하지 않았다.
+
 일반 test/VNC에 `DESIGN=1`(직접 실행 `--design`)을 붙이면 다음 변경을 함께 적용한다. 생략 또는 `DESIGN=0`은 기존 화면·물리 동작이다.
 
 - Distractor를 화면·충돌 영역 밖으로 옮긴다. 작업 물체·받침·공유 alias는 보존하고, distractor의 관측 pose·속도·형상·토큰은 초기 샘플 상태를 유지한다.
@@ -407,3 +409,23 @@ TOKENHSI_GPU=5 bash tokenhsi/scripts/multi_agent/stage2_eval.sh "$CKPT" --agents
 ```
 
 본학습 전 `CHECK`·`MAX_ITERATIONS`·`RESUME_CHECKPOINT`·`OUTPUT_PATH` 잔여 설정을 해제한다. `stage2_distill` wrapper는 GPU5/6만 허용하며 생략 시6이다. `--coupled_assignment random|ordered|distance|optimal`로 eval 배정 방식을 지정할 수 있고 기본은 ordered다. `--agents`/`--objects`는 통합 `stage2`·`stage2_distill` eval에서만 받으며 N>4는 `--group_spawn_over4`가 필요하다. 평가 seed 기본0/1/2·환경 수512·1200step이며 인원/물체 수를 바꾼 결과는 기본 학습 분포 평가와 구분한다.
+
+
+## SCT + Coop. FT
+
+`sct_coopft`는 `stage2_900`의 일반 PPO+AMP 학습을 사용하고 DCT를 평균 집계 MLP로 교체한다. Teacher·행동 증류는 사용하지 않는다. [모델·동결·집계 명세](reference/sct_coopft.md), train/로컬 viewer/VNC 기본 명령은 [config](config.md)를 따른다. GPU6/7만 허용하며 기본6이다. Stage1 전이는 기존26k이고 학습률2e-5·최대1,000,000epoch 등 학습 조건은 `stage2_900`과 같다. 체크포인트는 `output/sct_coopft/SCTCoopFT_*/nn/`에 저장한다.
+
+```bash
+# sct_coopft: 1024환경·1iteration 확인 학습
+TOKENHSI_GPU=6 CHECK=1 OUTPUT_PATH=output_etc/check/sct_coopft_check bash tokenhsi/scripts/multi_agent/sct_coopft_train.sh 4 1024 8
+
+# sct_coopft: PPO checkpoint로 이어학습
+TOKENHSI_GPU=7 RESUME_CHECKPOINT="$CKPT" bash tokenhsi/scripts/multi_agent/sct_coopft_train.sh 4 1024 8
+
+# sct_coopft: 단일 checkpoint 공간 평가
+TOKENHSI_GPU=7 bash tokenhsi/scripts/multi_agent/sct_coopft_eval.sh "$CKPT" --output output_etc/check/sct_coopft_eval
+```
+
+본학습 전 `CHECK`·`MAX_ITERATIONS`·`RESUME_CHECKPOINT`·`OUTPUT_PATH` 잔여값을 해제한다. 직접 `run.py`를 실행할 때도 `TOKENHSI_GPU=6` 또는7을 지정하고 `runtime_env.sh`를 먼저 source해 같은 GPU를 전달한다.
+
+기존 증류 run `SCTCoopFT_10-21-59-40`은 PPO 실험 결과로 사용하지 않는다. 해당 checkpoint의 학습 resume은 차단한다.

@@ -31,12 +31,13 @@ STAGE2_900 = 'stage2_900'
 DISTILL_900 = 'stage2_distill_900'
 DISTILL_900_V2 = 'stage2_distill_900_v2'
 DISTILL_900_V3 = 'stage2_distill_900_v3'
-STAGE2_NAMES = (STAGE2, DISTILL, STAGE2_900, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3)
-NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B, STAGE2, DISTILL, STAGE2_900, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3)
+COOPFT = 'sct_coopft'
+STAGE2_NAMES = (STAGE2, DISTILL, STAGE2_900, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3, COOPFT)
+NAMES = (FIXED, NEAR, MIX, MIX_RSI, PUSH, BEFORE_PUSH, COUPLED, BEFORE_PUSH_NEAR50, COUPLED_GOAL5, COUPLED_INDIVIDUAL, BEFORE_PUSH_SOURCE5, COUPLED_INDIVIDUAL_SOLO5, COUPLED_INDIVIDUAL_CARRY5, COUPLED_COUNTNORM, COUPLED_COUNTNORM_NONE, COUPLED_KEEP1, COUPLED_SHRINK1, COUPLED_CARRY5_GROUND, COUPLED_RELFUSION_A, COUPLED_RELFUSION_B, STAGE2, DISTILL, STAGE2_900, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3, COOPFT)
 
 
 def experiment_horizon(name):
-    if name in (STAGE2_900, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3):
+    if name in (STAGE2_900, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3, COOPFT):
         return 900
     return 1200 if name == STAGE2 or name.startswith("stage2_") else 900
 BEFORE_NAMES = (NEAR, MIX, MIX_RSI)
@@ -121,6 +122,8 @@ def validate_experiment(name, env, train, evaluation=False):
         if not evaluation and env['episodeLength'] != experiment_horizon(name):
             raise ValueError(f'{name} training requires {experiment_horizon(name)} steps')
         params['config']['minibatch_size'] = params['config'].get('scene_minibatch_size', 4096)*env['numAgents']
+        if name == COOPFT and (params['algo']['name'] != 'ma' or 'distillation' in params['config']):
+            raise ValueError('sct_coopft requires ordinary PPO+AMP training without distillation')
         if name in (DISTILL, DISTILL_900, DISTILL_900_V2, DISTILL_900_V3):
             from utils.stage2_distill_spec import validate_config
             validate_config(params)

@@ -165,6 +165,9 @@ class MAAgent(amp_agent.AMPAgent):
 
     def set_weights(self, weights):
         task = self.vec_env.env.task
+        if (task.cfg.get('experiment', {}).get('name') == 'sct_coopft'
+                and 'distillation_contract' in weights):
+            raise ValueError('sct_coopft PPO training cannot resume a distillation checkpoint')
         if task.cfg['env'].get('jointPush') is not None and not getattr(task, '_before', False) and not getattr(task, '_coupled', False):
             from utils.stage1_jointpush import contract
             if weights.get('stage1_jointpush_contract') != contract(task.cfg['env']):
