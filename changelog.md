@@ -4,6 +4,13 @@
 
 ## 2026-11-15
 
+### 새 at1mm15/20/25/28k — 사용자 지정64환경 빠른 비교
+
+- GPU6에서 저장본4개를 순차 평가했다. 사용자 지정64환경×seed0×1회×900step,공통 교집합·합일치·near50 해제·대소제약 없음·distractor 물리만 제외/관측 유지. 기존512×3seed 추세에 합치지 않았다.
+- 전체 XY80/XY100/동일쌍 선행AT(%): 15k67.69/69.23/96.92,20k75.38/75.38/96.92,25k81.54/83.08/100,28k80.00/83.08/98.46. XY80후행/같은행동AT:SIT75/100→83.33/100→83.33/100→91.67/100;CLIMB50/91.67→66.67/91.67→75/100→66.67/91.67;ON_TOP70.73/97.56→75.61/97.56→82.93/100→80.49/100.
+- 동일 초기장면65쌍(SIT12·CLIMB12·ON_TOP41),CPU/GPU/JSON·크기/거리·원본PTH·운영401파일 보존 검증 통과. 기존GPU6학습PID120726 생존 확인. 동일64trace 정지도 집계했으나SIT정지0건·CLIMB1건씩으로 거리 추세 판단에 부적합. 집계기의 정지0건 빈 중앙값 출력 오류를 해당검사폴더 스크립트에서 처리했다. 학습/평가 운영코드 변경 없음.
+- 이번표본의XY80최고는25k이나1seed소표본이므로기존512평가 최고리슘34k와직접순위비교하지않는다. [결과](output_etc/check/scratch64_15_20_25_28_eval_20261115/report.txt),[지표](output_etc/check/scratch64_15_20_25_28_eval_20261115/trends.csv),[정지](output_etc/check/scratch64_15_20_25_28_eval_20261115/stops.csv),[검증](output_etc/check/scratch64_15_20_25_28_eval_20261115/verification.json).
+
 ### stage2_before_total_at1mm_nobias — BEFORE attention bias 어블레이션
 
 - 기존 total_at1mm의 환경·학습 설정을 복사하고 `human_relation_fusion: before_zerobg_nobias`로 분리했다. actor/critic 사람 attention의 bias projection 파라미터·bias 계산을 생략하고 `attn_mask=None`을 전달한다. BEFORE embedding/후행 잔차 MLP fusion·Stage1 task bias·보상·샘플링은 유지한다.
